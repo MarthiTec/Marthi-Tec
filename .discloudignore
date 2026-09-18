@@ -8,5 +8,13 @@ node_modules/
 *.log
 .tmp-evolution-qr.png
 apps/*/node_modules/
+apps/api/package-lock.json
+apps/api/dist/
+apps/web/dist/
+dist/
+packages/
 docs/
 agent-transcripts/
+marthi-platform-site.zip
+*.zip
+.tmp-zip-check/
