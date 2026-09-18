@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
+import { TotemKeyboard } from './TotemKeyboard';
 import {
   FULFILLMENT_OPTIONS,
   INSTALLMENTS,
@@ -15,7 +16,18 @@ import {
 } from './totemData';
 import './totem.css';
 
-type Step = 'welcome' | 'catalog' | 'configure' | 'checkout' | 'done';
+const EXIT_PASSWORD =
+  import.meta.env.VITE_TOTEM_EXIT_PASSWORD?.trim() || 'cellponto';
+const FILTER_IDLE_MS = 2 * 60 * 1000;
+
+type Step = 'catalog' | 'checkout' | 'done';
+type BrandFilter = TotemBrand | 'all';
+
+type CardConfig = {
+  storage: string;
+  color: string;
+  fulfillment: string;
+};
 
 type Selection = {
   product: TotemProduct;
@@ -26,48 +38,192 @@ type Selection = {
   installment: string;
 };
 
+function defaultConfig(product: TotemProduct): CardConfig {
+  return {
+    storage: product.storages[0],
+    color: product.colors[0],
+    fulfillment: FULFILLMENT_OPTIONS[0],
+  };
+}
+
+function uniqueSorted(values: string[]) {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
 export function TotemPage() {
-  const [step, setStep] = useState<Step>('welcome');
-  const [brand, setBrand] = useState<TotemBrand | 'all'>('all');
+  const navigate = useNavigate();
+  const listRef = useRef<HTMLDivElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
+  const [step, setStep] = useState<Step>('catalog');
+  const [brand, setBrand] = useState<BrandFilter>('all');
   const [search, setSearch] = useState('');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [filterColor, setFilterColor] = useState('all');
+  const [filterStorage, setFilterStorage] = useState('all');
+  const [filterFulfillment, setFilterFulfillment] = useState('all');
+  const [openFilter, setOpenFilter] = useState<'color' | 'storage' | 'fulfillment' | null>(null);
+  const [configs, setConfigs] = useState<Record<number, CardConfig>>({});
   const [selection, setSelection] = useState<Selection | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [idleTick, setIdleTick] = useState(0);
+
+  const [exitOpen, setExitOpen] = useState(false);
+  const [exitPassword, setExitPassword] = useState('');
+  const [exitError, setExitError] = useState<string | null>(null);
+
+  const hasActiveQuery =
+    search.trim() !== '' ||
+    filterColor !== 'all' ||
+    filterStorage !== 'all' ||
+    filterFulfillment !== 'all' ||
+    brand !== 'all';
+
+  function bumpIdle() {
+    setIdleTick((current) => current + 1);
+  }
+
+  function clearCatalogFilters() {
+    setSearch('');
+    setBrand('all');
+    setFilterColor('all');
+    setFilterStorage('all');
+    setFilterFulfillment('all');
+    setOpenFilter(null);
+    setKeyboardOpen(false);
+  }
+
+  const brandProducts = useMemo(() => {
+    return TOTEM_PRODUCTS.filter((item) => brand === 'all' || item.brand === brand);
+  }, [brand]);
+
+  const colorOptions = useMemo(
+    () => uniqueSorted(brandProducts.flatMap((item) => item.colors)),
+    [brandProducts],
+  );
+  const storageOptions = useMemo(
+    () => uniqueSorted(brandProducts.flatMap((item) => item.storages)),
+    [brandProducts],
+  );
 
   const products = useMemo(() => {
-    return TOTEM_PRODUCTS.filter((item) => {
-      const brandOk = brand === 'all' || item.brand === brand;
-      const searchOk =
-        search.trim() === '' ||
-        item.name.toLowerCase().includes(search.trim().toLowerCase());
-      return brandOk && searchOk;
+    const query = search.trim().toLowerCase();
+    return brandProducts.filter((item) => {
+      const searchOk = query === '' || item.name.toLowerCase().includes(query);
+      const colorOk = filterColor === 'all' || item.colors.includes(filterColor);
+      const storageOk = filterStorage === 'all' || item.storages.includes(filterStorage);
+      const fulfillmentOk = filterFulfillment === 'all';
+      return searchOk && colorOk && storageOk && fulfillmentOk;
     });
-  }, [brand, search]);
+  }, [brandProducts, search, filterColor, filterStorage, filterFulfillment]);
 
-  function openProduct(product: TotemProduct) {
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, [brand, search, filterColor, filterStorage, filterFulfillment]);
+
+  useEffect(() => {
+    setFilterColor('all');
+    setFilterStorage('all');
+  }, [brand]);
+
+  useEffect(() => {
+    if (step !== 'catalog' || !hasActiveQuery) return;
+    const timer = window.setTimeout(() => {
+      clearCatalogFilters();
+    }, FILTER_IDLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [step, hasActiveQuery, idleTick, search, brand, filterColor, filterStorage, filterFulfillment]);
+
+  useEffect(() => {
+    if (!keyboardOpen && !openFilter) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (searchPanelRef.current?.contains(target)) return;
+      setKeyboardOpen(false);
+      setOpenFilter(null);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [keyboardOpen, openFilter]);
+
+  function getConfig(product: TotemProduct): CardConfig {
+    const base = configs[product.id] ?? defaultConfig(product);
+    return {
+      ...base,
+      color: filterColor !== 'all' && product.colors.includes(filterColor) ? filterColor : base.color,
+      storage:
+        filterStorage !== 'all' && product.storages.includes(filterStorage)
+          ? filterStorage
+          : base.storage,
+      fulfillment:
+        filterFulfillment !== 'all' ? filterFulfillment : base.fulfillment,
+    };
+  }
+
+  function patchConfig(productId: number, patch: Partial<CardConfig>) {
+    setConfigs((current) => {
+      const product = TOTEM_PRODUCTS.find((item) => item.id === productId);
+      const base = current[productId] ?? (product ? defaultConfig(product) : null);
+      if (!base) return current;
+      return { ...current, [productId]: { ...base, ...patch } };
+    });
+  }
+
+  function openCheckout(product: TotemProduct) {
+    const config = getConfig(product);
     setSelection({
       product,
-      storage: product.storages[0],
-      color: product.colors[0],
-      fulfillment: FULFILLMENT_OPTIONS[0],
+      storage: config.storage,
+      color: config.color,
+      fulfillment: config.fulfillment,
       payment: PAYMENT_OPTIONS[0],
       installment: INSTALLMENTS[0],
     });
     setError(null);
-    setStep('configure');
+    setKeyboardOpen(false);
+    setOpenFilter(null);
+    setStep('checkout');
   }
 
   function resetTotem() {
-    setStep('welcome');
-    setBrand('all');
-    setSearch('');
+    setStep('catalog');
+    clearCatalogFilters();
     setSelection(null);
     setName('');
     setPhone('');
     setError(null);
     setSubmitting(false);
+  }
+
+  function requestExit() {
+    setExitPassword('');
+    setExitError(null);
+    setExitOpen(true);
+  }
+
+  function confirmExit(event: FormEvent) {
+    event.preventDefault();
+    if (exitPassword.trim() !== EXIT_PASSWORD) {
+      setExitError('Senha incorreta. Só a loja pode fechar o totem.');
+      return;
+    }
+    setExitOpen(false);
+    navigate('/');
+  }
+
+  function appendSearch(char: string) {
+    bumpIdle();
+    setSearch((current) => `${current}${char}`.slice(0, 40));
+  }
+
+  function backspaceSearch() {
+    bumpIdle();
+    setSearch((current) => current.slice(0, -1));
   }
 
   async function handleWhatsAppSubmit() {
@@ -106,147 +262,248 @@ export function TotemPage() {
         <BrandLogo variant="mark" className="totem__mark" />
         <div className="totem__top-meta">
           <strong>Cell Ponto</strong>
-          <span>Totem Marthi · WhatsApp via Evolution</span>
+          <span>Totem Marthi · Shopping</span>
         </div>
-        <Link to="/" className="totem__exit">
+        <button type="button" className="totem__exit" onClick={requestExit}>
           Sair
-        </Link>
+        </button>
       </header>
 
-      {step === 'welcome' && (
-        <section className="totem__welcome">
-          <BrandLogo variant="hero" className="totem__welcome-logo" />
-          <h1>Bem-vindo</h1>
-          <p>Escolha seu aparelho em poucos toques. Sem fila, sem complicação.</p>
-          <button type="button" className="totem-btn totem-btn--primary" onClick={() => setStep('catalog')}>
-            Começar
-          </button>
-        </section>
-      )}
-
       {step === 'catalog' && (
-        <section className="totem__catalog">
-          <div className="totem__toolbar">
-            <input
-              className="totem__search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar modelo…"
-            />
-            <div className="totem__brands">
-              {TOTEM_BRANDS.map((item) => (
+        <section className="totem__floor totem__floor--topnav">
+          <div className="totem__stage">
+            <div className="totem__search-panel" ref={searchPanelRef}>
+              <div className="totem__toolbar totem__toolbar--quiet">
+                <div className="totem__brands" role="tablist" aria-label="Marcas">
+                  {TOTEM_BRANDS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={brand === item.id}
+                      className={`totem-chip ${brand === item.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        bumpIdle();
+                        setBrand(item.id);
+                        setKeyboardOpen(false);
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
                 <button
-                  key={item.id}
                   type="button"
-                  className={`totem-chip ${brand === item.id ? 'is-active' : ''}`}
-                  onClick={() => setBrand(item.id)}
+                  className={`totem__search-trigger ${search || keyboardOpen ? 'is-active' : ''}`}
+                  onClick={() => {
+                    bumpIdle();
+                    setOpenFilter(null);
+                    setKeyboardOpen(true);
+                  }}
                 >
-                  {item.label}
+                  {search || 'Buscar modelo'}
                 </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="totem__grid">
-            {products.map((product) => (
-              <button
-                key={product.id}
-                type="button"
-                className="totem-card"
-                onClick={() => openProduct(product)}
-              >
-                <ProductCarousel
-                  images={product.images}
-                  alt={product.name}
-                  size="card"
-                  className={`brand-${product.brand}`}
-                />
-                <div className="totem-card__body">
-                  <h2>{product.name}</h2>
-                  <p className="totem-card__price">{formatBRL(product.cashPrice)}</p>
-                  <p className="totem-card__parc">{product.installmentLabel}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {step === 'configure' && selection && (
-        <section className="totem__configure">
-          <button type="button" className="totem-link" onClick={() => setStep('catalog')}>
-            ← Voltar
-          </button>
-
-          <div className="totem__configure-layout">
-            <ProductCarousel
-              images={selection.product.images}
-              alt={selection.product.name}
-              size="hero"
-              autoPlayMs={5000}
-              className={`brand-${selection.product.brand}`}
-            />
-
-            <div className="totem__configure-panel">
-              <h1>{selection.product.name}</h1>
-
-              <label className="totem-field">
-                Capacidade
-                <select
-                  value={selection.storage}
-                  onChange={(e) => setSelection({ ...selection, storage: e.target.value })}
-                >
-                  {selection.product.storages.map((item) => (
-                    <option key={item}>{item}</option>
+                <div className="totem__filters totem__filters--quiet">
+                  {(
+                    [
+                      {
+                        id: 'color' as const,
+                        label: 'Cor',
+                        value: filterColor,
+                        options: colorOptions,
+                        onChange: setFilterColor,
+                      },
+                      {
+                        id: 'storage' as const,
+                        label: 'Capacidade',
+                        value: filterStorage,
+                        options: storageOptions,
+                        onChange: setFilterStorage,
+                      },
+                      {
+                        id: 'fulfillment' as const,
+                        label: 'Retirada',
+                        value: filterFulfillment,
+                        options: [...FULFILLMENT_OPTIONS],
+                        onChange: setFilterFulfillment,
+                      },
+                    ] as const
+                  ).map((filter) => (
+                    <div key={filter.id} className="totem-filter">
+                      <button
+                        type="button"
+                        className={`totem-filter__label ${filter.value !== 'all' ? 'is-set' : ''} ${openFilter === filter.id ? 'is-open' : ''}`}
+                        onClick={() => {
+                          bumpIdle();
+                          setKeyboardOpen(false);
+                          setOpenFilter((current) => (current === filter.id ? null : filter.id));
+                        }}
+                      >
+                        {filter.label}
+                        {filter.value !== 'all' ? `: ${filter.value}` : ''}
+                      </button>
+                      {openFilter === filter.id && (
+                        <div className="totem-filter__menu" role="listbox" aria-label={filter.label}>
+                          <button
+                            type="button"
+                            className={filter.value === 'all' ? 'is-active' : ''}
+                            onClick={() => {
+                              bumpIdle();
+                              filter.onChange('all');
+                              setOpenFilter(null);
+                            }}
+                          >
+                            Todas
+                          </button>
+                          {filter.options.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              className={filter.value === option ? 'is-active' : ''}
+                              onClick={() => {
+                                bumpIdle();
+                                filter.onChange(option);
+                                setOpenFilter(null);
+                              }}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </select>
-              </label>
-
-              <label className="totem-field">
-                Cor
-                <select
-                  value={selection.color}
-                  onChange={(e) => setSelection({ ...selection, color: e.target.value })}
-                >
-                  {selection.product.colors.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="totem-field">
-                Retirada
-                <select
-                  value={selection.fulfillment}
-                  onChange={(e) => setSelection({ ...selection, fulfillment: e.target.value })}
-                >
-                  {FULFILLMENT_OPTIONS.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="totem__prices">
-                <div>
-                  <span>À vista</span>
-                  <strong>{formatBRL(selection.product.cashPrice)}</strong>
-                </div>
-                <div>
-                  <span>Parcelado</span>
-                  <strong>{selection.product.installmentLabel}</strong>
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="totem-btn totem-btn--primary totem-btn--block"
-                onClick={() => {
-                  setError(null);
-                  setStep('checkout');
-                }}
-              >
-                Próximo
-              </button>
+              {keyboardOpen && (
+                <div className="totem__search-dock">
+                  <div className="totem__search-query" aria-live="polite">
+                    <span>Buscando</span>
+                    <strong>{search || '…'}</strong>
+                    {search && (
+                      <button
+                        type="button"
+                        className="totem__search-clear"
+                        onClick={() => {
+                          bumpIdle();
+                          setSearch('');
+                        }}
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <TotemKeyboard
+                    onKey={appendSearch}
+                    onBackspace={backspaceSearch}
+                    onSpace={() => appendSearch(' ')}
+                    onClear={() => {
+                      bumpIdle();
+                      setSearch('');
+                    }}
+                    onClose={() => setKeyboardOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="totem__scroll" ref={listRef}>
+              {products.map((product) => {
+                const config = getConfig(product);
+                return (
+                  <article
+                    key={product.id}
+                    className="totem-card"
+                    onPointerDown={bumpIdle}
+                  >
+                    <div className="totem-card__media">
+                      <ProductCarousel
+                        images={product.images}
+                        alt={product.name}
+                        size="card"
+                        className={`brand-${product.brand}`}
+                      />
+                    </div>
+
+                    <div className="totem-card__body">
+                      <h2>{product.name}</h2>
+
+                      <div className="totem-card__fields">
+                        <label>
+                          <span>Cor</span>
+                          <select
+                            value={config.color}
+                            onChange={(e) => {
+                              bumpIdle();
+                              patchConfig(product.id, { color: e.target.value });
+                            }}
+                          >
+                            {product.colors.map((color) => (
+                              <option key={color} value={color}>
+                                {color}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Capacidade</span>
+                          <select
+                            value={config.storage}
+                            onChange={(e) => {
+                              bumpIdle();
+                              patchConfig(product.id, { storage: e.target.value });
+                            }}
+                          >
+                            {product.storages.map((storage) => (
+                              <option key={storage} value={storage}>
+                                {storage}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Retirada</span>
+                          <select
+                            value={config.fulfillment}
+                            onChange={(e) => {
+                              bumpIdle();
+                              patchConfig(product.id, { fulfillment: e.target.value });
+                            }}
+                          >
+                            {FULFILLMENT_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="totem-card__footer">
+                        <div className="totem-card__price">
+                          <span>À Vista</span>
+                          <strong>{formatBRL(product.cashPrice)}</strong>
+                          <small>{product.installmentLabel}</small>
+                        </div>
+                        <button
+                          type="button"
+                          className="totem-btn totem-btn--primary"
+                          onClick={() => openCheckout(product)}
+                        >
+                          Próximo
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {products.length === 0 && (
+                <p className="totem__empty">Nenhum produto encontrado com esses filtros.</p>
+              )}
             </div>
           </div>
         </section>
@@ -257,98 +514,114 @@ export function TotemPage() {
           <button
             type="button"
             className="totem-link"
-            onClick={() => setStep('configure')}
+            onClick={() => setStep('catalog')}
             disabled={submitting}
           >
-            ← Voltar
+            ← Voltar ao catálogo
           </button>
 
-          <h1>{selection.product.name}</h1>
-          <div className="totem__summary">
-            <p>
-              <span>Cor</span>
-              <strong>{selection.color}</strong>
-            </p>
-            <p>
-              <span>Capacidade</span>
-              <strong>{selection.storage}</strong>
-            </p>
-            <p>
-              <span>Retirada</span>
-              <strong>{selection.fulfillment}</strong>
-            </p>
-          </div>
-
-          {error && <p className="totem__error">{error}</p>}
-
-          <label className="totem-field">
-            Digite seu nome e sobrenome
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
-              disabled={submitting}
+          <div className="totem__checkout-card">
+            <ProductCarousel
+              images={selection.product.images}
+              alt={selection.product.name}
+              size="hero"
+              autoPlayMs={5000}
+              className={`brand-${selection.product.brand}`}
             />
-          </label>
 
-          <label className="totem-field">
-            Digite seu telefone com DDD
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(24) 99999-9999"
-              inputMode="tel"
-              disabled={submitting}
-            />
-          </label>
+            <div className="totem__checkout-form">
+              <h1>{selection.product.name}</h1>
+              <div className="totem__summary">
+                <p>
+                  <span>Cor</span>
+                  <strong>{selection.color}</strong>
+                </p>
+                <p>
+                  <span>Capacidade</span>
+                  <strong>{selection.storage}</strong>
+                </p>
+                <p>
+                  <span>Retirada</span>
+                  <strong>{selection.fulfillment}</strong>
+                </p>
+              </div>
 
-          <label className="totem-field">
-            Modo de pagamento
-            <select
-              value={selection.payment}
-              onChange={(e) => setSelection({ ...selection, payment: e.target.value })}
-              disabled={submitting}
-            >
-              {PAYMENT_OPTIONS.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
+              {error && (
+                <p className="totem__error" role="alert">
+                  {error}
+                </p>
+              )}
 
-          {selection.payment === 'Parcelado' && (
-            <label className="totem-field">
-              Parcelas
-              <select
-                value={selection.installment}
-                onChange={(e) => setSelection({ ...selection, installment: e.target.value })}
-                disabled={submitting}
+              <label className="totem-field">
+                Digite seu nome e sobrenome
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  disabled={submitting}
+                />
+              </label>
+
+              <label className="totem-field">
+                Digite seu telefone com DDD
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(24) 99999-9999"
+                  inputMode="tel"
+                  disabled={submitting}
+                />
+              </label>
+
+              <label className="totem-field">
+                Modo de pagamento
+                <select
+                  value={selection.payment}
+                  onChange={(e) => setSelection({ ...selection, payment: e.target.value })}
+                  disabled={submitting}
+                >
+                  {PAYMENT_OPTIONS.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+
+              {selection.payment === 'Parcelado' && (
+                <label className="totem-field">
+                  Parcelas
+                  <select
+                    value={selection.installment}
+                    onChange={(e) => setSelection({ ...selection, installment: e.target.value })}
+                    disabled={submitting}
+                  >
+                    {INSTALLMENTS.map((item) => (
+                      <option key={item}>{item}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="totem__prices">
+                <div>
+                  <span>Valor definido</span>
+                  <strong>
+                    {selection.payment === 'À vista'
+                      ? formatBRL(selection.product.cashPrice)
+                      : `${selection.installment} · ${selection.product.installmentLabel}`}
+                  </strong>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="totem-btn totem-btn--primary totem-btn--block"
+                disabled={submitting || !name.trim() || phone.trim().length < 8}
+                onClick={() => void handleWhatsAppSubmit()}
               >
-                {INSTALLMENTS.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <div className="totem__prices">
-            <div>
-              <span>Valor definido</span>
-              <strong>
-                {selection.payment === 'À vista'
-                  ? formatBRL(selection.product.cashPrice)
-                  : `${selection.installment} · ${selection.product.installmentLabel}`}
-              </strong>
+                {submitting ? 'Enviando…' : 'Continuar no WhatsApp…'}
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="totem-btn totem-btn--primary totem-btn--block"
-            disabled={submitting || !name.trim() || phone.trim().length < 8}
-            onClick={() => void handleWhatsAppSubmit()}
-          >
-            {submitting ? 'Enviando…' : 'Continuar no WhatsApp…'}
-          </button>
         </section>
       )}
 
@@ -365,6 +638,51 @@ export function TotemPage() {
             Novo atendimento
           </button>
         </section>
+      )}
+
+      <footer className="totem__hint">
+        Escolha o modelo que mais te agrade e nos envie um WhatsApp. Clique em Próximo e digite seus
+        dados.
+      </footer>
+
+      {exitOpen && (
+        <div className="totem-lock" role="dialog" aria-modal="true" aria-labelledby="totem-exit-title">
+          <form className="totem-lock__card" onSubmit={confirmExit}>
+            <h2 id="totem-exit-title">Saída protegida</h2>
+            <p>Digite a senha da loja para fechar o totem. Clientes não devem sair desta tela.</p>
+            {exitError && (
+              <p className="totem__error" role="alert">
+                {exitError}
+              </p>
+            )}
+            <label className="totem-field">
+              Senha
+              <input
+                type="password"
+                value={exitPassword}
+                onChange={(e) => {
+                  setExitPassword(e.target.value);
+                  setExitError(null);
+                }}
+                autoFocus
+                autoComplete="current-password"
+                placeholder="Senha da loja"
+              />
+            </label>
+            <div className="totem-lock__actions">
+              <button
+                type="button"
+                className="totem-btn totem-btn--ghost"
+                onClick={() => setExitOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="totem-btn totem-btn--primary">
+                Confirmar saída
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

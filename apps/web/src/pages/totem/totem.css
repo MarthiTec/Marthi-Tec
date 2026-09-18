@@ -1,27 +1,28 @@
 .totem {
   min-height: 100vh;
-  background: #ffffff;
+  min-height: 100dvh;
+  background: #f3f3f5;
   color: #1d1d1f;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .totem__top {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px clamp(16px, 3vw, 28px);
+  padding: 12px clamp(16px, 2vw, 28px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 5;
 }
 
 .totem__mark {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: contain;
 }
@@ -33,143 +34,402 @@
 }
 
 .totem__top-meta strong {
-  font-size: 0.95rem;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
 }
 
 .totem__top-meta span {
   color: #86868b;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .totem__exit {
+  border: 1px solid #d2d2d7;
+  background: #fff;
   color: #1d1d1f;
   font-weight: 600;
   font-size: 0.9rem;
-  opacity: 0.8;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  opacity: 0.55;
 }
 
-.totem__welcome,
-.totem__done {
+.totem__exit:hover {
+  opacity: 1;
+}
+
+.totem__floor {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 40px 24px 64px;
-  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 
-.totem__welcome-logo {
-  width: min(420px, 80vw);
-  margin-bottom: 12px;
+.totem__floor--topnav {
+  padding: 0;
 }
 
-.totem__welcome h1,
-.totem__done h1,
-.totem__checkout h1,
-.totem__configure-panel h1 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3rem);
-  letter-spacing: -0.04em;
-  font-weight: 600;
-}
-
-.totem__welcome p,
-.totem__done p {
-  margin: 0;
-  max-width: 36ch;
-  color: #86868b;
-  font-size: 1.1rem;
-  line-height: 1.5;
-}
-
-.totem__catalog,
-.totem__configure,
-.totem__checkout {
+.totem__stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   flex: 1;
-  padding: 20px clamp(16px, 3vw, 32px) 40px;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
+  padding: 14px clamp(16px, 2.5vw, 28px) 12px;
+}
+
+.totem__search-panel {
+  flex-shrink: 0;
+  margin-bottom: 10px;
 }
 
 .totem__toolbar {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  flex-shrink: 0;
 }
 
-.totem__search {
-  width: 100%;
-  min-height: 56px;
-  border: 1px solid #d2d2d7;
-  border-radius: 16px;
-  padding: 0 18px;
-  font-size: 1.05rem;
-  background: #fff;
+.totem__toolbar--quiet {
+  min-height: 40px;
 }
 
 .totem__brands {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
+  margin-right: auto;
 }
 
 .totem-chip {
-  min-height: 48px;
-  padding: 0 18px;
+  min-height: 36px;
+  padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid #d2d2d7;
-  background: #fff;
-  font-size: 1rem;
+  border: none;
+  background: transparent;
+  color: #86868b;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .totem-chip.is-active {
   background: #1d1d1f;
-  border-color: #1d1d1f;
   color: #fff;
 }
 
-.totem__grid {
+.totem__search-trigger {
+  border: none;
+  background: transparent;
+  color: #86868b;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.totem__search-trigger.is-active {
+  color: #1d1d1f;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.totem__search-dock {
+  margin-top: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+.totem__search-query {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fafafa;
+}
+
+.totem__search-query span {
+  color: #86868b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.totem__search-query strong {
+  flex: 1;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  min-height: 1.2em;
+}
+
+.totem__search-clear {
+  border: none;
+  background: transparent;
+  color: #6e6e73;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.totem__filters--quiet {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.totem-filter {
+  position: relative;
+}
+
+.totem-filter__label {
+  border: none;
+  background: transparent;
+  color: #a1a1a6;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.totem-filter__label.is-set,
+.totem-filter__label.is-open {
+  color: #1d1d1f;
+}
+
+.totem-filter__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 12;
+  min-width: 160px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  gap: 2px;
+}
+
+.totem-filter__menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 12px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.totem-filter__menu button.is-active,
+.totem-filter__menu button:hover {
+  background: #f5f5f7;
+}
+
+.totem__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-content: start;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .totem-card {
-  border: 1px solid #e8e8ed;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px;
   border-radius: 22px;
-  background: #fff;
-  text-align: left;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
+}
+
+.totem-card__media {
+  border-radius: 18px;
   overflow: hidden;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  background: #f5f5f7;
+  aspect-ratio: 4 / 3;
+  flex-shrink: 0;
 }
 
-.totem-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+.totem-card__media .totem-carousel--card {
+  height: 100%;
+  min-height: 0;
 }
 
-.totem-card__visual {
-  height: 160px;
+.totem-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 4px 2px;
+  flex: 1;
+}
+
+.totem-card__body h2 {
+  margin: 0;
+  font-size: clamp(1.15rem, 2vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.totem-card__fields {
   display: grid;
-  place-items: center;
-  color: #fff;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.totem-card__fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.72rem;
   font-weight: 700;
+  color: #6e6e73;
+  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.brand-apple {
-  background: linear-gradient(145deg, #2c2c2e, #111);
+.totem-card__fields select {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  padding: 0 10px;
+  font-size: clamp(0.85rem, 1.2vw, 1.05rem);
+  font-weight: 700;
+  color: #1d1d1f;
+  background: #e8e8ed;
+  text-transform: uppercase;
 }
 
-.brand-xiaomi {
-  background: linear-gradient(145deg, #ff6900, #b34100);
+.totem-card__footer {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.totem-card__price {
+  display: grid;
+  gap: 2px;
+}
+
+.totem-card__price span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.totem-card__price strong {
+  font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+  font-weight: 800;
+  color: #d70015;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.totem-card__price small {
+  color: #86868b;
+  font-size: clamp(0.85rem, 1.3vw, 1.05rem);
+  font-weight: 600;
+}
+
+.totem__empty {
+  grid-column: 1 / -1;
+  margin: auto;
+  color: #86868b;
+  font-size: 1.1rem;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.totem__hint {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  background: #1d1d1f;
+  color: #fff;
+  text-align: center;
+  font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.totem__checkout,
+.totem__done {
+  flex: 1;
+  padding: 20px clamp(16px, 3vw, 32px) 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  overflow: auto;
+}
+
+.totem__checkout-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.totem__checkout-form {
+  display: grid;
+  gap: 14px;
+}
+
+.totem__checkout h1,
+.totem__done h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  letter-spacing: -0.04em;
+  font-weight: 700;
+}
+
+.totem__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.totem__done p {
+  margin: 0;
+  max-width: 40ch;
+  color: #86868b;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.totem__done-note {
+  font-size: 0.95rem !important;
 }
 
 .totem-carousel {
@@ -178,15 +438,12 @@
   background: #f5f5f7;
   user-select: none;
   touch-action: pan-y;
-}
-
-.totem-carousel--card {
-  height: 220px;
+  height: 100%;
 }
 
 .totem-carousel--hero {
-  min-height: 520px;
-  border-radius: 28px;
+  min-height: 420px;
+  border-radius: 22px;
 }
 
 .totem-carousel--empty,
@@ -225,38 +482,32 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   color: #1d1d1f;
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 2;
 }
 
-.totem-carousel--card .totem-carousel__nav {
-  width: 40px;
-  height: 40px;
-  font-size: 1.4rem;
-}
-
 .totem-carousel__nav--prev {
-  left: 12px;
+  left: 10px;
 }
 
 .totem-carousel__nav--next {
-  right: 12px;
+  right: 10px;
 }
 
 .totem-carousel__dots {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 14px;
+  bottom: 12px;
   display: flex;
   justify-content: center;
   gap: 8px;
@@ -274,43 +525,8 @@
 }
 
 .totem-carousel__dot.is-active {
-  width: 28px;
+  width: 26px;
   background: #fff;
-}
-
-.totem-card__body {
-  padding: 16px;
-}
-
-.totem-card__body h2 {
-  margin: 0 0 8px;
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
-}
-
-.totem-card__price {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.totem-card__parc {
-  margin: 4px 0 0;
-  color: #86868b;
-  font-size: 0.9rem;
-}
-
-.totem__configure-layout {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.totem__configure-panel,
-.totem__checkout {
-  display: grid;
-  gap: 14px;
 }
 
 .totem-field {
@@ -319,6 +535,7 @@
   font-size: 0.92rem;
   font-weight: 600;
   color: #6e6e73;
+  text-align: left;
 }
 
 .totem-field select,
@@ -376,12 +593,13 @@
 
 .totem-btn {
   min-height: 56px;
-  padding: 0 24px;
-  border-radius: 999px;
+  padding: 0 28px;
+  border-radius: 14px;
   border: none;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .totem-btn--primary {
@@ -391,6 +609,17 @@
 
 .totem-btn--primary:disabled {
   opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.totem-btn--ghost {
+  background: #fff;
+  border: 1px solid #d2d2d7;
+  color: #1d1d1f;
+}
+
+.totem-btn--ghost:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -407,11 +636,7 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0;
-  margin-bottom: 8px;
-}
-
-.totem__done-note {
-  font-size: 0.95rem !important;
+  margin-bottom: 12px;
 }
 
 .totem__error {
@@ -422,18 +647,134 @@
   color: #b00020;
   font-size: 0.95rem;
   line-height: 1.4;
+  text-align: left;
 }
 
-@media (max-width: 900px) {
-  .totem__configure-layout {
+.totem-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.totem-lock__card {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.totem-lock__card h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.totem-lock__card > p {
+  margin: 0;
+  color: #6e6e73;
+  line-height: 1.45;
+}
+
+.totem-lock__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.totem-kb {
+  background: #2c2c2e;
+  padding: 12px clamp(10px, 2vw, 18px) 14px;
+}
+
+.totem-kb__rows {
+  display: grid;
+  gap: 7px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.totem-kb__row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.totem-kb__key {
+  min-width: 48px;
+  min-height: 48px;
+  border: none;
+  border-radius: 10px;
+  background: #3a3a3c;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.totem-kb__key:active {
+  background: #5a5a5c;
+}
+
+.totem-kb__key--wide {
+  min-width: 100px;
+  font-size: 0.9rem;
+}
+
+.totem-kb__key--space {
+  flex: 1;
+  min-width: 140px;
+  max-width: 320px;
+  font-size: 0.9rem;
+}
+
+.totem-kb__key--done {
+  min-width: 100px;
+  background: #0a84ff;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 980px) {
+  .totem-card__fields {
     grid-template-columns: 1fr;
   }
 
-  .totem-carousel--hero {
-    min-height: 280px;
+  .totem__checkout-card {
+    grid-template-columns: 1fr;
   }
 
   .totem__summary {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .totem {
+    overflow: auto;
+  }
+
+  .totem__scroll {
+    grid-template-columns: 1fr;
+  }
+
+  .totem-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .totem-kb__key {
+    min-width: 40px;
+    min-height: 44px;
+    font-size: 1rem;
   }
 }

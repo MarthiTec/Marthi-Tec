@@ -56,10 +56,14 @@ export function LoginPage() {
 
       <div className="auth__card">
         <BrandLogo variant="mark" className="auth__mark" />
-        <h1>Entrar</h1>
-        <p className="auth__lead">Acesse o painel Marthi com sua conta.</p>
+        <p className="auth__tenant">Cell Ponto · demo</p>
+        <h1>Entrar na loja</h1>
+        <p className="auth__lead">
+          Use o login da operação da <strong>Cell Ponto</strong> para abrir o painel. A plataforma é
+          Marthi; a loja nesta demo é o tenant.
+        </p>
 
-        {error && <p className="auth__error">{error}</p>}
+        {error && <p className="auth__error" role="alert">{error}</p>}
 
         <form className="auth__form" onSubmit={handlePasswordLogin}>
           <label>

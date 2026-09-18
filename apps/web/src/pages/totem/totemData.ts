@@ -27,10 +27,10 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     id: 1,
     name: 'iPhone 16 Pro Max',
     brand: 'apple',
-    storages: ['128 GB', '256 GB', '512 GB'],
-    colors: ['Preto', 'Branco', 'Desert', 'Natural'],
-    cashPrice: 8999,
-    installmentLabel: '12x de R$ 849,00',
+    storages: ['256 GB', '512 GB'],
+    colors: ['Desert', 'Preto', 'Branco', 'Natural'],
+    cashPrice: 6990,
+    installmentLabel: '12 X R$ 649,00',
     images: phoneImages('iphone-16-pro-max', 5),
   },
   {
@@ -39,8 +39,8 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     brand: 'apple',
     storages: ['128 GB', '256 GB'],
     colors: ['Preto', 'Branco', 'Desert'],
-    cashPrice: 7999,
-    installmentLabel: '12x de R$ 749,00',
+    cashPrice: 6290,
+    installmentLabel: '12 X R$ 585,00',
     images: phoneImages('iphone-16-pro', 4),
   },
   {
@@ -50,7 +50,7 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['128 GB', '256 GB'],
     colors: ['Preto', 'Azul', 'Rosa'],
     cashPrice: 4499,
-    installmentLabel: '12x de R$ 419,00',
+    installmentLabel: '12 X R$ 419,00',
     images: phoneImages('iphone-15', 4),
   },
   {
@@ -60,7 +60,7 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['128 GB', '256 GB'],
     colors: ['Preto', 'Azul', 'Roxo'],
     cashPrice: 3899,
-    installmentLabel: '12x de R$ 365,00',
+    installmentLabel: '12 X R$ 365,00',
     images: phoneImages('iphone-14', 4),
   },
   {
@@ -70,7 +70,7 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['128 GB', '256 GB'],
     colors: ['Preto', 'Branco', 'Azul'],
     cashPrice: 3400,
-    installmentLabel: '12x de R$ 355,00',
+    installmentLabel: '12 X R$ 355,00',
     images: phoneImages('iphone-13', 4),
   },
   {
@@ -80,7 +80,7 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['64 GB', '128 GB'],
     colors: ['Preto', 'Branco', 'Azul'],
     cashPrice: 2799,
-    installmentLabel: '12x de R$ 265,00',
+    installmentLabel: '12 X R$ 265,00',
     images: phoneImages('iphone-12', 3),
   },
   {
@@ -90,7 +90,7 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['64 GB', '128 GB'],
     colors: ['Preto', 'Branco', 'Vermelho'],
     cashPrice: 2299,
-    installmentLabel: '12x de R$ 219,00',
+    installmentLabel: '12 X R$ 219,00',
     images: phoneImages('iphone-11', 3),
   },
   {
@@ -100,12 +100,12 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     storages: ['256 GB', '512 GB'],
     colors: ['Preto', 'Verde', 'Roxo'],
     cashPrice: 2199,
-    installmentLabel: '12x de R$ 209,00',
+    installmentLabel: '12 X R$ 209,00',
     images: phoneImages('redmi-note-13-pro', 4),
   },
 ];
 
-export const FULFILLMENT_OPTIONS = ['À pronta entrega', 'Por encomenda'] as const;
+export const FULFILLMENT_OPTIONS = ['Pronta entrega', 'Por encomenda'] as const;
 export const PAYMENT_OPTIONS = ['À vista', 'Parcelado'] as const;
 export const INSTALLMENTS = ['2x', '3x', '6x', '10x', '12x'] as const;
 
