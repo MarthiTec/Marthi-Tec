@@ -1,27 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
 import { useAuth } from '../../contexts/AuthContext';
 import { getOperatorProfile } from '../../data/operatorProfile';
+import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
+import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
+import { ModuleLockedPage } from './ModuleLockedPage';
 import './admin.css';
-
-const NAV = [
-  { to: '/painel', label: 'Painel', end: true },
-  { to: '/painel/pdv', label: 'PDV' },
-  { to: '/painel/pedidos', label: 'Pedidos' },
-  { to: '/painel/clientes', label: 'Clientes' },
-  { to: '/painel/estoque', label: 'Estoque' },
-  { to: '/painel/financeiro', label: 'Financeiro' },
-];
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'ERP', title: 'Painel da operação' },
-  '/painel/pdv': { kicker: 'Vendas', title: 'PDV' },
+  '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
+  '/painel/pdv/venda': { kicker: 'Vendas', title: 'Lançar venda' },
+  '/painel/totem': { kicker: 'Totem', title: 'Modo do totem' },
   '/painel/pedidos': { kicker: 'Vendas', title: 'Pedidos' },
   '/painel/clientes': { kicker: 'Cadastros', title: 'Clientes' },
   '/painel/estoque': { kicker: 'Cadastros', title: 'Estoque' },
+  '/painel/atributos': { kicker: 'Cadastros', title: 'Atributos' },
+  '/painel/tabelas': { kicker: 'Cadastros', title: 'Tabelas de preço' },
+  '/painel/pagamentos': { kicker: 'Cadastros', title: 'Formas de pagamento' },
   '/painel/financeiro': { kicker: 'Gestão', title: 'Financeiro' },
+  '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
+  '/painel/os/nova': { kicker: 'Oficina', title: 'Nova ordem de serviço' },
   '/painel/perfil': { kicker: 'Conta', title: 'Meu perfil' },
+  '/painel/plano': { kicker: 'Contrato', title: 'Plano da loja' },
 };
 
 function initials(name: string) {
@@ -31,11 +33,31 @@ function initials(name: string) {
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
 }
 
+function resolveTitle(pathname: string, search: string) {
+  if (pathname === '/painel/os' && search.includes('status=ready')) {
+    return { kicker: 'Oficina', title: 'OS prontas' };
+  }
+  if (pathname === '/painel/os' && search.includes('status=progress')) {
+    return { kicker: 'Oficina', title: 'OS em serviço' };
+  }
+  return (
+    TITLES[pathname] ??
+    (pathname.startsWith('/painel/os/')
+      ? { kicker: 'Oficina', title: 'Ordem de serviço' }
+      : { kicker: 'ERP', title: 'Operação' })
+  );
+}
+
 export function AdminLayout() {
   const { user, loading, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState(() => getOperatorProfile(user?.name ?? 'Operador'));
+  const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
+  const [openGroups, setOpenGroups] = useState<string[]>(() => {
+    const current = navGroupForPath(window.location.pathname, window.location.search);
+    return current ? [current] : ['os'];
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -43,16 +65,35 @@ export function AdminLayout() {
   }, [user]);
 
   useEffect(() => {
-    function refresh() {
+    function refreshProfile() {
       setProfile(getOperatorProfile(user?.name ?? 'Operador'));
     }
-    window.addEventListener('marthi-profile-updated', refresh);
-    return () => window.removeEventListener('marthi-profile-updated', refresh);
+    function refreshPlan() {
+      setEntitlement(getStoreEntitlement());
+    }
+    window.addEventListener('marthi-profile-updated', refreshProfile);
+    window.addEventListener('marthi-plan-updated', refreshPlan);
+    return () => {
+      window.removeEventListener('marthi-profile-updated', refreshProfile);
+      window.removeEventListener('marthi-plan-updated', refreshPlan);
+    };
   }, [user]);
 
   useEffect(() => {
+    const current = navGroupForPath(location.pathname, location.search);
+    if (current) {
+      setOpenGroups((groups) => (groups.includes(current) ? groups : [...groups, current]));
+    }
     setMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
+
+  const requiredModule = moduleForPath(location.pathname);
+  const moduleAllowed = !requiredModule || hasModule(requiredModule);
+
+  const page = useMemo(
+    () => resolveTitle(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
   if (loading) {
     return (
@@ -66,9 +107,14 @@ export function AdminLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const page = TITLES[location.pathname] ?? { kicker: 'ERP', title: 'Operação' };
   const photo = profile.photo || user.picture;
   const mark = initials(profile.displayName);
+
+  function toggleGroup(id: string) {
+    setOpenGroups((groups) =>
+      groups.includes(id) ? groups.filter((item) => item !== id) : [...groups, id],
+    );
+  }
 
   return (
     <div className={`admin ${menuOpen ? 'is-menu-open' : ''}`}>
@@ -77,7 +123,7 @@ export function AdminLayout() {
           <BrandLogo variant="mark" className="admin__mark" />
           <div>
             <strong>Sua Loja</strong>
-            <span>ERP Marthi</span>
+            <span>Plano {planLabel(entitlement.planId)}</span>
           </div>
         </div>
 
@@ -96,19 +142,72 @@ export function AdminLayout() {
         </NavLink>
 
         <nav className="admin__nav" aria-label="Módulos do ERP">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {ADMIN_NAV.map((group) => {
+            const unlocked = !group.module || hasModule(group.module);
+            const opened = openGroups.includes(group.id);
+
+            if (!group.children) {
+              return (
+                <NavLink
+                  key={group.id}
+                  to={group.to ?? '/painel'}
+                  end={group.end}
+                  className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+                >
+                  {group.label}
+                </NavLink>
+              );
+            }
+
+            return (
+              <div
+                key={group.id}
+                className={`admin__group ${opened ? 'is-open' : ''} ${unlocked ? '' : 'is-locked'}`}
+              >
+                <button
+                  type="button"
+                  className="admin__group-toggle"
+                  aria-expanded={opened}
+                  onClick={() => toggleGroup(group.id)}
+                >
+                  <span>{group.label}</span>
+                  <span className="admin__group-meta">
+                    {unlocked ? null : <em>plano</em>}
+                    <i aria-hidden="true">{opened ? '▾' : '▸'}</i>
+                  </span>
+                </button>
+                {opened ? (
+                  <div className="admin__sub">
+                    {group.children.map((child) => (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        end={child.end}
+                        className={() =>
+                          `admin__sub-link ${
+                            childIsActive(child, location.pathname, location.search.slice(1))
+                              ? 'is-active'
+                              : ''
+                          }`
+                        }
+                      >
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="admin__sidebar-foot">
+          <NavLink
+            to="/painel/plano"
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            Plano da loja
+          </NavLink>
           <button type="button" className="admin__logout" onClick={logout}>
             Sair
           </button>
@@ -135,7 +234,13 @@ export function AdminLayout() {
         </header>
 
         <div className="admin__main">
-          <Outlet />
+          {moduleAllowed || location.pathname === '/painel/plano' ? (
+            <Outlet />
+          ) : requiredModule ? (
+            <ModuleLockedPage moduleId={requiredModule} />
+          ) : (
+            <Outlet />
+          )}
         </div>
       </div>
 

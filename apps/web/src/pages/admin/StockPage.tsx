@@ -1,21 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAdminState, saveStock, type StockItem } from '../../data/adminStore';
-
-const EMPTY: Omit<StockItem, 'id'> = {
-  name: '',
-  sku: '',
-  color: '',
-  capacity: '',
-  qty: 0,
-  minQty: 1,
-  cost: 0,
-  price: 0,
-};
+import { ATTRIBUTES_EVENT, stockAttributes } from '../../data/attributeStore';
 
 export function StockPage() {
+  const [attrDefs, setAttrDefs] = useState(() => stockAttributes());
   const [items, setItems] = useState(() => getAdminState().stock);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id)));
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    function refresh() {
+      setAttrDefs(stockAttributes());
+    }
+    window.addEventListener(ATTRIBUTES_EVENT, refresh);
+    return () => window.removeEventListener(ATTRIBUTES_EVENT, refresh);
+  }, []);
 
   function persist(next: StockItem[]) {
     setItems(next);
@@ -24,18 +23,25 @@ export function StockPage() {
 
   function submit() {
     if (!form.name.trim()) return;
+    const payload = {
+      ...form,
+      color: form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('cor'))?.id ?? ''] ?? form.color,
+      capacity:
+        form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('capac'))?.id ?? ''] ??
+        form.capacity,
+    };
     if (editingId) {
-      persist(items.map((item) => (item.id === editingId ? { ...item, ...form } : item)));
+      persist(items.map((item) => (item.id === editingId ? { ...item, ...payload } : item)));
     } else {
       persist([
         {
-          ...form,
+          ...payload,
           id: `STK-${Date.now().toString(36).toUpperCase()}`,
         },
         ...items,
       ]);
     }
-    setForm(EMPTY);
+    setForm(emptyForm(attrDefs.map((item) => item.id)));
     setEditingId(null);
   }
 
@@ -44,8 +50,11 @@ export function StockPage() {
     setForm({
       name: item.name,
       sku: item.sku,
+      barcode: item.barcode,
+      imei: item.imei,
       color: item.color,
       capacity: item.capacity,
+      attrs: { ...item.attrs },
       qty: item.qty,
       minQty: item.minQty,
       cost: item.cost,
@@ -57,7 +66,11 @@ export function StockPage() {
     <section className="admin-page">
       <article className="admin-card">
         <h2>{editingId ? 'Atualizar item' : 'Cadastro de estoque'}</h2>
-        <p>Módulo mais completo da operação: SKU, variação, mínimo, custo e preço de venda.</p>
+        <p>
+          SKU, código de barras e IMEI alimentam o PDV. Cada linha é uma variação: iPhone 16 Pro Max
+          256 GB tem preço e quantidade diferentes do 512 GB. Os atributos do ERP montam essa
+          combinação.
+        </p>
         <div className="admin-form">
           <label>
             Produto
@@ -68,19 +81,38 @@ export function StockPage() {
             <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
           </label>
           <label>
-            Cor
+            Código de barras
             <input
-              value={form.color}
-              onChange={(e) => setForm({ ...form, color: e.target.value })}
+              value={form.barcode}
+              onChange={(e) => setForm({ ...form, barcode: e.target.value })}
             />
           </label>
           <label>
-            Capacidade
+            IMEI
             <input
-              value={form.capacity}
-              onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+              value={form.imei}
+              onChange={(e) => setForm({ ...form, imei: e.target.value })}
+              placeholder="Opcional"
             />
           </label>
+          {attrDefs.map((attr) => (
+            <label key={attr.id}>
+              {attr.name}
+              <select
+                value={form.attrs[attr.id] ?? ''}
+                onChange={(e) =>
+                  setForm({ ...form, attrs: { ...form.attrs, [attr.id]: e.target.value } })
+                }
+              >
+                <option value="">Selecionar</option>
+                {attr.values.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
           <label>
             Quantidade
             <input
@@ -126,7 +158,7 @@ export function StockPage() {
           <thead>
             <tr>
               <th>Produto</th>
-              <th>SKU</th>
+              <th>SKU / barras / IMEI</th>
               <th>Variação</th>
               <th>Qtd</th>
               <th>Preço</th>
@@ -137,9 +169,18 @@ export function StockPage() {
             {items.map((item) => (
               <tr key={item.id}>
                 <td>{item.name}</td>
-                <td>{item.sku}</td>
                 <td>
-                  {item.color} · {item.capacity}
+                  {item.sku}
+                  {item.barcode ? ` · ${item.barcode}` : ''}
+                  {item.imei ? ` · IMEI ${item.imei}` : ''}
+                </td>
+                <td>
+                  {attrDefs
+                    .map((attr) => item.attrs?.[attr.id])
+                    .filter(Boolean)
+                    .join(' · ') ||
+                    [item.color, item.capacity].filter(Boolean).join(' · ') ||
+                    '—'}
                 </td>
                 <td className={item.qty <= item.minQty ? 'qty-low' : ''}>{item.qty}</td>
                 <td className="price-red">
@@ -157,4 +198,20 @@ export function StockPage() {
       </article>
     </section>
   );
+}
+
+function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
+  return {
+    name: '',
+    sku: '',
+    barcode: '',
+    imei: '',
+    color: '',
+    capacity: '',
+    attrs: Object.fromEntries(attrIds.map((id) => [id, ''])),
+    qty: 0,
+    minQty: 1,
+    cost: 0,
+    price: 0,
+  };
 }

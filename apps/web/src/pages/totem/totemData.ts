@@ -1,3 +1,5 @@
+import { ATTR_CAP, ATTR_COR, ATTR_RET } from '../../data/attributeStore';
+
 export type TotemBrand = 'apple' | 'xiaomi';
 
 export type TotemProduct = {
@@ -8,8 +10,8 @@ export type TotemProduct = {
   colors: string[];
   cashPrice: number;
   installmentLabel: string;
-  /** Várias fotos por modelo (carrossel do totem) */
   images: string[];
+  attrs: Record<string, string[]>;
 };
 
 export const TOTEM_BRANDS: { id: TotemBrand | 'all'; label: string }[] = [
@@ -18,11 +20,24 @@ export const TOTEM_BRANDS: { id: TotemBrand | 'all'; label: string }[] = [
   { id: 'xiaomi', label: 'Xiaomi' },
 ];
 
+export const FULFILLMENT_OPTIONS = ['Pronta entrega', 'Por encomenda'] as const;
+
+function phone(product: Omit<TotemProduct, 'attrs'>): TotemProduct {
+  return {
+    ...product,
+    attrs: {
+      [ATTR_COR]: product.colors,
+      [ATTR_CAP]: product.storages,
+      [ATTR_RET]: [...FULFILLMENT_OPTIONS],
+    },
+  };
+}
+
 function phoneImages(slug: string, count = 4): string[] {
   return Array.from({ length: count }, (_, index) => `/totem/${slug}/${index + 1}.svg`);
 }
 
-export const TOTEM_PRODUCTS: TotemProduct[] = [
+export const TOTEM_PRODUCTS = [
   {
     id: 1,
     name: 'iPhone 16 Pro Max',
@@ -103,9 +118,8 @@ export const TOTEM_PRODUCTS: TotemProduct[] = [
     installmentLabel: '12 X R$ 209,00',
     images: phoneImages('redmi-note-13-pro', 4),
   },
-];
+].map(phone);
 
-export const FULFILLMENT_OPTIONS = ['Pronta entrega', 'Por encomenda'] as const;
 export const PAYMENT_OPTIONS = ['À vista', 'Parcelado'] as const;
 export const INSTALLMENTS = ['2x', '3x', '6x', '10x', '12x'] as const;
 

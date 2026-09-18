@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { closeSale, parsePriceLabel } from '../../data/adminStore';
+import { updateQueueTicket, ticketVariation } from '../../data/posQueueStore';
 import { updatePosTicket } from '../../services/pos';
 import { usePosTickets } from './usePosTickets';
 
@@ -9,7 +11,12 @@ export function PosPage() {
   async function closeTicket(id: string, status: 'sold' | 'cancelled') {
     const ticket = tickets.find((item) => item.id === id);
     if (!ticket) return;
-    await updatePosTicket(id, status);
+    updateQueueTicket(id, status);
+    try {
+      await updatePosTicket(id, status);
+    } catch {
+      /* fila local já atualizou */
+    }
     if (status === 'sold') {
       closeSale({
         ticketId: ticket.id,
@@ -28,9 +35,14 @@ export function PosPage() {
       <article className="admin-card">
         <h2>PDV · fila do totem</h2>
         <p>
-          Interesse no totem vira ticket aqui. A loja confirma, baixa estoque e registra cliente e
-          financeiro.
+          Toda proposta confirmada no totem cai nesta fila para o representante. Venda no balcão usa
+          SKU, código de barras ou IMEI em Lançar venda.
         </p>
+        <div className="admin-toolbar" style={{ marginTop: 12 }}>
+          <Link to="/painel/pdv/venda" className="btn btn--primary">
+            Lançar venda no PDV
+          </Link>
+        </div>
       </article>
       {error && <p className="empty">{error} Suba a API (`npm run dev:api`) para receber o totem.</p>}
       {loading && <p className="empty">Atualizando fila…</p>}
@@ -45,10 +57,10 @@ export function PosPage() {
             </div>
             <h3>{ticket.customerName}</h3>
             <p>
-              {ticket.customerPhone} · {ticket.productName} · {ticket.color} · {ticket.storage}
+              {ticket.customerPhone} · {ticket.productName} · {ticketVariation(ticket)}
             </p>
             <p>
-              {ticket.fulfillment} · {ticket.payment}
+              {ticket.payment}
               {ticket.installment ? ` ${ticket.installment}` : ''}
             </p>
             <strong className="price-red">{ticket.priceLabel}</strong>

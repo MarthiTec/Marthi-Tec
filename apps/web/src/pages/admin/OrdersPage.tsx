@@ -1,4 +1,5 @@
 import { getAdminState } from '../../data/adminStore';
+import { ticketVariation } from '../../data/posQueueStore';
 import { usePosTickets } from './usePosTickets';
 
 export function OrdersPage() {
@@ -18,7 +19,7 @@ export function OrdersPage() {
       .map((ticket) => ({
         id: ticket.id,
         customer: ticket.customerName,
-        product: `${ticket.productName} · ${ticket.color}`,
+        product: `${ticket.productName} · ${ticketVariation(ticket)}`,
         amount: ticket.priceLabel,
         status: 'open' as const,
         when: ticket.createdAt,

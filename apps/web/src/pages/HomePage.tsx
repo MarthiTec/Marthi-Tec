@@ -19,9 +19,9 @@ const PRODUCTS = [
   },
   {
     title: 'OS + ERP',
-    text: 'Ordem de serviço e gestão no mesmo fio do totem — roadmap.',
-    href: '/parceiro',
-    cta: 'Quero ser parceiro',
+    text: 'Ordem de serviço no mesmo painel da loja — abertura, oficina e entrega.',
+    href: '/login',
+    cta: 'Ver no painel',
   },
 ] as const;
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 
 type ProductCarouselProps = {
   images: string[];
@@ -8,16 +8,18 @@ type ProductCarouselProps = {
   size?: 'card' | 'hero';
 };
 
+const AUTO_MS = 10_000;
+
 export function ProductCarousel({
   images,
   alt,
   className = '',
-  autoPlayMs = 4200,
+  autoPlayMs = AUTO_MS,
   size = 'card',
 }: ProductCarouselProps) {
   const slides = images.length > 0 ? images : [];
   const [index, setIndex] = useState(0);
-  const touchStartX = useRef<number | null>(null);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const paused = useRef(false);
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function ProductCarousel({
       setIndex((current) => (current + 1) % slides.length);
     }, autoPlayMs);
     return () => window.clearInterval(timer);
-  }, [slides.length, autoPlayMs]);
+  }, [slides.length, autoPlayMs, index]);
 
   if (slides.length === 0) {
     return <div className={`totem-carousel totem-carousel--empty ${className}`} />;
@@ -41,30 +43,42 @@ export function ProductCarousel({
     setIndex((current) => (current + delta + slides.length) % slides.length);
   }
 
+  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+    paused.current = true;
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const start = pointerStart.current;
+    if (!start) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {
+      event.stopPropagation();
+    }
+  }
+
+  function onPointerUp(event: PointerEvent<HTMLDivElement>) {
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    paused.current = false;
+    if (!start) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    event.stopPropagation();
+    go(dx < 0 ? 1 : -1);
+  }
+
   return (
     <div
       className={`totem-carousel totem-carousel--${size} ${className}`}
-      onMouseEnter={() => {
-        paused.current = true;
-      }}
-      onMouseLeave={() => {
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        pointerStart.current = null;
         paused.current = false;
-      }}
-      onTouchStart={(event) => {
-        if (size === 'card') return;
-        touchStartX.current = event.touches[0]?.clientX ?? null;
-        paused.current = true;
-      }}
-      onTouchEnd={(event) => {
-        if (size === 'card') return;
-        const start = touchStartX.current;
-        const end = event.changedTouches[0]?.clientX;
-        touchStartX.current = null;
-        paused.current = false;
-        if (start == null || end == null) return;
-        const delta = end - start;
-        if (Math.abs(delta) < 40) return;
-        go(delta < 0 ? 1 : -1);
       }}
     >
       <div
@@ -78,47 +92,23 @@ export function ProductCarousel({
         ))}
       </div>
 
-      {slides.length > 1 && (
-        <>
-          <button
-            type="button"
-            className="totem-carousel__nav totem-carousel__nav--prev"
-            aria-label="Imagem anterior"
-            onClick={(event) => {
-              event.stopPropagation();
-              go(-1);
-            }}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="totem-carousel__nav totem-carousel__nav--next"
-            aria-label="Próxima imagem"
-            onClick={(event) => {
-              event.stopPropagation();
-              go(1);
-            }}
-          >
-            ›
-          </button>
-          <div className="totem-carousel__dots" role="tablist" aria-label="Fotos do produto">
-            {slides.map((_, dotIndex) => (
-              <button
-                key={dotIndex}
-                type="button"
-                role="tab"
-                aria-selected={dotIndex === index}
-                className={`totem-carousel__dot ${dotIndex === index ? 'is-active' : ''}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setIndex(dotIndex);
-                }}
-              />
-            ))}
-          </div>
-        </>
-      )}
+      {slides.length > 1 ? (
+        <div className="totem-carousel__dots" role="tablist" aria-label="Fotos do produto">
+          {slides.map((_, dotIndex) => (
+            <button
+              key={dotIndex}
+              type="button"
+              role="tab"
+              aria-selected={dotIndex === index}
+              className={`totem-carousel__dot ${dotIndex === index ? 'is-active' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setIndex(dotIndex);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

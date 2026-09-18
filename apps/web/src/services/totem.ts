@@ -1,9 +1,13 @@
+import { enqueueTotemLead } from '../data/posQueueStore';
+import type { PickedAttribute } from '../data/attributeStore';
+
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 export type TotemLeadRequest = {
   customerName: string;
   customerPhone: string;
   productName: string;
+  attributes?: PickedAttribute[];
   color: string;
   storage: string;
   fulfillment: string;
@@ -12,19 +16,25 @@ export type TotemLeadRequest = {
   priceLabel: string;
 };
 
-export async function submitTotemLead(payload: TotemLeadRequest): Promise<void> {
-  const response = await fetch(`${API_URL}/api/v1/totem/leads`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+export async function submitTotemLead(payload: TotemLeadRequest) {
+  const ticket = enqueueTotemLead(payload);
+  let customerNotified = false;
 
-  const json = (await response.json()) as {
-    success: boolean;
-    error?: { message?: string };
-  };
-
-  if (!response.ok || !json.success) {
-    throw new Error(json.error?.message ?? `Falha ao enviar lead (${response.status})`);
+  try {
+    const response = await fetch(`${API_URL}/api/v1/totem/leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(2500),
+    });
+    const json = (await response.json()) as {
+      success?: boolean;
+      data?: { customerNotified?: boolean };
+    };
+    customerNotified = Boolean(json.data?.customerNotified);
+  } catch {
+    customerNotified = false;
   }
+
+  return { ticketId: ticket.id, customerNotified };
 }

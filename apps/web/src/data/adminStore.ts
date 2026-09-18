@@ -1,3 +1,5 @@
+import { ATTR_CAP, ATTR_COR } from './attributeStore';
+
 const STORAGE_KEY = 'marthi.admin.v1';
 
 export type Customer = {
@@ -14,12 +16,31 @@ export type StockItem = {
   id: string;
   name: string;
   sku: string;
+  barcode: string;
+  imei: string;
   color: string;
   capacity: string;
+  attrs: Record<string, string>;
   qty: number;
   minQty: number;
   cost: number;
   price: number;
+};
+
+export type PriceTable = {
+  id: string;
+  name: string;
+  percent: number;
+  active: boolean;
+};
+
+export type PaymentMethod = {
+  id: string;
+  name: string;
+  type: 'cash' | 'pix' | 'debit' | 'credit' | 'other';
+  priceTableId: string;
+  maxInstallments: number;
+  active: boolean;
 };
 
 export type SalesOrder = {
@@ -41,15 +62,294 @@ export type FinanceEntry = {
   createdAt: string;
 };
 
+export type PosLineInput = {
+  stockId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  imei: string;
+};
+
 type AdminState = {
   customers: Customer[];
   stock: StockItem[];
   orders: SalesOrder[];
   finance: FinanceEntry[];
+  priceTables: PriceTable[];
+  payments: PaymentMethod[];
 };
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function seedPriceTables(): PriceTable[] {
+  return [
+    { id: 'TAB-VISTA', name: 'Vista', percent: 0, active: true },
+    { id: 'TAB-ATACADO', name: 'Atacado', percent: -8, active: true },
+    { id: 'TAB-CARTAO', name: 'Cartão', percent: 5, active: true },
+  ];
+}
+
+function seedPayments(): PaymentMethod[] {
+  return [
+    {
+      id: 'PAY-DIN',
+      name: 'Dinheiro',
+      type: 'cash',
+      priceTableId: 'TAB-VISTA',
+      maxInstallments: 1,
+      active: true,
+    },
+    {
+      id: 'PAY-PIX',
+      name: 'Pix',
+      type: 'pix',
+      priceTableId: 'TAB-VISTA',
+      maxInstallments: 1,
+      active: true,
+    },
+    {
+      id: 'PAY-DEB',
+      name: 'Cartão de débito',
+      type: 'debit',
+      priceTableId: 'TAB-VISTA',
+      maxInstallments: 1,
+      active: true,
+    },
+    {
+      id: 'PAY-CRE',
+      name: 'Cartão de crédito',
+      type: 'credit',
+      priceTableId: 'TAB-CARTAO',
+      maxInstallments: 12,
+      active: true,
+    },
+  ];
+}
+
+function variantSku(item: Omit<StockItem, 'attrs'>): StockItem {
+  return normalizeStock({ ...item, attrs: {} });
+}
+
+function seedStock(): StockItem[] {
+  return [
+    variantSku({
+      id: 'STK-16PM',
+      name: 'iPhone 16 Pro Max',
+      sku: 'APL-16PM-256',
+      barcode: '7891000160256',
+      imei: '353456789012345',
+      color: 'Desert',
+      capacity: '256 GB',
+      qty: 4,
+      minQty: 2,
+      cost: 6200,
+      price: 6990,
+    }),
+    variantSku({
+      id: 'STK-16PM-512',
+      name: 'iPhone 16 Pro Max',
+      sku: 'APL-16PM-512',
+      barcode: '7891000160512',
+      imei: '',
+      color: 'Desert',
+      capacity: '512 GB',
+      qty: 2,
+      minQty: 1,
+      cost: 7300,
+      price: 8290,
+    }),
+    variantSku({
+      id: 'STK-16P',
+      name: 'iPhone 16 Pro',
+      sku: 'APL-16P-128',
+      barcode: '7891000160128',
+      imei: '353456789012346',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 6,
+      minQty: 2,
+      cost: 5400,
+      price: 6290,
+    }),
+    variantSku({
+      id: 'STK-16P-256',
+      name: 'iPhone 16 Pro',
+      sku: 'APL-16P-256',
+      barcode: '7891000160257',
+      imei: '',
+      color: 'Preto',
+      capacity: '256 GB',
+      qty: 3,
+      minQty: 1,
+      cost: 6100,
+      price: 7190,
+    }),
+    variantSku({
+      id: 'STK-15',
+      name: 'iPhone 15',
+      sku: 'APL-15-128',
+      barcode: '7891000150128',
+      imei: '359844120000001',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 8,
+      minQty: 3,
+      cost: 3800,
+      price: 4499,
+    }),
+    variantSku({
+      id: 'STK-15-256',
+      name: 'iPhone 15',
+      sku: 'APL-15-256',
+      barcode: '7891000150256',
+      imei: '',
+      color: 'Preto',
+      capacity: '256 GB',
+      qty: 4,
+      minQty: 2,
+      cost: 4400,
+      price: 5199,
+    }),
+    variantSku({
+      id: 'STK-14-128',
+      name: 'iPhone 14',
+      sku: 'APL-14-128',
+      barcode: '7891000140128',
+      imei: '',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 5,
+      minQty: 2,
+      cost: 3200,
+      price: 3899,
+    }),
+    variantSku({
+      id: 'STK-14-256',
+      name: 'iPhone 14',
+      sku: 'APL-14-256',
+      barcode: '7891000140256',
+      imei: '',
+      color: 'Preto',
+      capacity: '256 GB',
+      qty: 3,
+      minQty: 1,
+      cost: 3700,
+      price: 4499,
+    }),
+    variantSku({
+      id: 'STK-13-128',
+      name: 'iPhone 13',
+      sku: 'APL-13-128',
+      barcode: '7891000130128',
+      imei: '',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 4,
+      minQty: 2,
+      cost: 2800,
+      price: 3400,
+    }),
+    variantSku({
+      id: 'STK-13-256',
+      name: 'iPhone 13',
+      sku: 'APL-13-256',
+      barcode: '7891000130256',
+      imei: '',
+      color: 'Preto',
+      capacity: '256 GB',
+      qty: 2,
+      minQty: 1,
+      cost: 3200,
+      price: 3899,
+    }),
+    variantSku({
+      id: 'STK-12-64',
+      name: 'iPhone 12',
+      sku: 'APL-12-64',
+      barcode: '7891000120064',
+      imei: '',
+      color: 'Preto',
+      capacity: '64 GB',
+      qty: 3,
+      minQty: 1,
+      cost: 2100,
+      price: 2799,
+    }),
+    variantSku({
+      id: 'STK-12-128',
+      name: 'iPhone 12',
+      sku: 'APL-12-128',
+      barcode: '7891000120128',
+      imei: '',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 3,
+      minQty: 1,
+      cost: 2400,
+      price: 3199,
+    }),
+    variantSku({
+      id: 'STK-11-64',
+      name: 'iPhone 11',
+      sku: 'APL-11-64',
+      barcode: '7891000110064',
+      imei: '',
+      color: 'Preto',
+      capacity: '64 GB',
+      qty: 4,
+      minQty: 1,
+      cost: 1700,
+      price: 2299,
+    }),
+    variantSku({
+      id: 'STK-11-128',
+      name: 'iPhone 11',
+      sku: 'APL-11-128',
+      barcode: '7891000110128',
+      imei: '',
+      color: 'Preto',
+      capacity: '128 GB',
+      qty: 3,
+      minQty: 1,
+      cost: 2000,
+      price: 2699,
+    }),
+    variantSku({
+      id: 'STK-RN13',
+      name: 'Redmi Note 13 Pro',
+      sku: 'XIA-RN13-256',
+      barcode: '7892000130256',
+      imei: '',
+      color: 'Preto',
+      capacity: '256 GB',
+      qty: 12,
+      minQty: 4,
+      cost: 1650,
+      price: 2199,
+    }),
+    variantSku({
+      id: 'STK-RN13-512',
+      name: 'Redmi Note 13 Pro',
+      sku: 'XIA-RN13-512',
+      barcode: '7892000130512',
+      imei: '',
+      color: 'Preto',
+      capacity: '512 GB',
+      qty: 5,
+      minQty: 2,
+      cost: 1950,
+      price: 2599,
+    }),
+  ];
+}
+
+function mergeVariantStock(stock: StockItem[]) {
+  const ids = new Set(stock.map((item) => item.id));
+  const missing = seedStock().filter((item) => !ids.has(item.id));
+  if (!missing.length) return stock.map(normalizeStock);
+  return [...stock.map(normalizeStock), ...missing];
 }
 
 function seed(): AdminState {
@@ -74,52 +374,7 @@ function seed(): AdminState {
         createdAt: new Date().toISOString(),
       },
     ],
-    stock: [
-      {
-        id: 'STK-16PM',
-        name: 'iPhone 16 Pro Max',
-        sku: 'APL-16PM-256',
-        color: 'Desert',
-        capacity: '256 GB',
-        qty: 4,
-        minQty: 2,
-        cost: 6200,
-        price: 6990,
-      },
-      {
-        id: 'STK-16P',
-        name: 'iPhone 16 Pro',
-        sku: 'APL-16P-128',
-        color: 'Preto',
-        capacity: '128 GB',
-        qty: 6,
-        minQty: 2,
-        cost: 5400,
-        price: 6290,
-      },
-      {
-        id: 'STK-15',
-        name: 'iPhone 15',
-        sku: 'APL-15-128',
-        color: 'Preto',
-        capacity: '128 GB',
-        qty: 8,
-        minQty: 3,
-        cost: 3800,
-        price: 4499,
-      },
-      {
-        id: 'STK-RN13',
-        name: 'Redmi Note 13 Pro',
-        sku: 'XIA-RN13-256',
-        color: 'Preto',
-        capacity: '256 GB',
-        qty: 12,
-        minQty: 4,
-        cost: 1650,
-        price: 2199,
-      },
-    ],
+    stock: seedStock(),
     orders: [],
     finance: [
       {
@@ -130,18 +385,68 @@ function seed(): AdminState {
         createdAt: new Date().toISOString(),
       },
     ],
+    priceTables: seedPriceTables(),
+    payments: seedPayments(),
+  };
+}
+
+function normalizeStock(item: StockItem): StockItem {
+  const attrs = { ...(item.attrs ?? {}) };
+  if (!attrs[ATTR_COR] && item.color) attrs[ATTR_COR] = item.color;
+  if (!attrs[ATTR_CAP] && item.capacity) attrs[ATTR_CAP] = item.capacity;
+  return {
+    ...item,
+    barcode: item.barcode ?? '',
+    imei: item.imei ?? '',
+    attrs,
+    color: attrs[ATTR_COR] ?? item.color ?? '',
+    capacity: attrs[ATTR_CAP] ?? item.capacity ?? '',
+  };
+}
+
+function hydrate(parsed: Partial<AdminState>): AdminState {
+  const base = seed();
+  return {
+    customers: parsed.customers ?? base.customers,
+    stock: (parsed.stock ?? base.stock).map(normalizeStock),
+    orders: parsed.orders ?? [],
+    finance: parsed.finance ?? base.finance,
+    priceTables: parsed.priceTables?.length ? parsed.priceTables : base.priceTables,
+    payments: parsed.payments?.length ? parsed.payments : base.payments,
   };
 }
 
 function load(): AdminState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seed();
-    const parsed = JSON.parse(raw) as AdminState;
-    if (!parsed.customers || !parsed.stock) return seed();
-    return parsed;
+    if (!raw) {
+      const fresh = seed();
+      save(fresh);
+      return fresh;
+    }
+    const parsed = JSON.parse(raw) as Partial<AdminState>;
+    if (!parsed.customers || !parsed.stock) {
+      const fresh = seed();
+      save(fresh);
+      return fresh;
+    }
+    const next = hydrate(parsed);
+    const stockNeedsCodes = (parsed.stock ?? []).some(
+      (item) => item.barcode === undefined || item.imei === undefined,
+    );
+    const shouldMergeVariants = !localStorage.getItem('marthi.admin.variants.v2');
+    if (shouldMergeVariants) {
+      next.stock = mergeVariantStock(next.stock);
+      localStorage.setItem('marthi.admin.variants.v2', '1');
+    }
+    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes || shouldMergeVariants) {
+      save(next);
+    }
+    return next;
   } catch {
-    return seed();
+    const fresh = seed();
+    save(fresh);
+    return fresh;
   }
 }
 
@@ -151,6 +456,27 @@ function save(state: AdminState) {
 
 export function getAdminState() {
   return load();
+}
+
+export function applyPriceTable(basePrice: number, table: PriceTable | undefined) {
+  const percent = table?.percent ?? 0;
+  return Math.round(basePrice * (1 + percent / 100) * 100) / 100;
+}
+
+export function findStockByCode(code: string) {
+  const needle = code.trim().toLowerCase().replace(/\s+/g, '');
+  if (!needle) return null;
+  const stock = load().stock;
+  const exact = stock.find((item) => {
+    const sku = item.sku.toLowerCase().replace(/\s+/g, '');
+    const barcode = item.barcode.toLowerCase().replace(/\s+/g, '');
+    const imei = item.imei.toLowerCase().replace(/\s+/g, '');
+    const id = item.id.toLowerCase();
+    return needle === sku || needle === barcode || needle === imei || needle === id;
+  });
+  if (exact) return exact;
+  const named = stock.filter((item) => item.name.toLowerCase().includes(needle));
+  return named.length === 1 ? named[0] : null;
 }
 
 export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?: string }) {
@@ -179,7 +505,21 @@ export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?
 
 export function saveStock(items: StockItem[]) {
   const state = load();
-  state.stock = items;
+  state.stock = items.map(normalizeStock);
+  save(state);
+  return state;
+}
+
+export function savePriceTables(items: PriceTable[]) {
+  const state = load();
+  state.priceTables = items;
+  save(state);
+  return state;
+}
+
+export function savePayments(items: PaymentMethod[]) {
+  const state = load();
+  state.payments = items;
   save(state);
   return state;
 }
@@ -192,46 +532,78 @@ export function closeSale(input: {
   amount: number;
   payment: string;
 }) {
+  return closePosSale({
+    ticketId: input.ticketId,
+    customerName: input.customerName,
+    customerPhone: input.customerPhone,
+    paymentName: input.payment,
+    priceTableName: 'Vista',
+    discount: 0,
+    surcharge: 0,
+    lines: [{ stockId: '', name: input.productName, qty: 1, unitPrice: input.amount, imei: '' }],
+  });
+}
+
+export function closePosSale(input: {
+  ticketId: string | null;
+  customerName: string;
+  customerPhone: string;
+  paymentName: string;
+  priceTableName: string;
+  discount: number;
+  surcharge: number;
+  lines: PosLineInput[];
+}) {
   const state = load();
+  const subtotal = input.lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+  const amount = Math.max(0, subtotal - input.discount + input.surcharge);
+  const summary = input.lines.map((line) => `${line.qty}x ${line.name}`).join(', ');
   const order: SalesOrder = {
     id: uid('PED'),
     ticketId: input.ticketId,
-    customerName: input.customerName,
-    productName: input.productName,
-    amount: input.amount,
+    customerName: input.customerName || 'Consumidor',
+    productName: summary,
+    amount,
     status: 'sold',
-    payment: input.payment,
+    payment: `${input.paymentName} · ${input.priceTableName}`,
     createdAt: new Date().toISOString(),
   };
   state.orders.unshift(order);
   state.finance.unshift({
     id: uid('FIN'),
     type: 'in',
-    label: `Venda ${order.id} · ${input.productName}`,
-    amount: input.amount,
+    label: `Venda ${order.id} · ${summary}`,
+    amount,
     createdAt: order.createdAt,
   });
 
-  const stock = state.stock.find((item) =>
-    input.productName.toLowerCase().includes(item.name.toLowerCase()),
-  );
-  if (stock && stock.qty > 0) stock.qty -= 1;
+  for (const line of input.lines) {
+    const stock = line.stockId
+      ? state.stock.find((item) => item.id === line.stockId)
+      : state.stock.find((item) => line.name.toLowerCase().includes(item.name.toLowerCase()));
+    if (stock) {
+      stock.qty = Math.max(0, stock.qty - line.qty);
+      if (line.imei && stock.imei === line.imei) stock.imei = '';
+    }
+  }
 
-  const phoneKey = input.customerPhone.replace(/\D/g, '');
-  const existing = state.customers.find((item) => item.phone.replace(/\D/g, '') === phoneKey);
-  if (existing) {
-    existing.name = input.customerName;
-    existing.phone = input.customerPhone;
-  } else {
-    state.customers.unshift({
-      id: uid('CLI'),
-      name: input.customerName,
-      phone: input.customerPhone,
-      document: '',
-      email: '',
-      city: '',
-      createdAt: order.createdAt,
-    });
+  if (input.customerPhone.replace(/\D/g, '').length >= 8) {
+    const phoneKey = input.customerPhone.replace(/\D/g, '');
+    const existing = state.customers.find((item) => item.phone.replace(/\D/g, '') === phoneKey);
+    if (existing) {
+      existing.name = input.customerName || existing.name;
+      existing.phone = input.customerPhone;
+    } else {
+      state.customers.unshift({
+        id: uid('CLI'),
+        name: input.customerName || 'Cliente PDV',
+        phone: input.customerPhone,
+        document: '',
+        email: '',
+        city: '',
+        createdAt: order.createdAt,
+      });
+    }
   }
 
   save(state);

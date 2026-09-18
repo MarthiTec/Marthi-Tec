@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminState } from '../../data/adminStore';
-import { getOperatorProfile } from '../../data/operatorProfile';
+import { ticketVariation } from '../../data/posQueueStore';
+import { hasModule } from '../../data/storePlan';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePosTickets } from './usePosTickets';
 
@@ -76,7 +77,7 @@ export function AdminHomePage() {
                   <tr key={ticket.id}>
                     <td>{ticket.customerName}</td>
                     <td>
-                      {ticket.productName} · {ticket.color} · {ticket.storage}
+                      {ticket.productName} · {ticketVariation(ticket)}
                     </td>
                     <td className="price-red">{ticket.priceLabel}</td>
                     <td>
@@ -95,14 +96,45 @@ export function AdminHomePage() {
           <h2>Atalhos da loja</h2>
           <p>Cadastros e caixa da operação no centro do dia.</p>
           <div className="admin-toolbar admin-toolbar--stack">
-            <Link to="/painel/clientes" className="btn btn--ghost">
-              Clientes
-            </Link>
-            <Link to="/painel/estoque" className="btn btn--ghost">
-              Estoque
-            </Link>
-            <Link to="/painel/financeiro" className="btn btn--ghost">
-              Financeiro
+            {hasModule('totem') ? (
+              <Link to="/painel/totem" className="btn btn--ghost">
+                Modo do totem
+              </Link>
+            ) : null}
+            {hasModule('presales') ? (
+              <Link to="/painel/pdv/venda" className="btn btn--primary">
+                Lançar venda
+              </Link>
+            ) : null}
+            {hasModule('os') ? (
+              <Link to="/painel/os" className="btn btn--ghost">
+                Ordens de serviço
+              </Link>
+            ) : null}
+            {hasModule('erp') ? (
+              <>
+                <Link to="/painel/clientes" className="btn btn--ghost">
+                  Clientes
+                </Link>
+                <Link to="/painel/estoque" className="btn btn--ghost">
+                  Estoque
+                </Link>
+                <Link to="/painel/atributos" className="btn btn--ghost">
+                  Atributos
+                </Link>
+                <Link to="/painel/tabelas" className="btn btn--ghost">
+                  Tabelas de preço
+                </Link>
+                <Link to="/painel/pagamentos" className="btn btn--ghost">
+                  Formas de pagamento
+                </Link>
+                <Link to="/painel/financeiro" className="btn btn--ghost">
+                  Financeiro
+                </Link>
+              </>
+            ) : null}
+            <Link to="/painel/plano" className="btn btn--ghost">
+              Plano da loja
             </Link>
             <Link to="/painel/perfil" className="btn btn--ghost">
               Meu perfil

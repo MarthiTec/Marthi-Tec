@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 
-const SKIP = 'button, a, select, input, textarea, label, .totem-carousel__nav, .totem-carousel__dot';
+const SKIP = 'button, a, select, input, textarea, label, .totem-carousel__dot';
 
 export function useDragScroll(ref: RefObject<HTMLDivElement | null>, enabled: boolean) {
   useEffect(() => {

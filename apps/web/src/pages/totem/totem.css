@@ -129,6 +129,14 @@ body.totem-html-scroll #root {
   margin-bottom: 10px;
 }
 
+.totem--page-scroll .totem__search-panel {
+  position: sticky;
+  top: 66px;
+  z-index: 18;
+  background: linear-gradient(#f5f5f7 70%, rgba(245, 245, 247, 0.92));
+  padding: 4px 0 10px;
+}
+
 .totem__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -165,24 +173,34 @@ body.totem-html-scroll #root {
   color: #fff;
 }
 
+.totem__querybar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.35fr) repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+  align-items: stretch;
+}
+
 .totem__search-trigger {
   border: none;
-  background: transparent;
-  color: #86868b;
+  background: #e8e8ed;
+  color: #6e6e73;
   font-size: 0.92rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
-  max-width: 220px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 
 .totem__search-trigger.is-active {
   color: #1d1d1f;
-  background: rgba(0, 0, 0, 0.04);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .totem__search-dock {
@@ -235,28 +253,54 @@ body.totem-html-scroll #root {
 
 .totem-filter {
   position: relative;
+  min-width: 0;
 }
 
 .totem-filter__label {
+  width: 100%;
+  min-height: 52px;
   border: none;
-  background: transparent;
-  color: #a1a1a6;
-  font-size: 0.82rem;
-  font-weight: 500;
+  background: #e8e8ed;
+  color: #6e6e73;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  text-align: left;
+}
+
+.totem-filter__label strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .totem-filter__label.is-set,
 .totem-filter__label.is-open {
-  color: #1d1d1f;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .totem-filter__menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
+  right: auto;
+  min-width: 100%;
   z-index: 12;
   min-width: 160px;
   max-height: 260px;
@@ -348,6 +392,11 @@ body.totem-html-scroll #root {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.totem-card__fields[data-count='4'],
+.totem-card__fields[data-count='5'] {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .totem-picker {
@@ -506,6 +555,14 @@ body.totem-html-scroll #root {
   font-weight: 600;
 }
 
+.totem-card__stock {
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
 .totem__empty {
   grid-column: 1 / -1;
   margin: auto;
@@ -630,31 +687,6 @@ body.totem-html-scroll #root {
   pointer-events: none;
 }
 
-.totem-carousel__nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: #1d1d1f;
-  font-size: 1.6rem;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 2;
-}
-
-.totem-carousel__nav--prev {
-  left: 10px;
-}
-
-.totem-carousel__nav--next {
-  right: 10px;
-}
-
 .totem-carousel__dots {
   position: absolute;
   left: 0;
@@ -662,11 +694,13 @@ body.totem-html-scroll #root {
   bottom: 12px;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   z-index: 2;
+  pointer-events: none;
 }
 
 .totem-carousel__dot {
+  position: relative;
   width: 10px;
   height: 10px;
   border-radius: 999px;
@@ -674,6 +708,13 @@ body.totem-html-scroll #root {
   background: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   padding: 0;
+  pointer-events: auto;
+}
+
+.totem-carousel__dot::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
 }
 
 .totem-carousel__dot.is-active {
@@ -897,9 +938,21 @@ body.totem-html-scroll #root {
   font-size: 0.9rem;
 }
 
+@media (max-width: 1180px) {
+  .totem__querybar {
+    grid-template-columns: minmax(160px, 1.2fr) repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
-  .totem-card__fields {
-    grid-template-columns: 1fr;
+  .totem-card__fields,
+  .totem-card__fields[data-count='4'],
+  .totem-card__fields[data-count='5'] {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .totem__querybar {
+    grid-template-columns: 1fr 1fr;
   }
 
   .totem__checkout-card {
