@@ -18,6 +18,19 @@ const envSchema = z.object({
   DB_USERNAME: z.string().optional(),
   DB_PASSWORD: z.string().optional(),
   DB_SSLMODE: z.string().default('prefer'),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  JWT_SECRET: z.string().min(16).default('marthi-dev-secret-change-me'),
+  AUTH_DEV_EMAIL: z.string().email().optional(),
+  AUTH_DEV_PASSWORD: z.string().optional(),
+  EVOLUTION_BASE_URL: z.string().url().optional(),
+  EVOLUTION_INSTANCE: z.string().optional(),
+  EVOLUTION_API_KEY: z.string().optional(),
+  EVOLUTION_STORE_NUMBER: z.string().optional(),
+  EVOLUTION_NOTIFY_CUSTOMER: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  TOTEM_LOCATION_LABEL: z.string().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);

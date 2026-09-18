@@ -6,6 +6,8 @@ build/
 .env
 .env.local
 .env.*.local
+client_secret*.json
+**/client_secret*.json
 *.log
 .DS_Store
 Thumbs.db
@@ -14,3 +16,5 @@ Thumbs.db
 .cursor/
 coverage/
 *.tsbuildinfo
+
+.tmp-evolution-qr.png

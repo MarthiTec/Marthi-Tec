@@ -1,0 +1,439 @@
+.totem {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #1d1d1f;
+  display: flex;
+  flex-direction: column;
+}
+
+.totem__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px clamp(16px, 3vw, 28px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.totem__mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.totem__top-meta {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+}
+
+.totem__top-meta strong {
+  font-size: 0.95rem;
+}
+
+.totem__top-meta span {
+  color: #86868b;
+  font-size: 0.8rem;
+}
+
+.totem__exit {
+  color: #1d1d1f;
+  font-weight: 600;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.totem__welcome,
+.totem__done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 24px 64px;
+  gap: 12px;
+}
+
+.totem__welcome-logo {
+  width: min(420px, 80vw);
+  margin-bottom: 12px;
+}
+
+.totem__welcome h1,
+.totem__done h1,
+.totem__checkout h1,
+.totem__configure-panel h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+  font-weight: 600;
+}
+
+.totem__welcome p,
+.totem__done p {
+  margin: 0;
+  max-width: 36ch;
+  color: #86868b;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.totem__catalog,
+.totem__configure,
+.totem__checkout {
+  flex: 1;
+  padding: 20px clamp(16px, 3vw, 32px) 40px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.totem__toolbar {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.totem__search {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid #d2d2d7;
+  border-radius: 16px;
+  padding: 0 18px;
+  font-size: 1.05rem;
+  background: #fff;
+}
+
+.totem__brands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.totem-chip {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid #d2d2d7;
+  background: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.totem-chip.is-active {
+  background: #1d1d1f;
+  border-color: #1d1d1f;
+  color: #fff;
+}
+
+.totem__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.totem-card {
+  border: 1px solid #e8e8ed;
+  border-radius: 22px;
+  background: #fff;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.totem-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+}
+
+.totem-card__visual {
+  height: 160px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.brand-apple {
+  background: linear-gradient(145deg, #2c2c2e, #111);
+}
+
+.brand-xiaomi {
+  background: linear-gradient(145deg, #ff6900, #b34100);
+}
+
+.totem-carousel {
+  position: relative;
+  overflow: hidden;
+  background: #f5f5f7;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.totem-carousel--card {
+  height: 220px;
+}
+
+.totem-carousel--hero {
+  min-height: 520px;
+  border-radius: 28px;
+}
+
+.totem-carousel--empty,
+.totem-carousel.brand-apple,
+.totem-carousel.brand-xiaomi {
+  background: linear-gradient(145deg, #2c2c2e, #111);
+}
+
+.totem-carousel.brand-xiaomi {
+  background: linear-gradient(145deg, #ff6900, #b34100);
+}
+
+.totem-carousel__track {
+  display: flex;
+  height: 100%;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.totem-carousel__slide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.totem-carousel__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.totem-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d1d1f;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+}
+
+.totem-carousel--card .totem-carousel__nav {
+  width: 40px;
+  height: 40px;
+  font-size: 1.4rem;
+}
+
+.totem-carousel__nav--prev {
+  left: 12px;
+}
+
+.totem-carousel__nav--next {
+  right: 12px;
+}
+
+.totem-carousel__dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  z-index: 2;
+}
+
+.totem-carousel__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  padding: 0;
+}
+
+.totem-carousel__dot.is-active {
+  width: 28px;
+  background: #fff;
+}
+
+.totem-card__body {
+  padding: 16px;
+}
+
+.totem-card__body h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.totem-card__price {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.totem-card__parc {
+  margin: 4px 0 0;
+  color: #86868b;
+  font-size: 0.9rem;
+}
+
+.totem__configure-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.totem__configure-panel,
+.totem__checkout {
+  display: grid;
+  gap: 14px;
+}
+
+.totem-field {
+  display: grid;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+.totem-field select,
+.totem-field input {
+  min-height: 56px;
+  border: 1px solid #d2d2d7;
+  border-radius: 14px;
+  padding: 0 14px;
+  font-size: 1.05rem;
+  color: #1d1d1f;
+  background: #fff;
+}
+
+.totem__prices {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #f5f5f7;
+}
+
+.totem__prices > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.totem__prices span {
+  color: #86868b;
+}
+
+.totem__prices strong {
+  font-size: 1.05rem;
+}
+
+.totem__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.totem__summary p {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f5f7;
+  display: grid;
+  gap: 6px;
+}
+
+.totem__summary span {
+  color: #86868b;
+  font-size: 0.85rem;
+}
+
+.totem-btn {
+  min-height: 56px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.totem-btn--primary {
+  background: #1d1d1f;
+  color: #fff;
+}
+
+.totem-btn--primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.totem-btn--block {
+  width: 100%;
+}
+
+.totem-link {
+  justify-self: start;
+  border: none;
+  background: transparent;
+  color: #1d1d1f;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.totem__done-note {
+  font-size: 0.95rem !important;
+}
+
+.totem__error {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff5f5;
+  color: #b00020;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .totem__configure-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .totem-carousel--hero {
+    min-height: 280px;
+  }
+
+  .totem__summary {
+    grid-template-columns: 1fr;
+  }
+}
