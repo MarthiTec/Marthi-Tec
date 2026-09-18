@@ -37,7 +37,7 @@ function phoneImages(slug: string, count = 4): string[] {
   return Array.from({ length: count }, (_, index) => `/totem/${slug}/${index + 1}.svg`);
 }
 
-export const TOTEM_PRODUCTS = [
+export const TOTEM_PRODUCTS: TotemProduct[] = ([
   {
     id: 1,
     name: 'iPhone 16 Pro Max',
@@ -118,7 +118,7 @@ export const TOTEM_PRODUCTS = [
     installmentLabel: '12 X R$ 209,00',
     images: phoneImages('redmi-note-13-pro', 4),
   },
-].map(phone);
+] as Omit<TotemProduct, 'attrs'>[]).map(phone);
 
 export const PAYMENT_OPTIONS = ['À vista', 'Parcelado'] as const;
 export const INSTALLMENTS = ['2x', '3x', '6x', '10x', '12x'] as const;
