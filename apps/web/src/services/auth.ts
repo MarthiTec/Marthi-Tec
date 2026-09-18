@@ -1,3 +1,5 @@
+import { DEMO_LOGIN, isDemoCredentials, isDemoToken, readJson } from './http';
+
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 export type AuthUser = {
@@ -27,8 +29,8 @@ type ApiErrorBody = {
   };
 };
 
-async function parseJson<T>(response: Response): Promise<T> {
-  const json = (await response.json()) as T | ApiErrorBody;
+async function parseAuth<T>(response: Response): Promise<T> {
+  const json = await readJson<T | ApiErrorBody>(response);
   if (!response.ok || (json as ApiErrorBody).success === false) {
     const message =
       (json as ApiErrorBody).error?.message ?? `Falha na autenticação (${response.status})`;
@@ -37,19 +39,44 @@ async function parseJson<T>(response: Response): Promise<T> {
   return json as T;
 }
 
+function demoSession(): AuthSession {
+  return { token: DEMO_LOGIN.token, user: DEMO_LOGIN.user };
+}
+
 export async function fetchAuthProviders(): Promise<AuthProviders> {
-  const response = await fetch(`${API_URL}/api/v1/auth/providers`);
-  const json = await parseJson<{ success: true; data: AuthProviders }>(response);
-  return json.data;
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/providers`);
+    const json = await parseAuth<{ success: true; data: AuthProviders }>(response);
+    return { ...json.data, password: true };
+  } catch {
+    return {
+      google: Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID),
+      password: true,
+      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? null,
+    };
+  }
 }
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthSession> {
+  if (isDemoCredentials(email, password)) {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      return (await parseAuth<{ success: true; data: AuthSession }>(response)).data;
+    } catch {
+      return demoSession();
+    }
+  }
+
   const response = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const json = await parseJson<{ success: true; data: AuthSession }>(response);
+  const json = await parseAuth<{ success: true; data: AuthSession }>(response);
   return json.data;
 }
 
@@ -59,14 +86,18 @@ export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idToken }),
   });
-  const json = await parseJson<{ success: true; data: AuthSession }>(response);
+  const json = await parseAuth<{ success: true; data: AuthSession }>(response);
   return json.data;
 }
 
 export async function fetchCurrentUser(token: string): Promise<AuthUser> {
+  if (isDemoToken(token)) {
+    return DEMO_LOGIN.user;
+  }
+
   const response = await fetch(`${API_URL}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const json = await parseJson<{ success: true; data: { user: AuthUser } }>(response);
+  const json = await parseAuth<{ success: true; data: { user: AuthUser } }>(response);
   return json.data.user;
 }

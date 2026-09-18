@@ -24,7 +24,7 @@ export function PanelPage() {
           <BrandLogo variant="mark" className="panel-shell__mark" />
         </Link>
         <div className="panel-shell__meta">
-          <strong>Cell Ponto · Painel</strong>
+          <strong>Sua Loja · Painel</strong>
           <span>
             {user.name} · {user.provider === 'google' ? 'Google' : 'E-mail'}
           </span>

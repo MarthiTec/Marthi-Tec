@@ -4,6 +4,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemKeyboard } from './TotemKeyboard';
+import { TotemPicker } from './TotemPicker';
 import {
   FULFILLMENT_OPTIONS,
   INSTALLMENTS,
@@ -120,8 +121,21 @@ export function TotemPage() {
   }, [brandProducts, search, filterColor, filterStorage, filterFulfillment]);
 
   useEffect(() => {
+    const scrolling = step === 'catalog';
+    document.documentElement.classList.toggle('totem-html-scroll', scrolling);
+    document.body.classList.toggle('totem-html-scroll', scrolling);
+    return () => {
+      document.documentElement.classList.remove('totem-html-scroll');
+      document.body.classList.remove('totem-html-scroll');
+    };
+  }, [step]);
+
+  useEffect(() => {
+    if (step === 'catalog') {
+      window.scrollTo({ top: 0 });
+    }
     listRef.current?.scrollTo({ top: 0 });
-  }, [brand, search, filterColor, filterStorage, filterFulfillment]);
+  }, [step, brand, search, filterColor, filterStorage, filterFulfillment]);
 
   useEffect(() => {
     setFilterColor('all');
@@ -257,11 +271,11 @@ export function TotemPage() {
   }
 
   return (
-    <div className="totem">
+    <div className={`totem ${step === 'catalog' ? 'totem--page-scroll' : ''}`}>
       <header className="totem__top">
         <BrandLogo variant="mark" className="totem__mark" />
         <div className="totem__top-meta">
-          <strong>Cell Ponto</strong>
+          <strong>Sua Loja</strong>
           <span>Totem Marthi · Shopping</span>
         </div>
         <button type="button" className="totem__exit" onClick={requestExit}>
@@ -432,54 +446,33 @@ export function TotemPage() {
                       <h2>{product.name}</h2>
 
                       <div className="totem-card__fields">
-                        <label>
-                          <span>Cor</span>
-                          <select
-                            value={config.color}
-                            onChange={(e) => {
-                              bumpIdle();
-                              patchConfig(product.id, { color: e.target.value });
-                            }}
-                          >
-                            {product.colors.map((color) => (
-                              <option key={color} value={color}>
-                                {color}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Capacidade</span>
-                          <select
-                            value={config.storage}
-                            onChange={(e) => {
-                              bumpIdle();
-                              patchConfig(product.id, { storage: e.target.value });
-                            }}
-                          >
-                            {product.storages.map((storage) => (
-                              <option key={storage} value={storage}>
-                                {storage}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Retirada</span>
-                          <select
-                            value={config.fulfillment}
-                            onChange={(e) => {
-                              bumpIdle();
-                              patchConfig(product.id, { fulfillment: e.target.value });
-                            }}
-                          >
-                            {FULFILLMENT_OPTIONS.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        <TotemPicker
+                          label="Cor"
+                          value={config.color}
+                          options={product.colors}
+                          onChange={(value) => {
+                            bumpIdle();
+                            patchConfig(product.id, { color: value });
+                          }}
+                        />
+                        <TotemPicker
+                          label="Capacidade"
+                          value={config.storage}
+                          options={product.storages}
+                          onChange={(value) => {
+                            bumpIdle();
+                            patchConfig(product.id, { storage: value });
+                          }}
+                        />
+                        <TotemPicker
+                          label="Retirada"
+                          value={config.fulfillment}
+                          options={FULFILLMENT_OPTIONS}
+                          onChange={(value) => {
+                            bumpIdle();
+                            patchConfig(product.id, { fulfillment: value });
+                          }}
+                        />
                       </div>
 
                       <div className="totem-card__footer">
@@ -573,32 +566,22 @@ export function TotemPage() {
                 />
               </label>
 
-              <label className="totem-field">
-                Modo de pagamento
-                <select
-                  value={selection.payment}
-                  onChange={(e) => setSelection({ ...selection, payment: e.target.value })}
-                  disabled={submitting}
-                >
-                  {PAYMENT_OPTIONS.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
+              <TotemPicker
+                label="Modo de pagamento"
+                value={selection.payment}
+                options={PAYMENT_OPTIONS}
+                disabled={submitting}
+                onChange={(value) => setSelection({ ...selection, payment: value })}
+              />
 
               {selection.payment === 'Parcelado' && (
-                <label className="totem-field">
-                  Parcelas
-                  <select
-                    value={selection.installment}
-                    onChange={(e) => setSelection({ ...selection, installment: e.target.value })}
-                    disabled={submitting}
-                  >
-                    {INSTALLMENTS.map((item) => (
-                      <option key={item}>{item}</option>
-                    ))}
-                  </select>
-                </label>
+                <TotemPicker
+                  label="Parcelas"
+                  value={selection.installment}
+                  options={INSTALLMENTS}
+                  disabled={submitting}
+                  onChange={(value) => setSelection({ ...selection, installment: value })}
+                />
               )}
 
               <div className="totem__prices">

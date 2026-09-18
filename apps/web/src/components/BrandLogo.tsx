@@ -4,7 +4,7 @@ type BrandLogoProps = {
 };
 
 const sources = {
-  mark: '/brand/logo-mark.png?v=2',
+  mark: '/brand/logo-mark.png?v=4',
   wordmark: '/brand/wordmark.png',
   full: '/brand/logo-hero.png',
   hero: '/brand/logo-hero.png',

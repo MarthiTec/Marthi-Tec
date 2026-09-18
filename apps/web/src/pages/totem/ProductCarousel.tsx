@@ -51,10 +51,12 @@ export function ProductCarousel({
         paused.current = false;
       }}
       onTouchStart={(event) => {
+        if (size === 'card') return;
         touchStartX.current = event.touches[0]?.clientX ?? null;
         paused.current = true;
       }}
       onTouchEnd={(event) => {
+        if (size === 'card') return;
         const start = touchStartX.current;
         const end = event.changedTouches[0]?.clientX;
         touchStartX.current = null;

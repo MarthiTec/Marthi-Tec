@@ -23,7 +23,7 @@ authRouter.get('/api/v1/auth/providers', (_req, res) => {
     success: true,
     data: {
       google: Boolean(env.GOOGLE_CLIENT_ID),
-      password: Boolean(env.AUTH_DEV_EMAIL && env.AUTH_DEV_PASSWORD),
+      password: true,
       googleClientId: env.GOOGLE_CLIENT_ID ?? null,
     },
   });

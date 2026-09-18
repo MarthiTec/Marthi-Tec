@@ -56,10 +56,10 @@ export function LoginPage() {
 
       <div className="auth__card">
         <BrandLogo variant="mark" className="auth__mark" />
-        <p className="auth__tenant">Cell Ponto · demo</p>
+        <p className="auth__tenant">Sua Loja · demo</p>
         <h1>Entrar na loja</h1>
         <p className="auth__lead">
-          Use o login da operação da <strong>Cell Ponto</strong> para abrir o painel. A plataforma é
+          Use o login da operação da <strong>Sua Loja</strong> para abrir o painel. A plataforma é
           Marthi; a loja nesta demo é o tenant.
         </p>
 
@@ -73,7 +73,7 @@ export function LoginPage() {
               name="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="voce@empresa.com"
+              placeholder="teste@marthi.com.br"
               autoComplete="username"
               required
               disabled={submitting}
@@ -86,7 +86,7 @@ export function LoginPage() {
               name="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
+              placeholder="123"
               autoComplete="current-password"
               required
               disabled={submitting}
@@ -95,6 +95,9 @@ export function LoginPage() {
           <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
             {submitting ? 'Entrando…' : 'Continuar'}
           </button>
+          <p className="auth__demo">
+            Demo: <strong>teste@marthi.com.br</strong> · senha <strong>123</strong>
+          </p>
         </form>
 
         <div className="auth__divider" role="separator">

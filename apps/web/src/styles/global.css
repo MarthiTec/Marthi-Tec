@@ -30,7 +30,7 @@ body,
 
 body {
   margin: 0;
-  background: #ffffff;
+  background: #f5f5f7;
 }
 
 a {
@@ -73,6 +73,7 @@ input {
 .btn--primary {
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .btn--primary:hover {
@@ -426,6 +427,13 @@ input {
   outline: none;
   border-color: #86868b;
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+.auth__demo {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .panel-shell {

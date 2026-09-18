@@ -72,7 +72,7 @@ export async function loginWithPassword(email: string, password: string): Promis
   const user: AuthUser = {
     id: `password:${expectedEmail.toLowerCase()}`,
     email: expectedEmail.toLowerCase(),
-    name: expectedEmail.split('@')[0] ?? 'Usuário',
+    name: 'Marthi Teste',
     picture: null,
     provider: 'password',
   };

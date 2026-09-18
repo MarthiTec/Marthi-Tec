@@ -8,6 +8,7 @@ import { productsRouter } from './routes/products.js';
 import { authRouter } from './routes/auth.js';
 import { totemRouter } from './routes/totem.js';
 import { partnersRouter } from './routes/partners.js';
+import { posRouter } from './routes/pos.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 
@@ -23,6 +24,7 @@ app.use(authRouter);
 app.use(totemRouter);
 app.use(productsRouter);
 app.use(partnersRouter);
+app.use(posRouter);
 
 if (serveWeb) {
   app.use(express.static(webDist, { index: false, maxAge: '1h' }));
