@@ -1,0 +1,22 @@
+{
+  "name": "marthi-tec",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Marthi — plataforma de autoatendimento (API Node + React + PostgreSQL)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=@marthi/api",
+    "dev:web": "npm run dev --workspace=@marthi/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:api": "npm run build --workspace=@marthi/api",
+    "build:web": "npm run build --workspace=@marthi/web",
+    "start:api": "npm run start --workspace=@marthi/api",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
