@@ -6,6 +6,7 @@ export function useDragScroll(ref: RefObject<HTMLDivElement | null>, enabled: bo
   useEffect(() => {
     const scroller = ref.current;
     if (!scroller || !enabled) return;
+    const el = scroller;
 
     let pointerId: number | null = null;
     let startY = 0;
@@ -19,9 +20,9 @@ export function useDragScroll(ref: RefObject<HTMLDivElement | null>, enabled: bo
 
       pointerId = event.pointerId;
       startY = event.clientY;
-      startTop = scroller.scrollTop;
+      startTop = el.scrollTop;
       dragging = false;
-      scroller.classList.add('is-drag-ready');
+      el.classList.add('is-drag-ready');
     }
 
     function onMove(event: PointerEvent) {
@@ -30,36 +31,36 @@ export function useDragScroll(ref: RefObject<HTMLDivElement | null>, enabled: bo
       if (!dragging) {
         if (Math.abs(dy) < 8) return;
         dragging = true;
-        scroller.classList.add('is-dragging');
+        el.classList.add('is-dragging');
         try {
-          scroller.setPointerCapture(event.pointerId);
+          el.setPointerCapture(event.pointerId);
         } catch {
           /* ignore */
         }
       }
       event.preventDefault();
-      scroller.scrollTop = startTop - dy;
+      el.scrollTop = startTop - dy;
     }
 
     function onUp(event: PointerEvent) {
       if (pointerId !== event.pointerId) return;
       pointerId = null;
       dragging = false;
-      scroller.classList.remove('is-dragging', 'is-drag-ready');
+      el.classList.remove('is-dragging', 'is-drag-ready');
     }
 
-    scroller.addEventListener('pointerdown', onDown);
-    scroller.addEventListener('pointermove', onMove, { passive: false });
-    scroller.addEventListener('pointerup', onUp);
-    scroller.addEventListener('pointercancel', onUp);
-    scroller.addEventListener('lostpointercapture', onUp);
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove, { passive: false });
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    el.addEventListener('lostpointercapture', onUp);
 
     return () => {
-      scroller.removeEventListener('pointerdown', onDown);
-      scroller.removeEventListener('pointermove', onMove);
-      scroller.removeEventListener('pointerup', onUp);
-      scroller.removeEventListener('pointercancel', onUp);
-      scroller.removeEventListener('lostpointercapture', onUp);
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      el.removeEventListener('lostpointercapture', onUp);
     };
   }, [ref, enabled]);
 }
