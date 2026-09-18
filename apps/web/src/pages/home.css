@@ -139,11 +139,46 @@
   animation: rise 1000ms cubic-bezier(0.22, 1, 0.36, 1) 110ms both;
 }
 
+.hero__segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+  animation: rise 1020ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+}
+
+.hero__segment {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 20, 24, 0.12);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.hero__segment.is-active {
+  background: var(--teal-deep);
+  border-color: var(--teal-deep);
+  color: #fff;
+}
+
+.hero__segment-hint {
+  margin: 10px 0 0 !important;
+  font-size: 0.88rem !important;
+  color: var(--teal-deep) !important;
+  font-weight: 600;
+  animation: rise 1040ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
+}
+
 .hero__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 22px;
   animation: rise 1050ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
 }
 
@@ -152,7 +187,55 @@
   min-height: 420px;
   display: grid;
   place-items: center;
+  gap: 18px;
   animation: rise 1100ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+.hero__flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  z-index: 2;
+}
+
+.hero__flow li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(16, 20, 24, 0.08);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--mute);
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
+}
+
+.hero__flow li span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(16, 20, 24, 0.08);
+  font-size: 0.72rem;
+}
+
+.hero__flow li.is-active {
+  color: var(--ink);
+  background: #fff;
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
+.hero__flow li.is-active span {
+  background: var(--teal);
+  color: #fff;
 }
 
 .hero__totem {
@@ -165,6 +248,7 @@
     0 30px 80px rgba(16, 20, 24, 0.28),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   transform: rotate(-2deg);
+  z-index: 1;
 }
 
 .hero__totem-screen {
@@ -178,6 +262,7 @@
   flex-direction: column;
   gap: 14px;
   color: var(--ink);
+  animation: rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .hero__totem-brand {
@@ -551,8 +636,11 @@
   .hero__logo,
   .hero h1,
   .hero p,
+  .hero__segments,
+  .hero__segment-hint,
   .hero__actions,
   .hero__stage,
+  .hero__totem-screen,
   .products__panel,
   .hero__orbit,
   .hero__totem-rail i {

@@ -13,8 +13,12 @@ client_secret*.json
 Thumbs.db
 .idea/
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 coverage/
 *.tsbuildinfo
 
 .tmp-evolution-qr.png
+marthi-platform-site.zip
+*.zip

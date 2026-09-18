@@ -70,9 +70,44 @@ const PRODUCTS = [
   },
 ] as const;
 
+const SEGMENTS = [
+  {
+    id: 'celulares',
+    label: 'Celulares',
+    brand: 'Cell Ponto',
+    line: 'Escolha o aparelho. Confirme. WhatsApp da loja.',
+    hint: 'Demo ativa desta plataforma',
+  },
+  {
+    id: 'otica',
+    label: 'Ótica',
+    brand: 'Sua ótica',
+    line: 'Armação, lentes e agendamento no totem.',
+    hint: 'Mesmo motor, outra fachada',
+  },
+  {
+    id: 'moda',
+    label: 'Moda',
+    brand: 'Sua loja',
+    line: 'Lookbook touch e interesse direto no WhatsApp.',
+    hint: 'Catálogo visual na loja',
+  },
+  {
+    id: 'servicos',
+    label: 'Serviços',
+    brand: 'Sua operação',
+    line: 'Do pedido à OS — roadmap ERP no mesmo fio.',
+    hint: 'Base para OS + ERP',
+  },
+] as const;
+
+const FLOW = ['Escolha no totem', 'Confirme o interesse', 'Lead no WhatsApp'] as const;
+
 export function HomePage() {
   const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('growth');
   const [spotlight, setSpotlight] = useState(0);
+  const [segmentId, setSegmentId] = useState<(typeof SEGMENTS)[number]['id']>('celulares');
+  const [flowStep, setFlowStep] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -81,7 +116,15 @@ export function HomePage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setFlowStep((current) => (current + 1) % FLOW.length);
+    }, 2600);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const selected = PLANS.find((plan) => plan.id === activePlan) ?? PLANS[1];
+  const segment = SEGMENTS.find((item) => item.id === segmentId) ?? SEGMENTS[0];
 
   return (
     <div className="site">
@@ -111,23 +154,38 @@ export function HomePage() {
             <h1>Totem de autoatendimento para qualquer segmento</h1>
             <p>
               A Marthi entrega a experiência na loja — e o login da operação fica com quem vende.
-              Hoje, a demo abre para a <strong>Cell Ponto</strong>. Amanhã, OS e ERP no mesmo fio.
+              Nesta demo, o tenant é a <strong>Cell Ponto</strong>. O roadmap une OS e ERP ao totem.
             </p>
+            <div className="hero__segments" role="tablist" aria-label="Segmentos">
+              {SEGMENTS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={segmentId === item.id}
+                  className={`hero__segment ${segmentId === item.id ? 'is-active' : ''}`}
+                  onClick={() => setSegmentId(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <p className="hero__segment-hint">{segment.hint}</p>
             <div className="hero__actions">
               <Link to="/login" className="btn btn--primary">
                 Entrar na loja
               </Link>
               <Link to="/totem" className="btn btn--ghost">
-                Abrir totem demo
+                Abrir totem Cell Ponto
               </Link>
             </div>
           </div>
 
-          <div className="hero__stage" aria-hidden="true">
-            <div className="hero__totem">
-              <div className="hero__totem-screen">
-                <span className="hero__totem-brand">Cell Ponto</span>
-                <strong>Escolha. Confirme. WhatsApp.</strong>
+          <div className="hero__stage">
+            <div className="hero__totem" aria-hidden="true">
+              <div className="hero__totem-screen" key={segment.id}>
+                <span className="hero__totem-brand">{segment.brand}</span>
+                <strong>{segment.line}</strong>
                 <div className="hero__totem-rail">
                   <i />
                   <i />
@@ -135,8 +193,16 @@ export function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="hero__orbit hero__orbit--a" />
-            <div className="hero__orbit hero__orbit--b" />
+            <ol className="hero__flow" aria-label="Fluxo do totem">
+              {FLOW.map((step, index) => (
+                <li key={step} className={flowStep === index ? 'is-active' : ''}>
+                  <span>{index + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <div className="hero__orbit hero__orbit--a" aria-hidden="true" />
+            <div className="hero__orbit hero__orbit--b" aria-hidden="true" />
           </div>
         </section>
 

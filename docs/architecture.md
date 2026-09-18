@@ -1,12 +1,16 @@
 # Arquitetura atual (nova stack)
 
 ```text
-React Web (apps/web)
+Browser (qualquer lugar)
         │
         ▼
-Node API (apps/api)  ──►  PostgreSQL (Discloud)
-        ▲
-React Native (futuro)
+https://marthi-totem.discloud.app   (Discloud Site)
+        │
+        ▼
+Node API (apps/api)  ──► serve apps/web/dist (SPA)
+        │
+        ├── PostgreSQL (Discloud)     [quando configurado]
+        └── Evolution (marthi-tec)   [WhatsApp leads]
 ```
 
 ## Apps
@@ -15,15 +19,23 @@ React Native (futuro)
 - Express + TypeScript
 - Escuta `0.0.0.0:8080` (exigência Discloud)
 - `/health` — status + ping no Postgres
-- `/api/v1/products` — placeholder (501) para o Thiago implementar
+- `/api/v1/*` — auth, products, totem leads
+- Em produção serve o build de `apps/web/dist`
 
 ### `apps/web`
 - React + Vite
-- Tela inicial consome `/health`
-- Proxy local para a API
+- Home Marthi (planos, quem somos, produtos, segmentos)
+- Totem Cell Ponto + login da loja
+- Proxy local para a API no `vite` dev
 
 ### `packages/shared`
 - Tipos `Product`, `ProductVariant`, `ApiResponse`
+
+## Deploy
+
+- Site: `discloud.config` → `TYPE=site`, `ID=marthi-totem`
+- Skill: `.cursor/skills/discloud-marthi-deploy/`
+- Spec: `docs/specs/platform-public-site.md`
 
 ## Legado (ainda em produção)
 
