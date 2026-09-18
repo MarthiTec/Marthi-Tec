@@ -1,53 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
+import { PLANS } from '../data/catalog';
 import './home.css';
-
-const PLANS = [
-  {
-    id: 'start',
-    name: 'Start',
-    price: 'R$ 297',
-    period: '/mês',
-    blurb: 'Uma loja, um totem, operação enxuta.',
-    features: [
-      '1 totem de autoatendimento',
-      'Painel web da loja',
-      'Leads via WhatsApp (Evolution)',
-      'Catálogo e preços',
-      'Suporte em horário comercial',
-    ],
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    price: 'R$ 597',
-    period: '/mês',
-    blurb: 'Multi-totem e operação com mais ritmo.',
-    featured: true,
-    features: [
-      'Até 3 totens',
-      'Multi-usuário no painel',
-      'Relatórios de interesse',
-      'Personalização de marca da loja',
-      'Prioridade no suporte',
-    ],
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    price: 'Sob consulta',
-    period: '',
-    blurb: 'Rede, ERP e ordem de serviço sob medida.',
-    features: [
-      'Totens ilimitados*',
-      'Roadmap ERP + OS online',
-      'Integrações sob demanda',
-      'Ambiente dedicado',
-      'Acompanhamento comercial',
-    ],
-  },
-] as const;
 
 const PRODUCTS = [
   {
@@ -65,8 +20,8 @@ const PRODUCTS = [
   {
     title: 'OS + ERP (roadmap)',
     text: 'Ordem de serviço e gestão online interligadas ao totem — do interesse à entrega, num só sistema.',
-    href: '#planos',
-    cta: 'Ver planos',
+    href: '/parceiro',
+    cta: 'Quero ser parceiro',
   },
 ] as const;
 
@@ -141,7 +96,10 @@ export function HomePage() {
           <a href="#produtos">Produtos</a>
           <a href="#planos">Planos</a>
           <Link to="/totem">Demo totem</Link>
-          <Link to="/login" className="site__nav-cta">
+          <Link to="/parceiro" className="site__nav-cta">
+            Seja parceiro
+          </Link>
+          <Link to="/login">
             Entrar
           </Link>
         </nav>
@@ -172,8 +130,8 @@ export function HomePage() {
             </div>
             <p className="hero__segment-hint">{segment.hint}</p>
             <div className="hero__actions">
-              <Link to="/login" className="btn btn--primary">
-                Entrar na loja
+              <Link to="/parceiro" className="btn btn--primary">
+                Quero ser parceiro
               </Link>
               <Link to="/totem" className="btn btn--ghost">
                 Abrir totem Cell Ponto
@@ -307,7 +265,7 @@ export function HomePage() {
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
-            <Link to="/login" className="btn btn--primary">
+            <Link to={`/parceiro?plano=${selected.id}`} className="btn btn--primary">
               Quero este plano
             </Link>
           </div>
@@ -320,8 +278,8 @@ export function HomePage() {
             WhatsApp.
           </p>
           <div className="hero__actions">
-            <Link to="/login" className="btn btn--primary">
-              Login da loja
+            <Link to="/parceiro" className="btn btn--primary">
+              Cadastrar parceiro
             </Link>
             <Link to="/totem" className="btn btn--ghost">
               Totem Cell Ponto
