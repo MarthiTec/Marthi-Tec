@@ -36,7 +36,8 @@ function read(): StoreEntitlement {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultEntitlement();
     const parsed = JSON.parse(raw) as Partial<StoreEntitlement>;
-    const planId = isPlanId(parsed.planId ?? '') ? parsed.planId : 'scale';
+    const planId: PlanId =
+      parsed.planId && isPlanId(parsed.planId) ? parsed.planId : 'scale';
     const modules = Array.isArray(parsed.modules)
       ? parsed.modules.filter((item): item is PartnerModuleId =>
           ALL_MODULES.includes(item as PartnerModuleId),

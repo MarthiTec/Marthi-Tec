@@ -1,4 +1,4 @@
-import type { PartnerModuleId } from '../data/catalog';
+import type { PartnerModuleId } from '../../data/catalog';
 
 export type AdminNavChild = {
   to: string;

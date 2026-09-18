@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminState } from '../../data/adminStore';
+import { getOperatorProfile } from '../../data/operatorProfile';
 import { ticketVariation } from '../../data/posQueueStore';
 import { hasModule } from '../../data/storePlan';
 import { useAuth } from '../../contexts/AuthContext';
