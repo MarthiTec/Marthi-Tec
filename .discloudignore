@@ -1,0 +1,11 @@
+.git/
+.cursor/
+node_modules/
+apps/web/
+packages/
+docs/
+*.md
+.env
+.env.local
+apps/api/node_modules/
+apps/api/dist/
