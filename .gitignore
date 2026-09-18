@@ -1,5 +1,7 @@
-node_modules/
 dist/
+apps/api/dist/
+apps/web/dist/
+node_modules/
 build/
 .env
 .env.local
@@ -12,5 +14,3 @@ Thumbs.db
 .cursor/
 coverage/
 *.tsbuildinfo
-apps/web/dist/
-apps/api/dist/

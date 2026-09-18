@@ -3,20 +3,33 @@
   "private": true,
   "version": "0.1.0",
   "description": "Marthi — plataforma de autoatendimento (API Node + React + PostgreSQL)",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "type": "module",
   "scripts": {
+    "build": "tsc -p apps/api/tsconfig.json",
+    "start": "node dist/index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
     "dev:web": "npm run dev --workspace=@marthi/web",
-    "build": "npm run build --workspaces --if-present",
-    "build:api": "npm run build --workspace=@marthi/api",
+    "build:api": "tsc -p apps/api/tsconfig.json",
     "build:web": "npm run build --workspace=@marthi/web",
-    "start:api": "npm run start --workspace=@marthi/api",
     "lint": "npm run lint --workspaces --if-present"
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "dependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.11",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.3",
+    "typescript": "^5.8.2",
+    "zod": "^3.24.2"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

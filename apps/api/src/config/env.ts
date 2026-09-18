@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 loadEnv({ path: resolve(process.cwd(), '.env') });
 loadEnv({ path: resolve(process.cwd(), '../../.env') });
+loadEnv({ path: resolve(process.cwd(), '../../../.env') });
 loadEnv();
 
 const envSchema = z.object({

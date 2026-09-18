@@ -1,11 +1,12 @@
+node_modules/
+dist/
 .git/
 .cursor/
-node_modules/
-apps/web/
-packages/
-docs/
-*.md
+.vscode/
 .env
 .env.local
+package-lock.json
+apps/web/node_modules/
+apps/web/dist/
 apps/api/node_modules/
 apps/api/dist/
