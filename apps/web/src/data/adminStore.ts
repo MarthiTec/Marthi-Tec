@@ -12,6 +12,9 @@ export type Customer = {
   createdAt: string;
 };
 
+export type StockKind = 'part' | 'device' | 'supply';
+export type StockCondition = 'new' | 'used' | 'refurbished';
+
 export type StockItem = {
   id: string;
   name: string;
@@ -25,6 +28,9 @@ export type StockItem = {
   minQty: number;
   cost: number;
   price: number;
+  kind: StockKind;
+  condition: StockCondition;
+  sourceWorkOrderId?: string;
 };
 
 export type PriceTable = {
@@ -54,12 +60,16 @@ export type SalesOrder = {
   createdAt: string;
 };
 
+export type FinanceSource = 'manual' | 'pos' | 'os_part' | 'os_purchase' | 'os_revenue' | 'os_reversal';
+
 export type FinanceEntry = {
   id: string;
   type: 'in' | 'out';
   label: string;
   amount: number;
   createdAt: string;
+  source: FinanceSource;
+  refId?: string;
 };
 
 export type PosLineInput = {
@@ -128,8 +138,11 @@ function seedPayments(): PaymentMethod[] {
   ];
 }
 
-function variantSku(item: Omit<StockItem, 'attrs'>): StockItem {
-  return normalizeStock({ ...item, attrs: {} });
+function variantSku(
+  item: Omit<StockItem, 'attrs' | 'kind' | 'condition' | 'sourceWorkOrderId'> &
+    Partial<Pick<StockItem, 'kind' | 'condition' | 'sourceWorkOrderId'>>,
+): StockItem {
+  return normalizeStock({ ...item, attrs: {} } as StockItem);
 }
 
 function seedStock(): StockItem[] {
@@ -383,6 +396,7 @@ function seed(): AdminState {
         label: 'Saldo inicial de caixa',
         amount: 2500,
         createdAt: new Date().toISOString(),
+        source: 'manual',
       },
     ],
     priceTables: seedPriceTables(),
@@ -394,6 +408,7 @@ function normalizeStock(item: StockItem): StockItem {
   const attrs = { ...(item.attrs ?? {}) };
   if (!attrs[ATTR_COR] && item.color) attrs[ATTR_COR] = item.color;
   if (!attrs[ATTR_CAP] && item.capacity) attrs[ATTR_CAP] = item.capacity;
+  const looksLikeDevice = Boolean(item.imei || item.capacity || /iphone|redmi|galaxy|notebook/i.test(item.name));
   return {
     ...item,
     barcode: item.barcode ?? '',
@@ -401,6 +416,17 @@ function normalizeStock(item: StockItem): StockItem {
     attrs,
     color: attrs[ATTR_COR] ?? item.color ?? '',
     capacity: attrs[ATTR_CAP] ?? item.capacity ?? '',
+    kind: item.kind ?? (looksLikeDevice ? 'device' : 'part'),
+    condition: item.condition ?? 'new',
+    sourceWorkOrderId: item.sourceWorkOrderId,
+  };
+}
+
+function normalizeFinance(entry: FinanceEntry): FinanceEntry {
+  return {
+    ...entry,
+    source: entry.source ?? 'manual',
+    refId: entry.refId,
   };
 }
 
@@ -410,7 +436,7 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
     customers: parsed.customers ?? base.customers,
     stock: (parsed.stock ?? base.stock).map(normalizeStock),
     orders: parsed.orders ?? [],
-    finance: parsed.finance ?? base.finance,
+    finance: (parsed.finance ?? base.finance).map(normalizeFinance),
     priceTables: parsed.priceTables?.length ? parsed.priceTables : base.priceTables,
     payments: parsed.payments?.length ? parsed.payments : base.payments,
   };
@@ -575,6 +601,8 @@ export function closePosSale(input: {
     label: `Venda ${order.id} · ${summary}`,
     amount,
     createdAt: order.createdAt,
+    source: 'pos',
+    refId: order.id,
   });
 
   for (const line of input.lines) {
@@ -614,12 +642,49 @@ export function addFinance(entry: Omit<FinanceEntry, 'id' | 'createdAt'>) {
   const state = load();
   state.finance.unshift({
     ...entry,
+    source: entry.source ?? 'manual',
     id: uid('FIN'),
     createdAt: new Date().toISOString(),
   });
   save(state);
   return state;
 }
+
+export function findStockMatches(query: string, limit = 8) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [] as StockItem[];
+  return load()
+    .stock.filter((item) => {
+      const hay = `${item.name} ${item.sku} ${item.barcode} ${item.imei}`.toLowerCase();
+      return hay.includes(needle);
+    })
+    .slice(0, limit);
+}
+
+export function getStockItem(id: string) {
+  return load().stock.find((item) => item.id === id) ?? null;
+}
+
+export const STOCK_KIND_LABEL: Record<StockKind, string> = {
+  part: 'Peça',
+  device: 'Aparelho',
+  supply: 'Insumo',
+};
+
+export const STOCK_CONDITION_LABEL: Record<StockCondition, string> = {
+  new: 'Novo',
+  used: 'Usado',
+  refurbished: 'Recondicionado',
+};
+
+export const FINANCE_SOURCE_LABEL: Record<FinanceSource, string> = {
+  manual: 'Manual',
+  pos: 'PDV',
+  os_part: 'OS · peça',
+  os_purchase: 'OS · compra',
+  os_revenue: 'OS · receita',
+  os_reversal: 'OS · estorno',
+};
 
 export function parsePriceLabel(label: string) {
   const cleaned = label.replace(/[^\d,.-]/g, '').trim();

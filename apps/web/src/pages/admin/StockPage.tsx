@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react';
-import { getAdminState, saveStock, type StockItem } from '../../data/adminStore';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  getAdminState,
+  saveStock,
+  STOCK_CONDITION_LABEL,
+  STOCK_KIND_LABEL,
+  type StockCondition,
+  type StockItem,
+  type StockKind,
+} from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, stockAttributes } from '../../data/attributeStore';
 
 export function StockPage() {
@@ -7,6 +16,8 @@ export function StockPage() {
   const [items, setItems] = useState(() => getAdminState().stock);
   const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id)));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<'all' | StockKind>('all');
+  const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
 
   useEffect(() => {
     function refresh() {
@@ -15,6 +26,14 @@ export function StockPage() {
     window.addEventListener(ATTRIBUTES_EVENT, refresh);
     return () => window.removeEventListener(ATTRIBUTES_EVENT, refresh);
   }, []);
+
+  const visible = useMemo(() => {
+    return items.filter((item) => {
+      if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
+      if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
+      return true;
+    });
+  }, [items, kindFilter, conditionFilter]);
 
   function persist(next: StockItem[]) {
     setItems(next);
@@ -59,6 +78,9 @@ export function StockPage() {
       minQty: item.minQty,
       cost: item.cost,
       price: item.price,
+      kind: item.kind,
+      condition: item.condition,
+      sourceWorkOrderId: item.sourceWorkOrderId,
     });
   }
 
@@ -67,9 +89,8 @@ export function StockPage() {
       <article className="admin-card">
         <h2>{editingId ? 'Atualizar item' : 'Cadastro de estoque'}</h2>
         <p>
-          SKU, código de barras e IMEI alimentam o PDV. Cada linha é uma variação: iPhone 16 Pro Max
-          256 GB tem preço e quantidade diferentes do 512 GB. Os atributos do ERP montam essa
-          combinação.
+          SKU, código de barras e IMEI alimentam o PDV. Peças, aparelhos e insumos compartilham o
+          mesmo cadastro — recondicionados vindos de OS aparecem com origem.
         </p>
         <div className="admin-form">
           <label>
@@ -79,6 +100,28 @@ export function StockPage() {
           <label>
             SKU
             <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+          </label>
+          <label>
+            Tipo
+            <select
+              value={form.kind}
+              onChange={(e) => setForm({ ...form, kind: e.target.value as StockKind })}
+            >
+              <option value="device">{STOCK_KIND_LABEL.device}</option>
+              <option value="part">{STOCK_KIND_LABEL.part}</option>
+              <option value="supply">{STOCK_KIND_LABEL.supply}</option>
+            </select>
+          </label>
+          <label>
+            Condição
+            <select
+              value={form.condition}
+              onChange={(e) => setForm({ ...form, condition: e.target.value as StockCondition })}
+            >
+              <option value="new">{STOCK_CONDITION_LABEL.new}</option>
+              <option value="used">{STOCK_CONDITION_LABEL.used}</option>
+              <option value="refurbished">{STOCK_CONDITION_LABEL.refurbished}</option>
+            </select>
           </label>
           <label>
             Código de barras
@@ -154,11 +197,38 @@ export function StockPage() {
       </article>
 
       <article className="admin-card">
+        <div className="admin-toolbar" style={{ marginBottom: 12 }}>
+          <label>
+            Tipo{' '}
+            <select
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value as 'all' | StockKind)}
+            >
+              <option value="all">Todos</option>
+              <option value="device">{STOCK_KIND_LABEL.device}</option>
+              <option value="part">{STOCK_KIND_LABEL.part}</option>
+              <option value="supply">{STOCK_KIND_LABEL.supply}</option>
+            </select>
+          </label>
+          <label>
+            Condição{' '}
+            <select
+              value={conditionFilter}
+              onChange={(e) => setConditionFilter(e.target.value as 'all' | StockCondition)}
+            >
+              <option value="all">Todas</option>
+              <option value="new">{STOCK_CONDITION_LABEL.new}</option>
+              <option value="used">{STOCK_CONDITION_LABEL.used}</option>
+              <option value="refurbished">{STOCK_CONDITION_LABEL.refurbished}</option>
+            </select>
+          </label>
+        </div>
         <table className="admin-table">
           <thead>
             <tr>
               <th>Produto</th>
               <th>SKU / barras / IMEI</th>
+              <th>Tipo</th>
               <th>Variação</th>
               <th>Qtd</th>
               <th>Preço</th>
@@ -166,13 +236,31 @@ export function StockPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {visible.map((item) => (
               <tr key={item.id}>
-                <td>{item.name}</td>
+                <td>
+                  {item.name}
+                  {item.condition === 'refurbished' ? (
+                    <div className="empty">
+                      Recondicionado
+                      {item.sourceWorkOrderId ? (
+                        <>
+                          {' · '}
+                          <Link to={`/painel/os/${item.sourceWorkOrderId}`}>
+                            {item.sourceWorkOrderId}
+                          </Link>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </td>
                 <td>
                   {item.sku}
                   {item.barcode ? ` · ${item.barcode}` : ''}
                   {item.imei ? ` · IMEI ${item.imei}` : ''}
+                </td>
+                <td>
+                  {STOCK_KIND_LABEL[item.kind]} · {STOCK_CONDITION_LABEL[item.condition]}
                 </td>
                 <td>
                   {attrDefs
@@ -213,5 +301,7 @@ function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
     minQty: 1,
     cost: 0,
     price: 0,
+    kind: 'device',
+    condition: 'new',
   };
 }

@@ -720,6 +720,19 @@
   color: var(--ink);
 }
 
+.os-stock-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.os-stock-matches .btn {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
 .os-flow {
   display: flex;
   flex-wrap: wrap;

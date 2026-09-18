@@ -130,7 +130,7 @@ export function WorkOrderNewPage() {
             />
           </label>
           <label>
-            Peças (R$)
+            Peças estimadas (R$)
             <input
               type="number"
               min="0"
