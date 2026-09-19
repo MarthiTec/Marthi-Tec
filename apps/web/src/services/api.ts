@@ -1,3 +1,5 @@
+import { nestApiUrl } from './config';
+
 export type HealthPayload = {
   service: string;
   status: string;
@@ -9,7 +11,7 @@ export type HealthPayload = {
   };
 };
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+const API_URL = nestApiUrl();
 
 export async function getHealth(): Promise<HealthPayload> {
   const response = await fetch(`${API_URL}/health`);

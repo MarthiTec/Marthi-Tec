@@ -1,3 +1,5 @@
+import { nestApiUrl } from './config';
+
 export type PartnerSignupPayload = {
   planId: string;
   modules: string[];
@@ -21,7 +23,7 @@ export type PartnerSignupPayload = {
 };
 
 export async function submitPartnerSignup(payload: PartnerSignupPayload) {
-  const base = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+  const base = nestApiUrl();
   const response = await fetch(`${base}/api/v1/partners/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

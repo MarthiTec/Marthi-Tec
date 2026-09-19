@@ -11,14 +11,16 @@ description: >-
 ## Goal
 
 Public URL: `https://marthi-totem.discloud.app`  
-Config: root `discloud.config` with `TYPE=site` and `ID=marthi-totem`.
+API Nest (alvo): `https://marthi-api.discloud.app` (repo `Marthi-Backend`)  
+Config totem: root `discloud.config` with `TYPE=site` and `ID=marthi-totem`.
 
 ## Hard rules
 
-1. **Site ≠ Bot.** A Bot app (numeric ID like `1789690624065`) never activates `*.discloud.app`. Always create a **new** Site via **+ Upload**, do not rely on Commit into an existing Bot.
-2. **MAIN must exist in the ZIP** before upload. Discloud validates `MAIN=dist/index.js` inside the archive. Run `npm run build` and keep `dist/` **out** of `.discloudignore`.
-3. App must listen on `0.0.0.0:8080` (already default in API).
+1. **Site ≠ Bot.** A Bot app (numeric ID like `1789690624065` or `1789778106897`) never activates `*.discloud.app`. Always create a **new** Site via **+ Upload**, do not rely on Commit into an existing Bot.
+2. **MAIN must exist in the ZIP** before upload. Discloud validates `MAIN=...` inside the archive.
+3. App must listen on `0.0.0.0:8080`.
 4. Subdomain must be registered under Domínios. Status **Livre** = not bound; **Em uso** = Site is routing.
+5. **Nest API** (`Marthi-Backend`): use `discloud.config` with `ID=marthi-api`, set `DATABASE_URL`, then point front build `VITE_API_URL=https://marthi-api.discloud.app`. See `docs/specs/backend-nest-wiring.md`.
 
 ## Deploy checklist
 

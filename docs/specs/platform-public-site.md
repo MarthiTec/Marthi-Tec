@@ -15,7 +15,7 @@ Precisamos de uma URL pública estável para demonstrar a Marthi a qualquer clie
 - Demo totem multi-segmento; tenant atual = **Cell Ponto** (loja de celular).
 - Login da operação (`/login`) separado da experiência do totem (`/totem`).
 - Deploy público Discloud Site em `marthi-totem.discloud.app`.
-- API + web no mesmo processo Node (API serve `apps/web/dist`).
+- API Nest (auth/produtos) em Site separado `marthi-api.discloud.app` (repo Marthi-Backend); Express no totem ainda cobre totem/POS.
 
 ## 3. Non-goals (MVP)
 

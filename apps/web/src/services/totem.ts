@@ -1,7 +1,8 @@
 import { enqueueTotemLead } from '../data/posQueueStore';
 import type { PickedAttribute } from '../data/attributeStore';
+import { edgeApiUrl } from './config';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+const API_URL = edgeApiUrl();
 
 export type TotemLeadRequest = {
   customerName: string;

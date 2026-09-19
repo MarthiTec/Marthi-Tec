@@ -1,6 +1,7 @@
 import { DEMO_LOGIN, isDemoCredentials, isDemoToken, readJson } from './http';
+import { nestApiUrl } from './config';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+const API_URL = nestApiUrl();
 
 export type AuthUser = {
   id: string;
