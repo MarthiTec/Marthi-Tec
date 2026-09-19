@@ -9,6 +9,7 @@ export type Customer = {
   document: string;
   email: string;
   city: string;
+  active: boolean;
   createdAt: string;
 };
 
@@ -31,6 +32,10 @@ export type StockItem = {
   kind: StockKind;
   condition: StockCondition;
   sourceWorkOrderId?: string;
+  /** Se o item aparece no catálogo do totem quando o estoque é compartilhado. */
+  showOnTotem: boolean;
+  /** URLs de imagem compartilhadas (totem, PDV, OS). */
+  images: string[];
 };
 
 export type PriceTable = {
@@ -57,6 +62,8 @@ export type SalesOrder = {
   amount: number;
   status: 'open' | 'sold' | 'cancelled';
   payment: string;
+  sellerId: string;
+  sellerName: string;
   createdAt: string;
 };
 
@@ -139,8 +146,8 @@ function seedPayments(): PaymentMethod[] {
 }
 
 function variantSku(
-  item: Omit<StockItem, 'attrs' | 'kind' | 'condition' | 'sourceWorkOrderId'> &
-    Partial<Pick<StockItem, 'kind' | 'condition' | 'sourceWorkOrderId'>>,
+  item: Omit<StockItem, 'attrs' | 'kind' | 'condition' | 'sourceWorkOrderId' | 'showOnTotem' | 'images'> &
+    Partial<Pick<StockItem, 'kind' | 'condition' | 'sourceWorkOrderId' | 'showOnTotem' | 'images'>>,
 ): StockItem {
   return normalizeStock({ ...item, attrs: {} } as StockItem);
 }
@@ -375,6 +382,7 @@ function seed(): AdminState {
         document: '123.456.789-00',
         email: 'ana@email.com',
         city: 'Três Rios',
+        active: true,
         createdAt: new Date().toISOString(),
       },
       {
@@ -384,6 +392,7 @@ function seed(): AdminState {
         document: '987.654.321-00',
         email: 'carlos@email.com',
         city: 'Três Rios',
+        active: true,
         createdAt: new Date().toISOString(),
       },
     ],
@@ -409,6 +418,9 @@ function normalizeStock(item: StockItem): StockItem {
   if (!attrs[ATTR_COR] && item.color) attrs[ATTR_COR] = item.color;
   if (!attrs[ATTR_CAP] && item.capacity) attrs[ATTR_CAP] = item.capacity;
   const looksLikeDevice = Boolean(item.imei || item.capacity || /iphone|redmi|galaxy|notebook/i.test(item.name));
+  const images = Array.isArray(item.images)
+    ? item.images.map((url) => String(url).trim()).filter(Boolean)
+    : [];
   return {
     ...item,
     barcode: item.barcode ?? '',
@@ -419,7 +431,32 @@ function normalizeStock(item: StockItem): StockItem {
     kind: item.kind ?? (looksLikeDevice ? 'device' : 'part'),
     condition: item.condition ?? 'new',
     sourceWorkOrderId: item.sourceWorkOrderId,
+    showOnTotem: item.showOnTotem ?? looksLikeDevice,
+    images: images.length ? images : defaultImagesForName(item.name),
   };
+}
+
+function defaultImagesForName(name: string): string[] {
+  const slug = name.toLowerCase();
+  const map: { test: RegExp; folder: string; count: number }[] = [
+    { test: /16 pro max/, folder: 'iphone-16-pro-max', count: 5 },
+    { test: /16 pro/, folder: 'iphone-16-pro', count: 4 },
+    { test: /iphone 15/, folder: 'iphone-15', count: 4 },
+    { test: /iphone 14/, folder: 'iphone-14', count: 4 },
+    { test: /iphone 13/, folder: 'iphone-13', count: 4 },
+    { test: /iphone 12/, folder: 'iphone-12', count: 3 },
+    { test: /iphone 11/, folder: 'iphone-11', count: 3 },
+    { test: /redmi|note 13/, folder: 'redmi-note-13', count: 4 },
+  ];
+  const hit = map.find((item) => item.test.test(slug));
+  if (!hit) return [];
+  return Array.from({ length: hit.count }, (_, index) => `/totem/${hit.folder}/${index + 1}.svg`);
+}
+
+export function stockItemImages(item: Pick<StockItem, 'name' | 'images'> | null | undefined) {
+  if (!item) return [] as string[];
+  if (item.images?.length) return item.images;
+  return defaultImagesForName(item.name);
 }
 
 function normalizeFinance(entry: FinanceEntry): FinanceEntry {
@@ -430,12 +467,29 @@ function normalizeFinance(entry: FinanceEntry): FinanceEntry {
   };
 }
 
+function normalizeCustomer(item: Partial<Customer> & Pick<Customer, 'id' | 'name'>): Customer {
+  return {
+    id: item.id,
+    name: item.name ?? '',
+    phone: item.phone ?? '',
+    document: item.document ?? '',
+    email: item.email ?? '',
+    city: item.city ?? '',
+    active: item.active !== false,
+    createdAt: item.createdAt ?? new Date().toISOString(),
+  };
+}
+
 function hydrate(parsed: Partial<AdminState>): AdminState {
   const base = seed();
   return {
-    customers: parsed.customers ?? base.customers,
+    customers: (parsed.customers ?? base.customers).map(normalizeCustomer),
     stock: (parsed.stock ?? base.stock).map(normalizeStock),
-    orders: parsed.orders ?? [],
+    orders: (parsed.orders ?? []).map((order) => ({
+      ...order,
+      sellerId: order.sellerId ?? '',
+      sellerName: order.sellerName ?? '',
+    })),
     finance: (parsed.finance ?? base.finance).map(normalizeFinance),
     priceTables: parsed.priceTables?.length ? parsed.priceTables : base.priceTables,
     payments: parsed.payments?.length ? parsed.payments : base.payments,
@@ -507,19 +561,27 @@ export function findStockByCode(code: string) {
 
 export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?: string }) {
   const state = load();
+  const payload = {
+    name: input.name.trim(),
+    phone: input.phone.trim(),
+    document: input.document.trim(),
+    email: input.email.trim(),
+    city: input.city.trim(),
+    active: input.active ?? true,
+  };
   if (input.id) {
     state.customers = state.customers.map((item) =>
-      item.id === input.id ? { ...item, ...input } : item,
+      item.id === input.id ? { ...item, ...payload } : item,
     );
   } else {
     const existing = state.customers.find(
-      (item) => item.phone.replace(/\D/g, '') === input.phone.replace(/\D/g, ''),
+      (item) => item.phone.replace(/\D/g, '') === payload.phone.replace(/\D/g, ''),
     );
     if (existing) {
-      Object.assign(existing, input);
+      Object.assign(existing, payload);
     } else {
       state.customers.unshift({
-        ...input,
+        ...payload,
         id: uid('CLI'),
         createdAt: new Date().toISOString(),
       });
@@ -529,12 +591,48 @@ export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?
   return state;
 }
 
+export function removeCustomer(id: string) {
+  const state = load();
+  state.customers = state.customers.filter((item) => item.id !== id);
+  save(state);
+  return state;
+}
+
+export function removeStockItem(id: string) {
+  const state = load();
+  state.stock = state.stock.filter((item) => item.id !== id);
+  save(state);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('marthi-stock'));
+  }
+  return state;
+}
+
+export function removePriceTable(id: string) {
+  const state = load();
+  state.priceTables = state.priceTables.filter((item) => item.id !== id);
+  save(state);
+  return state;
+}
+
+export function removePayment(id: string) {
+  const state = load();
+  state.payments = state.payments.filter((item) => item.id !== id);
+  save(state);
+  return state;
+}
+
 export function saveStock(items: StockItem[]) {
   const state = load();
   state.stock = items.map(normalizeStock);
   save(state);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('marthi-stock'));
+  }
   return state;
 }
+
+export const STOCK_EVENT = 'marthi-stock';
 
 export function savePriceTables(items: PriceTable[]) {
   const state = load();
@@ -578,6 +676,8 @@ export function closePosSale(input: {
   priceTableName: string;
   discount: number;
   surcharge: number;
+  sellerId?: string;
+  sellerName?: string;
   lines: PosLineInput[];
 }) {
   const state = load();
@@ -592,6 +692,8 @@ export function closePosSale(input: {
     amount,
     status: 'sold',
     payment: `${input.paymentName} · ${input.priceTableName}`,
+    sellerId: input.sellerId ?? '',
+    sellerName: input.sellerName ?? '',
     createdAt: new Date().toISOString(),
   };
   state.orders.unshift(order);
@@ -629,6 +731,7 @@ export function closePosSale(input: {
         document: '',
         email: '',
         city: '',
+        active: true,
         createdAt: order.createdAt,
       });
     }

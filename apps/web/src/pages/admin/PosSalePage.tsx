@@ -1,15 +1,18 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   applyPriceTable,
   closePosSale,
   findStockByCode,
   getAdminState,
+  stockItemImages,
   type Customer,
   type PaymentMethod,
   type PriceTable,
   type StockItem,
 } from '../../data/adminStore';
+import { listSellers } from '../../data/erpRegistry';
 
 type CartLine = {
   key: string;
@@ -51,11 +54,14 @@ export function PosSalePage() {
   const [installments, setInstallments] = useState(1);
   const [discount, setDiscount] = useState(0);
   const [surcharge, setSurcharge] = useState(0);
+  const [sellerId, setSellerId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sellers = useMemo(() => listSellers(true), []);
 
   const table = tables.find((item) => item.id === tableId);
   const payment = payments.find((item) => item.id === paymentId);
+  const seller = sellers.find((item) => item.id === sellerId);
 
   const pricedLines = useMemo(
     () =>
@@ -161,6 +167,8 @@ export function PosSalePage() {
       priceTableName: table.name,
       discount,
       surcharge,
+      sellerId: seller?.id,
+      sellerName: seller?.name,
       lines: pricedLines.map((line) => ({
         stockId: line.stockId,
         name: line.name,
@@ -175,6 +183,7 @@ export function PosSalePage() {
     setLines([]);
     setDiscount(0);
     setSurcharge(0);
+    setSellerId('');
     setInstallments(1);
     pickCustomer(undefined);
     setPaymentId(payments[0]?.id ?? '');
@@ -240,11 +249,24 @@ export function PosSalePage() {
                 {pricedLines.map((line) => (
                   <tr key={line.key}>
                     <td>
-                      <strong className="pdv__item">{line.name}</strong>
-                      <small>
-                        {line.sku}
-                        {line.imei ? ` · IMEI ${line.imei}` : ''}
-                      </small>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        {stockItemImages(stock.find((item) => item.id === line.stockId))[0] ? (
+                          <img
+                            src={stockItemImages(stock.find((item) => item.id === line.stockId))[0]}
+                            alt=""
+                            width={40}
+                            height={40}
+                            style={{ objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                          />
+                        ) : null}
+                        <div>
+                          <strong className="pdv__item">{line.name}</strong>
+                          <small>
+                            {line.sku}
+                            {line.imei ? ` · IMEI ${line.imei}` : ''}
+                          </small>
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <input
@@ -279,6 +301,15 @@ export function PosSalePage() {
                   disabled={item.qty <= 0}
                   onClick={() => addItem(item, false)}
                 >
+                  {stockItemImages(item)[0] ? (
+                    <img
+                      src={stockItemImages(item)[0]}
+                      alt=""
+                      width={28}
+                      height={28}
+                      style={{ objectFit: 'cover', borderRadius: 4 }}
+                    />
+                  ) : null}
                   {item.name}
                   <span>{item.qty} un.</span>
                 </button>
@@ -290,20 +321,17 @@ export function PosSalePage() {
         <article className="admin-card pdv__side">
           <h2>Cliente, tabela e pagamento</h2>
           <div className="admin-form">
-            <label className="span-2">
-              Cliente cadastrado
-              <select
-                value={customerId}
-                onChange={(e) => pickCustomer(customers.find((item) => item.id === e.target.value))}
-              >
-                <option value="">Consumidor / informar abaixo</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} · {customer.phone}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AdminPicker
+              className="span-2"
+              label="Cliente cadastrado"
+              value={customerId}
+              placeholder="Consumidor / informar abaixo"
+              options={customers.map((customer) => ({
+                value: customer.id,
+                label: `${customer.name} · ${customer.phone}`,
+              }))}
+              onChange={(value) => pickCustomer(customers.find((item) => item.id === value))}
+            />
             <label>
               Nome
               <input
@@ -324,44 +352,48 @@ export function PosSalePage() {
                 }}
               />
             </label>
-            <label className="span-2">
-              Tabela de preço
-              <select value={tableId} onChange={(e) => setTableId(e.target.value)}>
-                {tables.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.percent > 0 ? '+' : ''}
-                    {item.percent}%)
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="span-2">
-              Forma de pagamento
-              <select value={paymentId} onChange={(e) => onPaymentChange(e.target.value)}>
-                {payments.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                    {linkedTableName(item, tables)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AdminPicker
+              className="span-2"
+              label="Tabela de preço"
+              value={tableId}
+              options={tables.map((item) => ({
+                value: item.id,
+                label: `${item.name} (${item.percent > 0 ? '+' : ''}${item.percent}%)`,
+              }))}
+              onChange={setTableId}
+            />
+            <AdminPicker
+              className="span-2"
+              label="Forma de pagamento"
+              value={paymentId}
+              options={payments.map((item) => ({
+                value: item.id,
+                label: `${item.name}${linkedTableName(item, tables)}`,
+              }))}
+              onChange={onPaymentChange}
+            />
+            <AdminPicker
+              className="span-2"
+              label="Vendedor"
+              value={sellerId}
+              placeholder="Sem vendedor"
+              options={sellers.map((item) => ({ value: item.id, label: item.name }))}
+              onChange={setSellerId}
+            />
             {payment && payment.maxInstallments > 1 && pricedLines.length > 0 ? (
-              <label className="span-2">
-                Parcelas
-                <select
-                  value={installments}
-                  onChange={(e) => setInstallments(Number(e.target.value))}
-                >
-                  {Array.from({ length: payment.maxInstallments }, (_, index) => index + 1).map(
-                    (count) => (
-                      <option key={count} value={count}>
-                        {count}x de {money(total / count)}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
+              <AdminPicker
+                className="span-2"
+                label="Parcelas"
+                value={String(installments)}
+                options={Array.from({ length: payment.maxInstallments }, (_, index) => {
+                  const count = index + 1;
+                  return {
+                    value: String(count),
+                    label: `${count}x de ${money(total / count)}`,
+                  };
+                })}
+                onChange={(value) => setInstallments(Number(value))}
+              />
             ) : null}
             <label>
               Desconto

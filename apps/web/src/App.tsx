@@ -20,7 +20,14 @@ import { ProfilePage } from './pages/admin/ProfilePage';
 import { WorkOrdersPage } from './pages/admin/WorkOrdersPage';
 import { WorkOrderNewPage } from './pages/admin/WorkOrderNewPage';
 import { WorkOrderDetailPage } from './pages/admin/WorkOrderDetailPage';
+import { WorkOrderReportPage } from './pages/admin/WorkOrderReportPage';
+import { AgendaPage } from './pages/admin/AgendaPage';
 import { PlanPage } from './pages/admin/PlanPage';
+import { SellersPage } from './pages/admin/SellersPage';
+import { SuppliersPage } from './pages/admin/SuppliersPage';
+import { EmployeesPage } from './pages/admin/EmployeesPage';
+import { AuditPage } from './pages/admin/AuditPage';
+import { InvoicesPage } from './pages/admin/InvoicesPage';
 
 export function App() {
   return (
@@ -42,8 +49,15 @@ export function App() {
           <Route path="tabelas" element={<PriceTablesPage />} />
           <Route path="pagamentos" element={<PaymentsPage />} />
           <Route path="financeiro" element={<FinancePage />} />
+          <Route path="vendedores" element={<SellersPage />} />
+          <Route path="fornecedores" element={<SuppliersPage />} />
+          <Route path="funcionarios" element={<EmployeesPage />} />
+          <Route path="auditoria" element={<AuditPage />} />
+          <Route path="notas" element={<InvoicesPage />} />
           <Route path="os" element={<WorkOrdersPage />} />
           <Route path="os/nova" element={<WorkOrderNewPage />} />
+          <Route path="os/agenda" element={<AgendaPage />} />
+          <Route path="os/:id/relatorio" element={<WorkOrderReportPage />} />
           <Route path="os/:id" element={<WorkOrderDetailPage />} />
           <Route path="perfil" element={<ProfilePage />} />
           <Route path="plano" element={<PlanPage />} />

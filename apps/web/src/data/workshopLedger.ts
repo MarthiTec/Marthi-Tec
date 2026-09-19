@@ -163,6 +163,8 @@ export function purchaseAssetFromWorkOrder(
     kind: input.kind ?? 'device',
     condition: 'refurbished',
     sourceWorkOrderId: osId,
+    showOnTotem: false,
+    images: [],
   };
 
   const state = getAdminState();

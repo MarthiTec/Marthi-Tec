@@ -1,0 +1,88 @@
+import { getAdminState, stockItemImages, type StockItem } from '../../data/adminStore';
+import { ATTR_CAP, ATTR_COR, ATTR_RET } from '../../data/attributeStore';
+import { getTotemSettings } from '../../data/totemSettings';
+import { formatInstallment } from '../../data/variantQuote';
+import {
+  FULFILLMENT_OPTIONS,
+  TOTEM_PRODUCTS,
+  type TotemBrand,
+  type TotemProduct,
+} from './totemData';
+
+function stableId(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return hash || 1;
+}
+
+function guessBrand(name: string): TotemBrand {
+  const slug = name.toLowerCase();
+  if (slug.includes('xiaomi') || slug.includes('redmi')) return 'xiaomi';
+  return 'apple';
+}
+
+function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: number })[] {
+  const groups = new Map<string, StockItem[]>();
+  for (const item of items) {
+    if (!item.showOnTotem) continue;
+    if (item.qty <= 0) continue;
+    if (item.kind === 'supply') continue;
+    const key = item.name.trim();
+    if (!key) continue;
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+
+  return [...groups.entries()].map(([name, rows]) => {
+    const colors = [
+      ...new Set(rows.map((row) => row.color || row.attrs[ATTR_COR]).filter(Boolean)),
+    ];
+    const storages = [
+      ...new Set(rows.map((row) => row.capacity || row.attrs[ATTR_CAP]).filter(Boolean)),
+    ];
+    const priced = [...rows].sort((a, b) => a.price - b.price);
+    const primary = priced[0];
+    const images = rows
+      .flatMap((row) => stockItemImages(row))
+      .filter((url, index, all) => all.indexOf(url) === index);
+
+    return {
+      id: stableId(name),
+      name,
+      brand: guessBrand(name),
+      storages: storages.length ? storages : ['—'],
+      colors: colors.length ? colors : ['—'],
+      cashPrice: primary.price,
+      installmentLabel: formatInstallment(primary.price, 12),
+      images: images.length ? images : stockItemImages(primary),
+      attrs: {
+        [ATTR_COR]: colors.length ? colors : ['—'],
+        [ATTR_CAP]: storages.length ? storages : ['—'],
+        [ATTR_RET]: [...FULFILLMENT_OPTIONS],
+      },
+      totalQty: rows.reduce((sum, row) => sum + row.qty, 0),
+    };
+  });
+}
+
+/** Catálogo efetivo do totem: demo isolado ou estoque ERP marcado para exibir. */
+export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
+  const { shareStockWithErp } = getTotemSettings();
+  if (!shareStockWithErp) return TOTEM_PRODUCTS;
+  return groupStockForTotem(getAdminState().stock);
+}
+
+export function findStockImageById(stockId: string) {
+  const item = getAdminState().stock.find((entry) => entry.id === stockId);
+  return stockItemImages(item);
+}
+
+export function findStockImageByName(name: string) {
+  const item = getAdminState().stock.find(
+    (entry) => entry.name.toLowerCase() === name.trim().toLowerCase(),
+  );
+  return stockItemImages(item);
+}

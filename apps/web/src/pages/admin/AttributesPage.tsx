@@ -1,7 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
+import {
+  confirmDelete,
+  CrudListBar,
+  CrudRowActions,
+  crudFormTitle,
+  matchesQuery,
+  matchesStatus,
+  type CrudStatusFilter,
+} from '../../components/CrudKit';
 import {
   getAttributes,
   MAX_ATTRIBUTES,
+  removeAttribute,
   saveAttributes,
   type ProductAttribute,
 } from '../../data/attributeStore';
@@ -23,20 +34,45 @@ function moneyDelta(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+type Mode = 'new' | 'edit' | 'view';
+
 export function AttributesPage() {
   const [items, setItems] = useState(() => getAttributes());
   const [form, setForm] = useState(emptyForm);
   const [valueDraft, setValueDraft] = useState('');
   const [deltaDraft, setDeltaDraft] = useState('0');
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>('new');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<CrudStatusFilter>('all');
 
-  const atLimit = !editingId && items.length >= MAX_ATTRIBUTES;
+  const readOnly = mode === 'view';
+  const atLimit = mode === 'new' && items.length >= MAX_ATTRIBUTES;
+
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          matchesStatus(item.active, status) &&
+          matchesQuery(`${item.name} ${item.values.join(' ')}`, query),
+      ),
+    [items, query, status],
+  );
 
   function persist(next: ProductAttribute[]) {
     setItems(saveAttributes(next));
   }
 
+  function resetForm() {
+    setForm(emptyForm());
+    setValueDraft('');
+    setDeltaDraft('0');
+    setSelectedId(null);
+    setMode('new');
+  }
+
   function addValue() {
+    if (readOnly) return;
     const next = valueDraft.trim();
     if (!next || form.values.some((item) => item.toLowerCase() === next.toLowerCase())) {
       setValueDraft('');
@@ -53,9 +89,9 @@ export function AttributesPage() {
   }
 
   function submit() {
-    if (atLimit || !form.name.trim() || form.values.length === 0) return;
-    if (editingId) {
-      persist(items.map((item) => (item.id === editingId ? { ...item, ...form } : item)));
+    if (readOnly || atLimit || !form.name.trim() || form.values.length === 0) return;
+    if (mode === 'edit' && selectedId) {
+      persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
     } else {
       persist([
         {
@@ -66,14 +102,12 @@ export function AttributesPage() {
         ...items,
       ]);
     }
-    setForm(emptyForm());
-    setValueDraft('');
-    setDeltaDraft('0');
-    setEditingId(null);
+    resetForm();
   }
 
-  function edit(item: ProductAttribute) {
-    setEditingId(item.id);
+  function loadItem(item: ProductAttribute, nextMode: Mode) {
+    setSelectedId(item.id);
+    setMode(nextMode);
     setForm({
       name: item.name,
       values: item.values,
@@ -86,44 +120,41 @@ export function AttributesPage() {
     });
   }
 
-  function remove(id: string) {
-    persist(items.filter((item) => item.id !== id));
-    if (editingId === id) {
-      setForm(emptyForm());
-      setEditingId(null);
-    }
+  function remove(item: ProductAttribute) {
+    if (!confirmDelete(`o atributo ${item.name}`)) return;
+    setItems(removeAttribute(item.id));
+    if (selectedId === item.id) resetForm();
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
-        <h2>{editingId ? 'Atualizar atributo' : 'Atributo do produto'}</h2>
+        <h2>{crudFormTitle(mode, 'atributo')}</h2>
         <p>
           Até {MAX_ATTRIBUTES} atributos. Celular usa cor e capacidade; roupa, cor e tamanho; ótica,
           armação e lente. O estoque guarda o preço de cada combinação (128 GB ≠ 256 GB). Valores
           como retirada usam o ajuste abaixo, somado na hora no totem.
         </p>
-        <div className="admin-form">
+        <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Atributo
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Cor, tamanho, armação…"
-              disabled={atLimit}
+              disabled={atLimit || readOnly}
             />
           </label>
-          <label>
-            Situação
-            <select
-              value={form.active ? '1' : '0'}
-              onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}
-              disabled={atLimit}
-            >
-              <option value="1">Ativo</option>
-              <option value="0">Inativo</option>
-            </select>
-          </label>
+          <AdminPicker
+            label="Situação"
+            value={form.active ? '1' : '0'}
+            disabled={atLimit || readOnly}
+            options={[
+              { value: '1', label: 'Ativo' },
+              { value: '0', label: 'Inativo' },
+            ]}
+            onChange={(value) => setForm({ ...form, active: value === '1' })}
+          />
           <label>
             Valor
             <input
@@ -136,7 +167,7 @@ export function AttributesPage() {
                 }
               }}
               placeholder="Preto, branco, P, M…"
-              disabled={atLimit}
+              disabled={atLimit || readOnly}
             />
           </label>
           <label>
@@ -148,9 +179,14 @@ export function AttributesPage() {
                 value={deltaDraft}
                 onChange={(e) => setDeltaDraft(e.target.value)}
                 placeholder="0"
-                disabled={atLimit}
+                disabled={atLimit || readOnly}
               />
-              <button type="button" className="btn btn--ghost" onClick={addValue} disabled={atLimit}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={addValue}
+                disabled={atLimit || readOnly}
+              >
                 Incluir valor
               </button>
             </span>
@@ -215,7 +251,7 @@ export function AttributesPage() {
             <input
               type="checkbox"
               checked={form.useOnTotem}
-              disabled={atLimit}
+              disabled={atLimit || readOnly}
               onChange={(e) => setForm({ ...form, useOnTotem: e.target.checked })}
             />
             Usar no totem
@@ -224,7 +260,7 @@ export function AttributesPage() {
             <input
               type="checkbox"
               checked={form.filterOnTotem}
-              disabled={atLimit}
+              disabled={atLimit || readOnly}
               onChange={(e) => setForm({ ...form, filterOnTotem: e.target.checked })}
             />
             Filtro no totem
@@ -233,7 +269,7 @@ export function AttributesPage() {
             <input
               type="checkbox"
               checked={form.useOnStock}
-              disabled={atLimit}
+              disabled={atLimit || readOnly}
               onChange={(e) => setForm({ ...form, useOnStock: e.target.checked })}
             />
             Usar no estoque
@@ -241,23 +277,27 @@ export function AttributesPage() {
         </div>
 
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit} disabled={atLimit}>
-            {editingId ? 'Salvar atributo' : 'Cadastrar atributo'}
-          </button>
-          {editingId ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setEditingId(null);
-                setForm(emptyForm());
-                setValueDraft('');
-                setDeltaDraft('0');
-              }}
-            >
-              Cancelar
-            </button>
-          ) : null}
+          {readOnly ? (
+            <>
+              <button type="button" className="btn btn--primary" onClick={() => setMode('edit')}>
+                Editar
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={resetForm}>
+                Fechar
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn--primary" onClick={submit} disabled={atLimit}>
+                {mode === 'edit' ? 'Salvar atributo' : 'Cadastrar atributo'}
+              </button>
+              {mode === 'edit' ? (
+                <button type="button" className="btn btn--ghost" onClick={resetForm}>
+                  Cancelar
+                </button>
+              ) : null}
+            </>
+          )}
           {atLimit ? (
             <span className="empty">
               Limite de {MAX_ATTRIBUTES} atributos. Edite ou exclua um existente para cadastrar outro.
@@ -271,49 +311,64 @@ export function AttributesPage() {
       </article>
 
       <article className="admin-card">
+        <CrudListBar
+          query={query}
+          onQueryChange={setQuery}
+          placeholder="Buscar atributo ou valor…"
+          status={status}
+          onStatusChange={setStatus}
+          onNew={resetForm}
+          newLabel="Novo atributo"
+        />
         <table className="admin-table">
           <thead>
             <tr>
               <th>Atributo</th>
               <th>Valores</th>
               <th>Uso</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  {item.name}
-                  {item.active ? '' : ' (inativo)'}
-                </td>
-                <td>
-                  {item.values
-                    .map((value) => {
-                      const delta = item.priceDeltas?.[value] ?? 0;
-                      return delta ? `${value} (${moneyDelta(delta)})` : value;
-                    })
-                    .join(', ')}
-                </td>
-                <td>
-                  {[
-                    item.useOnTotem ? 'Totem' : null,
-                    item.filterOnTotem ? 'Filtro' : null,
-                    item.useOnStock ? 'Estoque' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '—'}
-                </td>
-                <td>
-                  <button type="button" className="btn btn--ghost" onClick={() => edit(item)}>
-                    Editar
-                  </button>
-                  <button type="button" className="btn btn--ghost" onClick={() => remove(item.id)}>
-                    Excluir
-                  </button>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="empty">
+                  Nenhum atributo encontrado.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>
+                    {item.values
+                      .map((value) => {
+                        const delta = item.priceDeltas?.[value] ?? 0;
+                        return delta ? `${value} (${moneyDelta(delta)})` : value;
+                      })
+                      .join(', ')}
+                  </td>
+                  <td>
+                    {[
+                      item.useOnTotem ? 'Totem' : null,
+                      item.filterOnTotem ? 'Filtro' : null,
+                      item.useOnStock ? 'Estoque' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </td>
+                  <td>{item.active ? 'Ativo' : 'Inativo'}</td>
+                  <td>
+                    <CrudRowActions
+                      onView={() => loadItem(item, 'view')}
+                      onEdit={() => loadItem(item, 'edit')}
+                      onDelete={() => remove(item)}
+                    />
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </article>

@@ -2,9 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
 import { useAuth } from '../../contexts/AuthContext';
+import { logAccess } from '../../data/auditLog';
+import {
+  canAccessPath,
+  navPathToAccessArea,
+  userCanAccessArea,
+} from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
 import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
+import { AccessDeniedPage } from './AccessDeniedPage';
 import { ModuleLockedPage } from './ModuleLockedPage';
 import './admin.css';
 
@@ -12,16 +19,23 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'ERP', title: 'Painel da operação' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/pdv/venda': { kicker: 'Vendas', title: 'Lançar venda' },
-  '/painel/totem': { kicker: 'Totem', title: 'Modo do totem' },
+  '/painel/totem': { kicker: 'Totem', title: 'Configurações do totem' },
   '/painel/pedidos': { kicker: 'Vendas', title: 'Pedidos' },
-  '/painel/clientes': { kicker: 'Cadastros', title: 'Clientes' },
-  '/painel/estoque': { kicker: 'Cadastros', title: 'Estoque' },
-  '/painel/atributos': { kicker: 'Cadastros', title: 'Atributos' },
-  '/painel/tabelas': { kicker: 'Cadastros', title: 'Tabelas de preço' },
-  '/painel/pagamentos': { kicker: 'Cadastros', title: 'Formas de pagamento' },
-  '/painel/financeiro': { kicker: 'Gestão', title: 'Financeiro' },
+  '/painel/clientes': { kicker: 'Pessoas', title: 'Clientes' },
+  '/painel/vendedores': { kicker: 'Pessoas', title: 'Vendedores' },
+  '/painel/fornecedores': { kicker: 'Pessoas', title: 'Fornecedores' },
+  '/painel/funcionarios': { kicker: 'Pessoas', title: 'Funcionários' },
+  '/painel/estoque': { kicker: 'ERP', title: 'Estoque' },
+  '/painel/notas': { kicker: 'ERP', title: 'Notas de entrada e saída' },
+  '/painel/atributos': { kicker: 'ERP', title: 'Atributos' },
+  '/painel/tabelas': { kicker: 'ERP', title: 'Tabelas de preço' },
+  '/painel/pagamentos': { kicker: 'ERP', title: 'Formas de pagamento' },
+  '/painel/financeiro': { kicker: 'ERP', title: 'Financeiro' },
+  '/painel/auditoria': { kicker: 'ERP', title: 'Auditoria e acessos' },
   '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
   '/painel/os/nova': { kicker: 'Oficina', title: 'Nova ordem de serviço' },
+  '/painel/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
+  '/painel/os/relatorio': { kicker: 'Oficina', title: 'Relatório da OS' },
   '/painel/perfil': { kicker: 'Conta', title: 'Meu perfil' },
   '/painel/plano': { kicker: 'Contrato', title: 'Plano da loja' },
 };
@@ -34,11 +48,20 @@ function initials(name: string) {
 }
 
 function resolveTitle(pathname: string, search: string) {
+  if (pathname === '/painel/os' && search.includes('quote=sent')) {
+    return { kicker: 'Oficina', title: 'Orçamentos aguardando' };
+  }
   if (pathname === '/painel/os' && search.includes('status=ready')) {
     return { kicker: 'Oficina', title: 'OS prontas' };
   }
   if (pathname === '/painel/os' && search.includes('status=progress')) {
     return { kicker: 'Oficina', title: 'OS em serviço' };
+  }
+  if (pathname === '/painel/os/agenda') {
+    return { kicker: 'Oficina', title: 'Agenda da oficina' };
+  }
+  if (pathname.endsWith('/relatorio')) {
+    return { kicker: 'Oficina', title: 'Relatório da OS' };
   }
   return (
     TITLES[pathname] ??
@@ -81,19 +104,30 @@ export function AdminLayout() {
 
   useEffect(() => {
     const current = navGroupForPath(location.pathname, location.search);
-    if (current) {
-      setOpenGroups((groups) => (groups.includes(current) ? groups : [...groups, current]));
-    }
+    setOpenGroups(current ? [current] : []);
     setMenuOpen(false);
   }, [location.pathname, location.search]);
 
   const requiredModule = moduleForPath(location.pathname);
   const moduleAllowed = !requiredModule || hasModule(requiredModule);
+  const aclAllowed = canAccessPath(location.pathname, user?.email);
 
   const page = useMemo(
     () => resolveTitle(location.pathname, location.search),
     [location.pathname, location.search],
   );
+
+  useEffect(() => {
+    if (!user || loading) return;
+    if (moduleAllowed && !aclAllowed) {
+      logAccess({
+        actorName: user.name,
+        actorEmail: user.email,
+        action: 'denied',
+        detail: location.pathname,
+      });
+    }
+  }, [user, loading, moduleAllowed, aclAllowed, location.pathname]);
 
   if (loading) {
     return (
@@ -109,11 +143,16 @@ export function AdminLayout() {
 
   const photo = profile.photo || user.picture;
   const mark = initials(profile.displayName);
+  const userEmail = user.email;
 
   function toggleGroup(id: string) {
-    setOpenGroups((groups) =>
-      groups.includes(id) ? groups.filter((item) => item !== id) : [...groups, id],
-    );
+    setOpenGroups((groups) => (groups.includes(id) ? [] : [id]));
+  }
+
+  function childVisible(to: string) {
+    const area = navPathToAccessArea(to);
+    if (!area) return true;
+    return userCanAccessArea(userEmail, area);
   }
 
   return (
@@ -178,7 +217,9 @@ export function AdminLayout() {
                 </button>
                 {opened ? (
                   <div className="admin__sub">
-                    {group.children.map((child) => (
+                    {group.children
+                      .filter((child) => childVisible(child.to))
+                      .map((child) => (
                       <NavLink
                         key={child.to}
                         to={child.to}
@@ -234,10 +275,10 @@ export function AdminLayout() {
         </header>
 
         <div className="admin__main">
-          {moduleAllowed || location.pathname === '/painel/plano' ? (
-            <Outlet />
-          ) : requiredModule ? (
+          {!moduleAllowed && requiredModule && location.pathname !== '/painel/plano' ? (
             <ModuleLockedPage moduleId={requiredModule} />
+          ) : !aclAllowed ? (
+            <AccessDeniedPage pathname={location.pathname} />
           ) : (
             <Outlet />
           )}

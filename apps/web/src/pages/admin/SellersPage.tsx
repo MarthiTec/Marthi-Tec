@@ -9,40 +9,43 @@ import {
   matchesStatus,
   type CrudStatusFilter,
 } from '../../components/CrudKit';
+import { useAuth } from '../../contexts/AuthContext';
+import { logAction } from '../../data/auditLog';
 import {
-  getAdminState,
-  removeCustomer,
-  type Customer,
-  upsertCustomer,
-} from '../../data/adminStore';
+  listSellers,
+  removeSeller,
+  upsertSeller,
+  type Seller,
+} from '../../data/erpRegistry';
 
 const EMPTY = {
   name: '',
   phone: '',
-  document: '',
   email: '',
-  city: '',
+  document: '',
+  commissionPercent: 0,
   active: true,
 };
 
 type Mode = 'new' | 'edit' | 'view';
 
-export function CustomersPage() {
+export function SellersPage() {
+  const { user } = useAuth();
+  const [items, setItems] = useState(() => listSellers());
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
   const [form, setForm] = useState(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | undefined>();
-  const [customers, setCustomers] = useState(() => getAdminState().customers);
 
   const filtered = useMemo(
     () =>
-      customers.filter(
+      items.filter(
         (item) =>
-          matchesStatus(item.active !== false, status) &&
-          matchesQuery(`${item.name} ${item.phone} ${item.document} ${item.email} ${item.city}`, query),
+          matchesStatus(item.active, status) &&
+          matchesQuery(`${item.name} ${item.phone} ${item.email} ${item.document}`, query),
       ),
-    [customers, query, status],
+    [items, query, status],
   );
 
   const readOnly = mode === 'view';
@@ -53,37 +56,49 @@ export function CustomersPage() {
     setMode('new');
   }
 
-  function loadItem(customer: Customer, nextMode: Mode) {
-    setSelectedId(customer.id);
+  function loadItem(item: Seller, nextMode: Mode) {
+    setSelectedId(item.id);
     setMode(nextMode);
     setForm({
-      name: customer.name,
-      phone: customer.phone,
-      document: customer.document,
-      email: customer.email,
-      city: customer.city,
-      active: customer.active !== false,
+      name: item.name,
+      phone: item.phone,
+      email: item.email,
+      document: item.document,
+      commissionPercent: item.commissionPercent,
+      active: item.active,
     });
   }
 
   function submit() {
-    if (readOnly) return;
-    if (!form.name.trim() || form.phone.replace(/\D/g, '').length < 8) return;
-    const next = upsertCustomer({ ...form, id: mode === 'edit' ? selectedId : undefined });
-    setCustomers(next.customers);
+    if (readOnly || !form.name.trim()) return;
+    const next = upsertSeller({ ...form, id: mode === 'edit' ? selectedId : undefined });
+    setItems(next.sellers);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: mode === 'edit' ? 'vendedor.atualizar' : 'vendedor.criar',
+      detail: form.name,
+    });
     resetForm();
   }
 
-  function remove(customer: Customer) {
-    if (!confirmDelete(`o cliente ${customer.name}`)) return;
-    setCustomers(removeCustomer(customer.id).customers);
-    if (selectedId === customer.id) resetForm();
+  function remove(item: Seller) {
+    if (!confirmDelete(`o vendedor ${item.name}`)) return;
+    setItems(removeSeller(item.id).sellers);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'vendedor.excluir',
+      detail: item.name,
+    });
+    if (selectedId === item.id) resetForm();
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
-        <h2>{crudFormTitle(mode, 'cliente')}</h2>
+        <h2>{crudFormTitle(mode, 'vendedor')}</h2>
+        <p>Usado na OS e no PDV para comissão e rastreio de venda.</p>
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Nome
@@ -102,14 +117,6 @@ export function CustomersPage() {
             />
           </label>
           <label>
-            CPF / CNPJ
-            <input
-              value={form.document}
-              disabled={readOnly}
-              onChange={(e) => setForm({ ...form, document: e.target.value })}
-            />
-          </label>
-          <label>
             E-mail
             <input
               value={form.email}
@@ -118,11 +125,24 @@ export function CustomersPage() {
             />
           </label>
           <label>
-            Cidade
+            CPF / documento
             <input
-              value={form.city}
+              value={form.document}
               disabled={readOnly}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              onChange={(e) => setForm({ ...form, document: e.target.value })}
+            />
+          </label>
+          <label>
+            Comissão (%)
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={form.commissionPercent}
+              disabled={readOnly}
+              onChange={(e) =>
+                setForm({ ...form, commissionPercent: Number(e.target.value) || 0 })
+              }
             />
           </label>
           <AdminPicker
@@ -139,11 +159,7 @@ export function CustomersPage() {
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
           {readOnly ? (
             <>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setMode('edit')}
-              >
+              <button type="button" className="btn btn--primary" onClick={() => setMode('edit')}>
                 Editar
               </button>
               <button type="button" className="btn btn--ghost" onClick={resetForm}>
@@ -169,18 +185,18 @@ export function CustomersPage() {
         <CrudListBar
           query={query}
           onQueryChange={setQuery}
-          placeholder="Buscar cliente, telefone, documento…"
+          placeholder="Buscar vendedor…"
           status={status}
           onStatusChange={setStatus}
           onNew={resetForm}
-          newLabel="Novo cliente"
+          newLabel="Novo vendedor"
         />
         <table className="admin-table">
           <thead>
             <tr>
               <th>Nome</th>
               <th>Telefone</th>
-              <th>Documento</th>
+              <th>Comissão</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -189,21 +205,21 @@ export function CustomersPage() {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} className="empty">
-                  Nenhum cliente encontrado.
+                  Nenhum vendedor encontrado.
                 </td>
               </tr>
             ) : (
-              filtered.map((customer) => (
-                <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.phone}</td>
-                  <td>{customer.document || '—'}</td>
-                  <td>{customer.active !== false ? 'Ativo' : 'Inativo'}</td>
+              filtered.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.phone || '—'}</td>
+                  <td>{item.commissionPercent}%</td>
+                  <td>{item.active ? 'Ativo' : 'Inativo'}</td>
                   <td>
                     <CrudRowActions
-                      onView={() => loadItem(customer, 'view')}
-                      onEdit={() => loadItem(customer, 'edit')}
-                      onDelete={() => remove(customer)}
+                      onView={() => loadItem(item, 'view')}
+                      onEdit={() => loadItem(item, 'edit')}
+                      onDelete={() => remove(item)}
                     />
                   </td>
                 </tr>

@@ -1,18 +1,31 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
+import { listSellers } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
-import { createWorkOrder, type WorkOrderPriority } from '../../data/osStore';
+import { createWorkOrder, PRIORITY_LABEL, type WorkOrderPriority } from '../../data/osStore';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EMPTY = {
   customerName: '',
   customerPhone: '',
+  customerDocument: '',
+  customerEmail: '',
   itemName: '',
+  itemBrand: '',
+  itemModel: '',
+  itemColor: '',
   itemRef: '',
+  devicePassword: '',
+  accessories: '',
+  conditionOnEntry: '',
   defect: '',
+  diagnosis: '',
   notes: '',
+  estimatedReadyAt: '',
   technician: '',
+  sellerId: '',
   priority: 'normal' as WorkOrderPriority,
   labor: 0,
   parts: 0,
@@ -23,6 +36,7 @@ export function WorkOrderNewPage() {
   const { user } = useAuth();
   const profile = getOperatorProfile(user?.name ?? 'Operador');
   const customers = getAdminState().customers;
+  const sellers = listSellers(true);
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
 
   function pickCustomer(id: string) {
@@ -32,6 +46,8 @@ export function WorkOrderNewPage() {
       ...current,
       customerName: customer.name,
       customerPhone: customer.phone,
+      customerDocument: customer.document || current.customerDocument,
+      customerEmail: customer.email || current.customerEmail,
     }));
   }
 
@@ -39,26 +55,28 @@ export function WorkOrderNewPage() {
     event.preventDefault();
     if (!form.customerName.trim() || !form.itemName.trim() || !form.defect.trim()) return;
     const created = createWorkOrder(form);
-    navigate(`/painel/os/${created.id}`, { replace: true });
+    navigate(`/painel/os/${created.id}/relatorio`, { replace: true });
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card admin-card--form">
         <h2>Abrir ordem de serviço</h2>
-        <p>Cliente, item e defeito entram aqui. O quadro da oficina pega o restante.</p>
+        <p>
+          Preencha os campos estruturados — evita jogar tudo em observações. Depois da abertura sai o
+          relatório para imprimir ou guardar.
+        </p>
         <form className="admin-form" onSubmit={submit}>
-          <label>
-            Cliente cadastrado
-            <select defaultValue="" onChange={(event) => pickCustomer(event.target.value)}>
-              <option value="">Selecionar…</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name} · {customer.phone}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AdminPicker
+            label="Cliente cadastrado"
+            value=""
+            placeholder="Selecionar…"
+            options={customers.map((customer) => ({
+              value: customer.id,
+              label: `${customer.name} · ${customer.phone}`,
+            }))}
+            onChange={(value) => pickCustomer(value)}
+          />
           <label>
             Telefone
             <input
@@ -66,7 +84,7 @@ export function WorkOrderNewPage() {
               onChange={(event) => setForm({ ...form, customerPhone: event.target.value })}
             />
           </label>
-          <label className="span-2">
+          <label>
             Nome do cliente
             <input
               value={form.customerName}
@@ -75,20 +93,80 @@ export function WorkOrderNewPage() {
             />
           </label>
           <label>
-            Item / equipamento
+            CPF / CNPJ
+            <input
+              value={form.customerDocument}
+              onChange={(event) => setForm({ ...form, customerDocument: event.target.value })}
+            />
+          </label>
+          <label className="span-2">
+            E-mail
+            <input
+              type="email"
+              value={form.customerEmail}
+              onChange={(event) => setForm({ ...form, customerEmail: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Equipamento
             <input
               value={form.itemName}
               onChange={(event) => setForm({ ...form, itemName: event.target.value })}
-              placeholder="Celular, óculos, notebook…"
+              placeholder="Ex.: iPhone 15, Notebook Dell"
               required
             />
           </label>
           <label>
-            Referência
+            Marca
+            <input
+              value={form.itemBrand}
+              onChange={(event) => setForm({ ...form, itemBrand: event.target.value })}
+            />
+          </label>
+          <label>
+            Modelo
+            <input
+              value={form.itemModel}
+              onChange={(event) => setForm({ ...form, itemModel: event.target.value })}
+            />
+          </label>
+          <label>
+            Cor
+            <input
+              value={form.itemColor}
+              onChange={(event) => setForm({ ...form, itemColor: event.target.value })}
+            />
+          </label>
+          <label>
+            IMEI / série / ref.
             <input
               value={form.itemRef}
               onChange={(event) => setForm({ ...form, itemRef: event.target.value })}
-              placeholder="IMEI, série, modelo"
+            />
+          </label>
+          <label>
+            Senha / padrão / PIN
+            <input
+              value={form.devicePassword}
+              onChange={(event) => setForm({ ...form, devicePassword: event.target.value })}
+              placeholder="Uso interno da oficina"
+            />
+          </label>
+          <label className="span-2">
+            Acessórios deixados
+            <input
+              value={form.accessories}
+              onChange={(event) => setForm({ ...form, accessories: event.target.value })}
+              placeholder="Capa, cabo, chip, fonte…"
+            />
+          </label>
+          <label className="span-2">
+            Estado na entrada
+            <textarea
+              value={form.conditionOnEntry}
+              onChange={(event) => setForm({ ...form, conditionOnEntry: event.target.value })}
+              placeholder="Riscos, amassados, tela trincada, etc."
             />
           </label>
           <label className="span-2">
@@ -99,6 +177,14 @@ export function WorkOrderNewPage() {
               required
             />
           </label>
+          <label className="span-2">
+            Diagnóstico inicial
+            <textarea
+              value={form.diagnosis}
+              onChange={(event) => setForm({ ...form, diagnosis: event.target.value })}
+              placeholder="Opcional — o que a oficina já identificou"
+            />
+          </label>
           <label>
             Técnico
             <input
@@ -106,18 +192,32 @@ export function WorkOrderNewPage() {
               onChange={(event) => setForm({ ...form, technician: event.target.value })}
             />
           </label>
+          <AdminPicker
+            label="Vendedor"
+            value={form.sellerId}
+            placeholder="Sem vendedor"
+            options={sellers.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={(value) => setForm({ ...form, sellerId: value })}
+          />
+          <AdminPicker
+            label="Prioridade"
+            value={form.priority}
+            options={[
+              { value: 'low', label: PRIORITY_LABEL.low },
+              { value: 'normal', label: PRIORITY_LABEL.normal },
+              { value: 'high', label: PRIORITY_LABEL.high },
+            ]}
+            onChange={(value) =>
+              setForm({ ...form, priority: value as WorkOrderPriority })
+            }
+          />
           <label>
-            Prioridade
-            <select
-              value={form.priority}
-              onChange={(event) =>
-                setForm({ ...form, priority: event.target.value as WorkOrderPriority })
-              }
-            >
-              <option value="low">Baixa</option>
-              <option value="normal">Normal</option>
-              <option value="high">Alta</option>
-            </select>
+            Previsão de pronto
+            <input
+              type="date"
+              value={form.estimatedReadyAt}
+              onChange={(event) => setForm({ ...form, estimatedReadyAt: event.target.value })}
+            />
           </label>
           <label>
             Mão de obra (R$)
@@ -140,15 +240,16 @@ export function WorkOrderNewPage() {
             />
           </label>
           <label className="span-2">
-            Observações
+            Observações internas
             <textarea
               value={form.notes}
               onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              placeholder="Só o que não cabe nos campos acima"
             />
           </label>
           <div className="span-2 admin-toolbar">
             <button type="submit" className="btn btn--primary">
-              Abrir OS
+              Abrir OS e gerar relatório
             </button>
             <Link to="/painel/os" className="btn btn--ghost">
               Voltar ao quadro

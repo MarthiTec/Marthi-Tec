@@ -125,6 +125,10 @@ export function saveAttributes(items: ProductAttribute[]) {
   return persist(items.slice(0, MAX_ATTRIBUTES));
 }
 
+export function removeAttribute(id: string) {
+  return persist(load().filter((item) => item.id !== id).slice(0, MAX_ATTRIBUTES));
+}
+
 export function totemAttributes() {
   return load()
     .filter((item) => item.active && item.useOnTotem)

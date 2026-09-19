@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   addFinance,
   FINANCE_SOURCE_LABEL,
@@ -51,13 +52,15 @@ export function FinancePage() {
       <article className="admin-card">
         <h2>Lançar movimento</h2>
         <div className="admin-form">
-          <label>
-            Tipo
-            <select value={type} onChange={(e) => setType(e.target.value as 'in' | 'out')}>
-              <option value="in">Entrada</option>
-              <option value="out">Saída</option>
-            </select>
-          </label>
+          <AdminPicker
+            label="Tipo"
+            value={type}
+            options={[
+              { value: 'in', label: 'Entrada' },
+              { value: 'out', label: 'Saída' },
+            ]}
+            onChange={(value) => setType(value as 'in' | 'out')}
+          />
           <label>
             Valor
             <input value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -77,20 +80,18 @@ export function FinancePage() {
       <article className="admin-card">
         <div className="admin-toolbar" style={{ marginBottom: 12 }}>
           <h2 style={{ margin: 0, flex: 1 }}>Extrato</h2>
-          <label>
-            Origem{' '}
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as 'all' | FinanceSource)}
-            >
-              <option value="all">Todas</option>
-              {(Object.keys(FINANCE_SOURCE_LABEL) as FinanceSource[]).map((key) => (
-                <option key={key} value={key}>
-                  {FINANCE_SOURCE_LABEL[key]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AdminPicker
+            label="Origem"
+            value={sourceFilter}
+            options={[
+              { value: 'all', label: 'Todas' },
+              ...(Object.keys(FINANCE_SOURCE_LABEL) as FinanceSource[]).map((key) => ({
+                value: key,
+                label: FINANCE_SOURCE_LABEL[key],
+              })),
+            ]}
+            onChange={(value) => setSourceFilter(value as 'all' | FinanceSource)}
+          />
         </div>
         <table className="admin-table">
           <thead>

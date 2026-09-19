@@ -79,7 +79,12 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/tabelas') ||
     pathname.startsWith('/painel/pagamentos') ||
-    pathname.startsWith('/painel/financeiro')
+    pathname.startsWith('/painel/financeiro') ||
+    pathname.startsWith('/painel/vendedores') ||
+    pathname.startsWith('/painel/fornecedores') ||
+    pathname.startsWith('/painel/funcionarios') ||
+    pathname.startsWith('/painel/auditoria') ||
+    pathname.startsWith('/painel/notas')
   ) {
     return 'erp';
   }

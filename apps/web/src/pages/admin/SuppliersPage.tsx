@@ -9,40 +9,48 @@ import {
   matchesStatus,
   type CrudStatusFilter,
 } from '../../components/CrudKit';
+import { useAuth } from '../../contexts/AuthContext';
+import { logAction } from '../../data/auditLog';
 import {
-  getAdminState,
-  removeCustomer,
-  type Customer,
-  upsertCustomer,
-} from '../../data/adminStore';
+  listSuppliers,
+  removeSupplier,
+  upsertSupplier,
+  type Supplier,
+} from '../../data/erpRegistry';
 
 const EMPTY = {
   name: '',
-  phone: '',
+  tradeName: '',
   document: '',
+  phone: '',
   email: '',
   city: '',
+  notes: '',
   active: true,
 };
 
 type Mode = 'new' | 'edit' | 'view';
 
-export function CustomersPage() {
+export function SuppliersPage() {
+  const { user } = useAuth();
+  const [items, setItems] = useState(() => listSuppliers());
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
   const [form, setForm] = useState(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | undefined>();
-  const [customers, setCustomers] = useState(() => getAdminState().customers);
 
   const filtered = useMemo(
     () =>
-      customers.filter(
+      items.filter(
         (item) =>
-          matchesStatus(item.active !== false, status) &&
-          matchesQuery(`${item.name} ${item.phone} ${item.document} ${item.email} ${item.city}`, query),
+          matchesStatus(item.active, status) &&
+          matchesQuery(
+            `${item.name} ${item.tradeName} ${item.document} ${item.city} ${item.phone}`,
+            query,
+          ),
       ),
-    [customers, query, status],
+    [items, query, status],
   );
 
   const readOnly = mode === 'view';
@@ -53,44 +61,74 @@ export function CustomersPage() {
     setMode('new');
   }
 
-  function loadItem(customer: Customer, nextMode: Mode) {
-    setSelectedId(customer.id);
+  function loadItem(item: Supplier, nextMode: Mode) {
+    setSelectedId(item.id);
     setMode(nextMode);
     setForm({
-      name: customer.name,
-      phone: customer.phone,
-      document: customer.document,
-      email: customer.email,
-      city: customer.city,
-      active: customer.active !== false,
+      name: item.name,
+      tradeName: item.tradeName,
+      document: item.document,
+      phone: item.phone,
+      email: item.email,
+      city: item.city,
+      notes: item.notes,
+      active: item.active,
     });
   }
 
   function submit() {
-    if (readOnly) return;
-    if (!form.name.trim() || form.phone.replace(/\D/g, '').length < 8) return;
-    const next = upsertCustomer({ ...form, id: mode === 'edit' ? selectedId : undefined });
-    setCustomers(next.customers);
+    if (readOnly || !form.name.trim()) return;
+    const next = upsertSupplier({ ...form, id: mode === 'edit' ? selectedId : undefined });
+    setItems(next.suppliers);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: mode === 'edit' ? 'fornecedor.atualizar' : 'fornecedor.criar',
+      detail: form.name,
+    });
     resetForm();
   }
 
-  function remove(customer: Customer) {
-    if (!confirmDelete(`o cliente ${customer.name}`)) return;
-    setCustomers(removeCustomer(customer.id).customers);
-    if (selectedId === customer.id) resetForm();
+  function remove(item: Supplier) {
+    if (!confirmDelete(`o fornecedor ${item.name}`)) return;
+    setItems(removeSupplier(item.id).suppliers);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'fornecedor.excluir',
+      detail: item.name,
+    });
+    if (selectedId === item.id) resetForm();
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
-        <h2>{crudFormTitle(mode, 'cliente')}</h2>
+        <h2>{crudFormTitle(mode, 'fornecedor')}</h2>
+        <p>Vinculado às notas de entrada de mercadoria.</p>
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
-            Nome
+            Razão social
             <input
               value={form.name}
               disabled={readOnly}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </label>
+          <label>
+            Nome fantasia
+            <input
+              value={form.tradeName}
+              disabled={readOnly}
+              onChange={(e) => setForm({ ...form, tradeName: e.target.value })}
+            />
+          </label>
+          <label>
+            CNPJ / CPF
+            <input
+              value={form.document}
+              disabled={readOnly}
+              onChange={(e) => setForm({ ...form, document: e.target.value })}
             />
           </label>
           <label>
@@ -99,14 +137,6 @@ export function CustomersPage() {
               value={form.phone}
               disabled={readOnly}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-          </label>
-          <label>
-            CPF / CNPJ
-            <input
-              value={form.document}
-              disabled={readOnly}
-              onChange={(e) => setForm({ ...form, document: e.target.value })}
             />
           </label>
           <label>
@@ -135,15 +165,19 @@ export function CustomersPage() {
             ]}
             onChange={(value) => setForm({ ...form, active: value === '1' })}
           />
+          <label className="span-2">
+            Observações
+            <textarea
+              value={form.notes}
+              disabled={readOnly}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </label>
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
           {readOnly ? (
             <>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setMode('edit')}
-              >
+              <button type="button" className="btn btn--primary" onClick={() => setMode('edit')}>
                 Editar
               </button>
               <button type="button" className="btn btn--ghost" onClick={resetForm}>
@@ -169,18 +203,18 @@ export function CustomersPage() {
         <CrudListBar
           query={query}
           onQueryChange={setQuery}
-          placeholder="Buscar cliente, telefone, documento…"
+          placeholder="Buscar fornecedor…"
           status={status}
           onStatusChange={setStatus}
           onNew={resetForm}
-          newLabel="Novo cliente"
+          newLabel="Novo fornecedor"
         />
         <table className="admin-table">
           <thead>
             <tr>
               <th>Nome</th>
-              <th>Telefone</th>
               <th>Documento</th>
+              <th>Cidade</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -189,21 +223,24 @@ export function CustomersPage() {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} className="empty">
-                  Nenhum cliente encontrado.
+                  Nenhum fornecedor encontrado.
                 </td>
               </tr>
             ) : (
-              filtered.map((customer) => (
-                <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.phone}</td>
-                  <td>{customer.document || '—'}</td>
-                  <td>{customer.active !== false ? 'Ativo' : 'Inativo'}</td>
+              filtered.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    {item.name}
+                    {item.tradeName ? ` · ${item.tradeName}` : ''}
+                  </td>
+                  <td>{item.document || '—'}</td>
+                  <td>{item.city || '—'}</td>
+                  <td>{item.active ? 'Ativo' : 'Inativo'}</td>
                   <td>
                     <CrudRowActions
-                      onView={() => loadItem(customer, 'view')}
-                      onEdit={() => loadItem(customer, 'edit')}
-                      onDelete={() => remove(customer)}
+                      onView={() => loadItem(item, 'view')}
+                      onEdit={() => loadItem(item, 'edit')}
+                      onDelete={() => remove(item)}
                     />
                   </td>
                 </tr>

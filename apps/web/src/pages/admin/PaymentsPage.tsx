@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
+import {
+  confirmDelete,
+  CrudListBar,
+  CrudRowActions,
+  crudFormTitle,
+  matchesQuery,
+  matchesStatus,
+  type CrudStatusFilter,
+} from '../../components/CrudKit';
 import {
   getAdminState,
+  removePayment,
   savePayments,
   type PaymentMethod,
 } from '../../data/adminStore';
@@ -21,37 +32,47 @@ const TYPES: { id: PaymentMethod['type']; label: string }[] = [
   { id: 'other', label: 'Outro' },
 ];
 
+type Mode = 'new' | 'edit' | 'view';
+
 export function PaymentsPage() {
   const state = getAdminState();
   const [tables] = useState(state.priceTables);
   const [items, setItems] = useState(state.payments);
   const [form, setForm] = useState({ ...EMPTY, priceTableId: state.priceTables[0]?.id ?? '' });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>('new');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<CrudStatusFilter>('all');
+
+  const filtered = useMemo(
+    () =>
+      items.filter((item) => {
+        const tableName = tables.find((table) => table.id === item.priceTableId)?.name ?? '';
+        const typeLabel = TYPES.find((entry) => entry.id === item.type)?.label ?? item.type;
+        return (
+          matchesStatus(item.active, status) &&
+          matchesQuery(`${item.name} ${typeLabel} ${tableName}`, query)
+        );
+      }),
+    [items, query, status, tables],
+  );
+
+  const readOnly = mode === 'view';
 
   function persist(next: PaymentMethod[]) {
     setItems(next);
     savePayments(next);
   }
 
-  function submit() {
-    if (!form.name.trim() || !form.priceTableId) return;
-    if (editingId) {
-      persist(items.map((item) => (item.id === editingId ? { ...item, ...form } : item)));
-    } else {
-      persist([
-        {
-          ...form,
-          id: `PAY-${Date.now().toString(36).toUpperCase()}`,
-        },
-        ...items,
-      ]);
-    }
+  function resetForm() {
     setForm({ ...EMPTY, priceTableId: tables[0]?.id ?? '' });
-    setEditingId(null);
+    setSelectedId(null);
+    setMode('new');
   }
 
-  function edit(item: PaymentMethod) {
-    setEditingId(item.id);
+  function loadItem(item: PaymentMethod, nextMode: Mode) {
+    setSelectedId(item.id);
+    setMode(nextMode);
     setForm({
       name: item.name,
       type: item.type,
@@ -61,81 +82,117 @@ export function PaymentsPage() {
     });
   }
 
+  function submit() {
+    if (readOnly || !form.name.trim() || !form.priceTableId) return;
+    if (mode === 'edit' && selectedId) {
+      persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
+    } else {
+      persist([
+        { ...form, id: `PAY-${Date.now().toString(36).toUpperCase()}` },
+        ...items,
+      ]);
+    }
+    resetForm();
+  }
+
+  function remove(item: PaymentMethod) {
+    if (!confirmDelete(`a forma ${item.name}`)) return;
+    setItems(removePayment(item.id).payments);
+    if (selectedId === item.id) resetForm();
+  }
+
   return (
     <section className="admin-page">
       <article className="admin-card">
-        <h2>{editingId ? 'Atualizar forma' : 'Forma de pagamento'}</h2>
+        <h2>{crudFormTitle(mode, 'forma de pagamento')}</h2>
         <p>
           Cada forma aparece no PDV e puxa a tabela de preço vinculada (vista, cartão, atacado).
         </p>
-        <div className="admin-form">
+        <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Nome
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input
+              value={form.name}
+              disabled={readOnly}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </label>
-          <label>
-            Tipo
-            <select
-              value={form.type}
-              onChange={(e) =>
-                setForm({ ...form, type: e.target.value as PaymentMethod['type'] })
-              }
-            >
-              {TYPES.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Tabela de preço
-            <select
-              value={form.priceTableId}
-              onChange={(e) => setForm({ ...form, priceTableId: e.target.value })}
-            >
-              {tables.length === 0 ? (
-                <option value="">Cadastre uma tabela primeiro</option>
-              ) : (
-                tables.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.percent > 0 ? '+' : ''}
-                    {item.percent}%)
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
+          <AdminPicker
+            label="Tipo"
+            value={form.type}
+            disabled={readOnly}
+            options={TYPES.map((item) => ({ value: item.id, label: item.label }))}
+            onChange={(value) => setForm({ ...form, type: value as PaymentMethod['type'] })}
+          />
+          <AdminPicker
+            label="Tabela de preço"
+            value={form.priceTableId}
+            disabled={readOnly}
+            placeholder="Cadastre uma tabela primeiro"
+            options={tables.map((item) => ({
+              value: item.id,
+              label: `${item.name} (${item.percent > 0 ? '+' : ''}${item.percent}%)`,
+            }))}
+            onChange={(value) => setForm({ ...form, priceTableId: value })}
+          />
           <label>
             Máx. parcelas
             <input
               type="number"
               min={1}
               value={form.maxInstallments}
+              disabled={readOnly}
               onChange={(e) =>
                 setForm({ ...form, maxInstallments: Math.max(1, Number(e.target.value) || 1) })
               }
             />
           </label>
-          <label>
-            Situação
-            <select
-              value={form.active ? '1' : '0'}
-              onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}
-            >
-              <option value="1">Ativa no PDV</option>
-              <option value="0">Inativa</option>
-            </select>
-          </label>
+          <AdminPicker
+            label="Situação"
+            value={form.active ? '1' : '0'}
+            disabled={readOnly}
+            options={[
+              { value: '1', label: 'Ativa no PDV' },
+              { value: '0', label: 'Inativa' },
+            ]}
+            onChange={(value) => setForm({ ...form, active: value === '1' })}
+          />
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
-            {editingId ? 'Salvar forma' : 'Cadastrar forma'}
-          </button>
+          {readOnly ? (
+            <>
+              <button type="button" className="btn btn--primary" onClick={() => setMode('edit')}>
+                Editar
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={resetForm}>
+                Fechar
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn--primary" onClick={submit}>
+                {mode === 'edit' ? 'Salvar forma' : 'Cadastrar forma'}
+              </button>
+              {mode === 'edit' ? (
+                <button type="button" className="btn btn--ghost" onClick={resetForm}>
+                  Cancelar
+                </button>
+              ) : null}
+            </>
+          )}
         </div>
       </article>
 
       <article className="admin-card">
+        <CrudListBar
+          query={query}
+          onQueryChange={setQuery}
+          placeholder="Buscar forma de pagamento…"
+          status={status}
+          onStatusChange={setStatus}
+          onNew={resetForm}
+          newLabel="Nova forma"
+        />
         <table className="admin-table">
           <thead>
             <tr>
@@ -148,20 +205,30 @@ export function PaymentsPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.name}</td>
-                <td>{TYPES.find((entry) => entry.id === item.type)?.label ?? item.type}</td>
-                <td>{tables.find((table) => table.id === item.priceTableId)?.name ?? '—'}</td>
-                <td>{item.maxInstallments}x</td>
-                <td>{item.active ? 'Ativa' : 'Inativa'}</td>
-                <td>
-                  <button type="button" className="btn btn--ghost" onClick={() => edit(item)}>
-                    Editar
-                  </button>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="empty">
+                  Nenhuma forma encontrada.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{TYPES.find((entry) => entry.id === item.type)?.label ?? item.type}</td>
+                  <td>{tables.find((table) => table.id === item.priceTableId)?.name ?? '—'}</td>
+                  <td>{item.maxInstallments}x</td>
+                  <td>{item.active ? 'Ativa' : 'Inativa'}</td>
+                  <td>
+                    <CrudRowActions
+                      onView={() => loadItem(item, 'view')}
+                      onEdit={() => loadItem(item, 'edit')}
+                      onDelete={() => remove(item)}
+                    />
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </article>

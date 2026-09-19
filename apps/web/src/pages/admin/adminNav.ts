@@ -40,8 +40,22 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/painel/os', label: 'Quadro da oficina', end: true },
       { to: '/painel/os/nova', label: 'Nova OS' },
+      { to: '/painel/os/agenda', label: 'Agenda' },
+      { to: '/painel/os?quote=sent', label: 'Orçamentos' },
       { to: '/painel/os?status=progress', label: 'Em serviço' },
       { to: '/painel/os?status=ready', label: 'Prontas' },
+    ],
+  },
+  {
+    id: 'people',
+    label: 'Pessoas',
+    module: 'erp',
+    children: [
+      { to: '/painel/clientes', label: 'Clientes' },
+      { to: '/painel/funcionarios', label: 'Funcionários' },
+      { to: '/painel/vendedores', label: 'Vendedores' },
+      { to: '/painel/fornecedores', label: 'Fornecedores' },
+      // Futuro: condutores (emissão de notas)
     ],
   },
   {
@@ -49,12 +63,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'ERP',
     module: 'erp',
     children: [
-      { to: '/painel/clientes', label: 'Clientes' },
       { to: '/painel/estoque', label: 'Estoque' },
+      { to: '/painel/notas', label: 'Notas entrada/saída' },
       { to: '/painel/atributos', label: 'Atributos' },
       { to: '/painel/tabelas', label: 'Tabelas de preço' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
       { to: '/painel/financeiro', label: 'Financeiro' },
+      { to: '/painel/auditoria', label: 'Auditoria' },
     ],
   },
 ];
@@ -65,11 +80,21 @@ export function navGroupForPath(pathname: string, search = '') {
   if (pathname.startsWith('/painel/os')) return 'os';
   if (
     pathname.startsWith('/painel/clientes') ||
+    pathname.startsWith('/painel/funcionarios') ||
+    pathname.startsWith('/painel/vendedores') ||
+    pathname.startsWith('/painel/fornecedores') ||
+    pathname.startsWith('/painel/condutores')
+  ) {
+    return 'people';
+  }
+  if (
     pathname.startsWith('/painel/estoque') ||
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/tabelas') ||
     pathname.startsWith('/painel/pagamentos') ||
-    pathname.startsWith('/painel/financeiro')
+    pathname.startsWith('/painel/financeiro') ||
+    pathname.startsWith('/painel/auditoria') ||
+    pathname.startsWith('/painel/notas')
   ) {
     return 'erp';
   }
@@ -84,6 +109,6 @@ export function childIsActive(child: AdminNavChild, pathname: string, search: st
     return pathname === path && cleanSearch === query;
   }
   if (pathname === path && cleanSearch) return false;
-  if (child.end) return pathname === path;
+  if (child.end) return pathname === path && !cleanSearch;
   return pathname === path || pathname.startsWith(`${path}/`);
 }

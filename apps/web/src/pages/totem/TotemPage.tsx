@@ -11,7 +11,7 @@ import {
   type PickedAttribute,
   type ProductAttribute,
 } from '../../data/attributeStore';
-import { getTotemSettings, TOTEM_SETTINGS_EVENT, type TotemMode } from '../../data/totemSettings';
+import { getTotemExitPassword, getTotemSettings, TOTEM_SETTINGS_EVENT, type TotemMode } from '../../data/totemSettings';
 import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../data/variantQuote';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
@@ -21,15 +21,13 @@ import {
   INSTALLMENTS,
   PAYMENT_OPTIONS,
   TOTEM_BRANDS,
-  TOTEM_PRODUCTS,
   formatBRL,
   type TotemBrand,
   type TotemProduct,
 } from './totemData';
+import { listTotemCatalog } from './totemCatalog';
 import './totem.css';
 
-const EXIT_PASSWORD =
-  import.meta.env.VITE_TOTEM_EXIT_PASSWORD?.trim() || 'cellponto';
 const FILTER_IDLE_MS = 2 * 60 * 1000;
 
 type Step = 'catalog' | 'checkout' | 'done';
@@ -100,12 +98,22 @@ export function TotemPage() {
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
   const [mode, setMode] = useState<TotemMode>(() => getTotemSettings().mode);
+  const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
+  const [catalog, setCatalog] = useState(() => listTotemCatalog());
   const catalogOnly = mode === 'catalog';
 
   const hasActiveQuery =
     search.trim() !== '' ||
     brand !== 'all' ||
     Object.values(filters).some((value) => value && value !== 'all');
+
+  const awayFromHome =
+    step !== 'catalog' ||
+    hasActiveQuery ||
+    Boolean(selection) ||
+    name.trim() !== '' ||
+    phone.trim() !== '' ||
+    exitOpen;
 
   function bumpIdle() {
     setIdleTick((current) => current + 1);
@@ -119,9 +127,25 @@ export function TotemPage() {
     setKeyboardOpen(false);
   }
 
+  function resetToHome() {
+    clearCatalogFilters();
+    setStep('catalog');
+    setSelection(null);
+    setName('');
+    setPhone('');
+    setError(null);
+    setSubmitting(false);
+    setExitOpen(false);
+    setExitPassword('');
+    setExitError(null);
+    setConfigs({});
+    window.scrollTo({ top: 0 });
+    listRef.current?.scrollTo({ top: 0 });
+  }
+
   const brandProducts = useMemo(() => {
-    return TOTEM_PRODUCTS.filter((item) => brand === 'all' || item.brand === brand);
-  }, [brand]);
+    return catalog.filter((item) => brand === 'all' || item.brand === brand);
+  }, [brand, catalog]);
 
   const products = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -158,12 +182,29 @@ export function TotemPage() {
   }, [brand]);
 
   useEffect(() => {
-    if (step !== 'catalog' || !hasActiveQuery) return;
+    if (!awayFromHome) return;
     const timer = window.setTimeout(() => {
-      clearCatalogFilters();
+      resetToHome();
     }, FILTER_IDLE_MS);
     return () => window.clearTimeout(timer);
-  }, [step, hasActiveQuery, idleTick, search, brand, filters]);
+  }, [awayFromHome, idleTick, step, hasActiveQuery, selection, name, phone, exitOpen, search, brand, filters]);
+
+  useEffect(() => {
+    function onActivity() {
+      bumpIdle();
+    }
+    const options: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener('pointerdown', onActivity, options);
+    window.addEventListener('keydown', onActivity, options);
+    window.addEventListener('touchstart', onActivity, options);
+    window.addEventListener('scroll', onActivity, options);
+    return () => {
+      window.removeEventListener('pointerdown', onActivity, options);
+      window.removeEventListener('keydown', onActivity, options);
+      window.removeEventListener('touchstart', onActivity, options);
+      window.removeEventListener('scroll', onActivity, options);
+    };
+  }, []);
 
   useEffect(() => {
     if (!keyboardOpen && !openFilter) return;
@@ -181,10 +222,12 @@ export function TotemPage() {
   }, [keyboardOpen, openFilter]);
 
   useEffect(() => {
-    function refreshMode() {
-      const next = getTotemSettings().mode;
-      setMode(next);
-      if (next === 'catalog') {
+    function refreshSettings() {
+      const settings = getTotemSettings();
+      setMode(settings.mode);
+      setRequiredExitPassword(settings.exitPassword);
+      setCatalog(listTotemCatalog());
+      if (settings.mode === 'catalog') {
         setStep('catalog');
         setSelection(null);
       }
@@ -192,13 +235,18 @@ export function TotemPage() {
     function refreshAttrs() {
       setAttrs(totemAttributes());
       setFilterAttrs(totemFilterAttributes());
+      setCatalog(listTotemCatalog());
     }
     refreshAttrs();
-    window.addEventListener(TOTEM_SETTINGS_EVENT, refreshMode);
+    window.addEventListener(TOTEM_SETTINGS_EVENT, refreshSettings);
     window.addEventListener(ATTRIBUTES_EVENT, refreshAttrs);
+    window.addEventListener('storage', refreshSettings);
+    window.addEventListener('marthi-stock', refreshSettings);
     return () => {
-      window.removeEventListener(TOTEM_SETTINGS_EVENT, refreshMode);
+      window.removeEventListener(TOTEM_SETTINGS_EVENT, refreshSettings);
       window.removeEventListener(ATTRIBUTES_EVENT, refreshAttrs);
+      window.removeEventListener('storage', refreshSettings);
+      window.removeEventListener('marthi-stock', refreshSettings);
     };
   }, []);
 
@@ -216,7 +264,7 @@ export function TotemPage() {
 
   function patchConfig(productId: number, attrId: string, value: string) {
     setConfigs((current) => {
-      const product = TOTEM_PRODUCTS.find((item) => item.id === productId);
+      const product = catalog.find((item) => item.id === productId);
       const base = current[productId] ?? (product ? defaultConfig(product, attrs) : {});
       return { ...current, [productId]: { ...base, [attrId]: value } };
     });
@@ -259,7 +307,7 @@ export function TotemPage() {
 
   function confirmExit(event: FormEvent) {
     event.preventDefault();
-    if (exitPassword.trim() !== EXIT_PASSWORD) {
+    if (exitPassword.trim() !== requiredExitPassword) {
       setExitError('Senha incorreta. Só a loja pode fechar o totem.');
       return;
     }

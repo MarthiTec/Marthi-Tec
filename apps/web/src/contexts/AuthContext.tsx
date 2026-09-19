@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { logAccess } from '../data/auditLog';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
@@ -39,6 +40,11 @@ function applySession(
   localStorage.setItem(STORAGE_KEY, session.token);
   setToken(session.token);
   setUser(session.user);
+  logAccess({
+    actorName: session.user.name,
+    actorEmail: session.user.email,
+    action: 'login',
+  });
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -104,10 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (user) {
+      logAccess({
+        actorName: user.name,
+        actorEmail: user.email,
+        action: 'logout',
+      });
+    }
     localStorage.removeItem(STORAGE_KEY);
     setToken(null);
     setUser(null);
-  }, []);
+  }, [user]);
 
   const value = useMemo(
     () => ({
