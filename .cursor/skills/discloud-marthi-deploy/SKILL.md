@@ -58,7 +58,19 @@ Ignore: `node_modules/`, `.env*`, `packages/` (unused), `docs/`, zips.
 
 ## After go-live
 
-Set Site **Variáveis** (not only Bot): `JWT_SECRET`, DB_*, `EVOLUTION_*`, Google OAuth origins for `https://marthi-totem.discloud.app`.
+Set Site **Variáveis** (app `marthi-totem`, not the Bot):
+
+- `GOOGLE_CLIENT_ID` — same OAuth Web client ID as local
+- `JWT_SECRET` — required for sessions
+- `AUTH_DEV_EMAIL` / `AUTH_DEV_PASSWORD` — optional password login
+- DB_* / `EVOLUTION_*` as needed
+
+Google Cloud Console → Credentials → OAuth client:
+
+- Authorized JavaScript origins: `https://marthi-totem.discloud.app`
+- (Keep `http://localhost:5173` for local)
+
+The SPA reads `googleClientId` from `GET /api/v1/auth/providers` — no rebuild needed after setting `GOOGLE_CLIENT_ID` on the Site (restart app).
 
 ## Related docs
 

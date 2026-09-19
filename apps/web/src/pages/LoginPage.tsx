@@ -117,8 +117,9 @@ export function LoginPage() {
               Continuar com Google
             </button>
             <p>
-              Configure <code>VITE_GOOGLE_CLIENT_ID</code> e <code>GOOGLE_CLIENT_ID</code> para
-              habilitar.
+              No Site Discloud (<code>marthi-totem</code>), defina <code>GOOGLE_CLIENT_ID</code> e{' '}
+              <code>JWT_SECRET</code>. No Google Cloud Console, autorize a origem{' '}
+              <code>https://marthi-totem.discloud.app</code>.
             </p>
           </div>
         )}

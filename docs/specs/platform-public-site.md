@@ -65,8 +65,9 @@ Precisamos de uma URL pública estável para demonstrar a Marthi a qualquer clie
 - [x] `https://marthi-totem.discloud.app/health` → 200
 - [x] `https://marthi-totem.discloud.app/` → home Marthi
 - [x] `/totem` e `/login` acessíveis na mesma origem
-- [ ] Variáveis Evolution/JWT/DB no **Site** (não só no Bot legado)
-- [ ] Google OAuth origins apontando para o domínio público
+- [ ] Variáveis Evolution/JWT/DB/`GOOGLE_CLIENT_ID` no **Site** `marthi-totem` (não só no Bot)
+- [ ] Google OAuth: origem `https://marthi-totem.discloud.app` no Cloud Console
+- [ ] `GET /api/v1/auth/providers` no domínio público → `google: true`
 
 ## 8. Future
 
