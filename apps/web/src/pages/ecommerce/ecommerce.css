@@ -1,0 +1,444 @@
+.ecommerce-app {
+  --ink: #12151a;
+  --mute: #6b7280;
+  --line: #d8dde3;
+  --teal: #0f766e;
+  --amber: #b45309;
+  --side: #101820;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr);
+  background:
+    radial-gradient(900px 420px at 0% 0%, rgba(180, 83, 9, 0.07), transparent 55%),
+    #eef1f4;
+  color: var(--ink);
+}
+
+.ecommerce-app__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: #12181f;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 20;
+}
+
+.ecommerce-app__menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ecommerce-app__menu-btn:hover,
+.ecommerce-app.is-nav-open .ecommerce-app__menu-btn {
+  background: rgba(180, 83, 9, 0.35);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.ecommerce-app__menu-btn .admin-ico {
+  width: 18px;
+  height: 18px;
+}
+
+.ecommerce-app__menu-btn kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.ecommerce-app__mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.ecommerce-app__brand {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ecommerce-app__brand strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.ecommerce-app__brand span {
+  display: block;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ecommerce-app__exit {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ecommerce-app__exit:hover {
+  background: rgba(215, 0, 21, 0.35);
+}
+
+.ecommerce-app__shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.ecommerce-app.is-nav-closed .ecommerce-app__shell {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.ecommerce-app__side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px;
+  background: var(--side);
+  color: #e8eef4;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: auto;
+  min-width: 0;
+}
+
+.ecommerce-app.is-nav-closed .ecommerce-app__side {
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ecommerce-app__side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ecommerce-app__side-head strong {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ecommerce-app__side-close {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.ecommerce-app__side-label {
+  margin: 10px 10px 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.ecommerce-app__side a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.ecommerce-app__side a:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.ecommerce-app__side a.is-active {
+  background: rgba(180, 83, 9, 0.42);
+  color: #fff;
+}
+
+.ecommerce-app__side .admin-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.ecommerce-app__main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ecommerce-app__heading {
+  padding: 16px 20px 8px;
+  flex-shrink: 0;
+}
+
+.ecommerce-app__heading h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ecommerce-app__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 20px 24px;
+}
+
+.ecommerce-app__backdrop {
+  display: none;
+}
+
+.ecommerce-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 14, 20, 0.55);
+  padding: 20px;
+}
+
+.ecommerce-lock__card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.ecommerce-lock__card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.ecommerce-lock__card p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.ecommerce-lock__card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.ecommerce-lock__card input {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font: inherit;
+}
+
+.ecommerce-lock__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ecommerce-home {
+  display: grid;
+  gap: 16px;
+}
+
+.ecommerce-home__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.ecommerce-home__kpi {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.ecommerce-home__kpi strong {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ecommerce-home__kpi span {
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.ecommerce-home__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.ecommerce-home__card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ecommerce-home__card:hover {
+  border-color: rgba(180, 83, 9, 0.45);
+}
+
+.ecommerce-home__card em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.ecommerce-home__card strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.ecommerce-home__card span {
+  font-size: 0.85rem;
+  color: var(--mute);
+  line-height: 1.4;
+}
+
+.ecommerce-home__card .is-ok {
+  color: var(--teal);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.ecommerce-home__card .is-wait {
+  color: var(--amber);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.ecommerce-channel {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.ecommerce-channel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #f7f7f8;
+}
+
+.ecommerce-channel__status.is-ok {
+  color: var(--teal);
+}
+
+.ecommerce-channel__status.is-wait {
+  color: var(--amber);
+}
+
+@media (max-width: 900px) {
+  .ecommerce-app__shell,
+  .ecommerce-app.is-nav-closed .ecommerce-app__shell,
+  .ecommerce-app.is-nav-open .ecommerce-app__shell {
+    grid-template-columns: 1fr;
+  }
+
+  .ecommerce-app__side {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 88vw);
+    z-index: 40;
+    transform: translateX(-105%);
+    opacity: 1;
+    pointer-events: auto;
+    padding: 14px 10px;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .ecommerce-app.is-nav-closed .ecommerce-app__side {
+    transform: translateX(-105%);
+  }
+
+  .ecommerce-app.is-nav-open .ecommerce-app__side {
+    transform: translateX(0);
+  }
+
+  .ecommerce-app.is-nav-open .ecommerce-app__backdrop {
+    display: block;
+    position: fixed;
+    inset: 52px 0 0;
+    z-index: 30;
+    border: 0;
+    background: rgba(10, 14, 20, 0.45);
+    cursor: pointer;
+  }
+}

@@ -88,6 +88,7 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
   ) {
     return 'fiscal';
   }
+  if (pathname.startsWith('/ecommerce')) return 'ecommerce';
   if (
     pathname.startsWith('/painel/pdv') ||
     pathname.startsWith('/painel/pedidos') ||

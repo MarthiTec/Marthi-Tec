@@ -19,6 +19,7 @@ export type AccessArea =
   | 'erp_audit'
   | 'erp_invoices'
   | 'erp_fiscal'
+  | 'ecommerce'
   | 'erp_plan';
 
 export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
@@ -37,6 +38,7 @@ export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
   erp_audit: 'Auditoria',
   erp_invoices: 'Notas entrada/saída',
   erp_fiscal: 'Fiscal (NCM/CFOP)',
+  ecommerce: 'E-commerce',
   erp_plan: 'Plano da loja (admin)',
 };
 
@@ -431,6 +433,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   ) {
     return 'erp_fiscal';
   }
+  if (pathname.startsWith('/ecommerce')) return 'ecommerce';
   if (pathname.startsWith('/painel/plano')) return 'erp_plan';
   return null;
 }
@@ -464,6 +467,7 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
   if (module === 'totem') return ['totem'];
   if (module === 'os') return ['os'];
   if (module === 'fiscal') return ['erp_invoices', 'erp_fiscal'];
+  if (module === 'ecommerce') return ['ecommerce'];
   if (module === 'erp') {
     return [
       'pdv',

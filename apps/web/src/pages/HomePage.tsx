@@ -4,43 +4,17 @@ import { BrandLogo } from '../components/BrandLogo';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import { PLANS } from '../data/catalog';
+import { MARTHI_PRODUCTS } from '../data/marthiProducts';
 import { isStoreContracted } from '../data/demoLeadStore';
+import { ingestContactLeadToCrm, ingestSellerApplicantToCrm } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import './home.css';
-
-const PRODUCTS = [
-  {
-    title: 'Totem de autoatendimento',
-    text: 'Touch grande, fluxo guiado e lead no WhatsApp da loja — em qualquer segmento.',
-    demoProduct: 'totem' as const,
-    href: '/totem',
-    cta: 'Demo do totem',
-  },
-  {
-    title: 'PDV / Caixa',
-    text: 'Venda rápida, troca, vale-compra, sangria, aporte e fechamento de caixa.',
-    demoProduct: 'caixa' as const,
-    href: '/caixa',
-    cta: 'Demo do caixa',
-  },
-  {
-    title: 'Ordem de serviço',
-    text: 'Orçamento, oficina, agenda e entrega — app próprio para o operador da bancada.',
-    demoProduct: 'os' as const,
-    href: '/os',
-    cta: 'Demo da OS',
-  },
-  {
-    title: 'ERP + Emissor Fiscal',
-    text: 'Produtos, financeiro e emissão de NF-e, NFS-e, CT-e e MDF-e (NFC-e no PDV).',
-    demoProduct: 'erp' as const,
-    href: '/fiscal',
-    cta: 'Abrir emissor fiscal',
-  },
-] as const;
+import './products.css';
 
 const WHATSAPP_HREF = 'https://wa.me/5524981244253';
 const INSTAGRAM_HREF = 'https://instagram.com/marthi.tecnologia';
+
+const HOME_PRODUCT_IDS = ['totem', 'pdv', 'os', 'fiscal', 'ecommerce', 'crm', 'erp', 'painel'] as const;
 
 function IconWhatsApp() {
   return (
@@ -76,17 +50,30 @@ function IconLabel({ icon, children }: { icon: ReactNode; children: ReactNode })
 export function HomePage() {
   const { user } = useAuth();
   const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('silver');
-  const [spotlight, setSpotlight] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const [contracted, setContracted] = useState(() => isStoreContracted());
   const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
     null,
   );
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactMsg, setContactMsg] = useState('');
+  const [contactFeedback, setContactFeedback] = useState('');
+  const [jobName, setJobName] = useState('');
+  const [jobPhone, setJobPhone] = useState('');
+  const [jobCity, setJobCity] = useState('');
+  const [jobExp, setJobExp] = useState('');
+  const [jobFeedback, setJobFeedback] = useState('');
+  const [navOpen, setNavOpen] = useState(false);
 
   const showCaixa = contracted && hasModule('erp');
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
   const showFiscal = contracted && hasModule('fiscal');
+
+  const homeProducts = HOME_PRODUCT_IDS.map(
+    (id) => MARTHI_PRODUCTS.find((item) => item.id === id)!,
+  ).filter(Boolean);
 
   useEffect(() => {
     function refresh() {
@@ -105,13 +92,6 @@ export function HomePage() {
   }, [user]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setSpotlight((current) => (current + 1) % PRODUCTS.length);
-    }, 5600);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (!helpOpen) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') setHelpOpen(false);
@@ -121,7 +101,6 @@ export function HomePage() {
   }, [helpOpen]);
 
   const selected = PLANS.find((plan) => plan.id === activePlan) ?? PLANS[1];
-  const featured = PRODUCTS[spotlight];
 
   function openDemo(product: 'totem' | 'caixa' | 'os', to: string) {
     setDemoGate({ product, to });
@@ -136,38 +115,94 @@ export function HomePage() {
           <BrandLogo variant="mark" className="site__nav-mark" />
           <span>Marthi Tecnologia</span>
         </a>
-        <nav className="site__nav-links">
-          <a href="#produtos">Produtos</a>
-          <a href="#planos">Planos</a>
-          <button type="button" className="site__nav-link" onClick={() => setHelpOpen(true)}>
+        <button
+          type="button"
+          className="site__nav-burger"
+          aria-expanded={navOpen}
+          aria-label="Abrir menu"
+          onClick={() => setNavOpen((open) => !open)}
+        >
+          <i />
+          <i />
+          <i />
+        </button>
+        <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
+          <Link to="/produtos" onClick={() => setNavOpen(false)}>
+            Nossos produtos
+          </Link>
+          <a href="#planos" onClick={() => setNavOpen(false)}>
+            Planos
+          </a>
+          <a href="#trabalhe-conosco" onClick={() => setNavOpen(false)}>
+            Trabalhe conosco
+          </a>
+          <button
+            type="button"
+            className="site__nav-link"
+            onClick={() => {
+              setHelpOpen(true);
+              setNavOpen(false);
+            }}
+          >
             Contato
           </button>
           {showCaixa ? (
-            <Link to={user ? '/caixa' : '/login?next=/caixa'}>Caixa</Link>
+            <Link to={user ? '/caixa' : '/login?next=/caixa'} onClick={() => setNavOpen(false)}>
+              Caixa
+            </Link>
           ) : (
-            <button type="button" className="site__nav-link" onClick={() => openDemo('caixa', '/caixa')}>
+            <button
+              type="button"
+              className="site__nav-link"
+              onClick={() => {
+                openDemo('caixa', '/caixa');
+                setNavOpen(false);
+              }}
+            >
               Demo caixa
             </button>
           )}
           {showOs ? (
-            <Link to={user ? '/os' : '/login?next=/os'}>OS</Link>
+            <Link to={user ? '/os' : '/login?next=/os'} onClick={() => setNavOpen(false)}>
+              OS
+            </Link>
           ) : (
-            <button type="button" className="site__nav-link" onClick={() => openDemo('os', '/os')}>
+            <button
+              type="button"
+              className="site__nav-link"
+              onClick={() => {
+                openDemo('os', '/os');
+                setNavOpen(false);
+              }}
+            >
               Demo OS
             </button>
           )}
           {showFiscal ? (
-            <Link to={user ? '/fiscal' : '/login?next=/fiscal'}>Fiscal</Link>
+            <Link to={user ? '/fiscal' : '/login?next=/fiscal'} onClick={() => setNavOpen(false)}>
+              Fiscal
+            </Link>
           ) : null}
           {showTotem ? (
-            <Link to="/totem">Totem</Link>
+            <Link to="/totem" onClick={() => setNavOpen(false)}>
+              Totem
+            </Link>
           ) : (
-            <button type="button" className="site__nav-link" onClick={() => openDemo('totem', '/totem')}>
+            <button
+              type="button"
+              className="site__nav-link"
+              onClick={() => {
+                openDemo('totem', '/totem');
+                setNavOpen(false);
+              }}
+            >
               Demo totem
             </button>
           )}
-          <Link to="/login">Entrar</Link>
-          <Link to="/parceiro" className="site__nav-cta">
+          <Link to="/login" onClick={() => setNavOpen(false)}>
+            Entrar
+          </Link>
+          <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
             Solicitar demonstração
           </Link>
         </nav>
@@ -182,7 +217,12 @@ export function HomePage() {
             onClick={() => setHelpOpen(false)}
           />
           <div className="site-help__panel">
-            <button type="button" className="site-help__close" onClick={() => setHelpOpen(false)} aria-label="Fechar">
+            <button
+              type="button"
+              className="site-help__close"
+              onClick={() => setHelpOpen(false)}
+              aria-label="Fechar"
+            >
               ×
             </button>
             <div className="site-help__faces" aria-hidden="true">
@@ -192,7 +232,7 @@ export function HomePage() {
             <h2 id="site-help-title">Estamos aqui para ajudar.</h2>
             <div className="site-help__block">
               <strong>Fale com a Marthi</strong>
-              <p>Totem, painel ou cadastro de parceiro.</p>
+              <p>Totem, painel, CRM ou cadastro de parceiro.</p>
               <a href={WHATSAPP_HREF} className="btn btn--whatsapp" target="_blank" rel="noreferrer">
                 <IconLabel icon={<IconWhatsApp />}>WhatsApp (24) 98124-4253</IconLabel>
               </a>
@@ -215,32 +255,17 @@ export function HomePage() {
           </div>
           <div className="hero__copy">
             <p className="hero__brand">Marthi</p>
-            <h1>Sistemas na sua mão.</h1>
+            <h1>A operação da sua loja, completa.</h1>
             <p>
-              Totem, OS, ERP e emissor fiscal — a operação da
-              <strong> Sua Loja</strong> em um só lugar.
+              Totem, PDV, OS, ERP, fiscal, e-commerce e CRM — novos negócios, um só ecossistema.
             </p>
             <div className="hero__actions">
-              <Link to="/parceiro" className="btn btn--primary">
-                Ver soluções
+              <Link to="/produtos" className="btn btn--primary">
+                Nossos produtos
               </Link>
-              {showOs ? (
-                <Link to={user ? '/os' : '/login?next=/os'} className="btn btn--ghost hero__ghost">
-                  Abrir oficina
-                </Link>
-              ) : showCaixa ? (
-                <Link to={user ? '/caixa' : '/login?next=/caixa'} className="btn btn--ghost hero__ghost">
-                  Abrir caixa
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--ghost hero__ghost"
-                  onClick={() => openDemo('os', '/os')}
-                >
-                  Demo da OS
-                </button>
-              )}
+              <Link to="/parceiro" className="btn btn--ghost hero__ghost">
+                Solicitar demonstração
+              </Link>
             </div>
           </div>
         </section>
@@ -282,79 +307,40 @@ export function HomePage() {
           </figure>
           <div className="split__copy">
             <p className="eyebrow">Na operação</p>
-            <h2 id="split-title">Da vitrine ao caixa, sem fricção.</h2>
+            <h2 id="split-title">Da vitrine ao marketplace, sem fricção.</h2>
             <p>
-              O cliente escolhe no totem. A loja vê o interesse no painel e responde no WhatsApp.
+              O cliente escolhe no totem. A loja vende no caixa, atende na OS, emite nota, sincroniza
+              canais e fecha negócios no CRM.
             </p>
-            <Link to="/login" className="btn btn--primary">
-              Explorar o painel
+            <Link to="/produtos" className="btn btn--primary">
+              Ver tudo que atendemos
             </Link>
           </div>
         </section>
 
-        <section id="produtos" className="section section--products">
+        <section id="produtos" className="section home-products">
           <div className="section__head">
             <p className="eyebrow">Produtos</p>
-            <h2>Quatro módulos. Três planos.</h2>
+            <h2>O que a Marthi entrega</h2>
           </div>
-          <div className="products">
-            <div className="products__spotlight">
-              {PRODUCTS.map((product, index) => (
-                <button
-                  key={product.title}
-                  type="button"
-                  className={`products__tab ${spotlight === index ? 'is-active' : ''}`}
-                  onClick={() => setSpotlight(index)}
-                >
-                  {product.title}
-                </button>
-              ))}
-            </div>
-            <div className="products__panel" key={featured.title}>
-              <h3>{featured.title}</h3>
-              <p>{featured.text}</p>
-              {featured.demoProduct === 'totem' ||
-              featured.demoProduct === 'caixa' ||
-              featured.demoProduct === 'os' ? (
-                contracted &&
-                ((featured.demoProduct === 'caixa' && showCaixa) ||
-                  (featured.demoProduct === 'totem' && showTotem) ||
-                  (featured.demoProduct === 'os' && showOs)) ? (
-                  <Link
-                    to={
-                      featured.demoProduct === 'caixa'
-                        ? user
-                          ? '/caixa'
-                          : '/login?next=/caixa'
-                        : featured.demoProduct === 'os'
-                          ? user
-                            ? '/os'
-                            : '/login?next=/os'
-                          : featured.href
-                    }
-                    className="btn btn--primary"
-                  >
-                    {featured.demoProduct === 'caixa'
-                      ? 'Abrir caixa'
-                      : featured.demoProduct === 'os'
-                        ? 'Abrir oficina'
-                        : 'Abrir totem'}
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    onClick={() => openDemo(featured.demoProduct, featured.href)}
-                  >
-                    {featured.cta}
-                  </button>
-                )
-              ) : (
-                <Link to={featured.href} className="btn btn--primary">
-                  {featured.cta}
-                </Link>
-              )}
-            </div>
+          <div className="home-products__grid">
+            {homeProducts.map((product) => (
+              <Link key={product.id} to="/produtos" className="home-products__card">
+                <span
+                  className="products-grid__dot"
+                  style={{ background: product.accent }}
+                  aria-hidden
+                />
+                <strong>{product.name}</strong>
+                <span>{product.tagline}</span>
+                <p>{product.summary}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="home-products__more">
+            <Link to="/produtos" className="btn btn--primary">
+              Página completa de produtos
+            </Link>
           </div>
         </section>
 
@@ -371,7 +357,9 @@ export function HomePage() {
                 className={`plan-card plan-card--${plan.id} ${activePlan === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
                 onClick={() => setActivePlan(plan.id)}
               >
-                {'featured' in plan && plan.featured ? <span className="plan-card__badge">Mais escolhido</span> : null}
+                {'featured' in plan && plan.featured ? (
+                  <span className="plan-card__badge">Mais escolhido</span>
+                ) : null}
                 <h3>{plan.name}</h3>
                 <p className="plan-card__price">
                   {plan.price}
@@ -394,6 +382,101 @@ export function HomePage() {
             <Link to={`/parceiro?plano=${selected.id}&passo=pagamento`} className="btn btn--primary">
               Contratar e pagar
             </Link>
+          </div>
+        </section>
+
+        <section id="trabalhe-conosco" className="section careers">
+          <div className="careers__layout">
+            <div className="careers__copy">
+              <p className="eyebrow">Carreira</p>
+              <h2>Trabalhe conosco</h2>
+              <p>
+                Quer vender Marthi? Cadastre-se e fale com a gente no WhatsApp. Buscamos vendedores
+                para atender lojas e levar totem, PDV, OS, fiscal e CRM ao mercado.
+              </p>
+              <ul className="careers__list">
+                <li>Comissão por negócio fechado</li>
+                <li>Perfil na rede CRM Marthi</li>
+                <li>Leads da homepage e parceiros</li>
+              </ul>
+            </div>
+            <form
+              className="careers__form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const result = ingestSellerApplicantToCrm({
+                  name: jobName,
+                  whatsapp: jobPhone,
+                  city: jobCity,
+                  experience: jobExp,
+                });
+                if (!result.ok) {
+                  setJobFeedback(result.error);
+                  return;
+                }
+                const text = [
+                  'Olá Marthi! Quero trabalhar como vendedor.',
+                  '',
+                  `Nome: ${jobName.trim()}`,
+                  `WhatsApp: ${jobPhone.trim()}`,
+                  jobCity.trim() ? `Cidade: ${jobCity.trim()}` : '',
+                  jobExp.trim() ? `Experiência: ${jobExp.trim()}` : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n');
+                setJobFeedback('Abrindo WhatsApp… Candidatura também entrou no CRM.');
+                window.open(
+                  `${WHATSAPP_HREF}?text=${encodeURIComponent(text)}`,
+                  '_blank',
+                  'noopener,noreferrer',
+                );
+                setJobName('');
+                setJobPhone('');
+                setJobCity('');
+                setJobExp('');
+              }}
+            >
+              <h3>Cadastro de vendedor</h3>
+              <label>
+                Nome completo
+                <input
+                  value={jobName}
+                  onChange={(e) => setJobName(e.target.value)}
+                  required
+                  placeholder="Seu nome"
+                />
+              </label>
+              <label>
+                Seu WhatsApp
+                <input
+                  value={jobPhone}
+                  onChange={(e) => setJobPhone(e.target.value)}
+                  required
+                  placeholder="(24) 99999-9999"
+                />
+              </label>
+              <label>
+                Cidade
+                <input
+                  value={jobCity}
+                  onChange={(e) => setJobCity(e.target.value)}
+                  placeholder="Cidade — UF"
+                />
+              </label>
+              <label>
+                Experiência comercial
+                <textarea
+                  value={jobExp}
+                  onChange={(e) => setJobExp(e.target.value)}
+                  rows={3}
+                  placeholder="Ex.: vendi software B2B, PDV, varejo…"
+                />
+              </label>
+              <button type="submit" className="btn btn--whatsapp">
+                <IconLabel icon={<IconWhatsApp />}>Enviar no WhatsApp</IconLabel>
+              </button>
+              {jobFeedback ? <p className="careers__feedback">{jobFeedback}</p> : null}
+            </form>
           </div>
         </section>
 
@@ -421,6 +504,61 @@ export function HomePage() {
                 <IconLabel icon={<IconInstagram />}>Abrir Instagram</IconLabel>
               </a>
             </article>
+            <article className="span-2" style={{ gridColumn: '1 / -1' }}>
+              <h3>Deixe seu contato</h3>
+              <p className="empty">Cai no CRM para a equipe comercial puxar o lead.</p>
+              <form
+                className="admin-form"
+                style={{ marginTop: 12 }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const result = ingestContactLeadToCrm({
+                    name: contactName,
+                    whatsapp: contactPhone,
+                    message: contactMsg,
+                  });
+                  if (!result.ok) {
+                    setContactFeedback(result.error);
+                    return;
+                  }
+                  setContactFeedback('Recebido! Em breve um vendedor entra em contato.');
+                  setContactName('');
+                  setContactPhone('');
+                  setContactMsg('');
+                }}
+              >
+                <label>
+                  Nome
+                  <input
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  WhatsApp
+                  <input
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  Mensagem
+                  <input
+                    value={contactMsg}
+                    onChange={(e) => setContactMsg(e.target.value)}
+                    placeholder="Quero conhecer o Marthi…"
+                  />
+                </label>
+                <div className="span-2 admin-toolbar">
+                  <button type="submit" className="btn btn--primary">
+                    Enviar para o CRM
+                  </button>
+                  {contactFeedback ? <span className="empty">{contactFeedback}</span> : null}
+                </div>
+              </form>
+            </article>
           </div>
         </section>
       </main>
@@ -430,12 +568,13 @@ export function HomePage() {
           <BrandLogo variant="mark" className="site__footer-mark" />
           <div>
             <strong>Marthi Tecnologia</strong>
-            <span>Totem, painel e o próximo passo do ERP.</span>
+            <span>Totem, painel, CRM e o próximo passo do ERP.</span>
           </div>
         </div>
         <nav className="site__footer-links" aria-label="Links rápidos">
-          <a href="#produtos">Produtos</a>
+          <Link to="/produtos">Nossos produtos</Link>
           <a href="#planos">Planos</a>
+          <a href="#trabalhe-conosco">Trabalhe conosco</a>
           <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer">
             <IconLabel icon={<IconWhatsApp />}>WhatsApp</IconLabel>
           </a>

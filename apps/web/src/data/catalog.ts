@@ -37,12 +37,12 @@ export const PLANS = [
     name: 'Golden',
     price: 'Sob consulta',
     period: '',
-    blurb: 'Tudo liberado: Totem + OS + ERP + Emissor Fiscal.',
-    maxModules: 4,
+    blurb: 'Tudo liberado: Totem + OS + ERP + Fiscal + E-commerce.',
+    maxModules: 5,
     allModules: true,
     features: [
       'Todos os módulos liberados',
-      'Totem + OS + ERP + Emissor Fiscal',
+      'Totem + OS + ERP + Emissor Fiscal + E-commerce',
       'Ambiente dedicado',
       'Integrações sob demanda',
       'Acompanhamento comercial',
@@ -73,6 +73,11 @@ export const PARTNER_MODULES = [
     id: 'fiscal',
     name: 'Emissor Fiscal',
     blurb: 'Notas, NCM/CFOP, classificação e reforma (IBS/CBS).',
+  },
+  {
+    id: 'ecommerce',
+    name: 'E-commerce',
+    blurb: 'Mercado Livre, Shopee, iFood, Amazon e hubs (Tray).',
   },
 ] as const;
 

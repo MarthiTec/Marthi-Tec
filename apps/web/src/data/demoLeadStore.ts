@@ -91,6 +91,10 @@ export function saveDemoLead(input: {
   leads.unshift(lead);
   saveLeads(leads);
   grantDemoAccess(input.product, lead.id);
+  // CRM ingest (lazy to avoid circular import)
+  void import('./crmStore')
+    .then(({ ingestDemoLeadToCrm }) => ingestDemoLeadToCrm(lead))
+    .catch(() => undefined);
   return { ok: true, lead };
 }
 

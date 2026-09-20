@@ -6,6 +6,7 @@ export type AdminIconName =
   | 'people'
   | 'box'
   | 'fiscal'
+  | 'store'
   | 'ops'
   | 'help'
   | 'plan'
@@ -87,6 +88,15 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
         <svg {...common}>
           <path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
           <path d="M14 3v4h4M8 12h8M8 16h6" />
+        </svg>
+      );
+    case 'store':
+      return (
+        <svg {...common}>
+          <path d="M4 9 5.5 4h13L20 9" />
+          <path d="M4 9h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z" />
+          <path d="M9 20v-6h6v6" />
+          <path d="M4 9h4a2 2 0 0 0 4 0 2 2 0 0 0 4 0h4" />
         </svg>
       );
     case 'ops':

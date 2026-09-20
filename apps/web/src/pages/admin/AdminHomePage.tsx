@@ -55,6 +55,19 @@ export function AdminHomePage() {
               Abrir emissor
             </Link>
           ) : null}
+          {hasModule('ecommerce') ? (
+            <Link to="/ecommerce" className="btn btn--ghost">
+              <AdminIcon name="store" />
+              Abrir e-commerce
+            </Link>
+          ) : null}
+            <Link to="/painel/crm" className="btn btn--ghost">
+              <AdminIcon name="people" />
+              Visão CRM
+            </Link>
+            <Link to="/crm" className="btn btn--ghost">
+              Abrir CRM
+            </Link>
           {hasModule('totem') ? (
             <Link to="/totem" className="btn btn--ghost">
               <AdminIcon name="totem" />
@@ -311,6 +324,30 @@ export function AdminHomePage() {
                 </Link>
               </>
             ) : null}
+            {hasModule('ecommerce') ? (
+              <>
+                <Link to="/ecommerce" className="btn btn--ghost">
+                  <AdminIcon name="store" />
+                  Abrir e-commerce
+                </Link>
+                <Link to="/ecommerce/pedidos" className="btn btn--ghost">
+                  Pedidos online
+                </Link>
+                <Link to="/ecommerce/mercadolivre" className="btn btn--ghost">
+                  Mercado Livre
+                </Link>
+                <Link to="/ecommerce/tray" className="btn btn--ghost">
+                  Tray (hub)
+                </Link>
+              </>
+            ) : null}
+            <Link to="/painel/crm" className="btn btn--ghost">
+              <AdminIcon name="people" />
+              Visão CRM (painel)
+            </Link>
+            <Link to="/crm" className="btn btn--primary">
+              Abrir CRM
+            </Link>
             {hasModule('erp') ? (
               <>
                 <Link to="/painel/financeiro?tab=receber" className="btn btn--ghost">

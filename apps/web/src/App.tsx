@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { ProductsPage } from './pages/ProductsPage';
 import { PartnerSignupPage } from './pages/PartnerSignupPage';
 import { TotemPage } from './pages/totem/TotemPage';
 import { CaixaPage } from './pages/caixa/CaixaPage';
@@ -11,10 +12,22 @@ import { FiscalHomePage } from './pages/fiscal/FiscalHomePage';
 import { FiscalNfsePage } from './pages/fiscal/FiscalNfsePage';
 import { FiscalCtePage } from './pages/fiscal/FiscalCtePage';
 import { FiscalMdfePage } from './pages/fiscal/FiscalMdfePage';
+import { EcommerceLayout } from './pages/ecommerce/EcommerceLayout';
+import { EcommerceHomePage } from './pages/ecommerce/EcommerceHomePage';
+import { EcommerceOrdersPage } from './pages/ecommerce/EcommerceOrdersPage';
+import { EcommerceListingsPage } from './pages/ecommerce/EcommerceListingsPage';
+import { EcommerceConnectionsPage } from './pages/ecommerce/EcommerceConnectionsPage';
+import { EcommerceChannelPage } from './pages/ecommerce/EcommerceChannelPage';
+import { CrmLayout } from './pages/crm/CrmLayout';
+import { CrmBoardPage } from './pages/crm/CrmBoardPage';
+import { CrmDealPage } from './pages/crm/CrmDealPage';
+import { CrmProfilePage } from './pages/crm/CrmProfilePage';
+import { CrmNetworkPage } from './pages/crm/CrmNetworkPage';
 import { TotemSettingsPage } from './pages/admin/TotemSettingsPage';
 import { TotemInsightsPage } from './pages/admin/TotemInsightsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminHomePage } from './pages/admin/AdminHomePage';
+import { CrmPanelPage } from './pages/admin/CrmPanelPage';
 import { CustomersPage } from './pages/admin/CustomersPage';
 import { StockPage } from './pages/admin/StockPage';
 import { AttributesPage } from './pages/admin/AttributesPage';
@@ -50,6 +63,7 @@ export function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/parceiro" element={<PartnerSignupPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/totem" element={<TotemPage />} />
@@ -70,6 +84,19 @@ export function App() {
           <Route path="config" element={<FiscalIssuerPage />} />
           <Route path="cst" element={<FiscalCstPage />} />
         </Route>
+        <Route path="/ecommerce" element={<EcommerceLayout />}>
+          <Route index element={<EcommerceHomePage />} />
+          <Route path="pedidos" element={<EcommerceOrdersPage />} />
+          <Route path="anuncios" element={<EcommerceListingsPage />} />
+          <Route path="conexoes" element={<EcommerceConnectionsPage />} />
+          <Route path=":channelId" element={<EcommerceChannelPage />} />
+        </Route>
+        <Route path="/crm" element={<CrmLayout />}>
+          <Route index element={<CrmBoardPage />} />
+          <Route path="negocio/:id" element={<CrmDealPage />} />
+          <Route path="perfil" element={<CrmProfilePage />} />
+          <Route path="rede" element={<CrmNetworkPage />} />
+        </Route>
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
           <Route path="pdv" element={<PosPage />} />
@@ -78,6 +105,7 @@ export function App() {
           <Route path="totem/config" element={<TotemSettingsPage />} />
           <Route path="pedidos" element={<OrdersPage />} />
           <Route path="clientes" element={<CustomersPage />} />
+          <Route path="crm" element={<CrmPanelPage />} />
           <Route path="produtos" element={<StockPage />} />
           <Route path="estoque" element={<Navigate to="/painel/produtos" replace />} />
           <Route path="atributos" element={<AttributesPage />} />

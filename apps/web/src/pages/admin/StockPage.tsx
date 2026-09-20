@@ -26,6 +26,7 @@ import {
   listFiscalClassifications,
   listWarehouses,
 } from '../../data/fiscalCatalog';
+import { onStockChanged } from '../../data/ecommerceStore';
 
 type Mode = 'new' | 'edit' | 'view';
 
@@ -66,9 +67,10 @@ export function StockPage() {
 
   const readOnly = mode === 'view';
 
-  function persist(next: StockItem[]) {
+  function persist(next: StockItem[], syncId?: string | null) {
     setItems(next);
     saveStock(next);
+    onStockChanged(syncId || undefined);
   }
 
   function resetForm() {
@@ -87,15 +89,22 @@ export function StockPage() {
         form.capacity,
     };
     if (mode === 'edit' && selectedId) {
-      persist(items.map((item) => (item.id === selectedId ? { ...item, ...payload } : item)));
+      persist(
+        items.map((item) => (item.id === selectedId ? { ...item, ...payload } : item)),
+        selectedId,
+      );
     } else {
-      persist([
-        {
-          ...payload,
-          id: `STK-${Date.now().toString(36).toUpperCase()}`,
-        },
-        ...items,
-      ]);
+      const newId = `STK-${Date.now().toString(36).toUpperCase()}`;
+      persist(
+        [
+          {
+            ...payload,
+            id: newId,
+          },
+          ...items,
+        ],
+        newId,
+      );
     }
     resetForm();
   }
@@ -182,7 +191,7 @@ export function StockPage() {
             </span>
           </label>
           <label className="span-2">
-            Imagens (URLs, uma por linha)
+            Imagens (URLs, uma por linha) — obrigatórias para publicar no e-commerce
             <textarea
               value={form.images.join('\n')}
               onChange={(e) =>
@@ -194,7 +203,7 @@ export function StockPage() {
                     .filter(Boolean),
                 })
               }
-              placeholder={'/totem/iphone-15/1.svg\nhttps://…'}
+              placeholder={'/totem/iphone-15/1.svg\nhttps://cdn.loja/produto-1.jpg'}
               rows={3}
             />
           </label>

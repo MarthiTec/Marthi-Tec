@@ -265,6 +265,16 @@ export function PartnerSignupPage() {
       saveStoreEntitlement({ planId: form.planId, modules: form.modules });
       markStoreContracted();
       setProtocol(result.id);
+      void import('../data/crmStore').then(({ ingestPartnerLeadToCrm }) => {
+        ingestPartnerLeadToCrm({
+          protocol: result.id,
+          tradeName: form.tradeName.trim() || form.legalName.trim(),
+          contactName: form.contactName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          planName: selectedPlan.name,
+        });
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao enviar cadastro.');
     } finally {

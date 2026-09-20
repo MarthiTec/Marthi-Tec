@@ -96,6 +96,32 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    id: 'ecommerce',
+    label: 'E-commerce',
+    icon: 'store',
+    module: 'ecommerce',
+    children: [
+      { to: '/ecommerce', label: 'Abrir e-commerce' },
+      { to: '/ecommerce/pedidos', label: 'Pedidos online' },
+      { to: '/ecommerce/conexoes', label: 'Conexões / canais' },
+      { to: '/ecommerce/mercadolivre', label: 'Mercado Livre' },
+      { to: '/ecommerce/shopee', label: 'Shopee' },
+      { to: '/ecommerce/ifood', label: 'iFood' },
+      { to: '/ecommerce/amazon', label: 'Amazon' },
+      { to: '/ecommerce/tray', label: 'Tray (hub)' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    icon: 'people',
+    module: null,
+    children: [
+      { to: '/painel/crm', label: 'Visão no painel', end: true },
+      { to: '/crm', label: 'Abrir CRM (app)' },
+    ],
+  },
+  {
     id: 'erp',
     label: 'Operações',
     icon: 'ops',
@@ -147,6 +173,9 @@ export function navGroupForPath(pathname: string, search = '') {
   ) {
     return 'fiscal';
   }
+  if (pathname.startsWith('/ecommerce')) return 'ecommerce';
+  if (pathname.startsWith('/painel/crm')) return 'crm';
+  if (pathname.startsWith('/crm')) return 'crm';
   if (pathname.startsWith('/painel/financeiro') || pathname.startsWith('/painel/auditoria')) {
     return 'erp';
   }
