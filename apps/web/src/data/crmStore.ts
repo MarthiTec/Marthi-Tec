@@ -6,8 +6,32 @@ import { listDemoLeads, type DemoLead, DEMO_PRODUCT_LABEL } from './demoLeadStor
 import { listSellers, type Seller } from './erpRegistry';
 import { getAdminState, upsertCustomer } from './adminStore';
 
-const STORAGE_KEY = 'marthi.crm.v1';
+const STORAGE_KEY = 'marthi.crm.v2';
 export const CRM_EVENT = 'marthi-crm-updated';
+
+export const CRM_INTEREST_OPTIONS = [
+  'Totem de autoatendimento',
+  'Caixa / PDV',
+  'OS / Oficina',
+  'Emissor fiscal',
+  'E-commerce',
+  'CRM Marthi',
+  'ERP completo',
+  'Parceiro lojista',
+  'Plano mensal Marthi',
+  'Candidato a vendedor',
+] as const;
+
+export const CRM_SEGMENT_OPTIONS = [
+  'Loja de celulares',
+  'Assistência técnica',
+  'Ótica',
+  'Farmácia',
+  'Clínica / saúde',
+  'Varejo geral',
+  'E-commerce próprio',
+  'Outro',
+] as const;
 
 export type CrmStage = 'leads' | 'waiting' | 'attending' | 'payment' | 'won' | 'lost';
 
@@ -107,6 +131,8 @@ type State = {
   profiles: CrmSellerProfile[];
   activities: CrmActivity[];
   migratedDemo: boolean;
+  /** Leads de demonstração do funil Marthi. */
+  seededMocks: boolean;
 };
 
 export const CRM_STAGE_LABEL: Record<CrmStage, string> = {
@@ -148,15 +174,29 @@ function now() {
 }
 
 function empty(): State {
-  return { leads: [], messages: [], profiles: [], activities: [], migratedDemo: false };
+  return {
+    leads: [],
+    messages: [],
+    profiles: [],
+    activities: [],
+    migratedDemo: false,
+    seededMocks: false,
+  };
+}
+
+function hoursAgo(hours: number) {
+  return new Date(Date.now() - hours * 3600_000).toISOString();
 }
 
 function load(): State {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Migra v1 → v2 se ainda existir no browser.
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem('marthi.crm.v1');
     if (!raw) {
       const initial = empty();
-      save(migrateDemoLeads(initial));
+      let boot = migrateDemoLeads(initial);
+      boot = seedMockLeads(boot);
+      save(boot);
       return load();
     }
     const parsed = JSON.parse(raw) as Partial<State>;
@@ -166,11 +206,18 @@ function load(): State {
       profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
       activities: Array.isArray(parsed.activities) ? parsed.activities : [],
       migratedDemo: Boolean(parsed.migratedDemo),
+      seededMocks: Boolean(parsed.seededMocks),
     };
+    let dirty = false;
     if (!state.migratedDemo) {
       state = migrateDemoLeads(state);
-      save(state);
+      dirty = true;
     }
+    if (!state.seededMocks) {
+      state = seedMockLeads(state);
+      dirty = true;
+    }
+    if (dirty) save(state);
     return state;
   } catch {
     return empty();
@@ -254,6 +301,578 @@ function migrateDemoLeads(state: State): State {
   };
 }
 
+function buildMockCatalog(sellers: Seller[]): Array<{
+  lead: CrmLead;
+  activities: Omit<CrmActivity, 'id'>[];
+  messages: Omit<CrmMessage, 'id'>[];
+}> {
+  const bruno = sellers.find((item) => /bruno/i.test(item.name)) ?? sellers[0] ?? null;
+  const camilaName = 'Camila Santos';
+  const camilaId = 'VEN-MOCK-CAMILA';
+
+  const catalog: Array<{
+    lead: CrmLead;
+    activities: Omit<CrmActivity, 'id'>[];
+    messages: Omit<CrmMessage, 'id'>[];
+  }> = [
+    {
+      lead: {
+        id: 'CRM-MOCK-01',
+        name: 'Renata Oliveira | CellMix Três Rios',
+        email: 'renata@cellmix.local',
+        whatsapp: '24998112233',
+        source: 'demo',
+        interest: 'Totem de autoatendimento',
+        value: 1890,
+        stage: 'leads',
+        ownerSellerId: null,
+        ownerName: '',
+        notes: 'Pediu demo do totem na homepage. Quer 2 unidades.',
+        createdAt: hoursAgo(5),
+        updatedAt: hoursAgo(5),
+        externalRef: 'mock:totem-renata',
+        graduation: 'Loja de celulares',
+        polo: 'Três Rios — RJ',
+        sourceInfo: 'Demo homepage · Totem',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-01',
+          kind: 'system',
+          title: 'Lead criado',
+          body: 'Lead criado · fonte: Demo homepage.',
+          fromSellerId: null,
+          fromName: 'Sistema',
+          createdAt: hoursAgo(5),
+        },
+        {
+          leadId: 'CRM-MOCK-01',
+          kind: 'comment',
+          title: 'Comentário',
+          body: 'Loja no Shopping Olga Sola — alto fluxo de sábado.',
+          fromSellerId: null,
+          fromName: 'Sistema',
+          createdAt: hoursAgo(4.5),
+        },
+      ],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-02',
+        name: 'João Pedro Ferreira',
+        email: 'jp.ferreira@gmail.com',
+        whatsapp: '24991234567',
+        source: 'contact',
+        interest: 'Caixa / PDV',
+        value: 990,
+        stage: 'leads',
+        ownerSellerId: null,
+        ownerName: '',
+        notes: 'Contato pelo formulário do site. Troca de sistema atual.',
+        createdAt: hoursAgo(28),
+        updatedAt: hoursAgo(26),
+        externalRef: 'mock:pdv-joao',
+        graduation: 'Assistência técnica',
+        polo: 'Petrópolis — RJ',
+        sourceInfo: 'Formulário contato · site',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-02',
+          kind: 'system',
+          title: 'Lead criado',
+          body: 'Lead criado · fonte: Contato.',
+          fromSellerId: null,
+          fromName: 'Sistema',
+          createdAt: hoursAgo(28),
+        },
+      ],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-03',
+        name: 'Marina Souza · Ótica Vision',
+        email: 'marina@oticavision.local',
+        whatsapp: '21988776655',
+        source: 'partner',
+        interest: 'ERP completo',
+        value: 2490,
+        stage: 'waiting',
+        ownerSellerId: bruno?.id ?? null,
+        ownerName: bruno?.name ?? '',
+        claimedAt: hoursAgo(20),
+        notes: 'Cadastro parceiro — plano profissional.',
+        createdAt: hoursAgo(30),
+        updatedAt: hoursAgo(6),
+        externalRef: 'mock:partner-marina',
+        graduation: 'Ótica',
+        polo: 'Niterói — RJ',
+        sourceInfo: 'Cadastro parceiro · plano Pro',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-03',
+          kind: 'system',
+          title: 'Lead puxado',
+          body: `${bruno?.name ?? 'Vendedor'} assumiu o atendimento.`,
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(20),
+        },
+        {
+          leadId: 'CRM-MOCK-03',
+          kind: 'message',
+          title: 'Mensagem enviada',
+          body: 'Marina, enviei o link da demo do ERP. Me avisa se abriu?',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(18),
+        },
+        {
+          leadId: 'CRM-MOCK-03',
+          kind: 'schedule',
+          title: 'Agendamento',
+          body: 'Call de apresentação amanhã às 10h.',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(12),
+          dueAt: hoursAgo(-18),
+        },
+      ],
+      messages: [
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-03',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          text: 'Marina, enviei o link da demo do ERP. Me avisa se abriu?',
+          createdAt: hoursAgo(18),
+        },
+      ],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-04',
+        name: 'Carlos Mendes | TechPhone',
+        email: 'carlos@techphone.local',
+        whatsapp: '24997654321',
+        source: 'demo',
+        interest: 'OS / Oficina',
+        value: 1290,
+        stage: 'waiting',
+        ownerSellerId: camilaId,
+        ownerName: camilaName,
+        claimedAt: hoursAgo(40),
+        notes: 'Quer OS + estoque de peças.',
+        createdAt: hoursAgo(48),
+        updatedAt: hoursAgo(8),
+        externalRef: 'mock:os-carlos',
+        graduation: 'Assistência técnica',
+        polo: 'Três Rios — RJ',
+        sourceInfo: 'Demo homepage · OS',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-04',
+          kind: 'system',
+          title: 'Lead puxado',
+          body: `${camilaName} assumiu o atendimento.`,
+          fromSellerId: camilaId,
+          fromName: camilaName,
+          createdAt: hoursAgo(40),
+        },
+        {
+          leadId: 'CRM-MOCK-04',
+          kind: 'task',
+          title: 'Tarefa',
+          body: 'Enviar vídeo do kanban de OS.',
+          fromSellerId: camilaId,
+          fromName: camilaName,
+          createdAt: hoursAgo(36),
+          dueAt: hoursAgo(-4),
+        },
+      ],
+      messages: [
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-04',
+          fromSellerId: camilaId,
+          fromName: camilaName,
+          text: 'Carlos, a OS tem quadro kanban e agenda. Quer que eu mostre ao vivo?',
+          createdAt: hoursAgo(35),
+        },
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-04',
+          fromSellerId: null,
+          fromName: 'Carlos Mendes',
+          fromLead: true,
+          text: 'Quero sim, pode ser depois das 16h.',
+          createdAt: hoursAgo(34),
+        },
+      ],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-05',
+        name: 'Farmácia Vida Plena',
+        email: 'compras@vidaplena.local',
+        whatsapp: '21995551234',
+        source: 'contact',
+        interest: 'Emissor fiscal',
+        value: 790,
+        stage: 'attending',
+        ownerSellerId: bruno?.id ?? null,
+        ownerName: bruno?.name ?? '',
+        claimedAt: hoursAgo(72),
+        notes: 'NF-e + NFC-e para balcão.',
+        createdAt: hoursAgo(80),
+        updatedAt: hoursAgo(3),
+        externalRef: 'mock:fiscal-farmacia',
+        graduation: 'Farmácia',
+        polo: 'Nova Friburgo — RJ',
+        sourceInfo: 'WhatsApp comercial Marthi',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-05',
+          kind: 'activity',
+          title: 'Atividade',
+          body: 'Reunião: mapeou CST e CFOP do estoque atual.',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(24),
+        },
+      ],
+      messages: [
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-05',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          text: 'Enviei a proposta do emissor com NF-e e NFS-e.',
+          createdAt: hoursAgo(10),
+        },
+      ],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-06',
+        name: 'Luciana Prado',
+        email: 'luciana.prado@outlook.com',
+        whatsapp: '24990001122',
+        source: 'demo',
+        interest: 'E-commerce',
+        value: 1590,
+        stage: 'attending',
+        ownerSellerId: camilaId,
+        ownerName: camilaName,
+        claimedAt: hoursAgo(50),
+        notes: 'Quer ML + site próprio integrados ao estoque.',
+        createdAt: hoursAgo(60),
+        updatedAt: hoursAgo(2),
+        externalRef: 'mock:ecom-luciana',
+        graduation: 'E-commerce próprio',
+        polo: 'Volta Redonda — RJ',
+        sourceInfo: 'Demo homepage · E-commerce',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-06',
+          kind: 'comment',
+          title: 'Comentário',
+          body: 'Já vende no Mercado Livre — prioridade é sincronizar estoque.',
+          fromSellerId: camilaId,
+          fromName: camilaName,
+          createdAt: hoursAgo(14),
+        },
+      ],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-07',
+        name: 'Diego Ramos · Phone House',
+        email: 'diego@phonehouse.local',
+        whatsapp: '24993334455',
+        source: 'partner',
+        interest: 'Plano mensal Marthi',
+        value: 3490,
+        stage: 'attending',
+        ownerSellerId: bruno?.id ?? null,
+        ownerName: bruno?.name ?? '',
+        claimedAt: hoursAgo(90),
+        notes: 'Pacote Totem + Caixa + OS.',
+        createdAt: hoursAgo(100),
+        updatedAt: hoursAgo(1),
+        externalRef: 'mock:plano-diego',
+        graduation: 'Loja de celulares',
+        polo: 'Juiz de Fora — MG',
+        sourceInfo: 'Parceiro · indicação Ana',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-07',
+          kind: 'activity',
+          title: 'Atividade',
+          body: 'Visitou a loja — aprovou layout do totem.',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(30),
+        },
+      ],
+      messages: [
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-07',
+          fromSellerId: null,
+          fromName: 'Diego Ramos',
+          fromLead: true,
+          text: 'Podemos fechar se o treinamento entrar no pacote.',
+          createdAt: hoursAgo(5),
+        },
+      ],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-08',
+        name: 'Clínica Bem Estar',
+        email: 'admin@bemestar.local',
+        whatsapp: '2133334455',
+        source: 'contact',
+        interest: 'CRM Marthi',
+        value: 690,
+        stage: 'payment',
+        ownerSellerId: bruno?.id ?? null,
+        ownerName: bruno?.name ?? '',
+        claimedAt: hoursAgo(120),
+        notes: 'Link de pagamento PIX enviado.',
+        createdAt: hoursAgo(140),
+        updatedAt: hoursAgo(4),
+        externalRef: 'mock:crm-clinica',
+        graduation: 'Clínica / saúde',
+        polo: 'Rio de Janeiro — RJ',
+        sourceInfo: 'Instagram · @marthi.tecnologia',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-08',
+          kind: 'system',
+          title: 'Etapa alterada',
+          body: 'Movido para Envio link pagamento.',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(4),
+        },
+      ],
+      messages: [
+        {
+          kind: 'lead',
+          leadId: 'CRM-MOCK-08',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          text: 'Segue o link PIX do plano CRM. Qualquer dúvida me chama.',
+          createdAt: hoursAgo(4),
+        },
+      ],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-09',
+        name: 'Andreia Lopes',
+        email: 'andreia.lopes@empresa.local',
+        whatsapp: '24996667788',
+        source: 'demo',
+        interest: 'Totem de autoatendimento',
+        value: 1890,
+        stage: 'payment',
+        ownerSellerId: camilaId,
+        ownerName: camilaName,
+        claimedAt: hoursAgo(160),
+        notes: 'Aguardando confirmação do cartão.',
+        createdAt: hoursAgo(180),
+        updatedAt: hoursAgo(9),
+        externalRef: 'mock:totem-andreia',
+        graduation: 'Varejo geral',
+        polo: 'Barra Mansa — RJ',
+        sourceInfo: 'Demo homepage · Totem',
+        hideContact: true,
+      },
+      activities: [],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-10',
+        name: 'Mercado Express Centro',
+        email: 'ti@mercadoexpress.local',
+        whatsapp: '24994445566',
+        source: 'partner',
+        interest: 'ERP completo',
+        value: 4200,
+        stage: 'won',
+        ownerSellerId: bruno?.id ?? null,
+        ownerName: bruno?.name ?? '',
+        claimedAt: hoursAgo(200),
+        notes: 'Fechado — aguarda pagamento final para virar cliente.',
+        createdAt: hoursAgo(220),
+        updatedAt: hoursAgo(12),
+        externalRef: 'mock:erp-mercado',
+        graduation: 'Varejo geral',
+        polo: 'Três Rios — RJ',
+        sourceInfo: 'Parceiro · feira do varejo',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-10',
+          kind: 'system',
+          title: 'Negócio fechado',
+          body: 'Negócio fechado. Continua como lead até confirmar o pagamento.',
+          fromSellerId: bruno?.id ?? null,
+          fromName: bruno?.name ?? 'Vendedor',
+          createdAt: hoursAgo(12),
+        },
+      ],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-11',
+        name: 'Patrícia Nunes',
+        email: '',
+        whatsapp: '24991112233',
+        source: 'careers',
+        interest: 'Candidato a vendedor',
+        value: 0,
+        stage: 'leads',
+        ownerSellerId: null,
+        ownerName: '',
+        notes: 'Cidade: Três Rios\nExperiência: 3 anos em varejo de celular',
+        createdAt: hoursAgo(10),
+        updatedAt: hoursAgo(10),
+        externalRef: 'mock:careers-patricia',
+        graduation: 'Outro',
+        polo: 'Três Rios — RJ',
+        sourceInfo: 'Trabalhe conosco · homepage',
+        hideContact: false,
+      },
+      activities: [
+        {
+          leadId: 'CRM-MOCK-11',
+          kind: 'system',
+          title: 'Lead criado',
+          body: 'Candidata a vendedora via Trabalhe conosco.',
+          fromSellerId: null,
+          fromName: 'Sistema',
+          createdAt: hoursAgo(10),
+        },
+      ],
+      messages: [],
+    },
+    {
+      lead: {
+        id: 'CRM-MOCK-12',
+        name: 'Gabriel Costa · iFix Hub',
+        email: 'gabriel@ifixhub.local',
+        whatsapp: '21990008877',
+        source: 'demo',
+        interest: 'Caixa / PDV',
+        value: 990,
+        stage: 'waiting',
+        ownerSellerId: null,
+        ownerName: '',
+        notes: 'Pool aberto — interessado em sangria/aporte e vale-troca.',
+        createdAt: hoursAgo(15),
+        updatedAt: hoursAgo(15),
+        externalRef: 'mock:pdv-gabriel',
+        graduation: 'Assistência técnica',
+        polo: 'Duque de Caxias — RJ',
+        sourceInfo: 'Demo homepage · Caixa',
+        hideContact: false,
+      },
+      activities: [],
+      messages: [],
+    },
+  ];
+
+  return catalog;
+}
+
+function seedMockLeads(state: State): State {
+  const existing = new Set(
+    state.leads.map((item) => item.externalRef || item.id).filter(Boolean),
+  );
+  const sellers = listSellers(true);
+  const catalog = buildMockCatalog(sellers);
+  const next: State = {
+    ...state,
+    leads: [...state.leads],
+    activities: [...state.activities],
+    messages: [...state.messages],
+    seededMocks: true,
+  };
+
+  for (const entry of catalog) {
+    if (existing.has(entry.lead.externalRef ?? '') || existing.has(entry.lead.id)) continue;
+    next.leads.unshift(entry.lead);
+    for (const activity of entry.activities) {
+      next.activities.unshift({
+        ...activity,
+        id: uid('ACT'),
+      });
+    }
+    for (const message of entry.messages) {
+      next.messages.push({
+        ...message,
+        id: uid('MSG'),
+      });
+    }
+    if (entry.activities.length === 0) {
+      pushActivity(next, {
+        leadId: entry.lead.id,
+        kind: 'system',
+        title: 'Lead criado',
+        body: `Lead criado · fonte: ${CRM_SOURCE_LABEL[entry.lead.source]}.`,
+        fromSellerId: null,
+        fromName: 'Sistema',
+        createdAt: entry.lead.createdAt,
+      });
+      pushActivity(next, {
+        leadId: entry.lead.id,
+        kind: 'system',
+        title: 'Negócio criado',
+        body: `Negócio criado para ${entry.lead.name} a partir do lead.`,
+        fromSellerId: null,
+        fromName: 'Sistema',
+        createdAt: entry.lead.createdAt,
+      });
+    }
+  }
+
+  return next;
+}
+
+/** Reinsere leads mocados (útil se o board estiver vazio). */
+export function resetCrmMockLeads(): { ok: true; added: number } {
+  const state = load();
+  state.seededMocks = false;
+  const before = state.leads.length;
+  const next = seedMockLeads(state);
+  save(next);
+  return { ok: true, added: Math.max(0, next.leads.length - before) };
+}
+
 export function listCrmLeads() {
   return load().leads;
 }
@@ -307,6 +926,13 @@ export function createCrmLead(input: {
   value?: number;
   notes?: string;
   externalRef?: string;
+  stage?: CrmStage;
+  graduation?: string;
+  polo?: string;
+  sourceInfo?: string;
+  hideContact?: boolean;
+  ownerSellerId?: string | null;
+  ownerName?: string;
 }): { ok: true; lead: CrmLead } | { ok: false; error: string } {
   const name = input.name.trim();
   if (name.length < 2) return { ok: false, error: 'Informe o nome do lead.' };
@@ -315,6 +941,15 @@ export function createCrmLead(input: {
     const dup = state.leads.find((item) => item.externalRef === input.externalRef);
     if (dup) return { ok: true, lead: dup };
   }
+  const stamped = now();
+  const ownerSellerId = input.ownerSellerId ?? null;
+  const ownerName = (input.ownerName ?? '').trim();
+  const stage =
+    input.stage && CRM_BOARD_STAGES.includes(input.stage)
+      ? input.stage
+      : ownerSellerId
+        ? 'attending'
+        : 'leads';
   const lead: CrmLead = {
     id: uid('CRM'),
     name,
@@ -322,18 +957,19 @@ export function createCrmLead(input: {
     whatsapp: (input.whatsapp ?? '').replace(/\D/g, ''),
     source: input.source,
     interest: (input.interest ?? '').trim(),
-    value: input.value ?? 0,
-    stage: 'leads',
-    ownerSellerId: null,
-    ownerName: '',
+    value: Math.max(0, input.value ?? 0),
+    stage,
+    ownerSellerId,
+    ownerName: ownerSellerId ? ownerName || 'Vendedor' : '',
+    claimedAt: ownerSellerId ? stamped : undefined,
     notes: (input.notes ?? '').trim(),
-    createdAt: now(),
-    updatedAt: now(),
+    createdAt: stamped,
+    updatedAt: stamped,
     externalRef: input.externalRef,
-    graduation: '',
-    polo: '',
-    sourceInfo: CRM_SOURCE_LABEL[input.source],
-    hideContact: false,
+    graduation: (input.graduation ?? '').trim(),
+    polo: (input.polo ?? '').trim(),
+    sourceInfo: (input.sourceInfo ?? '').trim() || CRM_SOURCE_LABEL[input.source],
+    hideContact: Boolean(input.hideContact),
   };
   state.leads.unshift(lead);
   pushActivity(state, {
@@ -352,6 +988,16 @@ export function createCrmLead(input: {
     fromSellerId: null,
     fromName: 'Sistema',
   });
+  if (ownerSellerId) {
+    pushActivity(state, {
+      leadId: lead.id,
+      kind: 'system',
+      title: 'Lead atribuído',
+      body: `${lead.ownerName} ficou responsável desde a criação.`,
+      fromSellerId: ownerSellerId,
+      fromName: lead.ownerName,
+    });
+  }
   save(state);
   return { ok: true, lead };
 }

@@ -8,6 +8,8 @@ import {
   createCrmLead,
   CRM_BOARD_STAGES,
   CRM_EVENT,
+  CRM_INTEREST_OPTIONS,
+  CRM_SEGMENT_OPTIONS,
   CRM_SOURCE_LABEL,
   CRM_STAGE_LABEL,
   crmStageTotals,
@@ -15,11 +17,13 @@ import {
   listLeadMessages,
   listSellerMessages,
   moveCrmLead,
+  resetCrmMockLeads,
   sendLeadMessage,
   sendSellerMessage,
   updateCrmLeadValue,
   whatsappHref,
   type CrmLead,
+  type CrmLeadSource,
   type CrmStage,
 } from '../../data/crmStore';
 import { listSellers } from '../../data/erpRegistry';
@@ -30,6 +34,40 @@ type Dock =
   | { type: 'lead'; leadId: string }
   | { type: 'sellers'; peerId: string; peerName: string }
   | null;
+
+type CreateDraft = {
+  name: string;
+  whatsapp: string;
+  email: string;
+  interest: string;
+  value: string;
+  source: CrmLeadSource;
+  sourceInfo: string;
+  graduation: string;
+  polo: string;
+  notes: string;
+  stage: CrmStage;
+  hideContact: boolean;
+  claimToMe: boolean;
+  openAfter: boolean;
+};
+
+const EMPTY_CREATE: CreateDraft = {
+  name: '',
+  whatsapp: '',
+  email: '',
+  interest: CRM_INTEREST_OPTIONS[0],
+  value: '0',
+  source: 'manual',
+  sourceInfo: '',
+  graduation: CRM_SEGMENT_OPTIONS[0],
+  polo: '',
+  notes: '',
+  stage: 'leads',
+  hideContact: false,
+  claimToMe: false,
+  openAfter: true,
+};
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -53,6 +91,17 @@ function formatWhen(iso: string) {
   });
 }
 
+function formatPhone(raw: string) {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length >= 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  }
+  if (digits.length >= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+  }
+  return raw || '';
+}
+
 export function CrmBoardPage() {
   const navigate = useNavigate();
   const me = useOutletContext<SellerCtx>();
@@ -65,9 +114,10 @@ export function CrmBoardPage() {
   const [message, setMessage] = useState('');
   const [peerId, setPeerId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newEmail, setNewEmail] = useState('');
+  const [draft, setDraft] = useState<CreateDraft>(EMPTY_CREATE);
+  const [query, setQuery] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [onlyPool, setOnlyPool] = useState(false);
 
   useEffect(() => {
     function refresh() {
@@ -79,6 +129,29 @@ export function CrmBoardPage() {
 
   const leads = useMemo(() => listCrmLeads(), [tick]);
   const sellers = useMemo(() => listSellers(true).filter((item) => item.id !== me.sellerId), [tick, me.sellerId]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return leads.filter((lead) => {
+      if (onlyMine && lead.ownerSellerId !== me.sellerId) return false;
+      if (onlyPool && lead.ownerSellerId) return false;
+      if (!q) return true;
+      const hay = [
+        lead.name,
+        lead.email,
+        lead.whatsapp,
+        lead.interest,
+        lead.polo,
+        lead.graduation,
+        lead.sourceInfo,
+        lead.ownerName,
+        CRM_SOURCE_LABEL[lead.source],
+      ]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [leads, query, onlyMine, onlyPool, me.sellerId]);
 
   const leadDock = dock?.type === 'lead' ? leads.find((item) => item.id === dock.leadId) ?? null : null;
   const leadMessages = useMemo(
@@ -98,6 +171,10 @@ export function CrmBoardPage() {
   function flashErr(text: string) {
     setError(text);
     setMessage('');
+  }
+
+  function patchDraft<K extends keyof CreateDraft>(key: K, value: CreateDraft[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
   }
 
   function claim(lead: CrmLead) {
@@ -192,22 +269,36 @@ export function CrmBoardPage() {
   function createLead(event: FormEvent) {
     event.preventDefault();
     const result = createCrmLead({
-      name: newName,
-      email: newEmail,
-      whatsapp: newPhone,
-      source: 'manual',
-      interest: 'Cadastro manual CRM',
+      name: draft.name,
+      email: draft.email,
+      whatsapp: draft.whatsapp,
+      source: draft.source,
+      interest: draft.interest,
+      value: Number(draft.value) || 0,
+      notes: draft.notes,
+      stage: draft.claimToMe ? (draft.stage === 'leads' ? 'attending' : draft.stage) : draft.stage,
+      graduation: draft.graduation,
+      polo: draft.polo,
+      sourceInfo: draft.sourceInfo || CRM_SOURCE_LABEL[draft.source],
+      hideContact: draft.hideContact,
+      ownerSellerId: draft.claimToMe ? me.sellerId : null,
+      ownerName: draft.claimToMe ? me.sellerName : '',
     });
     if (!result.ok) {
       flashErr(result.error);
       return;
     }
     setCreateOpen(false);
-    setNewName('');
-    setNewPhone('');
-    setNewEmail('');
-    flashOk('Lead criado no pool (visível para todos).');
+    setDraft(EMPTY_CREATE);
+    flashOk(
+      draft.claimToMe
+        ? `Negócio de ${result.lead.name} criado e atribuído a você.`
+        : `Lead ${result.lead.name} entrou no pool para qualquer vendedor puxar.`,
+    );
     setTick((value) => value + 1);
+    if (draft.openAfter) {
+      navigate(`/crm/negocio/${result.lead.id}`);
+    }
   }
 
   function openSellerChat() {
@@ -220,22 +311,78 @@ export function CrmBoardPage() {
     setChatText('');
   }
 
+  function reloadMocks() {
+    const result = resetCrmMockLeads();
+    flashOk(
+      result.added > 0
+        ? `${result.added} leads de demonstração adicionados ao funil.`
+        : 'Leads de demonstração já estavam no board.',
+    );
+    setTick((value) => value + 1);
+  }
+
   return (
-    <section className="admin-page">
-      <div className="admin-toolbar">
-        <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
-          + Criar lead
-        </button>
-        <span className="empty" style={{ margin: 0 }}>
-          Pool aberto · puxar = exclusivo · cliente Marthi só após fechar + pagar
-        </span>
+    <section className="admin-page crm-board-page">
+      <div className="crm-board-bar">
+        <div className="crm-board-bar__left">
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => {
+              setDraft(EMPTY_CREATE);
+              setCreateOpen(true);
+            }}
+          >
+            + Criar lead
+          </button>
+          <div className="crm-board-bar__filters">
+            <label className="crm-board-search">
+              <span className="visually-hidden">Pesquisar</span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Pesquisar nome, interesse, cidade…"
+              />
+            </label>
+            <label className="crm-chip-toggle">
+              <input
+                type="checkbox"
+                checked={onlyPool}
+                onChange={(e) => {
+                  setOnlyPool(e.target.checked);
+                  if (e.target.checked) setOnlyMine(false);
+                }}
+              />
+              Só pool
+            </label>
+            <label className="crm-chip-toggle">
+              <input
+                type="checkbox"
+                checked={onlyMine}
+                onChange={(e) => {
+                  setOnlyMine(e.target.checked);
+                  if (e.target.checked) setOnlyPool(false);
+                }}
+              />
+              Meus negócios
+            </label>
+          </div>
+        </div>
+        <div className="crm-board-bar__right">
+          <span className="crm-board-bar__hint">
+            {filtered.length} negócios · pool aberto · cliente só após fechar + pagar
+          </span>
+          <button type="button" className="btn btn--ghost" onClick={reloadMocks}>
+            Popular demos
+          </button>
+        </div>
       </div>
 
       {message ? <p className="empty">{message}</p> : null}
       {error ? <p className="qty-low">{error}</p> : null}
 
-      <article className="admin-card" style={{ marginBottom: 12 }}>
-        <h2 style={{ marginTop: 0, fontSize: '1rem' }}>Conversar com vendedores</h2>
+      <article className="admin-card crm-sellers-card">
+        <h2>Conversar com vendedores</h2>
         <div className="admin-toolbar">
           <AdminPicker
             compact
@@ -255,7 +402,7 @@ export function CrmBoardPage() {
 
       <div className="crm-board">
         {CRM_BOARD_STAGES.map((stage) => {
-          const columnLeads = leads.filter((item) => item.stage === stage);
+          const columnLeads = filtered.filter((item) => item.stage === stage);
           const totals = crmStageTotals(stage);
           return (
             <div
@@ -274,7 +421,8 @@ export function CrmBoardPage() {
               <div className="crm-col__head">
                 <h2>{CRM_STAGE_LABEL[stage]}</h2>
                 <span className="crm-col__meta">
-                  {totals.count} · {money(totals.value)}
+                  {columnLeads.length}
+                  {query || onlyMine || onlyPool ? `/${totals.count}` : ''} · {money(totals.value)}
                 </span>
               </div>
               {columnLeads.length === 0 ? <p className="empty">Arraste um card aqui</p> : null}
@@ -308,10 +456,36 @@ export function CrmBoardPage() {
                       <span className="crm-card__value">{money(lead.value)}</span>
                       <span>{formatWhen(lead.updatedAt)}</span>
                     </div>
+                    {(lead.interest || lead.graduation) && (
+                      <div className="crm-card__tags">
+                        {lead.interest ? <span className="crm-tag">{lead.interest}</span> : null}
+                        {lead.graduation ? <span className="crm-tag is-mute">{lead.graduation}</span> : null}
+                      </div>
+                    )}
                     <div className="crm-card__row">
                       <span>{CRM_SOURCE_LABEL[lead.source]}</span>
-                      <span>{lead.interest || '—'}</span>
+                      <span className="crm-card__contact-icons">
+                        {lead.whatsapp && !lead.hideContact ? (
+                          <a
+                            href={whatsappHref(lead.whatsapp, `Olá ${lead.name}, sou ${me.sellerName} da Marthi.`)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={formatPhone(lead.whatsapp)}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            WA
+                          </a>
+                        ) : null}
+                        {lead.email && !lead.hideContact ? (
+                          <a href={`mailto:${lead.email}`} title={lead.email} onClick={(e) => e.stopPropagation()}>
+                            @
+                          </a>
+                        ) : null}
+                        {lead.hideContact ? <span title="Contato oculto">•••</span> : null}
+                      </span>
                     </div>
+                    {lead.sourceInfo ? <div className="crm-card__source">{lead.sourceInfo}</div> : null}
+                    {lead.polo ? <div className="crm-card__polo">{lead.polo}</div> : null}
                     {lead.ownerName ? (
                       <div className="crm-card__owner">
                         <span className="crm-card__avatar">
@@ -351,20 +525,23 @@ export function CrmBoardPage() {
                           >
                             Chat
                           </button>
-                          {lead.whatsapp ? (
-                            <a
-                              className="btn btn--ghost"
-                              style={{ fontSize: '0.78rem', minHeight: 28, padding: '0 8px' }}
-                              href={whatsappHref(
-                                lead.whatsapp,
-                                `Olá ${lead.name}, sou ${me.sellerName} da Marthi.`,
-                              )}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              WA
-                            </a>
-                          ) : null}
+                          <button
+                            type="button"
+                            className="btn btn--ghost"
+                            style={{ fontSize: '0.78rem', minHeight: 28, padding: '0 8px' }}
+                            onClick={() => {
+                              const note = window.prompt('Nova atividade / observação');
+                              if (!note) return;
+                              const result = addCrmLeadNote(lead.id, note, me.sellerId);
+                              if (!result.ok) flashErr(result.error);
+                              else {
+                                flashOk('Atividade registrada.');
+                                setTick((value) => value + 1);
+                              }
+                            }}
+                          >
+                            + Atividade
+                          </button>
                         </>
                       ) : null}
                     </div>
@@ -434,19 +611,6 @@ export function CrmBoardPage() {
               <button type="button" className="btn btn--ghost" onClick={simulateLeadReply}>
                 Simular resposta do lead
               </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  const note = window.prompt('Observação interna');
-                  if (!note) return;
-                  const result = addCrmLeadNote(leadDock.id, note, me.sellerId);
-                  if (!result.ok) flashErr(result.error);
-                  else setTick((value) => value + 1);
-                }}
-              >
-                + Atividade
-              </button>
             </div>
           </form>
         </div>
@@ -500,32 +664,202 @@ export function CrmBoardPage() {
       ) : null}
 
       {createOpen ? (
-        <div className="crm-lock" role="dialog" aria-modal="true">
-          <form className="crm-lock__card" onSubmit={createLead}>
-            <h2 style={{ margin: 0 }}>Novo lead</h2>
-            <p className="empty" style={{ margin: 0 }}>
-              Entra no pool para qualquer vendedor puxar.
-            </p>
-            <label>
-              Nome
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} required />
-            </label>
-            <label>
-              WhatsApp
-              <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-            </label>
-            <label>
-              E-mail
-              <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-            </label>
-            <div className="admin-toolbar">
-              <button type="button" className="btn btn--ghost" onClick={() => setCreateOpen(false)}>
+        <div className="crm-lock" role="dialog" aria-modal="true" aria-label="Novo lead">
+          <form className="crm-create" onSubmit={createLead}>
+            <header className="crm-create__head">
+              <div>
+                <p className="crm-create__eyebrow">Marthi CRM · Vendas</p>
+                <h2>Novo negócio / lead</h2>
+                <p>
+                  Preencha o contato e a oportunidade. Sem responsável, o lead fica no pool para
+                  qualquer vendedor puxar.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setCreateOpen(false);
+                  setDraft(EMPTY_CREATE);
+                }}
+              >
+                Fechar
+              </button>
+            </header>
+
+            <div className="crm-create__grid">
+              <section className="crm-create__panel">
+                <h3>Contato</h3>
+                <label>
+                  Nome completo ou empresa *
+                  <input
+                    value={draft.name}
+                    onChange={(e) => patchDraft('name', e.target.value)}
+                    placeholder="Ex.: Renata Oliveira | CellMix"
+                    required
+                    autoFocus
+                  />
+                </label>
+                <div className="crm-create__row">
+                  <label>
+                    WhatsApp
+                    <input
+                      value={draft.whatsapp}
+                      onChange={(e) => patchDraft('whatsapp', e.target.value)}
+                      placeholder="(24) 99999-0000"
+                      inputMode="tel"
+                    />
+                  </label>
+                  <label>
+                    E-mail
+                    <input
+                      type="email"
+                      value={draft.email}
+                      onChange={(e) => patchDraft('email', e.target.value)}
+                      placeholder="contato@loja.com"
+                    />
+                  </label>
+                </div>
+                <div className="crm-create__row">
+                  <label>
+                    Cidade / polo
+                    <input
+                      value={draft.polo}
+                      onChange={(e) => patchDraft('polo', e.target.value)}
+                      placeholder="Três Rios — RJ"
+                    />
+                  </label>
+                  <label>
+                    Segmento
+                    <select
+                      value={draft.graduation}
+                      onChange={(e) => patchDraft('graduation', e.target.value)}
+                    >
+                      {CRM_SEGMENT_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="crm-create__check">
+                  <input
+                    type="checkbox"
+                    checked={draft.hideContact}
+                    onChange={(e) => patchDraft('hideContact', e.target.checked)}
+                  />
+                  Ocultar contato no board (só o responsável vê)
+                </label>
+              </section>
+
+              <section className="crm-create__panel">
+                <h3>Oportunidade</h3>
+                <label>
+                  Interesse / produto *
+                  <select
+                    value={draft.interest}
+                    onChange={(e) => patchDraft('interest', e.target.value)}
+                  >
+                    {CRM_INTEREST_OPTIONS.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                    <option value="Outro">Outro</option>
+                  </select>
+                </label>
+                <div className="crm-create__row">
+                  <label>
+                    Valor estimado (R$)
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={draft.value}
+                      onChange={(e) => patchDraft('value', e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Etapa inicial
+                    <select
+                      value={draft.stage}
+                      onChange={(e) => patchDraft('stage', e.target.value as CrmStage)}
+                    >
+                      {CRM_BOARD_STAGES.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {CRM_STAGE_LABEL[stage]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="crm-create__row">
+                  <label>
+                    Fonte
+                    <select
+                      value={draft.source}
+                      onChange={(e) => patchDraft('source', e.target.value as CrmLeadSource)}
+                    >
+                      {(Object.keys(CRM_SOURCE_LABEL) as CrmLeadSource[]).map((key) => (
+                        <option key={key} value={key}>
+                          {CRM_SOURCE_LABEL[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Detalhe da fonte
+                    <input
+                      value={draft.sourceInfo}
+                      onChange={(e) => patchDraft('sourceInfo', e.target.value)}
+                      placeholder="Ex.: Meta Lead Ads · WhatsApp SP"
+                    />
+                  </label>
+                </div>
+                <label>
+                  Observações internas
+                  <textarea
+                    value={draft.notes}
+                    onChange={(e) => patchDraft('notes', e.target.value)}
+                    placeholder="Contexto da conversa, urgência, concorrente…"
+                    rows={4}
+                  />
+                </label>
+                <label className="crm-create__check">
+                  <input
+                    type="checkbox"
+                    checked={draft.claimToMe}
+                    onChange={(e) => patchDraft('claimToMe', e.target.checked)}
+                  />
+                  Já atribuir a mim (sai do pool)
+                </label>
+                <label className="crm-create__check">
+                  <input
+                    type="checkbox"
+                    checked={draft.openAfter}
+                    onChange={(e) => patchDraft('openAfter', e.target.checked)}
+                  />
+                  Abrir o negócio depois de criar
+                </label>
+              </section>
+            </div>
+
+            <footer className="crm-create__foot">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setCreateOpen(false);
+                  setDraft(EMPTY_CREATE);
+                }}
+              >
                 Cancelar
               </button>
               <button type="submit" className="btn btn--primary">
-                Criar
+                {draft.claimToMe ? 'Criar e assumir' : 'Criar no pool'}
               </button>
-            </div>
+            </footer>
           </form>
         </div>
       ) : null}

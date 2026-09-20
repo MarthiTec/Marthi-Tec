@@ -113,8 +113,9 @@ export function ProductsPage() {
       setBridge({
         top: br.top - lr.top,
         height: br.height,
-        left: br.right - lr.left,
-        width: gap,
+        /* Entra um pouco nos dois cards para cobrir a borda e unir em branco */
+        left: br.right - lr.left - 4,
+        width: gap + 8,
       });
     }
 
