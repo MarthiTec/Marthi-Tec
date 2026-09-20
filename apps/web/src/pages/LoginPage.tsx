@@ -1,11 +1,18 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
 
+function safeNext(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/painel';
+  return value;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = safeNext(params.get('next'));
   const { user, loading, providers, loginWithPassword, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +25,7 @@ export function LoginPage() {
   );
 
   if (!loading && user) {
-    return <Navigate to="/painel" replace />;
+    return <Navigate to={next} replace />;
   }
 
   async function handlePasswordLogin(event: FormEvent<HTMLFormElement>) {
@@ -27,7 +34,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await loginWithPassword(email, password);
-      navigate('/painel', { replace: true });
+      navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
     } finally {
@@ -40,7 +47,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await loginWithGoogle(idToken);
-      navigate('/painel', { replace: true });
+      navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha no login com Google.');
     } finally {
@@ -59,8 +66,9 @@ export function LoginPage() {
         <p className="auth__tenant">Sua Loja · demo</p>
         <h1>Entrar na loja</h1>
         <p className="auth__lead">
-          Use o login da operação da <strong>Sua Loja</strong> para abrir o painel. A plataforma é
-          Marthi; a loja nesta demo é o tenant.
+          Use o login da operação da <strong>Sua Loja</strong>
+          {next === '/caixa' ? ' para abrir o caixa' : ' para abrir o painel'}. A plataforma é Marthi;
+          a loja nesta demo é o tenant.
         </p>
 
         {error && <p className="auth__error" role="alert">{error}</p>}

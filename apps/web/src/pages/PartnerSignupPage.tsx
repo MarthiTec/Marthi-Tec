@@ -7,12 +7,14 @@ import {
   PLANS,
   getPlanById,
   getPlanModuleLimit,
-  isPlanId,
+  normalizePlanId,
   planIncludesAllModules,
   type PartnerModuleId,
   type PlanId,
 } from '../data/catalog';
 import { submitPartnerSignup } from '../services/partners';
+import { markStoreContracted } from '../data/demoLeadStore';
+import { saveStoreEntitlement } from '../data/storePlan';
 import './partner-signup.css';
 
 type Step = 1 | 2 | 3 | 4;
@@ -88,7 +90,7 @@ function clampModulesForPlan(planId: PlanId, modules: PartnerModuleId[]) {
 }
 
 function initialForm(planFromQuery: string | null): FormState {
-  const planId = isPlanId(planFromQuery) ? planFromQuery : 'growth';
+  const planId = normalizePlanId(planFromQuery) ?? 'silver';
   return {
     planId,
     modules: clampModulesForPlan(planId, ['totem']),
@@ -114,11 +116,18 @@ function initialForm(planFromQuery: string | null): FormState {
 
 export function PartnerSignupPage() {
   const [params] = useSearchParams();
-  const [step, setStep] = useState<Step>(1);
-  const [form, setForm] = useState<FormState>(() => initialForm(params.get('plano')));
+  const planFromQuery = params.get('plano');
+  const goPayment = params.get('passo') === 'pagamento' || Boolean(normalizePlanId(planFromQuery));
+  const [step, setStep] = useState<Step>(() => (goPayment ? 4 : 1));
+  const [form, setForm] = useState<FormState>(() => initialForm(planFromQuery));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [protocol, setProtocol] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<'pix' | 'card'>('pix');
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
@@ -145,9 +154,9 @@ export function PartnerSignupPage() {
       }
       if (current.modules.length >= getPlanModuleLimit(current.planId)) {
         setError(
-          current.planId === 'start'
-            ? 'No plano Start você pode liberar apenas 1 módulo.'
-            : 'No plano Growth você pode selecionar no máximo 2 módulos.',
+          current.planId === 'bronze'
+            ? 'No plano Bronze você pode liberar apenas 1 módulo.'
+            : 'No plano Silver você pode selecionar no máximo 2 módulos.',
         );
         return current;
       }
@@ -160,25 +169,22 @@ export function PartnerSignupPage() {
     if (current === 1 && !form.planId) return 'Selecione um plano.';
     if (current === 2) {
       if (form.modules.length === 0) {
-        return 'Escolha ao menos um módulo (Totem, Pré-vendas, OS ou ERP).';
+        return 'Escolha ao menos um módulo (Totem, OS, ERP ou Emissor Fiscal).';
       }
       if (lockedAllModules && form.modules.length < PARTNER_MODULES.length) {
-        return 'No plano Scale todos os módulos ficam liberados.';
+        return 'No plano Golden todos os módulos ficam liberados.';
       }
       if (!lockedAllModules && form.modules.length > moduleLimit) {
         return `Este plano permite no máximo ${moduleLimit} módulo(s).`;
       }
-      if (!lockedAllModules && form.modules.length < 1) {
-        return 'Selecione o módulo desejado.';
+      if (form.planId === 'bronze' && form.modules.length !== 1) {
+        return 'No plano Bronze selecione exatamente 1 módulo.';
       }
-      if (form.planId === 'start' && form.modules.length !== 1) {
-        return 'No plano Start selecione exatamente 1 módulo.';
-      }
-      if (form.planId === 'growth' && (form.modules.length < 1 || form.modules.length > 2)) {
-        return 'No plano Growth selecione 1 ou 2 módulos.';
+      if (form.planId === 'silver' && (form.modules.length < 1 || form.modules.length > 2)) {
+        return 'No plano Silver selecione 1 ou 2 módulos.';
       }
     }
-    if (current === 3) {
+    if (current === 3 || current === 4) {
       const docDigits = onlyDigits(form.document);
       const expected = form.documentType === 'cnpj' ? 14 : 11;
       if (docDigits.length !== expected) {
@@ -200,6 +206,12 @@ export function PartnerSignupPage() {
       }
       if (!form.contactName.trim()) return 'Informe o responsável pelo contato.';
     }
+    if (current === 4 && payMethod === 'card') {
+      if (!cardName.trim()) return 'Informe o nome no cartão.';
+      if (onlyDigits(cardNumber).length < 13) return 'Informe o número do cartão.';
+      if (onlyDigits(cardExpiry).length < 4) return 'Informe a validade (MM/AA).';
+      if (onlyDigits(cardCvv).length < 3) return 'Informe o CVV.';
+    }
     return null;
   }
 
@@ -220,10 +232,9 @@ export function PartnerSignupPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const message = validateStep(3);
+    const message = validateStep(4);
     if (message) {
       setError(message);
-      setStep(3);
       return;
     }
 
@@ -251,6 +262,8 @@ export function PartnerSignupPage() {
         contactRole: form.contactRole.trim(),
         notes: form.notes.trim(),
       });
+      saveStoreEntitlement({ planId: form.planId, modules: form.modules });
+      markStoreContracted();
       setProtocol(result.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao enviar cadastro.');
@@ -306,7 +319,7 @@ export function PartnerSignupPage() {
           { id: 1, label: 'Plano' },
           { id: 2, label: 'Módulos' },
           { id: 3, label: 'Empresa' },
-          { id: 4, label: 'Revisão' },
+          { id: 4, label: 'Pagamento' },
         ].map((item) => (
           <li key={item.id} className={step === item.id ? 'is-active' : step > item.id ? 'is-done' : ''}>
             <span>{item.id}</span>
@@ -331,7 +344,7 @@ export function PartnerSignupPage() {
                 <button
                   key={plan.id}
                   type="button"
-                  className={`partner-plan ${form.planId === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
+                  className={`partner-plan partner-plan--${plan.id} ${form.planId === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
                   onClick={() => selectPlan(plan.id)}
                 >
                   {'featured' in plan && plan.featured ? <span>Mais escolhido</span> : null}
@@ -357,10 +370,10 @@ export function PartnerSignupPage() {
             <h1>O que você quer usar?</h1>
             <p className="partner__lead">
               {lockedAllModules
-                ? 'No Scale todos os módulos já vêm liberados e integrados.'
-                : form.planId === 'start'
-                  ? 'No Start escolha apenas 1 módulo.'
-                  : 'No Growth escolha até 2 módulos.'}
+                ? 'No Golden todos os módulos já vêm liberados e integrados.'
+                : form.planId === 'bronze'
+                  ? 'No Bronze escolha apenas 1 módulo.'
+                  : 'No Silver escolha até 2 módulos.'}
             </p>
             <p className="partner__module-count">
               {lockedAllModules
@@ -562,8 +575,11 @@ export function PartnerSignupPage() {
 
         {step === 4 && (
           <section className="partner__section">
-            <h1>Revisão</h1>
-            <p className="partner__lead">Confira antes de enviar. A Marthi valida e libera o acesso.</p>
+            <h1>Pagamento</h1>
+            <p className="partner__lead">
+              Finalize a contratação do plano {selectedPlan.name}. Na demo o pagamento é simulado —
+              em produção cai no gateway.
+            </p>
 
             <div className="partner__review">
               <article>
@@ -572,6 +588,11 @@ export function PartnerSignupPage() {
                   <strong>{selectedPlan.name}</strong> — {selectedPlan.price}
                   {selectedPlan.period}
                 </p>
+                <ul>
+                  {selectedPlan.features.slice(0, 4).map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
               </article>
               <article>
                 <h2>Módulos</h2>
@@ -579,35 +600,202 @@ export function PartnerSignupPage() {
                   {form.modules
                     .map((id) => PARTNER_MODULES.find((item) => item.id === id)?.name)
                     .filter(Boolean)
-                    .join(' · ')}
+                    .join(' · ') || '—'}
                 </p>
+                {goPayment ? (
+                  <div className="partner__modules" style={{ marginTop: 12 }}>
+                    {PARTNER_MODULES.map((module) => {
+                      const checked = form.modules.includes(module.id);
+                      const atLimit =
+                        !lockedAllModules && !checked && form.modules.length >= moduleLimit;
+                      return (
+                        <label
+                          key={module.id}
+                          className={`partner-module ${checked ? 'is-active' : ''} ${atLimit ? 'is-disabled' : ''} ${lockedAllModules ? 'is-included' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={lockedAllModules || atLimit}
+                            onChange={() => toggleModule(module.id)}
+                          />
+                          <strong>{module.name}</strong>
+                          <span>{module.blurb}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </article>
-              <article>
-                <h2>Empresa</h2>
-                <p>
-                  <strong>{form.tradeName}</strong>
-                  <br />
-                  {form.legalName}
-                  <br />
-                  {form.documentType.toUpperCase()}: {form.document}
-                  <br />
-                  {form.street}, {form.number}
-                  {form.complement ? ` — ${form.complement}` : ''}
-                  <br />
-                  {form.district} · {form.city}/{form.state} · CEP {form.zipCode}
+            </div>
+
+            {goPayment || !form.tradeName ? (
+              <div className="partner__grid" style={{ marginTop: 20 }}>
+                <label>
+                  Nome fantasia
+                  <input
+                    value={form.tradeName}
+                    onChange={(e) => patch('tradeName', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  {form.documentType === 'cnpj' ? 'CNPJ' : 'CPF'}
+                  <input
+                    value={form.document}
+                    onChange={(e) => patch('document', maskDocument(form.documentType, e.target.value))}
+                    inputMode="numeric"
+                    required
+                  />
+                </label>
+                <label>
+                  Razão social / Nome
+                  <input
+                    value={form.legalName}
+                    onChange={(e) => patch('legalName', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  E-mail
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => patch('email', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  WhatsApp
+                  <input
+                    value={form.phone}
+                    onChange={(e) => patch('phone', maskPhone(e.target.value))}
+                    inputMode="tel"
+                    required
+                  />
+                </label>
+                <label>
+                  Responsável
+                  <input
+                    value={form.contactName}
+                    onChange={(e) => patch('contactName', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  CEP
+                  <input
+                    value={form.zipCode}
+                    onChange={(e) => patch('zipCode', maskZip(e.target.value))}
+                    inputMode="numeric"
+                    required
+                  />
+                </label>
+                <label className="partner__span-2">
+                  Endereço
+                  <input
+                    value={form.street}
+                    onChange={(e) => patch('street', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Número
+                  <input value={form.number} onChange={(e) => patch('number', e.target.value)} required />
+                </label>
+                <label>
+                  Bairro
+                  <input
+                    value={form.district}
+                    onChange={(e) => patch('district', e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Cidade
+                  <input value={form.city} onChange={(e) => patch('city', e.target.value)} required />
+                </label>
+                <label>
+                  UF
+                  <select value={form.state} onChange={(e) => patch('state', e.target.value)} required>
+                    {BRAZIL_UFS.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <div className="partner__review" style={{ marginTop: 16 }}>
+                <article>
+                  <h2>Empresa</h2>
+                  <p>
+                    <strong>{form.tradeName}</strong>
+                    <br />
+                    {form.legalName}
+                    <br />
+                    {form.documentType.toUpperCase()}: {form.document}
+                  </p>
+                </article>
+              </div>
+            )}
+
+            <div className="partner__pay" style={{ marginTop: 20 }}>
+              <h2 style={{ fontSize: '1rem', margin: '0 0 10px' }}>Forma de pagamento</h2>
+              <div className="partner__doc-type" role="group" aria-label="Pagamento">
+                <button
+                  type="button"
+                  className={payMethod === 'pix' ? 'is-active' : ''}
+                  onClick={() => setPayMethod('pix')}
+                >
+                  PIX
+                </button>
+                <button
+                  type="button"
+                  className={payMethod === 'card' ? 'is-active' : ''}
+                  onClick={() => setPayMethod('card')}
+                >
+                  Cartão
+                </button>
+              </div>
+              {payMethod === 'pix' ? (
+                <p className="partner__lead" style={{ marginTop: 12 }}>
+                  Ao confirmar, geramos um PIX (simulado) e liberamos o onboarding da loja.
                 </p>
-              </article>
-              <article>
-                <h2>Contato</h2>
-                <p>
-                  {form.contactName}
-                  {form.contactRole ? ` · ${form.contactRole}` : ''}
-                  <br />
-                  {form.email}
-                  <br />
-                  {form.phone}
-                </p>
-              </article>
+              ) : (
+                <div className="partner__grid" style={{ marginTop: 12 }}>
+                  <label className="partner__span-2">
+                    Nome no cartão
+                    <input value={cardName} onChange={(e) => setCardName(e.target.value)} />
+                  </label>
+                  <label className="partner__span-2">
+                    Número
+                    <input
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="0000 0000 0000 0000"
+                    />
+                  </label>
+                  <label>
+                    Validade
+                    <input
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(e.target.value)}
+                      placeholder="MM/AA"
+                    />
+                  </label>
+                  <label>
+                    CVV
+                    <input
+                      value={cardCvv}
+                      onChange={(e) => setCardCvv(e.target.value)}
+                      inputMode="numeric"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -626,7 +814,7 @@ export function PartnerSignupPage() {
             </button>
           ) : (
             <button type="submit" className="btn btn--primary" disabled={submitting}>
-              {submitting ? 'Enviando…' : 'Enviar cadastro'}
+              {submitting ? 'Processando…' : 'Pagar e concluir'}
             </button>
           )}
         </div>

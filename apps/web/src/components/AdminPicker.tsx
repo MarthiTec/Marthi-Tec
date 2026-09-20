@@ -13,6 +13,8 @@ type AdminPickerProps = {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  /** Esconde o caption e usa aria-label — ideal em toolbars. */
+  compact?: boolean;
 };
 
 function normalizeOptions(
@@ -31,12 +33,14 @@ export function AdminPicker({
   disabled = false,
   placeholder = 'Selecionar',
   className = '',
+  compact = false,
 }: AdminPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const items = normalizeOptions(options);
   const selected = items.find((item) => item.value === value);
+  const showCaption = Boolean(label) && !compact;
 
   useEffect(() => {
     if (!open) return;
@@ -61,22 +65,23 @@ export function AdminPicker({
 
   return (
     <div
-      className={`admin-picker ${open ? 'is-open' : ''} ${disabled ? 'is-disabled' : ''} ${className}`.trim()}
+      className={`admin-picker ${compact ? 'admin-picker--compact' : ''} ${open ? 'is-open' : ''} ${disabled ? 'is-disabled' : ''} ${className}`.trim()}
       ref={rootRef}
     >
-      {label ? <span className="admin-picker__caption">{label}</span> : null}
+      {showCaption ? <span className="admin-picker__caption">{label}</span> : null}
       <button
         type="button"
         className="admin-picker__trigger"
+        aria-label={label}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >
-        <strong className={selected ? '' : 'is-placeholder'}>
+        <span className={`admin-picker__value${selected ? '' : ' is-placeholder'}`}>
           {selected?.label ?? placeholder}
-        </strong>
+        </span>
         <i aria-hidden="true" />
       </button>
       {open ? (

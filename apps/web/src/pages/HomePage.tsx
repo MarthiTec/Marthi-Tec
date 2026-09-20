@@ -1,27 +1,41 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
+import { DemoLeadGate } from '../components/DemoLeadGate';
+import { useAuth } from '../contexts/AuthContext';
 import { PLANS } from '../data/catalog';
+import { isStoreContracted } from '../data/demoLeadStore';
+import { hasModule } from '../data/storePlan';
 import './home.css';
 
 const PRODUCTS = [
   {
     title: 'Totem de autoatendimento',
     text: 'Touch grande, fluxo guiado e lead no WhatsApp da loja — em qualquer segmento.',
+    demoProduct: 'totem' as const,
     href: '/totem',
-    cta: 'Abrir demo do totem',
+    cta: 'Demo do totem',
   },
   {
-    title: 'Painel da loja',
-    text: 'Login da Sua Loja, catálogo e o que o cliente escolheu no totem.',
+    title: 'PDV / Caixa',
+    text: 'Venda rápida, troca, vale-compra, sangria, aporte e fechamento de caixa.',
+    demoProduct: 'caixa' as const,
+    href: '/caixa',
+    cta: 'Demo do caixa',
+  },
+  {
+    title: 'Ordem de serviço',
+    text: 'Orçamento, oficina, agenda e entrega — app próprio para o operador da bancada.',
+    demoProduct: 'os' as const,
+    href: '/os',
+    cta: 'Demo da OS',
+  },
+  {
+    title: 'ERP + Emissor Fiscal',
+    text: 'Produtos, financeiro e base fiscal (NCM, CFOP, IBS/CBS).',
+    demoProduct: 'erp' as const,
     href: '/login',
     cta: 'Entrar no painel',
-  },
-  {
-    title: 'OS + ERP',
-    text: 'Ordem de serviço no mesmo painel da loja — abertura, oficina e entrega.',
-    href: '/login',
-    cta: 'Ver no painel',
   },
 ] as const;
 
@@ -60,9 +74,34 @@ function IconLabel({ icon, children }: { icon: ReactNode; children: ReactNode })
 }
 
 export function HomePage() {
-  const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('growth');
+  const { user } = useAuth();
+  const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('silver');
   const [spotlight, setSpotlight] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [contracted, setContracted] = useState(() => isStoreContracted());
+  const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
+    null,
+  );
+
+  const showCaixa = contracted && hasModule('erp');
+  const showTotem = contracted && hasModule('totem');
+  const showOs = contracted && hasModule('os');
+
+  useEffect(() => {
+    function refresh() {
+      setContracted(isStoreContracted());
+    }
+    window.addEventListener('marthi-plan-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('marthi-plan-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user) setContracted(true);
+  }, [user]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -81,6 +120,11 @@ export function HomePage() {
   }, [helpOpen]);
 
   const selected = PLANS.find((plan) => plan.id === activePlan) ?? PLANS[1];
+  const featured = PRODUCTS[spotlight];
+
+  function openDemo(product: 'totem' | 'caixa' | 'os', to: string) {
+    setDemoGate({ product, to });
+  }
 
   return (
     <div className={`site ${helpOpen ? 'is-frosted' : ''}`}>
@@ -97,7 +141,27 @@ export function HomePage() {
           <button type="button" className="site__nav-link" onClick={() => setHelpOpen(true)}>
             Contato
           </button>
-          <Link to="/totem">Demo</Link>
+          {showCaixa ? (
+            <Link to={user ? '/caixa' : '/login?next=/caixa'}>Caixa</Link>
+          ) : (
+            <button type="button" className="site__nav-link" onClick={() => openDemo('caixa', '/caixa')}>
+              Demo caixa
+            </button>
+          )}
+          {showOs ? (
+            <Link to={user ? '/os' : '/login?next=/os'}>OS</Link>
+          ) : (
+            <button type="button" className="site__nav-link" onClick={() => openDemo('os', '/os')}>
+              Demo OS
+            </button>
+          )}
+          {showTotem ? (
+            <Link to="/totem">Totem</Link>
+          ) : (
+            <button type="button" className="site__nav-link" onClick={() => openDemo('totem', '/totem')}>
+              Demo totem
+            </button>
+          )}
           <Link to="/login">Entrar</Link>
           <Link to="/parceiro" className="site__nav-cta">
             Solicitar demonstração
@@ -141,26 +205,66 @@ export function HomePage() {
 
       <main id="topo">
         <section className="hero">
+          <div className="hero__media" aria-hidden="false">
+            <img src="/home/mulher-app.jpg" alt="" />
+            <div className="hero__veil" />
+          </div>
           <div className="hero__copy">
-            <p className="eyebrow">Marthi Tecnologia</p>
-            <h1>Sistemas na sua mão. A gestão que você precisa.</h1>
+            <p className="hero__brand">Marthi</p>
+            <h1>Sistemas na sua mão.</h1>
             <p>
-              Totem na loja, painel da operação e o próximo passo do ERP — com a marca da
-              <strong> Sua Loja</strong>.
+              Totem, OS, ERP e emissor fiscal — a operação da
+              <strong> Sua Loja</strong> em um só lugar.
             </p>
             <div className="hero__actions">
               <Link to="/parceiro" className="btn btn--primary">
                 Ver soluções
               </Link>
-              <Link to="/totem" className="btn btn--ghost">
-                Abrir demo do totem
-              </Link>
+              {showOs ? (
+                <Link to={user ? '/os' : '/login?next=/os'} className="btn btn--ghost hero__ghost">
+                  Abrir oficina
+                </Link>
+              ) : showCaixa ? (
+                <Link to={user ? '/caixa' : '/login?next=/caixa'} className="btn btn--ghost hero__ghost">
+                  Abrir caixa
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--ghost hero__ghost"
+                  onClick={() => openDemo('os', '/os')}
+                >
+                  Demo da OS
+                </button>
+              )}
             </div>
           </div>
-          <figure className="hero__photo">
-            <img src="/home/mulher-app.jpg" alt="Cliente usando o sistema no celular" />
-          </figure>
         </section>
+
+        {(showCaixa || showTotem || showOs) && (
+          <section className="section section--launch" aria-label="Acesso rápido">
+            <div className="launch-row">
+              {showCaixa ? (
+                <Link to={user ? '/caixa' : '/login?next=/caixa'} className="launch-card">
+                  <strong>Caixa / PDV</strong>
+                  <span>{user ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
+                </Link>
+              ) : null}
+              {showOs ? (
+                <Link to={user ? '/os' : '/login?next=/os'} className="launch-card">
+                  <strong>Ordem de serviço</strong>
+                  <span>{user ? 'Abrir oficina' : 'Entrar e abrir a oficina'}</span>
+                </Link>
+              ) : null}
+              {showTotem ? (
+                <Link to="/totem" className="launch-card">
+                  <strong>Totem</strong>
+                  <span>Abrir autoatendimento</span>
+                </Link>
+              ) : null}
+            </div>
+          </section>
+        )}
 
         <section className="split" aria-labelledby="split-title">
           <figure className="split__photo">
@@ -168,7 +272,7 @@ export function HomePage() {
           </figure>
           <div className="split__copy">
             <p className="eyebrow">Na operação</p>
-            <h2 id="split-title">Sistemas que colaboram. Equipes que produzem.</h2>
+            <h2 id="split-title">Da vitrine ao caixa, sem fricção.</h2>
             <p>
               O cliente escolhe no totem. A loja vê o interesse no painel e responde no WhatsApp.
             </p>
@@ -181,7 +285,7 @@ export function HomePage() {
         <section id="produtos" className="section section--products">
           <div className="section__head">
             <p className="eyebrow">Produtos</p>
-            <h2>Uma plataforma. Três módulos.</h2>
+            <h2>Quatro módulos. Três planos.</h2>
           </div>
           <div className="products">
             <div className="products__spotlight">
@@ -196,12 +300,50 @@ export function HomePage() {
                 </button>
               ))}
             </div>
-            <div className="products__panel" key={PRODUCTS[spotlight].title}>
-              <h3>{PRODUCTS[spotlight].title}</h3>
-              <p>{PRODUCTS[spotlight].text}</p>
-              <Link to={PRODUCTS[spotlight].href} className="btn btn--primary">
-                {PRODUCTS[spotlight].cta}
-              </Link>
+            <div className="products__panel" key={featured.title}>
+              <h3>{featured.title}</h3>
+              <p>{featured.text}</p>
+              {featured.demoProduct === 'totem' ||
+              featured.demoProduct === 'caixa' ||
+              featured.demoProduct === 'os' ? (
+                contracted &&
+                ((featured.demoProduct === 'caixa' && showCaixa) ||
+                  (featured.demoProduct === 'totem' && showTotem) ||
+                  (featured.demoProduct === 'os' && showOs)) ? (
+                  <Link
+                    to={
+                      featured.demoProduct === 'caixa'
+                        ? user
+                          ? '/caixa'
+                          : '/login?next=/caixa'
+                        : featured.demoProduct === 'os'
+                          ? user
+                            ? '/os'
+                            : '/login?next=/os'
+                          : featured.href
+                    }
+                    className="btn btn--primary"
+                  >
+                    {featured.demoProduct === 'caixa'
+                      ? 'Abrir caixa'
+                      : featured.demoProduct === 'os'
+                        ? 'Abrir oficina'
+                        : 'Abrir totem'}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => openDemo(featured.demoProduct, featured.href)}
+                  >
+                    {featured.cta}
+                  </button>
+                )
+              ) : (
+                <Link to={featured.href} className="btn btn--primary">
+                  {featured.cta}
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -216,7 +358,7 @@ export function HomePage() {
               <button
                 key={plan.id}
                 type="button"
-                className={`plan-card ${activePlan === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
+                className={`plan-card plan-card--${plan.id} ${activePlan === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
                 onClick={() => setActivePlan(plan.id)}
               >
                 {'featured' in plan && plan.featured ? <span className="plan-card__badge">Mais escolhido</span> : null}
@@ -235,12 +377,12 @@ export function HomePage() {
               <p>{selected.blurb}</p>
             </div>
             <ul>
-              {selected.features.slice(0, 4).map((feature) => (
+              {selected.features.map((feature) => (
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
-            <Link to={`/parceiro?plano=${selected.id}`} className="btn btn--primary">
-              Quero este plano
+            <Link to={`/parceiro?plano=${selected.id}&passo=pagamento`} className="btn btn--primary">
+              Contratar e pagar
             </Link>
           </div>
         </section>
@@ -292,6 +434,15 @@ export function HomePage() {
           </a>
         </nav>
       </footer>
+
+      {demoGate ? (
+        <DemoLeadGate
+          product={demoGate.product}
+          to={demoGate.to}
+          open
+          onClose={() => setDemoGate(null)}
+        />
+      ) : null}
     </div>
   );
 }

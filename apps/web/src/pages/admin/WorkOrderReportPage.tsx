@@ -1,11 +1,14 @@
 import { Link, useParams } from 'react-router-dom';
 import {
   CHECKLIST_MARK_LABEL,
+  formatDuration,
   getWorkOrder,
   PHOTO_KIND_LABEL,
   PRIORITY_LABEL,
   QUOTE_STATUS_LABEL,
   STATUS_LABEL,
+  workOrderExitAt,
+  workOrderShopDurationMs,
   workOrderTotal,
 } from '../../data/osStore';
 
@@ -42,7 +45,7 @@ export function WorkOrderReportPage() {
       <section className="admin-page">
         <article className="admin-card">
           <h2>OS não encontrada</h2>
-          <Link to="/painel/os" className="btn btn--ghost">
+          <Link to="/os" className="btn btn--ghost">
             Voltar ao quadro
           </Link>
         </article>
@@ -59,10 +62,10 @@ export function WorkOrderReportPage() {
   return (
     <section className="admin-page os-report-page">
       <div className="admin-toolbar no-print">
-        <Link to={`/painel/os/${order.id}`} className="btn btn--ghost">
+        <Link to={`/os/${order.id}`} className="btn btn--ghost">
           Abrir OS
         </Link>
-        <Link to="/painel/os" className="btn btn--ghost">
+        <Link to="/os" className="btn btn--ghost">
           Quadro
         </Link>
         <button type="button" className="btn btn--primary" onClick={() => window.print()}>
@@ -113,6 +116,18 @@ export function WorkOrderReportPage() {
             <Row label="Diagnóstico" value={order.diagnosis} />
             <Row label="Técnico" value={order.technician} />
             <Row label="Previsão" value={when(order.estimatedReadyAt)} />
+            <Row
+              label="Tempo na oficina"
+              value={formatDuration(workOrderShopDurationMs(order))}
+            />
+            <Row
+              label="Horário de saída"
+              value={
+                workOrderExitAt(order)
+                  ? when(workOrderExitAt(order)!)
+                  : 'Ainda na oficina'
+              }
+            />
             <Row label="Obs. internas" value={order.notes} />
           </section>
 

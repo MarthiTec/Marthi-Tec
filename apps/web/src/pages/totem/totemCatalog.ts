@@ -1,5 +1,5 @@
 import { getAdminState, stockItemImages, type StockItem } from '../../data/adminStore';
-import { ATTR_CAP, ATTR_COR, ATTR_RET } from '../../data/attributeStore';
+import { ATTR_CAP, ATTR_COR, ATTR_RET, totemAttributes } from '../../data/attributeStore';
 import { getTotemSettings } from '../../data/totemSettings';
 import { formatInstallment } from '../../data/variantQuote';
 import {
@@ -23,6 +23,42 @@ function guessBrand(name: string): TotemBrand {
   return 'apple';
 }
 
+function pushUnique(map: Record<string, string[]>, key: string, value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  const list = map[key] ?? [];
+  if (!list.includes(trimmed)) list.push(trimmed);
+  map[key] = list;
+}
+
+/** Agrega attrs do estoque ERP para o card do totem (incluindo atributos customizados). */
+function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
+  const attrs: Record<string, string[]> = {};
+
+  for (const row of rows) {
+    for (const [attrId, value] of Object.entries(row.attrs ?? {})) {
+      pushUnique(attrs, attrId, value);
+    }
+    pushUnique(attrs, ATTR_COR, row.color || row.attrs?.[ATTR_COR] || '');
+    pushUnique(attrs, ATTR_CAP, row.capacity || row.attrs?.[ATTR_CAP] || '');
+  }
+
+  // Retirada é opção de atendimento do totem (não vem do estoque).
+  for (const attr of totemAttributes()) {
+    if (attr.id === ATTR_RET) {
+      attrs[ATTR_RET] = [...FULFILLMENT_OPTIONS];
+    }
+  }
+  if (!attrs[ATTR_RET]?.length) {
+    attrs[ATTR_RET] = [...FULFILLMENT_OPTIONS];
+  }
+
+  if (!attrs[ATTR_COR]?.length) attrs[ATTR_COR] = ['—'];
+  if (!attrs[ATTR_CAP]?.length) attrs[ATTR_CAP] = ['—'];
+
+  return attrs;
+}
+
 function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: number })[] {
   const groups = new Map<string, StockItem[]>();
   for (const item of items) {
@@ -37,12 +73,9 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
   }
 
   return [...groups.entries()].map(([name, rows]) => {
-    const colors = [
-      ...new Set(rows.map((row) => row.color || row.attrs[ATTR_COR]).filter(Boolean)),
-    ];
-    const storages = [
-      ...new Set(rows.map((row) => row.capacity || row.attrs[ATTR_CAP]).filter(Boolean)),
-    ];
+    const attrs = buildTotemAttrs(rows);
+    const colors = attrs[ATTR_COR] ?? ['—'];
+    const storages = attrs[ATTR_CAP] ?? ['—'];
     const priced = [...rows].sort((a, b) => a.price - b.price);
     const primary = priced[0];
     const images = rows
@@ -53,16 +86,12 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       id: stableId(name),
       name,
       brand: guessBrand(name),
-      storages: storages.length ? storages : ['—'],
-      colors: colors.length ? colors : ['—'],
+      storages,
+      colors,
       cashPrice: primary.price,
       installmentLabel: formatInstallment(primary.price, 12),
       images: images.length ? images : stockItemImages(primary),
-      attrs: {
-        [ATTR_COR]: colors.length ? colors : ['—'],
-        [ATTR_CAP]: storages.length ? storages : ['—'],
-        [ATTR_RET]: [...FULFILLMENT_OPTIONS],
-      },
+      attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),
     };
   });

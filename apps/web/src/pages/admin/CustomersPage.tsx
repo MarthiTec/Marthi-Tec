@@ -22,6 +22,12 @@ const EMPTY = {
   document: '',
   email: '',
   city: '',
+  zipCode: '',
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  state: '',
   active: true,
 };
 
@@ -62,6 +68,12 @@ export function CustomersPage() {
       document: customer.document,
       email: customer.email,
       city: customer.city,
+      zipCode: customer.zipCode || '',
+      street: customer.street || '',
+      number: customer.number || '',
+      complement: customer.complement || '',
+      neighborhood: customer.neighborhood || '',
+      state: customer.state || '',
       active: customer.active !== false,
     });
   }

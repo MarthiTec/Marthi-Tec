@@ -100,6 +100,10 @@ export type WorkOrder = {
   purchaseStockId?: string;
   purchaseFinanceId?: string;
   revenueFinanceId?: string;
+  /** Início efetivo do serviço na bancada. */
+  progressStartedAt?: string;
+  /** Horário de saída / entrega ao cliente. */
+  deliveredAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -285,6 +289,8 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
     purchaseStockId: raw.purchaseStockId,
     purchaseFinanceId: raw.purchaseFinanceId,
     revenueFinanceId: raw.revenueFinanceId,
+    progressStartedAt: raw.progressStartedAt,
+    deliveredAt: raw.deliveredAt,
     createdAt: raw.createdAt ?? now(),
     updatedAt: raw.updatedAt ?? raw.createdAt ?? now(),
   };
@@ -473,8 +479,19 @@ export function createWorkOrder(
 export function updateWorkOrder(id: string, patch: Partial<Omit<WorkOrder, 'id' | 'createdAt'>>) {
   const next = load().map((item) => {
     if (item.id !== id) return item;
+    const stamp = now();
     const merged = normalizeWorkOrder({ ...item, ...patch, id: item.id, createdAt: item.createdAt });
-    return { ...merged, updatedAt: now() };
+    if (patch.status === 'progress' && item.status !== 'progress' && !merged.progressStartedAt) {
+      merged.progressStartedAt = stamp;
+    }
+    if (patch.status !== undefined) {
+      if (patch.status === 'delivered') {
+        merged.deliveredAt = item.deliveredAt || stamp;
+      } else {
+        merged.deliveredAt = undefined;
+      }
+    }
+    return { ...merged, updatedAt: stamp };
   });
   save(next);
   return next.find((item) => item.id === id) ?? null;
@@ -904,3 +921,53 @@ export function setWorkOrderReadyDate(osId: string, date: string): QuoteActionRe
   if (!order) return { ok: false, error: 'Falha ao salvar previsão.' };
   return { ok: true, order };
 }
+
+export function searchWorkOrders(query: string, limit = 12): WorkOrder[] {
+  const needle = query.trim().toLowerCase();
+  const items = listWorkOrders();
+  if (!needle) return items.slice(0, limit);
+  return items
+    .filter((order) =>
+      `${order.id} ${order.customerName} ${order.customerPhone} ${order.customerDocument} ${order.itemName} ${order.itemRef} ${order.technician}`
+        .toLowerCase()
+        .includes(needle),
+    )
+    .slice(0, limit);
+}
+
+export function workOrderPartsLines(order: Pick<WorkOrder, 'lines'>) {
+  return (order.lines ?? []).filter((line) => line.kind === 'part');
+}
+
+export function workOrderLaborLines(order: Pick<WorkOrder, 'lines'>) {
+  return (order.lines ?? []).filter((line) => line.kind === 'labor');
+}
+
+/** Tempo na oficina: entrada → saída (ou agora se ainda aberta). */
+export function workOrderShopDurationMs(
+  order: Pick<WorkOrder, 'createdAt' | 'deliveredAt' | 'status' | 'updatedAt'>,
+) {
+  const start = new Date(order.createdAt).getTime();
+  if (Number.isNaN(start)) return 0;
+  const exit = workOrderExitAt(order);
+  const end = exit ? new Date(exit).getTime() : Date.now();
+  if (Number.isNaN(end) || end < start) return 0;
+  return end - start;
+}
+
+export function formatDuration(ms: number) {
+  const totalMinutes = Math.max(0, Math.round(ms / 60000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes}min`;
+}
+
+export function workOrderExitAt(order: Pick<WorkOrder, 'deliveredAt' | 'status' | 'updatedAt'>) {
+  if (order.deliveredAt) return order.deliveredAt;
+  if (order.status === 'delivered') return order.updatedAt;
+  return null;
+}
+

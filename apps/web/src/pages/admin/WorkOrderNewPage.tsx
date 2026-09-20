@@ -55,7 +55,7 @@ export function WorkOrderNewPage() {
     event.preventDefault();
     if (!form.customerName.trim() || !form.itemName.trim() || !form.defect.trim()) return;
     const created = createWorkOrder(form);
-    navigate(`/painel/os/${created.id}/relatorio`, { replace: true });
+    navigate(`/os/${created.id}/relatorio`, { replace: true });
   }
 
   return (
@@ -251,7 +251,7 @@ export function WorkOrderNewPage() {
             <button type="submit" className="btn btn--primary">
               Abrir OS e gerar relatório
             </button>
-            <Link to="/painel/os" className="btn btn--ghost">
+            <Link to="/os" className="btn btn--ghost">
               Voltar ao quadro
             </Link>
           </div>

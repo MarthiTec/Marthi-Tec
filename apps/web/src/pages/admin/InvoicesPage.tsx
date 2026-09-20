@@ -146,6 +146,7 @@ export function InvoicesPage() {
     <section className="admin-page">
       <div className="admin-toolbar">
         <AdminPicker
+          compact
           label="Filtro"
           value={kindFilter}
           options={[

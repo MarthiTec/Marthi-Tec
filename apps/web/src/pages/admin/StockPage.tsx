@@ -20,6 +20,12 @@ import {
   type StockKind,
 } from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, stockAttributes } from '../../data/attributeStore';
+import { listSuppliers } from '../../data/erpRegistry';
+import {
+  getFiscalClassification,
+  listFiscalClassifications,
+  listWarehouses,
+} from '../../data/fiscalCatalog';
 
 type Mode = 'new' | 'edit' | 'view';
 
@@ -33,6 +39,9 @@ export function StockPage() {
   const [kindFilter, setKindFilter] = useState<'all' | StockKind>('all');
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
+  const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
+  const warehouses = useMemo(() => listWarehouses(true), []);
+  const suppliers = useMemo(() => listSuppliers(true), []);
 
   useEffect(() => {
     function refresh() {
@@ -111,6 +120,11 @@ export function StockPage() {
       sourceWorkOrderId: item.sourceWorkOrderId,
       showOnTotem: item.showOnTotem,
       images: [...(item.images ?? [])],
+      supplierId: item.supplierId ?? '',
+      fiscalClassificationId: item.fiscalClassificationId ?? '',
+      warehouseId: item.warehouseId ?? '',
+      trackLot: item.trackLot ?? false,
+      isKit: item.isKit ?? false,
     });
   }
 
@@ -123,10 +137,10 @@ export function StockPage() {
   return (
     <section className="admin-page">
       <article className="admin-card">
-        <h2>{crudFormTitle(mode, 'item de estoque')}</h2>
+        <h2>{crudFormTitle(mode, 'produto')}</h2>
         <p>
-          SKU, código de barras e IMEI alimentam o PDV. Peças, aparelhos e insumos compartilham o
-          mesmo cadastro — recondicionados vindos de OS aparecem com origem.
+          Cadastro comercial e fiscal do item. Vincule classificação fiscal, fornecedor, almoxarifado,
+          lote (rastro) e kit. SKU / barras / IMEI alimentam o PDV.
         </p>
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
@@ -243,6 +257,60 @@ export function StockPage() {
               onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
             />
           </label>
+          <AdminPicker
+            label="Fornecedor"
+            value={form.supplierId ?? ''}
+            placeholder="Nenhum"
+            options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={(value) => setForm({ ...form, supplierId: value })}
+          />
+          <AdminPicker
+            label="Classificação fiscal"
+            value={form.fiscalClassificationId ?? ''}
+            placeholder="Vincular…"
+            options={fiscalClasses.map((item) => ({
+              value: item.id,
+              label: `${item.name} · NCM ${item.ncm}`,
+            }))}
+            onChange={(value) => setForm({ ...form, fiscalClassificationId: value })}
+          />
+          <AdminPicker
+            label="Almoxarifado padrão"
+            value={form.warehouseId ?? ''}
+            placeholder="Nenhum"
+            options={warehouses.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={(value) => setForm({ ...form, warehouseId: value })}
+          />
+          <AdminPicker
+            label="Controla lote (rastro)"
+            value={form.trackLot ? '1' : '0'}
+            options={[
+              { value: '1', label: 'Sim — Grupo Rastro NF-e' },
+              { value: '0', label: 'Não' },
+            ]}
+            onChange={(value) => setForm({ ...form, trackLot: value === '1' })}
+          />
+          <AdminPicker
+            label="É kit"
+            value={form.isKit ? '1' : '0'}
+            options={[
+              { value: '1', label: 'Sim — composição em Kits' },
+              { value: '0', label: 'Não' },
+            ]}
+            onChange={(value) => setForm({ ...form, isKit: value === '1' })}
+          />
+          {form.fiscalClassificationId ? (
+            <p className="empty span-2">
+              Fiscal:{' '}
+              {(() => {
+                const fis = getFiscalClassification(form.fiscalClassificationId);
+                if (!fis) return '—';
+                return `NCM ${fis.ncm} · CST ${fis.cstIcms} · ICMS ${fis.icmsRate}% · IBS ${fis.ibsRate}% · CBS ${fis.cbsRate}%`;
+              })()}{' '}
+              ·{' '}
+              <Link to="/painel/classificacao-fiscal">editar tabelas</Link>
+            </p>
+          ) : null}
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
           {readOnly ? (
@@ -279,6 +347,7 @@ export function StockPage() {
           extra={
             <>
               <AdminPicker
+                compact
                 label="Tipo"
                 value={kindFilter}
                 options={[
@@ -290,6 +359,7 @@ export function StockPage() {
                 onChange={(value) => setKindFilter(value as 'all' | StockKind)}
               />
               <AdminPicker
+                compact
                 label="Condição"
                 value={conditionFilter}
                 options={[
@@ -301,6 +371,7 @@ export function StockPage() {
                 onChange={(value) => setConditionFilter(value as 'all' | StockCondition)}
               />
               <AdminPicker
+                compact
                 label="Totem"
                 value={totemFilter}
                 options={[
@@ -358,7 +429,7 @@ export function StockPage() {
                         {item.sourceWorkOrderId ? (
                           <>
                             {' · '}
-                            <Link to={`/painel/os/${item.sourceWorkOrderId}`}>
+                            <Link to={`/os/${item.sourceWorkOrderId}`}>
                               {item.sourceWorkOrderId}
                             </Link>
                           </>
@@ -421,5 +492,10 @@ function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
     condition: 'new',
     showOnTotem: true,
     images: [],
+    supplierId: '',
+    fiscalClassificationId: '',
+    warehouseId: '',
+    trackLot: false,
+    isKit: false,
   };
 }

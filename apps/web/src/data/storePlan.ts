@@ -1,7 +1,8 @@
 import {
   getPlanById,
   getPlanModuleLimit,
-  isPlanId,
+  normalizeModuleId,
+  normalizePlanId,
   PARTNER_MODULES,
   planIncludesAllModules,
   type PartnerModuleId,
@@ -28,7 +29,7 @@ export function clampModulesForPlan(planId: PlanId, modules: PartnerModuleId[]) 
 }
 
 export function defaultEntitlement(): StoreEntitlement {
-  return { planId: 'scale', modules: allModules() };
+  return { planId: 'golden', modules: allModules() };
 }
 
 function read(): StoreEntitlement {
@@ -36,12 +37,11 @@ function read(): StoreEntitlement {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultEntitlement();
     const parsed = JSON.parse(raw) as Partial<StoreEntitlement>;
-    const planId: PlanId =
-      parsed.planId && isPlanId(parsed.planId) ? parsed.planId : 'scale';
+    const planId = normalizePlanId(parsed.planId ?? null) ?? 'golden';
     const modules = Array.isArray(parsed.modules)
-      ? parsed.modules.filter((item): item is PartnerModuleId =>
-          ALL_MODULES.includes(item as PartnerModuleId),
-        )
+      ? parsed.modules
+          .map((item) => normalizeModuleId(String(item)))
+          .filter((item): item is PartnerModuleId => Boolean(item))
       : [];
     return { planId, modules: clampModulesForPlan(planId, modules) };
   } catch {
@@ -54,11 +54,17 @@ export function getStoreEntitlement() {
 }
 
 export function saveStoreEntitlement(input: StoreEntitlement) {
+  const planId = normalizePlanId(input.planId) ?? 'bronze';
   const next = {
-    planId: input.planId,
-    modules: clampModulesForPlan(input.planId, input.modules),
+    planId,
+    modules: clampModulesForPlan(planId, input.modules),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  try {
+    localStorage.setItem('marthi.store.contracted', '1');
+  } catch {
+    /* ignore */
+  }
   window.dispatchEvent(new Event('marthi-plan-updated'));
   return next;
 }
@@ -71,20 +77,33 @@ export function hasModule(id: PartnerModuleId) {
 
 export function moduleForPath(pathname: string): PartnerModuleId | null {
   if (pathname.startsWith('/totem') || pathname.startsWith('/painel/totem')) return 'totem';
-  if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'presales';
-  if (pathname.startsWith('/painel/os')) return 'os';
+  if (pathname.startsWith('/caixa')) return 'erp';
+  if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (
+    pathname.startsWith('/painel/notas') ||
+    pathname.startsWith('/painel/classificacao-fiscal') ||
+    pathname.startsWith('/painel/cfop')
+  ) {
+    return 'fiscal';
+  }
+  if (
+    pathname.startsWith('/painel/pdv') ||
+    pathname.startsWith('/painel/pedidos') ||
+    pathname.startsWith('/painel/pagamentos') ||
     pathname.startsWith('/painel/clientes') ||
+    pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
     pathname.startsWith('/painel/atributos') ||
+    pathname.startsWith('/painel/kits') ||
+    pathname.startsWith('/painel/lotes') ||
+    pathname.startsWith('/painel/almoxarifado') ||
     pathname.startsWith('/painel/tabelas') ||
-    pathname.startsWith('/painel/pagamentos') ||
     pathname.startsWith('/painel/financeiro') ||
     pathname.startsWith('/painel/vendedores') ||
     pathname.startsWith('/painel/fornecedores') ||
     pathname.startsWith('/painel/funcionarios') ||
-    pathname.startsWith('/painel/auditoria') ||
-    pathname.startsWith('/painel/notas')
+    pathname.startsWith('/painel/permissoes') ||
+    pathname.startsWith('/painel/auditoria')
   ) {
     return 'erp';
   }

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { logAccess } from '../data/auditLog';
+import { markStoreContracted } from '../data/demoLeadStore';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
@@ -40,6 +41,7 @@ function applySession(
   localStorage.setItem(STORAGE_KEY, session.token);
   setToken(session.token);
   setUser(session.user);
+  markStoreContracted();
   logAccess({
     actorName: session.user.name,
     actorEmail: session.user.email,

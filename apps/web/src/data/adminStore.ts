@@ -9,6 +9,12 @@ export type Customer = {
   document: string;
   email: string;
   city: string;
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  state: string;
   active: boolean;
   createdAt: string;
 };
@@ -36,6 +42,16 @@ export type StockItem = {
   showOnTotem: boolean;
   /** URLs de imagem compartilhadas (totem, PDV, OS). */
   images: string[];
+  /** Fornecedor habitual deste produto. */
+  supplierId?: string;
+  /** Classificação fiscal vinculada (NCM, CST, IBS/CBS…). */
+  fiscalClassificationId?: string;
+  /** Almoxarifado padrão. */
+  warehouseId?: string;
+  /** Controla lote / Grupo Rastro NF-e. */
+  trackLot?: boolean;
+  /** Produto é kit (composições em /kits). */
+  isKit?: boolean;
 };
 
 export type PriceTable = {
@@ -58,6 +74,7 @@ export type SalesOrder = {
   id: string;
   ticketId: string | null;
   customerName: string;
+  customerDocument?: string;
   productName: string;
   amount: number;
   status: 'open' | 'sold' | 'cancelled';
@@ -382,6 +399,12 @@ function seed(): AdminState {
         document: '123.456.789-00',
         email: 'ana@email.com',
         city: 'Três Rios',
+        zipCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        state: 'RJ',
         active: true,
         createdAt: new Date().toISOString(),
       },
@@ -392,6 +415,12 @@ function seed(): AdminState {
         document: '987.654.321-00',
         email: 'carlos@email.com',
         city: 'Três Rios',
+        zipCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        state: 'RJ',
         active: true,
         createdAt: new Date().toISOString(),
       },
@@ -433,6 +462,11 @@ function normalizeStock(item: StockItem): StockItem {
     sourceWorkOrderId: item.sourceWorkOrderId,
     showOnTotem: item.showOnTotem ?? looksLikeDevice,
     images: images.length ? images : defaultImagesForName(item.name),
+    supplierId: item.supplierId ?? '',
+    fiscalClassificationId: item.fiscalClassificationId ?? '',
+    warehouseId: item.warehouseId ?? '',
+    trackLot: item.trackLot ?? false,
+    isKit: item.isKit ?? false,
   };
 }
 
@@ -475,6 +509,12 @@ function normalizeCustomer(item: Partial<Customer> & Pick<Customer, 'id' | 'name
     document: item.document ?? '',
     email: item.email ?? '',
     city: item.city ?? '',
+    zipCode: item.zipCode ?? '',
+    street: item.street ?? '',
+    number: item.number ?? '',
+    complement: item.complement ?? '',
+    neighborhood: item.neighborhood ?? '',
+    state: item.state ?? '',
     active: item.active !== false,
     createdAt: item.createdAt ?? new Date().toISOString(),
   };
@@ -559,24 +599,83 @@ export function findStockByCode(code: string) {
   return named.length === 1 ? named[0] : null;
 }
 
+export function adjustStockQty(stockId: string, delta: number) {
+  const state = load();
+  const item = state.stock.find((entry) => entry.id === stockId);
+  if (!item) return { ok: false as const, error: 'Produto não encontrado no estoque.' };
+  item.qty = Math.max(0, item.qty + delta);
+  save(state);
+  window.dispatchEvent(new Event(STOCK_EVENT));
+  return { ok: true as const, item };
+}
+
+export function searchOrders(query: string, limit = 12) {
+  const needle = query.trim().toLowerCase();
+  const orders = load().orders.filter((item) => item.status === 'sold' || item.status === 'cancelled');
+  if (!needle) return orders.slice(0, limit);
+  return orders
+    .filter((item) => {
+      const blob = `${item.id} ${item.customerName} ${item.customerDocument ?? ''} ${item.productName} ${item.payment} ${item.status}`.toLowerCase();
+      return blob.includes(needle);
+    })
+    .slice(0, limit);
+}
+
+export function getOrderById(id: string) {
+  return load().orders.find((item) => item.id === id) ?? null;
+}
+
+export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrder } | { ok: false; error: string } {
+  const state = load();
+  const order = state.orders.find((item) => item.id === orderId);
+  if (!order) return { ok: false, error: 'Venda não encontrada.' };
+  if (order.status === 'cancelled') return { ok: false, error: 'Venda já cancelada.' };
+  if (order.status !== 'sold') return { ok: false, error: 'Só é possível cancelar vendas fechadas.' };
+  order.status = 'cancelled';
+  state.finance.unshift({
+    id: uid('FIN'),
+    type: 'out',
+    label: `Cancelamento venda ${order.id}`,
+    amount: order.amount,
+    createdAt: new Date().toISOString(),
+    source: 'pos',
+    refId: order.id,
+  });
+  save(state);
+  return { ok: true, order };
+}
+
 export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?: string }) {
   const state = load();
   const payload = {
     name: input.name.trim(),
-    phone: input.phone.trim(),
-    document: input.document.trim(),
-    email: input.email.trim(),
-    city: input.city.trim(),
+    phone: (input.phone ?? '').trim(),
+    document: (input.document ?? '').trim(),
+    email: (input.email ?? '').trim(),
+    city: (input.city ?? '').trim(),
+    zipCode: (input.zipCode ?? '').trim(),
+    street: (input.street ?? '').trim(),
+    number: (input.number ?? '').trim(),
+    complement: (input.complement ?? '').trim(),
+    neighborhood: (input.neighborhood ?? '').trim(),
+    state: (input.state ?? '').trim().toUpperCase(),
     active: input.active ?? true,
   };
+  const docKey = payload.document.replace(/\D/g, '');
+  const phoneKey = payload.phone.replace(/\D/g, '');
+
   if (input.id) {
     state.customers = state.customers.map((item) =>
       item.id === input.id ? { ...item, ...payload } : item,
     );
   } else {
-    const existing = state.customers.find(
-      (item) => item.phone.replace(/\D/g, '') === payload.phone.replace(/\D/g, ''),
-    );
+    const existing =
+      (docKey.length >= 11
+        ? state.customers.find((item) => item.document.replace(/\D/g, '') === docKey)
+        : undefined) ??
+      (phoneKey.length >= 8
+        ? state.customers.find((item) => item.phone.replace(/\D/g, '') === phoneKey)
+        : undefined);
     if (existing) {
       Object.assign(existing, payload);
     } else {
@@ -672,6 +771,7 @@ export function closePosSale(input: {
   ticketId: string | null;
   customerName: string;
   customerPhone: string;
+  customerDocument?: string;
   paymentName: string;
   priceTableName: string;
   discount: number;
@@ -687,7 +787,8 @@ export function closePosSale(input: {
   const order: SalesOrder = {
     id: uid('PED'),
     ticketId: input.ticketId,
-    customerName: input.customerName || 'Consumidor',
+    customerName: input.customerName || 'Consumidor Final',
+    customerDocument: (input.customerDocument ?? '').replace(/\D/g, ''),
     productName: summary,
     amount,
     status: 'sold',
@@ -731,6 +832,12 @@ export function closePosSale(input: {
         document: '',
         email: '',
         city: '',
+        zipCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        state: '',
         active: true,
         createdAt: order.createdAt,
       });

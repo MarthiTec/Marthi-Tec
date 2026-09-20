@@ -102,10 +102,10 @@ export function TotemSettingsPage() {
       </article>
 
       <article className="admin-card admin-card--form">
-        <h2>Senha para sair do totem</h2>
+        <h2>Senha para sair do totem e do PDV</h2>
         <p>
-          Protege a saída da tela /totem. Só quem souber a senha consegue fechar o quiosque e voltar
-          para a home.
+          Protege a saída das telas /totem e /caixa. Só quem souber a senha consegue fechar o
+          quiosque ou o caixa e voltar para a home.
         </p>
         <div className="admin-form">
           <label>
@@ -155,11 +155,14 @@ export function TotemSettingsPage() {
           entre totem, PDV e OS.
         </p>
         <div className="admin-toolbar admin-toolbar--stack">
+          <Link to="/painel/totem" className="btn btn--ghost">
+            Dados do totem
+          </Link>
           <Link to="/painel/atributos" className="btn btn--ghost">
             Cadastrar atributos
           </Link>
-          <Link to="/painel/estoque" className="btn btn--ghost">
-            Estoque e imagens
+          <Link to="/painel/produtos" className="btn btn--ghost">
+            Produtos e imagens
           </Link>
         </div>
       </article>

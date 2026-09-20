@@ -394,15 +394,19 @@ body.totem-html-scroll #root {
   gap: 10px;
 }
 
-.totem-card__fields[data-count='4'],
-.totem-card__fields[data-count='5'] {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+.totem-card__fields[data-count='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.totem-card__fields[data-count='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .totem-picker {
   position: relative;
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .totem-picker__caption {
@@ -946,9 +950,9 @@ body.totem-html-scroll #root {
 
 @media (max-width: 980px) {
   .totem-card__fields,
-  .totem-card__fields[data-count='4'],
-  .totem-card__fields[data-count='5'] {
-    grid-template-columns: 1fr 1fr;
+  .totem-card__fields[data-count='1'],
+  .totem-card__fields[data-count='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .totem__querybar {

@@ -17,14 +17,16 @@ export type AccessArea =
   | 'erp_suppliers'
   | 'erp_employees'
   | 'erp_audit'
-  | 'erp_invoices';
+  | 'erp_invoices'
+  | 'erp_fiscal'
+  | 'erp_plan';
 
 export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
   totem: 'Totem',
   pdv: 'PDV / pedidos',
   os: 'Ordens de serviço',
   erp_customers: 'Clientes',
-  erp_stock: 'Estoque',
+  erp_stock: 'Produtos',
   erp_attrs: 'Atributos',
   erp_prices: 'Tabelas de preço',
   erp_payments: 'Formas de pagamento',
@@ -34,6 +36,8 @@ export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
   erp_employees: 'Funcionários',
   erp_audit: 'Auditoria',
   erp_invoices: 'Notas entrada/saída',
+  erp_fiscal: 'Fiscal (NCM/CFOP)',
+  erp_plan: 'Plano da loja (admin)',
 };
 
 export const ALL_ACCESS_AREAS = Object.keys(ACCESS_AREA_LABEL) as AccessArea[];
@@ -397,18 +401,35 @@ export function employeeHasArea(employee: Employee | null, area: AccessArea) {
 export function pathToAccessArea(pathname: string): AccessArea | null {
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'pdv';
-  if (pathname.startsWith('/painel/os')) return 'os';
+  if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (pathname.startsWith('/painel/clientes')) return 'erp_customers';
-  if (pathname.startsWith('/painel/estoque')) return 'erp_stock';
+  if (
+    pathname.startsWith('/painel/produtos') ||
+    pathname.startsWith('/painel/estoque') ||
+    pathname.startsWith('/painel/kits') ||
+    pathname.startsWith('/painel/lotes') ||
+    pathname.startsWith('/painel/almoxarifado')
+  ) {
+    return 'erp_stock';
+  }
   if (pathname.startsWith('/painel/atributos')) return 'erp_attrs';
   if (pathname.startsWith('/painel/tabelas')) return 'erp_prices';
   if (pathname.startsWith('/painel/pagamentos')) return 'erp_payments';
   if (pathname.startsWith('/painel/financeiro')) return 'erp_finance';
   if (pathname.startsWith('/painel/vendedores')) return 'erp_sellers';
   if (pathname.startsWith('/painel/fornecedores')) return 'erp_suppliers';
-  if (pathname.startsWith('/painel/funcionarios')) return 'erp_employees';
+  if (pathname.startsWith('/painel/funcionarios') || pathname.startsWith('/painel/permissoes')) {
+    return 'erp_employees';
+  }
   if (pathname.startsWith('/painel/auditoria')) return 'erp_audit';
   if (pathname.startsWith('/painel/notas')) return 'erp_invoices';
+  if (
+    pathname.startsWith('/painel/classificacao-fiscal') ||
+    pathname.startsWith('/painel/cfop')
+  ) {
+    return 'erp_fiscal';
+  }
+  if (pathname.startsWith('/painel/plano')) return 'erp_plan';
   return null;
 }
 
@@ -439,10 +460,11 @@ export function canAccessPath(pathname: string, userEmail: string | null | undef
 
 export function moduleAreas(module: PartnerModuleId): AccessArea[] {
   if (module === 'totem') return ['totem'];
-  if (module === 'presales') return ['pdv'];
   if (module === 'os') return ['os'];
+  if (module === 'fiscal') return ['erp_invoices', 'erp_fiscal'];
   if (module === 'erp') {
     return [
+      'pdv',
       'erp_customers',
       'erp_stock',
       'erp_attrs',
@@ -453,10 +475,17 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
       'erp_suppliers',
       'erp_employees',
       'erp_audit',
-      'erp_invoices',
+      'erp_plan',
     ];
   }
   return [];
+}
+
+/** Administrador da loja (role admin) — ou bootstrap sem usuários vinculados. */
+export function userIsStoreAdmin(userEmail: string | null | undefined) {
+  const employee = findEmployeeByUserEmail(userEmail);
+  if (employee) return employee.active && employee.role === 'admin';
+  return linkedSystemUsers().length === 0;
 }
 
 export function navPathToAccessArea(path: string): AccessArea | null {

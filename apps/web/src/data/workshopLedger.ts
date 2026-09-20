@@ -165,6 +165,11 @@ export function purchaseAssetFromWorkOrder(
     sourceWorkOrderId: osId,
     showOnTotem: false,
     images: [],
+    supplierId: '',
+    fiscalClassificationId: '',
+    warehouseId: '',
+    trackLot: false,
+    isKit: false,
   };
 
   const state = getAdminState();

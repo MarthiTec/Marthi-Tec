@@ -1,4 +1,5 @@
 import { AdminPicker } from './AdminPicker';
+import { AdminIcon } from './AdminIcons';
 import type { ReactNode } from 'react';
 
 export type CrudStatusFilter = 'all' | 'active' | 'inactive';
@@ -28,27 +29,35 @@ export function CrudListBar({
 }: CrudListBarProps) {
   return (
     <div className="admin-toolbar crud-bar">
-      <input
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
-        placeholder={placeholder}
-        aria-label="Buscar"
-      />
-      {status !== undefined && onStatusChange ? (
-        <AdminPicker
-          label={statusLabel}
-          value={status}
-          options={[
-            { value: 'all', label: 'Todos' },
-            { value: 'active', label: 'Ativos' },
-            { value: 'inactive', label: 'Inativos' },
-          ]}
-          onChange={(value) => onStatusChange(value as CrudStatusFilter)}
+      <label className="crud-search">
+        <AdminIcon name="search" />
+        <input
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={placeholder}
+          aria-label="Buscar"
         />
+      </label>
+      {status !== undefined && onStatusChange ? (
+        <div className="crud-filter">
+          <AdminIcon name="filter" />
+          <AdminPicker
+            compact
+            label={statusLabel}
+            value={status}
+            options={[
+              { value: 'all', label: 'Todos' },
+              { value: 'active', label: 'Ativos' },
+              { value: 'inactive', label: 'Inativos' },
+            ]}
+            onChange={(value) => onStatusChange(value as CrudStatusFilter)}
+          />
+        </div>
       ) : null}
       {extra}
       {onNew ? (
         <button type="button" className="btn btn--primary" onClick={onNew}>
+          <AdminIcon name="plus" />
           {newLabel}
         </button>
       ) : null}

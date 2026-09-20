@@ -1,0 +1,304 @@
+.caixa-app {
+  --ink: #12151a;
+  --mute: #6b7280;
+  --line: #d8dde3;
+  --red: #d70015;
+  --teal: #0f766e;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr);
+  background:
+    radial-gradient(900px 420px at 100% 0%, rgba(15, 118, 110, 0.06), transparent 55%),
+    #eef1f4;
+  color: var(--ink);
+}
+
+.caixa-app__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: #12181f;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.caixa-app__ops-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.caixa-app__ops-btn:hover,
+.caixa-app.is-ops-open .caixa-app__ops-btn {
+  background: rgba(15, 118, 110, 0.35);
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.caixa-app__ops-btn .admin-ico {
+  width: 18px;
+  height: 18px;
+}
+
+.caixa-app__ops-btn kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.caixa-app__ops-backdrop {
+  position: fixed;
+  inset: 52px 0 0;
+  z-index: 60;
+  border: 0;
+  background: rgba(18, 21, 26, 0.35);
+  cursor: pointer;
+}
+
+.caixa-app__ops-drawer {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  bottom: 0;
+  z-index: 70;
+  width: min(280px, 88vw);
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(520px 280px at -10% -10%, rgba(15, 118, 110, 0.28), transparent 60%),
+    linear-gradient(180deg, #161e27 0%, #12181f 50%, #0e141a 100%);
+  color: #fff;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.25);
+  transform: translateX(-105%);
+  transition: transform 180ms ease;
+  overflow: hidden;
+}
+
+.caixa-app__ops-drawer.is-open {
+  transform: translateX(0);
+}
+
+.caixa-app__ops-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.caixa-app__ops-head strong {
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.caixa-app__ops-close {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.caixa-app__ops-close:hover {
+  color: #fff;
+}
+
+.caixa-app__ops-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  overflow: auto;
+  flex: 1;
+}
+
+.caixa-app__ops-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.caixa-app__ops-nav button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.caixa-app__ops-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.caixa-app__ops-nav button.is-danger:hover:not(:disabled) {
+  background: rgba(215, 0, 21, 0.18);
+  color: #ffb4b4;
+}
+
+.caixa-app__ops-nav kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 22px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+
+.caixa-app__mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.caixa-app__brand {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.caixa-app__brand strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.caixa-app__brand span {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.caixa-app__exit {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.caixa-app__exit:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.caixa-app .admin-page.pdv--caixa {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  padding: 10px 14px 12px;
+  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.caixa-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(18, 21, 26, 0.5);
+}
+
+.caixa-lock__card {
+  width: min(400px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+}
+
+.caixa-lock__card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.caixa-lock__card p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.caixa-lock__card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--mute);
+}
+
+.caixa-lock__card input {
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+}
+
+.caixa-lock__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 1100px) {
+  .caixa-app {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+  }
+
+  .caixa-app .admin-page.pdv--caixa {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}

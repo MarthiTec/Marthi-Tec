@@ -39,8 +39,8 @@ export function PosPage() {
           SKU, código de barras ou IMEI em Lançar venda.
         </p>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <Link to="/painel/pdv/venda" className="btn btn--primary">
-            Lançar venda no PDV
+          <Link to="/caixa" className="btn btn--primary">
+            Abrir caixa (PDV)
           </Link>
         </div>
       </article>

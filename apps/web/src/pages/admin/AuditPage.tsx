@@ -62,6 +62,7 @@ export function AuditPage() {
             placeholder="Buscar ator, ação, detalhe…"
           />
           <AdminPicker
+            compact
             label="Tipo"
             value={kind}
             options={[

@@ -5,13 +5,15 @@ import {
   ATTRIBUTES_EVENT,
   formatPicked,
   productAttrValues,
+  resolveTotemAttrOptions,
   toLegacyFields,
-  totemAttributes,
+  totemCardAttributes,
   totemFilterAttributes,
   type PickedAttribute,
   type ProductAttribute,
 } from '../../data/attributeStore';
 import { getTotemExitPassword, getTotemSettings, TOTEM_SETTINGS_EVENT, type TotemMode } from '../../data/totemSettings';
+import { trackTotemProductClick } from '../../data/totemAnalyticsStore';
 import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../data/variantQuote';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
@@ -50,7 +52,7 @@ function uniqueSorted(values: string[]) {
 function defaultConfig(product: TotemProduct, attrs: ProductAttribute[]): CardConfig {
   const next: CardConfig = {};
   for (const attr of attrs) {
-    const values = productAttrValues(product, attr);
+    const values = resolveTotemAttrOptions(product, attr);
     if (values[0]) next[attr.id] = values[0];
   }
   return next;
@@ -63,7 +65,7 @@ function pickedFromConfig(
 ): PickedAttribute[] {
   return attrs
     .map((attr) => {
-      const values = productAttrValues(product, attr);
+      const values = resolveTotemAttrOptions(product, attr);
       if (!values.length) return null;
       return {
         id: attr.id,
@@ -91,7 +93,7 @@ export function TotemPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idleTick, setIdleTick] = useState(0);
-  const [attrs, setAttrs] = useState(() => totemAttributes());
+  const [cardAttrs, setCardAttrs] = useState(() => totemCardAttributes());
   const [filterAttrs, setFilterAttrs] = useState(() => totemFilterAttributes());
 
   const [exitOpen, setExitOpen] = useState(false);
@@ -233,7 +235,7 @@ export function TotemPage() {
       }
     }
     function refreshAttrs() {
-      setAttrs(totemAttributes());
+      setCardAttrs(totemCardAttributes());
       setFilterAttrs(totemFilterAttributes());
       setCatalog(listTotemCatalog());
     }
@@ -251,10 +253,10 @@ export function TotemPage() {
   }, []);
 
   function getConfig(product: TotemProduct): CardConfig {
-    const base = { ...defaultConfig(product, attrs), ...(configs[product.id] ?? {}) };
+    const base = { ...defaultConfig(product, cardAttrs), ...(configs[product.id] ?? {}) };
     for (const attr of filterAttrs) {
       const selected = filters[attr.id];
-      const values = productAttrValues(product, attr);
+      const values = resolveTotemAttrOptions(product, attr);
       if (selected && selected !== 'all' && values.includes(selected)) {
         base[attr.id] = selected;
       }
@@ -265,15 +267,16 @@ export function TotemPage() {
   function patchConfig(productId: number, attrId: string, value: string) {
     setConfigs((current) => {
       const product = catalog.find((item) => item.id === productId);
-      const base = current[productId] ?? (product ? defaultConfig(product, attrs) : {});
+      const base = current[productId] ?? (product ? defaultConfig(product, cardAttrs) : {});
       return { ...current, [productId]: { ...base, [attrId]: value } };
     });
   }
 
   function openCheckout(product: TotemProduct) {
+    trackTotemProductClick({ productId: product.id, productName: product.name });
     if (catalogOnly) return;
     const config = getConfig(product);
-    const picked = pickedFromConfig(product, config, attrs);
+    const picked = pickedFromConfig(product, config, cardAttrs);
     const quote = quoteFromPicked(product.name, product.cashPrice, picked);
     setSelection({
       product,
@@ -499,8 +502,8 @@ export function TotemPage() {
             <div className="totem__scroll" ref={listRef}>
               {products.map((product) => {
                 const config = getConfig(product);
-                const pickers = attrs
-                  .filter((attr) => productAttrValues(product, attr).length > 0)
+                const pickers = cardAttrs
+                  .filter((attr) => resolveTotemAttrOptions(product, attr).length > 0)
                   .slice(0, 5);
                 const quote = quoteTotemVariant(product.name, product.cashPrice, config);
                 return (
@@ -509,7 +512,17 @@ export function TotemPage() {
                     className="totem-card"
                     onPointerDown={bumpIdle}
                   >
-                    <div className="totem-card__media">
+                    <div
+                      className="totem-card__media"
+                      onClick={() => {
+                        if (catalogOnly) {
+                          trackTotemProductClick({
+                            productId: product.id,
+                            productName: product.name,
+                          });
+                        }
+                      }}
+                    >
                       <ProductCarousel
                         images={product.images}
                         alt={product.name}
@@ -523,7 +536,7 @@ export function TotemPage() {
 
                       <div className="totem-card__fields" data-count={pickers.length}>
                         {pickers.map((attr) => {
-                          const options = productAttrValues(product, attr);
+                          const options = resolveTotemAttrOptions(product, attr);
                           return (
                             <TotemPicker
                               key={attr.id}

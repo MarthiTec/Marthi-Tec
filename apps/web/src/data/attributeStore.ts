@@ -167,6 +167,27 @@ export function productAttrValues(
   return [];
 }
 
+/** Opções do picker no card: valores do produto, senão os valores cadastrados no atributo. */
+export function resolveTotemAttrOptions(
+  product: { attrs?: Record<string, string[]>; colors?: string[]; storages?: string[] },
+  attr: ProductAttribute,
+) {
+  const fromProduct = productAttrValues(product, attr);
+  if (fromProduct.length) return fromProduct;
+  return (attr.values ?? []).filter(Boolean);
+}
+
+/** Atributos que aparecem no card (totem + filtro). */
+export function totemCardAttributes() {
+  const byId = new Map<string, ProductAttribute>();
+  for (const item of load()) {
+    if (!item.active) continue;
+    if (!item.useOnTotem && !item.filterOnTotem) continue;
+    byId.set(item.id, item);
+  }
+  return sortAttrs([...byId.values()]).slice(0, MAX_ATTRIBUTES);
+}
+
 export function toLegacyFields(picked: PickedAttribute[]) {
   const find = (...needles: string[]) =>
     picked.find((item) =>

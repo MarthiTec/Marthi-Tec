@@ -38,7 +38,7 @@ function AgendaCard({
 }) {
   return (
     <article className={`os-agenda__card os-agenda__card--${order.priority}`}>
-      <Link to={`/painel/os/${order.id}`} className="os-agenda__card-link">
+      <Link to={`/os/${order.id}`} className="os-agenda__card-link">
         <strong>{order.id}</strong>
         <span>{order.customerName}</span>
         <span className="os-agenda__card-item">{order.itemName}</span>
@@ -133,6 +133,7 @@ export function AgendaPage() {
           <strong>{formatWeekRange(monday)}</strong>
         </div>
         <AdminPicker
+          compact
           className="os-agenda__tech"
           label="Técnico"
           value={technician}
@@ -143,7 +144,7 @@ export function AgendaPage() {
           ]}
           onChange={setTechnician}
         />
-        <Link to="/painel/os/nova" className="btn btn--primary">
+        <Link to="/os/nova" className="btn btn--primary">
           Nova OS
         </Link>
       </div>

@@ -1,0 +1,1830 @@
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
+import {
+  adjustStockQty,
+  cancelPosSaleOrder,
+  findStockByCode,
+  findStockMatches,
+  getAdminState,
+  getOrderById,
+  searchOrders,
+  upsertCustomer,
+  type Customer,
+  type SalesOrder,
+  type StockItem,
+} from '../../data/adminStore';
+import {
+  addCashAporte,
+  addCashSangria,
+  APORTE_REASONS,
+  cancelStoreCredit,
+  cashBeneficiaryLabel,
+  CASH_KIND_LABEL,
+  closeCashSession,
+  deleteCashMovement,
+  issueStoreCredit,
+  listCashSessions,
+  listStoreCredits,
+  openCashDrawer,
+  openCashSession,
+  redeemStoreCredit,
+  registerExchange,
+  reopenCashSession,
+  SANGRIA_REASONS,
+  updateCashMovement,
+  type CashBeneficiaryType,
+  type CashMovement,
+  type CashSession,
+  type ExchangeLine,
+} from '../../data/cashRegisterStore';
+import { listEmployees } from '../../data/erpRegistry';
+import { lookupCep, maskCep } from '../../services/cep';
+import {
+  cancelFiscalDocumentForSale,
+  emitNfeFromSale,
+  FISCAL_KIND_LABEL,
+  FISCAL_STATUS_LABEL,
+  getLatestFiscalDocumentForRef,
+  reprintFiscalDocument,
+} from '../../data/fiscalDocuments';
+import { hasModule } from '../../data/storePlan';
+
+function money(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function roundMoney(value: number) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function stripQtyPrefix(label: string) {
+  return label.replace(/^\d+\s*x\s*/i, '').trim();
+}
+
+function namesMatch(a: string, b: string) {
+  const left = stripQtyPrefix(a).toLowerCase();
+  const right = stripQtyPrefix(b).toLowerCase();
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function returnLinesFromOrder(order: SalesOrder): ExchangeLine[] {
+  const bare = stripQtyPrefix(order.productName.split(',')[0] ?? order.productName);
+  const match =
+    findStockMatches(bare, 8).find((item) => namesMatch(item.name, bare)) ??
+    findStockMatches(bare, 1)[0];
+  if (match) {
+    return [
+      {
+        stockId: match.id,
+        name: match.name,
+        sku: match.sku,
+        qty: 1,
+        unitPrice: roundMoney(order.amount),
+      },
+    ];
+  }
+  return [
+    {
+      stockId: `sale:${order.id}`,
+      name: bare || order.productName,
+      sku: '',
+      qty: 1,
+      unitPrice: roundMoney(order.amount),
+    },
+  ];
+}
+
+function formatDateTimeLocal(iso?: string) {
+  const date = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDisplay(iso: string) {
+  return new Date(iso).toLocaleString('pt-BR');
+}
+
+export type CaixaPanel =
+  | 'sales'
+  | 'open'
+  | 'aporte'
+  | 'sangria'
+  | 'movements'
+  | 'exchange'
+  | 'vale'
+  | 'close'
+  | 'sessions'
+  | 'price'
+  | 'customer'
+  | null;
+
+type PanelProps = {
+  panel: Exclude<CaixaPanel, null>;
+  operatorName: string;
+  cashSession: CashSession | null;
+  onClose: () => void;
+  onDone: (message: string) => void;
+  onError: (message: string) => void;
+  onRefresh: () => void;
+  onCustomerCreated?: (customer: Customer) => void;
+};
+
+export function CaixaPanelHost(props: PanelProps) {
+  const { panel, onClose } = props;
+  return (
+    <div className="pdv__modal" role="dialog" aria-modal="true">
+      <button type="button" className="pdv__modal-backdrop" aria-label="Fechar" onClick={onClose} />
+      <div className="admin-card pdv__modal-card pdv__modal-card--wide">
+        {panel === 'sales' ? <SalesPanel {...props} /> : null}
+        {panel === 'open' ? <OpenPanel {...props} /> : null}
+        {panel === 'aporte' || panel === 'sangria' ? <SupplyPanel {...props} kind={panel} /> : null}
+        {panel === 'movements' ? <MovementsPanel {...props} /> : null}
+        {panel === 'exchange' ? <ExchangePanel {...props} /> : null}
+        {panel === 'vale' ? <ValePanel {...props} /> : null}
+        {panel === 'close' ? <ClosePanel {...props} /> : null}
+        {panel === 'sessions' ? <SessionsPanel {...props} /> : null}
+        {panel === 'price' ? <PricePanel {...props} /> : null}
+        {panel === 'customer' ? <CustomerQuickPanel {...props} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function SalesPanel({ onClose, onDone, onError }: PanelProps) {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<SalesOrder | null>(null);
+  const [tick, setTick] = useState(0);
+  const fiscalOn = hasModule('fiscal');
+  const hits = useMemo(() => searchOrders(query, 40), [query, tick]);
+  const fiscal = selected
+    ? getLatestFiscalDocumentForRef('sale', selected.id)
+    : null;
+  const canEmitNfce =
+    Boolean(selected) &&
+    selected?.status === 'sold' &&
+    fiscalOn &&
+    (!fiscal || fiscal.kind === 'receipt' || fiscal.status === 'cancelled' || fiscal.status === 'error');
+
+  function refresh() {
+    setTick((value) => value + 1);
+    if (selected) {
+      const next = getOrderById(selected.id);
+      setSelected(next);
+    }
+  }
+
+  function reprint() {
+    if (!selected) return;
+    const result = reprintFiscalDocument(selected.id);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    onDone(`Reimpressão · ${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number}`);
+    window.alert(result.text);
+  }
+
+  function emitNfce() {
+    if (!selected) return;
+    const result = emitNfeFromSale({
+      orderId: selected.id,
+      customerName: selected.customerName,
+      amount: selected.amount,
+      asNfce: true,
+      customerDocument: selected.customerDocument,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(
+      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} · ${FISCAL_STATUS_LABEL[result.document.status]}`,
+    );
+  }
+
+  function cancelSale() {
+    if (!selected) return;
+    if (!window.confirm(`Cancelar a venda ${selected.id}?`)) return;
+    const fiscalCancel = cancelFiscalDocumentForSale(selected.id);
+    const result = cancelPosSaleOrder(selected.id);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(
+      `Venda ${result.order.id} cancelada${fiscalCancel.ok ? ` · ${FISCAL_KIND_LABEL[fiscalCancel.document.kind]} cancelada` : ''}`,
+    );
+  }
+
+  return (
+    <div className="caixa-panel caixa-panel--sales">
+      <div className="caixa-panel__head">
+        <h2>Consultar vendas</h2>
+        <p className="empty">Busque por pedido, cliente, produto ou pagamento.</p>
+      </div>
+      <label className="caixa-panel__full">
+        Buscar
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected(null);
+          }}
+          placeholder="PED-… / Maria / iPhone / Pix"
+          autoFocus
+        />
+      </label>
+      <div className="caixa-panel__table">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Cliente</th>
+              <th>Itens</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Quando</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hits.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  <p className="empty">{query ? 'Nenhuma venda encontrada.' : 'Nenhuma venda ainda.'}</p>
+                </td>
+              </tr>
+            ) : (
+              hits.map((order) => {
+                const doc = getLatestFiscalDocumentForRef('sale', order.id);
+                return (
+                  <tr
+                    key={order.id}
+                    className={selected?.id === order.id ? 'is-selected' : ''}
+                    onClick={() => setSelected(order)}
+                  >
+                    <td>{order.id}</td>
+                    <td>{order.customerName}</td>
+                    <td>{order.productName}</td>
+                    <td className="price-red">{money(order.amount)}</td>
+                    <td>
+                      {order.status === 'cancelled'
+                        ? 'Cancelada'
+                        : doc
+                          ? FISCAL_STATUS_LABEL[doc.status]
+                          : 'Sem DF-e'}
+                    </td>
+                    <td>{formatDisplay(order.createdAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {selected ? (
+        <div className="caixa-panel__detail">
+          <div className="caixa-panel__summary">
+            <div>
+              <span>Pedido</span>
+              <strong>{selected.id}</strong>
+            </div>
+            <div>
+              <span>Cliente</span>
+              <strong>{selected.customerName}</strong>
+            </div>
+            <div>
+              <span>Documento</span>
+              <strong>{selected.customerDocument || '—'}</strong>
+            </div>
+            <div>
+              <span>Pagamento</span>
+              <strong>{selected.payment}</strong>
+            </div>
+            <div>
+              <span>SEFAZ / DF-e</span>
+              <strong className={fiscal?.status === 'authorized' ? 'pdv__ok' : undefined}>
+                {fiscal
+                  ? `${FISCAL_KIND_LABEL[fiscal.kind]} · ${FISCAL_STATUS_LABEL[fiscal.status]}`
+                  : 'Sem documento fiscal'}
+              </strong>
+            </div>
+            <div>
+              <span>Total</span>
+              <strong className="price-red">{money(selected.amount)}</strong>
+            </div>
+          </div>
+          {fiscal ? (
+            <p className="empty caixa-panel__fiscal-note">
+              {fiscal.kind !== 'receipt'
+                ? `Nº ${fiscal.number}/${fiscal.series} · chave ${fiscal.accessKey.slice(0, 20)}…`
+                : `Notinha ${fiscal.number}`}
+            </p>
+          ) : null}
+          <div className="caixa-panel__actions">
+            <button type="button" className="btn btn--ghost" onClick={reprint} disabled={!fiscal}>
+              Reimprimir
+            </button>
+            {canEmitNfce ? (
+              <button type="button" className="btn btn--ghost" onClick={emitNfce}>
+                Emitir NFC-e
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={cancelSale}
+              disabled={selected.status === 'cancelled'}
+            >
+              Cancelar venda
+            </button>
+            <button type="button" className="btn btn--primary" onClick={onClose}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="pdv__modal-actions">
+          <button type="button" className="btn btn--primary" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OpenPanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const [name, setName] = useState(operatorName);
+  const [amount, setAmount] = useState('100');
+  const [at, setAt] = useState(formatDateTimeLocal());
+  const [note, setNote] = useState('');
+  const [drawerMsg, setDrawerMsg] = useState<string | null>(null);
+
+  function openDrawer() {
+    openCashDrawer(name || operatorName, 'Contagem antes da abertura');
+    setDrawerMsg('Sinal enviado à gaveta (simulado). Conte o dinheiro e informe o valor.');
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const result = openCashSession({
+      openingFloat: Number(amount.replace(',', '.')) || 0,
+      operatorName: name,
+      note,
+      openedAt: at,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    onRefresh();
+    onDone(
+      `Caixa ${result.session.id} aberto · ${money(result.session.openingFloat)} · ${formatDisplay(result.session.openedAt)}`,
+    );
+    onClose();
+  }
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
+      <div className="caixa-panel__head">
+        <h2>Abrir caixa</h2>
+        <p className="empty">
+          Informe operador, data/hora e fundo de troco. Use a gaveta para contar o dinheiro antes de
+          confirmar.
+        </p>
+      </div>
+      <div className="caixa-panel__body">
+      <div className="caixa-panel__grid">
+        <label>
+          Operador
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          Data e hora
+          <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
+        </label>
+        <label>
+          Valor do caixa (fundo)
+          <input
+            type="number"
+            step="0.01"
+            min={0}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Observação
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
+        </label>
+      </div>
+      {drawerMsg ? <p className="pdv__ok">{drawerMsg}</p> : null}
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={openDrawer}>
+          Abrir gaveta
+        </button>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary">
+          Confirmar abertura
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SupplyPanel({
+  kind,
+  operatorName,
+  cashSession,
+  onClose,
+  onDone,
+  onError,
+  onRefresh,
+}: PanelProps & { kind: 'aporte' | 'sangria' }) {
+  const reasons = kind === 'aporte' ? APORTE_REASONS : SANGRIA_REASONS;
+  const employees = useMemo(() => listEmployees(true), []);
+  const [amount, setAmount] = useState('');
+  const [at, setAt] = useState(formatDateTimeLocal());
+  const [reason, setReason] = useState<string>(reasons[0]);
+  const [note, setNote] = useState('');
+  const [beneficiaryType, setBeneficiaryType] = useState<CashBeneficiaryType>('store');
+  const [employeeId, setEmployeeId] = useState('');
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (beneficiaryType === 'employee' && !employeeId) {
+      onError('Selecione o funcionário.');
+      return;
+    }
+    const employee = employees.find((item) => item.id === employeeId);
+    const payload = {
+      amount: Number(amount.replace(',', '.')) || 0,
+      reason,
+      note: note.trim() || reason,
+      beneficiaryType,
+      beneficiaryId: beneficiaryType === 'employee' ? employeeId : undefined,
+      beneficiaryName: beneficiaryType === 'employee' ? employee?.name : 'Loja',
+      operatorName,
+      at,
+    };
+    const result = kind === 'aporte' ? addCashAporte(payload) : addCashSangria(payload);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    onRefresh();
+    onDone(
+      `${kind === 'aporte' ? 'Aporte' : 'Sangria'} · ${reason} · ${payload.beneficiaryName} · ${money(payload.amount)}`,
+    );
+    onClose();
+  }
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
+      <div className="caixa-panel__head">
+        <h2>{kind === 'aporte' ? 'Aporte / suprimento' : 'Sangria'}</h2>
+        <p className="empty">
+          Caixa {cashSession?.id ?? '—'} · esperado {money(cashSession?.expectedCash ?? 0)}
+        </p>
+      </div>
+      <div className="caixa-panel__body">
+      <div className="caixa-panel__grid">
+        <label>
+          Valor
+          <input
+            type="number"
+            step="0.01"
+            min={0.01}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            autoFocus
+          />
+        </label>
+        <label>
+          Data e hora
+          <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
+        </label>
+        <AdminPicker
+          label="Motivo"
+          value={reason}
+          options={[...reasons]}
+          onChange={setReason}
+        />
+        <AdminPicker
+          label="Para quem"
+          value={beneficiaryType}
+          options={[
+            { value: 'store', label: 'Loja' },
+            { value: 'employee', label: 'Funcionário' },
+          ]}
+          onChange={(value) => {
+            const next = value as CashBeneficiaryType;
+            setBeneficiaryType(next);
+            if (next === 'store') setEmployeeId('');
+          }}
+        />
+        {beneficiaryType === 'employee' ? (
+          <AdminPicker
+            className="caixa-panel__full"
+            label="Funcionário"
+            value={employeeId}
+            placeholder="Selecione…"
+            options={employees.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={setEmployeeId}
+          />
+        ) : null}
+        <label className="caixa-panel__full">
+          Observação (opcional)
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Detalhe extra, se precisar"
+          />
+        </label>
+      </div>
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary">
+          Confirmar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+type CashSupplyMovement = CashMovement & { kind: 'aporte' | 'sangria' };
+
+function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const employees = useMemo(() => listEmployees(true), []);
+  const rows = useMemo(
+    () =>
+      (cashSession?.movements ?? [])
+        .filter((item): item is CashSupplyMovement => item.kind === 'aporte' || item.kind === 'sangria')
+        .slice()
+        .reverse(),
+    [cashSession],
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editAt, setEditAt] = useState('');
+  const [editBeneficiaryType, setEditBeneficiaryType] = useState<CashBeneficiaryType>('store');
+  const [editEmployeeId, setEditEmployeeId] = useState('');
+
+  function reasonsFor(kind: 'aporte' | 'sangria'): string[] {
+    return kind === 'aporte' ? [...APORTE_REASONS] : [...SANGRIA_REASONS];
+  }
+
+  function startEdit(row: CashSupplyMovement) {
+    const list = reasonsFor(row.kind);
+    const currentReason = row.reason && list.includes(row.reason) ? row.reason : list[0];
+    setEditingId(row.id);
+    setEditAmount(String(row.amount));
+    setEditReason(currentReason);
+    setEditNote(row.note);
+    setEditAt(formatDateTimeLocal(row.createdAt));
+    setEditBeneficiaryType(row.beneficiaryType === 'employee' ? 'employee' : 'store');
+    setEditEmployeeId(row.beneficiaryId ?? '');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditAmount('');
+    setEditReason('');
+    setEditNote('');
+    setEditAt('');
+    setEditBeneficiaryType('store');
+    setEditEmployeeId('');
+  }
+
+  function saveEdit(id: string) {
+    if (editBeneficiaryType === 'employee' && !editEmployeeId) {
+      onError('Selecione o funcionário.');
+      return;
+    }
+    const employee = employees.find((item) => item.id === editEmployeeId);
+    const result = updateCashMovement({
+      movementId: id,
+      amount: Number(editAmount.replace(',', '.')) || 0,
+      reason: editReason,
+      note: editNote.trim() || editReason,
+      at: editAt,
+      beneficiaryType: editBeneficiaryType,
+      beneficiaryId: editBeneficiaryType === 'employee' ? editEmployeeId : undefined,
+      beneficiaryName: editBeneficiaryType === 'employee' ? employee?.name : 'Loja',
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    cancelEdit();
+    onRefresh();
+    onDone('Movimento atualizado e saldo recalculado.');
+  }
+
+  function remove(id: string) {
+    const result = deleteCashMovement(id);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    if (editingId === id) cancelEdit();
+    onRefresh();
+    onDone('Movimento excluído e saldo recalculado.');
+  }
+
+  return (
+    <div className="caixa-panel caixa-panel--fit">
+      <div className="caixa-panel__head">
+        <h2>Sangrias e aportes</h2>
+        <p className="empty">Consulte, edite no grid ou exclua lançamentos do caixa aberto.</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="empty">Nenhuma sangria ou aporte neste caixa.</p>
+      ) : (
+        <div className="caixa-panel__table">
+          <table className="admin-table caixa-mov-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Motivo</th>
+                <th>Para</th>
+                <th>Valor</th>
+                <th>Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const editing = editingId === row.id;
+                const reasonOptions = reasonsFor(row.kind);
+                const rowClass = row.kind === 'sangria' ? 'is-sangria' : 'is-aporte';
+                return (
+                  <Fragment key={row.id}>
+                    <tr className={`${rowClass} caixa-mov-main`}>
+                      <td>{CASH_KIND_LABEL[row.kind]}</td>
+                      <td>
+                        {editing ? (
+                          <AdminPicker
+                            compact
+                            className="caixa-mov-picker"
+                            label="Motivo"
+                            value={editReason}
+                            options={reasonOptions}
+                            onChange={setEditReason}
+                          />
+                        ) : (
+                          row.reason || '—'
+                        )}
+                      </td>
+                      <td>
+                        {editing ? (
+                          <div className="caixa-mov-beneficiary">
+                            <AdminPicker
+                              compact
+                              className="caixa-mov-picker"
+                              label="Para quem"
+                              value={editBeneficiaryType}
+                              options={[
+                                { value: 'store', label: 'Loja' },
+                                { value: 'employee', label: 'Funcionário' },
+                              ]}
+                              onChange={(value) => {
+                                const next = value as CashBeneficiaryType;
+                                setEditBeneficiaryType(next);
+                                if (next === 'store') setEditEmployeeId('');
+                              }}
+                            />
+                            {editBeneficiaryType === 'employee' ? (
+                              <AdminPicker
+                                compact
+                                className="caixa-mov-picker"
+                                label="Funcionário"
+                                value={editEmployeeId}
+                                placeholder="Selecione…"
+                                options={employees.map((item) => ({
+                                  value: item.id,
+                                  label: item.name,
+                                }))}
+                                onChange={setEditEmployeeId}
+                              />
+                            ) : null}
+                          </div>
+                        ) : (
+                          cashBeneficiaryLabel(row)
+                        )}
+                      </td>
+                      <td className="caixa-mov-amount">
+                        {editing ? (
+                          <input
+                            className="caixa-mov-input"
+                            type="number"
+                            step="0.01"
+                            min={0.01}
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                            autoFocus
+                          />
+                        ) : (
+                          money(row.amount)
+                        )}
+                      </td>
+                      <td className="caixa-mov-date">
+                        {editing ? (
+                          <input
+                            className="caixa-mov-input"
+                            type="datetime-local"
+                            value={editAt}
+                            onChange={(e) => setEditAt(e.target.value)}
+                          />
+                        ) : (
+                          formatDisplay(row.createdAt)
+                        )}
+                      </td>
+                    </tr>
+                    <tr className={`${rowClass} caixa-mov-meta`}>
+                      <td colSpan={5}>
+                        <div className="caixa-mov-meta__row">
+                          <span className="caixa-mov-note__label">Obs.</span>
+                          <div className="caixa-mov-meta__line">
+                            <div className="caixa-mov-note">
+                              {editing ? (
+                                <input
+                                  className="caixa-mov-input caixa-mov-input--note"
+                                  value={editNote}
+                                  onChange={(e) => setEditNote(e.target.value)}
+                                  placeholder="Observação"
+                                />
+                              ) : (
+                                <p>{row.note?.trim() || '—'}</p>
+                              )}
+                            </div>
+                            <div className="caixa-mov-actions">
+                              {editing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn--primary"
+                                    onClick={() => saveEdit(row.id)}
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
+                                    Cancelar
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost"
+                                    disabled={Boolean(editingId)}
+                                    onClick={() => startEdit(row)}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost"
+                                    disabled={Boolean(editingId)}
+                                    onClick={() => remove(row.id)}
+                                  >
+                                    Excluir
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--primary" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ExchangePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<SalesOrder[]>([]);
+  const [order, setOrder] = useState<SalesOrder | null>(null);
+  const [returnLines, setReturnLines] = useState<ExchangeLine[]>([]);
+  const [outLines, setOutLines] = useState<ExchangeLine[]>([]);
+  const [stockQuery, setStockQuery] = useState('');
+  const [stockHits, setStockHits] = useState<StockItem[]>([]);
+  const [target, setTarget] = useState<'return' | 'out'>('return');
+  const [settleAs, setSettleAs] = useState<'cash' | 'credit'>('cash');
+  const [note, setNote] = useState('');
+
+  const returnTotal = roundMoney(
+    returnLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0),
+  );
+  const outTotal = roundMoney(outLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0));
+  const delta = roundMoney(outTotal - returnTotal);
+
+  useEffect(() => {
+    setHits(searchOrders(query, 10));
+  }, [query]);
+
+  useEffect(() => {
+    setStockHits(findStockMatches(stockQuery, 8));
+  }, [stockQuery]);
+
+  function pickOrder(item: SalesOrder) {
+    setOrder(item);
+    setQuery(item.id);
+    setHits([]);
+    setReturnLines(returnLinesFromOrder(item));
+    setOutLines([]);
+    setTarget('out');
+  }
+
+  function unitPriceFor(item: StockItem, side: 'return' | 'out') {
+    if (side === 'return' && order) {
+      const bare = stripQtyPrefix(order.productName).toLowerCase();
+      if (
+        bare.includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(bare.slice(0, 16))
+      ) {
+        return roundMoney(order.amount);
+      }
+    }
+    if (side === 'out') {
+      const matchedReturn = returnLines.find(
+        (row) => row.stockId === item.id || namesMatch(row.name, item.name),
+      );
+      if (matchedReturn) return roundMoney(matchedReturn.unitPrice);
+    }
+    return roundMoney(item.price);
+  }
+
+  function addStock(item: StockItem) {
+    const line: ExchangeLine = {
+      stockId: item.id,
+      name: item.name,
+      sku: item.sku,
+      qty: 1,
+      unitPrice: unitPriceFor(item, target),
+    };
+    if (target === 'return') {
+      setReturnLines((prev) => {
+        const existing = prev.find((row) => row.stockId === item.id);
+        if (existing) {
+          return prev.map((row) =>
+            row.stockId === item.id ? { ...row, qty: row.qty + 1 } : row,
+          );
+        }
+        return [...prev, line];
+      });
+    } else {
+      if (item.qty <= 0) {
+        onError(`${item.name} sem estoque para saída.`);
+        return;
+      }
+      setOutLines((prev) => {
+        const existing = prev.find((row) => row.stockId === item.id);
+        if (existing) {
+          return prev.map((row) =>
+            row.stockId === item.id ? { ...row, qty: row.qty + 1 } : row,
+          );
+        }
+        return [...prev, line];
+      });
+    }
+    setStockQuery('');
+    setStockHits([]);
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!order && !query.trim()) {
+      onError('Busque a venda (número, cliente ou produto).');
+      return;
+    }
+    const result = registerExchange({
+      orderId: order?.id || query.trim(),
+      customerName: order?.customerName || 'Cliente',
+      customerPhone: '',
+      returnLines,
+      outLines,
+      note,
+      operatorName,
+      settleAs,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+
+    for (const line of returnLines) {
+      if (!line.stockId.startsWith('sale:')) adjustStockQty(line.stockId, line.qty);
+    }
+    for (const line of outLines) {
+      adjustStockQty(line.stockId, -line.qty);
+    }
+
+    onRefresh();
+    const creditMsg = result.credit ? ` · vale ${result.credit.code}` : '';
+    onDone(
+      `Troca ${result.exchange.id} · devolve ${money(returnTotal)} · sai ${money(outTotal)}${creditMsg}`,
+    );
+    onClose();
+  }
+
+  const diffClass =
+    delta > 0 ? 'caixa-diff is-pos' : delta < 0 ? 'caixa-diff is-neg' : 'caixa-diff is-zero';
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
+      <div className="caixa-panel__head">
+        <h2>Troca de produto</h2>
+        <p className="empty">
+          Localize a venda, devolva o item (estoque volta) e escolha o produto que sai. Diferença em
+          dinheiro ou vale-compra.
+        </p>
+      </div>
+
+      <div className="caixa-panel__body">
+      <label className="caixa-panel__full">
+        Buscar venda (nº, cliente ou produto)
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOrder(null);
+          }}
+          placeholder="PED-… / Maria / iPhone"
+          autoFocus
+        />
+      </label>
+      {hits.length > 0 && !order ? (
+        <ul className="caixa-panel__hits">
+          {hits.map((item) => (
+            <li key={item.id}>
+              <button type="button" onClick={() => pickOrder(item)}>
+                <strong>{item.id}</strong>
+                <span>
+                  {item.customerName} · {item.productName}
+                </span>
+                <em>{money(item.amount)}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {order ? (
+        <p className="pdv__ok">
+          Venda {order.id} · {order.customerName} · {order.productName} · {money(order.amount)} ·{' '}
+          {formatDisplay(order.createdAt)}
+        </p>
+      ) : null}
+
+      <div className="caixa-panel__tabs">
+        <button
+          type="button"
+          className={target === 'return' ? 'is-active' : ''}
+          onClick={() => setTarget('return')}
+        >
+          Devolvendo
+        </button>
+        <button
+          type="button"
+          className={target === 'out' ? 'is-active' : ''}
+          onClick={() => setTarget('out')}
+        >
+          Saindo
+        </button>
+      </div>
+
+      <div className="caixa-panel__scan">
+        <input
+          value={stockQuery}
+          onChange={(e) => setStockQuery(e.target.value)}
+          placeholder={
+            target === 'return' ? 'SKU/IMEI do produto que volta' : 'SKU/IMEI do produto que sai'
+          }
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const item = findStockByCode(stockQuery);
+              if (!item) {
+                onError('Produto não encontrado.');
+                return;
+              }
+              addStock(item);
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            const item = findStockByCode(stockQuery);
+            if (!item) {
+              onError('Produto não encontrado.');
+              return;
+            }
+            addStock(item);
+          }}
+        >
+          Incluir
+        </button>
+      </div>
+      {stockHits.length > 0 ? (
+        <ul className="caixa-panel__hits">
+          {stockHits.map((item) => (
+            <li key={item.id}>
+              <button type="button" onClick={() => addStock(item)}>
+                <strong>{item.name}</strong>
+                <span>
+                  {item.sku} · {item.qty} un. · {money(item.price)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="caixa-panel__split">
+        <div>
+          <h3>Volta ao estoque</h3>
+          {returnLines.length === 0 ? (
+            <p className="empty">Nenhum item</p>
+          ) : (
+            <ul>
+              {returnLines.map((line) => (
+                <li key={line.stockId}>
+                  {line.qty}x {line.name} · {money(line.unitPrice * line.qty)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <strong>{money(returnTotal)}</strong>
+        </div>
+        <div>
+          <h3>Sai do estoque</h3>
+          {outLines.length === 0 ? (
+            <p className="empty">Nenhum item</p>
+          ) : (
+            <ul>
+              {outLines.map((line) => (
+                <li key={line.stockId}>
+                  {line.qty}x {line.name} · {money(line.unitPrice * line.qty)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <strong>{money(outTotal)}</strong>
+        </div>
+      </div>
+
+      <p className={diffClass}>
+        Diferença: {money(delta)}{' '}
+        {delta > 0 ? '(cliente paga)' : delta < 0 ? '(loja devolve / vale)' : '(troca igual)'}
+      </p>
+
+      <div className="caixa-panel__grid">
+        <AdminPicker
+          label="Acertar diferença"
+          value={settleAs}
+          options={[
+            { value: 'cash', label: 'Dinheiro no caixa' },
+            { value: 'credit', label: 'Gerar vale-compra (se loja deve)' },
+          ]}
+          onChange={(value) => setSettleAs(value as 'cash' | 'credit')}
+        />
+        <label>
+          Observação
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+      </div>
+      </div>
+
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary">
+          Confirmar troca
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const [mode, setMode] = useState<'issue' | 'redeem' | 'list'>('list');
+  const [customerName, setCustomerName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [amount, setAmount] = useState('');
+  const [code, setCode] = useState('');
+  const [note, setNote] = useState('');
+  const [credits, setCredits] = useState(() => listStoreCredits());
+
+  function refresh() {
+    setCredits(listStoreCredits());
+    onRefresh();
+  }
+
+  function issue(event: FormEvent) {
+    event.preventDefault();
+    const result = issueStoreCredit({
+      customerName,
+      customerPhone: phone,
+      amount: Number(amount.replace(',', '.')) || 0,
+      note,
+      operatorName,
+      affectCash: true,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(`Vale ${result.credit.code} · ${money(result.credit.amount)}`);
+    setMode('list');
+  }
+
+  function redeem(event: FormEvent) {
+    event.preventDefault();
+    const result = redeemStoreCredit({
+      code,
+      amount: Number(amount.replace(',', '.')) || 0,
+      operatorName,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(`Resgate ${result.credit.code} · saldo ${money(result.credit.remaining)}`);
+    setMode('list');
+  }
+
+  return (
+    <div className="caixa-panel caixa-panel--fit">
+      <div className="caixa-panel__head">
+        <h2>Vale-compra</h2>
+      </div>
+      <div className="caixa-panel__tabs">
+        <button type="button" className={mode === 'list' ? 'is-active' : ''} onClick={() => setMode('list')}>
+          Consultar
+        </button>
+        <button type="button" className={mode === 'issue' ? 'is-active' : ''} onClick={() => setMode('issue')}>
+          Emitir
+        </button>
+        <button type="button" className={mode === 'redeem' ? 'is-active' : ''} onClick={() => setMode('redeem')}>
+          Resgatar
+        </button>
+      </div>
+
+      {mode === 'list' ? (
+        credits.length === 0 ? (
+          <p className="empty">Nenhum vale emitido.</p>
+        ) : (
+          <div className="caixa-panel__table">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Cliente</th>
+                  <th>Saldo</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {credits.map((credit) => (
+                  <tr key={credit.id}>
+                    <td>{credit.code}</td>
+                    <td>{credit.customerName}</td>
+                    <td>{money(credit.remaining)}</td>
+                    <td>{credit.status}</td>
+                    <td>
+                      {credit.status === 'open' ? (
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => {
+                            const result = cancelStoreCredit(credit.id);
+                            if (!result.ok) onError(result.error);
+                            else {
+                              refresh();
+                              onDone(`Vale ${credit.code} cancelado.`);
+                            }
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : null}
+
+      {mode === 'issue' ? (
+        <form className="caixa-panel__grid" onSubmit={issue}>
+          <label>
+            Cliente
+            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+          </label>
+          <label>
+            WhatsApp
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </label>
+          <label>
+            Valor
+            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          </label>
+          <label>
+            Obs.
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          <div className="pdv__modal-actions caixa-panel__full">
+            <button type="submit" className="btn btn--primary">
+              Emitir vale
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {mode === 'redeem' ? (
+        <form className="caixa-panel__grid" onSubmit={redeem}>
+          <label>
+            Código
+            <input value={code} onChange={(e) => setCode(e.target.value)} required />
+          </label>
+          <label>
+            Valor a usar
+            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          </label>
+          <div className="pdv__modal-actions caixa-panel__full">
+            <button type="submit" className="btn btn--primary">
+              Resgatar
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClosePanel({
+  operatorName,
+  cashSession,
+  onClose,
+  onDone,
+  onError,
+  onRefresh,
+}: PanelProps) {
+  const [counted, setCounted] = useState(
+    cashSession ? String(cashSession.expectedCash) : '0',
+  );
+  const [at, setAt] = useState(formatDateTimeLocal());
+  const [note, setNote] = useState('');
+  const expected = cashSession?.expectedCash ?? 0;
+  const diff = (Number(counted.replace(',', '.')) || 0) - expected;
+
+  function openDrawer() {
+    openCashDrawer(operatorName, 'Contagem no fechamento');
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const result = closeCashSession({
+      countedCash: Number(counted.replace(',', '.')) || 0,
+      operatorName,
+      note,
+      closedAt: at,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    onRefresh();
+    onDone(
+      `Caixa fechado · esperado ${money(expected)} · contado ${money(Number(counted) || 0)} · dif ${money(diff)}`,
+    );
+    onClose();
+  }
+
+  const movements = cashSession?.movements ?? [];
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
+      <div className="caixa-panel__head">
+        <h2>Fechamento de caixa</h2>
+      </div>
+      <div className="caixa-panel__summary">
+        <div>
+          <span>Caixa</span>
+          <strong>{cashSession?.id ?? '—'}</strong>
+        </div>
+        <div>
+          <span>Operador</span>
+          <strong>{cashSession?.operatorName ?? operatorName}</strong>
+        </div>
+        <div>
+          <span>Aberto em</span>
+          <strong>{cashSession ? formatDisplay(cashSession.openedAt) : '—'}</strong>
+        </div>
+        <div>
+          <span>Esperado</span>
+          <strong>{money(expected)}</strong>
+        </div>
+      </div>
+
+      <div className="caixa-panel__table">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Movimento</th>
+              <th>Valor</th>
+              <th>Quando</th>
+            </tr>
+          </thead>
+          <tbody>
+            {movements.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  {CASH_KIND_LABEL[row.kind]}
+                  {row.reason ? ` · ${row.reason}` : row.note ? ` · ${row.note}` : ''}
+                  {row.kind === 'sangria' || row.kind === 'aporte'
+                    ? ` · ${cashBeneficiaryLabel(row)}`
+                    : ''}
+                </td>
+                <td>{money(row.amount)}</td>
+                <td>{formatDisplay(row.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="caixa-panel__footer">
+        <div className="caixa-panel__grid">
+          <label>
+            Valor contado na gaveta
+            <input
+              type="number"
+              step="0.01"
+              value={counted}
+              onChange={(e) => setCounted(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Data/hora fechamento
+            <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
+          </label>
+          <label className="caixa-panel__full">
+            Observação
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </div>
+        <p className={diff === 0 ? 'pdv__ok' : 'pdv__alert'}>Diferença: {money(diff)}</p>
+        <div className="pdv__modal-actions">
+          <button type="button" className="btn btn--ghost" onClick={openDrawer}>
+            Abrir gaveta
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn--primary">
+            Confirmar fechamento
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function SessionsPanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const [sessions, setSessions] = useState(() => listCashSessions());
+  const [selected, setSelected] = useState<CashSession | null>(null);
+
+  function refresh() {
+    setSessions(listCashSessions());
+    onRefresh();
+  }
+
+  function reopen(id: string) {
+    const result = reopenCashSession({ sessionId: id, operatorName });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(`Caixa ${result.session.id} reaberto.`);
+    onClose();
+  }
+
+  return (
+    <div className="caixa-panel caixa-panel--fit">
+      <div className="caixa-panel__head">
+        <h2>Consulta de caixas</h2>
+        <p className="empty">Histórico de aberturas. Reabra um caixa fechado se necessário.</p>
+      </div>
+      <div className="caixa-panel__table">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Caixa</th>
+              <th>Status</th>
+              <th>Operador</th>
+              <th>Aberto</th>
+              <th>Esperado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session) => (
+              <tr key={session.id}>
+                <td>
+                  <button type="button" className="btn btn--ghost" onClick={() => setSelected(session)}>
+                    {session.id}
+                  </button>
+                </td>
+                <td>{session.status === 'open' ? 'Aberto' : 'Fechado'}</td>
+                <td>{session.operatorName}</td>
+                <td>{formatDisplay(session.openedAt)}</td>
+                <td>{money(session.expectedCash)}</td>
+                <td>
+                  {session.status === 'closed' ? (
+                    <button type="button" className="btn btn--primary" onClick={() => reopen(session.id)}>
+                      Reabrir
+                    </button>
+                  ) : (
+                    <span className="empty">Atual</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {selected ? (
+        <div className="caixa-panel__summary">
+          <div>
+            <span>Detalhe</span>
+            <strong>{selected.id}</strong>
+          </div>
+          <div>
+            <span>Fechado</span>
+            <strong>{selected.closedAt ? formatDisplay(selected.closedAt) : '—'}</strong>
+          </div>
+          <div>
+            <span>Contado</span>
+            <strong>{selected.countedCash != null ? money(selected.countedCash) : '—'}</strong>
+          </div>
+          <div>
+            <span>Diferença</span>
+            <strong>{selected.difference != null ? money(selected.difference) : '—'}</strong>
+          </div>
+          <div>
+            <span>Reaberturas</span>
+            <strong>{selected.reopenCount}</strong>
+          </div>
+          <div>
+            <span>Movimentos</span>
+            <strong>{selected.movements.length}</strong>
+          </div>
+        </div>
+      ) : null}
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--primary" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PricePanel({ onClose }: PanelProps) {
+  const [query, setQuery] = useState('');
+  const tables = getAdminState().priceTables.filter((item) => item.active);
+  const hits = useMemo(() => findStockMatches(query, 12), [query]);
+
+  return (
+    <div className="caixa-panel caixa-panel--fit">
+      <div className="caixa-panel__head">
+        <h2>Consulta de preço</h2>
+        <p className="empty">Busque por nome, SKU ou IMEI — sem alterar o carrinho.</p>
+      </div>
+      <label className="caixa-panel__full">
+        Produto
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Digite para buscar"
+          autoFocus
+        />
+      </label>
+      <div className="caixa-panel__table">
+        {hits.length === 0 ? (
+          <p className="empty">{query ? 'Nenhum produto.' : 'Comece a digitar.'}</p>
+        ) : (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>SKU</th>
+                <th>Estoque</th>
+                <th>Preço base</th>
+                {tables.slice(0, 2).map((table) => (
+                  <th key={table.id}>{table.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hits.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.sku}</td>
+                  <td>{item.qty}</td>
+                  <td className="price-red">{money(item.price)}</td>
+                  {tables.slice(0, 2).map((table) => (
+                    <td key={table.id}>
+                      {money(item.price * (1 + table.percent / 100))}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--primary" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function onlyDigitsLocal(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function formatCpfLocal(value: string) {
+  const digits = onlyDigitsLocal(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function isValidCpfLocal(value: string) {
+  const cpf = onlyDigitsLocal(value);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += Number(cpf[i]) * (10 - i);
+  let dig = (sum * 10) % 11;
+  if (dig === 10) dig = 0;
+  if (dig !== Number(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i += 1) sum += Number(cpf[i]) * (11 - i);
+  dig = (sum * 10) % 11;
+  if (dig === 10) dig = 0;
+  return dig === Number(cpf[10]);
+}
+
+function formatPhoneLocal(value: string) {
+  const digits = onlyDigitsLocal(value).slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated }: PanelProps) {
+  const [name, setName] = useState('');
+  const [document, setDocument] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [complement, setComplement] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [cepStatus, setCepStatus] = useState('');
+  const [cepLoading, setCepLoading] = useState(false);
+
+  async function consultCep(raw: string) {
+    const digits = onlyDigitsLocal(raw);
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    setCepStatus('Consultando CEP…');
+    try {
+      const address = await lookupCep(digits);
+      setZipCode(address.zipCode);
+      if (address.street) setStreet(address.street);
+      if (address.complement) setComplement(address.complement);
+      if (address.neighborhood) setNeighborhood(address.neighborhood);
+      if (address.city) setCity(address.city);
+      if (address.state) setState(address.state);
+      setCepStatus('Endereço preenchido pelo CEP.');
+    } catch (error) {
+      setCepStatus(error instanceof Error ? error.message : 'Falha ao consultar CEP.');
+    } finally {
+      setCepLoading(false);
+    }
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    const cpfDigits = onlyDigitsLocal(document);
+    if (!trimmedName) {
+      onError('Informe o nome do cliente.');
+      return;
+    }
+    if (cpfDigits.length !== 11 || !isValidCpfLocal(cpfDigits)) {
+      onError('Informe um CPF válido.');
+      return;
+    }
+
+    const next = upsertCustomer({
+      name: trimmedName,
+      document: formatCpfLocal(cpfDigits),
+      phone: phone.trim(),
+      email: email.trim(),
+      zipCode: zipCode.trim(),
+      street: street.trim(),
+      number: number.trim(),
+      complement: complement.trim(),
+      neighborhood: neighborhood.trim(),
+      city: city.trim(),
+      state: state.trim().toUpperCase(),
+      active: true,
+    });
+
+    const saved =
+      next.customers.find((item) => onlyDigitsLocal(item.document) === cpfDigits) ??
+      next.customers[0];
+
+    if (saved) onCustomerCreated?.(saved);
+    onDone(`Cliente ${saved?.name ?? trimmedName} cadastrado.`);
+    onClose();
+  }
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
+      <div className="caixa-panel__head">
+        <h2>Cadastro rápido de cliente</h2>
+        <p className="empty">Obrigatório: nome e CPF. Endereço, telefone e e-mail são opcionais.</p>
+      </div>
+      <div className="caixa-panel__body">
+        <div className="caixa-panel__grid">
+          <label className="caixa-panel__full">
+            Nome *
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nome completo"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            CPF *
+            <input
+              value={document}
+              onChange={(e) => setDocument(formatCpfLocal(e.target.value))}
+              placeholder="000.000.000-00"
+              inputMode="numeric"
+              required
+            />
+          </label>
+          <label>
+            Telefone
+            <input
+              value={phone}
+              onChange={(e) => setPhone(formatPhoneLocal(e.target.value))}
+              placeholder="(00) 00000-0000"
+              inputMode="tel"
+            />
+          </label>
+          <label className="caixa-panel__full">
+            E-mail
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="opcional"
+            />
+          </label>
+          <label>
+            CEP
+            <input
+              value={zipCode}
+              onChange={(e) => {
+                const masked = maskCep(e.target.value);
+                setZipCode(masked);
+                setCepStatus('');
+                if (onlyDigitsLocal(masked).length === 8) void consultCep(masked);
+              }}
+              onBlur={() => void consultCep(zipCode)}
+              placeholder="00000-000"
+              inputMode="numeric"
+              disabled={cepLoading}
+            />
+          </label>
+          <label>
+            Número
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="nº"
+            />
+          </label>
+          <label className="caixa-panel__full">
+            Endereço
+            <input
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Rua / avenida"
+            />
+          </label>
+          <label>
+            Complemento
+            <input
+              value={complement}
+              onChange={(e) => setComplement(e.target.value)}
+              placeholder="opcional"
+            />
+          </label>
+          <label>
+            Bairro
+            <input
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+            />
+          </label>
+          <label>
+            Cidade
+            <input value={city} onChange={(e) => setCity(e.target.value)} />
+          </label>
+          <label>
+            UF
+            <input
+              value={state}
+              onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="UF"
+              maxLength={2}
+            />
+          </label>
+        </div>
+        {cepStatus ? <p className="empty">{cepStatus}</p> : null}
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary" disabled={cepLoading}>
+          Salvar cliente
+        </button>
+      </div>
+    </form>
+  );
+}

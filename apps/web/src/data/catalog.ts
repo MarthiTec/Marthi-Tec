@@ -1,48 +1,52 @@
 export const PLANS = [
   {
-    id: 'start',
-    name: 'Start',
+    id: 'bronze',
+    name: 'Bronze',
     price: 'R$ 297',
     period: '/mês',
-    blurb: 'Plano básico: escolha 1 módulo para começar.',
+    blurb: 'Comece com 1 módulo e opere enxuto.',
     maxModules: 1,
     features: [
-      '1 módulo liberado (Totem, Pré-vendas, OS ou ERP)',
+      '1 módulo liberado à sua escolha',
+      'Totem, OS, ERP ou Emissor Fiscal',
       'Painel web da loja',
       '1 unidade / operação enxuta',
       'Suporte em horário comercial',
+      'Atualizações da plataforma',
     ],
   },
   {
-    id: 'growth',
-    name: 'Growth',
+    id: 'silver',
+    name: 'Silver',
     price: 'R$ 597',
     period: '/mês',
-    blurb: 'Plano intermediário: combine até 2 módulos.',
+    blurb: 'Combine 2 módulos e conecte a operação.',
     featured: true,
     maxModules: 2,
     features: [
-      'Até 2 módulos à sua escolha',
+      'Até 2 módulos liberados',
       'Multi-usuário no painel',
-      'Relatórios de interesse',
+      'Permissões por funcionário',
+      'Relatórios da operação',
       'Personalização de marca da loja',
       'Prioridade no suporte',
     ],
   },
   {
-    id: 'scale',
-    name: 'Scale',
+    id: 'golden',
+    name: 'Golden',
     price: 'Sob consulta',
     period: '',
-    blurb: 'Plano completo: tudo integrado (Totem + Pré-vendas + OS + ERP).',
+    blurb: 'Tudo liberado: Totem + OS + ERP + Emissor Fiscal.',
     maxModules: 4,
     allModules: true,
     features: [
       'Todos os módulos liberados',
-      'Totem + Pré-vendas + OS + ERP integrados',
+      'Totem + OS + ERP + Emissor Fiscal',
       'Ambiente dedicado',
       'Integrações sob demanda',
       'Acompanhamento comercial',
+      'Suporte prioritário contínuo',
     ],
   },
 ] as const;
@@ -56,19 +60,19 @@ export const PARTNER_MODULES = [
     blurb: 'Autoatendimento na loja com lead no WhatsApp.',
   },
   {
-    id: 'presales',
-    name: 'Pré-vendas',
-    blurb: 'Captura de interesse e acompanhamento comercial.',
-  },
-  {
     id: 'os',
     name: 'Ordem de serviço',
-    blurb: 'OS online ligada à operação da loja.',
+    blurb: 'OS online: orçamento, oficina, agenda e entrega.',
   },
   {
     id: 'erp',
     name: 'ERP',
-    blurb: 'Gestão e estoque no mesmo ecossistema.',
+    blurb: 'Produtos, PDV, pessoas, financeiro e estoque.',
+  },
+  {
+    id: 'fiscal',
+    name: 'Emissor Fiscal',
+    blurb: 'Notas, NCM/CFOP, classificação e reforma (IBS/CBS).',
   },
 ] as const;
 
@@ -79,17 +83,34 @@ export const BRAZIL_UFS = [
   'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ] as const;
 
+/** Migra IDs antigos (Start/Growth/Scale) para Bronze/Silver/Golden. */
+export function normalizePlanId(value: string | null | undefined): PlanId | null {
+  if (!value) return null;
+  if (value === 'start') return 'bronze';
+  if (value === 'growth') return 'silver';
+  if (value === 'scale') return 'golden';
+  return PLANS.some((plan) => plan.id === value) ? (value as PlanId) : null;
+}
+
+/** Migra módulo antigo `presales` → `erp` (PDV passa a fazer parte do ERP). */
+export function normalizeModuleId(value: string): PartnerModuleId | null {
+  if (value === 'presales') return 'erp';
+  return PARTNER_MODULES.some((module) => module.id === value)
+    ? (value as PartnerModuleId)
+    : null;
+}
+
 export function isPlanId(value: string | null): value is PlanId {
-  return PLANS.some((plan) => plan.id === value);
+  return normalizePlanId(value) !== null;
 }
 
 export function getPlanById(planId: PlanId) {
-  return PLANS.find((plan) => plan.id === planId) ?? PLANS[0];
+  const id = normalizePlanId(planId) ?? 'bronze';
+  return PLANS.find((plan) => plan.id === id) ?? PLANS[0];
 }
 
 export function getPlanModuleLimit(planId: PlanId) {
-  const plan = getPlanById(planId);
-  return plan.maxModules;
+  return getPlanById(planId).maxModules;
 }
 
 export function planIncludesAllModules(planId: PlanId) {

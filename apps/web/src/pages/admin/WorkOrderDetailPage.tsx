@@ -52,6 +52,13 @@ import {
   removeWorkOrderLine,
   setAssetDisposition,
 } from '../../data/workshopLedger';
+import { AdminIcon } from '../../components/AdminIcons';
+import {
+  emitNfseFromOs,
+  FISCAL_KIND_LABEL,
+  getFiscalDocumentForRef,
+} from '../../data/fiscalDocuments';
+import { hasModule } from '../../data/storePlan';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -76,6 +83,8 @@ export function WorkOrderDetailPage() {
 
   const matches = useMemo(() => findStockMatches(stockQuery, 6), [stockQuery]);
   const sellers = useMemo(() => listSellers(true), []);
+  const fiscalOn = hasModule('fiscal');
+  const fiscalDoc = form ? getFiscalDocumentForRef('os', form.id) : null;
   const relatedByImei = useMemo(
     () => (form ? findWorkOrdersByItemRef(form.itemRef, form.id) : []),
     [form?.id, form?.itemRef],
@@ -98,7 +107,7 @@ export function WorkOrderDetailPage() {
         <article className="admin-card">
           <h2>OS não encontrada</h2>
           <p>Essa ordem não está no histórico local.</p>
-          <Link to="/painel/os" className="btn btn--ghost">
+          <Link to="/os" className="btn btn--ghost">
             Voltar ao quadro
           </Link>
         </article>
@@ -182,6 +191,23 @@ export function WorkOrderDetailPage() {
     const next = updateWorkOrder(form.id, { status });
     if (next) setForm(next);
     flash('Status atualizado.');
+  }
+
+  function emitNfse() {
+    if (!form) return;
+    const amount = workOrderTotal(form);
+    const result = emitNfseFromOs({
+      workOrderId: form.id,
+      customerName: form.customerName,
+      amount,
+    });
+    if (!result.ok) {
+      fail(result.error);
+      return;
+    }
+    flash(
+      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} autorizada (simulação).`,
+    );
   }
 
   function pickStock(item: StockItem) {
@@ -278,18 +304,18 @@ export function WorkOrderDetailPage() {
         {message ? <p className="empty">{message}</p> : null}
         {error ? <p className="qty-low">{error}</p> : null}
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <Link to={`/painel/os/${form.id}/relatorio`} className="btn btn--ghost">
+          <Link to={`/os/${form.id}/relatorio`} className="btn btn--ghost">
             Relatório / imprimir
           </Link>
           <Link
             to={
               form.estimatedReadyAt
-                ? `/painel/os/agenda?week=${form.estimatedReadyAt.slice(0, 10)}${
+                ? `/os/agenda?week=${form.estimatedReadyAt.slice(0, 10)}${
                     form.technician.trim()
                       ? `&tech=${encodeURIComponent(form.technician.trim())}`
                       : ''
                   }`
-                : '/painel/os/agenda'
+                : '/os/agenda'
             }
             className="btn btn--ghost"
           >
@@ -515,6 +541,7 @@ export function WorkOrderDetailPage() {
         {!locked ? (
           <div className="admin-toolbar" style={{ marginBottom: 12 }}>
             <AdminPicker
+              compact
               label="Momento"
               value={photoKind}
               options={[
@@ -683,7 +710,7 @@ export function WorkOrderDetailPage() {
                 <ul>
                   {relatedByImei.map((order) => (
                     <li key={order.id}>
-                      <Link to={`/painel/os/${order.id}`}>
+                      <Link to={`/os/${order.id}`}>
                         {order.id} · {STATUS_LABEL[order.status]} ·{' '}
                         {new Date(order.createdAt).toLocaleDateString('pt-BR')}
                       </Link>
@@ -702,7 +729,7 @@ export function WorkOrderDetailPage() {
                 <ul>
                   {relatedByCustomer.map((order) => (
                     <li key={order.id}>
-                      <Link to={`/painel/os/${order.id}`}>
+                      <Link to={`/os/${order.id}`}>
                         {order.id} · {order.itemName || 'sem equipamento'} ·{' '}
                         {STATUS_LABEL[order.status]}
                       </Link>
@@ -956,7 +983,7 @@ export function WorkOrderDetailPage() {
             />
             {form.estimatedReadyAt ? (
               <Link
-                to={`/painel/os/agenda?week=${form.estimatedReadyAt}`}
+                to={`/os/agenda?week=${form.estimatedReadyAt}`}
                 className="empty"
                 style={{ marginTop: 6, display: 'inline-block' }}
               >
@@ -1004,10 +1031,31 @@ export function WorkOrderDetailPage() {
             >
               Entregar · lançar receita
             </button>
-            <Link to={`/painel/os/${form.id}/relatorio`} className="btn btn--ghost">
+            {fiscalOn ? (
+              fiscalDoc ? (
+                <span className="badge badge--sold">
+                  {FISCAL_KIND_LABEL[fiscalDoc.kind]} {fiscalDoc.number}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={emitNfse}
+                  title="Emitir NFS-e do serviço"
+                >
+                  <AdminIcon name="fiscal" />
+                  Emitir NFS-e
+                </button>
+              )
+            ) : (
+              <Link to="/painel/plano" className="btn btn--ghost" title="Requer Emissor Fiscal">
+                Plano fiscal
+              </Link>
+            )}
+            <Link to={`/os/${form.id}/relatorio`} className="btn btn--ghost">
               Relatório
             </Link>
-            <Link to="/painel/os" className="btn btn--ghost">
+            <Link to="/os" className="btn btn--ghost">
               Voltar ao quadro
             </Link>
             {saved && !message ? <span className="empty">OS atualizada.</span> : null}
