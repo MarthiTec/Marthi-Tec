@@ -429,7 +429,7 @@ export function StockPage() {
                         {item.sourceWorkOrderId ? (
                           <>
                             {' · '}
-                            <Link to={`/os/${item.sourceWorkOrderId}`}>
+                            <Link to={`/painel/os/${item.sourceWorkOrderId}`}>
                               {item.sourceWorkOrderId}
                             </Link>
                           </>

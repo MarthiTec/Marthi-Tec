@@ -32,10 +32,10 @@ const PRODUCTS = [
   },
   {
     title: 'ERP + Emissor Fiscal',
-    text: 'Produtos, financeiro e base fiscal (NCM, CFOP, IBS/CBS).',
+    text: 'Produtos, financeiro e emissão de NF-e, NFS-e, CT-e e MDF-e (NFC-e no PDV).',
     demoProduct: 'erp' as const,
-    href: '/login',
-    cta: 'Entrar no painel',
+    href: '/fiscal',
+    cta: 'Abrir emissor fiscal',
   },
 ] as const;
 
@@ -86,6 +86,7 @@ export function HomePage() {
   const showCaixa = contracted && hasModule('erp');
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
+  const showFiscal = contracted && hasModule('fiscal');
 
   useEffect(() => {
     function refresh() {
@@ -155,6 +156,9 @@ export function HomePage() {
               Demo OS
             </button>
           )}
+          {showFiscal ? (
+            <Link to={user ? '/fiscal' : '/login?next=/fiscal'}>Fiscal</Link>
+          ) : null}
           {showTotem ? (
             <Link to="/totem">Totem</Link>
           ) : (
@@ -241,7 +245,7 @@ export function HomePage() {
           </div>
         </section>
 
-        {(showCaixa || showTotem || showOs) && (
+        {(showCaixa || showTotem || showOs || showFiscal) && (
           <section className="section section--launch" aria-label="Acesso rápido">
             <div className="launch-row">
               {showCaixa ? (
@@ -254,6 +258,12 @@ export function HomePage() {
                 <Link to={user ? '/os' : '/login?next=/os'} className="launch-card">
                   <strong>Ordem de serviço</strong>
                   <span>{user ? 'Abrir oficina' : 'Entrar e abrir a oficina'}</span>
+                </Link>
+              ) : null}
+              {showFiscal ? (
+                <Link to={user ? '/fiscal' : '/login?next=/fiscal'} className="launch-card">
+                  <strong>Emissor Fiscal</strong>
+                  <span>{user ? 'Abrir NF-e / NFS-e / CT-e / MDF-e' : 'Entrar e abrir o emissor'}</span>
                 </Link>
               ) : null}
               {showTotem ? (

@@ -36,7 +36,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     icon: 'cart',
     module: 'erp',
     children: [
-      { to: '/caixa', label: 'Abrir caixa (PDV)' },
+      { to: '/caixa', label: 'Abrir caixa (PDV + NFC-e)' },
       { to: '/painel/pdv', label: 'Fila do totem', end: true },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
@@ -49,11 +49,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     module: 'os',
     children: [
       { to: '/os', label: 'Abrir oficina (OS)' },
-      { to: '/os/nova', label: 'Nova OS' },
-      { to: '/os/agenda', label: 'Agenda' },
-      { to: '/os?quote=sent', label: 'Orçamentos' },
-      { to: '/os?status=progress', label: 'Em serviço' },
-      { to: '/os?status=ready', label: 'Prontas' },
+      { to: '/painel/os', label: 'Quadro no painel', end: true },
+      { to: '/painel/os/nova', label: 'Nova OS' },
+      { to: '/painel/os/agenda', label: 'Agenda' },
+      { to: '/painel/os?quote=sent', label: 'Orçamentos' },
+      { to: '/painel/os?status=progress', label: 'Em serviço' },
+      { to: '/painel/os?status=ready', label: 'Prontas' },
     ],
   },
   {
@@ -89,7 +90,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     icon: 'fiscal',
     module: 'fiscal',
     children: [
-      { to: '/painel/notas', label: 'Notas entrada/saída' },
+      { to: '/fiscal', label: 'Abrir emissor fiscal' },
       { to: '/painel/classificacao-fiscal', label: 'Classificação fiscal' },
       { to: '/painel/cfop', label: 'CFOP e FECP' },
     ],
@@ -139,8 +140,10 @@ export function navGroupForPath(pathname: string, search = '') {
   }
   if (
     pathname.startsWith('/painel/notas') ||
+    pathname.startsWith('/painel/fiscal') ||
     pathname.startsWith('/painel/classificacao-fiscal') ||
-    pathname.startsWith('/painel/cfop')
+    pathname.startsWith('/painel/cfop') ||
+    pathname.startsWith('/fiscal')
   ) {
     return 'fiscal';
   }

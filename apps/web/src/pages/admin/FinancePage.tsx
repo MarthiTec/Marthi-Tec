@@ -385,7 +385,7 @@ function ExtratoPanel({ onSaved }: { onSaved: () => void }) {
                 <td>{item.label}</td>
                 <td>
                   {item.refId?.startsWith('OS-') ? (
-                    <Link to={`/os/${item.refId}`}>{item.refId}</Link>
+                    <Link to={`/painel/os/${item.refId}`}>{item.refId}</Link>
                   ) : (
                     item.refId || '—'
                   )}

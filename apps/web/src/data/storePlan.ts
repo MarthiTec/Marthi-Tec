@@ -80,7 +80,9 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
   if (pathname.startsWith('/caixa')) return 'erp';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (
+    pathname.startsWith('/fiscal') ||
     pathname.startsWith('/painel/notas') ||
+    pathname.startsWith('/painel/fiscal') ||
     pathname.startsWith('/painel/classificacao-fiscal') ||
     pathname.startsWith('/painel/cfop')
   ) {

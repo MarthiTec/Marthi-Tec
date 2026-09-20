@@ -13,6 +13,7 @@ import {
   type WorkOrder,
   type WorkOrderStatus,
 } from '../../data/osStore';
+import { osHref, useOsBase } from '../os/osPaths';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -25,6 +26,7 @@ function when(iso: string) {
 const DROP_STATUSES: WorkOrderStatus[] = [...BOARD_COLUMNS, 'delivered'];
 
 export function WorkOrdersPage() {
+  const osBase = useOsBase();
   const [params] = useSearchParams();
   const statusFilter = params.get('status') as WorkOrderStatus | null;
   const quoteFilter = params.get('quote') as QuoteStatus | null;
@@ -83,10 +85,10 @@ export function WorkOrdersPage() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Buscar OS, cliente ou item…"
         />
-        <Link to="/os/nova" className="btn btn--primary">
+        <Link to={osHref(osBase, '/nova')} className="btn btn--primary">
           Nova OS
         </Link>
-        <Link to="/os/agenda" className="btn btn--ghost">
+        <Link to={osHref(osBase, '/agenda')} className="btn btn--ghost">
           Agenda
         </Link>
       </div>
@@ -112,7 +114,7 @@ export function WorkOrdersPage() {
           <strong>{quoteWaiting}</strong>
           <p>
             Aguardando aprovação.{' '}
-            <Link to="/os?quote=sent">Ver lista</Link>
+            <Link to={osHref(osBase, '?quote=sent')}>Ver lista</Link>
           </p>
         </article>
       </div>
@@ -131,6 +133,7 @@ export function WorkOrdersPage() {
               <WorkOrderCard
                 key={order.id}
                 order={order}
+                osBase={osBase}
                 onMove={move}
                 dragging={draggingId === order.id}
                 onDragStart={onDragStart}
@@ -139,7 +142,7 @@ export function WorkOrdersPage() {
             ))}
           </div>
           <div className="admin-toolbar" style={{ marginTop: 12 }}>
-            <Link to="/os" className="btn btn--ghost">
+            <Link to={osBase} className="btn btn--ghost">
               Voltar ao quadro
             </Link>
           </div>
@@ -153,6 +156,7 @@ export function WorkOrdersPage() {
                 key={status}
                 status={status}
                 orders={column}
+                osBase={osBase}
                 isOver={overStatus === status}
                 draggingId={draggingId}
                 onDragOver={() => setOverStatus(status)}
@@ -173,6 +177,7 @@ export function WorkOrdersPage() {
 function BoardColumn({
   status,
   orders,
+  osBase,
   isOver,
   draggingId,
   onDragOver,
@@ -184,6 +189,7 @@ function BoardColumn({
 }: {
   status: WorkOrderStatus;
   orders: WorkOrder[];
+  osBase: string;
   isOver: boolean;
   draggingId: string | null;
   onDragOver: () => void;
@@ -221,6 +227,7 @@ function BoardColumn({
         <WorkOrderCard
           key={order.id}
           order={order}
+          osBase={osBase}
           onMove={onMove}
           dragging={draggingId === order.id}
           onDragStart={onDragStart}
@@ -233,12 +240,14 @@ function BoardColumn({
 
 function WorkOrderCard({
   order,
+  osBase,
   onMove,
   dragging,
   onDragStart,
   onDragEnd,
 }: {
   order: WorkOrder;
+  osBase: string;
   onMove: (id: string, status: WorkOrderStatus) => void;
   dragging: boolean;
   onDragStart: (id: string) => void;
@@ -269,7 +278,7 @@ function WorkOrderCard({
       onDragEnd={handleDragEnd}
     >
       <Link
-        to={`/os/${order.id}`}
+        to={osHref(osBase, `/${order.id}`)}
         className="os-ticket__link"
         draggable={false}
         onClick={(event) => {

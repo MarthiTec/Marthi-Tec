@@ -6,6 +6,7 @@ import { listSellers } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
 import { createWorkOrder, PRIORITY_LABEL, type WorkOrderPriority } from '../../data/osStore';
 import { useAuth } from '../../contexts/AuthContext';
+import { osHref, useOsBase } from '../os/osPaths';
 
 const EMPTY = {
   customerName: '',
@@ -33,6 +34,7 @@ const EMPTY = {
 
 export function WorkOrderNewPage() {
   const navigate = useNavigate();
+  const osBase = useOsBase();
   const { user } = useAuth();
   const profile = getOperatorProfile(user?.name ?? 'Operador');
   const customers = getAdminState().customers;
@@ -55,7 +57,7 @@ export function WorkOrderNewPage() {
     event.preventDefault();
     if (!form.customerName.trim() || !form.itemName.trim() || !form.defect.trim()) return;
     const created = createWorkOrder(form);
-    navigate(`/os/${created.id}/relatorio`, { replace: true });
+    navigate(osHref(osBase, `/${created.id}/relatorio`), { replace: true });
   }
 
   return (
@@ -251,7 +253,7 @@ export function WorkOrderNewPage() {
             <button type="submit" className="btn btn--primary">
               Abrir OS e gerar relatório
             </button>
-            <Link to="/os" className="btn btn--ghost">
+            <Link to={osBase} className="btn btn--ghost">
               Voltar ao quadro
             </Link>
           </div>

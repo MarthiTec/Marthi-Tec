@@ -49,6 +49,12 @@ export function AdminHomePage() {
               Abrir oficina
             </Link>
           ) : null}
+          {hasModule('fiscal') ? (
+            <Link to="/fiscal" className="btn btn--ghost">
+              <AdminIcon name="fiscal" />
+              Abrir emissor
+            </Link>
+          ) : null}
           {hasModule('totem') ? (
             <Link to="/totem" className="btn btn--ghost">
               <AdminIcon name="totem" />
@@ -147,6 +153,90 @@ export function AdminHomePage() {
         </article>
       </div>
 
+      {hasModule('os') ? (
+        <>
+          <div className="admin-grid dash-kpis">
+            <article className="admin-card">
+              <h2>Mais serviços fechados</h2>
+              <strong>{dash.topCloser?.name ?? '—'}</strong>
+              <p>
+                {dash.topCloser
+                  ? `${dash.topCloser.closedCount} OS entregues · ticket médio ${money(dash.topCloser.avgTicket)}`
+                  : 'Sem entregas registradas.'}
+              </p>
+            </article>
+            <article className="admin-card">
+              <h2>Maior retorno financeiro</h2>
+              <strong className="price-red">
+                {dash.topEarner ? money(dash.topEarner.revenue) : '—'}
+              </strong>
+              <p>
+                {dash.topEarner
+                  ? `${dash.topEarner.name} · ${dash.topEarner.closedCount} OS`
+                  : 'Sem receita de OS ainda.'}
+              </p>
+            </article>
+            <article className="admin-card">
+              <h2>Mais retornos pós-serviço</h2>
+              <strong className={dash.topReturns ? 'qty-low' : ''}>
+                {dash.topReturns?.name ?? '—'}
+              </strong>
+              <p>
+                {dash.topReturns
+                  ? `${dash.topReturns.returns} retorno(s) no mesmo equipamento`
+                  : 'Nenhum retorno detectado por IMEI/série.'}
+              </p>
+            </article>
+            <article className="admin-card">
+              <h2>Taxa de retorno</h2>
+              <strong>{(dash.returnRate * 100).toFixed(0)}%</strong>
+              <p>
+                {dash.deliveredCount} entregues · OS abertas {dash.openOs}
+              </p>
+            </article>
+          </div>
+
+          <article className="admin-card">
+            <div className="dash-card__head">
+              <h2>Ranking da oficina</h2>
+              <span className="empty">Visão gerencial · poucos acessos a este painel</span>
+            </div>
+            {dash.technicians.length === 0 ? (
+              <p className="empty">Nenhum técnico com OS ainda.</p>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Técnico</th>
+                    <th>Fechadas</th>
+                    <th>Receita</th>
+                    <th>Ticket</th>
+                    <th>Em aberto</th>
+                    <th>Retornos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...dash.technicians]
+                    .sort((a, b) => b.revenue - a.revenue || b.closedCount - a.closedCount)
+                    .map((row, index) => (
+                      <tr key={row.name}>
+                        <td>{index + 1}</td>
+                        <td>{row.name}</td>
+                        <td>{row.closedCount}</td>
+                        <td className="price-red">{money(row.revenue)}</td>
+                        <td>{money(row.avgTicket)}</td>
+                        <td>{row.inProgress}</td>
+                        <td className={row.returns > 0 ? 'qty-low' : ''}>{row.returns}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </article>
+        </>
+      ) : null}
+
       <div className="admin-ops">
         <article className="admin-card">
           <h2>Operações em aberto</h2>
@@ -211,10 +301,15 @@ export function AdminHomePage() {
               </Link>
             ) : null}
             {hasModule('os') ? (
-              <Link to="/os" className="btn btn--ghost">
-                <AdminIcon name="wrench" />
-                OS
-              </Link>
+              <>
+                <Link to="/painel/os" className="btn btn--ghost">
+                  <AdminIcon name="wrench" />
+                  Quadro OS (painel)
+                </Link>
+                <Link to="/os" className="btn btn--ghost">
+                  Abrir oficina
+                </Link>
+              </>
             ) : null}
             {hasModule('erp') ? (
               <>

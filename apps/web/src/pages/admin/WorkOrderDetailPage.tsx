@@ -56,15 +56,23 @@ import { AdminIcon } from '../../components/AdminIcons';
 import {
   emitNfseFromOs,
   FISCAL_KIND_LABEL,
+  FISCAL_STATUS_LABEL,
+  formatNfsePortalSummary,
   getFiscalDocumentForRef,
+  NFSE_ENV_LABEL,
+  NFSE_SERVICE_OPTIONS,
+  type NfseEnvironment,
 } from '../../data/fiscalDocuments';
+import { getFiscalIssuerSettings } from '../../data/fiscalIssuerStore';
 import { hasModule } from '../../data/storePlan';
+import { osHref, useOsBase } from '../os/osPaths';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export function WorkOrderDetailPage() {
+  const osBase = useOsBase();
   const { id = '' } = useParams();
   const current = getWorkOrder(id);
   const [form, setForm] = useState(current);
@@ -80,6 +88,12 @@ export function WorkOrderDetailPage() {
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [photoKind, setPhotoKind] = useState<WorkOrderPhotoKind>('entry');
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [nfseItemLc116, setNfseItemLc116] = useState<string>(NFSE_SERVICE_OPTIONS[0].itemLc116);
+  const [nfseAliqIss, setNfseAliqIss] = useState(() => getFiscalIssuerSettings().issqnRateDefault ?? 5);
+  const [nfseEnv, setNfseEnv] = useState<NfseEnvironment>(
+    () => getFiscalIssuerSettings().environment ?? 'homologacao',
+  );
+  const [nfseDesc, setNfseDesc] = useState('');
 
   const matches = useMemo(() => findStockMatches(stockQuery, 6), [stockQuery]);
   const sellers = useMemo(() => listSellers(true), []);
@@ -107,7 +121,7 @@ export function WorkOrderDetailPage() {
         <article className="admin-card">
           <h2>OS não encontrada</h2>
           <p>Essa ordem não está no histórico local.</p>
-          <Link to="/os" className="btn btn--ghost">
+          <Link to={osBase} className="btn btn--ghost">
             Voltar ao quadro
           </Link>
         </article>
@@ -196,17 +210,26 @@ export function WorkOrderDetailPage() {
   function emitNfse() {
     if (!form) return;
     const amount = workOrderTotal(form);
+    const description =
+      nfseDesc.trim() ||
+      [form.defect, form.diagnosis, form.itemName].filter(Boolean).join(' · ') ||
+      `Serviço OS ${form.id}`;
     const result = emitNfseFromOs({
       workOrderId: form.id,
       customerName: form.customerName,
+      customerDocument: form.customerDocument,
       amount,
+      serviceDescription: description,
+      itemLc116: nfseItemLc116,
+      aliqIss: nfseAliqIss,
+      environment: nfseEnv,
     });
     if (!result.ok) {
       fail(result.error);
       return;
     }
     flash(
-      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} autorizada (simulação).`,
+      `NFS-e Portal Nacional ${result.document.number} · DPS ${result.document.nfse?.dpsId} autorizada (${NFSE_ENV_LABEL[nfseEnv]}).`,
     );
   }
 
@@ -304,18 +327,21 @@ export function WorkOrderDetailPage() {
         {message ? <p className="empty">{message}</p> : null}
         {error ? <p className="qty-low">{error}</p> : null}
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <Link to={`/os/${form.id}/relatorio`} className="btn btn--ghost">
+          <Link to={osHref(osBase, `/${form.id}/relatorio`)} className="btn btn--ghost">
             Relatório / imprimir
           </Link>
           <Link
             to={
               form.estimatedReadyAt
-                ? `/os/agenda?week=${form.estimatedReadyAt.slice(0, 10)}${
-                    form.technician.trim()
-                      ? `&tech=${encodeURIComponent(form.technician.trim())}`
-                      : ''
-                  }`
-                : '/os/agenda'
+                ? osHref(
+                    osBase,
+                    `/agenda?week=${form.estimatedReadyAt.slice(0, 10)}${
+                      form.technician.trim()
+                        ? `&tech=${encodeURIComponent(form.technician.trim())}`
+                        : ''
+                    }`,
+                  )
+                : osHref(osBase, '/agenda')
             }
             className="btn btn--ghost"
           >
@@ -710,7 +736,7 @@ export function WorkOrderDetailPage() {
                 <ul>
                   {relatedByImei.map((order) => (
                     <li key={order.id}>
-                      <Link to={`/os/${order.id}`}>
+                      <Link to={osHref(osBase, `/${order.id}`)}>
                         {order.id} · {STATUS_LABEL[order.status]} ·{' '}
                         {new Date(order.createdAt).toLocaleDateString('pt-BR')}
                       </Link>
@@ -729,7 +755,7 @@ export function WorkOrderDetailPage() {
                 <ul>
                   {relatedByCustomer.map((order) => (
                     <li key={order.id}>
-                      <Link to={`/os/${order.id}`}>
+                      <Link to={osHref(osBase, `/${order.id}`)}>
                         {order.id} · {order.itemName || 'sem equipamento'} ·{' '}
                         {STATUS_LABEL[order.status]}
                       </Link>
@@ -983,7 +1009,7 @@ export function WorkOrderDetailPage() {
             />
             {form.estimatedReadyAt ? (
               <Link
-                to={`/os/agenda?week=${form.estimatedReadyAt}`}
+                to={osHref(osBase, `/agenda?week=${form.estimatedReadyAt}`)}
                 className="empty"
                 style={{ marginTop: 6, display: 'inline-block' }}
               >
@@ -1033,18 +1059,20 @@ export function WorkOrderDetailPage() {
             </button>
             {fiscalOn ? (
               fiscalDoc ? (
-                <span className="badge badge--sold">
+                <span className="badge badge--sold" title={formatNfsePortalSummary(fiscalDoc)}>
                   {FISCAL_KIND_LABEL[fiscalDoc.kind]} {fiscalDoc.number}
                 </span>
               ) : (
                 <button
                   type="button"
                   className="btn btn--ghost"
-                  onClick={emitNfse}
-                  title="Emitir NFS-e do serviço"
+                  onClick={() => {
+                    document.getElementById('os-nfse-portal')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  title="Emitir NFS-e Portal Nacional"
                 >
                   <AdminIcon name="fiscal" />
-                  Emitir NFS-e
+                  NFS-e
                 </button>
               )
             ) : (
@@ -1052,15 +1080,102 @@ export function WorkOrderDetailPage() {
                 Plano fiscal
               </Link>
             )}
-            <Link to={`/os/${form.id}/relatorio`} className="btn btn--ghost">
+            <Link to={osHref(osBase, `/${form.id}/relatorio`)} className="btn btn--ghost">
               Relatório
             </Link>
-            <Link to="/os" className="btn btn--ghost">
+            <Link to={osBase} className="btn btn--ghost">
               Voltar ao quadro
             </Link>
             {saved && !message ? <span className="empty">OS atualizada.</span> : null}
           </div>
         </form>
+      </article>
+
+      <article className="admin-card" id="os-nfse-portal">
+        <h2>NFS-e · Portal Nacional</h2>
+        <p>
+          Modelo DPS → ADN (Ambiente de Dados Nacional). Homologação local por enquanto; a estrutura já
+          segue o layout nacional (cTribNac, LC 116, chave e protocolo ADN).
+        </p>
+        {!fiscalOn ? (
+          <p className="empty">
+            Ative o módulo Emissor Fiscal no{' '}
+            <Link to="/painel/plano">plano da loja</Link> para emitir NFS-e.
+          </p>
+        ) : fiscalDoc ? (
+          <div className="os-nfse-result">
+            <p>
+              <strong>
+                {FISCAL_KIND_LABEL[fiscalDoc.kind]} {fiscalDoc.number}/{fiscalDoc.series}
+              </strong>{' '}
+              · {FISCAL_STATUS_LABEL[fiscalDoc.status]}
+            </p>
+            <pre className="os-nfse-pre">{formatNfsePortalSummary(fiscalDoc)}</pre>
+          </div>
+        ) : (
+          <div className="admin-form">
+            <AdminPicker
+              label="Item LC 116 / cTribNac"
+              value={nfseItemLc116}
+              options={NFSE_SERVICE_OPTIONS.map((item) => ({
+                value: item.itemLc116,
+                label: item.label,
+              }))}
+              onChange={setNfseItemLc116}
+            />
+            <AdminPicker
+              label="Ambiente"
+              value={nfseEnv}
+              options={[
+                { value: 'homologacao', label: NFSE_ENV_LABEL.homologacao },
+                { value: 'producao', label: NFSE_ENV_LABEL.producao },
+              ]}
+              onChange={(value) => setNfseEnv(value as NfseEnvironment)}
+            />
+            <label>
+              Alíquota ISSQN (%)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={nfseAliqIss}
+                onChange={(event) => setNfseAliqIss(Number(event.target.value) || 0)}
+              />
+            </label>
+            <label>
+              Valor do serviço
+              <input value={money(workOrderTotal(form))} readOnly />
+            </label>
+            <label className="span-2">
+              Descrição do serviço (xDescServ)
+              <textarea
+                rows={3}
+                value={nfseDesc}
+                onChange={(event) => setNfseDesc(event.target.value)}
+                placeholder={
+                  [form.defect, form.diagnosis, form.itemName].filter(Boolean).join(' · ') ||
+                  `Serviço OS ${form.id}`
+                }
+              />
+            </label>
+            <div className="span-2 admin-toolbar">
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={locked || workOrderTotal(form) <= 0}
+                onClick={emitNfse}
+              >
+                <AdminIcon name="fiscal" />
+                Gerar DPS e emitir NFS-e
+              </button>
+              <span className="empty">
+                Tomador: {form.customerName}
+                {form.customerDocument ? ` · ${form.customerDocument}` : ''}
+              </span>
+            </div>
+          </div>
+        )}
       </article>
 
       <article className="admin-card">

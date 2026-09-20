@@ -5,7 +5,13 @@ import {
   receivablesOpenTotal,
   totalTreasury,
 } from './financeBook';
-import { listWorkOrders, type WorkOrderStatus } from './osStore';
+import {
+  listWorkOrders,
+  normalizeItemRefKey,
+  workOrderTotal,
+  type WorkOrder,
+  type WorkOrderStatus,
+} from './osStore';
 
 export type DayPoint = {
   key: string;
@@ -13,6 +19,15 @@ export type DayPoint = {
   inflow: number;
   outflow: number;
   sales: number;
+};
+
+export type TechnicianRank = {
+  name: string;
+  closedCount: number;
+  revenue: number;
+  returns: number;
+  inProgress: number;
+  avgTicket: number;
 };
 
 export type DashboardSnapshot = {
@@ -29,6 +44,12 @@ export type DashboardSnapshot = {
   lowStock: number;
   series: DayPoint[];
   mix: { label: string; value: number; tone: string }[];
+  technicians: TechnicianRank[];
+  topCloser: TechnicianRank | null;
+  topEarner: TechnicianRank | null;
+  topReturns: TechnicianRank | null;
+  deliveredCount: number;
+  returnRate: number;
 };
 
 function dayKey(iso: string) {
@@ -58,6 +79,64 @@ function sumEntries(entries: FinanceEntry[], type: 'in' | 'out', from: Date, to:
 
 const OPEN_OS: WorkOrderStatus[] = ['open', 'diagnosis', 'waiting', 'progress', 'ready'];
 
+function techName(order: WorkOrder) {
+  return order.technician.trim() || 'Sem técnico';
+}
+
+function buildTechnicianRanks(orders: WorkOrder[]): TechnicianRank[] {
+  const map = new Map<string, TechnicianRank>();
+
+  function ensure(name: string) {
+    let row = map.get(name);
+    if (!row) {
+      row = { name, closedCount: 0, revenue: 0, returns: 0, inProgress: 0, avgTicket: 0 };
+      map.set(name, row);
+    }
+    return row;
+  }
+
+  for (const order of orders) {
+    const name = techName(order);
+    const row = ensure(name);
+    if (order.status === 'delivered') {
+      row.closedCount += 1;
+      row.revenue += workOrderTotal(order);
+    }
+    if (OPEN_OS.includes(order.status)) {
+      row.inProgress += 1;
+    }
+  }
+
+  const byItem = new Map<string, WorkOrder[]>();
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue;
+    const key = normalizeItemRefKey(order.itemRef);
+    if (key.length < 4) continue;
+    const list = byItem.get(key) ?? [];
+    list.push(order);
+    byItem.set(key, list);
+  }
+
+  for (const list of byItem.values()) {
+    list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (let i = 1; i < list.length; i += 1) {
+      const priorDelivered = list
+        .slice(0, i)
+        .reverse()
+        .find((item) => item.status === 'delivered' || Boolean(item.deliveredAt));
+      if (!priorDelivered) continue;
+      ensure(techName(priorDelivered)).returns += 1;
+    }
+  }
+
+  return [...map.values()]
+    .map((row) => ({
+      ...row,
+      avgTicket: row.closedCount > 0 ? row.revenue / row.closedCount : 0,
+    }))
+    .sort((a, b) => b.closedCount - a.closedCount || b.revenue - a.revenue);
+}
+
 export function getDashboardSnapshot(days = 7): DashboardSnapshot {
   const admin = getAdminState();
   const orders = listWorkOrders();
@@ -69,8 +148,6 @@ export function getDashboardSnapshot(days = 7): DashboardSnapshot {
   for (let i = 0; i < days; i += 1) {
     const day = startOfDay(-(days - 1 - i));
     const key = dayKey(day.toISOString());
-    const next = new Date(day);
-    next.setHours(23, 59, 59, 999);
     const dayEntries = admin.finance.filter((item) => dayKey(item.createdAt) === key);
     const inflow = dayEntries
       .filter((item) => item.type === 'in')
@@ -130,6 +207,19 @@ export function getDashboardSnapshot(days = 7): DashboardSnapshot {
     .sort((a, b) => b.value - a.value);
 
   const openOs = orders.filter((item) => OPEN_OS.includes(item.status)).length;
+  const technicians = buildTechnicianRanks(orders);
+  const deliveredCount = technicians.reduce((sum, row) => sum + row.closedCount, 0);
+  const returnCount = technicians.reduce((sum, row) => sum + row.returns, 0);
+  const topCloser =
+    [...technicians].sort((a, b) => b.closedCount - a.closedCount || b.revenue - a.revenue)[0] ??
+    null;
+  const topEarner =
+    [...technicians].sort((a, b) => b.revenue - a.revenue || b.closedCount - a.closedCount)[0] ??
+    null;
+  const topReturns =
+    [...technicians]
+      .filter((row) => row.returns > 0)
+      .sort((a, b) => b.returns - a.returns || b.closedCount - a.closedCount)[0] ?? null;
 
   return {
     cashBalance,
@@ -145,5 +235,11 @@ export function getDashboardSnapshot(days = 7): DashboardSnapshot {
     lowStock: admin.stock.filter((item) => item.qty <= item.minQty).length,
     series,
     mix: mix.slice(0, 5),
+    technicians,
+    topCloser,
+    topEarner,
+    topReturns,
+    deliveredCount,
+    returnRate: deliveredCount > 0 ? returnCount / deliveredCount : 0,
   };
 }

@@ -1,10 +1,12 @@
 import { getAdminState, saveStock, type StockItem } from './adminStore';
 import { getSupplier } from './erpRegistry';
+import type { FiscalDocPurpose } from './fiscalTaxTables';
 
 const STORAGE_KEY = 'marthi.invoices.v1';
 
 export type InvoiceKind = 'entry' | 'exit';
 export type InvoiceStatus = 'draft' | 'posted' | 'cancelled';
+export type { FiscalDocPurpose };
 
 export type InvoiceLine = {
   id: string;
@@ -20,6 +22,8 @@ export type Invoice = {
   kind: InvoiceKind;
   number: string;
   status: InvoiceStatus;
+  /** Tipo do documento fiscal na emissão (finNFe / reforma). */
+  documentPurpose: FiscalDocPurpose;
   supplierId: string;
   customerName: string;
   issuedAt: string;
@@ -58,7 +62,13 @@ function load(): InvoiceState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { invoices: [] };
     const parsed = JSON.parse(raw) as Partial<InvoiceState>;
-    return { invoices: Array.isArray(parsed.invoices) ? parsed.invoices : [] };
+    const invoices = Array.isArray(parsed.invoices)
+      ? parsed.invoices.map((item) => ({
+          ...item,
+          documentPurpose: (item as Invoice).documentPurpose ?? 'normal',
+        }))
+      : [];
+    return { invoices };
   } catch {
     return { invoices: [] };
   }
@@ -106,6 +116,7 @@ export function createInvoice(input: {
     kind: input.kind,
     number: (input.number ?? '').trim() || uid('DOC'),
     status: 'draft',
+    documentPurpose: 'normal',
     supplierId: input.supplierId ?? '',
     customerName: (input.customerName ?? '').trim(),
     issuedAt: input.issuedAt || stamp.slice(0, 10),
@@ -122,7 +133,12 @@ export function createInvoice(input: {
 
 export function updateInvoiceDraft(
   id: string,
-  patch: Partial<Pick<Invoice, 'number' | 'supplierId' | 'customerName' | 'issuedAt' | 'notes' | 'lines'>>,
+  patch: Partial<
+    Pick<
+      Invoice,
+      'number' | 'supplierId' | 'customerName' | 'issuedAt' | 'notes' | 'lines' | 'documentPurpose'
+    >
+  >,
 ): InvoiceResult {
   const state = load();
   const current = state.invoices.find((item) => item.id === id);

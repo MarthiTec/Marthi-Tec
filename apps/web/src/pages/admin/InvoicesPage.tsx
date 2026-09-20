@@ -1,9 +1,25 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAdminState } from '../../data/adminStore';
 import { logAction } from '../../data/auditLog';
-import { listSuppliers } from '../../data/erpRegistry';
+import { getSupplier, listSuppliers } from '../../data/erpRegistry';
+import {
+  cancelNfeDocument,
+  consultNfeStatus,
+  FISCAL_KIND_LABEL,
+  FISCAL_STATUS_LABEL,
+  getFiscalDocumentForRef,
+  openDanfePreview,
+  transmitNfeForInvoice,
+  type FiscalDocument,
+} from '../../data/fiscalDocuments';
+import {
+  getFiscalIssuerSettings,
+  issuerIsReadyForNfe,
+  SEFAZ_ENV_LABEL,
+} from '../../data/fiscalIssuerStore';
 import {
   addInvoiceLine,
   cancelInvoice,
@@ -18,6 +34,12 @@ import {
   type Invoice,
   type InvoiceKind,
 } from '../../data/invoiceStore';
+import {
+  NFE_DOC_PURPOSE_HINT,
+  NFE_DOC_PURPOSE_LABEL,
+  type FiscalDocPurpose,
+} from '../../data/fiscalTaxTables';
+import { hasModule } from '../../data/storePlan';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -25,6 +47,7 @@ function money(value: number) {
 
 export function InvoicesPage() {
   const { user } = useAuth();
+  const fiscalOn = hasModule('fiscal');
   const [kindFilter, setKindFilter] = useState<'all' | InvoiceKind>('all');
   const [invoices, setInvoices] = useState(() => listInvoices());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -32,8 +55,11 @@ export function InvoicesPage() {
   const [error, setError] = useState('');
   const [stockId, setStockId] = useState('');
   const [qty, setQty] = useState(1);
+  const [fiscalTick, setFiscalTick] = useState(0);
+  const [cancelReason, setCancelReason] = useState('Cancelamento solicitado pelo emitente');
   const suppliers = useMemo(() => listSuppliers(true), []);
   const stock = useMemo(() => getAdminState().stock, [invoices]);
+  const issuer = useMemo(() => getFiscalIssuerSettings(), [fiscalTick, message]);
 
   const filtered = useMemo(() => {
     if (kindFilter === 'all') return invoices;
@@ -41,6 +67,10 @@ export function InvoicesPage() {
   }, [invoices, kindFilter]);
 
   const selected = selectedId ? invoices.find((item) => item.id === selectedId) ?? null : null;
+  const fiscalDoc = useMemo(
+    () => (selected ? getFiscalDocumentForRef('invoice', selected.id) : null),
+    [selected, fiscalTick],
+  );
 
   function refresh(nextId?: string) {
     const next = listInvoices();
@@ -142,6 +172,127 @@ export function InvoicesPage() {
     flash('Nota cancelada.');
   }
 
+  function partyName(invoice: Invoice) {
+    if (invoice.kind === 'entry') {
+      return getSupplier(invoice.supplierId)?.name || 'Fornecedor';
+    }
+    return invoice.customerName || 'Destinatário';
+  }
+
+  function transmit(asNfce = false) {
+    if (!selected) return;
+    if (selected.status !== 'posted') {
+      fail('Lance a nota no estoque antes de transmitir a NF-e.');
+      return;
+    }
+    if (!issuerIsReadyForNfe(issuer)) {
+      fail('Configure certificado, senha e emitente em Configuração fiscal.');
+      return;
+    }
+    const result = transmitNfeForInvoice({
+      invoiceId: selected.id,
+      kind: selected.kind,
+      customerName: partyName(selected),
+      amount: invoiceTotal(selected),
+      asNfce: asNfce && selected.kind === 'exit',
+      documentPurpose: selected.documentPurpose ?? 'normal',
+      items: selected.lines.map((line) => ({
+        name: line.name,
+        qty: line.qty,
+        unitPrice: selected.kind === 'entry' ? line.unitCost : line.unitPrice,
+      })),
+    });
+    if (!result.ok) {
+      fail(result.error);
+      return;
+    }
+    setFiscalTick((value) => value + 1);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'nota.transmitir_nfe',
+      detail: `${result.document.kind} ${result.document.number} · ${result.document.accessKey}`,
+    });
+    flash(
+      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} transmitida (${SEFAZ_ENV_LABEL[result.document.nfe?.environment ?? issuer.environment]}) · protocolo ${result.document.nfe?.protocol}`,
+    );
+  }
+
+  function consult(doc: FiscalDocument) {
+    const result = consultNfeStatus(doc.id);
+    if (!result.ok) {
+      fail(result.error);
+      return;
+    }
+    setFiscalTick((value) => value + 1);
+    flash(
+      `Consulta SEFAZ: ${result.document.nfe?.statusCode} — ${result.document.nfe?.statusMessage}`,
+    );
+  }
+
+  function cancelFiscal(doc: FiscalDocument) {
+    const result = cancelNfeDocument(doc.id, cancelReason);
+    if (!result.ok) {
+      fail(result.error);
+      return;
+    }
+    setFiscalTick((value) => value + 1);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'nota.cancelar_nfe',
+      detail: `${result.document.number} · ${cancelReason}`,
+    });
+    flash(`${FISCAL_KIND_LABEL[result.document.kind]} cancelada na SEFAZ.`);
+  }
+
+  function danfe(doc: FiscalDocument, print: boolean) {
+    const result = openDanfePreview(doc, print);
+    if (!result.ok) fail(result.error);
+  }
+
+  function danfeFromNote(print: boolean) {
+    if (!selected) return;
+    if (fiscalDoc) {
+      danfe(fiscalDoc, print);
+      return;
+    }
+    if (selected.lines.length === 0) {
+      fail('Inclua itens para visualizar a DANFE.');
+      return;
+    }
+    const draftDoc: FiscalDocument = {
+      id: `DRAFT-${selected.id}`,
+      kind: 'nfe',
+      status: 'pending',
+      refType: 'invoice',
+      refId: selected.id,
+      customerName: partyName(selected),
+      amount: invoiceTotal(selected),
+      number: selected.number || '—',
+      series: issuer.nfeSeries || '1',
+      accessKey: 'PREVIEW-SEM-TRANSMISSAO',
+      provider: 'sefaz_mock',
+      createdAt: new Date().toISOString(),
+      message: `Pré-visualização DANFE · ${NFE_DOC_PURPOSE_LABEL[selected.documentPurpose ?? 'normal']} · ainda não transmitida`,
+      items: selected.lines.map((line) => ({
+        name: line.name,
+        qty: line.qty,
+        unitPrice: selected.kind === 'entry' ? line.unitCost : line.unitPrice,
+      })),
+      nfe: {
+        environment: issuer.environment,
+        protocol: '—',
+        receiptNumber: '—',
+        statusCode: '—',
+        statusMessage: 'Pré-visualização',
+        xmlDigest: '',
+        documentPurpose: selected.documentPurpose ?? 'normal',
+      },
+    };
+    danfe(draftDoc, print);
+  }
+
   return (
     <section className="admin-page">
       <div className="admin-toolbar">
@@ -162,6 +313,16 @@ export function InvoicesPage() {
         <button type="button" className="btn btn--ghost" onClick={() => create('exit')}>
           Nova saída
         </button>
+        {fiscalOn ? (
+          <>
+            <Link to="/fiscal/config" className="btn btn--ghost">
+              Configuração fiscal
+            </Link>
+            <Link to="/fiscal/cst" className="btn btn--ghost">
+              CST / cClassTrib
+            </Link>
+          </>
+        ) : null}
       </div>
 
       {message ? <p className="empty">{message}</p> : null}
@@ -176,30 +337,39 @@ export function InvoicesPage() {
                 <th>Código</th>
                 <th>Tipo</th>
                 <th>Status</th>
+                <th>Fiscal</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="empty">
+                  <td colSpan={5} className="empty">
                     Nenhuma nota ainda.
                   </td>
                 </tr>
               ) : (
-                filtered.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={selectedId === item.id ? 'is-selected' : ''}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedId(item.id)}
-                  >
-                    <td>{item.id}</td>
-                    <td>{INVOICE_KIND_LABEL[item.kind]}</td>
-                    <td>{INVOICE_STATUS_LABEL[item.status]}</td>
-                    <td>{money(invoiceTotal(item))}</td>
-                  </tr>
-                ))
+                filtered.map((item) => {
+                  const doc = getFiscalDocumentForRef('invoice', item.id);
+                  return (
+                    <tr
+                      key={item.id}
+                      className={selectedId === item.id ? 'is-selected' : ''}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <td>{item.id}</td>
+                      <td>{INVOICE_KIND_LABEL[item.kind]}</td>
+                      <td>{INVOICE_STATUS_LABEL[item.status]}</td>
+                      <td>
+                        {doc
+                          ? `${FISCAL_KIND_LABEL[doc.kind]} · ${FISCAL_STATUS_LABEL[doc.status]}`
+                          : '—'}
+                      </td>
+                      <td>{money(invoiceTotal(item))}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -216,9 +386,16 @@ export function InvoicesPage() {
               <h2>
                 {INVOICE_KIND_LABEL[selected.kind]} · {selected.id}
               </h2>
-              <p>
-                Status: <strong>{INVOICE_STATUS_LABEL[selected.status]}</strong> · Total{' '}
-                {money(invoiceTotal(selected))}
+              <p className="fiscal-note-meta">
+                Status: <span>{INVOICE_STATUS_LABEL[selected.status]}</span>
+                {' · '}
+                Total {money(invoiceTotal(selected))}
+                {fiscalOn ? (
+                  <>
+                    {' · '}
+                    Ambiente SEFAZ: <span>{SEFAZ_ENV_LABEL[issuer.environment]}</span>
+                  </>
+                ) : null}
               </p>
 
               <div className="admin-form" style={{ marginTop: 12 }}>
@@ -239,6 +416,22 @@ export function InvoicesPage() {
                     onChange={(e) => saveDraft({ issuedAt: e.target.value })}
                   />
                 </label>
+                <AdminPicker
+                  className="span-2"
+                  label="Tipo de documento (NF-e)"
+                  value={selected.documentPurpose ?? 'normal'}
+                  disabled={selected.status !== 'draft'}
+                  options={(Object.keys(NFE_DOC_PURPOSE_LABEL) as FiscalDocPurpose[]).map((key) => ({
+                    value: key,
+                    label: NFE_DOC_PURPOSE_LABEL[key],
+                  }))}
+                  onChange={(value) =>
+                    saveDraft({ documentPurpose: value as FiscalDocPurpose })
+                  }
+                />
+                <p className="span-2 empty" style={{ margin: 0 }}>
+                  {NFE_DOC_PURPOSE_HINT[selected.documentPurpose ?? 'normal']}
+                </p>
                 {selected.kind === 'entry' ? (
                   <AdminPicker
                     className="span-2"
@@ -272,7 +465,7 @@ export function InvoicesPage() {
               </div>
 
               {selected.status === 'draft' ? (
-                <div className="admin-toolbar" style={{ marginTop: 12 }}>
+                <div className="erp-invoice-lines">
                   <AdminPicker
                     label="Item do estoque"
                     value={stockId}
@@ -283,7 +476,7 @@ export function InvoicesPage() {
                     }))}
                     onChange={setStockId}
                   />
-                  <label>
+                  <label className="erp-invoice-qty">
                     Qtd
                     <input
                       type="number"
@@ -354,10 +547,123 @@ export function InvoicesPage() {
                 ) : null}
                 {selected.status !== 'cancelled' ? (
                   <button type="button" className="btn btn--ghost" onClick={cancel}>
-                    Cancelar
+                    Cancelar lançamento
                   </button>
                 ) : null}
+                {fiscalOn ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() => danfeFromNote(false)}
+                    >
+                      Visualizar DANFE
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() => danfeFromNote(true)}
+                    >
+                      Imprimir DANFE
+                    </button>
+                  </>
+                ) : null}
               </div>
+
+              {fiscalOn ? (
+                <div className="os-nfse-result" style={{ marginTop: 18 }}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '0.95rem' }}>NF-e / transmissão SEFAZ</h3>
+                  <p className="empty" style={{ marginTop: 0 }}>
+                    Transmitir gera o XML, envia e consulta o recibo. Configure certificado e ambiente em{' '}
+                    <Link to="/fiscal/config">Configuração fiscal</Link>.
+                  </p>
+
+                  {fiscalDoc ? (
+                    <>
+                      <p>
+                        <strong>
+                          {FISCAL_KIND_LABEL[fiscalDoc.kind]} {fiscalDoc.number}/{fiscalDoc.series}
+                        </strong>{' '}
+                        · {FISCAL_STATUS_LABEL[fiscalDoc.status]}
+                      </p>
+                      <pre className="os-nfse-pre">
+                        {[
+                          `Ambiente: ${SEFAZ_ENV_LABEL[fiscalDoc.nfe?.environment ?? issuer.environment]}`,
+                          `Chave: ${fiscalDoc.accessKey}`,
+                          `Protocolo: ${fiscalDoc.nfe?.protocol ?? '—'}`,
+                          `Recibo: ${fiscalDoc.nfe?.receiptNumber ?? '—'}`,
+                          `Consulta: ${fiscalDoc.nfe?.statusCode ?? '—'} — ${fiscalDoc.nfe?.statusMessage ?? '—'}`,
+                          fiscalDoc.nfe?.consultedAt
+                            ? `Consultado em: ${new Date(fiscalDoc.nfe.consultedAt).toLocaleString('pt-BR')}`
+                            : '',
+                          fiscalDoc.message,
+                        ]
+                          .filter(Boolean)
+                          .join('\n')}
+                      </pre>
+                      <div className="admin-toolbar" style={{ marginTop: 10 }}>
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => consult(fiscalDoc)}
+                        >
+                          Consultar status
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => danfe(fiscalDoc, false)}
+                        >
+                          Visualizar DANFE
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => danfe(fiscalDoc, true)}
+                        >
+                          Imprimir DANFE
+                        </button>
+                      </div>
+                      {fiscalDoc.status === 'authorized' ? (
+                        <div className="admin-form" style={{ marginTop: 12 }}>
+                          <label className="span-2">
+                            Justificativa do cancelamento (mín. 15 caracteres)
+                            <input
+                              value={cancelReason}
+                              onChange={(e) => setCancelReason(e.target.value)}
+                            />
+                          </label>
+                          <div className="span-2 admin-toolbar">
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              onClick={() => cancelFiscal(fiscalDoc)}
+                            >
+                              Cancelar NF-e
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="admin-toolbar" style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        disabled={selected.status !== 'posted'}
+                        onClick={() => transmit(false)}
+                      >
+                        Transmitir NF-e
+                      </button>
+                      {!issuerIsReadyForNfe(issuer) ? (
+                        <Link to="/fiscal/config" className="btn btn--ghost">
+                          Cadastrar certificado
+                        </Link>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </>
           )}
         </article>

@@ -15,6 +15,7 @@ import {
   workOrderReadyDate,
   type WorkOrder,
 } from '../../data/osStore';
+import { osHref, useOsBase } from '../os/osPaths';
 
 const WEEKDAY = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -31,14 +32,16 @@ function formatWeekRange(monday: Date) {
 
 function AgendaCard({
   order,
+  osBase,
   onDateChange,
 }: {
   order: WorkOrder;
+  osBase: string;
   onDateChange: (id: string, date: string) => void;
 }) {
   return (
     <article className={`os-agenda__card os-agenda__card--${order.priority}`}>
-      <Link to={`/os/${order.id}`} className="os-agenda__card-link">
+      <Link to={osHref(osBase, `/${order.id}`)} className="os-agenda__card-link">
         <strong>{order.id}</strong>
         <span>{order.customerName}</span>
         <span className="os-agenda__card-item">{order.itemName}</span>
@@ -61,6 +64,7 @@ function AgendaCard({
 }
 
 export function AgendaPage() {
+  const osBase = useOsBase();
   const [params, setParams] = useSearchParams();
   const technician = params.get('tech') || 'all';
   const weekParam = params.get('week');
@@ -144,7 +148,7 @@ export function AgendaPage() {
           ]}
           onChange={setTechnician}
         />
-        <Link to="/os/nova" className="btn btn--primary">
+        <Link to={osHref(osBase, '/nova')} className="btn btn--primary">
           Nova OS
         </Link>
       </div>
@@ -188,7 +192,7 @@ export function AgendaPage() {
                     <p className="empty">Livre</p>
                   ) : (
                     day.orders.map((order) => (
-                      <AgendaCard key={order.id} order={order} onDateChange={changeDate} />
+                      <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
                     ))
                   )}
                 </div>
@@ -203,7 +207,7 @@ export function AgendaPage() {
               <h2>Atrasadas</h2>
               <div className="os-agenda__side-list">
                 {overdue.map((order) => (
-                  <AgendaCard key={order.id} order={order} onDateChange={changeDate} />
+                  <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
                 ))}
               </div>
             </article>
@@ -216,7 +220,7 @@ export function AgendaPage() {
             ) : (
               <div className="os-agenda__side-list">
                 {unscheduled.map((order) => (
-                  <AgendaCard key={order.id} order={order} onDateChange={changeDate} />
+                  <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
                 ))}
               </div>
             )}

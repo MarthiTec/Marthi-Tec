@@ -6,7 +6,11 @@ import { PartnerSignupPage } from './pages/PartnerSignupPage';
 import { TotemPage } from './pages/totem/TotemPage';
 import { CaixaPage } from './pages/caixa/CaixaPage';
 import { OsLayout } from './pages/os/OsLayout';
-import { PainelOsRedirect } from './pages/os/PainelOsRedirect';
+import { FiscalLayout } from './pages/fiscal/FiscalLayout';
+import { FiscalHomePage } from './pages/fiscal/FiscalHomePage';
+import { FiscalNfsePage } from './pages/fiscal/FiscalNfsePage';
+import { FiscalCtePage } from './pages/fiscal/FiscalCtePage';
+import { FiscalMdfePage } from './pages/fiscal/FiscalMdfePage';
 import { TotemSettingsPage } from './pages/admin/TotemSettingsPage';
 import { TotemInsightsPage } from './pages/admin/TotemInsightsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -33,6 +37,8 @@ import { AuditPage } from './pages/admin/AuditPage';
 import { InvoicesPage } from './pages/admin/InvoicesPage';
 import { FiscalClassPage } from './pages/admin/FiscalClassPage';
 import { CfopPage } from './pages/admin/CfopPage';
+import { FiscalIssuerPage } from './pages/admin/FiscalIssuerPage';
+import { FiscalCstPage } from './pages/admin/FiscalCstPage';
 import { KitsPage } from './pages/admin/KitsPage';
 import { LotsPage } from './pages/admin/LotsPage';
 import { WarehousePage } from './pages/admin/WarehousePage';
@@ -54,6 +60,15 @@ export function App() {
           <Route path="agenda" element={<AgendaPage />} />
           <Route path=":id/relatorio" element={<WorkOrderReportPage />} />
           <Route path=":id" element={<WorkOrderDetailPage />} />
+        </Route>
+        <Route path="/fiscal" element={<FiscalLayout />}>
+          <Route index element={<FiscalHomePage />} />
+          <Route path="nfe" element={<InvoicesPage />} />
+          <Route path="nfse" element={<FiscalNfsePage />} />
+          <Route path="cte" element={<FiscalCtePage />} />
+          <Route path="mdfe" element={<FiscalMdfePage />} />
+          <Route path="config" element={<FiscalIssuerPage />} />
+          <Route path="cst" element={<FiscalCstPage />} />
         </Route>
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
@@ -79,9 +94,14 @@ export function App() {
           <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="permissoes" element={<PermissionsPage />} />
           <Route path="auditoria" element={<AuditPage />} />
-          <Route path="notas" element={<InvoicesPage />} />
-          <Route path="os" element={<PainelOsRedirect />} />
-          <Route path="os/*" element={<PainelOsRedirect />} />
+          <Route path="notas" element={<Navigate to="/fiscal/nfe" replace />} />
+          <Route path="fiscal/config" element={<Navigate to="/fiscal/config" replace />} />
+          <Route path="fiscal/cst" element={<Navigate to="/fiscal/cst" replace />} />
+          <Route path="os" element={<WorkOrdersPage />} />
+          <Route path="os/nova" element={<WorkOrderNewPage />} />
+          <Route path="os/agenda" element={<AgendaPage />} />
+          <Route path="os/:id/relatorio" element={<WorkOrderReportPage />} />
+          <Route path="os/:id" element={<WorkOrderDetailPage />} />
           <Route path="perfil" element={<ProfilePage />} />
           <Route path="plano" element={<PlanPage />} />
           <Route path="ajuda" element={<HelpPage />} />

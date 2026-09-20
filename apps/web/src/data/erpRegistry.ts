@@ -422,8 +422,10 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
     return 'erp_employees';
   }
   if (pathname.startsWith('/painel/auditoria')) return 'erp_audit';
-  if (pathname.startsWith('/painel/notas')) return 'erp_invoices';
+  if (pathname.startsWith('/painel/notas') || pathname.startsWith('/fiscal/nfe')) return 'erp_invoices';
   if (
+    pathname.startsWith('/fiscal') ||
+    pathname.startsWith('/painel/fiscal') ||
     pathname.startsWith('/painel/classificacao-fiscal') ||
     pathname.startsWith('/painel/cfop')
   ) {

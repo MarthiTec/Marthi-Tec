@@ -11,6 +11,7 @@ import {
   workOrderShopDurationMs,
   workOrderTotal,
 } from '../../data/osStore';
+import { osHref, useOsBase } from '../os/osPaths';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -37,6 +38,7 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 export function WorkOrderReportPage() {
+  const osBase = useOsBase();
   const { id = '' } = useParams();
   const order = getWorkOrder(id);
 
@@ -45,7 +47,7 @@ export function WorkOrderReportPage() {
       <section className="admin-page">
         <article className="admin-card">
           <h2>OS não encontrada</h2>
-          <Link to="/os" className="btn btn--ghost">
+          <Link to={osBase} className="btn btn--ghost">
             Voltar ao quadro
           </Link>
         </article>
@@ -62,10 +64,10 @@ export function WorkOrderReportPage() {
   return (
     <section className="admin-page os-report-page">
       <div className="admin-toolbar no-print">
-        <Link to={`/os/${order.id}`} className="btn btn--ghost">
+        <Link to={osHref(osBase, `/${order.id}`)} className="btn btn--ghost">
           Abrir OS
         </Link>
-        <Link to="/os" className="btn btn--ghost">
+        <Link to={osBase} className="btn btn--ghost">
           Quadro
         </Link>
         <button type="button" className="btn btn--primary" onClick={() => window.print()}>
