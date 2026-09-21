@@ -325,7 +325,7 @@ export function apiGetTotemSettings() {
   return nestGet<TotemSettings>('/store/totem-settings');
 }
 
-export function apiPutTotemSettings(body: Partial<TotemSettings> & Pick<TotemSettings, 'mode'>) {
+export function apiPutTotemSettings(body: Partial<TotemSettings>) {
   return nestPut<TotemSettings>('/store/totem-settings', body);
 }
 

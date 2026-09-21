@@ -17,9 +17,9 @@ import {
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
 
-const STORAGE_KEY = 'marthi.admin.v1';
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
+const STORAGE_KEY = 'marthi.admin.v1';
 
 export type Customer = {
   id: string;
@@ -663,6 +663,13 @@ function save(state: AdminState) {
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(ADMIN_STATE_EVENT));
+    try {
+      const channel = new BroadcastChannel('marthi-totem-live');
+      channel.postMessage({ at: Date.now() });
+      channel.close();
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -687,6 +694,11 @@ export function replaceAdminState(state: AdminState) {
 
 export function getAdminState() {
   return load();
+}
+
+/** Força o totem (outra aba) a reler o estoque do localStorage. */
+export function invalidateAdminMemory() {
+  memoryState = null;
 }
 
 function apiErrorMessage(error: unknown, fallback: string) {

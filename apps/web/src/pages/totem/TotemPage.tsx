@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
 import {
-  ATTRIBUTES_EVENT,
   formatPicked,
   productAttrValues,
   resolveTotemAttrOptions,
@@ -12,11 +11,27 @@ import {
   type PickedAttribute,
   type ProductAttribute,
 } from '../../data/attributeStore';
-import { getTotemExitPassword, getTotemSettings, TOTEM_SETTINGS_EVENT, type TotemMode } from '../../data/totemSettings';
+import { subscribeTotemLive } from '../../data/totemLiveSync';
+import { speakTotem, stopTotemSpeech } from '../../data/totemSpeech';
+import {
+  getTotemExitPassword,
+  getTotemSettings,
+  storeGreeting,
+  totemCopy,
+  TOTEM_DINE_ID,
+  TOTEM_DINE_OPTIONS,
+  type TotemColumns,
+  type TotemKeyboardPlacement,
+  type TotemMode,
+  type TotemSettings,
+  type TotemVertical,
+} from '../../data/totemSettings';
+import { printWaitTicket, ticketSenha } from '../../data/totemTicketPrint';
 import { trackTotemProductClick } from '../../data/totemAnalyticsStore';
 import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../data/variantQuote';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
+import { TotemAttractScene } from './TotemAttractScene';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
 import {
@@ -32,7 +47,7 @@ import './totem.css';
 
 const FILTER_IDLE_MS = 2 * 60 * 1000;
 
-type Step = 'catalog' | 'checkout' | 'done';
+type Step = 'attract' | 'welcome' | 'catalog' | 'checkout' | 'done';
 type BrandFilter = TotemBrand | 'all';
 type CardConfig = Record<string, string>;
 
@@ -47,6 +62,15 @@ type Selection = {
 
 function uniqueSorted(values: string[]) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+function startStep(settings: TotemSettings): Step {
+  if (settings.showAttractScreen) return 'attract';
+  return settings.mode !== 'catalog' && settings.askCustomerName ? 'welcome' : 'catalog';
+}
+
+function catalogFingerprint(items: { id: number; name: string; cashPrice: number; totalQty?: number }[]) {
+  return items.map((item) => `${item.id}:${item.name}:${item.cashPrice}:${item.totalQty ?? ''}`).join('|');
 }
 
 function defaultConfig(product: TotemProduct, attrs: ProductAttribute[]): CardConfig {
@@ -80,7 +104,7 @@ export function TotemPage() {
   const navigate = useNavigate();
   const listRef = useRef<HTMLDivElement>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
-  const [step, setStep] = useState<Step>('catalog');
+  const [step, setStep] = useState<Step>(() => startStep(getTotemSettings()));
   const [brand, setBrand] = useState<BrandFilter>('all');
   const [search, setSearch] = useState('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -100,21 +124,54 @@ export function TotemPage() {
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
   const [mode, setMode] = useState<TotemMode>(() => getTotemSettings().mode);
+  const [vertical, setVertical] = useState<TotemVertical>(() => getTotemSettings().vertical);
+  const [columns, setColumns] = useState<TotemColumns>(() => getTotemSettings().columns);
+  const [askCustomerName, setAskCustomerName] = useState(() => getTotemSettings().askCustomerName);
+  const [offerFulfillment, setOfferFulfillment] = useState(() => getTotemSettings().offerFulfillment);
+  const [printTicket, setPrintTicket] = useState(() => getTotemSettings().printTicket);
+  const [audioAssist, setAudioAssist] = useState(() => getTotemSettings().audioAssist);
+  const [showAttractScreen, setShowAttractScreen] = useState(() => getTotemSettings().showAttractScreen);
+  const [storeName, setStoreName] = useState(() => getTotemSettings().storeName);
+  const [storeLogo, setStoreLogo] = useState(() => getTotemSettings().storeLogo);
+  const [attractBackground, setAttractBackground] = useState(() => getTotemSettings().attractBackground);
+  const [attractGradientColor, setAttractGradientColor] = useState(
+    () => getTotemSettings().attractGradientColor,
+  );
+  const [keyboardPlacement, setKeyboardPlacement] = useState<TotemKeyboardPlacement>(
+    () => getTotemSettings().keyboardPlacement,
+  );
+  const [sessionMode, setSessionMode] = useState<TotemMode | null>(null);
+  const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
   const [catalog, setCatalog] = useState(() => listTotemCatalog());
   const [catalogLoading, setCatalogLoading] = useState(true);
-  const catalogOnly = mode === 'catalog';
+  const [ticketId, setTicketId] = useState<string | null>(null);
+  const effectiveMode = sessionMode ?? mode;
+  const catalogOnly = effectiveMode === 'catalog';
+  const showDineIn = offerFulfillment && !catalogOnly;
+  const collectNameUpFront = askCustomerName && !catalogOnly;
+  const canPrintTicket = printTicket && !catalogOnly;
+  const copy = totemCopy(vertical);
+  const senha = ticketId ? ticketSenha(ticketId) : '';
+  const greeting = storeGreeting();
 
   const hasActiveQuery =
     search.trim() !== '' ||
     brand !== 'all' ||
     Object.values(filters).some((value) => value && value !== 'all');
 
+  const homeStep: Step = showAttractScreen
+    ? 'attract'
+    : collectNameUpFront
+      ? 'welcome'
+      : 'catalog';
+
   const awayFromHome =
-    step !== 'catalog' ||
+    step !== homeStep ||
     hasActiveQuery ||
     Boolean(selection) ||
-    name.trim() !== '' ||
+    (step === 'welcome' && name.trim() !== '') ||
+    (step !== 'welcome' && name.trim() !== '') ||
     phone.trim() !== '' ||
     exitOpen;
 
@@ -132,7 +189,7 @@ export function TotemPage() {
 
   function resetToHome() {
     clearCatalogFilters();
-    setStep('catalog');
+    setStep(homeStep);
     setSelection(null);
     setName('');
     setPhone('');
@@ -142,8 +199,28 @@ export function TotemPage() {
     setExitPassword('');
     setExitError(null);
     setConfigs({});
+    setTicketId(null);
+    setSessionMode(null);
+    stopTotemSpeech();
     window.scrollTo({ top: 0 });
     listRef.current?.scrollTo({ top: 0 });
+  }
+
+  function printCurrentTicket(
+    id: string,
+    productName: string,
+    picked: PickedAttribute[],
+    priceLabel: string,
+  ) {
+    return printWaitTicket({
+      storeName: storeName.trim() || 'Sua Loja',
+      ticketId: id,
+      senha: ticketSenha(id),
+      customerName: name.trim() || 'Cliente',
+      productName,
+      picked,
+      priceLabel,
+    });
   }
 
   const brandProducts = useMemo(() => {
@@ -225,6 +302,39 @@ export function TotemPage() {
   }, [keyboardOpen, openFilter]);
 
   useEffect(() => {
+    return () => stopTotemSpeech();
+  }, []);
+
+  useEffect(() => {
+    if (!voiceOn) {
+      stopTotemSpeech();
+      return;
+    }
+    if (step === 'attract' && showAttractScreen) {
+      speakTotem(`${greeting}. Bem-vindo à ${storeName}. Inicie um pedido ou veja o catálogo.`, true);
+      return;
+    }
+    if (step === 'welcome' && collectNameUpFront) {
+      speakTotem(`${copy.welcomeTitle}. ${copy.welcomeText}`, true);
+      return;
+    }
+    if (step === 'catalog') {
+      speakTotem(catalogOnly ? copy.footerCatalog : collectNameUpFront ? copy.footerNamed : copy.footerKiosk, true);
+      return;
+    }
+    if (step === 'checkout' && selection) {
+      speakTotem(`Confira ${selection.product.name} e confirme o pedido.`, true);
+      return;
+    }
+    if (step === 'done') {
+      speakTotem(
+        senha ? `${copy.doneTitle}. Senha ${senha.split('').join(' ')}. ${copy.doneHint}` : `${copy.doneTitle}. ${copy.doneHint}`,
+        true,
+      );
+    }
+  }, [step, voiceOn]);
+
+  useEffect(() => {
     let active = true;
     async function hydrateCatalog() {
       setCatalogLoading(true);
@@ -241,36 +351,60 @@ export function TotemPage() {
   }, []);
 
   useEffect(() => {
-    function refreshSettings() {
+    function applyCatalog(next: ReturnType<typeof listTotemCatalog>) {
+      setCatalog((current) =>
+        catalogFingerprint(current) === catalogFingerprint(next) ? current : next,
+      );
+    }
+
+    function refreshLive() {
       const settings = getTotemSettings();
       setMode(settings.mode);
+      setVertical(settings.vertical);
+      setColumns(settings.columns);
+      setAskCustomerName(settings.askCustomerName);
+      setOfferFulfillment(settings.offerFulfillment);
+      setPrintTicket(settings.printTicket);
+      setAudioAssist(settings.audioAssist);
+      setShowAttractScreen(settings.showAttractScreen);
+      setStoreName(settings.storeName);
+      setStoreLogo(settings.storeLogo);
+      setAttractBackground(settings.attractBackground);
+      setAttractGradientColor(settings.attractGradientColor);
+      setKeyboardPlacement(settings.keyboardPlacement);
       setRequiredExitPassword(settings.exitPassword);
-      void loadTotemCatalog().then(setCatalog);
-      if (settings.mode === 'catalog') {
-        setStep('catalog');
-        setSelection(null);
-      }
-    }
-    function refreshAttrs() {
       setCardAttrs(totemCardAttributes());
       setFilterAttrs(totemFilterAttributes());
-      void loadTotemCatalog().then(setCatalog);
+      applyCatalog(listTotemCatalog());
+      void loadTotemCatalog().then(applyCatalog);
     }
-    refreshAttrs();
-    window.addEventListener(TOTEM_SETTINGS_EVENT, refreshSettings);
-    window.addEventListener(ATTRIBUTES_EVENT, refreshAttrs);
-    window.addEventListener('storage', refreshSettings);
-    window.addEventListener('marthi-stock', refreshSettings);
-    return () => {
-      window.removeEventListener(TOTEM_SETTINGS_EVENT, refreshSettings);
-      window.removeEventListener(ATTRIBUTES_EVENT, refreshAttrs);
-      window.removeEventListener('storage', refreshSettings);
-      window.removeEventListener('marthi-stock', refreshSettings);
-    };
+
+    refreshLive();
+    return subscribeTotemLive(refreshLive);
   }, []);
+
+  useEffect(() => {
+    if (!collectNameUpFront && step === 'welcome') setStep('catalog');
+    if (!showAttractScreen && step === 'attract') {
+      setStep(collectNameUpFront ? 'welcome' : 'catalog');
+    }
+  }, [collectNameUpFront, showAttractScreen, step]);
+
+  function beginOrder() {
+    bumpIdle();
+    setSessionMode('kiosk');
+    setStep(askCustomerName ? 'welcome' : 'catalog');
+  }
+
+  function beginCatalogBrowse() {
+    bumpIdle();
+    setSessionMode('catalog');
+    setStep('catalog');
+  }
 
   function getConfig(product: TotemProduct): CardConfig {
     const base = { ...defaultConfig(product, cardAttrs), ...(configs[product.id] ?? {}) };
+    if (showDineIn && !base[TOTEM_DINE_ID]) base[TOTEM_DINE_ID] = TOTEM_DINE_OPTIONS[0];
     for (const attr of filterAttrs) {
       const selected = filters[attr.id];
       const values = resolveTotemAttrOptions(product, attr);
@@ -294,6 +428,13 @@ export function TotemPage() {
     if (catalogOnly) return;
     const config = getConfig(product);
     const picked = pickedFromConfig(product, config, cardAttrs);
+    if (showDineIn) {
+      picked.push({
+        id: TOTEM_DINE_ID,
+        name: 'Pedido',
+        value: config[TOTEM_DINE_ID] || TOTEM_DINE_OPTIONS[0],
+      });
+    }
     const quote = quoteFromPicked(product.name, product.cashPrice, picked);
     setSelection({
       product,
@@ -310,13 +451,7 @@ export function TotemPage() {
   }
 
   function resetTotem() {
-    setStep('catalog');
-    clearCatalogFilters();
-    setSelection(null);
-    setName('');
-    setPhone('');
-    setError(null);
-    setSubmitting(false);
+    resetToHome();
   }
 
   function requestExit() {
@@ -351,7 +486,7 @@ export function TotemPage() {
     setSubmitting(true);
 
     const priceLabel =
-      selection.payment === 'À vista'
+      !copy.showInstallments || selection.payment === 'À vista'
         ? formatBRL(selection.cashPrice)
         : `${selection.installment} · ${formatInstallment(
             selection.cashPrice,
@@ -360,17 +495,22 @@ export function TotemPage() {
     const legacy = toLegacyFields(selection.picked);
 
     try {
-      await submitTotemLead({
+      const result = await submitTotemLead({
         customerName: name.trim(),
         customerPhone: phone.trim(),
         productName: selection.product.name,
         attributes: selection.picked,
         ...legacy,
-        payment: selection.payment,
-        installment: selection.payment === 'Parcelado' ? selection.installment : null,
+        payment: copy.showInstallments ? selection.payment : 'À vista',
+        installment:
+          copy.showInstallments && selection.payment === 'Parcelado' ? selection.installment : null,
         priceLabel,
       });
+      setTicketId(result.ticketId);
       setStep('done');
+      if (canPrintTicket) {
+        printCurrentTicket(result.ticketId, selection.product.name, selection.picked, priceLabel);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível enviar a proposta.');
     } finally {
@@ -379,42 +519,198 @@ export function TotemPage() {
   }
 
   return (
-    <div className={`totem ${step === 'catalog' ? 'totem--page-scroll' : ''}`}>
-      <header className="totem__top">
-        <BrandLogo variant="mark" className="totem__mark" />
+    <div
+      className={`totem ${step === 'catalog' ? 'totem--page-scroll' : ''} ${step === 'attract' ? 'totem--attract' : ''}`}
+      data-cols={columns}
+      data-kb={keyboardPlacement}
+      data-vertical={vertical}
+      style={{ ['--totem-cols' as string]: String(columns) }}
+    >
+      <header className={`totem__top ${step === 'attract' ? 'totem__top--ghost' : ''}`}>
+        {storeLogo ? (
+          <img src={storeLogo} alt={storeName} className="totem__mark" />
+        ) : (
+          <BrandLogo variant="mark" className="totem__mark" />
+        )}
         <div className="totem__top-meta">
-          <strong>Sua Loja</strong>
-          <span>{catalogOnly ? 'Catálogo da loja' : 'Quiosque de venda · Shopping'}</span>
+          <strong>{storeName}</strong>
+          <span>{catalogOnly ? copy.catalogSubtitle : copy.kioskSubtitle}</span>
         </div>
+        {audioAssist ? (
+          <button
+            type="button"
+            className={`totem__audio ${voiceOn ? 'is-on' : ''}`}
+            aria-pressed={voiceOn}
+            onClick={() => {
+              const next = !voiceOn;
+              setVoiceOn(next);
+              if (next) speakTotem('Áudio ligado.', true);
+              else stopTotemSpeech();
+            }}
+          >
+            {voiceOn ? 'Ouvir' : 'Mudo'}
+          </button>
+        ) : null}
         <button type="button" className="totem__exit" onClick={requestExit}>
           Sair
         </button>
       </header>
+      <p className="totem-sr-only" aria-live="polite">
+        {step === 'done' && senha ? `Senha ${senha}` : `${greeting}. ${storeName}`}
+      </p>
+
+      {step === 'attract' && showAttractScreen && (
+        <TotemAttractScene
+          storeName={storeName}
+          storeLogo={storeLogo}
+          greeting={greeting}
+          gradientColor={attractGradientColor}
+          backgroundImage={attractBackground}
+          onStartOrder={beginOrder}
+          onBrowseCatalog={beginCatalogBrowse}
+        />
+      )}
+
+      {step === 'welcome' && collectNameUpFront && (
+        <section className={`totem__welcome totem__welcome--kb-${keyboardPlacement}`}>
+          {keyboardPlacement === 'top' ? (
+            <>
+              <TotemKeyboard
+                onKey={(char) => {
+                  bumpIdle();
+                  setName((current) => `${current}${char}`.slice(0, 40));
+                }}
+                onBackspace={() => {
+                  bumpIdle();
+                  setName((current) => current.slice(0, -1));
+                }}
+                onSpace={() => {
+                  bumpIdle();
+                  setName((current) => `${current} `.slice(0, 40));
+                }}
+                onClear={() => {
+                  bumpIdle();
+                  setName('');
+                }}
+                onClose={() => {
+                  if (name.trim()) {
+                    bumpIdle();
+                    setStep('catalog');
+                  }
+                }}
+              />
+              <div className="totem__welcome-copy">
+                <h1>{copy.welcomeTitle}</h1>
+                <p>{copy.welcomeText}</p>
+                <label className="totem-field">
+                  Nome
+                  <input
+                    value={name}
+                    onChange={(e) => {
+                      bumpIdle();
+                      setName(e.target.value);
+                    }}
+                    placeholder="Seu nome"
+                    autoComplete="off"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="totem-btn totem-btn--primary totem-btn--block"
+                  disabled={!name.trim()}
+                  onClick={() => {
+                    bumpIdle();
+                    setStep('catalog');
+                  }}
+                >
+                  Ver produtos
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="totem__welcome-copy">
+                <h1>{copy.welcomeTitle}</h1>
+                <p>{copy.welcomeText}</p>
+                <label className="totem-field">
+                  Nome
+                  <input
+                    value={name}
+                    onChange={(e) => {
+                      bumpIdle();
+                      setName(e.target.value);
+                    }}
+                    placeholder="Seu nome"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+              <TotemKeyboard
+                onKey={(char) => {
+                  bumpIdle();
+                  setName((current) => `${current}${char}`.slice(0, 40));
+                }}
+                onBackspace={() => {
+                  bumpIdle();
+                  setName((current) => current.slice(0, -1));
+                }}
+                onSpace={() => {
+                  bumpIdle();
+                  setName((current) => `${current} `.slice(0, 40));
+                }}
+                onClear={() => {
+                  bumpIdle();
+                  setName('');
+                }}
+                onClose={() => {
+                  if (name.trim()) {
+                    bumpIdle();
+                    setStep('catalog');
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="totem-btn totem-btn--primary totem-btn--block"
+                disabled={!name.trim()}
+                onClick={() => {
+                  bumpIdle();
+                  setStep('catalog');
+                }}
+              >
+                Ver produtos
+              </button>
+            </>
+          )}
+        </section>
+      )}
 
       {step === 'catalog' && (
         <section className="totem__floor totem__floor--topnav">
-          <div className="totem__stage">
-            <div className="totem__search-panel" ref={searchPanelRef}>
-              <div className="totem__toolbar totem__toolbar--quiet">
-                <div className="totem__brands" role="tablist" aria-label="Marcas">
-                  {TOTEM_BRANDS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={brand === item.id}
-                      className={`totem-chip ${brand === item.id ? 'is-active' : ''}`}
-                      onClick={() => {
-                        bumpIdle();
-                        setBrand(item.id);
-                        setKeyboardOpen(false);
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+          <div className="totem__stage" ref={searchPanelRef}>
+            <div className="totem__search-panel">
+              {copy.showBrandFilters ? (
+                <div className="totem__toolbar totem__toolbar--quiet">
+                  <div className="totem__brands" role="tablist" aria-label="Marcas">
+                    {TOTEM_BRANDS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={brand === item.id}
+                        className={`totem-chip ${brand === item.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          bumpIdle();
+                          setBrand(item.id);
+                          setKeyboardOpen(false);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="totem__querybar">
                 <button
@@ -426,7 +722,7 @@ export function TotemPage() {
                     setKeyboardOpen(true);
                   }}
                 >
-                  {search || 'Buscar modelo'}
+                  {search || copy.searchPlaceholder}
                 </button>
 
                 {filterAttrs.map((attr) => {
@@ -484,7 +780,7 @@ export function TotemPage() {
                 })}
               </div>
 
-              {keyboardOpen && (
+              {keyboardOpen && keyboardPlacement === 'top' ? (
                 <div className="totem__search-dock">
                   <div className="totem__search-query" aria-live="polite">
                     <span>Buscando</span>
@@ -513,10 +809,14 @@ export function TotemPage() {
                     onClose={() => setKeyboardOpen(false)}
                   />
                 </div>
-              )}
+              ) : null}
             </div>
 
-            <div className="totem__scroll" ref={listRef}>
+            <div
+              className="totem__scroll"
+              ref={listRef}
+              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+            >
               {products.map((product) => {
                 const config = getConfig(product);
                 const pickers = cardAttrs
@@ -551,7 +851,7 @@ export function TotemPage() {
                     <div className="totem-card__body">
                       <h2>{product.name}</h2>
 
-                      <div className="totem-card__fields" data-count={pickers.length}>
+                      <div className="totem-card__fields" data-count={pickers.length + (showDineIn ? 1 : 0)}>
                         {pickers.map((attr) => {
                           const options = resolveTotemAttrOptions(product, attr);
                           return (
@@ -569,13 +869,24 @@ export function TotemPage() {
                             />
                           );
                         })}
+                        {showDineIn ? (
+                          <TotemPicker
+                            label="Pedido"
+                            value={config[TOTEM_DINE_ID] || TOTEM_DINE_OPTIONS[0]}
+                            options={TOTEM_DINE_OPTIONS}
+                            onChange={(value) => {
+                              bumpIdle();
+                              patchConfig(product.id, TOTEM_DINE_ID, value);
+                            }}
+                          />
+                        ) : null}
                       </div>
 
                       <div className="totem-card__footer">
                         <div className="totem-card__price">
-                          <span>À Vista</span>
+                          {copy.showInstallments ? <span>À Vista</span> : <span>Preço</span>}
                           <strong>{formatBRL(quote.cashPrice)}</strong>
-                          <small>{quote.installmentLabel}</small>
+                          {copy.showInstallments ? <small>{quote.installmentLabel}</small> : null}
                           {quote.stock ? (
                             <em className="totem-card__stock">
                               {quote.qty > 0 ? `${quote.qty} un. em estoque` : 'Sob consulta'}
@@ -588,7 +899,7 @@ export function TotemPage() {
                             className="totem-btn totem-btn--primary"
                             onClick={() => openCheckout(product)}
                           >
-                            Próximo
+                            {copy.nextButton}
                           </button>
                         )}
                       </div>
@@ -604,6 +915,36 @@ export function TotemPage() {
                 <p className="totem__empty">Nenhum produto encontrado com esses filtros.</p>
               )}
             </div>
+            {keyboardOpen && keyboardPlacement === 'bottom' ? (
+              <div className="totem__search-dock totem__search-dock--floor">
+                <div className="totem__search-query" aria-live="polite">
+                  <span>Buscando</span>
+                  <strong>{search || '…'}</strong>
+                  {search && (
+                    <button
+                      type="button"
+                      className="totem__search-clear"
+                      onClick={() => {
+                        bumpIdle();
+                        setSearch('');
+                      }}
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <TotemKeyboard
+                  onKey={appendSearch}
+                  onBackspace={backspaceSearch}
+                  onSpace={() => appendSearch(' ')}
+                  onClear={() => {
+                    bumpIdle();
+                    setSearch('');
+                  }}
+                  onClose={() => setKeyboardOpen(false)}
+                />
+              </div>
+            ) : null}
           </div>
         </section>
       )}
@@ -644,36 +985,46 @@ export function TotemPage() {
                 </p>
               )}
 
-              <label className="totem-field">
-                Digite seu nome e sobrenome
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
+              {collectNameUpFront ? (
+                <p className="totem__summary-name">
+                  Ticket para <strong>{name.trim()}</strong>
+                </p>
+              ) : (
+                <label className="totem-field">
+                  Digite seu nome e sobrenome
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Seu nome"
+                    disabled={submitting}
+                  />
+                </label>
+              )}
+
+              {!collectNameUpFront && !canPrintTicket ? (
+                <label className="totem-field">
+                  Digite seu telefone com DDD
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(24) 99999-9999"
+                    inputMode="tel"
+                    disabled={submitting}
+                  />
+                </label>
+              ) : null}
+
+              {copy.showInstallments ? (
+                <TotemPicker
+                  label="Modo de pagamento"
+                  value={selection.payment}
+                  options={PAYMENT_OPTIONS}
                   disabled={submitting}
+                  onChange={(value) => setSelection({ ...selection, payment: value })}
                 />
-              </label>
+              ) : null}
 
-              <label className="totem-field">
-                Digite seu telefone com DDD
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(24) 99999-9999"
-                  inputMode="tel"
-                  disabled={submitting}
-                />
-              </label>
-
-              <TotemPicker
-                label="Modo de pagamento"
-                value={selection.payment}
-                options={PAYMENT_OPTIONS}
-                disabled={submitting}
-                onChange={(value) => setSelection({ ...selection, payment: value })}
-              />
-
-              {selection.payment === 'Parcelado' && (
+              {copy.showInstallments && selection.payment === 'Parcelado' && (
                 <TotemPicker
                   label="Parcelas"
                   value={selection.installment}
@@ -687,12 +1038,12 @@ export function TotemPage() {
                 <div>
                   <span>Valor definido</span>
                   <strong>
-                    {selection.payment === 'À vista'
-                      ? formatBRL(selection.cashPrice)
-                      : `${selection.installment} · ${formatInstallment(
+                    {copy.showInstallments && selection.payment === 'Parcelado'
+                      ? `${selection.installment} · ${formatInstallment(
                           selection.cashPrice,
                           Number.parseInt(selection.installment, 10) || 12,
-                        )}`}
+                        )}`
+                      : formatBRL(selection.cashPrice)}
                   </strong>
                 </div>
               </div>
@@ -700,10 +1051,14 @@ export function TotemPage() {
               <button
                 type="button"
                 className="totem-btn totem-btn--primary totem-btn--block"
-                disabled={submitting || !name.trim() || phone.trim().length < 8}
+                disabled={
+                  submitting ||
+                  (collectNameUpFront && !name.trim()) ||
+                  (!collectNameUpFront && !canPrintTicket && (!name.trim() || phone.trim().length < 8))
+                }
                 onClick={() => void handleWhatsAppSubmit()}
               >
-                {submitting ? 'Enviando…' : 'Enviar proposta para a loja'}
+                {submitting ? copy.sendingButton : copy.confirmButton}
               </button>
             </div>
           </div>
@@ -712,24 +1067,47 @@ export function TotemPage() {
 
       {step === 'done' && selection && (
         <section className="totem__done">
-          <h1>Proposta enviada</h1>
+          <h1>{copy.doneTitle}</h1>
+          {senha ? (
+            <div className="totem__senha" aria-label={`Senha ${senha}`}>
+              {senha}
+            </div>
+          ) : null}
           <p>
-            Obrigado, <strong>{name}</strong>! O representante da loja recebeu seu interesse no{' '}
+            {name.trim() ? `Obrigado, ${name.trim()}!` : 'Obrigado!'} {copy.doneHint}
+          </p>
+          <p>
             <strong>{selection.product.name}</strong>
             {formatPicked(selection.picked) ? ` (${formatPicked(selection.picked)})` : ''}.
           </p>
           <p className="totem__done-note">O pedido já está na fila do PDV para atendimento.</p>
+          {canPrintTicket ? (
+            <button
+              type="button"
+              className="totem-btn totem-btn--ghost"
+              onClick={() =>
+                printCurrentTicket(
+                  ticketId || 'PDV-0',
+                  selection.product.name,
+                  selection.picked,
+                  formatBRL(selection.cashPrice),
+                )
+              }
+            >
+              Imprimir ticket
+            </button>
+          ) : null}
           <button type="button" className="totem-btn totem-btn--primary" onClick={resetTotem}>
             Novo atendimento
           </button>
         </section>
       )}
 
+      {step !== 'attract' ? (
       <footer className="totem__hint">
-        {catalogOnly
-          ? 'Toque nas fotos para passar o carrossel. Este totem é um catálogo da loja.'
-          : 'Escolha o modelo, toque em Próximo e envie a proposta. O pedido cai na fila da loja.'}
+        {catalogOnly ? copy.footerCatalog : collectNameUpFront ? copy.footerNamed : copy.footerKiosk}
       </footer>
+      ) : null}
 
       {exitOpen && (
         <div className="totem-lock" role="dialog" aria-modal="true" aria-labelledby="totem-exit-title">
