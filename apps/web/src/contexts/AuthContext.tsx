@@ -20,6 +20,7 @@ import {
 } from '../services/auth';
 
 const STORAGE_KEY = 'marthi.auth.token';
+const LEGACY_DEMO_TOKEN = 'marthi-demo-token';
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -50,7 +51,14 @@ function applySession(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
+  const [token, setToken] = useState<string | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === LEGACY_DEMO_TOKEN) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return saved;
+  });
   const [user, setUser] = useState<AuthUser | null>(null);
   const [providers, setProviders] = useState<AuthProviders | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,8 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        if (active) setLoading(false);
+      if (!saved || saved === LEGACY_DEMO_TOKEN) {
+        localStorage.removeItem(STORAGE_KEY);
+        if (active) {
+          setToken(null);
+          setLoading(false);
+        }
         return;
       }
 

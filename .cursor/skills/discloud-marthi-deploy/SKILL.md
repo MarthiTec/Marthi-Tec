@@ -11,7 +11,7 @@ description: >-
 ## Goal
 
 Public URL: `https://marthi-totem.discloud.app`  
-API Nest (alvo): `https://marthi-api.discloud.app` (repo `Marthi-Backend`)  
+API Nest (alvo): `https://marthi-backend.discloud.app` (repo `Marthi-Backend`)  
 Config totem: root `discloud.config` with `TYPE=site` and `ID=marthi-totem`.
 
 ## Hard rules
@@ -20,7 +20,7 @@ Config totem: root `discloud.config` with `TYPE=site` and `ID=marthi-totem`.
 2. **MAIN must exist in the ZIP** before upload. Discloud validates `MAIN=...` inside the archive.
 3. App must listen on `0.0.0.0:8080`.
 4. Subdomain must be registered under Domínios. Status **Livre** = not bound; **Em uso** = Site is routing.
-5. **Nest API** (`Marthi-Backend`): use `discloud.config` with `ID=marthi-api`, set `DATABASE_URL`, then point front build `VITE_API_URL=https://marthi-api.discloud.app`. See `docs/specs/backend-nest-wiring.md`.
+5. **Nest API** (`Marthi-Backend`): use `discloud.config` with `ID=marthi-backend`, set `DATABASE_URL`, then point front build `VITE_API_URL=https://marthi-backend.discloud.app`. See `docs/specs/backend-nest-wiring.md`.
 
 ## Deploy checklist
 

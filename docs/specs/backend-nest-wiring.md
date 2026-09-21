@@ -2,19 +2,19 @@
 
 **Status:** Wiring in progress  
 **Front Site:** https://marthi-totem.discloud.app  
-**API Site (alvo):** https://marthi-api.discloud.app  
+**API Site (alvo):** https://marthi-backend.discloud.app  
 **API repo:** https://github.com/MarthiTec/Marthi-Backend
 
 ## Modelo
 
 | Superfície | Origem |
 |------------|--------|
-| Auth, partners, products, `/health` | Nest (`VITE_API_URL`) |
+| Auth, partners, products, `/health` | Nest (`VITE_API_URL`) — products **públicos** para o totem |
 | Totem leads, POS tickets | Express no Site `marthi-totem` (mesma origem) até migrar |
 
 ## Variáveis Discloud
 
-### Site `marthi-api` (Nest — upload ZIP do Marthi-Backend)
+### Site `marthi-backend` (Nest — upload ZIP do Marthi-Backend)
 
 ```text
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/MarthiDB?schema=public
@@ -30,15 +30,15 @@ SWAGGER_ENABLED=true
 NODE_ENV=production
 ```
 
-Depois do upload: Domínios → `marthi-api` **Em uso**.  
-Aceite: `GET https://marthi-api.discloud.app/health` → `database.connected: true`.
+Depois do upload: Domínios → `marthi-backend` **Em uso**.  
+Aceite: `GET https://marthi-backend.discloud.app/health` → `database.connected: true`.
 
 ### Site `marthi-totem` (front)
 
 No **build** do front:
 
 ```text
-VITE_API_URL=https://marthi-api.discloud.app
+VITE_API_URL=https://marthi-backend.discloud.app
 VITE_GOOGLE_CLIENT_ID=...
 ```
 
@@ -63,7 +63,7 @@ npm run dev
 
 ## Aceite
 
-- [ ] `https://marthi-api.discloud.app/health` com banco conectado
-- [ ] Login do painel via Nest
-- [ ] `GET /api/v1/products` autenticado retorna catálogo (não 501)
-- [ ] Totem lead ainda funciona no domínio totem
+- [x] `https://marthi-backend.discloud.app/health` com banco conectado
+- [x] Login do painel via Nest (sem mock local)
+- [x] `GET /api/v1/products` público para o totem
+- [ ] Totem lead ainda funciona no domínio totem (Express)

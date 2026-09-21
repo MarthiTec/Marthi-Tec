@@ -1,5 +1,5 @@
-import { DEMO_LOGIN, isDemoCredentials, isDemoToken, readJson } from './http';
 import { nestApiUrl } from './config';
+import { readJson } from './http';
 
 const API_URL = nestApiUrl();
 
@@ -40,38 +40,13 @@ async function parseAuth<T>(response: Response): Promise<T> {
   return json as T;
 }
 
-function demoSession(): AuthSession {
-  return { token: DEMO_LOGIN.token, user: DEMO_LOGIN.user };
-}
-
 export async function fetchAuthProviders(): Promise<AuthProviders> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/providers`);
-    const json = await parseAuth<{ success: true; data: AuthProviders }>(response);
-    return { ...json.data, password: true };
-  } catch {
-    return {
-      google: Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID),
-      password: true,
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? null,
-    };
-  }
+  const response = await fetch(`${API_URL}/api/v1/auth/providers`);
+  const json = await parseAuth<{ success: true; data: AuthProviders }>(response);
+  return json.data;
 }
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthSession> {
-  if (isDemoCredentials(email, password)) {
-    try {
-      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      return (await parseAuth<{ success: true; data: AuthSession }>(response)).data;
-    } catch {
-      return demoSession();
-    }
-  }
-
   const response = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -92,13 +67,11 @@ export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
 }
 
 export async function fetchCurrentUser(token: string): Promise<AuthUser> {
-  if (isDemoToken(token)) {
-    return DEMO_LOGIN.user;
-  }
-
   const response = await fetch(`${API_URL}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await parseAuth<{ success: true; data: { user: AuthUser } }>(response);
   return json.data.user;
 }
+
+export { SEED_LOGIN_HINT } from './http';

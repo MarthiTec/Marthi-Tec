@@ -63,12 +63,12 @@ export function LoginPage() {
 
       <div className="auth__card">
         <BrandLogo variant="mark" className="auth__mark" />
-        <p className="auth__tenant">Sua Loja · demo</p>
+        <p className="auth__tenant">Sua Loja</p>
         <h1>Entrar na loja</h1>
         <p className="auth__lead">
           Use o login da operação da <strong>Sua Loja</strong>
-          {next === '/caixa' ? ' para abrir o caixa' : ' para abrir o painel'}. A plataforma é Marthi;
-          a loja nesta demo é o tenant.
+          {next === '/caixa' ? ' para abrir o caixa' : ' para abrir o painel'}. Autenticação via Nest
+          (`marthi-backend`).
         </p>
 
         {error && <p className="auth__error" role="alert">{error}</p>}
@@ -104,7 +104,7 @@ export function LoginPage() {
             {submitting ? 'Entrando…' : 'Continuar'}
           </button>
           <p className="auth__demo">
-            Demo: <strong>teste@marthi.com.br</strong> · senha <strong>123</strong>
+            Conta seed Nest: <strong>teste@marthi.com.br</strong> · senha <strong>123</strong>
           </p>
         </form>
 

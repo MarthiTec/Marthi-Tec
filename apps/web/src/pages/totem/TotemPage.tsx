@@ -27,7 +27,7 @@ import {
   type TotemBrand,
   type TotemProduct,
 } from './totemData';
-import { listTotemCatalog } from './totemCatalog';
+import { listTotemCatalog, loadTotemCatalog } from './totemCatalog';
 import './totem.css';
 
 const FILTER_IDLE_MS = 2 * 60 * 1000;
@@ -102,6 +102,7 @@ export function TotemPage() {
   const [mode, setMode] = useState<TotemMode>(() => getTotemSettings().mode);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
   const [catalog, setCatalog] = useState(() => listTotemCatalog());
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const catalogOnly = mode === 'catalog';
 
   const hasActiveQuery =
@@ -224,11 +225,27 @@ export function TotemPage() {
   }, [keyboardOpen, openFilter]);
 
   useEffect(() => {
+    let active = true;
+    async function hydrateCatalog() {
+      setCatalogLoading(true);
+      const next = await loadTotemCatalog();
+      if (active) {
+        setCatalog(next);
+        setCatalogLoading(false);
+      }
+    }
+    void hydrateCatalog();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     function refreshSettings() {
       const settings = getTotemSettings();
       setMode(settings.mode);
       setRequiredExitPassword(settings.exitPassword);
-      setCatalog(listTotemCatalog());
+      void loadTotemCatalog().then(setCatalog);
       if (settings.mode === 'catalog') {
         setStep('catalog');
         setSelection(null);
@@ -237,7 +254,7 @@ export function TotemPage() {
     function refreshAttrs() {
       setCardAttrs(totemCardAttributes());
       setFilterAttrs(totemFilterAttributes());
-      setCatalog(listTotemCatalog());
+      void loadTotemCatalog().then(setCatalog);
     }
     refreshAttrs();
     window.addEventListener(TOTEM_SETTINGS_EVENT, refreshSettings);
@@ -580,7 +597,10 @@ export function TotemPage() {
                 );
               })}
 
-              {products.length === 0 && (
+              {catalogLoading && products.length === 0 && (
+                <p className="totem__empty">Carregando catálogo…</p>
+              )}
+              {!catalogLoading && products.length === 0 && (
                 <p className="totem__empty">Nenhum produto encontrado com esses filtros.</p>
               )}
             </div>
