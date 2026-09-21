@@ -4167,3 +4167,261 @@ select.caixa-mov-input {
     grid-template-columns: 1fr;
   }
 }
+
+/* —— Tema escuro (somente painel / AdminLayout) —— */
+.admin.admin--dark {
+  --ink: #e8eef4;
+  --mute: #94a3b8;
+  --line: rgba(148, 163, 184, 0.22);
+  --card: #171e27;
+  --card-2: #1c2430;
+  --surface: #0f141a;
+  background:
+    radial-gradient(900px 420px at 100% 0%, rgba(45, 212, 191, 0.08), transparent 55%),
+    var(--surface);
+  color: var(--ink);
+}
+
+.admin.admin--dark .admin__top {
+  background: rgba(15, 20, 26, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin.admin--dark .admin__title h1 {
+  color: var(--ink);
+}
+
+.admin.admin--dark .admin__kicker {
+  color: #2dd4bf;
+}
+
+.admin.admin--dark .admin-card,
+.admin.admin--dark .admin-card--form {
+  background: var(--card);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.admin.admin--dark .admin-card h2,
+.admin.admin--dark .admin-card h3 {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .admin-card strong,
+.admin.admin--dark .admin-card p,
+.admin.admin--dark .empty {
+  color: var(--ink);
+}
+
+.admin.admin--dark .empty {
+  color: var(--mute);
+}
+
+.admin.admin--dark .admin-table {
+  color: var(--ink);
+}
+
+.admin.admin--dark .admin-table th {
+  color: #94a3b8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .admin-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin.admin--dark .admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin.admin--dark .btn--ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.admin.admin--dark input,
+.admin.admin--dark select,
+.admin.admin--dark textarea {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.admin.admin--dark input::placeholder,
+.admin.admin--dark textarea::placeholder {
+  color: #64748b;
+}
+
+.admin.admin--dark .admin-divider {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .dash-hero__title {
+  color: var(--ink);
+}
+
+.admin.admin--dark .op-profile {
+  --op-ink: #e8eef4;
+  --op-mute: #94a3b8;
+  --op-line: rgba(148, 163, 184, 0.22);
+}
+
+.admin.admin--dark .op-profile__card,
+.admin.admin--dark .op-profile__form {
+  background: var(--card);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin.admin--dark .op-profile__form-head {
+  background: rgba(15, 23, 42, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin.admin--dark .op-profile__form-head h3,
+.admin.admin--dark .op-profile__info h2 {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .op-profile__form-head p,
+.admin.admin--dark .op-profile__meta,
+.admin.admin--dark .op-profile__address,
+.admin.admin--dark .op-profile__lead {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .op-profile__grid label,
+.admin.admin--dark .op-profile__fieldset legend {
+  color: #cbd5e1;
+}
+
+.admin.admin--dark .op-profile__grid input {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .op-profile__badge {
+  background: rgba(45, 212, 191, 0.14);
+  color: #99f6e4;
+}
+
+.admin.admin--dark .op-profile__role-lock {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.admin.admin--dark .presence-board,
+.admin.admin--dark .ops-board,
+.admin.admin--dark .ops-form {
+  background: var(--card);
+}
+
+.admin.admin--dark .presence-board__row {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin.admin--dark .presence-board__meta strong,
+.admin.admin--dark .ops-board__head h2,
+.admin.admin--dark .ops-form__head h2 {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .presence-board__meta small,
+.admin.admin--dark .presence-board__place,
+.admin.admin--dark .ops-board__head p,
+.admin.admin--dark .ops-form__head p,
+.admin.admin--dark .ops-tile__body small {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .ops-tile__link,
+.admin.admin--dark .ops-tile__panel {
+  background: var(--card-2);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .ops-tile__link.is-disabled {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.admin.admin--dark .ops-tile__body strong {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .ops-form__grid label,
+.admin.admin--dark .ops-form__status {
+  color: #cbd5e1;
+}
+
+.admin.admin--dark .ops-form__grid input,
+.admin.admin--dark .ops-form__grid select,
+.admin.admin--dark .ops-status-toggle {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .ops-status-toggle.is-on {
+  background: rgba(22, 163, 74, 0.16);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #86efac;
+}
+
+.admin.admin--dark .ops-status-toggle.is-off {
+  background: rgba(220, 38, 38, 0.16);
+  border-color: rgba(252, 165, 165, 0.35);
+  color: #fca5a5;
+}
+
+.admin.admin--dark .ops-form__swatches .ops-swatch.is-selected {
+  border-color: #e2e8f0;
+  box-shadow: 0 0 0 2px #0f141a, 0 0 0 4px #e2e8f0;
+}
+
+.admin.admin--dark .presence-ctl {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin.admin--dark .presence-ctl__trigger,
+.admin.admin--dark .presence-ctl__copy strong,
+.admin.admin--dark .presence-ctl__short {
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .presence-ctl__copy em {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .presence-ctl__menu {
+  background: #1c2430;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .admin-note,
+.admin.admin--dark .qty-low {
+  color: #fca5a5;
+}
+
+.admin.admin--dark .price-red {
+  color: #fb7185;
+}
+
+.admin.admin--dark .totem-rank__bar {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .dash-charts .admin-card,
+.admin.admin--dark .dash-kpis .admin-card {
+  background: var(--card);
+}

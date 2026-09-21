@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getTotemExitPassword } from '../data/totemSettings';
 import {
@@ -9,6 +10,7 @@ import {
   saveOperatorProfile,
 } from '../data/operatorProfile';
 import { PresenceStatusControl } from './PresenceStatusControl';
+import { PanelThemeToggle } from './PanelThemeToggle';
 import './operatorProfilePanel.css';
 
 type OperatorProfilePanelProps = {
@@ -23,6 +25,8 @@ type OperatorProfilePanelProps = {
  */
 export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProfilePanelProps) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const showPanelTheme = pathname.startsWith('/painel');
   const fallback = user?.name ?? 'Operador';
   const fallbackEmail = user?.email ?? '';
   const current = getOperatorProfile(fallback, fallbackEmail);
@@ -242,6 +246,13 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
             </label>
           </div>
         </fieldset>
+
+        {showPanelTheme ? (
+          <fieldset className="op-profile__fieldset">
+            <legend>Aparência</legend>
+            <PanelThemeToggle />
+          </fieldset>
+        ) : null}
 
         <footer className="op-profile__form-foot">
           {photo ? (

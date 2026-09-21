@@ -1,0 +1,81 @@
+.panel-theme {
+  display: grid;
+  gap: 10px;
+}
+
+.panel-theme__label {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+.panel-theme__label em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.panel-theme__switch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  max-width: 280px;
+  border-radius: 12px;
+  border: 1px solid #d8dde3;
+  background: #f1f5f9;
+}
+
+.panel-theme__switch button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: #64748b;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.panel-theme__switch button:hover {
+  color: #0f172a;
+}
+
+.panel-theme__switch button.is-active {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+.admin.admin--dark .panel-theme__label {
+  color: #cbd5e1;
+}
+
+.admin.admin--dark .panel-theme__label em {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .panel-theme__switch {
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.admin.admin--dark .panel-theme__switch button {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .panel-theme__switch button:hover {
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .panel-theme__switch button.is-active {
+  background: #1e293b;
+  color: #f8fafc;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}

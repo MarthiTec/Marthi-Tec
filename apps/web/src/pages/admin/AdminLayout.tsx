@@ -13,6 +13,7 @@ import {
 } from '../../data/erpRegistry';
 import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
 import { AccessDeniedPage } from './AccessDeniedPage';
 import { ModuleLockedPage } from './ModuleLockedPage';
@@ -97,6 +98,7 @@ export function AdminLayout() {
   const { user, loading, logout } = useAuth();
   const location = useLocation();
   usePresenceSession('painel');
+  const { isDark } = usePanelTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
@@ -192,7 +194,9 @@ export function AdminLayout() {
 
   return (
     <div
-      className={`admin ${menuOpen ? 'is-menu-open' : ''} ${collapsed ? 'is-collapsed' : ''}`}
+      className={`admin ${menuOpen ? 'is-menu-open' : ''} ${collapsed ? 'is-collapsed' : ''} ${
+        isDark ? 'admin--dark' : ''
+      }`}
     >
       <aside className="admin__sidebar">
         <div className="admin__brand">
