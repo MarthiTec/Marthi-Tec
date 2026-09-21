@@ -9,6 +9,8 @@ import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
 import { ticketVariation } from '../../data/posQueueStore';
 import { hasModule } from '../../data/storePlan';
+import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
+import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { usePosTickets } from './usePosTickets';
 
 export function AdminHomePage() {
@@ -37,6 +39,9 @@ export function AdminHomePage() {
           <h1 className="dash-hero__title">Dashboard</h1>
         </div>
         <div className="dash-hero__launch">
+          <div className="dash-hero__presence">
+            <PresenceStatusControl />
+          </div>
           {hasModule('erp') ? (
             <Link to="/caixa" className="btn btn--primary">
               <AdminIcon name="cart" />
@@ -83,6 +88,8 @@ export function AdminHomePage() {
           </Link>
         </div>
       </div>
+
+      <TeamPresenceBoard />
 
       <div className="admin-grid">
         <article className="admin-card">

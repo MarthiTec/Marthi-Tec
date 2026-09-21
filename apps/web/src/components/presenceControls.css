@@ -1,0 +1,167 @@
+.presence-ctl {
+  position: relative;
+  margin: 0 10px 8px;
+}
+
+.presence-ctl--compact {
+  margin: 6px 10px 8px;
+}
+
+.presence-ctl__trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.presence-ctl__trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.presence-ctl__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+}
+
+.presence-ctl.is-away .presence-ctl__dot,
+.presence-ctl__dot.is-away {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+}
+
+.presence-ctl__dot.is-online {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+}
+
+.presence-ctl__copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.presence-ctl__copy strong {
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: #fff;
+}
+
+.presence-ctl__copy em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.48);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presence-ctl__short {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.presence-ctl__menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #161e27;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.presence-ctl__menu-label {
+  margin: 4px 6px 2px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.presence-ctl__menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.presence-ctl__menu button:hover,
+.presence-ctl__menu button.is-current {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Em superfícies claras (perfil) */
+.op-profile .presence-ctl,
+.admin-page .presence-ctl {
+  margin: 0;
+}
+
+.op-profile .presence-ctl__trigger,
+.admin-page .presence-ctl__trigger {
+  border-color: #d8dde3;
+  background: #fff;
+  color: #12151a;
+}
+
+.op-profile .presence-ctl__copy strong,
+.admin-page .presence-ctl__copy strong {
+  color: #12151a;
+}
+
+.op-profile .presence-ctl__copy em,
+.admin-page .presence-ctl__copy em {
+  color: #6b7280;
+}
+
+.op-profile .presence-ctl__menu,
+.admin-page .presence-ctl__menu {
+  background: #fff;
+  border-color: #d8dde3;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.op-profile .presence-ctl__menu-label,
+.admin-page .presence-ctl__menu-label {
+  color: #94a3b8;
+}
+
+.op-profile .presence-ctl__menu button,
+.admin-page .presence-ctl__menu button {
+  color: #12151a;
+}
+
+.op-profile .presence-ctl__menu button:hover,
+.op-profile .presence-ctl__menu button.is-current,
+.admin-page .presence-ctl__menu button:hover,
+.admin-page .presence-ctl__menu button.is-current {
+  background: #f1f5f9;
+}

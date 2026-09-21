@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom';
+import { PresenceStatusControl } from './PresenceStatusControl';
 import { useOperatorProfile } from '../hooks/useOperatorProfile';
+import { useMyPresence } from '../hooks/usePresence';
 import { profileInitials } from '../data/operatorProfile';
 import './userChip.css';
 
@@ -13,6 +15,8 @@ type UserChipProps = {
   compact?: boolean;
   className?: string;
   title?: string;
+  /** Mostra seletor de status logo abaixo do chip (padrão: true no sidebar). */
+  showPresence?: boolean;
 };
 
 /**
@@ -26,9 +30,12 @@ export function UserChip({
   compact = false,
   className = '',
   title = 'Configurar meu perfil',
+  showPresence = variant === 'sidebar',
 }: UserChipProps) {
   const { profile, photo } = useOperatorProfile();
+  const { mine } = useMyPresence();
   const mark = profileInitials(profile.displayName);
+  const away = mine?.availability === 'away' && mine.module !== 'offline';
 
   const classNames = ({ isActive = false }: { isActive?: boolean } = {}) =>
     [
@@ -36,6 +43,7 @@ export function UserChip({
       `user-chip--${variant}`,
       compact ? 'user-chip--compact' : '',
       isActive ? 'is-active' : '',
+      away ? 'is-away' : '',
       className,
     ]
       .filter(Boolean)
@@ -45,6 +53,7 @@ export function UserChip({
     <>
       <span className="user-chip__photo" aria-hidden>
         {photo ? <img src={photo} alt="" /> : <span>{mark}</span>}
+        <i className={`user-chip__presence ${away ? 'is-away' : 'is-on'}`} />
       </span>
       {!compact ? (
         <span className="user-chip__text">
@@ -56,8 +65,8 @@ export function UserChip({
     </>
   );
 
-  if (to) {
-    return (
+  const chip =
+    to ? (
       <NavLink
         to={to}
         className={({ isActive }) => classNames({ isActive })}
@@ -67,18 +76,24 @@ export function UserChip({
       >
         {body}
       </NavLink>
+    ) : (
+      <button
+        type="button"
+        className={classNames()}
+        title={title}
+        aria-label={title}
+        onClick={onOpen}
+      >
+        {body}
+      </button>
     );
-  }
+
+  if (!showPresence || compact) return chip;
 
   return (
-    <button
-      type="button"
-      className={classNames()}
-      title={title}
-      aria-label={title}
-      onClick={onOpen}
-    >
-      {body}
-    </button>
+    <div className="user-chip-stack">
+      {chip}
+      <PresenceStatusControl compact />
+    </div>
   );
 }

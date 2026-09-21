@@ -34,10 +34,11 @@ button.user-chip {
 }
 
 .user-chip__photo {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -47,6 +48,73 @@ button.user-chip {
   font-weight: 800;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
+}
+
+.user-chip__photo img,
+.user-chip__photo > span:not(.user-chip__presence) {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.user-chip__presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #12181f;
+}
+
+.user-chip__presence.is-away {
+  background: #f59e0b;
+}
+
+.user-chip-stack {
+  display: grid;
+  gap: 0;
+  width: auto;
+  align-self: stretch;
+  margin: 10px 0 4px;
+  min-width: 0;
+}
+
+.admin__sidebar > .user-chip-stack {
+  margin: 10px 0 4px;
+}
+
+.admin__sidebar > .user-chip-stack > .user-chip--sidebar {
+  margin: 0 10px 0;
+}
+
+.erp-app__side > .user-chip-stack,
+.fiscal-app__side > .user-chip-stack,
+.ecommerce-app__side > .user-chip-stack,
+.crm-app__side > .user-chip-stack {
+  margin: 0 0 6px;
+}
+
+.erp-app__side > .user-chip-stack > .user-chip--sidebar,
+.fiscal-app__side > .user-chip-stack > .user-chip--sidebar,
+.ecommerce-app__side > .user-chip-stack > .user-chip--sidebar,
+.crm-app__side > .user-chip-stack > .user-chip--sidebar {
+  margin: 4px 0 0;
+}
+
+.os-app__ops-drawer > .user-chip-stack,
+.caixa-app__ops-drawer > .user-chip-stack {
+  margin: 8px 0 4px;
+}
+
+.os-app__ops-drawer > .user-chip-stack > .user-chip--sidebar,
+.caixa-app__ops-drawer > .user-chip-stack > .user-chip--sidebar {
+  margin: 0 10px 0;
 }
 
 .user-chip__photo img {

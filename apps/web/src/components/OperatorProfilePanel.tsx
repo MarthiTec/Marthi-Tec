@@ -8,6 +8,7 @@ import {
   profileInitials,
   saveOperatorProfile,
 } from '../data/operatorProfile';
+import { PresenceStatusControl } from './PresenceStatusControl';
 import './operatorProfilePanel.css';
 
 type OperatorProfilePanelProps = {
@@ -129,6 +130,9 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
                 'Complete seus contatos abaixo'}
             </p>
             <p className="op-profile__address">{address || 'Endereço ainda não informado.'}</p>
+            <div className="op-profile__presence">
+              <PresenceStatusControl />
+            </div>
           </div>
         </div>
       </article>

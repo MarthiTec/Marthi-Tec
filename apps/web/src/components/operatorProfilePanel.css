@@ -180,6 +180,15 @@
   color: #334155;
 }
 
+.op-profile__presence {
+  margin-top: 14px;
+  max-width: 280px;
+}
+
+.op-profile__presence .presence-ctl {
+  width: 100%;
+}
+
 .op-profile__form {
   background: #fff;
   border: 1px solid var(--op-line);

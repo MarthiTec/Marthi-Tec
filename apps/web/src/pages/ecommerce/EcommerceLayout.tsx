@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
+import { usePresenceSession } from '../../hooks/usePresence';
 import '../admin/admin.css';
 import './ecommerce.css';
 
@@ -47,6 +48,7 @@ export function EcommerceLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  usePresenceSession('ecommerce');
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');

@@ -27,6 +27,7 @@ import { emitNfeFromSale, emitSaleCheckoutDocument, FISCAL_KIND_LABEL } from '..
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
+import { usePresenceSession } from '../../hooks/usePresence';
 import { CaixaPanelHost, type CaixaPanel } from './CaixaPanels';
 import '../admin/admin.css';
 import './caixa.css';
@@ -84,6 +85,7 @@ function lineKey(item: StockItem, scannedImei: boolean) {
 export function CaixaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  usePresenceSession('caixa');
   const operatorName = user?.name ?? 'Operador';
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');

@@ -3793,6 +3793,15 @@ select.caixa-mov-input {
   align-items: center;
 }
 
+.dash-hero__presence {
+  margin-right: auto;
+  min-width: min(240px, 100%);
+}
+
+.dash-hero__presence .presence-ctl {
+  margin: 0;
+}
+
 .dash-kpis .admin-card strong {
   font-size: 1.25rem;
 }

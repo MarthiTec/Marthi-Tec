@@ -6,6 +6,7 @@ import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { getTotemExitPassword } from '../../data/totemSettings';
+import { usePresenceSession } from '../../hooks/usePresence';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import '../admin/admin.css';
 import './os.css';
@@ -42,6 +43,7 @@ export function OsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  usePresenceSession('os');
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);

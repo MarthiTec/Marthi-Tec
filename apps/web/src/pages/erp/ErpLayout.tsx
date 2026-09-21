@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
+import { usePresenceSession } from '../../hooks/usePresence';
 import '../admin/admin.css';
 import './erp.css';
 
@@ -72,6 +73,7 @@ export function ErpLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  usePresenceSession('erp');
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');

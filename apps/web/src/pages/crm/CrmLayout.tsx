@@ -6,6 +6,7 @@ import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
+import { usePresenceSession } from '../../hooks/usePresence';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import '../admin/admin.css';
 import './crm.css';
@@ -33,6 +34,7 @@ export function CrmLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading } = useAuth();
+  usePresenceSession('crm');
   const seller = useMemo(
     () => resolveCrmSeller(user?.name, user?.email),
     [user?.name, user?.email],

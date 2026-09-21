@@ -12,6 +12,7 @@ import {
   userIsStoreAdmin,
 } from '../../data/erpRegistry';
 import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
+import { usePresenceSession } from '../../hooks/usePresence';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
 import { AccessDeniedPage } from './AccessDeniedPage';
 import { ModuleLockedPage } from './ModuleLockedPage';
@@ -94,6 +95,7 @@ function readCollapsed() {
 export function AdminLayout() {
   const { user, loading, logout } = useAuth();
   const location = useLocation();
+  usePresenceSession('painel');
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());

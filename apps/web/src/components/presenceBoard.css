@@ -1,0 +1,201 @@
+.presence-board {
+  display: grid;
+  gap: 14px;
+}
+
+.presence-board__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 18px;
+}
+
+.presence-board__head h2 {
+  margin: 0 0 4px;
+}
+
+.presence-board__head p {
+  margin: 0;
+  color: var(--mute, #6b7280);
+  font-size: 0.9rem;
+  max-width: 42ch;
+}
+
+.presence-board__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presence-board__stats span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.presence-board__stats strong {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.presence-board__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.presence-board__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.presence-board__row.is-me {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.presence-board__row.is-offline {
+  opacity: 0.72;
+}
+
+.presence-board__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.presence-board__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: #1f3d36;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #d8dde3;
+}
+
+.presence-board__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.presence-board__pulse {
+  position: absolute;
+  left: 30px;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 2px solid #fff;
+}
+
+.presence-board__pulse.is-on {
+  background: #22c55e;
+}
+
+.presence-board__pulse.is-away {
+  background: #f59e0b;
+}
+
+.presence-board__meta {
+  min-width: 0;
+}
+
+.presence-board__meta strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.presence-board__meta em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.presence-board__meta small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.presence-board__state {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.presence-board__badge {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.presence-board__row.is-online:not(.is-away) .presence-board__badge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.presence-board__row.is-away .presence-board__badge {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.presence-board__place {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .presence-board__row {
+    grid-template-columns: 1fr;
+  }
+
+  .presence-board__state {
+    justify-items: start;
+    text-align: left;
+    padding-left: 54px;
+  }
+}
