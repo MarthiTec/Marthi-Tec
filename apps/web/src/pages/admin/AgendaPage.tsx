@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
@@ -19,6 +19,13 @@ import { osHref, useOsBase } from '../os/osPaths';
 
 const WEEKDAY = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 function formatDayHeading(dateKey: string) {
   const date = new Date(`${dateKey}T12:00:00`);
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
@@ -37,7 +44,7 @@ function AgendaCard({
 }: {
   order: WorkOrder;
   osBase: string;
-  onDateChange: (id: string, date: string) => void;
+  onDateChange: (id: string, date: string) => void | Promise<void>;
 }) {
   return (
     <article className={`os-agenda__card os-agenda__card--${order.priority}`}>
@@ -56,7 +63,7 @@ function AgendaCard({
         <input
           type="date"
           value={workOrderReadyDate(order) ?? ''}
-          onChange={(event) => onDateChange(order.id, event.target.value)}
+          onChange={(event) => void onDateChange(order.id, event.target.value)}
         />
       </label>
     </article>
@@ -70,6 +77,16 @@ export function AgendaPage() {
   const weekParam = params.get('week');
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setTick((value) => value + 1);
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const anchor = useMemo(() => {
     if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
@@ -109,8 +126,8 @@ export function AgendaPage() {
     setParams(next, { replace: true });
   }
 
-  function changeDate(id: string, date: string) {
-    const result = setWorkOrderReadyDate(id, date);
+  async function changeDate(id: string, date: string) {
+    const result = await setWorkOrderReadyDate(id, date);
     if (!result.ok) {
       setMessage(result.error);
       return;

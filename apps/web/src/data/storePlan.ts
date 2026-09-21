@@ -18,6 +18,8 @@ export type StoreEntitlement = {
 
 const ALL_MODULES = PARTNER_MODULES.map((item) => item.id);
 
+let memoryPlan: StoreEntitlement | null = null;
+
 function allModules(): PartnerModuleId[] {
   return [...ALL_MODULES];
 }
@@ -33,6 +35,12 @@ export function defaultEntitlement(): StoreEntitlement {
 }
 
 function read(): StoreEntitlement {
+  if (memoryPlan) {
+    return {
+      planId: memoryPlan.planId,
+      modules: [...memoryPlan.modules],
+    };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultEntitlement();
@@ -53,12 +61,31 @@ export function getStoreEntitlement() {
   return read();
 }
 
-export function saveStoreEntitlement(input: StoreEntitlement) {
+export function replaceStoreEntitlement(input: StoreEntitlement) {
   const planId = normalizePlanId(input.planId) ?? 'bronze';
   const next = {
     planId,
     modules: clampModulesForPlan(planId, input.modules),
   };
+  memoryPlan = next;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event('marthi-plan-updated'));
+  return next;
+}
+
+export async function saveStoreEntitlement(input: StoreEntitlement) {
+  const planId = normalizePlanId(input.planId) ?? 'bronze';
+  const next = {
+    planId,
+    modules: clampModulesForPlan(planId, input.modules),
+  };
+  const { isNestAuthed } = await import('../services/nestClient');
+  if (isNestAuthed()) {
+    const { apiPutStorePlan } = await import('../services/erpApi');
+    const saved = await apiPutStorePlan(next);
+    return replaceStoreEntitlement(saved);
+  }
+  memoryPlan = next;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   try {
     localStorage.setItem('marthi.store.contracted', '1');

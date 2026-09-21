@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -34,15 +34,35 @@ const TYPES: { id: PaymentMethod['type']; label: string }[] = [
 
 type Mode = 'new' | 'edit' | 'view';
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function PaymentsPage() {
-  const state = getAdminState();
-  const [tables] = useState(state.priceTables);
-  const [items, setItems] = useState(state.payments);
-  const [form, setForm] = useState({ ...EMPTY, priceTableId: state.priceTables[0]?.id ?? '' });
+  const initial = getAdminState();
+  const [tables, setTables] = useState(initial.priceTables);
+  const [items, setItems] = useState(initial.payments);
+  const [form, setForm] = useState({ ...EMPTY, priceTableId: initial.priceTables[0]?.id ?? '' });
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      const state = getAdminState();
+      setTables(state.priceTables);
+      setItems(state.payments);
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -59,9 +79,15 @@ export function PaymentsPage() {
 
   const readOnly = mode === 'view';
 
-  function persist(next: PaymentMethod[]) {
-    setItems(next);
-    savePayments(next);
+  async function persist(next: PaymentMethod[]) {
+    setError('');
+    try {
+      const state = await savePayments(next);
+      setItems(state.payments);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar formas de pagamento.');
+      throw err;
+    }
   }
 
   function resetForm() {
@@ -82,29 +108,40 @@ export function PaymentsPage() {
     });
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly || !form.name.trim() || !form.priceTableId) return;
-    if (mode === 'edit' && selectedId) {
-      persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
-    } else {
-      persist([
-        { ...form, id: `PAY-${Date.now().toString(36).toUpperCase()}` },
-        ...items,
-      ]);
+    try {
+      if (mode === 'edit' && selectedId) {
+        await persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
+      } else {
+        await persist([
+          { ...form, id: `PAY-${Date.now().toString(36).toUpperCase()}` },
+          ...items,
+        ]);
+      }
+      resetForm();
+    } catch {
+      /* error already shown */
     }
-    resetForm();
   }
 
-  function remove(item: PaymentMethod) {
+  async function remove(item: PaymentMethod) {
     if (!confirmDelete(`a forma ${item.name}`)) return;
-    setItems(removePayment(item.id).payments);
-    if (selectedId === item.id) resetForm();
+    setError('');
+    try {
+      const state = await removePayment(item.id);
+      setItems(state.payments);
+      if (selectedId === item.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover forma de pagamento.');
+    }
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
         <h2>{crudFormTitle(mode, 'forma de pagamento')}</h2>
+        {error ? <p className="qty-low">{error}</p> : null}
         <p>
           Cada forma aparece no PDV e puxa a tabela de preço vinculada (vista, cartão, atacado).
         </p>
@@ -170,7 +207,7 @@ export function PaymentsPage() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn--primary" onClick={submit}>
+              <button type="button" className="btn btn--primary" onClick={() => void submit()}>
                 {mode === 'edit' ? 'Salvar forma' : 'Cadastrar forma'}
               </button>
               {mode === 'edit' ? (
@@ -223,7 +260,7 @@ export function PaymentsPage() {
                     <CrudRowActions
                       onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
-                      onDelete={() => remove(item)}
+                      onDelete={() => void remove(item)}
                     />
                   </td>
                 </tr>

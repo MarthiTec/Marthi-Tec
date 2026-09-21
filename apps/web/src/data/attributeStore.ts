@@ -24,6 +24,8 @@ export type PickedAttribute = {
 const STORAGE_KEY = 'marthi.attributes.v1';
 export const ATTRIBUTES_EVENT = 'marthi-attributes-updated';
 
+let memoryAttrs: ProductAttribute[] | null = null;
+
 export function seedAttributes(): ProductAttribute[] {
   return [
     {
@@ -67,6 +69,7 @@ function sortAttrs(items: ProductAttribute[]) {
 }
 
 function load(): ProductAttribute[] {
+  if (memoryAttrs) return sortAttrs(memoryAttrs.map((item) => ({ ...item, values: [...item.values], priceDeltas: { ...item.priceDeltas } })));
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -112,20 +115,68 @@ function load(): ProductAttribute[] {
 
 function persist(items: ProductAttribute[]) {
   const next = sortAttrs(items);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  memoryAttrs = next;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
   window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
   return next;
+}
+
+export function replaceAttributes(items: ProductAttribute[]) {
+  return persist(items.slice(0, MAX_ATTRIBUTES));
 }
 
 export function getAttributes() {
   return load();
 }
 
-export function saveAttributes(items: ProductAttribute[]) {
+export async function saveAttributes(items: ProductAttribute[]) {
+  const { isNestAuthed } = await import('../services/nestClient');
+  if (isNestAuthed()) {
+    const {
+      apiCreateAttribute,
+      apiDeleteAttribute,
+      apiListAttributes,
+      apiUpdateAttribute,
+    } = await import('../services/erpApi');
+    const current = await apiListAttributes();
+    const next = items.slice(0, MAX_ATTRIBUTES);
+    const nextIds = new Set(next.map((item) => item.id).filter(Boolean));
+    for (const old of current) {
+      if (!nextIds.has(old.id)) await apiDeleteAttribute(old.id);
+    }
+    const saved: ProductAttribute[] = [];
+    for (const item of next) {
+      const body = {
+        name: item.name,
+        values: item.values,
+        priceDeltas: item.priceDeltas,
+        useOnTotem: item.useOnTotem,
+        filterOnTotem: item.filterOnTotem,
+        useOnStock: item.useOnStock,
+        sort: item.sort,
+        active: item.active,
+      };
+      if (current.some((row) => row.id === item.id)) {
+        saved.push(await apiUpdateAttribute(item.id, body));
+      } else {
+        saved.push(await apiCreateAttribute(body));
+      }
+    }
+    return persist(saved);
+  }
   return persist(items.slice(0, MAX_ATTRIBUTES));
 }
 
-export function removeAttribute(id: string) {
+export async function removeAttribute(id: string) {
+  const { isNestAuthed } = await import('../services/nestClient');
+  if (isNestAuthed()) {
+    const { apiDeleteAttribute } = await import('../services/erpApi');
+    await apiDeleteAttribute(id);
+  }
   return persist(load().filter((item) => item.id !== id).slice(0, MAX_ATTRIBUTES));
 }
 

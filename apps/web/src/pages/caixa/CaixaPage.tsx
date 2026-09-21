@@ -266,7 +266,7 @@ export function CaixaPage() {
     setInstallments(1);
   }
 
-  function finish() {
+  async function finish() {
     if (!pricedLines.length) {
       setError('Informe ao menos um produto.');
       focusCode();
@@ -293,69 +293,75 @@ export function CaixaPage() {
     const saleTotal = total;
     const saleCustomer = walkIn || !customerName.trim() ? CONSUMIDOR_FINAL : customerName.trim();
     const saleCpf = askCpf ? cpfDigits : '';
-    const state = closePosSale({
-      ticketId: null,
-      customerName: saleCustomer,
-      customerPhone: walkIn ? '' : customerPhone.trim(),
-      customerDocument: saleCpf,
-      paymentName: `${payment.name}${installmentLabel}`,
-      priceTableName: table.name,
-      discount,
-      surcharge,
-      sellerId: seller?.id,
-      sellerName: seller?.name,
-      lines: pricedLines.map((line) => ({
-        stockId: line.stockId,
-        name: line.name,
-        qty: line.qty,
-        unitPrice: line.unitPrice,
-        imei: line.imei,
-      })),
-    });
-    const order = state.orders[0];
-    setLastOrderId(order?.id ?? null);
-    setLastOrderAmount(saleTotal);
-    setLastCustomerName(saleCustomer || order?.customerName || CONSUMIDOR_FINAL);
-    setStock(state.stock);
-    setCustomers(state.customers);
-    setLines([]);
-    setDiscount(0);
-    setSurcharge(0);
-    setSellerId('');
-    setInstallments(1);
-    setAskCpf(false);
-    setCustomerCpf('');
-    pickCustomer(undefined);
-    setWalkIn(true);
-    setPaymentId(payments[0]?.id ?? '');
-    setTableId(
-      payments[0]?.priceTableId && tables.some((item) => item.id === payments[0].priceTableId)
-        ? payments[0].priceTableId
-        : (tables[0]?.id ?? ''),
-    );
-
-    if (order) {
-      registerCashSale(saleTotal, operatorName, `Venda ${order.id}`);
-      refreshCash();
-    }
-
-    let docMsg = '';
-    if (order) {
-      const emitted = emitSaleCheckoutDocument({
-        orderId: order.id,
+    try {
+      const state = await closePosSale({
+        ticketId: null,
         customerName: saleCustomer,
-        amount: saleTotal,
+        customerPhone: walkIn ? '' : customerPhone.trim(),
         customerDocument: saleCpf,
-        fiscalIntegrated: fiscalOn,
+        paymentName: `${payment.name}${installmentLabel}`,
+        priceTableName: table.name,
+        paymentMethodId: payment.id,
+        priceTableId: table.id,
+        discount,
+        surcharge,
+        sellerId: seller?.id,
+        sellerName: seller?.name,
+        lines: pricedLines.map((line) => ({
+          stockId: line.stockId,
+          name: line.name,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          imei: line.imei,
+        })),
       });
-      if (emitted.ok) {
-        docMsg = ` · ${FISCAL_KIND_LABEL[emitted.document.kind]} ${emitted.document.number}`;
-      }
-    }
+      const order = state.orders[0];
+      setLastOrderId(order?.id ?? null);
+      setLastOrderAmount(saleTotal);
+      setLastCustomerName(saleCustomer || order?.customerName || CONSUMIDOR_FINAL);
+      setStock(state.stock);
+      setCustomers(state.customers);
+      setLines([]);
+      setDiscount(0);
+      setSurcharge(0);
+      setSellerId('');
+      setInstallments(1);
+      setAskCpf(false);
+      setCustomerCpf('');
+      pickCustomer(undefined);
+      setWalkIn(true);
+      setPaymentId(payments[0]?.id ?? '');
+      setTableId(
+        payments[0]?.priceTableId && tables.some((item) => item.id === payments[0].priceTableId)
+          ? payments[0].priceTableId
+          : (tables[0]?.id ?? ''),
+      );
 
-    setError(null);
-    setMessage(`Pedido ${order?.id ?? ''} · ${money(saleTotal)}${docMsg}`);
-    focusCode();
+      if (order) {
+        registerCashSale(saleTotal, operatorName, `Venda ${order.id}`);
+        refreshCash();
+      }
+
+      let docMsg = '';
+      if (order) {
+        const emitted = emitSaleCheckoutDocument({
+          orderId: order.id,
+          customerName: saleCustomer,
+          amount: saleTotal,
+          customerDocument: saleCpf,
+          fiscalIntegrated: fiscalOn,
+        });
+        if (emitted.ok) {
+          docMsg = ` · ${FISCAL_KIND_LABEL[emitted.document.kind]} ${emitted.document.number}`;
+        }
+      }
+
+      setError(null);
+      setMessage(`Pedido ${order?.id ?? ''} · ${money(saleTotal)}${docMsg}`);
+      focusCode();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao fechar a venda.');
+    }
   }
 
   finishRef.current = finish;

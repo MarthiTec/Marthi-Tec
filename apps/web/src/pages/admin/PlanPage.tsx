@@ -22,6 +22,7 @@ export function PlanPage() {
   const [planId, setPlanId] = useState<PlanId>(current.planId);
   const [modules, setModules] = useState<PartnerModuleId[]>(current.modules);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
   const isAdmin = userIsStoreAdmin(user?.email);
 
   const lockedAll = planIncludesAllModules(planId);
@@ -58,11 +59,17 @@ export function PlanPage() {
     setSaved(false);
   }
 
-  function save() {
-    const next = saveStoreEntitlement({ planId, modules: selected });
-    setPlanId(next.planId);
-    setModules(next.modules);
-    setSaved(true);
+  async function save() {
+    setError('');
+    try {
+      const next = await saveStoreEntitlement({ planId, modules: selected });
+      setPlanId(next.planId);
+      setModules(next.modules);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar plano.');
+      setSaved(false);
+    }
   }
 
   return (
@@ -131,11 +138,12 @@ export function PlanPage() {
           <button
             type="button"
             className="btn btn--primary"
-            onClick={save}
+            onClick={() => void save()}
             disabled={!lockedAll && selected.length === 0}
           >
             Salvar liberação
           </button>
+          {error ? <span className="qty-low">{error}</span> : null}
           {saved ? (
             <span className="empty">Plano atualizado. O menu lateral já respeita a liberação.</span>
           ) : null}

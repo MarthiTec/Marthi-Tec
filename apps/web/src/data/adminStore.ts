@@ -1,6 +1,25 @@
 import { ATTR_CAP, ATTR_COR } from './attributeStore';
+import {
+  apiClosePosSale,
+  apiCreateCustomer,
+  apiCreateFinanceManual,
+  apiCreatePayment,
+  apiCreatePriceTable,
+  apiCreateStock,
+  apiDeleteCustomer,
+  apiDeletePayment,
+  apiDeletePriceTable,
+  apiDeleteStock,
+  apiUpdateCustomer,
+  apiUpdatePayment,
+  apiUpdatePriceTable,
+  apiUpdateStock,
+} from '../services/erpApi';
+import { isNestAuthed, NestApiError } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.admin.v1';
+export const ADMIN_STATE_EVENT = 'marthi-admin-state';
+export const STOCK_EVENT = 'marthi-stock';
 
 export type Customer = {
   id: string;
@@ -112,6 +131,8 @@ type AdminState = {
   priceTables: PriceTable[];
   payments: PaymentMethod[];
 };
+
+let memoryState: AdminState | null = null;
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -537,6 +558,16 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
 }
 
 function load(): AdminState {
+  if (memoryState) {
+    return {
+      customers: memoryState.customers.map((item) => ({ ...item })),
+      stock: memoryState.stock.map((item) => ({ ...item, attrs: { ...item.attrs }, images: [...item.images] })),
+      orders: memoryState.orders.map((item) => ({ ...item })),
+      finance: memoryState.finance.map((item) => ({ ...item })),
+      priceTables: memoryState.priceTables.map((item) => ({ ...item })),
+      payments: memoryState.payments.map((item) => ({ ...item })),
+    };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -571,11 +602,44 @@ function load(): AdminState {
 }
 
 function save(state: AdminState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  memoryState = state;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* quota / private mode */
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ADMIN_STATE_EVENT));
+  }
+}
+
+/** Substitui o estado do ERP (bootstrap Nest). */
+export function replaceAdminState(state: AdminState) {
+  save({
+    customers: state.customers.map(normalizeCustomer),
+    stock: state.stock.map(normalizeStock),
+    orders: state.orders.map((order) => ({
+      ...order,
+      sellerId: order.sellerId ?? '',
+      sellerName: order.sellerName ?? '',
+    })),
+    finance: state.finance.map(normalizeFinance),
+    priceTables: state.priceTables,
+    payments: state.payments,
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(STOCK_EVENT));
+  }
 }
 
 export function getAdminState() {
   return load();
+}
+
+function apiErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof NestApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
 }
 
 export function applyPriceTable(basePrice: number, table: PriceTable | undefined) {
@@ -645,8 +709,9 @@ export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrd
   return { ok: true, order };
 }
 
-export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?: string }) {
-  const state = load();
+export async function upsertCustomer(
+  input: Omit<Customer, 'id' | 'createdAt'> & { id?: string },
+): Promise<AdminState> {
   const payload = {
     name: input.name.trim(),
     phone: (input.phone ?? '').trim(),
@@ -661,6 +726,30 @@ export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?
     state: (input.state ?? '').trim().toUpperCase(),
     active: input.active ?? true,
   };
+
+  if (isNestAuthed()) {
+    try {
+      const saved = input.id
+        ? await apiUpdateCustomer(input.id, payload)
+        : await apiCreateCustomer(payload);
+      const state = load();
+      if (input.id) {
+        state.customers = state.customers.map((item) =>
+          item.id === input.id ? normalizeCustomer(saved) : item,
+        );
+      } else {
+        const existing = state.customers.find((item) => item.id === saved.id);
+        if (existing) Object.assign(existing, normalizeCustomer(saved));
+        else state.customers.unshift(normalizeCustomer(saved));
+      }
+      save(state);
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao salvar cliente.'));
+    }
+  }
+
+  const state = load();
   const docKey = payload.document.replace(/\D/g, '');
   const phoneKey = payload.phone.replace(/\D/g, '');
 
@@ -690,31 +779,59 @@ export function upsertCustomer(input: Omit<Customer, 'id' | 'createdAt'> & { id?
   return state;
 }
 
-export function removeCustomer(id: string) {
+export async function removeCustomer(id: string): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeleteCustomer(id);
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao remover cliente.'));
+    }
+  }
   const state = load();
   state.customers = state.customers.filter((item) => item.id !== id);
   save(state);
   return state;
 }
 
-export function removeStockItem(id: string) {
+export async function removeStockItem(id: string): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeleteStock(id);
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao remover estoque.'));
+    }
+  }
   const state = load();
   state.stock = state.stock.filter((item) => item.id !== id);
   save(state);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('marthi-stock'));
+    window.dispatchEvent(new Event(STOCK_EVENT));
   }
   return state;
 }
 
-export function removePriceTable(id: string) {
+export async function removePriceTable(id: string): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeletePriceTable(id);
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao remover tabela.'));
+    }
+  }
   const state = load();
   state.priceTables = state.priceTables.filter((item) => item.id !== id);
   save(state);
   return state;
 }
 
-export function removePayment(id: string) {
+export async function removePayment(id: string): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeletePayment(id);
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao remover pagamento.'));
+    }
+  }
   const state = load();
   state.payments = state.payments.filter((item) => item.id !== id);
   save(state);
@@ -726,28 +843,123 @@ export function saveStock(items: StockItem[]) {
   state.stock = items.map(normalizeStock);
   save(state);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('marthi-stock'));
+    window.dispatchEvent(new Event(STOCK_EVENT));
   }
   return state;
 }
 
-export const STOCK_EVENT = 'marthi-stock';
+export async function upsertStockItem(
+  item: Omit<StockItem, 'id'> & { id?: string },
+): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      const payload = normalizeStock({
+        ...item,
+        id: item.id ?? 'STK-TEMP',
+      } as StockItem);
+      const { id: _id, ...body } = payload;
+      const saved = item.id
+        ? await apiUpdateStock(item.id, body)
+        : await apiCreateStock(body);
+      const state = load();
+      if (item.id) {
+        state.stock = state.stock.map((row) => (row.id === item.id ? normalizeStock(saved) : row));
+      } else {
+        state.stock = [normalizeStock(saved), ...state.stock];
+      }
+      save(state);
+      window.dispatchEvent(new Event(STOCK_EVENT));
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao salvar estoque.'));
+    }
+  }
 
-export function savePriceTables(items: PriceTable[]) {
+  const state = load();
+  if (item.id) {
+    state.stock = state.stock.map((row) =>
+      row.id === item.id ? normalizeStock({ ...row, ...item, id: item.id }) : row,
+    );
+  } else {
+    state.stock = [
+      normalizeStock({ ...item, id: uid('STK') } as StockItem),
+      ...state.stock,
+    ];
+  }
+  save(state);
+  window.dispatchEvent(new Event(STOCK_EVENT));
+  return state;
+}
+
+export async function savePriceTables(items: PriceTable[]): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      const current = load().priceTables;
+      const nextIds = new Set(items.map((item) => item.id).filter(Boolean));
+      for (const old of current) {
+        if (!nextIds.has(old.id)) await apiDeletePriceTable(old.id);
+      }
+      const saved: PriceTable[] = [];
+      for (const item of items) {
+        const body = { name: item.name, percent: item.percent, active: item.active };
+        if (current.some((row) => row.id === item.id)) {
+          saved.push(await apiUpdatePriceTable(item.id, body));
+        } else {
+          saved.push(await apiCreatePriceTable(body));
+        }
+      }
+      const state = load();
+      state.priceTables = saved;
+      save(state);
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao salvar tabelas.'));
+    }
+  }
   const state = load();
   state.priceTables = items;
   save(state);
   return state;
 }
 
-export function savePayments(items: PaymentMethod[]) {
+export async function savePayments(items: PaymentMethod[]): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      const current = load().payments;
+      const nextIds = new Set(items.map((item) => item.id).filter(Boolean));
+      for (const old of current) {
+        if (!nextIds.has(old.id)) await apiDeletePayment(old.id);
+      }
+      const saved: PaymentMethod[] = [];
+      for (const item of items) {
+        const body = {
+          name: item.name,
+          type: item.type,
+          priceTableId: item.priceTableId,
+          maxInstallments: item.maxInstallments,
+          active: item.active,
+        };
+        if (current.some((row) => row.id === item.id)) {
+          saved.push(await apiUpdatePayment(item.id, body));
+        } else {
+          saved.push(await apiCreatePayment(body));
+        }
+      }
+      const state = load();
+      state.payments = saved;
+      save(state);
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao salvar pagamentos.'));
+    }
+  }
   const state = load();
   state.payments = items;
   save(state);
   return state;
 }
 
-export function closeSale(input: {
+export async function closeSale(input: {
   ticketId: string | null;
   customerName: string;
   customerPhone: string;
@@ -767,19 +979,89 @@ export function closeSale(input: {
   });
 }
 
-export function closePosSale(input: {
+export async function closePosSale(input: {
   ticketId: string | null;
   customerName: string;
   customerPhone: string;
   customerDocument?: string;
   paymentName: string;
   priceTableName: string;
+  paymentMethodId?: string;
+  priceTableId?: string;
   discount: number;
   surcharge: number;
   sellerId?: string;
   sellerName?: string;
   lines: PosLineInput[];
-}) {
+}): Promise<AdminState> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiClosePosSale({
+        ticketId: input.ticketId,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerDocument: input.customerDocument,
+        paymentName: input.paymentName,
+        priceTableName: input.priceTableName,
+        paymentMethodId: input.paymentMethodId,
+        priceTableId: input.priceTableId,
+        discount: input.discount,
+        surcharge: input.surcharge,
+        sellerId: input.sellerId,
+        sellerName: input.sellerName,
+        lines: input.lines.filter((line) => line.stockId),
+      });
+      const state = load();
+      state.orders = [
+        {
+          id: order.id,
+          ticketId: order.ticketId,
+          customerName: order.customerName,
+          customerDocument: order.customerDocument,
+          productName: order.productName,
+          amount: order.amount,
+          status: order.status,
+          payment: order.payment,
+          sellerId: order.sellerId,
+          sellerName: order.sellerName,
+          createdAt: order.createdAt,
+        },
+        ...state.orders.filter((item) => item.id !== order.id),
+      ];
+      for (const line of input.lines) {
+        const stock = state.stock.find((item) => item.id === line.stockId);
+        if (stock) {
+          stock.qty = Math.max(0, stock.qty - line.qty);
+          if (line.imei && stock.imei === line.imei) stock.imei = '';
+        }
+      }
+      state.finance.unshift({
+        id: uid('FIN'),
+        type: 'in',
+        label: `Venda ${order.id} · ${order.productName}`,
+        amount: order.amount,
+        createdAt: order.createdAt,
+        source: 'pos',
+        refId: order.id,
+      });
+      if (input.customerPhone.replace(/\D/g, '').length >= 8) {
+        const phoneKey = input.customerPhone.replace(/\D/g, '');
+        const existing = state.customers.find(
+          (item) => item.phone.replace(/\D/g, '') === phoneKey,
+        );
+        if (existing) {
+          existing.name = input.customerName || existing.name;
+          existing.phone = input.customerPhone;
+        }
+      }
+      save(state);
+      window.dispatchEvent(new Event(STOCK_EVENT));
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao fechar venda.'));
+    }
+  }
+
   const state = load();
   const subtotal = input.lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
   const amount = Math.max(0, subtotal - input.discount + input.surcharge);
@@ -848,7 +1130,25 @@ export function closePosSale(input: {
   return state;
 }
 
-export function addFinance(entry: Omit<FinanceEntry, 'id' | 'createdAt'>) {
+export async function addFinance(
+  entry: Omit<FinanceEntry, 'id' | 'createdAt'>,
+): Promise<AdminState> {
+  if (isNestAuthed() && (entry.source ?? 'manual') === 'manual') {
+    try {
+      const saved = await apiCreateFinanceManual({
+        type: entry.type,
+        amount: entry.amount,
+        label: entry.label,
+      });
+      const state = load();
+      state.finance.unshift(normalizeFinance(saved));
+      save(state);
+      return state;
+    } catch (error) {
+      throw new Error(apiErrorMessage(error, 'Falha ao lançar financeiro.'));
+    }
+  }
+
   const state = load();
   state.finance.unshift({
     ...entry,

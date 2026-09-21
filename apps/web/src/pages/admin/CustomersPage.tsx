@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -33,6 +33,13 @@ const EMPTY = {
 
 type Mode = 'new' | 'edit' | 'view';
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function CustomersPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
@@ -40,6 +47,17 @@ export function CustomersPage() {
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [customers, setCustomers] = useState(() => getAdminState().customers);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setCustomers(getAdminState().customers);
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -78,24 +96,36 @@ export function CustomersPage() {
     });
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly) return;
     if (!form.name.trim() || form.phone.replace(/\D/g, '').length < 8) return;
-    const next = upsertCustomer({ ...form, id: mode === 'edit' ? selectedId : undefined });
-    setCustomers(next.customers);
-    resetForm();
+    setError('');
+    try {
+      const next = await upsertCustomer({ ...form, id: mode === 'edit' ? selectedId : undefined });
+      setCustomers(next.customers);
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar cliente.');
+    }
   }
 
-  function remove(customer: Customer) {
+  async function remove(customer: Customer) {
     if (!confirmDelete(`o cliente ${customer.name}`)) return;
-    setCustomers(removeCustomer(customer.id).customers);
-    if (selectedId === customer.id) resetForm();
+    setError('');
+    try {
+      const next = await removeCustomer(customer.id);
+      setCustomers(next.customers);
+      if (selectedId === customer.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover cliente.');
+    }
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
         <h2>{crudFormTitle(mode, 'cliente')}</h2>
+        {error ? <p className="qty-low">{error}</p> : null}
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Nome
@@ -164,7 +194,7 @@ export function CustomersPage() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn--primary" onClick={submit}>
+              <button type="button" className="btn btn--primary" onClick={() => void submit()}>
                 {mode === 'edit' ? 'Salvar' : 'Cadastrar'}
               </button>
               {mode === 'edit' ? (
@@ -215,7 +245,7 @@ export function CustomersPage() {
                     <CrudRowActions
                       onView={() => loadItem(customer, 'view')}
                       onEdit={() => loadItem(customer, 'edit')}
-                      onDelete={() => remove(customer)}
+                      onDelete={() => void remove(customer)}
                     />
                   </td>
                 </tr>

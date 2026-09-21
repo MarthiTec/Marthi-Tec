@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -36,6 +36,13 @@ function moneyDelta(value: number) {
 
 type Mode = 'new' | 'edit' | 'view';
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function AttributesPage() {
   const [items, setItems] = useState(() => getAttributes());
   const [form, setForm] = useState(emptyForm);
@@ -45,6 +52,17 @@ export function AttributesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setItems(getAttributes());
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const readOnly = mode === 'view';
   const atLimit = mode === 'new' && items.length >= MAX_ATTRIBUTES;
@@ -59,8 +77,15 @@ export function AttributesPage() {
     [items, query, status],
   );
 
-  function persist(next: ProductAttribute[]) {
-    setItems(saveAttributes(next));
+  async function persist(next: ProductAttribute[]) {
+    setError('');
+    try {
+      const saved = await saveAttributes(next);
+      setItems(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar atributos.');
+      throw err;
+    }
   }
 
   function resetForm() {
@@ -88,21 +113,25 @@ export function AttributesPage() {
     setDeltaDraft('0');
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly || atLimit || !form.name.trim() || form.values.length === 0) return;
-    if (mode === 'edit' && selectedId) {
-      persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
-    } else {
-      persist([
-        {
-          ...form,
-          id: `ATTR-${Date.now().toString(36).toUpperCase()}`,
-          sort: items.length + 1,
-        },
-        ...items,
-      ]);
+    try {
+      if (mode === 'edit' && selectedId) {
+        await persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
+      } else {
+        await persist([
+          {
+            ...form,
+            id: `ATTR-${Date.now().toString(36).toUpperCase()}`,
+            sort: items.length + 1,
+          },
+          ...items,
+        ]);
+      }
+      resetForm();
+    } catch {
+      /* error already shown */
     }
-    resetForm();
   }
 
   function loadItem(item: ProductAttribute, nextMode: Mode) {
@@ -120,16 +149,22 @@ export function AttributesPage() {
     });
   }
 
-  function remove(item: ProductAttribute) {
+  async function remove(item: ProductAttribute) {
     if (!confirmDelete(`o atributo ${item.name}`)) return;
-    setItems(removeAttribute(item.id));
-    if (selectedId === item.id) resetForm();
+    setError('');
+    try {
+      setItems(await removeAttribute(item.id));
+      if (selectedId === item.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover atributo.');
+    }
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
         <h2>{crudFormTitle(mode, 'atributo')}</h2>
+        {error ? <p className="qty-low">{error}</p> : null}
         <p>
           Até {MAX_ATTRIBUTES} atributos. Celular usa cor e capacidade; roupa, cor e tamanho; ótica,
           armação e lente. O estoque guarda o preço de cada combinação (128 GB ≠ 256 GB). Valores
@@ -288,7 +323,7 @@ export function AttributesPage() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn--primary" onClick={submit} disabled={atLimit}>
+              <button type="button" className="btn btn--primary" onClick={() => void submit()} disabled={atLimit}>
                 {mode === 'edit' ? 'Salvar atributo' : 'Cadastrar atributo'}
               </button>
               {mode === 'edit' ? (
@@ -363,7 +398,7 @@ export function AttributesPage() {
                     <CrudRowActions
                       onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
-                      onDelete={() => remove(item)}
+                      onDelete={() => void remove(item)}
                     />
                   </td>
                 </tr>

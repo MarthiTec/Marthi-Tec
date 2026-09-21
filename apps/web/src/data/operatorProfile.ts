@@ -8,7 +8,16 @@ export type OperatorProfile = {
 
 const DEFAULT_ROLE = 'Operador';
 
+let memoryProfile: OperatorProfile | null = null;
+
 export function getOperatorProfile(fallbackName: string): OperatorProfile {
+  if (memoryProfile) {
+    return {
+      displayName: memoryProfile.displayName.trim() || fallbackName,
+      role: memoryProfile.role.trim() || DEFAULT_ROLE,
+      photo: memoryProfile.photo,
+    };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -25,15 +34,30 @@ export function getOperatorProfile(fallbackName: string): OperatorProfile {
   return { displayName: fallbackName, role: DEFAULT_ROLE, photo: null };
 }
 
-export function saveOperatorProfile(profile: OperatorProfile) {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      displayName: profile.displayName.trim(),
-      role: profile.role.trim() || DEFAULT_ROLE,
-      photo: profile.photo,
-    }),
-  );
+export function replaceOperatorProfileCache(profile: OperatorProfile) {
+  memoryProfile = {
+    displayName: profile.displayName.trim(),
+    role: profile.role.trim() || DEFAULT_ROLE,
+    photo: profile.photo,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
+}
+
+export async function saveOperatorProfile(profile: OperatorProfile) {
+  const next = {
+    displayName: profile.displayName.trim(),
+    role: profile.role.trim() || DEFAULT_ROLE,
+    photo: profile.photo,
+  };
+  const { isNestAuthed } = await import('../services/nestClient');
+  if (isNestAuthed()) {
+    const { apiPutOperatorProfile } = await import('../services/erpApi');
+    const saved = await apiPutOperatorProfile(next);
+    replaceOperatorProfileCache(saved);
+    return saved;
+  }
+  replaceOperatorProfileCache(next);
+  return next;
 }
 
 export function notifyProfileUpdated() {

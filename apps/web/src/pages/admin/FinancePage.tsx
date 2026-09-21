@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
@@ -57,6 +57,13 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 function parseTab(value: string | null): TabId {
   const match = TABS.find((tab) => tab.id === value);
   return match?.id ?? 'resumo';
@@ -83,6 +90,16 @@ export function FinancePage() {
   const advances = useMemo(() => listAdvances(), [tick]);
   const suppliers = useMemo(() => listSuppliers(true), []);
   const dre = useMemo(() => buildDre(), [tick]);
+
+  useEffect(() => {
+    function onRefresh() {
+      setTick((value) => value + 1);
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, onRefresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, onRefresh);
+    };
+  }, []);
 
   const cashBalance = admin.finance.reduce(
     (sum, item) => sum + (item.type === 'in' ? item.amount : -item.amount),
@@ -146,6 +163,7 @@ export function FinancePage() {
 
       {tab === 'extrato' ? (
         <ExtratoPanel
+          onError={setError}
           onSaved={() => {
             refresh('Movimento lançado.');
             audit('financeiro.extrato', 'Lançamento manual');
@@ -300,25 +318,45 @@ function ResumoPanel({
   );
 }
 
-function ExtratoPanel({ onSaved }: { onSaved: () => void }) {
+function ExtratoPanel({
+  onSaved,
+  onError,
+}: {
+  onSaved: () => void;
+  onError: (text: string) => void;
+}) {
   const [state, setState] = useState(() => getAdminState());
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'in' | 'out'>('out');
   const [sourceFilter, setSourceFilter] = useState<'all' | FinanceSource>('all');
 
+  useEffect(() => {
+    function refresh() {
+      setState(getAdminState());
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
+
   const entries =
     sourceFilter === 'all'
       ? state.finance
       : state.finance.filter((item) => item.source === sourceFilter);
 
-  function submit() {
+  async function submit() {
     const value = parseMoney(amount);
     if (!label.trim() || value <= 0) return;
-    setState(addFinance({ type, label: label.trim(), amount: value, source: 'manual' }));
-    setLabel('');
-    setAmount('');
-    onSaved();
+    try {
+      setState(await addFinance({ type, label: label.trim(), amount: value, source: 'manual' }));
+      setLabel('');
+      setAmount('');
+      onSaved();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Falha ao lançar movimento.');
+    }
   }
 
   return (
@@ -345,7 +383,7 @@ function ExtratoPanel({ onSaved }: { onSaved: () => void }) {
           </label>
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
+          <button type="button" className="btn btn--primary" onClick={() => void submit()}>
             Lançar
           </button>
         </div>

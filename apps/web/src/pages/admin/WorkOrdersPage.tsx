@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
@@ -25,6 +25,13 @@ function when(iso: string) {
 
 const DROP_STATUSES: WorkOrderStatus[] = [...BOARD_COLUMNS, 'delivered'];
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function WorkOrdersPage() {
   const osBase = useOsBase();
   const [params] = useSearchParams();
@@ -34,6 +41,17 @@ export function WorkOrdersPage() {
   const [orders, setOrders] = useState(() => listWorkOrders());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<WorkOrderStatus | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setOrders(listWorkOrders());
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -56,11 +74,16 @@ export function WorkOrdersPage() {
   const columns = statusFilter && BOARD_COLUMNS.includes(statusFilter) ? [statusFilter] : BOARD_COLUMNS;
   const showKanban = quoteFilter !== 'sent';
 
-  function move(id: string, status: WorkOrderStatus) {
+  async function move(id: string, status: WorkOrderStatus) {
     const current = orders.find((item) => item.id === id);
     if (!current || current.status === status) return;
-    updateWorkOrder(id, { status });
-    setOrders(listWorkOrders());
+    setError('');
+    try {
+      await updateWorkOrder(id, { status });
+      setOrders(listWorkOrders());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao atualizar status.');
+    }
   }
 
   function onDragStart(orderId: string) {
@@ -73,7 +96,7 @@ export function WorkOrdersPage() {
   }
 
   function onDrop(status: WorkOrderStatus) {
-    if (draggingId) move(draggingId, status);
+    if (draggingId) void move(draggingId, status);
     onDragEnd();
   }
 
@@ -92,6 +115,7 @@ export function WorkOrdersPage() {
           Agenda
         </Link>
       </div>
+      {error ? <p className="qty-low">{error}</p> : null}
 
       <div className="admin-grid">
         <article className="admin-card">

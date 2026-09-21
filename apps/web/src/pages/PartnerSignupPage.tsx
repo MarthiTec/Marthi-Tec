@@ -262,7 +262,7 @@ export function PartnerSignupPage() {
         contactRole: form.contactRole.trim(),
         notes: form.notes.trim(),
       });
-      saveStoreEntitlement({ planId: form.planId, modules: form.modules });
+      await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
       markStoreContracted();
       setProtocol(result.id);
       void import('../data/crmStore').then(({ ingestPartnerLeadToCrm }) => {

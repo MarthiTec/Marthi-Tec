@@ -186,9 +186,9 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function confirmPaid() {
+  async function confirmPaid() {
     if (!lead) return;
-    const result = confirmCrmLeadPaidAsCustomer(lead.id, me.sellerId);
+    const result = await confirmCrmLeadPaidAsCustomer(lead.id, me.sellerId);
     if (!result.ok) {
       flashErr(result.error);
       return;
@@ -341,7 +341,7 @@ export function CrmDealPage() {
               </button>
             ) : null}
             {mine && (lead.stage === 'won' || lead.stage === 'payment') && !lead.customerId ? (
-              <button type="button" className="btn btn--primary" onClick={confirmPaid}>
+              <button type="button" className="btn btn--primary" onClick={() => void confirmPaid()}>
                 Confirmar pagamento → cliente
               </button>
             ) : null}

@@ -16,6 +16,7 @@ export function ProfilePage() {
   const [photo, setPhoto] = useState<string | null>(current.photo);
   const [saved, setSaved] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const preview = photo || user?.picture;
   const mark = displayName.trim().slice(0, 1).toUpperCase() || 'U';
@@ -34,11 +35,17 @@ export function ProfilePage() {
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    saveOperatorProfile({ displayName, role, photo });
-    setSaved(true);
-    notifyProfileUpdated();
+    setError(null);
+    try {
+      await saveOperatorProfile({ displayName, role, photo });
+      setSaved(true);
+      notifyProfileUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar perfil.');
+      setSaved(false);
+    }
   }
 
   return (
@@ -103,6 +110,7 @@ export function ProfilePage() {
             <button type="submit" className="btn btn--primary">
               Salvar perfil
             </button>
+            {error ? <span className="qty-low">{error}</span> : null}
             {saved ? <span className="empty">Perfil atualizado.</span> : null}
           </div>
         </form>

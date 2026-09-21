@@ -151,39 +151,43 @@ export function WorkOrderDetailPage() {
     setMessage('');
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!form) return;
-    updateWorkOrder(form.id, {
-      customerName: form.customerName,
-      customerPhone: form.customerPhone,
-      customerDocument: form.customerDocument,
-      customerEmail: form.customerEmail,
-      itemName: form.itemName,
-      itemBrand: form.itemBrand,
-      itemModel: form.itemModel,
-      itemColor: form.itemColor,
-      itemRef: form.itemRef,
-      devicePassword: form.devicePassword,
-      accessories: form.accessories,
-      conditionOnEntry: form.conditionOnEntry,
-      defect: form.defect,
-      diagnosis: form.diagnosis,
-      notes: form.notes,
-      estimatedReadyAt: form.estimatedReadyAt,
-      technician: form.technician,
-      sellerId: form.sellerId,
-      priority: form.priority,
-      labor: form.labor,
-    });
-    refresh();
-    flash('OS atualizada.');
+    try {
+      await updateWorkOrder(form.id, {
+        customerName: form.customerName,
+        customerPhone: form.customerPhone,
+        customerDocument: form.customerDocument,
+        customerEmail: form.customerEmail,
+        itemName: form.itemName,
+        itemBrand: form.itemBrand,
+        itemModel: form.itemModel,
+        itemColor: form.itemColor,
+        itemRef: form.itemRef,
+        devicePassword: form.devicePassword,
+        accessories: form.accessories,
+        conditionOnEntry: form.conditionOnEntry,
+        defect: form.defect,
+        diagnosis: form.diagnosis,
+        notes: form.notes,
+        estimatedReadyAt: form.estimatedReadyAt,
+        technician: form.technician,
+        sellerId: form.sellerId,
+        priority: form.priority,
+        labor: form.labor,
+      });
+      refresh();
+      flash('OS atualizada.');
+    } catch (err) {
+      fail(err instanceof Error ? err.message : 'Falha ao atualizar OS.');
+    }
   }
 
-  function setStatus(status: WorkOrderStatus) {
+  async function setStatus(status: WorkOrderStatus) {
     if (!form) return;
     if (status === 'delivered') {
-      const result = deliverWorkOrder(form.id);
+      const result = await deliverWorkOrder(form.id);
       if (!result.ok) {
         fail(result.error);
         return;
@@ -193,7 +197,7 @@ export function WorkOrderDetailPage() {
       return;
     }
     if (status === 'cancelled') {
-      const result = cancelWorkOrderWithReversal(form.id);
+      const result = await cancelWorkOrderWithReversal(form.id);
       if (!result.ok) {
         fail(result.error);
         return;
@@ -202,9 +206,13 @@ export function WorkOrderDetailPage() {
       flash('OS cancelada · estoque e custos estornados.');
       return;
     }
-    const next = updateWorkOrder(form.id, { status });
-    if (next) setForm(next);
-    flash('Status atualizado.');
+    try {
+      const next = await updateWorkOrder(form.id, { status });
+      if (next) setForm(next);
+      flash('Status atualizado.');
+    } catch (err) {
+      fail(err instanceof Error ? err.message : 'Falha ao atualizar status.');
+    }
   }
 
   function emitNfse() {
@@ -240,12 +248,12 @@ export function WorkOrderDetailPage() {
     setConsumeQty(1);
   }
 
-  function consumePart() {
+  async function consumePart() {
     if (!form || !selectedStock) {
       fail(selectedStock ? 'OS inválida.' : 'Selecione um item do estoque.');
       return;
     }
-    const result = consumeStockOnWorkOrder(form.id, selectedStock.id, consumeQty, sellPrice);
+    const result = await consumeStockOnWorkOrder(form.id, selectedStock.id, consumeQty, sellPrice);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -256,9 +264,9 @@ export function WorkOrderDetailPage() {
     flash(`Peça baixada · custo ${money(selectedStock.cost * consumeQty)} no financeiro.`);
   }
 
-  function removeLine(lineId: string) {
+  async function removeLine(lineId: string) {
     if (!form) return;
-    const result = removeWorkOrderLine(form.id, lineId);
+    const result = await removeWorkOrderLine(form.id, lineId);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -267,13 +275,13 @@ export function WorkOrderDetailPage() {
     flash('Peça estornada do estoque e do financeiro.');
   }
 
-  function changeDisposition(value: AssetDisposition) {
+  async function changeDisposition(value: AssetDisposition) {
     if (!form) return;
     if (value === 'purchased') {
       setForm({ ...form, assetDisposition: 'purchased' });
       return;
     }
-    const result = setAssetDisposition(form.id, value);
+    const result = await setAssetDisposition(form.id, value);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -282,9 +290,9 @@ export function WorkOrderDetailPage() {
     flash('Destino do equipamento atualizado.');
   }
 
-  function buyAsset() {
+  async function buyAsset() {
     if (!form) return;
-    const result = purchaseAssetFromWorkOrder(form.id, {
+    const result = await purchaseAssetFromWorkOrder(form.id, {
       cost: purchaseCost,
       name: form.itemName,
       imei: form.itemRef,
@@ -318,7 +326,7 @@ export function WorkOrderDetailPage() {
               key={status}
               type="button"
               className={`os-flow__step ${form.status === status ? 'is-current' : ''}`}
-              onClick={() => setStatus(status)}
+              onClick={() => void setStatus(status)}
             >
               {STATUS_LABEL[status]}
             </button>
@@ -435,20 +443,22 @@ export function WorkOrderDetailPage() {
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => {
-                  const result = draftQuote(form.id, {
-                    labor: form.labor,
-                    parts: form.lines.some((line) => line.kind === 'part')
-                      ? partsCharge
-                      : form.parts,
-                    quoteNotes: form.quoteNotes,
-                    quoteValidUntil: form.quoteValidUntil,
-                  });
-                  if (!result.ok) {
-                    fail(result.error);
-                    return;
-                  }
-                  setForm(result.order);
-                  flash('Orçamento salvo como rascunho.');
+                  void (async () => {
+                    const result = await draftQuote(form.id, {
+                      labor: form.labor,
+                      parts: form.lines.some((line) => line.kind === 'part')
+                        ? partsCharge
+                        : form.parts,
+                      quoteNotes: form.quoteNotes,
+                      quoteValidUntil: form.quoteValidUntil,
+                    });
+                    if (!result.ok) {
+                      fail(result.error);
+                      return;
+                    }
+                    setForm(result.order);
+                    flash('Orçamento salvo como rascunho.');
+                  })();
                 }}
               >
                 Salvar rascunho
@@ -461,25 +471,27 @@ export function WorkOrderDetailPage() {
                 type="button"
                 className="btn btn--primary"
                 onClick={() => {
-                  const savedDraft = draftQuote(form.id, {
-                    labor: form.labor,
-                    parts: form.lines.some((line) => line.kind === 'part')
-                      ? partsCharge
-                      : form.parts,
-                    quoteNotes: form.quoteNotes,
-                    quoteValidUntil: form.quoteValidUntil,
-                  });
-                  if (!savedDraft.ok) {
-                    fail(savedDraft.error);
-                    return;
-                  }
-                  const result = sendQuote(form.id);
-                  if (!result.ok) {
-                    fail(result.error);
-                    return;
-                  }
-                  setForm(result.order);
-                  flash('Orçamento enviado · OS em Aguardando aprovação.');
+                  void (async () => {
+                    const savedDraft = await draftQuote(form.id, {
+                      labor: form.labor,
+                      parts: form.lines.some((line) => line.kind === 'part')
+                        ? partsCharge
+                        : form.parts,
+                      quoteNotes: form.quoteNotes,
+                      quoteValidUntil: form.quoteValidUntil,
+                    });
+                    if (!savedDraft.ok) {
+                      fail(savedDraft.error);
+                      return;
+                    }
+                    const result = await sendQuote(form.id);
+                    if (!result.ok) {
+                      fail(result.error);
+                      return;
+                    }
+                    setForm(result.order);
+                    flash('Orçamento enviado · OS em Aguardando aprovação.');
+                  })();
                 }}
               >
                 Enviar ao cliente
@@ -491,13 +503,15 @@ export function WorkOrderDetailPage() {
                   type="button"
                   className="btn btn--primary"
                   onClick={() => {
-                    const result = approveQuote(form.id, true);
-                    if (!result.ok) {
-                      fail(result.error);
-                      return;
-                    }
-                    setForm(result.order);
-                    flash('Orçamento aprovado · OS em serviço.');
+                    void (async () => {
+                      const result = await approveQuote(form.id, true);
+                      if (!result.ok) {
+                        fail(result.error);
+                        return;
+                      }
+                      setForm(result.order);
+                      flash('Orçamento aprovado · OS em serviço.');
+                    })();
                   }}
                 >
                   Cliente aprovou
@@ -506,13 +520,15 @@ export function WorkOrderDetailPage() {
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => {
-                    const result = rejectQuote(form.id);
-                    if (!result.ok) {
-                      fail(result.error);
-                      return;
-                    }
-                    setForm(result.order);
-                    flash('Orçamento recusado.');
+                    void (async () => {
+                      const result = await rejectQuote(form.id);
+                      if (!result.ok) {
+                        fail(result.error);
+                        return;
+                      }
+                      setForm(result.order);
+                      flash('Orçamento recusado.');
+                    })();
                   }}
                 >
                   Cliente recusou
@@ -521,13 +537,15 @@ export function WorkOrderDetailPage() {
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => {
-                    const result = reopenQuote(form.id);
-                    if (!result.ok) {
-                      fail(result.error);
-                      return;
-                    }
-                    setForm(result.order);
-                    flash('Orçamento reaberto para edição.');
+                    void (async () => {
+                      const result = await reopenQuote(form.id);
+                      if (!result.ok) {
+                        fail(result.error);
+                        return;
+                      }
+                      setForm(result.order);
+                      flash('Orçamento reaberto para edição.');
+                    })();
                   }}
                 >
                   Reabrir edição
@@ -539,13 +557,15 @@ export function WorkOrderDetailPage() {
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => {
-                  const result = reopenQuote(form.id);
-                  if (!result.ok) {
-                    fail(result.error);
-                    return;
-                  }
-                  setForm(result.order);
-                  flash('Orçamento reaberto.');
+                  void (async () => {
+                    const result = await reopenQuote(form.id);
+                    if (!result.ok) {
+                      fail(result.error);
+                      return;
+                    }
+                    setForm(result.order);
+                    flash('Orçamento reaberto.');
+                  })();
                 }}
               >
                 Revisar orçamento
@@ -592,7 +612,7 @@ export function WorkOrderDetailPage() {
                   setPhotoBusy(true);
                   try {
                     const dataUrl = await fileToWorkOrderPhoto(file);
-                    const result = addWorkOrderPhoto(form.id, { kind: photoKind, dataUrl });
+                    const result = await addWorkOrderPhoto(form.id, { kind: photoKind, dataUrl });
                     if (!result.ok) {
                       fail(result.error);
                       return;
@@ -626,13 +646,15 @@ export function WorkOrderDetailPage() {
                     type="button"
                     className="btn btn--ghost"
                     onClick={() => {
-                      const result = removeWorkOrderPhoto(form.id, photo.id);
-                      if (!result.ok) {
-                        fail(result.error);
-                        return;
-                      }
-                      setForm(result.order);
-                      flash('Foto removida.');
+                      void (async () => {
+                        const result = await removeWorkOrderPhoto(form.id, photo.id);
+                        if (!result.ok) {
+                          fail(result.error);
+                          return;
+                        }
+                        setForm(result.order);
+                        flash('Foto removida.');
+                      })();
                     }}
                   >
                     Remover
@@ -657,13 +679,15 @@ export function WorkOrderDetailPage() {
               type="button"
               className="btn btn--ghost"
               onClick={() => {
-                const result = resetWorkOrderChecklist(form.id);
-                if (!result.ok) {
-                  fail(result.error);
-                  return;
-                }
-                setForm(result.order);
-                flash('Checklist reiniciado.');
+                void (async () => {
+                  const result = await resetWorkOrderChecklist(form.id);
+                  if (!result.ok) {
+                    fail(result.error);
+                    return;
+                  }
+                  setForm(result.order);
+                  flash('Checklist reiniciado.');
+                })();
               }}
             >
               Reiniciar checklist
@@ -684,12 +708,14 @@ export function WorkOrderDetailPage() {
                     }`}
                     disabled={locked}
                     onClick={() => {
-                      const result = setChecklistItem(form.id, item.id, { mark });
-                      if (!result.ok) {
-                        fail(result.error);
-                        return;
-                      }
-                      setForm(result.order);
+                      void (async () => {
+                        const result = await setChecklistItem(form.id, item.id, { mark });
+                        if (!result.ok) {
+                          fail(result.error);
+                          return;
+                        }
+                        setForm(result.order);
+                      })();
                     }}
                   >
                     {CHECKLIST_MARK_LABEL[mark]}
@@ -711,11 +737,13 @@ export function WorkOrderDetailPage() {
                   });
                 }}
                 onBlur={(event) => {
-                  const result = setChecklistItem(form.id, item.id, {
-                    note: event.target.value,
-                  });
-                  if (!result.ok) fail(result.error);
-                  else setForm(result.order);
+                  void (async () => {
+                    const result = await setChecklistItem(form.id, item.id, {
+                      note: event.target.value,
+                    });
+                    if (!result.ok) fail(result.error);
+                    else setForm(result.order);
+                  })();
                 }}
               />
             </div>
@@ -786,13 +814,15 @@ export function WorkOrderDetailPage() {
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => {
-                  const result = clearCustomerSignature(form.id);
-                  if (!result.ok) {
-                    fail(result.error);
-                    return;
-                  }
-                  setForm(result.order);
-                  flash('Assinatura removida.');
+                  void (async () => {
+                    const result = await clearCustomerSignature(form.id);
+                    if (!result.ok) {
+                      fail(result.error);
+                      return;
+                    }
+                    setForm(result.order);
+                    flash('Assinatura removida.');
+                  })();
                 }}
               >
                 Refazer assinatura
@@ -803,16 +833,18 @@ export function WorkOrderDetailPage() {
           <SignaturePad
             disabled={locked}
             onSave={(dataUrl) => {
-              const result = saveCustomerSignature(form.id, {
-                dataUrl,
-                signedName: form.customerName,
-              });
-              if (!result.ok) {
-                fail(result.error);
-                return;
-              }
-              setForm(result.order);
-              flash('Assinatura salva.');
+              void (async () => {
+                const result = await saveCustomerSignature(form.id, {
+                  dataUrl,
+                  signedName: form.customerName,
+                });
+                if (!result.ok) {
+                  fail(result.error);
+                  return;
+                }
+                setForm(result.order);
+                flash('Assinatura salva.');
+              })();
             }}
           />
         )}
@@ -820,7 +852,7 @@ export function WorkOrderDetailPage() {
 
       <article className="admin-card admin-card--form">
         <h2>Dados da OS</h2>
-        <form className="admin-form" onSubmit={submit}>
+        <form className="admin-form" onSubmit={(event) => void submit(event)}>
           <label>
             Cliente
             <input
@@ -1053,7 +1085,7 @@ export function WorkOrderDetailPage() {
               type="button"
               className="btn btn--primary"
               disabled={locked}
-              onClick={() => setStatus('delivered')}
+              onClick={() => void setStatus('delivered')}
             >
               Entregar · lançar receita
             </button>
@@ -1228,7 +1260,7 @@ export function WorkOrderDetailPage() {
               />
             </label>
             <div className="span-2 admin-toolbar">
-              <button type="button" className="btn btn--primary" onClick={consumePart}>
+              <button type="button" className="btn btn--primary" onClick={() => void consumePart()}>
                 Baixar do estoque
               </button>
             </div>
@@ -1282,7 +1314,7 @@ export function WorkOrderDetailPage() {
                         <button
                           type="button"
                           className="btn btn--ghost"
-                          onClick={() => removeLine(line.id)}
+                          onClick={() => void removeLine(line.id)}
                         >
                           Estornar
                         </button>
@@ -1313,7 +1345,7 @@ export function WorkOrderDetailPage() {
               { value: 'purchased', label: DISPOSITION_LABEL.purchased },
               { value: 'scrapped', label: DISPOSITION_LABEL.scrapped },
             ]}
-            onChange={(value) => changeDisposition(value as AssetDisposition)}
+            onChange={(value) => void changeDisposition(value as AssetDisposition)}
           />
           {form.purchaseStockId ? (
             <label className="span-2">
@@ -1360,7 +1392,7 @@ export function WorkOrderDetailPage() {
               />
             </label>
             <div className="span-2 admin-toolbar">
-              <button type="button" className="btn btn--primary" onClick={buyAsset}>
+              <button type="button" className="btn btn--primary" onClick={() => void buyAsset()}>
                 Comprar para estoque
               </button>
             </div>

@@ -24,7 +24,7 @@ export function TotemSettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function save() {
+  async function save() {
     const next = exitPassword.trim();
     if (next.length < 4) {
       setError('A senha precisa ter pelo menos 4 caracteres.');
@@ -36,9 +36,14 @@ export function TotemSettingsPage() {
       setSaved(false);
       return;
     }
-    saveTotemSettings({ mode, exitPassword: next, shareStockWithErp });
-    setError(null);
-    setSaved(true);
+    try {
+      await saveTotemSettings({ mode, exitPassword: next, shareStockWithErp });
+      setError(null);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar configurações.');
+      setSaved(false);
+    }
   }
 
   return (
@@ -141,7 +146,7 @@ export function TotemSettingsPage() {
         </div>
         {error ? <p className="qty-low">{error}</p> : null}
         <div className="admin-toolbar admin-toolbar--stack" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={save}>
+          <button type="button" className="btn btn--primary" onClick={() => void save()}>
             Salvar configurações do totem
           </button>
           {saved ? <span className="empty">Configurações do totem salvas.</span> : null}

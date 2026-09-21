@@ -12,9 +12,9 @@ import {
 import {
   getAdminState,
   removeStockItem,
-  saveStock,
   STOCK_CONDITION_LABEL,
   STOCK_KIND_LABEL,
+  upsertStockItem,
   type StockCondition,
   type StockItem,
   type StockKind,
@@ -30,6 +30,13 @@ import { onStockChanged } from '../../data/ecommerceStore';
 
 type Mode = 'new' | 'edit' | 'view';
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function StockPage() {
   const [attrDefs, setAttrDefs] = useState(() => stockAttributes());
   const [items, setItems] = useState(() => getAdminState().stock);
@@ -40,16 +47,24 @@ export function StockPage() {
   const [kindFilter, setKindFilter] = useState<'all' | StockKind>('all');
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
+  const [error, setError] = useState('');
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   const suppliers = useMemo(() => listSuppliers(true), []);
 
   useEffect(() => {
-    function refresh() {
+    function refreshAttrs() {
       setAttrDefs(stockAttributes());
     }
-    window.addEventListener(ATTRIBUTES_EVENT, refresh);
-    return () => window.removeEventListener(ATTRIBUTES_EVENT, refresh);
+    function refreshStock() {
+      setItems(getAdminState().stock);
+    }
+    window.addEventListener(ATTRIBUTES_EVENT, refreshAttrs);
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refreshStock);
+    return () => {
+      window.removeEventListener(ATTRIBUTES_EVENT, refreshAttrs);
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refreshStock);
+    };
   }, []);
 
   const visible = useMemo(() => {
@@ -67,19 +82,13 @@ export function StockPage() {
 
   const readOnly = mode === 'view';
 
-  function persist(next: StockItem[], syncId?: string | null) {
-    setItems(next);
-    saveStock(next);
-    onStockChanged(syncId || undefined);
-  }
-
   function resetForm() {
     setForm(emptyForm(attrDefs.map((item) => item.id)));
     setSelectedId(null);
     setMode('new');
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly || !form.name.trim()) return;
     const payload = {
       ...form,
@@ -88,25 +97,17 @@ export function StockPage() {
         form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('capac'))?.id ?? ''] ??
         form.capacity,
     };
-    if (mode === 'edit' && selectedId) {
-      persist(
-        items.map((item) => (item.id === selectedId ? { ...item, ...payload } : item)),
-        selectedId,
+    setError('');
+    try {
+      const state = await upsertStockItem(
+        mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
       );
-    } else {
-      const newId = `STK-${Date.now().toString(36).toUpperCase()}`;
-      persist(
-        [
-          {
-            ...payload,
-            id: newId,
-          },
-          ...items,
-        ],
-        newId,
-      );
+      setItems(state.stock);
+      onStockChanged(mode === 'edit' && selectedId ? selectedId : state.stock[0]?.id);
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
     }
-    resetForm();
   }
 
   function loadItem(item: StockItem, nextMode: Mode) {
@@ -137,16 +138,23 @@ export function StockPage() {
     });
   }
 
-  function remove(item: StockItem) {
+  async function remove(item: StockItem) {
     if (!confirmDelete(`o produto ${item.name}`)) return;
-    setItems(removeStockItem(item.id).stock);
-    if (selectedId === item.id) resetForm();
+    setError('');
+    try {
+      const state = await removeStockItem(item.id);
+      setItems(state.stock);
+      if (selectedId === item.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover estoque.');
+    }
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
         <h2>{crudFormTitle(mode, 'produto')}</h2>
+        {error ? <p className="qty-low">{error}</p> : null}
         <p>
           Cadastro comercial e fiscal do item. Vincule classificação fiscal, fornecedor, almoxarifado,
           lote (rastro) e kit. SKU / barras / IMEI alimentam o PDV.
@@ -333,7 +341,7 @@ export function StockPage() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn--primary" onClick={submit}>
+              <button type="button" className="btn btn--primary" onClick={() => void submit()}>
                 {mode === 'edit' ? 'Salvar item' : 'Incluir no estoque'}
               </button>
               {mode === 'edit' ? (
@@ -471,7 +479,7 @@ export function StockPage() {
                     <CrudRowActions
                       onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
-                      onDelete={() => remove(item)}
+                      onDelete={() => void remove(item)}
                     />
                   </td>
                 </tr>

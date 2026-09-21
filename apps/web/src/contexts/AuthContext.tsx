@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { logAccess } from '../data/auditLog';
 import { markStoreContracted } from '../data/demoLeadStore';
+import { bootstrapErpFromApi } from '../data/erpBootstrap';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
@@ -26,18 +27,23 @@ type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
+  erpReady: boolean;
+  erpError: string | null;
   providers: AuthProviders | null;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => void;
+  refreshErp: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function applySession(
+async function applySession(
   session: AuthSession,
   setToken: (token: string | null) => void,
   setUser: (user: AuthUser | null) => void,
+  setErpReady: (ready: boolean) => void,
+  setErpError: (error: string | null) => void,
 ) {
   localStorage.setItem(STORAGE_KEY, session.token);
   setToken(session.token);
@@ -48,6 +54,9 @@ function applySession(
     actorEmail: session.user.email,
     action: 'login',
   });
+  const ok = await bootstrapErpFromApi();
+  setErpReady(ok);
+  setErpError(ok ? null : 'Não foi possível sincronizar o ERP. Tentaremos de novo.');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -62,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [providers, setProviders] = useState<AuthProviders | null>(null);
   const [loading, setLoading] = useState(true);
+  const [erpReady, setErpReady] = useState(false);
+  const [erpError, setErpError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -96,11 +107,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setUser(current);
         }
+        const ok = await bootstrapErpFromApi();
+        if (active) {
+          setErpReady(ok);
+          setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+        }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
         if (active) {
           setToken(null);
           setUser(null);
+          setErpReady(false);
         }
       } finally {
         if (active) setLoading(false);
@@ -115,12 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithPassword = useCallback(async (email: string, password: string) => {
     const session = await apiLoginWithPassword(email, password);
-    applySession(session, setToken, setUser);
+    await applySession(session, setToken, setUser, setErpReady, setErpError);
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {
     const session = await apiLoginWithGoogle(idToken);
-    applySession(session, setToken, setUser);
+    await applySession(session, setToken, setUser, setErpReady, setErpError);
   }, []);
 
   const logout = useCallback(() => {
@@ -134,19 +151,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
     setToken(null);
     setUser(null);
+    setErpReady(false);
+    setErpError(null);
   }, [user]);
+
+  const refreshErp = useCallback(async () => {
+    const ok = await bootstrapErpFromApi();
+    setErpReady(ok);
+    setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
       token,
       loading,
+      erpReady,
+      erpError,
       providers,
       loginWithPassword,
       loginWithGoogle,
       logout,
+      refreshErp,
     }),
-    [user, token, loading, providers, loginWithPassword, loginWithGoogle, logout],
+    [
+      user,
+      token,
+      loading,
+      erpReady,
+      erpError,
+      providers,
+      loginWithPassword,
+      loginWithGoogle,
+      logout,
+      refreshErp,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

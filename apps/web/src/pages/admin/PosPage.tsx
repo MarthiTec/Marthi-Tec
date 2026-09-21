@@ -18,14 +18,18 @@ export function PosPage() {
       /* fila local já atualizou */
     }
     if (status === 'sold') {
-      closeSale({
-        ticketId: ticket.id,
-        customerName: ticket.customerName,
-        customerPhone: ticket.customerPhone,
-        productName: ticket.productName,
-        amount: parsePriceLabel(ticket.priceLabel),
-        payment: ticket.payment,
-      });
+      try {
+        await closeSale({
+          ticketId: ticket.id,
+          customerName: ticket.customerName,
+          customerPhone: ticket.customerPhone,
+          productName: ticket.productName,
+          amount: parsePriceLabel(ticket.priceLabel),
+          payment: ticket.payment,
+        });
+      } catch {
+        /* fila local já atualizou; venda pode falhar offline */
+      }
     }
     await reload();
   }

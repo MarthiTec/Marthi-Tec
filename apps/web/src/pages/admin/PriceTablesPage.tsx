@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -19,6 +19,13 @@ const EMPTY: Omit<PriceTable, 'id'> = {
 
 type Mode = 'new' | 'edit' | 'view';
 
+const REFRESH_EVENTS = [
+  'marthi-admin-state',
+  'marthi-os-state',
+  'marthi-erp-bootstrap',
+  'marthi-stock',
+] as const;
+
 export function PriceTablesPage() {
   const [items, setItems] = useState(() => getAdminState().priceTables);
   const [form, setForm] = useState(EMPTY);
@@ -26,6 +33,17 @@ export function PriceTablesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setItems(getAdminState().priceTables);
+    }
+    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
+    return () => {
+      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    };
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -38,9 +56,15 @@ export function PriceTablesPage() {
 
   const readOnly = mode === 'view';
 
-  function persist(next: PriceTable[]) {
-    setItems(next);
-    savePriceTables(next);
+  async function persist(next: PriceTable[]) {
+    setError('');
+    try {
+      const state = await savePriceTables(next);
+      setItems(state.priceTables);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar tabelas.');
+      throw err;
+    }
   }
 
   function resetForm() {
@@ -55,29 +79,40 @@ export function PriceTablesPage() {
     setForm({ name: item.name, percent: item.percent, active: item.active });
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly || !form.name.trim()) return;
-    if (mode === 'edit' && selectedId) {
-      persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
-    } else {
-      persist([
-        { ...form, id: `TAB-${Date.now().toString(36).toUpperCase()}` },
-        ...items,
-      ]);
+    try {
+      if (mode === 'edit' && selectedId) {
+        await persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
+      } else {
+        await persist([
+          { ...form, id: `TAB-${Date.now().toString(36).toUpperCase()}` },
+          ...items,
+        ]);
+      }
+      resetForm();
+    } catch {
+      /* error already shown */
     }
-    resetForm();
   }
 
-  function remove(item: PriceTable) {
+  async function remove(item: PriceTable) {
     if (!confirmDelete(`a tabela ${item.name}`)) return;
-    setItems(removePriceTable(item.id).priceTables);
-    if (selectedId === item.id) resetForm();
+    setError('');
+    try {
+      const state = await removePriceTable(item.id);
+      setItems(state.priceTables);
+      if (selectedId === item.id) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover tabela.');
+    }
   }
 
   return (
     <section className="admin-page">
       <article className="admin-card">
         <h2>{crudFormTitle(mode, 'tabela de preço')}</h2>
+        {error ? <p className="qty-low">{error}</p> : null}
         <p>
           Percentual sobre o preço de estoque. Formas de pagamento do ERP vinculam uma tabela ao
           PDV.
@@ -123,7 +158,7 @@ export function PriceTablesPage() {
             </>
           ) : (
             <>
-              <button type="button" className="btn btn--primary" onClick={submit}>
+              <button type="button" className="btn btn--primary" onClick={() => void submit()}>
                 {mode === 'edit' ? 'Salvar tabela' : 'Cadastrar tabela'}
               </button>
               {mode === 'edit' ? (
@@ -175,7 +210,7 @@ export function PriceTablesPage() {
                     <CrudRowActions
                       onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
-                      onDelete={() => remove(item)}
+                      onDelete={() => void remove(item)}
                     />
                   </td>
                 </tr>

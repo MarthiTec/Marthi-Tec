@@ -1170,10 +1170,10 @@ export function moveCrmLead(
  * Confirma pagamento e só então cria o cliente no painel.
  * Exige estágio won (negócio fechado) e responsável.
  */
-export function confirmCrmLeadPaidAsCustomer(
+export async function confirmCrmLeadPaidAsCustomer(
   leadId: string,
   sellerId: string,
-): { ok: true; lead: CrmLead; customerId: string } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead; customerId: string } | { ok: false; error: string }> {
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1194,7 +1194,7 @@ export function confirmCrmLeadPaidAsCustomer(
     return { ok: true, lead, customerId: lead.customerId };
   }
 
-  const created = promoteLeadToCustomer(lead);
+  const created = await promoteLeadToCustomer(lead);
   if (!created.customerId) {
     return { ok: false, error: 'Não foi possível criar o cliente Marthi.' };
   }
@@ -1223,10 +1223,10 @@ export function confirmCrmLeadPaidAsCustomer(
 }
 
 /** @deprecated Use confirmCrmLeadPaidAsCustomer — cliente só após pagar. */
-export function closeCrmLeadAsCustomer(
+export async function closeCrmLeadAsCustomer(
   leadId: string,
   sellerId: string,
-): { ok: true; lead: CrmLead; customerId: string } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead; customerId: string } | { ok: false; error: string }> {
   const moved = moveCrmLead(leadId, 'won', sellerId);
   if (!moved.ok) return moved;
   return confirmCrmLeadPaidAsCustomer(leadId, sellerId);
@@ -1236,8 +1236,8 @@ export function listCrmConvertedCustomers() {
   return load().leads.filter((item) => Boolean(item.customerId && item.paidAt));
 }
 
-function promoteLeadToCustomer(lead: CrmLead): { customerId: string } {
-  upsertCustomer({
+async function promoteLeadToCustomer(lead: CrmLead): Promise<{ customerId: string }> {
+  await upsertCustomer({
     name: lead.name,
     phone: lead.whatsapp,
     email: lead.email,

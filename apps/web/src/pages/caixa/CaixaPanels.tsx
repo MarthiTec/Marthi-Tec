@@ -1671,7 +1671,7 @@ function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated }: Pan
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     const trimmedName = name.trim();
     const cpfDigits = onlyDigitsLocal(document);
@@ -1684,28 +1684,32 @@ function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated }: Pan
       return;
     }
 
-    const next = upsertCustomer({
-      name: trimmedName,
-      document: formatCpfLocal(cpfDigits),
-      phone: phone.trim(),
-      email: email.trim(),
-      zipCode: zipCode.trim(),
-      street: street.trim(),
-      number: number.trim(),
-      complement: complement.trim(),
-      neighborhood: neighborhood.trim(),
-      city: city.trim(),
-      state: state.trim().toUpperCase(),
-      active: true,
-    });
+    try {
+      const next = await upsertCustomer({
+        name: trimmedName,
+        document: formatCpfLocal(cpfDigits),
+        phone: phone.trim(),
+        email: email.trim(),
+        zipCode: zipCode.trim(),
+        street: street.trim(),
+        number: number.trim(),
+        complement: complement.trim(),
+        neighborhood: neighborhood.trim(),
+        city: city.trim(),
+        state: state.trim().toUpperCase(),
+        active: true,
+      });
 
-    const saved =
-      next.customers.find((item) => onlyDigitsLocal(item.document) === cpfDigits) ??
-      next.customers[0];
+      const saved =
+        next.customers.find((item) => onlyDigitsLocal(item.document) === cpfDigits) ??
+        next.customers[0];
 
-    if (saved) onCustomerCreated?.(saved);
-    onDone(`Cliente ${saved?.name ?? trimmedName} cadastrado.`);
-    onClose();
+      if (saved) onCustomerCreated?.(saved);
+      onDone(`Cliente ${saved?.name ?? trimmedName} cadastrado.`);
+      onClose();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Falha ao cadastrar cliente.');
+    }
   }
 
   return (

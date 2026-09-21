@@ -2,25 +2,57 @@ import {
   addFinance,
   getAdminState,
   getStockItem,
+  replaceAdminState,
   saveStock,
   type StockItem,
   type StockKind,
 } from './adminStore';
 import {
   getWorkOrder,
+  listWorkOrders,
   newWorkOrderLineId,
   partsTotalFromLines,
+  replaceWorkOrders,
   updateWorkOrder,
   workOrderTotal,
   type AssetDisposition,
   type WorkOrder,
   type WorkOrderLine,
 } from './osStore';
+import {
+  apiCancelWorkOrder,
+  apiConsumePart,
+  apiDeliverWorkOrder,
+  apiPurchaseAsset,
+  apiRemovePart,
+} from '../services/erpApi';
+import { isNestAuthed, NestApiError } from '../services/nestClient';
 
 export type LedgerResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
 
 function moneyLabel(amount: number) {
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function errMsg(error: unknown, fallback: string) {
+  if (error instanceof NestApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
+function patchWorkOrderCache(order: WorkOrder) {
+  replaceWorkOrders([order, ...listWorkOrders().filter((item) => item.id !== order.id)]);
+  return order;
+}
+
+async function refreshStockFinance() {
+  try {
+    const { apiListStock, apiListFinance } = await import('../services/erpApi');
+    const [stock, finance] = await Promise.all([apiListStock(), apiListFinance()]);
+    replaceAdminState({ ...getAdminState(), stock, finance });
+  } catch {
+    /* ignore */
+  }
 }
 
 function syncParts(order: WorkOrder, lines: WorkOrderLine[]) {
@@ -31,12 +63,23 @@ function syncParts(order: WorkOrder, lines: WorkOrderLine[]) {
 }
 
 /** Baixa peça/insumo do estoque, lança custo no financeiro e adiciona linha na OS. */
-export function consumeStockOnWorkOrder(
+export async function consumeStockOnWorkOrder(
   osId: string,
   stockId: string,
   qty: number,
   sellPrice?: number,
-): LedgerResult<WorkOrder> {
+): Promise<LedgerResult<WorkOrder>> {
+  if (isNestAuthed()) {
+    try {
+      const updated = await apiConsumePart(osId, { stockId, qty, unitPrice: sellPrice });
+      patchWorkOrderCache(updated);
+      await refreshStockFinance();
+      return { ok: true, data: updated };
+    } catch (error) {
+      return { ok: false, error: errMsg(error, 'Falha ao baixar peça.') };
+    }
+  }
+
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.status === 'cancelled' || order.status === 'delivered') {
@@ -53,12 +96,11 @@ export function consumeStockOnWorkOrder(
   const costTotal = unitCost * qty;
 
   const state = getAdminState();
-  const nextStock = state.stock.map((item) =>
-    item.id === stockId ? { ...item, qty: item.qty - qty } : item,
+  saveStock(
+    state.stock.map((item) => (item.id === stockId ? { ...item, qty: item.qty - qty } : item)),
   );
-  saveStock(nextStock);
 
-  const finance = addFinance({
+  const finance = await addFinance({
     type: 'out',
     label: `${osId} · peça ${stock.name}`,
     amount: costTotal,
@@ -77,13 +119,27 @@ export function consumeStockOnWorkOrder(
     kind: 'part',
     financeId,
   };
-  const updated = syncParts(order, [...order.lines, line]);
+  const updated = await syncParts(order, [...order.lines, line]);
   if (!updated) return { ok: false, error: 'Falha ao atualizar a OS.' };
   return { ok: true, data: updated };
 }
 
 /** Remove linha da OS e estorna estoque + lançamento de custo. */
-export function removeWorkOrderLine(osId: string, lineId: string): LedgerResult<WorkOrder> {
+export async function removeWorkOrderLine(
+  osId: string,
+  lineId: string,
+): Promise<LedgerResult<WorkOrder>> {
+  if (isNestAuthed()) {
+    try {
+      const updated = await apiRemovePart(osId, lineId);
+      patchWorkOrderCache(updated);
+      await refreshStockFinance();
+      return { ok: true, data: updated };
+    } catch (error) {
+      return { ok: false, error: errMsg(error, 'Falha ao estornar peça.') };
+    }
+  }
+
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.status === 'delivered') {
@@ -97,21 +153,21 @@ export function removeWorkOrderLine(osId: string, lineId: string): LedgerResult<
   }
 
   const state = getAdminState();
-  const nextStock = state.stock.map((item) =>
-    item.id === line.stockId ? { ...item, qty: item.qty + line.qty } : item,
+  saveStock(
+    state.stock.map((item) =>
+      item.id === line.stockId ? { ...item, qty: item.qty + line.qty } : item,
+    ),
   );
-  saveStock(nextStock);
 
-  const costTotal = line.unitCost * line.qty;
-  addFinance({
+  await addFinance({
     type: 'in',
     label: `${osId} · estorno peça ${line.name}`,
-    amount: costTotal,
+    amount: line.unitCost * line.qty,
     source: 'os_reversal',
     refId: osId,
   });
 
-  const updated = syncParts(
+  const updated = await syncParts(
     order,
     order.lines.filter((item) => item.id !== lineId),
   );
@@ -129,10 +185,25 @@ export type PurchaseAssetInput = {
 };
 
 /** Compra o equipamento da OS para estoque recondicionado + débito financeiro. */
-export function purchaseAssetFromWorkOrder(
+export async function purchaseAssetFromWorkOrder(
   osId: string,
   input: PurchaseAssetInput,
-): LedgerResult<{ order: WorkOrder; stock: StockItem }> {
+): Promise<LedgerResult<{ order: WorkOrder; stock: StockItem }>> {
+  if (isNestAuthed()) {
+    try {
+      const result = await apiPurchaseAsset(osId, input);
+      const order = patchWorkOrderCache(result);
+      await refreshStockFinance();
+      const stock =
+        result.stock ??
+        getAdminState().stock.find((item) => item.id === order.purchaseStockId);
+      if (!stock) return { ok: false, error: 'Compra ok, mas estoque não retornou.' };
+      return { ok: true, data: { order, stock } };
+    } catch (error) {
+      return { ok: false, error: errMsg(error, 'Falha na compra recondicionado.') };
+    }
+  }
+
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.status === 'cancelled') return { ok: false, error: 'OS cancelada.' };
@@ -175,7 +246,7 @@ export function purchaseAssetFromWorkOrder(
   const state = getAdminState();
   saveStock([stockItem, ...state.stock]);
 
-  const finance = addFinance({
+  const finance = await addFinance({
     type: 'out',
     label: `${osId} · compra recondicionado ${name}`,
     amount: input.cost,
@@ -183,7 +254,7 @@ export function purchaseAssetFromWorkOrder(
     refId: osId,
   });
 
-  const updated = updateWorkOrder(osId, {
+  const updated = await updateWorkOrder(osId, {
     assetDisposition: 'purchased',
     purchaseCost: input.cost,
     purchaseAt: new Date().toISOString(),
@@ -194,10 +265,10 @@ export function purchaseAssetFromWorkOrder(
   return { ok: true, data: { order: updated, stock: stockItem } };
 }
 
-export function setAssetDisposition(
+export async function setAssetDisposition(
   osId: string,
   disposition: AssetDisposition,
-): LedgerResult<WorkOrder> {
+): Promise<LedgerResult<WorkOrder>> {
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.assetDisposition === 'purchased' && order.purchaseStockId) {
@@ -206,13 +277,28 @@ export function setAssetDisposition(
   if (disposition === 'purchased') {
     return { ok: false, error: 'Use a compra com custo para marcar como comprado.' };
   }
-  const updated = updateWorkOrder(osId, { assetDisposition: disposition });
-  if (!updated) return { ok: false, error: 'Falha ao atualizar a OS.' };
-  return { ok: true, data: updated };
+  try {
+    const updated = await updateWorkOrder(osId, { assetDisposition: disposition });
+    if (!updated) return { ok: false, error: 'Falha ao atualizar a OS.' };
+    return { ok: true, data: updated };
+  } catch (error) {
+    return { ok: false, error: errMsg(error, 'Falha ao atualizar destino.') };
+  }
 }
 
-/** Entrega a OS e lança crédito de receita (mão de obra + preço das peças ao cliente). */
-export function deliverWorkOrder(osId: string): LedgerResult<WorkOrder> {
+/** Entrega a OS e lança crédito de receita. */
+export async function deliverWorkOrder(osId: string): Promise<LedgerResult<WorkOrder>> {
+  if (isNestAuthed()) {
+    try {
+      const updated = await apiDeliverWorkOrder(osId);
+      patchWorkOrderCache(updated);
+      await refreshStockFinance();
+      return { ok: true, data: updated };
+    } catch (error) {
+      return { ok: false, error: errMsg(error, 'Falha ao entregar OS.') };
+    }
+  }
+
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.status === 'cancelled') return { ok: false, error: 'OS cancelada.' };
@@ -222,7 +308,7 @@ export function deliverWorkOrder(osId: string): LedgerResult<WorkOrder> {
   let revenueFinanceId = order.revenueFinanceId;
 
   if (revenue > 0 && !revenueFinanceId) {
-    const finance = addFinance({
+    const finance = await addFinance({
       type: 'in',
       label: `${osId} · receita serviço (${moneyLabel(revenue)})`,
       amount: revenue,
@@ -232,7 +318,7 @@ export function deliverWorkOrder(osId: string): LedgerResult<WorkOrder> {
     revenueFinanceId = finance.finance[0]?.id;
   }
 
-  const updated = updateWorkOrder(osId, {
+  const updated = await updateWorkOrder(osId, {
     status: 'delivered',
     revenueFinanceId,
   });
@@ -241,7 +327,20 @@ export function deliverWorkOrder(osId: string): LedgerResult<WorkOrder> {
 }
 
 /** Cancela OS e estorna peças + compra de aparelho quando houver. */
-export function cancelWorkOrderWithReversal(osId: string): LedgerResult<WorkOrder> {
+export async function cancelWorkOrderWithReversal(
+  osId: string,
+): Promise<LedgerResult<WorkOrder>> {
+  if (isNestAuthed()) {
+    try {
+      const updated = await apiCancelWorkOrder(osId);
+      patchWorkOrderCache(updated);
+      await refreshStockFinance();
+      return { ok: true, data: updated };
+    } catch (error) {
+      return { ok: false, error: errMsg(error, 'Falha ao cancelar OS.') };
+    }
+  }
+
   const order = getWorkOrder(osId);
   if (!order) return { ok: false, error: 'OS não encontrada.' };
   if (order.status === 'delivered') {
@@ -252,7 +351,7 @@ export function cancelWorkOrderWithReversal(osId: string): LedgerResult<WorkOrde
   let working = order;
   for (const line of [...working.lines]) {
     if (line.kind !== 'part') continue;
-    const result = removeWorkOrderLine(working.id, line.id);
+    const result = await removeWorkOrderLine(working.id, line.id);
     if (!result.ok) return result;
     working = result.data;
   }
@@ -268,7 +367,7 @@ export function cancelWorkOrderWithReversal(osId: string): LedgerResult<WorkOrde
         };
       }
       saveStock(state.stock.filter((item) => item.id !== working.purchaseStockId));
-      addFinance({
+      await addFinance({
         type: 'in',
         label: `${osId} · estorno compra recondicionado ${stock.name}`,
         amount: working.purchaseCost,
@@ -282,7 +381,7 @@ export function cancelWorkOrderWithReversal(osId: string): LedgerResult<WorkOrde
     return { ok: false, error: 'Há receita lançada — estorne manualmente antes de cancelar.' };
   }
 
-  const updated = updateWorkOrder(osId, {
+  const updated = await updateWorkOrder(osId, {
     status: 'cancelled',
     assetDisposition: working.purchaseStockId ? 'customer' : working.assetDisposition,
     purchaseStockId: undefined,

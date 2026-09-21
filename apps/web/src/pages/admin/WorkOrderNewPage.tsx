@@ -40,6 +40,7 @@ export function WorkOrderNewPage() {
   const customers = getAdminState().customers;
   const sellers = listSellers(true);
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
+  const [error, setError] = useState('');
 
   function pickCustomer(id: string) {
     const customer = customers.find((item) => item.id === id);
@@ -53,11 +54,16 @@ export function WorkOrderNewPage() {
     }));
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!form.customerName.trim() || !form.itemName.trim() || !form.defect.trim()) return;
-    const created = createWorkOrder(form);
-    navigate(osHref(osBase, `/${created.id}/relatorio`), { replace: true });
+    setError('');
+    try {
+      const created = await createWorkOrder(form);
+      navigate(osHref(osBase, `/${created.id}/relatorio`), { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao abrir OS.');
+    }
   }
 
   return (
@@ -68,7 +74,8 @@ export function WorkOrderNewPage() {
           Preencha os campos estruturados — evita jogar tudo em observações. Depois da abertura sai o
           relatório para imprimir ou guardar.
         </p>
-        <form className="admin-form" onSubmit={submit}>
+        {error ? <p className="qty-low">{error}</p> : null}
+        <form className="admin-form" onSubmit={(event) => void submit(event)}>
           <AdminPicker
             label="Cliente cadastrado"
             value=""

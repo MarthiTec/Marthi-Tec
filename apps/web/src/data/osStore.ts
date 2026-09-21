@@ -1,4 +1,21 @@
+import {
+  apiAddPhoto,
+  apiClearSignature,
+  apiCreateWorkOrder,
+  apiPatchChecklist,
+  apiQuoteApprove,
+  apiQuoteDraft,
+  apiQuoteReject,
+  apiQuoteReopen,
+  apiQuoteSend,
+  apiRemovePhoto,
+  apiSignWorkOrder,
+  apiUpdateWorkOrder,
+} from '../services/erpApi';
+import { isNestAuthed, NestApiError } from '../services/nestClient';
+
 const STORAGE_KEY = 'marthi.os.v1';
+export const OS_STATE_EVENT = 'marthi-os-state';
 
 export type WorkOrderStatus =
   | 'open'
@@ -107,6 +124,8 @@ export type WorkOrder = {
   createdAt: string;
   updatedAt: string;
 };
+
+let memoryOrders: WorkOrder[] | null = null;
 
 export const STATUS_LABEL: Record<WorkOrderStatus, string> = {
   open: 'Aberta',
@@ -387,6 +406,9 @@ function seed(): WorkOrder[] {
 }
 
 function load(): WorkOrder[] {
+  if (memoryOrders) {
+    return memoryOrders.map((item) => normalizeWorkOrder(item));
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -409,7 +431,31 @@ function load(): WorkOrder[] {
 }
 
 function save(items: WorkOrder[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  memoryOrders = items;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(OS_STATE_EVENT));
+  }
+}
+
+export function replaceWorkOrders(items: WorkOrder[]) {
+  save(items.map((item) => normalizeWorkOrder(item)));
+}
+
+function osApiError(error: unknown, fallback: string) {
+  if (error instanceof NestApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
+function upsertLocal(order: WorkOrder) {
+  const next = [order, ...load().filter((item) => item.id !== order.id)];
+  save(next);
+  return order;
 }
 
 export function listWorkOrders() {
@@ -420,7 +466,7 @@ export function getWorkOrder(id: string) {
   return load().find((item) => item.id === id) ?? null;
 }
 
-export function createWorkOrder(
+export async function createWorkOrder(
   input: Omit<
     WorkOrder,
     | 'id'
@@ -452,6 +498,36 @@ export function createWorkOrder(
     quoteValidUntil?: string;
   },
 ) {
+  if (isNestAuthed()) {
+    try {
+      const created = await apiCreateWorkOrder({
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerDocument: input.customerDocument,
+        customerEmail: input.customerEmail,
+        itemName: input.itemName,
+        itemBrand: input.itemBrand,
+        itemModel: input.itemModel,
+        itemColor: input.itemColor,
+        itemRef: input.itemRef,
+        devicePassword: input.devicePassword,
+        accessories: input.accessories,
+        conditionOnEntry: input.conditionOnEntry,
+        defect: input.defect,
+        diagnosis: input.diagnosis,
+        notes: input.notes,
+        estimatedReadyAt: input.estimatedReadyAt,
+        technician: input.technician,
+        sellerId: input.sellerId,
+        priority: input.priority,
+        labor: input.labor,
+      });
+      return upsertLocal(normalizeWorkOrder(created));
+    } catch (error) {
+      throw new Error(osApiError(error, 'Falha ao criar OS.'));
+    }
+  }
+
   const stamp = now();
   const lines = input.lines ?? [];
   const order = normalizeWorkOrder({
@@ -476,7 +552,51 @@ export function createWorkOrder(
   return order;
 }
 
-export function updateWorkOrder(id: string, patch: Partial<Omit<WorkOrder, 'id' | 'createdAt'>>) {
+export async function updateWorkOrder(
+  id: string,
+  patch: Partial<Omit<WorkOrder, 'id' | 'createdAt'>>,
+) {
+  if (isNestAuthed()) {
+    try {
+      if (patch.status === 'delivered' || patch.status === 'cancelled') {
+        throw new Error('Use entrega/cancelamento via ledger.');
+      }
+      const body: Record<string, unknown> = {};
+      const keys = [
+        'status',
+        'labor',
+        'notes',
+        'diagnosis',
+        'priority',
+        'technician',
+        'sellerId',
+        'estimatedReadyAt',
+        'assetDisposition',
+        'quoteNotes',
+        'quoteValidUntil',
+        'customerName',
+        'customerPhone',
+        'customerDocument',
+        'customerEmail',
+        'itemName',
+        'itemBrand',
+        'itemModel',
+        'itemColor',
+        'itemRef',
+        'devicePassword',
+        'accessories',
+        'conditionOnEntry',
+      ] as const;
+      for (const key of keys) {
+        if (patch[key] !== undefined) body[key] = patch[key];
+      }
+      const updated = await apiUpdateWorkOrder(id, body);
+      return upsertLocal(normalizeWorkOrder(updated));
+    } catch (error) {
+      throw new Error(osApiError(error, 'Falha ao atualizar OS.'));
+    }
+  }
+
   const next = load().map((item) => {
     if (item.id !== id) return item;
     const stamp = now();
@@ -514,10 +634,22 @@ export type QuoteActionResult =
   | { ok: false; error: string };
 
 /** Marca orçamento como rascunho (ainda editável). */
-export function draftQuote(
+export async function draftQuote(
   id: string,
   input: { labor?: number; parts?: number; quoteNotes?: string; quoteValidUntil?: string },
-): QuoteActionResult {
+): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiQuoteDraft(id, {
+        labor: input.labor,
+        notes: input.quoteNotes,
+        validUntil: input.quoteValidUntil,
+      });
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao salvar orçamento.') };
+    }
+  }
   const current = getWorkOrder(id);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
@@ -526,8 +658,7 @@ export function draftQuote(
   if (current.quoteStatus === 'approved') {
     return { ok: false, error: 'Orçamento já aprovado. Crie revisão nas observações se precisar.' };
   }
-
-  const order = updateWorkOrder(id, {
+  const order = await updateWorkOrder(id, {
     labor: input.labor ?? current.labor,
     parts: input.parts ?? current.parts,
     quoteNotes: input.quoteNotes ?? current.quoteNotes,
@@ -540,7 +671,15 @@ export function draftQuote(
 }
 
 /** Envia orçamento ao cliente → status da OS vai para Aguardando. */
-export function sendQuote(id: string): QuoteActionResult {
+export async function sendQuote(id: string): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiQuoteSend(id);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao enviar orçamento.') };
+    }
+  }
   const current = getWorkOrder(id);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
@@ -550,8 +689,7 @@ export function sendQuote(id: string): QuoteActionResult {
   if (total <= 0 && !current.quoteNotes.trim()) {
     return { ok: false, error: 'Informe valores ou descrição do orçamento antes de enviar.' };
   }
-
-  const order = updateWorkOrder(id, {
+  const order = await updateWorkOrder(id, {
     quoteStatus: 'sent',
     quoteSentAt: now(),
     quoteDecidedAt: undefined,
@@ -562,14 +700,21 @@ export function sendQuote(id: string): QuoteActionResult {
 }
 
 /** Cliente aprovou → pode seguir para serviço. */
-export function approveQuote(id: string, moveToProgress = true): QuoteActionResult {
+export async function approveQuote(id: string, moveToProgress = true): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiQuoteApprove(id, { moveToProgress });
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao aprovar orçamento.') };
+    }
+  }
   const current = getWorkOrder(id);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.quoteStatus !== 'sent' && current.quoteStatus !== 'draft') {
     return { ok: false, error: 'Só dá para aprovar orçamento enviado ou em rascunho.' };
   }
-
-  const order = updateWorkOrder(id, {
+  const order = await updateWorkOrder(id, {
     quoteStatus: 'approved',
     quoteDecidedAt: now(),
     status: moveToProgress ? 'progress' : current.status,
@@ -579,14 +724,21 @@ export function approveQuote(id: string, moveToProgress = true): QuoteActionResu
 }
 
 /** Cliente recusou. */
-export function rejectQuote(id: string): QuoteActionResult {
+export async function rejectQuote(id: string): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiQuoteReject(id);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao recusar orçamento.') };
+    }
+  }
   const current = getWorkOrder(id);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.quoteStatus !== 'sent' && current.quoteStatus !== 'draft') {
     return { ok: false, error: 'Só dá para recusar orçamento enviado ou em rascunho.' };
   }
-
-  const order = updateWorkOrder(id, {
+  const order = await updateWorkOrder(id, {
     quoteStatus: 'rejected',
     quoteDecidedAt: now(),
     status: 'waiting',
@@ -596,13 +748,21 @@ export function rejectQuote(id: string): QuoteActionResult {
 }
 
 /** Volta orçamento para edição após recusa. */
-export function reopenQuote(id: string): QuoteActionResult {
+export async function reopenQuote(id: string): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiQuoteReopen(id);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao reabrir orçamento.') };
+    }
+  }
   const current = getWorkOrder(id);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.quoteStatus !== 'rejected' && current.quoteStatus !== 'sent') {
     return { ok: false, error: 'Nada para reabrir.' };
   }
-  const order = updateWorkOrder(id, {
+  const order = await updateWorkOrder(id, {
     quoteStatus: 'draft',
     quoteDecidedAt: undefined,
   });
@@ -633,17 +793,24 @@ export async function fileToWorkOrderPhoto(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.72);
 }
 
-export function addWorkOrderPhoto(
+export async function addWorkOrderPhoto(
   osId: string,
   input: { kind: WorkOrderPhotoKind; dataUrl: string; caption?: string },
-): QuoteActionResult {
+): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiAddPhoto(osId, input);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao salvar foto.') };
+    }
+  }
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'cancelled') return { ok: false, error: 'OS cancelada.' };
   if (current.photos.length >= MAX_WORK_ORDER_PHOTOS) {
     return { ok: false, error: `Limite de ${MAX_WORK_ORDER_PHOTOS} fotos por OS.` };
   }
-
   const photo: WorkOrderPhoto = {
     id: photoUid(),
     kind: input.kind,
@@ -651,32 +818,40 @@ export function addWorkOrderPhoto(
     caption: input.caption?.trim() ?? '',
     createdAt: now(),
   };
-  const order = updateWorkOrder(osId, { photos: [...current.photos, photo] });
+  const order = await updateWorkOrder(osId, { photos: [...current.photos, photo] });
   if (!order) return { ok: false, error: 'Falha ao salvar foto.' };
   return { ok: true, order };
 }
 
-export function removeWorkOrderPhoto(osId: string, photoId: string): QuoteActionResult {
+export async function removeWorkOrderPhoto(osId: string, photoId: string): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiRemovePhoto(osId, photoId);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao remover foto.') };
+    }
+  }
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
     return { ok: false, error: 'OS encerrada — não dá para remover fotos.' };
   }
-  const order = updateWorkOrder(osId, {
+  const order = await updateWorkOrder(osId, {
     photos: current.photos.filter((photo) => photo.id !== photoId),
   });
   if (!order) return { ok: false, error: 'Falha ao remover foto.' };
   return { ok: true, order };
 }
 
-export function updateWorkOrderPhotoCaption(
+export async function updateWorkOrderPhotoCaption(
   osId: string,
   photoId: string,
   caption: string,
-): QuoteActionResult {
+): Promise<QuoteActionResult> {
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
-  const order = updateWorkOrder(osId, {
+  const order = await updateWorkOrder(osId, {
     photos: current.photos.map((photo) =>
       photo.id === photoId ? { ...photo, caption: caption.trim() } : photo,
     ),
@@ -685,11 +860,19 @@ export function updateWorkOrderPhotoCaption(
   return { ok: true, order };
 }
 
-export function setChecklistItem(
+export async function setChecklistItem(
   osId: string,
   itemId: string,
   patch: { mark?: ChecklistMark; note?: string },
-): QuoteActionResult {
+): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiPatchChecklist(osId, itemId, patch);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao atualizar checklist.') };
+    }
+  }
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
@@ -704,18 +887,18 @@ export function setChecklistItem(
         }
       : item,
   );
-  const order = updateWorkOrder(osId, { checklist });
+  const order = await updateWorkOrder(osId, { checklist });
   if (!order) return { ok: false, error: 'Falha ao atualizar checklist.' };
   return { ok: true, order };
 }
 
-export function resetWorkOrderChecklist(osId: string): QuoteActionResult {
+export async function resetWorkOrderChecklist(osId: string): Promise<QuoteActionResult> {
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
     return { ok: false, error: 'OS encerrada.' };
   }
-  const order = updateWorkOrder(osId, { checklist: buildDefaultChecklist() });
+  const order = await updateWorkOrder(osId, { checklist: buildDefaultChecklist() });
   if (!order) return { ok: false, error: 'Falha ao reiniciar checklist.' };
   return { ok: true, order };
 }
@@ -757,17 +940,25 @@ export function findWorkOrdersByCustomer(
   });
 }
 
-export function saveCustomerSignature(
+export async function saveCustomerSignature(
   osId: string,
   input: { dataUrl: string; signedName?: string },
-): QuoteActionResult {
+): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiSignWorkOrder(osId, input);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao salvar assinatura.') };
+    }
+  }
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'cancelled') return { ok: false, error: 'OS cancelada.' };
   if (!input.dataUrl.startsWith('data:image')) {
     return { ok: false, error: 'Assinatura inválida.' };
   }
-  const order = updateWorkOrder(osId, {
+  const order = await updateWorkOrder(osId, {
     customerSignature: input.dataUrl,
     customerSignedAt: now(),
     customerSignedName: (input.signedName ?? current.customerName).trim(),
@@ -776,13 +967,21 @@ export function saveCustomerSignature(
   return { ok: true, order };
 }
 
-export function clearCustomerSignature(osId: string): QuoteActionResult {
+export async function clearCustomerSignature(osId: string): Promise<QuoteActionResult> {
+  if (isNestAuthed()) {
+    try {
+      const order = await apiClearSignature(osId);
+      return { ok: true, order: upsertLocal(normalizeWorkOrder(order)) };
+    } catch (error) {
+      return { ok: false, error: osApiError(error, 'Falha ao limpar assinatura.') };
+    }
+  }
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
-    return { ok: false, error: 'OS encerrada — assinatura bloqueada.' };
+    return { ok: false, error: 'OS encerrada.' };
   }
-  const order = updateWorkOrder(osId, {
+  const order = await updateWorkOrder(osId, {
     customerSignature: '',
     customerSignedAt: undefined,
     customerSignedName: '',
@@ -907,7 +1106,7 @@ export function listOverdueWorkOrders(technician = 'all', today = toDateKey(new 
     .sort((a, b) => (workOrderReadyDate(a) ?? '').localeCompare(workOrderReadyDate(b) ?? ''));
 }
 
-export function setWorkOrderReadyDate(osId: string, date: string): QuoteActionResult {
+export async function setWorkOrderReadyDate(osId: string, date: string): Promise<QuoteActionResult> {
   const current = getWorkOrder(osId);
   if (!current) return { ok: false, error: 'OS não encontrada.' };
   if (current.status === 'delivered' || current.status === 'cancelled') {
@@ -917,9 +1116,13 @@ export function setWorkOrderReadyDate(osId: string, date: string): QuoteActionRe
   if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return { ok: false, error: 'Data inválida.' };
   }
-  const order = updateWorkOrder(osId, { estimatedReadyAt: value });
-  if (!order) return { ok: false, error: 'Falha ao salvar previsão.' };
-  return { ok: true, order };
+  try {
+    const order = await updateWorkOrder(osId, { estimatedReadyAt: value });
+    if (!order) return { ok: false, error: 'Falha ao salvar previsão.' };
+    return { ok: true, order };
+  } catch (error) {
+    return { ok: false, error: osApiError(error, 'Falha ao salvar previsão.') };
+  }
 }
 
 export function searchWorkOrders(query: string, limit = 12): WorkOrder[] {
