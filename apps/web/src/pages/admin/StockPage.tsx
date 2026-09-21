@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
+  confirmDeleteMany,
   CrudListBar,
+  CrudNameButton,
   CrudRowActions,
+  CrudSelectionBar,
   crudFormTitle,
   matchesQuery,
+  setAllVisibleIds,
+  toggleIdInSet,
   type CrudStatusFilter,
 } from '../../components/CrudKit';
 import {
@@ -27,6 +32,7 @@ import {
   listWarehouses,
 } from '../../data/fiscalCatalog';
 import { onStockChanged } from '../../data/ecommerceStore';
+import { hasCapability, isTotemCatalogPath } from '../../data/moduleCapabilities';
 
 type Mode = 'new' | 'edit' | 'view';
 
@@ -38,15 +44,23 @@ const REFRESH_EVENTS = [
 ] as const;
 
 export function StockPage() {
+  const location = useLocation();
+  const totemSurface = isTotemCatalogPath(location.pathname);
+  const catalogFull = hasCapability('catalog.full');
+  const lite = totemSurface || !catalogFull;
+
   const [attrDefs, setAttrDefs] = useState(() => stockAttributes());
   const [items, setItems] = useState(() => getAdminState().stock);
-  const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id)));
+  const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id), totemSurface));
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | StockKind>('all');
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
-  const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
+  const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>(
+    totemSurface ? 'totem' : 'all',
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
@@ -67,6 +81,11 @@ export function StockPage() {
     };
   }, []);
 
+  const visibleAttrs = useMemo(() => {
+    if (!totemSurface) return attrDefs;
+    return attrDefs.filter((item) => item.useOnTotem || item.filterOnTotem);
+  }, [attrDefs, totemSurface]);
+
   const visible = useMemo(() => {
     return items.filter((item) => {
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
@@ -83,7 +102,7 @@ export function StockPage() {
   const readOnly = mode === 'view';
 
   function resetForm() {
-    setForm(emptyForm(attrDefs.map((item) => item.id)));
+    setForm(emptyForm(attrDefs.map((item) => item.id), totemSurface));
     setSelectedId(null);
     setMode('new');
   }
@@ -96,14 +115,56 @@ export function StockPage() {
       capacity:
         form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('capac'))?.id ?? ''] ??
         form.capacity,
+      avgCost: form.avgCost || form.cost,
+      lastPurchaseCost: form.lastPurchaseCost || form.cost,
+      lastPurchaseAt: form.lastPurchaseAt || (form.cost > 0 ? new Date().toISOString() : ''),
     };
     setError('');
+    const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
     try {
       const state = await upsertStockItem(
         mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
       );
       setItems(state.stock);
-      onStockChanged(mode === 'edit' && selectedId ? selectedId : state.stock[0]?.id);
+      const savedId =
+        mode === 'edit' && selectedId
+          ? selectedId
+          : state.stock.find((row) => row.sku === payload.sku)?.id ?? state.stock[0]?.id;
+      onStockChanged(savedId);
+      if (prev && savedId && prev.qty !== payload.qty) {
+        const delta = payload.qty - prev.qty;
+        void import('../../data/stockLedger').then(({ logStockMovements }) => {
+          logStockMovements([
+            {
+              stockId: savedId,
+              stockName: payload.name,
+              sku: payload.sku,
+              type: 'adjust',
+              qty: Math.abs(delta),
+              direction: delta >= 0 ? 1 : -1,
+              unitCost: payload.avgCost || payload.cost,
+              balanceAfter: payload.qty,
+              note: 'Ajuste via cadastro de produto',
+            },
+          ]);
+        });
+      } else if (!prev && savedId && payload.qty > 0) {
+        void import('../../data/stockLedger').then(({ logStockMovements }) => {
+          logStockMovements([
+            {
+              stockId: savedId,
+              stockName: payload.name,
+              sku: payload.sku,
+              type: 'entry',
+              qty: payload.qty,
+              direction: 1,
+              unitCost: payload.avgCost || payload.cost,
+              balanceAfter: payload.qty,
+              note: 'Saldo inicial no cadastro',
+            },
+          ]);
+        });
+      }
       resetForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
@@ -123,8 +184,12 @@ export function StockPage() {
       attrs: { ...item.attrs },
       qty: item.qty,
       minQty: item.minQty,
+      maxQty: item.maxQty,
       cost: item.cost,
+      avgCost: item.avgCost,
       price: item.price,
+      lastPurchaseAt: item.lastPurchaseAt,
+      lastPurchaseCost: item.lastPurchaseCost,
       kind: item.kind,
       condition: item.condition,
       sourceWorkOrderId: item.sourceWorkOrderId,
@@ -144,11 +209,39 @@ export function StockPage() {
     try {
       const state = await removeStockItem(item.id);
       setItems(state.stock);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
       if (selectedId === item.id) resetForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao remover estoque.');
     }
   }
+
+  async function removeSelected() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (!confirmDeleteMany(ids.length, ids.length === 1 ? 'produto' : 'produtos')) return;
+    setError('');
+    try {
+      let next = items;
+      for (const id of ids) {
+        const state = await removeStockItem(id);
+        next = state.stock;
+      }
+      setItems(next);
+      setSelectedIds(new Set());
+      if (selectedId && ids.includes(selectedId)) resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao remover produtos.');
+    }
+  }
+
+  const visibleIds = visible.map((item) => item.id);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
   return (
     <section className="admin-page">
@@ -156,9 +249,16 @@ export function StockPage() {
         <h2>{crudFormTitle(mode, 'produto')}</h2>
         {error ? <p className="qty-low">{error}</p> : null}
         <p>
-          Cadastro comercial e fiscal do item. Vincule classificação fiscal, fornecedor, almoxarifado,
-          lote (rastro) e kit. SKU / barras / IMEI alimentam o PDV.
+          {totemSurface
+            ? 'Catálogo da vitrine: nome, preço, imagens, quantidade e atributos do totem. O mesmo cadastro alimenta o ERP quando o módulo estiver ativo.'
+            : 'Cadastro comercial e fiscal do item. Vincule classificação fiscal, fornecedor, almoxarifado, lote (rastro) e kit. SKU / barras / IMEI alimentam o PDV.'}
         </p>
+        {totemSurface && catalogFull ? (
+          <p className="empty">
+            Visão vitrine. Cadastro completo (fiscal, kits, lotes) em{' '}
+            <Link to="/erp/produtos">Abrir ERP · produtos</Link>.
+          </p>
+        ) : null}
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Produto
@@ -199,7 +299,8 @@ export function StockPage() {
             </span>
           </label>
           <label className="span-2">
-            Imagens (URLs, uma por linha) — obrigatórias para publicar no e-commerce
+            Imagens (URLs, uma por linha)
+            {lite ? ' — usadas na vitrine do totem' : ' — obrigatórias para publicar no e-commerce'}
             <textarea
               value={form.images.join('\n')}
               onChange={(e) =>
@@ -222,15 +323,17 @@ export function StockPage() {
               onChange={(e) => setForm({ ...form, barcode: e.target.value })}
             />
           </label>
-          <label>
-            IMEI
-            <input
-              value={form.imei}
-              onChange={(e) => setForm({ ...form, imei: e.target.value })}
-              placeholder="Opcional"
-            />
-          </label>
-          {attrDefs.map((attr) => (
+          {!lite ? (
+            <label>
+              IMEI
+              <input
+                value={form.imei}
+                onChange={(e) => setForm({ ...form, imei: e.target.value })}
+                placeholder="Opcional"
+              />
+            </label>
+          ) : null}
+          {visibleAttrs.map((attr) => (
             <AdminPicker
               key={attr.id}
               label={attr.name}
@@ -258,75 +361,137 @@ export function StockPage() {
               onChange={(e) => setForm({ ...form, minQty: Number(e.target.value) })}
             />
           </label>
+          {!lite ? (
+            <label>
+              Máximo
+              <input
+                type="number"
+                value={form.maxQty}
+                onChange={(e) => setForm({ ...form, maxQty: Number(e.target.value) })}
+              />
+            </label>
+          ) : null}
+          {!lite ? (
+            <label>
+              Custo (última compra)
+              <input
+                type="number"
+                value={form.cost}
+                onChange={(e) => {
+                  const cost = Number(e.target.value);
+                  setForm({
+                    ...form,
+                    cost,
+                    avgCost: form.avgCost || cost,
+                    lastPurchaseCost: cost,
+                  });
+                }}
+              />
+            </label>
+          ) : null}
+          {!lite ? (
+            <label>
+              Custo médio
+              <input
+                type="number"
+                value={form.avgCost}
+                onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
+              />
+            </label>
+          ) : null}
           <label>
-            Custo
-            <input
-              type="number"
-              value={form.cost}
-              onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            Preço
+            Preço base
             <input
               type="number"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
             />
           </label>
-          <AdminPicker
-            label="Fornecedor"
-            value={form.supplierId ?? ''}
-            placeholder="Nenhum"
-            options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={(value) => setForm({ ...form, supplierId: value })}
-          />
-          <AdminPicker
-            label="Classificação fiscal"
-            value={form.fiscalClassificationId ?? ''}
-            placeholder="Vincular…"
-            options={fiscalClasses.map((item) => ({
-              value: item.id,
-              label: `${item.name} · NCM ${item.ncm}`,
-            }))}
-            onChange={(value) => setForm({ ...form, fiscalClassificationId: value })}
-          />
-          <AdminPicker
-            label="Almoxarifado padrão"
-            value={form.warehouseId ?? ''}
-            placeholder="Nenhum"
-            options={warehouses.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={(value) => setForm({ ...form, warehouseId: value })}
-          />
-          <AdminPicker
-            label="Controla lote (rastro)"
-            value={form.trackLot ? '1' : '0'}
-            options={[
-              { value: '1', label: 'Sim — Grupo Rastro NF-e' },
-              { value: '0', label: 'Não' },
-            ]}
-            onChange={(value) => setForm({ ...form, trackLot: value === '1' })}
-          />
-          <AdminPicker
-            label="É kit"
-            value={form.isKit ? '1' : '0'}
-            options={[
-              { value: '1', label: 'Sim — composição em Kits' },
-              { value: '0', label: 'Não' },
-            ]}
-            onChange={(value) => setForm({ ...form, isKit: value === '1' })}
-          />
-          {form.fiscalClassificationId ? (
+          {!lite ? (
             <p className="empty span-2">
-              Fiscal:{' '}
-              {(() => {
-                const fis = getFiscalClassification(form.fiscalClassificationId);
-                if (!fis) return '—';
-                return `NCM ${fis.ncm} · CST ${fis.cstIcms} · ICMS ${fis.icmsRate}% · IBS ${fis.ibsRate}% · CBS ${fis.cbsRate}%`;
-              })()}{' '}
-              ·{' '}
-              <Link to="/painel/classificacao-fiscal">editar tabelas</Link>
+              Markup{' '}
+              {form.avgCost || form.cost
+                ? `${(((form.price - (form.avgCost || form.cost)) / (form.avgCost || form.cost)) * 100).toFixed(1)}%`
+                : '—'}{' '}
+              · margem{' '}
+              {form.price
+                ? `${(((form.price - (form.avgCost || form.cost)) / form.price) * 100).toFixed(1)}%`
+                : '—'}{' '}
+              · última compra{' '}
+              {form.lastPurchaseCost
+                ? form.lastPurchaseCost.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })
+                : '—'}
+              {form.lastPurchaseAt
+                ? ` em ${new Date(form.lastPurchaseAt).toLocaleDateString('pt-BR')}`
+                : ''}
+              {' · '}
+              <Link to="/erp/balanco">balanço</Link>
+              {' · '}
+              <Link to="/erp/movimentos">movimentos</Link>
+              {' · '}
+              <Link to="/erp/tabelas">tipos de preço</Link>
             </p>
+          ) : null}
+          {!lite ? (
+            <>
+              <AdminPicker
+                label="Fornecedor"
+                value={form.supplierId ?? ''}
+                placeholder="Nenhum"
+                options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
+                onChange={(value) => setForm({ ...form, supplierId: value })}
+              />
+              <AdminPicker
+                label="Classificação fiscal"
+                value={form.fiscalClassificationId ?? ''}
+                placeholder="Vincular…"
+                options={fiscalClasses.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} · NCM ${item.ncm}`,
+                }))}
+                onChange={(value) => setForm({ ...form, fiscalClassificationId: value })}
+              />
+              <AdminPicker
+                label="Almoxarifado padrão"
+                value={form.warehouseId ?? ''}
+                placeholder="Nenhum"
+                options={warehouses.map((item) => ({ value: item.id, label: item.name }))}
+                onChange={(value) => setForm({ ...form, warehouseId: value })}
+              />
+              <AdminPicker
+                label="Controla lote (rastro)"
+                value={form.trackLot ? '1' : '0'}
+                options={[
+                  { value: '1', label: 'Sim — Grupo Rastro NF-e' },
+                  { value: '0', label: 'Não' },
+                ]}
+                onChange={(value) => setForm({ ...form, trackLot: value === '1' })}
+              />
+              <AdminPicker
+                label="É kit"
+                value={form.isKit ? '1' : '0'}
+                options={[
+                  { value: '1', label: 'Sim — composição em Kits' },
+                  { value: '0', label: 'Não' },
+                ]}
+                onChange={(value) => setForm({ ...form, isKit: value === '1' })}
+              />
+              {form.fiscalClassificationId ? (
+                <p className="empty span-2">
+                  Fiscal:{' '}
+                  {(() => {
+                    const fis = getFiscalClassification(form.fiscalClassificationId);
+                    if (!fis) return '—';
+                    return `NCM ${fis.ncm} · CST ${fis.cstIcms} · ICMS ${fis.icmsRate}% · IBS ${fis.ibsRate}% · CBS ${fis.cbsRate}%`;
+                  })()}{' '}
+                  ·{' '}
+                  <Link to="/painel/classificacao-fiscal">editar tabelas</Link>
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
@@ -401,9 +566,30 @@ export function StockPage() {
             </>
           }
         />
+        <CrudSelectionBar
+          selectedCount={selectedIds.size}
+          visibleCount={visible.length}
+          allVisibleSelected={allVisibleSelected}
+          onToggleAllVisible={() =>
+            setSelectedIds(setAllVisibleIds(visibleIds, selectedIds, !allVisibleSelected))
+          }
+          onClear={() => setSelectedIds(new Set())}
+          onDeleteSelected={removeSelected}
+          entityLabel="produtos"
+        />
         <table className="admin-table">
           <thead>
             <tr>
+              <th className="admin-table__check">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={() =>
+                    setSelectedIds(setAllVisibleIds(visibleIds, selectedIds, !allVisibleSelected))
+                  }
+                  aria-label="Marcar todos os produtos visíveis"
+                />
+              </th>
               <th></th>
               <th>Produto</th>
               <th>SKU / barras / IMEI</th>
@@ -411,20 +597,36 @@ export function StockPage() {
               <th>Totem</th>
               <th>Variação</th>
               <th>Qtd</th>
+              <th>Mín/Máx</th>
+              <th>Custo méd.</th>
               <th>Preço</th>
+              <th>Margem</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={9} className="empty">
+                <td colSpan={13} className="empty">
                   Nenhum produto encontrado.
                 </td>
               </tr>
             ) : (
-              visible.map((item) => (
-                <tr key={item.id}>
+              visible.map((item) => {
+                const avg = item.avgCost || item.cost || 0;
+                const margin =
+                  item.price > 0 ? (((item.price - avg) / item.price) * 100).toFixed(1) : '—';
+                const checked = selectedIds.has(item.id);
+                return (
+                <tr key={item.id} className={checked ? 'is-checked' : undefined}>
+                  <td className="admin-table__check">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setSelectedIds(toggleIdInSet(selectedIds, item.id))}
+                      aria-label={`Selecionar ${item.name}`}
+                    />
+                  </td>
                   <td>
                     {item.images?.[0] ? (
                       <img
@@ -439,14 +641,14 @@ export function StockPage() {
                     )}
                   </td>
                   <td>
-                    {item.name}
+                    <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
                     {item.condition === 'refurbished' ? (
                       <div className="empty">
                         Recondicionado
                         {item.sourceWorkOrderId ? (
                           <>
                             {' · '}
-                            <Link to={`/painel/os/${item.sourceWorkOrderId}`}>
+                            <Link to={`/os/${item.sourceWorkOrderId}`}>
                               {item.sourceWorkOrderId}
                             </Link>
                           </>
@@ -472,18 +674,25 @@ export function StockPage() {
                       '—'}
                   </td>
                   <td className={item.qty <= item.minQty ? 'qty-low' : ''}>{item.qty}</td>
+                  <td>
+                    {item.minQty}/{item.maxQty || '—'}
+                  </td>
+                  <td>
+                    {avg.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </td>
                   <td className="price-red">
                     {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
-                  <td>
+                  <td>{margin === '—' ? '—' : `${margin}%`}</td>
+                  <td className="admin-table__actions">
                     <CrudRowActions
-                      onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
                       onDelete={() => void remove(item)}
                     />
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
@@ -492,7 +701,7 @@ export function StockPage() {
   );
 }
 
-function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
+function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'> {
   return {
     name: '',
     sku: '',
@@ -503,8 +712,12 @@ function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
     attrs: Object.fromEntries(attrIds.map((id) => [id, ''])),
     qty: 0,
     minQty: 1,
+    maxQty: 10,
     cost: 0,
+    avgCost: 0,
     price: 0,
+    lastPurchaseAt: '',
+    lastPurchaseCost: 0,
     kind: 'device',
     condition: 'new',
     showOnTotem: true,
@@ -514,5 +727,6 @@ function emptyForm(attrIds: string[]): Omit<StockItem, 'id'> {
     warehouseId: '',
     trackLot: false,
     isKit: false,
+    ...(preferTotem ? { showOnTotem: true } : {}),
   };
 }

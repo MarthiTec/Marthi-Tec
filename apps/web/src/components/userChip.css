@@ -1,0 +1,154 @@
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  transition: background-color 160ms ease, border-color 160ms ease;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+button.user-chip {
+  appearance: none;
+}
+
+.user-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.user-chip.is-active {
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+.user-chip__photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: #2a3542;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.user-chip__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-chip__text {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.user-chip__text em,
+.user-chip__text strong,
+.user-chip__text small {
+  display: block;
+}
+
+.user-chip__text em {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.user-chip__text strong {
+  margin-top: 1px;
+  font-size: 0.9rem;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.user-chip__text small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mesma largura/padding do chip do painel principal */
+.user-chip--sidebar {
+  display: flex;
+  width: auto;
+  align-self: stretch;
+  box-sizing: border-box;
+  margin: 10px 10px 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.user-chip--sidebar .user-chip__photo {
+  width: 40px;
+  height: 40px;
+  font-size: 0.8rem;
+}
+
+/* Laterais já têm padding horizontal — só margem vertical */
+.erp-app__side > .user-chip--sidebar,
+.fiscal-app__side > .user-chip--sidebar,
+.ecommerce-app__side > .user-chip--sidebar,
+.crm-app__side > .user-chip--sidebar {
+  margin: 4px 0 10px;
+}
+
+/* Drawers OS/Caixa: mesma caixa do painel (280px + 10px inset) */
+.os-app__ops-drawer > .user-chip--sidebar,
+.caixa-app__ops-drawer > .user-chip--sidebar {
+  margin: 8px 10px 6px;
+}
+
+.user-chip--topbar {
+  margin-left: auto;
+  max-width: 260px;
+}
+
+.user-chip--compact {
+  padding: 4px;
+  border-radius: 999px;
+  max-width: none;
+}
+
+.user-chip--compact .user-chip__photo {
+  width: 36px;
+  height: 36px;
+  border-width: 1.5px;
+}
+
+@media (max-width: 720px) {
+  .user-chip--topbar:not(.user-chip--compact) .user-chip__text {
+    display: none;
+  }
+
+  .user-chip--topbar:not(.user-chip--compact) {
+    padding: 4px;
+    border-radius: 999px;
+  }
+}

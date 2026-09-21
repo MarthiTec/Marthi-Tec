@@ -4,12 +4,12 @@ export const PLANS = [
     name: 'Bronze',
     price: 'R$ 297',
     period: '/mês',
-    blurb: 'Comece com 1 módulo e opere enxuto.',
+    blurb: '1 módulo + painel da loja. Ideal para começar enxuto.',
     maxModules: 1,
     features: [
-      '1 módulo liberado à sua escolha',
-      'Totem, OS, ERP ou Emissor Fiscal',
-      'Painel web da loja',
+      '1 módulo à escolha (Totem, OS, ERP/PDV, Fiscal ou E-commerce)',
+      'Painel web da loja com perfil do operador',
+      'Central com casinha em cada app (mesma experiência)',
       '1 unidade / operação enxuta',
       'Suporte em horário comercial',
       'Atualizações da plataforma',
@@ -20,13 +20,13 @@ export const PLANS = [
     name: 'Silver',
     price: 'R$ 597',
     period: '/mês',
-    blurb: 'Combine 2 módulos e conecte a operação.',
+    blurb: 'Até 2 módulos + time no painel e permissões.',
     featured: true,
     maxModules: 2,
     features: [
       'Até 2 módulos liberados',
-      'Multi-usuário no painel',
-      'Permissões por funcionário',
+      'Multi-usuário no painel com permissões por funcionário',
+      'Perfil operacional unificado (foto, contato) em todos os apps',
       'Relatórios da operação',
       'Personalização de marca da loja',
       'Prioridade no suporte',
@@ -37,14 +37,14 @@ export const PLANS = [
     name: 'Golden',
     price: 'Sob consulta',
     period: '',
-    blurb: 'Tudo liberado: Totem + OS + ERP + Fiscal + E-commerce.',
+    blurb: 'Tudo liberado: Totem, OS, ERP/PDV, Fiscal e E-commerce.',
     maxModules: 5,
     allModules: true,
     features: [
-      'Todos os módulos liberados',
-      'Totem + OS + ERP + Emissor Fiscal + E-commerce',
-      'Ambiente dedicado',
-      'Integrações sob demanda',
+      'Todos os módulos: Totem + OS + ERP/PDV + Fiscal + E-commerce',
+      'ERP com balanço, movimentos, boletos e retaguarda',
+      'PDV/caixa, emissor fiscal e canais de marketplace',
+      'Ambiente dedicado e integrações sob demanda',
       'Acompanhamento comercial',
       'Suporte prioritário contínuo',
     ],
@@ -57,31 +57,40 @@ export const PARTNER_MODULES = [
   {
     id: 'totem',
     name: 'Totem',
-    blurb: 'Autoatendimento na loja com lead no WhatsApp.',
+    blurb: 'Autoatendimento touch na loja com lead no WhatsApp e insights no painel.',
   },
   {
     id: 'os',
     name: 'Ordem de serviço',
-    blurb: 'OS online: orçamento, oficina, agenda e entrega.',
+    blurb: 'Oficina: OS, orçamento, agenda da bancada, status e relatório.',
   },
   {
     id: 'erp',
-    name: 'ERP',
-    blurb: 'Produtos, PDV, pessoas, financeiro e estoque.',
+    name: 'ERP + PDV',
+    blurb: 'Estoque (balanço/movimentos), pessoas, financeiro, boletos e caixa/PDV.',
   },
   {
     id: 'fiscal',
     name: 'Emissor Fiscal',
-    blurb: 'Notas, NCM/CFOP, classificação e reforma (IBS/CBS).',
+    blurb: 'NF-e, NFS-e, CT-e, MDF-e; NFC-e no PDV; NCM/CFOP e reforma (IBS/CBS).',
   },
   {
     id: 'ecommerce',
     name: 'E-commerce',
-    blurb: 'Mercado Livre, Shopee, iFood, Amazon e hubs (Tray).',
+    blurb: 'Mercado Livre, Shopee, iFood, Amazon e hubs (Tray) com sync de estoque.',
   },
 ] as const;
 
 export type PartnerModuleId = (typeof PARTNER_MODULES)[number]['id'];
+
+/** Incluso em todo plano — não consome vaga de módulo. */
+export const PLATFORM_INCLUDES = [
+  {
+    id: 'painel',
+    name: 'Painel da loja',
+    blurb: 'Centro de comando, perfil do operador, plano, permissões e atalhos para cada app.',
+  },
+] as const;
 
 export const BRAZIL_UFS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',

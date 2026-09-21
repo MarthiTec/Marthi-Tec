@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
+import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   applyPriceTable,
@@ -118,6 +120,7 @@ export function CaixaPage() {
   const [cashSession, setCashSession] = useState<CashSession | null>(() => getOpenCashSession());
   const [panel, setPanel] = useState<CaixaPanel>(null);
   const [opsMenuOpen, setOpsMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [drawerFlash, setDrawerFlash] = useState<string | null>(null);
   const fiscalOn = hasModule('fiscal');
   const sellers = useMemo(() => listSellers(true), []);
@@ -488,6 +491,12 @@ export function CaixaPage() {
           focusCode();
           return;
         }
+        if (profileOpen) {
+          event.preventDefault();
+          setProfileOpen(false);
+          focusCode();
+          return;
+        }
         if (panel) {
           event.preventDefault();
           setPanel(null);
@@ -545,7 +554,7 @@ export function CaixaPage() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [fiscalOn, lastOrderId, quickStock, code, table, cashOpen, panel, exitOpen, opsMenuOpen]);
+  }, [fiscalOn, lastOrderId, quickStock, code, table, cashOpen, panel, exitOpen, opsMenuOpen, profileOpen]);
 
   useEffect(() => {
     function onDrawer() {
@@ -557,7 +566,9 @@ export function CaixaPage() {
   }, []);
 
   return (
-    <div className={`caixa-app ${opsMenuOpen ? 'is-ops-open' : ''}`}>
+    <div
+      className={`caixa-app ${opsMenuOpen ? 'is-ops-open' : ''} ${profileOpen ? 'is-profile-dock' : ''}`}
+    >
       <header className="caixa-app__top">
         <button
           type="button"
@@ -573,14 +584,13 @@ export function CaixaPage() {
         <BrandLogo variant="mark" className="caixa-app__mark" />
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
-          <span>{operatorName}</span>
         </div>
         <button type="button" className="caixa-app__exit" onClick={requestExit}>
           Sair
         </button>
       </header>
 
-      {opsMenuOpen ? (
+      {opsMenuOpen && !profileOpen ? (
         <button
           type="button"
           className="caixa-app__ops-backdrop"
@@ -589,14 +599,47 @@ export function CaixaPage() {
         />
       ) : null}
 
-      <aside className={`caixa-app__ops-drawer ${opsMenuOpen ? 'is-open' : ''}`} aria-hidden={!opsMenuOpen}>
-        <div className="caixa-app__ops-head">
-          <strong>Operações</strong>
-          <button type="button" className="caixa-app__ops-close" onClick={() => setOpsMenuOpen(false)}>
-            Fechar
-          </button>
-        </div>
-        <nav className="caixa-app__ops-nav" aria-label="Operações do caixa">
+      <div className="caixa-app__workspace">
+        <aside
+          className={`caixa-app__ops-drawer ${opsMenuOpen || profileOpen ? 'is-open' : ''}`}
+          aria-hidden={!opsMenuOpen && !profileOpen}
+        >
+          <div className="caixa-app__ops-head">
+            <strong>Operações</strong>
+            <button
+              type="button"
+              className="caixa-app__ops-close"
+              title="Central do caixa"
+              aria-label="Fechar menu e voltar ao caixa"
+              onClick={() => {
+                setProfileOpen(false);
+                setOpsMenuOpen(false);
+                focusCode();
+              }}
+            >
+              <AdminIcon name="home" />
+            </button>
+          </div>
+          <UserChip
+            onOpen={() => {
+              setPanel(null);
+              setOpsMenuOpen(true);
+              setProfileOpen(true);
+            }}
+          />
+          <nav className="caixa-app__ops-nav" aria-label="Operações do caixa">
+            <button
+              type="button"
+              className="caixa-app__ops-central"
+              onClick={() => {
+                setProfileOpen(false);
+                setOpsMenuOpen(false);
+                focusCode();
+              }}
+            >
+              <AdminIcon name="home" />
+              <span>Central</span>
+            </button>
           <button type="button" onClick={() => openPanel('sales')}>
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
@@ -645,6 +688,29 @@ export function CaixaPage() {
         </nav>
       </aside>
 
+      {profileOpen ? (
+        <div className="caixa-app__body">
+          <header className="caixa-app__heading">
+            <div>
+              <p className="admin__kicker">PDV</p>
+              <h1>Meu perfil</h1>
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                setProfileOpen(false);
+                focusCode();
+              }}
+            >
+              Fechar
+            </button>
+          </header>
+          <div className="caixa-app__content">
+            <OperatorProfilePanel workspaceLabel="PDV Marthi" />
+          </div>
+        </div>
+      ) : (
       <section className="admin-page pdv pdv--caixa">
       <header className="pdv__caixa-bar">
         <div className="pdv__caixa-title">
@@ -1017,6 +1083,8 @@ export function CaixaPage() {
         />
       ) : null}
     </section>
+      )}
+      </div>
 
       {exitOpen ? (
         <div className="caixa-lock" role="dialog" aria-modal="true" aria-labelledby="caixa-exit-title">

@@ -5,6 +5,8 @@
   --red: #d70015;
   --teal: #0f766e;
   --teal-soft: rgba(45, 212, 191, 0.16);
+  --accent: #0f766e;
+  --accent-rgb: 15, 118, 110;
   --sidebar: #12181f;
   --sidebar-w: 268px;
   --sidebar-collapsed-w: 76px;
@@ -37,6 +39,7 @@
   flex-direction: column;
   height: 100%;
   max-height: 100vh;
+  min-width: 0;
   background:
     radial-gradient(780px 460px at -8% -4%, rgba(15, 118, 110, 0.3), transparent 62%),
     radial-gradient(420px 280px at 110% 18%, rgba(15, 118, 110, 0.1), transparent 55%),
@@ -412,6 +415,16 @@
   box-shadow: inset 2px 0 0 #2dd4bf;
 }
 
+.admin__sub-link--open-app {
+  color: var(--open-app-accent, #5eead4);
+  font-weight: 700;
+}
+
+.admin__sub-link--open-app:hover,
+.admin__sub-link--open-app.is-active {
+  color: color-mix(in srgb, var(--open-app-accent, #5eead4) 78%, #fff);
+}
+
 .admin__flyout {
   position: absolute;
   left: calc(100% + 10px);
@@ -490,6 +503,7 @@
 
 .admin.is-collapsed .admin__brand-text,
 .admin.is-collapsed .admin__who-text,
+.admin.is-collapsed .user-chip--sidebar .user-chip__text,
 .admin.is-collapsed .admin__link-label,
 .admin.is-collapsed .admin__group-meta,
 .admin.is-collapsed .admin__plan-chip {
@@ -509,6 +523,15 @@
 .admin.is-collapsed .admin__burger-btn--brand {
   width: 40px;
   height: 40px;
+}
+
+.admin.is-collapsed .user-chip--sidebar {
+  justify-content: center;
+  padding: 8px;
+  margin-left: 8px;
+  margin-right: 8px;
+  width: auto;
+  align-self: stretch;
 }
 
 .admin.is-collapsed .admin__who {
@@ -566,6 +589,7 @@
 .admin__title {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .admin__kicker {
@@ -581,6 +605,9 @@
   margin: 2px 0 0;
   font-size: 1.35rem;
   letter-spacing: -0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin__user {
@@ -697,6 +724,16 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.admin-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 18px 0;
 }
 
 @media (max-width: 1280px) {
@@ -897,17 +934,42 @@
 .admin-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
   align-items: start;
 }
 
 .admin-form label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--mute);
+}
+
+.admin-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mute);
+}
+
+.admin-field input,
+.admin-field select,
+.admin-field textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink);
+  box-sizing: border-box;
+  background: #fff;
 }
 
 .admin-form textarea {
@@ -928,7 +990,7 @@
 .admin-picker {
   position: relative;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   width: 100%;
   z-index: 1;
@@ -1096,6 +1158,16 @@
   align-content: start;
 }
 
+.admin-form label .admin-picker {
+  width: 100%;
+}
+
+.admin-form > .btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 4px;
+}
+
 .crud-bar {
   width: 100%;
   align-items: center;
@@ -1107,20 +1179,99 @@
 }
 
 .crud-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 4px;
   justify-content: flex-end;
+  max-width: none;
 }
 
 .crud-actions .btn {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 0.76rem;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.crud-actions__view {
+  display: none;
 }
 
 .crud-actions__danger {
   color: var(--red);
+}
+
+.admin-table__name-btn {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.admin-table__name-btn:hover,
+.admin-table__name-btn:focus-visible {
+  color: #0e7490;
+  text-decoration: underline;
+  outline: none;
+}
+
+.admin-table th.admin-table__check,
+.admin-table td.admin-table__check {
+  width: 36px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.admin-table th.admin-table__check input,
+.admin-table td.admin-table__check input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.admin-table td.admin-table__actions {
+  width: 1%;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.admin-table tr.is-checked td {
+  background: rgba(14, 116, 144, 0.06);
+}
+
+.crud-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(14, 116, 144, 0.25);
+  border-radius: 10px;
+  background: rgba(14, 116, 144, 0.06);
+  font-size: 0.84rem;
+}
+
+.crud-selection-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.crud-selection-bar__actions .btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.74rem;
 }
 
 .admin-form.is-readonly input,
@@ -1751,11 +1902,36 @@
 
 .os-agenda__stats {
   margin-bottom: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+
+.os-agenda__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--mute);
+}
+
+.os-agenda__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.os-agenda__dot--high { background: var(--red, #d70015); }
+.os-agenda__dot--normal { background: #0f766e; }
+.os-agenda__dot--low { background: #94a3b8; }
 
 .os-agenda__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.8fr);
+  grid-template-columns: minmax(0, 1.85fr) minmax(280px, 0.75fr);
   gap: 16px;
   align-items: start;
 }
@@ -1768,12 +1944,13 @@
 
 .os-agenda__day {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
-  min-height: 220px;
+  min-height: 260px;
   display: grid;
   grid-template-rows: auto 1fr;
   overflow: hidden;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .os-agenda__day.is-today {
@@ -1781,35 +1958,54 @@
   box-shadow: inset 0 0 0 1px #0f766e;
 }
 
+.os-agenda__day.is-droppable {
+  border-style: dashed;
+  border-color: rgba(15, 118, 110, 0.55);
+}
+
 .os-agenda__day header {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 2px 8px;
-  padding: 10px;
-  background: #f8fafc;
+  padding: 10px 10px 8px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-bottom: 1px solid var(--line);
 }
 
 .os-agenda__day header span {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--mute);
 }
 
 .os-agenda__day header strong {
   grid-column: 1;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 .os-agenda__day header em {
   grid-row: 1 / span 2;
   grid-column: 2;
   align-self: center;
+  min-width: 26px;
+  min-height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
   font-style: normal;
+  font-size: 0.78rem;
   font-weight: 800;
   color: var(--mute);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.os-agenda__day header em.has-items {
+  color: #fff;
+  background: #0f766e;
 }
 
 .os-agenda__day-body {
@@ -1817,6 +2013,19 @@
   gap: 8px;
   padding: 8px;
   align-content: start;
+  min-height: 0;
+}
+
+.os-agenda__empty {
+  margin: 18px 6px;
+  padding: 16px 8px;
+  border: 1px dashed rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--mute);
+  background: rgba(248, 250, 252, 0.8);
 }
 
 .os-agenda__card {
@@ -1826,65 +2035,111 @@
   display: grid;
   gap: 6px;
   background: #fff;
+  cursor: grab;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
 }
 
-.os-agenda__card--high {
-  border-left: 3px solid var(--red);
-}
+.os-agenda__card:active { cursor: grabbing; }
 
-.os-agenda__card--normal {
-  border-left: 3px solid #0f766e;
-}
-
-.os-agenda__card--low {
-  border-left: 3px solid #94a3b8;
-}
+.os-agenda__card--high { border-left: 3px solid var(--red, #d70015); }
+.os-agenda__card--normal { border-left: 3px solid #0f766e; }
+.os-agenda__card--low { border-left: 3px solid #94a3b8; }
 
 .os-agenda__card-link {
   display: grid;
   gap: 2px;
   color: inherit;
   text-decoration: none;
+  min-width: 0;
+}
+
+.os-agenda__card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .os-agenda__card-link strong {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.os-agenda__card-customer {
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .os-agenda__card-item {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
+  color: var(--mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.os-agenda__prio {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--mute);
 }
+
+.os-agenda__prio--high { color: var(--red, #d70015); }
 
 .os-agenda__card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  font-size: 0.7rem;
-  color: var(--mute);
+  gap: 4px;
+}
+
+.os-agenda__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #475569;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .os-agenda__date {
   display: grid;
   gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 650;
   color: var(--mute);
 }
 
+.os-agenda__date--compact span { display: none; }
+
 .os-agenda__date input {
-  min-height: 32px;
+  width: 100%;
+  min-height: 30px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0 6px;
   font: inherit;
+  font-size: 0.72rem;
+  background: #f8fafc;
 }
 
 .os-agenda__side {
   display: grid;
   gap: 12px;
   align-content: start;
-  max-height: calc(100vh - 220px);
+  max-height: calc(100vh - 240px);
   overflow: hidden;
 }
 
@@ -1894,6 +2149,26 @@
   min-height: 0;
   max-height: 100%;
   overflow: hidden;
+}
+
+.os-agenda__side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.os-agenda__side-head h2 { margin: 0; }
+
+.os-agenda__side-head strong {
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 0.78rem;
 }
 
 .os-agenda__side-list {
@@ -1906,25 +2181,19 @@
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  max-height: 280px;
 }
 
-.os-agenda__side-list::-webkit-scrollbar {
-  width: 6px;
-}
-
+.os-agenda__side-list::-webkit-scrollbar { width: 6px; }
 .os-agenda__side-list::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.18);
   border-radius: 999px;
 }
 
-@media (max-width: 1100px) {
-  .os-agenda__layout {
-    grid-template-columns: 1fr;
-  }
-
-  .os-agenda__week {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+@media (max-width: 1200px) {
+  .os-agenda__layout { grid-template-columns: 1fr; }
+  .os-agenda__week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .os-agenda__side { max-height: none; }
 }
 
 @media (max-width: 720px) {
@@ -1933,6 +2202,10 @@
   }
 
   .os-agenda__week {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .os-agenda__stats {
     grid-template-columns: 1fr;
   }
 }
@@ -2107,6 +2380,29 @@
 
 .module-picker__item strong {
   font-size: 0.95rem;
+}
+
+.module-picker--included {
+  pointer-events: none;
+}
+
+.module-picker__item.is-included {
+  border-style: dashed;
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.module-picker__check {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.18);
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 @media (max-width: 1100px) {
@@ -3336,6 +3632,7 @@ select.caixa-mov-input {
   }
 
   .admin-grid,
+  .admin-grid--2,
   .admin-form {
     grid-template-columns: 1fr;
   }

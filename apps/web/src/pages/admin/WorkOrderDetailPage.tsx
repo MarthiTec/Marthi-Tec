@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { SignaturePad } from '../../components/SignaturePad';
+import { OperatorAccountPage } from '../shared/OperatorAccountPage';
 import {
   findStockMatches,
   getStockItem,
@@ -72,8 +73,16 @@ function money(value: number) {
 }
 
 export function WorkOrderDetailPage() {
-  const osBase = useOsBase();
   const { id = '' } = useParams();
+  // Evita /os/conta e /os/perfil caírem no :id (OS não encontrada).
+  if (id === 'conta' || id === 'perfil') {
+    return <OperatorAccountPage />;
+  }
+  return <WorkOrderDetailBody id={id} />;
+}
+
+function WorkOrderDetailBody({ id }: { id: string }) {
+  const osBase = useOsBase();
   const current = getWorkOrder(id);
   const [form, setForm] = useState(current);
   const [saved, setSaved] = useState(false);

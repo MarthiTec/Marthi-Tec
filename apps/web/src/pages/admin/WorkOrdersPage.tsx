@@ -108,12 +108,17 @@ export function WorkOrdersPage() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Buscar OS, cliente ou item…"
         />
-        <Link to={osHref(osBase, '/nova')} className="btn btn--primary">
+        <Link to="/os/nova" className="btn btn--primary">
           Nova OS
         </Link>
         <Link to={osHref(osBase, '/agenda')} className="btn btn--ghost">
           Agenda
         </Link>
+        {osBase.startsWith('/painel') ? (
+          <Link to="/os" className="btn btn--ghost">
+            Abrir oficina
+          </Link>
+        ) : null}
       </div>
       {error ? <p className="qty-low">{error}</p> : null}
 

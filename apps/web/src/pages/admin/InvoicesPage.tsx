@@ -315,10 +315,10 @@ export function InvoicesPage() {
         </button>
         {fiscalOn ? (
           <>
-            <Link to="/fiscal/config" className="btn btn--ghost">
+            <Link to="/painel/fiscal/config" className="btn btn--ghost">
               Configuração fiscal
             </Link>
-            <Link to="/fiscal/cst" className="btn btn--ghost">
+            <Link to="/painel/fiscal/cst" className="btn btn--ghost">
               CST / cClassTrib
             </Link>
           </>
@@ -575,7 +575,7 @@ export function InvoicesPage() {
                   <h3 style={{ margin: '0 0 8px', fontSize: '0.95rem' }}>NF-e / transmissão SEFAZ</h3>
                   <p className="empty" style={{ marginTop: 0 }}>
                     Transmitir gera o XML, envia e consulta o recibo. Configure certificado e ambiente em{' '}
-                    <Link to="/fiscal/config">Configuração fiscal</Link>.
+                    <Link to="/painel/fiscal/config">Configuração fiscal</Link>.
                   </p>
 
                   {fiscalDoc ? (
@@ -656,7 +656,7 @@ export function InvoicesPage() {
                         Transmitir NF-e
                       </button>
                       {!issuerIsReadyForNfe(issuer) ? (
-                        <Link to="/fiscal/config" className="btn btn--ghost">
+                        <Link to="/painel/fiscal/config" className="btn btn--ghost">
                           Cadastrar certificado
                         </Link>
                       ) : null}

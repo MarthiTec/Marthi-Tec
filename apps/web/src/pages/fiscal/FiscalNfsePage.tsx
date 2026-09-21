@@ -132,24 +132,25 @@ export function FiscalNfsePage() {
             Valor do serviço
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" required />
           </label>
-          <label>
-            Serviço (LC 116)
-            <select value={serviceKey} onChange={(e) => setServiceKey(e.target.value)}>
-              {NFSE_SERVICE_OPTIONS.map((item) => (
-                <option key={item.itemLc116} value={item.itemLc116}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AdminPicker
+            label="Serviço (LC 116)"
+            value={serviceKey}
+            options={NFSE_SERVICE_OPTIONS.map((item) => ({
+              value: item.itemLc116,
+              label: item.label,
+            }))}
+            onChange={setServiceKey}
+          />
           <label className="span-2">
             Descrição
             <input value={desc} onChange={(e) => setDesc(e.target.value)} />
           </label>
         </div>
-        <button type="submit" className="btn btn--primary" disabled={!ready}>
-          Transmitir NFS-e
-        </button>
+        <div className="admin-toolbar" style={{ marginTop: 12 }}>
+          <button type="submit" className="btn btn--primary" disabled={!ready}>
+            Transmitir NFS-e
+          </button>
+        </div>
       </form>
 
       <div className="fiscal-docs-list">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   addCrmLeadNote,
@@ -12,6 +12,7 @@ import {
   CRM_SEGMENT_OPTIONS,
   CRM_SOURCE_LABEL,
   CRM_STAGE_LABEL,
+  crmInboxUnansweredCount,
   crmStageTotals,
   listCrmLeads,
   listLeadMessages,
@@ -26,7 +27,6 @@ import {
   type CrmLeadSource,
   type CrmStage,
 } from '../../data/crmStore';
-import { listSellers } from '../../data/erpRegistry';
 
 type SellerCtx = { sellerId: string; sellerName: string };
 
@@ -102,6 +102,26 @@ function formatPhone(raw: string) {
   return raw || '';
 }
 
+function leadInitials(name: string) {
+  const parts = name
+    .replace(/[|·•]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+}
+
+function leadTitle(name: string) {
+  const cleaned = name.split(/[|·]/)[0]?.trim() || name.trim();
+  return cleaned;
+}
+
+function leadSubtitle(name: string, interest: string, polo: string) {
+  const afterPipe = name.includes('|') ? name.split('|').slice(1).join('|').trim() : '';
+  return afterPipe || interest || polo || '';
+}
+
 export function CrmBoardPage() {
   const navigate = useNavigate();
   const me = useOutletContext<SellerCtx>();
@@ -112,7 +132,6 @@ export function CrmBoardPage() {
   const [chatText, setChatText] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [peerId, setPeerId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState<CreateDraft>(EMPTY_CREATE);
   const [query, setQuery] = useState('');
@@ -128,7 +147,6 @@ export function CrmBoardPage() {
   }, []);
 
   const leads = useMemo(() => listCrmLeads(), [tick]);
-  const sellers = useMemo(() => listSellers(true).filter((item) => item.id !== me.sellerId), [tick, me.sellerId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -202,17 +220,23 @@ export function CrmBoardPage() {
 
   function onDrop(stage: CrmStage) {
     if (!draggingId) return;
-    const result = moveCrmLead(draggingId, stage, me.sellerId);
+    const dragged = leads.find((item) => item.id === draggingId);
+    const wasPool = Boolean(dragged && !dragged.ownerSellerId);
+    const result = moveCrmLead(draggingId, stage, me.sellerId, me.sellerName);
     setDraggingId(null);
     setOverStage(null);
     if (!result.ok) {
       flashErr(result.error);
       return;
     }
-    if (stage === 'won') {
+    if (wasPool) {
+      flashOk(`Você puxou ${result.lead.name} e moveu para ${CRM_STAGE_LABEL[stage]}.`);
+    } else if (stage === 'won') {
       flashOk('Negócio fechado. Continua como lead até confirmar o pagamento.');
     } else if (stage === 'payment') {
       flashOk('Etapa de pagamento. Confirme o pagamento no detalhe para virar cliente.');
+    } else {
+      flashOk(`Movido para ${CRM_STAGE_LABEL[stage]}.`);
     }
     setTick((value) => value + 1);
   }
@@ -301,16 +325,6 @@ export function CrmBoardPage() {
     }
   }
 
-  function openSellerChat() {
-    const peer = sellers.find((item) => item.id === peerId);
-    if (!peer) {
-      flashErr('Selecione um vendedor.');
-      return;
-    }
-    setDock({ type: 'sellers', peerId: peer.id, peerName: peer.name });
-    setChatText('');
-  }
-
   function reloadMocks() {
     const result = resetCrmMockLeads();
     flashOk(
@@ -321,8 +335,63 @@ export function CrmBoardPage() {
     setTick((value) => value + 1);
   }
 
+  const boardStats = useMemo(() => {
+    const pool = leads.filter((item) => !item.ownerSellerId).length;
+    const mine = leads.filter((item) => item.ownerSellerId === me.sellerId).length;
+    const pipeline = leads
+      .filter((item) => item.stage !== 'lost' && item.stage !== 'won')
+      .reduce((sum, item) => sum + (item.value || 0), 0);
+    const closed = leads
+      .filter((item) => item.stage === 'won')
+      .reduce((sum, item) => sum + (item.value || 0), 0);
+    const waitingReply = leads.filter((item) => item.stage === 'waiting').length;
+    const inbox = crmInboxUnansweredCount(me.sellerId);
+    return { total: leads.length, pool, mine, pipeline, closed, waitingReply, inbox };
+  }, [leads, me.sellerId]);
+
   return (
     <section className="admin-page crm-board-page">
+      <div className="crm-board-hero">
+        <div>
+          <p className="crm-board-hero__eyebrow">Funil de vendas · Kanban</p>
+          <h1>Negócios</h1>
+          <p>
+            Arraste cards entre etapas. Leads do pool podem ser puxados ao soltar. Conversas com
+            clientes ficam em <Link to="/crm/conversas">Canais abertos</Link>.
+          </p>
+        </div>
+        <div className="crm-board-stats">
+          <article>
+            <span>Total</span>
+            <strong>{boardStats.total}</strong>
+          </article>
+          <article>
+            <span>Pool aberto</span>
+            <strong>{boardStats.pool}</strong>
+          </article>
+          <article>
+            <span>Meus</span>
+            <strong>{boardStats.mine}</strong>
+          </article>
+          <article>
+            <span>Aguardando</span>
+            <strong>{boardStats.waitingReply}</strong>
+          </article>
+          <article>
+            <span>Pipeline</span>
+            <strong>{money(boardStats.pipeline)}</strong>
+          </article>
+          <article>
+            <span>Fechados</span>
+            <strong>{money(boardStats.closed)}</strong>
+          </article>
+          <article>
+            <span>Inbox</span>
+            <strong className={boardStats.inbox ? 'qty-low' : ''}>{boardStats.inbox}</strong>
+          </article>
+        </div>
+      </div>
+
       <div className="crm-board-bar">
         <div className="crm-board-bar__left">
           <button
@@ -370,8 +439,11 @@ export function CrmBoardPage() {
         </div>
         <div className="crm-board-bar__right">
           <span className="crm-board-bar__hint">
-            {filtered.length} negócios · pool aberto · cliente só após fechar + pagar
+            {filtered.length} visíveis · arraste para mudar etapa
           </span>
+          <Link to="/crm/conversas" className="btn btn--ghost">
+            Conversas{boardStats.inbox ? ` (${boardStats.inbox})` : ''}
+          </Link>
           <button type="button" className="btn btn--ghost" onClick={reloadMocks}>
             Popular demos
           </button>
@@ -380,25 +452,6 @@ export function CrmBoardPage() {
 
       {message ? <p className="empty">{message}</p> : null}
       {error ? <p className="qty-low">{error}</p> : null}
-
-      <article className="admin-card crm-sellers-card">
-        <h2>Conversar com vendedores</h2>
-        <div className="admin-toolbar">
-          <AdminPicker
-            compact
-            label="Colega"
-            value={peerId}
-            options={[
-              { value: '', label: 'Selecione…' },
-              ...sellers.map((item) => ({ value: item.id, label: item.name })),
-            ]}
-            onChange={setPeerId}
-          />
-          <button type="button" className="btn btn--ghost" onClick={openSellerChat}>
-            Abrir chat interno
-          </button>
-        </div>
-      </article>
 
       <div className="crm-board">
         {CRM_BOARD_STAGES.map((stage) => {
@@ -429,15 +482,23 @@ export function CrmBoardPage() {
               {columnLeads.map((lead) => {
                 const mine = lead.ownerSellerId === me.sellerId;
                 const locked = Boolean(lead.ownerSellerId && !mine);
+                const canDrag = !locked;
+                const title = leadTitle(lead.name);
+                const subtitle = leadSubtitle(lead.name, lead.interest, lead.polo ?? '');
                 return (
                   <div
                     key={lead.id}
-                    className={`crm-card ${mine ? 'is-mine' : ''} ${locked ? 'is-locked' : ''} ${
-                      draggingId === lead.id ? 'is-dragging' : ''
-                    }`}
-                    draggable={mine}
-                    onDragStart={() => {
-                      if (!mine) return;
+                    className={`crm-card ${mine ? 'is-mine' : ''} ${!lead.ownerSellerId ? 'is-pool' : ''} ${
+                      locked ? 'is-locked' : ''
+                    } ${draggingId === lead.id ? 'is-dragging' : ''} ${canDrag ? 'is-draggable' : ''}`}
+                    draggable={canDrag}
+                    onDragStart={(event) => {
+                      if (!canDrag) {
+                        event.preventDefault();
+                        return;
+                      }
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', lead.id);
                       setDraggingId(lead.id);
                     }}
                     onDragEnd={() => {
@@ -445,23 +506,36 @@ export function CrmBoardPage() {
                       setOverStage(null);
                     }}
                   >
-                    <button
-                      type="button"
-                      className="crm-card__name"
-                      onClick={() => navigate(`/crm/negocio/${lead.id}`)}
-                    >
-                      {lead.name}
-                    </button>
+                    <div className="crm-card__top">
+                      <span className="crm-card__lead-avatar" aria-hidden>
+                        {leadInitials(lead.name)}
+                      </span>
+                      <button
+                        type="button"
+                        className="crm-card__identity"
+                        onClick={() => navigate(`/crm/negocio/${lead.id}`)}
+                      >
+                        <span className="crm-card__name">{title}</span>
+                        {subtitle ? <span className="crm-card__sub">{subtitle}</span> : null}
+                      </button>
+                      {canDrag ? (
+                        <span className="crm-card__grip" aria-hidden title="Arrastar" />
+                      ) : null}
+                    </div>
                     <div className="crm-card__row">
                       <span className="crm-card__value">{money(lead.value)}</span>
                       <span>{formatWhen(lead.updatedAt)}</span>
                     </div>
-                    {(lead.interest || lead.graduation) && (
+                    {(lead.interest || lead.graduation) && !lead.name.includes('|') ? (
                       <div className="crm-card__tags">
                         {lead.interest ? <span className="crm-tag">{lead.interest}</span> : null}
                         {lead.graduation ? <span className="crm-tag is-mute">{lead.graduation}</span> : null}
                       </div>
-                    )}
+                    ) : lead.graduation ? (
+                      <div className="crm-card__tags">
+                        <span className="crm-tag is-mute">{lead.graduation}</span>
+                      </div>
+                    ) : null}
                     <div className="crm-card__row">
                       <span>{CRM_SOURCE_LABEL[lead.source]}</span>
                       <span className="crm-card__contact-icons">
@@ -494,7 +568,7 @@ export function CrmBoardPage() {
                         {locked ? `Com ${lead.ownerName}` : 'Seu atendimento'}
                       </div>
                     ) : (
-                      <div className="crm-card__owner">Pool — disponível</div>
+                      <div className="crm-card__owner is-pool-label">Pool — arraste para puxar</div>
                     )}
                     <div className="crm-card__actions">
                       <button
@@ -731,16 +805,13 @@ export function CrmBoardPage() {
                   </label>
                   <label>
                     Segmento
-                    <select
+                    <AdminPicker
+                      label="Segmento"
+                      compact
                       value={draft.graduation}
-                      onChange={(e) => patchDraft('graduation', e.target.value)}
-                    >
-                      {CRM_SEGMENT_OPTIONS.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
+                      options={CRM_SEGMENT_OPTIONS.map((item) => ({ value: item, label: item }))}
+                      onChange={(value) => patchDraft('graduation', value)}
+                    />
                   </label>
                 </div>
                 <label className="crm-create__check">
@@ -757,17 +828,16 @@ export function CrmBoardPage() {
                 <h3>Oportunidade</h3>
                 <label>
                   Interesse / produto *
-                  <select
+                  <AdminPicker
+                    label="Interesse / produto"
+                    compact
                     value={draft.interest}
-                    onChange={(e) => patchDraft('interest', e.target.value)}
-                  >
-                    {CRM_INTEREST_OPTIONS.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                    <option value="Outro">Outro</option>
-                  </select>
+                    options={[
+                      ...CRM_INTEREST_OPTIONS.map((item) => ({ value: item, label: item })),
+                      { value: 'Outro', label: 'Outro' },
+                    ]}
+                    onChange={(value) => patchDraft('interest', value)}
+                  />
                 </label>
                 <div className="crm-create__row">
                   <label>
@@ -782,31 +852,31 @@ export function CrmBoardPage() {
                   </label>
                   <label>
                     Etapa inicial
-                    <select
+                    <AdminPicker
+                      label="Etapa inicial"
+                      compact
                       value={draft.stage}
-                      onChange={(e) => patchDraft('stage', e.target.value as CrmStage)}
-                    >
-                      {CRM_BOARD_STAGES.map((stage) => (
-                        <option key={stage} value={stage}>
-                          {CRM_STAGE_LABEL[stage]}
-                        </option>
-                      ))}
-                    </select>
+                      options={CRM_BOARD_STAGES.map((stage) => ({
+                        value: stage,
+                        label: CRM_STAGE_LABEL[stage],
+                      }))}
+                      onChange={(value) => patchDraft('stage', value as CrmStage)}
+                    />
                   </label>
                 </div>
                 <div className="crm-create__row">
                   <label>
                     Fonte
-                    <select
+                    <AdminPicker
+                      label="Fonte"
+                      compact
                       value={draft.source}
-                      onChange={(e) => patchDraft('source', e.target.value as CrmLeadSource)}
-                    >
-                      {(Object.keys(CRM_SOURCE_LABEL) as CrmLeadSource[]).map((key) => (
-                        <option key={key} value={key}>
-                          {CRM_SOURCE_LABEL[key]}
-                        </option>
-                      ))}
-                    </select>
+                      options={(Object.keys(CRM_SOURCE_LABEL) as CrmLeadSource[]).map((key) => ({
+                        value: key,
+                        label: CRM_SOURCE_LABEL[key],
+                      }))}
+                      onChange={(value) => patchDraft('source', value as CrmLeadSource)}
+                    />
                   </label>
                   <label>
                     Detalhe da fonte

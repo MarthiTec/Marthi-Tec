@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAccess } from '../../data/auditLog';
 import {
@@ -10,7 +11,6 @@ import {
   userCanAccessArea,
   userIsStoreAdmin,
 } from '../../data/erpRegistry';
-import { getOperatorProfile } from '../../data/operatorProfile';
 import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
 import { AccessDeniedPage } from './AccessDeniedPage';
@@ -23,6 +23,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'ERP', title: 'Painel da operação' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/totem': { kicker: 'Totem', title: 'Dados do totem' },
+  '/painel/totem/produtos': { kicker: 'Totem', title: 'Catálogo do totem' },
+  '/painel/totem/atributos': { kicker: 'Totem', title: 'Atributos do totem' },
   '/painel/totem/config': { kicker: 'Totem', title: 'Configurações do totem' },
   '/painel/pedidos': { kicker: 'Vendas', title: 'Consultar vendas' },
   '/painel/clientes': { kicker: 'Pessoas', title: 'Clientes' },
@@ -31,6 +33,9 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/funcionarios': { kicker: 'Pessoas', title: 'Funcionários' },
   '/painel/estoque': { kicker: 'Produtos', title: 'Produtos' },
   '/painel/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
+  '/painel/ecommerce': { kicker: 'E-commerce', title: 'Visão da loja online' },
+  '/painel/fiscal': { kicker: 'Emissor Fiscal', title: 'Visão fiscal' },
+  '/painel/erp': { kicker: 'ERP', title: 'Visão e ajustes do ERP' },
   '/painel/notas': { kicker: 'Emissor Fiscal', title: 'Notas de entrada e saída' },
   '/painel/fiscal/config': { kicker: 'Emissor Fiscal', title: 'Configuração fiscal' },
   '/painel/fiscal/cst': { kicker: 'Emissor Fiscal', title: 'CST e cClassTrib' },
@@ -42,10 +47,9 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/cfop': { kicker: 'Produtos', title: 'CFOP e FECP' },
   '/painel/tabelas': { kicker: 'Produtos', title: 'Tabelas de preço' },
   '/painel/pagamentos': { kicker: 'Vendas', title: 'Formas de pagamento' },
-  '/painel/financeiro': { kicker: 'Operações', title: 'Financeiro' },
-  '/painel/auditoria': { kicker: 'Operações', title: 'Auditoria e acessos' },
+  '/painel/financeiro': { kicker: 'ERP', title: 'Financeiro' },
+  '/painel/auditoria': { kicker: 'ERP', title: 'Auditoria e acessos' },
   '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
-  '/painel/os/nova': { kicker: 'Oficina', title: 'Nova ordem de serviço' },
   '/painel/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
   '/painel/os/relatorio': { kicker: 'Oficina', title: 'Relatório da OS' },
   '/painel/permissoes': { kicker: 'Pessoas', title: 'Permissões de acesso' },
@@ -54,13 +58,6 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/plano': { kicker: 'Contrato', title: 'Plano da loja' },
   '/painel/ajuda': { kicker: 'Suporte', title: 'Central de ajuda' },
 };
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'U';
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
-}
 
 function resolveTitle(pathname: string, search: string) {
   if (pathname === '/painel/os' && search.includes('quote=sent')) {
@@ -99,7 +96,6 @@ export function AdminLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const [profile, setProfile] = useState(() => getOperatorProfile(user?.name ?? 'Operador'));
   const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
   const [openGroups, setOpenGroups] = useState<string[]>(() => {
     const current = navGroupForPath(window.location.pathname, window.location.search);
@@ -107,24 +103,12 @@ export function AdminLayout() {
   });
 
   useEffect(() => {
-    if (!user) return;
-    setProfile(getOperatorProfile(user.name));
-  }, [user]);
-
-  useEffect(() => {
-    function refreshProfile() {
-      setProfile(getOperatorProfile(user?.name ?? 'Operador'));
-    }
     function refreshPlan() {
       setEntitlement(getStoreEntitlement());
     }
-    window.addEventListener('marthi-profile-updated', refreshProfile);
     window.addEventListener('marthi-plan-updated', refreshPlan);
-    return () => {
-      window.removeEventListener('marthi-profile-updated', refreshProfile);
-      window.removeEventListener('marthi-plan-updated', refreshPlan);
-    };
-  }, [user]);
+    return () => window.removeEventListener('marthi-plan-updated', refreshPlan);
+  }, []);
 
   useEffect(() => {
     const current = navGroupForPath(location.pathname, location.search);
@@ -173,8 +157,6 @@ export function AdminLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const photo = profile.photo || user.picture;
-  const mark = initials(profile.displayName);
   const userEmail = user.email;
   const isAdmin = userIsStoreAdmin(userEmail);
 
@@ -229,20 +211,7 @@ export function AdminLayout() {
           </button>
         </div>
 
-        <NavLink
-          to="/painel/perfil"
-          className={({ isActive }) => `admin__who ${isActive ? 'is-active' : ''}`}
-          title={profile.displayName}
-        >
-          <span className="admin__photo">
-            {photo ? <img src={photo} alt="" /> : <span>{mark}</span>}
-          </span>
-          <span className="admin__who-text">
-            <em>Olá</em>
-            <strong>{profile.displayName}</strong>
-            <small>{profile.role}</small>
-          </span>
-        </NavLink>
+        <UserChip variant="sidebar" to="/painel/perfil" />
 
         <nav className="admin__nav" aria-label="Módulos do ERP">
           {ADMIN_NAV.map((group) => {
@@ -298,11 +267,16 @@ export function AdminLayout() {
                           to={child.to}
                           end={child.end}
                           className={() =>
-                            `admin__sub-link ${
+                            `admin__sub-link ${child.openApp ? 'admin__sub-link--open-app' : ''} ${
                               childIsActive(child, location.pathname, location.search.slice(1))
                                 ? 'is-active'
                                 : ''
                             }`
+                          }
+                          style={
+                            child.openApp && child.accent
+                              ? ({ '--open-app-accent': child.accent } as CSSProperties)
+                              : undefined
                           }
                         >
                           {child.label}
@@ -362,9 +336,6 @@ export function AdminLayout() {
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
           </div>
-          <NavLink to="/painel/perfil" className="admin__user" aria-label="Abrir meu perfil">
-            {photo ? <img src={photo} alt="" /> : <span>{mark}</span>}
-          </NavLink>
         </header>
 
         <div className="admin__main">

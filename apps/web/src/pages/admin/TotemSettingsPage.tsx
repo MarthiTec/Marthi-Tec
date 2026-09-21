@@ -77,8 +77,8 @@ export function TotemSettingsPage() {
       <article className="admin-card">
         <h2>Estoque do totem</h2>
         <p>
-          Escolha se o catálogo do totem usa o estoque do ERP (itens marcados para exibir) ou um
-          catálogo demo separado.
+          Escolha se a tela pública usa o estoque cadastrado (itens com “Exibir no totem”) ou um
+          catálogo demo. Com ERP contratado, é o mesmo cadastro do app ERP.
         </p>
         <div className="plan-picker">
           <button
@@ -89,8 +89,8 @@ export function TotemSettingsPage() {
               setSaved(false);
             }}
           >
-            <strong>Catálogo isolado</strong>
-            <span>Demo / vitrine própria, sem puxar o estoque do ERP.</span>
+            <strong>Catálogo demo</strong>
+            <span>Vitrine de demonstração, sem puxar o estoque cadastrado.</span>
           </button>
           <button
             type="button"
@@ -100,8 +100,8 @@ export function TotemSettingsPage() {
               setSaved(false);
             }}
           >
-            <strong>Compartilhar com o ERP</strong>
-            <span>Usa o estoque: só itens com “Exibir no totem” e quantidade &gt; 0.</span>
+            <strong>Usar estoque cadastrado</strong>
+            <span>Só itens com “Exibir no totem” e quantidade &gt; 0.</span>
           </button>
         </div>
       </article>
@@ -154,20 +154,21 @@ export function TotemSettingsPage() {
       </article>
 
       <article className="admin-card">
-        <h2>Atributos no totem</h2>
+        <h2>Catálogo e atributos</h2>
         <p>
-          Cor, capacidade e demais atributos nascem no ERP. Imagens do estoque são compartilhadas
-          entre totem, PDV e OS.
+          Cadastre produtos, preços e atributos aqui na aba Totem — o mesmo estoque que o ERP usa
+          quando o módulo estiver contratado. Marque “Exibir no totem” e use atributos com filtro
+          ativo para a vitrine.
         </p>
         <div className="admin-toolbar admin-toolbar--stack">
           <Link to="/painel/totem" className="btn btn--ghost">
             Dados do totem
           </Link>
-          <Link to="/painel/atributos" className="btn btn--ghost">
-            Cadastrar atributos
+          <Link to="/painel/totem/produtos" className="btn btn--ghost">
+            Catálogo do totem
           </Link>
-          <Link to="/painel/produtos" className="btn btn--ghost">
-            Produtos e imagens
+          <Link to="/painel/totem/atributos" className="btn btn--ghost">
+            Atributos
           </Link>
         </div>
       </article>

@@ -61,12 +61,6 @@ export function ProductsPage() {
   const [contactPhone, setContactPhone] = useState('');
   const [contactFeedback, setContactFeedback] = useState('');
   const [navOpen, setNavOpen] = useState(false);
-  const [bridge, setBridge] = useState<{
-    top: number;
-    height: number;
-    left: number;
-    width: number;
-  } | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
   const navBtnRefs = useRef<Partial<Record<MarthiProductId, HTMLButtonElement | null>>>({});
@@ -88,35 +82,30 @@ export function ProductsPage() {
   }, [user]);
 
   const active = MARTHI_PRODUCTS.find((item) => item.id === activeId) ?? MARTHI_PRODUCTS[0];
+  const activeIndex = MARTHI_PRODUCTS.findIndex((item) => item.id === activeId);
+  const isEdgeFirst = activeIndex <= 0;
+  const isEdgeLast = activeIndex === MARTHI_PRODUCTS.length - 1;
 
   useLayoutEffect(() => {
     function updateBridge() {
       const layout = layoutRef.current;
       const btn = navBtnRefs.current[activeId];
       const detail = detailRef.current;
-      if (!layout || !btn || !detail) {
-        setBridge(null);
-        return;
-      }
+      if (!layout || !btn || !detail) return;
+
       if (window.matchMedia('(max-width: 960px)').matches) {
-        setBridge(null);
+        layout.style.removeProperty('--bridge-gap');
+        detail.style.removeProperty('--bridge-top');
+        detail.style.removeProperty('--bridge-height');
         return;
       }
-      const lr = layout.getBoundingClientRect();
+
       const br = btn.getBoundingClientRect();
       const dr = detail.getBoundingClientRect();
-      const gap = dr.left - br.right;
-      if (gap < 10) {
-        setBridge(null);
-        return;
-      }
-      setBridge({
-        top: br.top - lr.top,
-        height: br.height,
-        /* Entra um pouco nos dois cards para cobrir a borda e unir em branco */
-        left: br.right - lr.left - 4,
-        width: gap + 8,
-      });
+      const gap = Math.max(0, dr.left - br.right);
+      layout.style.setProperty('--bridge-gap', `${gap}px`);
+      detail.style.setProperty('--bridge-top', `${Math.max(0, br.top - dr.top)}px`);
+      detail.style.setProperty('--bridge-height', `${br.height}px`);
     }
 
     updateBridge();
@@ -137,6 +126,7 @@ export function ProductsPage() {
     const needsLogin =
       product.href === '/caixa' ||
       product.href === '/os' ||
+      product.href === '/erp' ||
       product.href === '/fiscal' ||
       product.href === '/ecommerce' ||
       product.href === '/crm' ||
@@ -263,7 +253,13 @@ export function ProductsPage() {
           </div>
 
           <div
-            className="products-catalog__layout"
+            className={[
+              'products-catalog__layout',
+              isEdgeFirst ? 'is-edge-first' : '',
+              isEdgeLast ? 'is-edge-last' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             ref={layoutRef}
             style={{ ['--product-accent' as string]: active.accent }}
           >
@@ -280,8 +276,8 @@ export function ProductsPage() {
                     activeId === product.id
                       ? {
                           borderColor: product.accent,
+                          borderRight: 'none',
                           color: product.accent,
-                          ['--product-accent' as string]: product.accent,
                         }
                       : undefined
                   }
@@ -292,24 +288,6 @@ export function ProductsPage() {
                 </button>
               ))}
             </nav>
-
-            {bridge ? (
-              <div
-                className="products-catalog__bridge"
-                style={{
-                  top: bridge.top,
-                  height: bridge.height,
-                  left: bridge.left,
-                  width: bridge.width,
-                  ['--product-accent' as string]: active.accent,
-                }}
-                aria-hidden
-              >
-                <i className="products-catalog__bridge-top" />
-                <i className="products-catalog__bridge-fill" />
-                <i className="products-catalog__bridge-bot" />
-              </div>
-            ) : null}
 
             <article ref={detailRef} className="products-catalog__detail">
               <p className="products-catalog__tag" style={{ color: active.accent }}>

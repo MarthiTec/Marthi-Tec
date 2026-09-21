@@ -37,32 +37,52 @@ function formatWeekRange(monday: Date) {
   return `${monday.toLocaleDateString('pt-BR', opts)} – ${sunday.toLocaleDateString('pt-BR', opts)}`;
 }
 
+function formatShortDate(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+  });
+}
+
 function AgendaCard({
   order,
   osBase,
   onDateChange,
+  compactDate = false,
 }: {
   order: WorkOrder;
   osBase: string;
   onDateChange: (id: string, date: string) => void | Promise<void>;
+  compactDate?: boolean;
 }) {
+  const ready = workOrderReadyDate(order);
+
   return (
     <article className={`os-agenda__card os-agenda__card--${order.priority}`}>
       <Link to={osHref(osBase, `/${order.id}`)} className="os-agenda__card-link">
-        <strong>{order.id}</strong>
-        <span>{order.customerName}</span>
-        <span className="os-agenda__card-item">{order.itemName}</span>
+        <div className="os-agenda__card-top">
+          <strong>{order.id}</strong>
+          <em className={`os-agenda__prio os-agenda__prio--${order.priority}`}>
+            {PRIORITY_LABEL[order.priority]}
+          </em>
+        </div>
+        <span className="os-agenda__card-customer">{order.customerName}</span>
+        <span className="os-agenda__card-item" title={order.itemName}>
+          {order.itemName}
+        </span>
       </Link>
       <div className="os-agenda__card-meta">
-        <span>{STATUS_LABEL[order.status]}</span>
-        <span>{PRIORITY_LABEL[order.priority]}</span>
-        {order.technician ? <span>{order.technician}</span> : <span>Sem técnico</span>}
+        <span className="os-agenda__chip">{STATUS_LABEL[order.status]}</span>
+        <span className="os-agenda__chip">
+          {order.technician ? order.technician : 'Sem técnico'}
+        </span>
       </div>
-      <label className="os-agenda__date">
-        Previsão
+      <label className={`os-agenda__date ${compactDate ? 'os-agenda__date--compact' : ''}`}>
+        {compactDate ? null : <span>Previsão</span>}
         <input
           type="date"
-          value={workOrderReadyDate(order) ?? ''}
+          aria-label="Previsão de pronto"
+          value={ready ?? ''}
           onChange={(event) => void onDateChange(order.id, event.target.value)}
         />
       </label>
@@ -77,6 +97,7 @@ export function AgendaPage() {
   const weekParam = params.get('week');
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState('');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   useEffect(() => {
     function refresh() {
@@ -132,8 +153,14 @@ export function AgendaPage() {
       setMessage(result.error);
       return;
     }
-    setMessage(date ? 'Previsão atualizada.' : 'Previsão removida.');
+    setMessage(date ? `Previsão → ${formatShortDate(date)}` : 'Previsão removida.');
     setTick((value) => value + 1);
+  }
+
+  function onDropDay(dateKey: string) {
+    if (!draggingId) return;
+    changeDate(draggingId, dateKey);
+    setDraggingId(null);
   }
 
   const weekTotal = week.reduce((sum, day) => sum + day.orders.length, 0);
@@ -165,7 +192,7 @@ export function AgendaPage() {
           ]}
           onChange={setTechnician}
         />
-        <Link to={osHref(osBase, '/nova')} className="btn btn--primary">
+        <Link to="/os/nova" className="btn btn--primary">
           Nova OS
         </Link>
       </div>
@@ -180,7 +207,7 @@ export function AgendaPage() {
         </article>
         <article className="admin-card">
           <h2>Atrasadas</h2>
-          <strong>{overdue.length}</strong>
+          <strong className={overdue.length ? 'qty-low' : ''}>{overdue.length}</strong>
           <p>Previsão vencida e ainda em oficina.</p>
         </article>
         <article className="admin-card">
@@ -190,26 +217,61 @@ export function AgendaPage() {
         </article>
       </div>
 
+      <div className="os-agenda__legend">
+        <span>
+          <i className="os-agenda__dot os-agenda__dot--high" /> Alta
+        </span>
+        <span>
+          <i className="os-agenda__dot os-agenda__dot--normal" /> Normal
+        </span>
+        <span>
+          <i className="os-agenda__dot os-agenda__dot--low" /> Baixa
+        </span>
+        <span className="empty">Arraste um card para outro dia para remarcar a previsão.</span>
+      </div>
+
       <div className="os-agenda__layout">
         <div className="os-agenda__week">
           {week.map((day, index) => {
             const isToday = day.date === todayKey;
+            const count = day.orders.length;
             return (
               <section
                 key={day.date}
-                className={`os-agenda__day ${isToday ? 'is-today' : ''}`}
+                className={`os-agenda__day ${isToday ? 'is-today' : ''} ${
+                  draggingId ? 'is-droppable' : ''
+                }`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  onDropDay(day.date);
+                }}
               >
                 <header>
                   <span>{WEEKDAY[index]}</span>
                   <strong>{formatDayHeading(day.date)}</strong>
-                  <em>{day.orders.length}</em>
+                  <em className={count ? 'has-items' : ''}>{count}</em>
                 </header>
                 <div className="os-agenda__day-body">
-                  {day.orders.length === 0 ? (
-                    <p className="empty">Livre</p>
+                  {count === 0 ? (
+                    <p className="os-agenda__empty">Livre</p>
                   ) : (
                     day.orders.map((order) => (
-                      <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
+                      <div
+                        key={order.id}
+                        draggable
+                        onDragStart={() => setDraggingId(order.id)}
+                        onDragEnd={() => setDraggingId(null)}
+                      >
+                        <AgendaCard
+                          order={order}
+                          osBase={osBase}
+                          onDateChange={changeDate}
+                          compactDate
+                        />
+                      </div>
                     ))
                   )}
                 </div>
@@ -219,25 +281,49 @@ export function AgendaPage() {
         </div>
 
         <aside className="os-agenda__side">
-          {overdue.length > 0 ? (
-            <article className="admin-card">
+          <article className="admin-card">
+            <div className="os-agenda__side-head">
               <h2>Atrasadas</h2>
+              <strong>{overdue.length}</strong>
+            </div>
+            {overdue.length === 0 ? (
+              <p className="empty">Nenhuma OS atrasada.</p>
+            ) : (
               <div className="os-agenda__side-list">
                 {overdue.map((order) => (
-                  <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
+                  <div
+                    key={order.id}
+                    draggable
+                    onDragStart={() => setDraggingId(order.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                  >
+                    <AgendaCard order={order} osBase={osBase} onDateChange={changeDate} />
+                  </div>
                 ))}
               </div>
-            </article>
-          ) : null}
+            )}
+          </article>
           <article className="admin-card">
-            <h2>Sem previsão</h2>
-            <p>Defina a data para aparecer na semana.</p>
+            <div className="os-agenda__side-head">
+              <h2>Sem previsão</h2>
+              <strong>{unscheduled.length}</strong>
+            </div>
+            <p className="empty" style={{ marginTop: 0 }}>
+              Arraste para um dia da semana ou defina a data no card.
+            </p>
             {unscheduled.length === 0 ? (
               <p className="empty">Todas as OS ativas têm data.</p>
             ) : (
               <div className="os-agenda__side-list">
                 {unscheduled.map((order) => (
-                  <AgendaCard key={order.id} order={order} osBase={osBase} onDateChange={changeDate} />
+                  <div
+                    key={order.id}
+                    draggable
+                    onDragStart={() => setDraggingId(order.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                  >
+                    <AgendaCard order={order} osBase={osBase} onDateChange={changeDate} />
+                  </div>
                 ))}
               </div>
             )}

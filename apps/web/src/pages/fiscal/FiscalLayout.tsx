@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
@@ -11,6 +12,8 @@ import './fiscal.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/fiscal': { kicker: 'Emissor Fiscal', title: 'Central de emissão' },
+  '/fiscal/perfil': { kicker: 'Emissor Fiscal', title: 'Meu perfil' },
+  '/fiscal/conta': { kicker: 'Emissor Fiscal', title: 'Meu perfil' },
   '/fiscal/nfe': { kicker: 'Emissor Fiscal', title: 'NF-e — entrada e saída' },
   '/fiscal/nfse': { kicker: 'Emissor Fiscal', title: 'NFS-e — Portal Nacional' },
   '/fiscal/cte': { kicker: 'Emissor Fiscal', title: 'CT-e — conhecimento de transporte' },
@@ -39,7 +42,6 @@ export function FiscalLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const operatorName = user?.name ?? 'Operador';
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -111,7 +113,6 @@ export function FiscalLayout() {
         <BrandLogo variant="mark" className="fiscal-app__mark" />
         <div className="fiscal-app__brand">
           <strong>Marthi Emissor Fiscal</strong>
-          <span>{operatorName}</span>
         </div>
         <button type="button" className="fiscal-app__exit" onClick={requestExit}>
           Sair
@@ -138,11 +139,18 @@ export function FiscalLayout() {
             <button
               type="button"
               className="fiscal-app__side-close"
-              onClick={() => setNavOpen(false)}
+              title="Central do emissor"
+              aria-label="Ir para a central do emissor"
+              onClick={() => {
+                setNavOpen(false);
+                navigate('/fiscal');
+              }}
             >
-              Fechar
+              <AdminIcon name="home" />
             </button>
           </div>
+
+          <UserChip to="/fiscal/perfil" />
 
           <NavLink to="/fiscal" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />

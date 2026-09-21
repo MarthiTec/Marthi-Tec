@@ -6,6 +6,11 @@ import {
   saveCrmSellerProfile,
   type CrmSellerProfile,
 } from '../../data/crmStore';
+import {
+  getOperatorProfile,
+  notifyProfileUpdated,
+  saveOperatorProfile,
+} from '../../data/operatorProfile';
 
 type SellerCtx = { sellerId: string; sellerName: string };
 
@@ -193,8 +198,16 @@ export function CrmProfilePage() {
     }
     setError('');
     setDirty(false);
-    setMessage('Perfil publicado na rede Marthi CRM.');
+    setMessage('Perfil salvo na rede Marthi.');
     setTick((value) => value + 1);
+    // Mantém o chip/operador alinhado com o perfil do CRM.
+    const op = getOperatorProfile(form.displayName);
+    void saveOperatorProfile({
+      ...op,
+      displayName: form.displayName.trim(),
+      photo: form.avatarUrl.trim() || null,
+      phone: form.whatsapp.trim() || op.phone,
+    }).then(() => notifyProfileUpdated());
   }
 
   function reset() {
@@ -207,7 +220,8 @@ export function CrmProfilePage() {
   return (
     <section className="crm-profile">
       <p className="crm-profile__lead">
-        Seu perfil público na rede Marthi — vendedores e clientes fechados veem quem atende.
+        Perfil do vendedor Marthi no CRM interno. Foto, bio e contato valem na rede da equipe —
+        este módulo é para uso da Marthi, não da loja do cliente.
       </p>
 
       {message ? <p className="crm-profile__ok">{message}</p> : null}
@@ -497,8 +511,8 @@ export function CrmProfilePage() {
                 onChange={(e) => patch('publicProfile', e.target.checked)}
               />
               <span>
-                Perfil público na rede Marthi
-                <em>Se desmarcar, só você vê este perfil na rede.</em>
+                Perfil visível na rede Marthi
+                <em>Se desmarcar, só você vê este perfil na rede da equipe.</em>
               </span>
             </label>
           </div>

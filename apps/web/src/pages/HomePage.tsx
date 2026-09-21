@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { PLANS } from '../data/catalog';
 import { MARTHI_PRODUCTS } from '../data/marthiProducts';
 import { isStoreContracted } from '../data/demoLeadStore';
-import { ingestContactLeadToCrm, ingestSellerApplicantToCrm } from '../data/crmStore';
+import { ingestSellerApplicantToCrm, listLeadMessages, postHomepageCrmChat } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import './home.css';
 import './products.css';
@@ -59,6 +59,10 @@ export function HomePage() {
   const [contactPhone, setContactPhone] = useState('');
   const [contactMsg, setContactMsg] = useState('');
   const [contactFeedback, setContactFeedback] = useState('');
+  const [guestLeadId, setGuestLeadId] = useState<string | null>(null);
+  const [guestThread, setGuestThread] = useState<
+    Array<{ id: string; fromName: string; text: string; fromLead?: boolean; createdAt: string }>
+  >([]);
   const [jobName, setJobName] = useState('');
   const [jobPhone, setJobPhone] = useState('');
   const [jobCity, setJobCity] = useState('');
@@ -133,8 +137,8 @@ export function HomePage() {
           <a href="#planos" onClick={() => setNavOpen(false)}>
             Planos
           </a>
-          <a href="#trabalhe-conosco" onClick={() => setNavOpen(false)}>
-            Trabalhe conosco
+          <a href="#contato" onClick={() => setNavOpen(false)}>
+            Canal CRM
           </a>
           <button
             type="button"
@@ -348,6 +352,10 @@ export function HomePage() {
           <div className="section__head">
             <p className="eyebrow">Planos</p>
             <h2>Escolha o ritmo da sua operação</h2>
+            <p className="section__sub">
+              O painel da loja entra em todo plano. Os módulos (Totem, OS, ERP/PDV, Fiscal, E-commerce)
+              você combina conforme o Bronze, Silver ou Golden.
+            </p>
           </div>
           <div className="plans">
             {PLANS.map((plan) => (
@@ -396,7 +404,7 @@ export function HomePage() {
               </p>
               <ul className="careers__list">
                 <li>Comissão por negócio fechado</li>
-                <li>Perfil na rede CRM Marthi</li>
+                <li>Perfil no CRM interno Marthi</li>
                 <li>Leads da homepage e parceiros</li>
               </ul>
             </div>
@@ -482,8 +490,12 @@ export function HomePage() {
 
         <section id="contato" className="section contact">
           <div className="section__head">
-            <p className="eyebrow">Contato</p>
-            <h2>Estamos aqui para ajudar.</h2>
+            <p className="eyebrow">Canal CRM</p>
+            <h2>Converse com um vendedor Marthi.</h2>
+            <p className="empty" style={{ marginTop: 8 }}>
+              Canal direto na plataforma — a mensagem chega no CRM da equipe comercial, como uma
+              rede social de atendimento.
+            </p>
           </div>
           <div className="contact__grid">
             <article>
@@ -504,26 +516,44 @@ export function HomePage() {
                 <IconLabel icon={<IconInstagram />}>Abrir Instagram</IconLabel>
               </a>
             </article>
-            <article className="span-2" style={{ gridColumn: '1 / -1' }}>
-              <h3>Deixe seu contato</h3>
-              <p className="empty">Cai no CRM para a equipe comercial puxar o lead.</p>
+            <article className="home-crm-channel" style={{ gridColumn: '1 / -1' }}>
+              <div className="home-crm-channel__head">
+                <h3>Chat com a equipe comercial</h3>
+                <p className="empty" style={{ margin: 0 }}>
+                  Digite nome, WhatsApp e a mensagem. O vendedor responde no app CRM · Conversas.
+                </p>
+              </div>
+              {guestThread.length > 0 ? (
+                <div className="home-crm-channel__thread">
+                  {guestThread.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`home-crm-channel__bubble ${msg.fromLead ? 'is-me' : 'is-them'}`}
+                    >
+                      <strong>{msg.fromName}</strong>
+                      <p>{msg.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <form
                 className="admin-form"
                 style={{ marginTop: 12 }}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  const result = ingestContactLeadToCrm({
+                  const result = postHomepageCrmChat({
                     name: contactName,
                     whatsapp: contactPhone,
-                    message: contactMsg,
+                    text: contactMsg,
+                    leadId: guestLeadId || undefined,
                   });
                   if (!result.ok) {
                     setContactFeedback(result.error);
                     return;
                   }
-                  setContactFeedback('Recebido! Em breve um vendedor entra em contato.');
-                  setContactName('');
-                  setContactPhone('');
+                  setGuestLeadId(result.lead.id);
+                  setGuestThread(listLeadMessages(result.lead.id));
+                  setContactFeedback('Mensagem enviada. Um vendedor responde por aqui e no CRM.');
                   setContactMsg('');
                 }}
               >
@@ -549,12 +579,18 @@ export function HomePage() {
                     value={contactMsg}
                     onChange={(e) => setContactMsg(e.target.value)}
                     placeholder="Quero conhecer o Marthi…"
+                    required
                   />
                 </label>
                 <div className="span-2 admin-toolbar">
                   <button type="submit" className="btn btn--primary">
-                    Enviar para o CRM
+                    Enviar no canal CRM
                   </button>
+                  {user ? (
+                    <Link to="/crm/conversas" className="btn btn--ghost">
+                      Abrir CRM · Conversas
+                    </Link>
+                  ) : null}
                   {contactFeedback ? <span className="empty">{contactFeedback}</span> : null}
                 </div>
               </form>

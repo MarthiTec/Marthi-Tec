@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
-import { getOperatorProfile } from '../../data/operatorProfile';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import '../admin/admin.css';
@@ -12,6 +12,8 @@ import './os.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/os': { kicker: 'Oficina', title: 'Quadro da oficina' },
+  '/os/perfil': { kicker: 'Oficina', title: 'Meu perfil' },
+  '/os/conta': { kicker: 'Oficina', title: 'Meu perfil' },
   '/os/nova': { kicker: 'Oficina', title: 'Nova ordem de serviço' },
   '/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
 };
@@ -40,8 +42,6 @@ export function OsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const profile = useMemo(() => getOperatorProfile(user?.name ?? 'Operador'), [user?.name]);
-  const operatorName = user?.name ?? profile.displayName;
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
@@ -51,6 +51,12 @@ export function OsLayout() {
 
   const title = resolveTitle(location.pathname, location.search);
   const isBoard = location.pathname === '/os';
+  const isProfile =
+    location.pathname === '/os/perfil' || location.pathname === '/os/conta';
+
+  useEffect(() => {
+    if (isProfile) setOpsMenuOpen(true);
+  }, [isProfile]);
 
   useEffect(() => {
     if (!hasDemoAccess('os') && !user) {
@@ -188,7 +194,9 @@ export function OsLayout() {
   }
 
   return (
-    <div className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''}`}>
+    <div
+      className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''} ${isProfile ? 'is-profile-dock' : ''}`}
+    >
       <header className="os-app__top">
         <button
           type="button"
@@ -204,14 +212,13 @@ export function OsLayout() {
         <BrandLogo variant="mark" className="os-app__mark" />
         <div className="os-app__brand">
           <strong>Marthi OS</strong>
-          <span>{operatorName}</span>
         </div>
         <button type="button" className="os-app__exit" onClick={requestExit}>
           Sair
         </button>
       </header>
 
-      {opsMenuOpen ? (
+      {opsMenuOpen && !isProfile ? (
         <button
           type="button"
           className="os-app__ops-backdrop"
@@ -220,64 +227,83 @@ export function OsLayout() {
         />
       ) : null}
 
-      <aside className={`os-app__ops-drawer ${opsMenuOpen ? 'is-open' : ''}`} aria-hidden={!opsMenuOpen}>
-        <div className="os-app__ops-head">
-          <strong>Operações</strong>
-          <button type="button" className="os-app__ops-close" onClick={() => setOpsMenuOpen(false)}>
-            Fechar
-          </button>
-        </div>
-        <nav className="os-app__ops-nav" aria-label="Operações da oficina">
-          <button type="button" onClick={() => go('/os/nova')}>
-            <kbd>F2</kbd>
-            <span>Nova OS</span>
-          </button>
-          <button type="button" onClick={() => openPanel('consult')}>
-            <kbd>F7</kbd>
-            <span>Consultar OS</span>
-          </button>
-          <button type="button" onClick={() => openPanel('reprint')}>
-            <kbd>F8</kbd>
-            <span>Reimprimir OS</span>
-          </button>
-          <button type="button" onClick={() => go('/os/agenda')}>
-            <kbd>F6</kbd>
-            <span>Agenda</span>
-          </button>
-          <button type="button" onClick={() => go('/os?quote=sent')}>
-            <kbd>Alt+Q</kbd>
-            <span>Orçamentos</span>
-          </button>
-          <button type="button" onClick={() => go('/os?status=progress')}>
-            <kbd>F9</kbd>
-            <span>Em serviço</span>
-          </button>
-          <button type="button" onClick={() => go('/os?status=ready')}>
-            <kbd>F11</kbd>
-            <span>Prontas</span>
-          </button>
-          <button type="button" onClick={() => go('/os')}>
-            <kbd>F12</kbd>
-            <span>Quadro da oficina</span>
-          </button>
-        </nav>
-      </aside>
-
-      <div className="os-app__body">
-        <header className="os-app__heading">
-          <div>
-            <p className="admin__kicker">{title.kicker}</p>
-            <h1>{title.title}</h1>
+      <div className="os-app__workspace">
+        <aside
+          className={`os-app__ops-drawer ${opsMenuOpen || isProfile ? 'is-open' : ''}`}
+          aria-hidden={!opsMenuOpen && !isProfile}
+        >
+          <div className="os-app__ops-head">
+            <strong>Operações</strong>
+            <button
+              type="button"
+              className="os-app__ops-close"
+              title="Quadro da oficina"
+              aria-label="Ir para o quadro da oficina"
+              onClick={() => {
+                setOpsMenuOpen(false);
+                navigate('/os');
+              }}
+            >
+              <AdminIcon name="home" />
+            </button>
           </div>
-          {isBoard ? (
-            <OsHotkeysBar
-              onConsult={() => openPanel('consult')}
-              onReprint={() => openPanel('reprint')}
-            />
-          ) : null}
-        </header>
-        <div className="os-app__content">
-          <Outlet />
+          <UserChip to="/os/perfil" />
+          <nav className="os-app__ops-nav" aria-label="Operações da oficina">
+            <button type="button" className="os-app__ops-central" onClick={() => go('/os')}>
+              <AdminIcon name="home" />
+              <span>Central</span>
+            </button>
+            <button type="button" onClick={() => go('/os/nova')}>
+              <kbd>F2</kbd>
+              <span>Nova OS</span>
+            </button>
+            <button type="button" onClick={() => openPanel('consult')}>
+              <kbd>F7</kbd>
+              <span>Consultar OS</span>
+            </button>
+            <button type="button" onClick={() => openPanel('reprint')}>
+              <kbd>F8</kbd>
+              <span>Reimprimir OS</span>
+            </button>
+            <button type="button" onClick={() => go('/os/agenda')}>
+              <kbd>F6</kbd>
+              <span>Agenda</span>
+            </button>
+            <button type="button" onClick={() => go('/os?quote=sent')}>
+              <kbd>Alt+Q</kbd>
+              <span>Orçamentos</span>
+            </button>
+            <button type="button" onClick={() => go('/os?status=progress')}>
+              <kbd>F9</kbd>
+              <span>Em serviço</span>
+            </button>
+            <button type="button" onClick={() => go('/os?status=ready')}>
+              <kbd>F11</kbd>
+              <span>Prontas</span>
+            </button>
+            <button type="button" onClick={() => go('/os')}>
+              <kbd>F12</kbd>
+              <span>Quadro da oficina</span>
+            </button>
+          </nav>
+        </aside>
+
+        <div className="os-app__body">
+          <header className="os-app__heading">
+            <div>
+              <p className="admin__kicker">{title.kicker}</p>
+              <h1>{title.title}</h1>
+            </div>
+            {isBoard ? (
+              <OsHotkeysBar
+                onConsult={() => openPanel('consult')}
+                onReprint={() => openPanel('reprint')}
+              />
+            ) : null}
+          </header>
+          <div className="os-app__content">
+            <Outlet />
+          </div>
         </div>
       </div>
 

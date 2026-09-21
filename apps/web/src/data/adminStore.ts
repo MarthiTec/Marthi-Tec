@@ -52,8 +52,18 @@ export type StockItem = {
   attrs: Record<string, string>;
   qty: number;
   minQty: number;
+  /** Estoque máximo sugerido (alerta de excesso). */
+  maxQty: number;
+  /** Custo da última compra / referência. */
   cost: number;
+  /** Custo médio ponderado. */
+  avgCost: number;
+  /** Preço de venda base (vista / tabela 0%). */
   price: number;
+  /** Data ISO da última compra/entrada com custo. */
+  lastPurchaseAt: string;
+  /** Custo unitário da última compra. */
+  lastPurchaseCost: number;
   kind: StockKind;
   condition: StockCondition;
   sourceWorkOrderId?: string;
@@ -184,8 +194,33 @@ function seedPayments(): PaymentMethod[] {
 }
 
 function variantSku(
-  item: Omit<StockItem, 'attrs' | 'kind' | 'condition' | 'sourceWorkOrderId' | 'showOnTotem' | 'images'> &
-    Partial<Pick<StockItem, 'kind' | 'condition' | 'sourceWorkOrderId' | 'showOnTotem' | 'images'>>,
+  item: Omit<
+    StockItem,
+    | 'attrs'
+    | 'kind'
+    | 'condition'
+    | 'sourceWorkOrderId'
+    | 'showOnTotem'
+    | 'images'
+    | 'maxQty'
+    | 'avgCost'
+    | 'lastPurchaseAt'
+    | 'lastPurchaseCost'
+  > &
+    Partial<
+      Pick<
+        StockItem,
+        | 'kind'
+        | 'condition'
+        | 'sourceWorkOrderId'
+        | 'showOnTotem'
+        | 'images'
+        | 'maxQty'
+        | 'avgCost'
+        | 'lastPurchaseAt'
+        | 'lastPurchaseCost'
+      >
+    >,
 ): StockItem {
   return normalizeStock({ ...item, attrs: {} } as StockItem);
 }
@@ -471,6 +506,15 @@ function normalizeStock(item: StockItem): StockItem {
   const images = Array.isArray(item.images)
     ? item.images.map((url) => String(url).trim()).filter(Boolean)
     : [];
+  const cost = Number(item.cost) || 0;
+  const qty = Math.max(0, Number(item.qty) || 0);
+  const minQty = Math.max(0, Number(item.minQty) || 0);
+  const maxQtyRaw = Number(item.maxQty);
+  const maxQty =
+    Number.isFinite(maxQtyRaw) && maxQtyRaw > 0
+      ? maxQtyRaw
+      : Math.max(minQty * 5, qty || minQty || 10, 10);
+  const avgCost = Number(item.avgCost);
   return {
     ...item,
     barcode: item.barcode ?? '',
@@ -478,6 +522,15 @@ function normalizeStock(item: StockItem): StockItem {
     attrs,
     color: attrs[ATTR_COR] ?? item.color ?? '',
     capacity: attrs[ATTR_CAP] ?? item.capacity ?? '',
+    qty,
+    minQty,
+    maxQty,
+    cost,
+    avgCost: Number.isFinite(avgCost) && avgCost > 0 ? avgCost : cost,
+    price: Number(item.price) || 0,
+    lastPurchaseAt: item.lastPurchaseAt ?? '',
+    lastPurchaseCost:
+      Number(item.lastPurchaseCost) > 0 ? Number(item.lastPurchaseCost) : cost,
     kind: item.kind ?? (looksLikeDevice ? 'device' : 'part'),
     condition: item.condition ?? 'new',
     sourceWorkOrderId: item.sourceWorkOrderId,
@@ -667,9 +720,27 @@ export function adjustStockQty(stockId: string, delta: number) {
   const state = load();
   const item = state.stock.find((entry) => entry.id === stockId);
   if (!item) return { ok: false as const, error: 'Produto não encontrado no estoque.' };
+  const qty = Math.abs(Math.floor(delta) || 0);
+  if (qty === 0) return { ok: true as const, item };
   item.qty = Math.max(0, item.qty + delta);
   save(state);
   window.dispatchEvent(new Event(STOCK_EVENT));
+  void import('./stockLedger').then(({ logStockMovements }) => {
+    logStockMovements([
+      {
+        stockId: item.id,
+        stockName: item.name,
+        sku: item.sku,
+        type: 'adjust',
+        qty,
+        direction: delta >= 0 ? 1 : -1,
+        unitCost: item.avgCost || item.cost || 0,
+        balanceAfter: item.qty,
+        note: 'Ajuste rápido de quantidade',
+        warehouseId: item.warehouseId,
+      },
+    ]);
+  });
   return { ok: true as const, item };
 }
 
@@ -1090,6 +1161,20 @@ export async function closePosSale(input: {
     refId: order.id,
   });
 
+  const saleMoves: Array<{
+    stockId: string;
+    stockName: string;
+    sku: string;
+    type: 'sale';
+    qty: number;
+    direction: -1;
+    unitCost: number;
+    balanceAfter: number;
+    note: string;
+    refId: string;
+    warehouseId?: string;
+  }> = [];
+
   for (const line of input.lines) {
     const stock = line.stockId
       ? state.stock.find((item) => item.id === line.stockId)
@@ -1097,6 +1182,19 @@ export async function closePosSale(input: {
     if (stock) {
       stock.qty = Math.max(0, stock.qty - line.qty);
       if (line.imei && stock.imei === line.imei) stock.imei = '';
+      saleMoves.push({
+        stockId: stock.id,
+        stockName: stock.name,
+        sku: stock.sku,
+        type: 'sale',
+        qty: line.qty,
+        direction: -1,
+        unitCost: stock.avgCost || stock.cost || 0,
+        balanceAfter: stock.qty,
+        note: `PDV ${order.id}`,
+        refId: order.id,
+        warehouseId: stock.warehouseId,
+      });
     }
   }
 
@@ -1127,6 +1225,11 @@ export async function closePosSale(input: {
   }
 
   save(state);
+  if (saleMoves.length) {
+    void import('./stockLedger').then(({ logStockMovements }) => {
+      logStockMovements(saleMoves);
+    });
+  }
   return state;
 }
 

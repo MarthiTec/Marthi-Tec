@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   applyRootPathCascade,
@@ -33,6 +33,8 @@ function StatusChip({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export function FiscalIssuerPage() {
+  const { pathname } = useLocation();
+  const inPanel = pathname.startsWith('/painel');
   const [form, setForm] = useState<FiscalIssuerSettings>(() => getFiscalIssuerSettings());
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -422,12 +424,20 @@ export function FiscalIssuerPage() {
         <button type="button" className="btn btn--primary" disabled={busy} onClick={save}>
           Salvar
         </button>
-        <Link to="/fiscal/nfe" className="btn btn--ghost">
-          NF-e
-        </Link>
-        <Link to="/os" className="btn btn--ghost">
-          OS
-        </Link>
+        {inPanel ? (
+          <>
+            <Link to="/painel/notas" className="btn btn--ghost">
+              Notas
+            </Link>
+            <Link to="/fiscal" className="btn btn--ghost">
+              Abrir emissor
+            </Link>
+          </>
+        ) : (
+          <Link to="/fiscal/nfe" className="btn btn--ghost">
+            NF-e
+          </Link>
+        )}
       </div>
     </section>
   );

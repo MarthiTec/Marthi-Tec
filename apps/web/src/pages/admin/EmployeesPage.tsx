@@ -237,12 +237,21 @@ export function EmployeesPage() {
           <tbody>
             {filtered.map((item) => (
               <tr key={item.id}>
-                <td>{item.name}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="admin-table__name-btn"
+                    onClick={() => edit(item)}
+                    title="Clique para editar"
+                  >
+                    {item.name}
+                  </button>
+                </td>
                 <td>{EMPLOYEE_ROLE_LABEL[item.role]}</td>
                 <td>{item.isSystemUser ? 'Sim' : 'Não'}</td>
                 <td>{item.isSystemUser ? item.userEmail || item.email || '—' : '—'}</td>
                 <td>{item.active ? 'Ativo' : 'Inativo'}</td>
-                <td>
+                <td className="admin-table__actions">
                   <button type="button" className="btn btn--ghost" onClick={() => edit(item)}>
                     Editar
                   </button>

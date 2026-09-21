@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
@@ -11,6 +12,8 @@ import './ecommerce.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/ecommerce': { kicker: 'E-commerce', title: 'Central de canais' },
+  '/ecommerce/perfil': { kicker: 'E-commerce', title: 'Meu perfil' },
+  '/ecommerce/conta': { kicker: 'E-commerce', title: 'Meu perfil' },
   '/ecommerce/pedidos': { kicker: 'E-commerce', title: 'Pedidos dos canais' },
   '/ecommerce/anuncios': { kicker: 'E-commerce', title: 'Anúncios e catálogo' },
   '/ecommerce/conexoes': { kicker: 'E-commerce', title: 'Conexões' },
@@ -44,7 +47,6 @@ export function EcommerceLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const operatorName = user?.name ?? 'Operador';
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -116,7 +118,6 @@ export function EcommerceLayout() {
         <BrandLogo variant="mark" className="ecommerce-app__mark" />
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>
-          <span>{operatorName}</span>
         </div>
         <button type="button" className="ecommerce-app__exit" onClick={requestExit}>
           Sair
@@ -139,11 +140,18 @@ export function EcommerceLayout() {
             <button
               type="button"
               className="ecommerce-app__side-close"
-              onClick={() => setNavOpen(false)}
+              title="Central do e-commerce"
+              aria-label="Ir para a central do e-commerce"
+              onClick={() => {
+                setNavOpen(false);
+                navigate('/ecommerce');
+              }}
             >
-              Fechar
+              <AdminIcon name="home" />
             </button>
           </div>
+
+          <UserChip to="/ecommerce/perfil" />
 
           <NavLink to="/ecommerce" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />

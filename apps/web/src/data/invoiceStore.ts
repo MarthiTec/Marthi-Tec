@@ -1,5 +1,6 @@
-import { getAdminState, saveStock, type StockItem } from './adminStore';
+import { getAdminState } from './adminStore';
 import { getSupplier } from './erpRegistry';
+import { applyStockMovement } from './stockLedger';
 import type { FiscalDocPurpose } from './fiscalTaxTables';
 
 const STORAGE_KEY = 'marthi.invoices.v1';
@@ -188,22 +189,18 @@ export function removeInvoiceLine(id: string, lineId: string): InvoiceResult {
 }
 
 function applyStockDelta(lines: InvoiceLine[], direction: 1 | -1): { ok: true } | { ok: false; error: string } {
-  const admin = getAdminState();
-  const nextStock: StockItem[] = admin.stock.map((item) => ({ ...item }));
   for (const line of lines) {
-    const idx = nextStock.findIndex((item) => item.id === line.stockId);
-    if (idx < 0) return { ok: false, error: `Item ${line.name} sumiu do estoque.` };
-    const qty = nextStock[idx].qty + direction * line.qty;
-    if (qty < 0) {
-      return { ok: false, error: `Estoque insuficiente para ${line.name}.` };
-    }
-    nextStock[idx] = {
-      ...nextStock[idx],
-      qty,
-      cost: direction === 1 ? line.unitCost : nextStock[idx].cost,
-    };
+    const result = applyStockMovement({
+      stockId: line.stockId,
+      type: direction === 1 ? 'purchase' : 'exit',
+      qty: line.qty,
+      direction,
+      unitCost: line.unitCost,
+      note: direction === 1 ? `NF entrada · ${line.name}` : `NF saída · ${line.name}`,
+      skipAvgCost: direction !== 1,
+    });
+    if (!result.ok) return result;
   }
-  saveStock(nextStock);
   return { ok: true };
 }
 

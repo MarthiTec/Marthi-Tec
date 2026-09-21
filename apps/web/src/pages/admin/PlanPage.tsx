@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   PARTNER_MODULES,
+  PLATFORM_INCLUDES,
   PLANS,
   getPlanModuleLimit,
   planIncludesAllModules,
@@ -77,8 +78,8 @@ export function PlanPage() {
       <article className="admin-card">
         <h2>Plano da loja</h2>
         <p>
-          Bronze (1 módulo), Silver (2 módulos) e Golden (tudo). Visível apenas para
-          administradores.
+          Bronze (1 módulo), Silver (até 2) e Golden (tudo). O painel da loja entra em qualquer
+          plano — só administradores alteram o contrato.
         </p>
         <div className="plan-picker">
           {PLANS.map((item) => (
@@ -105,10 +106,28 @@ export function PlanPage() {
       </article>
 
       <article className="admin-card">
-        <h2>Módulos liberados</h2>
+        <h2>Incluso na plataforma</h2>
+        <p>Não consome vaga de módulo — vale em Bronze, Silver e Golden.</p>
+        <div className="module-picker module-picker--included">
+          {PLATFORM_INCLUDES.map((item) => (
+            <div key={item.id} className="module-picker__item is-active is-included">
+              <span className="module-picker__check" aria-hidden>
+                ✓
+              </span>
+              <span>
+                <strong>{item.name}</strong>
+                <em>{item.blurb}</em>
+              </span>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="admin-card">
+        <h2>Módulos contratados</h2>
         <p>
           {lockedAll
-            ? 'Golden libera Totem, OS, ERP e Emissor Fiscal juntos.'
+            ? 'Golden libera Totem, OS, ERP/PDV, Emissor Fiscal e E-commerce juntos.'
             : `${selected.length} de ${limit} módulo(s) no plano ${plan.name}.`}
         </p>
         <div className="module-picker">

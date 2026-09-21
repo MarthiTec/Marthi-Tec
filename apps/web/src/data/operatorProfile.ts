@@ -1,67 +1,115 @@
 const STORAGE_KEY = 'marthi.operator.profile';
+export const PROFILE_EVENT = 'marthi-profile-updated';
 
 export type OperatorProfile = {
   displayName: string;
+  /** Cargo/função — o próprio usuário não altera sem senha de gerente. */
   role: string;
   photo: string | null;
+  email: string;
+  phone: string;
+  address: string;
 };
 
 const DEFAULT_ROLE = 'Operador';
 
 let memoryProfile: OperatorProfile | null = null;
 
-export function getOperatorProfile(fallbackName: string): OperatorProfile {
+function emptyProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile {
+  return {
+    displayName: fallbackName,
+    role: DEFAULT_ROLE,
+    photo: null,
+    email: fallbackEmail,
+    phone: '',
+    address: '',
+  };
+}
+
+function normalizeProfile(
+  partial: Partial<OperatorProfile>,
+  fallbackName: string,
+  fallbackEmail = '',
+): OperatorProfile {
+  return {
+    displayName: partial.displayName?.trim() || fallbackName,
+    role: partial.role?.trim() || DEFAULT_ROLE,
+    photo: partial.photo?.trim() || null,
+    email: partial.email?.trim() || fallbackEmail,
+    phone: partial.phone?.trim() || '',
+    address: partial.address?.trim() || '',
+  };
+}
+
+export function getOperatorProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile {
   if (memoryProfile) {
-    return {
-      displayName: memoryProfile.displayName.trim() || fallbackName,
-      role: memoryProfile.role.trim() || DEFAULT_ROLE,
-      photo: memoryProfile.photo,
-    };
+    return normalizeProfile(memoryProfile, fallbackName, fallbackEmail || memoryProfile.email);
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<OperatorProfile>;
-      return {
-        displayName: parsed.displayName?.trim() || fallbackName,
-        role: parsed.role?.trim() || DEFAULT_ROLE,
-        photo: parsed.photo?.trim() || null,
-      };
+      return normalizeProfile(parsed, fallbackName, fallbackEmail);
     }
   } catch {
     /* ignore */
   }
-  return { displayName: fallbackName, role: DEFAULT_ROLE, photo: null };
+  return emptyProfile(fallbackName, fallbackEmail);
 }
 
 export function replaceOperatorProfileCache(profile: OperatorProfile) {
-  memoryProfile = {
-    displayName: profile.displayName.trim(),
-    role: profile.role.trim() || DEFAULT_ROLE,
-    photo: profile.photo,
-  };
+  memoryProfile = normalizeProfile(profile, profile.displayName, profile.email);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
 }
 
-export async function saveOperatorProfile(profile: OperatorProfile) {
-  const next = {
-    displayName: profile.displayName.trim(),
-    role: profile.role.trim() || DEFAULT_ROLE,
-    photo: profile.photo,
-  };
+export async function saveOperatorProfile(
+  profile: OperatorProfile,
+  options?: { allowRole?: boolean },
+) {
+  const current = getOperatorProfile(profile.displayName, profile.email);
+  const next = normalizeProfile(
+    {
+      ...profile,
+      role: options?.allowRole ? profile.role : current.role,
+    },
+    profile.displayName,
+    profile.email,
+  );
+
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
     const { apiPutOperatorProfile } = await import('../services/erpApi');
     const saved = await apiPutOperatorProfile(next);
-    replaceOperatorProfileCache(saved);
-    return saved;
+    const merged = normalizeProfile(
+      { ...next, ...saved },
+      next.displayName,
+      next.email,
+    );
+    replaceOperatorProfileCache(merged);
+    return merged;
   }
+
   replaceOperatorProfileCache(next);
   return next;
 }
 
 export function notifyProfileUpdated() {
-  window.dispatchEvent(new Event('marthi-profile-updated'));
+  window.dispatchEvent(new Event(PROFILE_EVENT));
+}
+
+/** Iniciais no estilo do chip (ex.: Marthi Teste → MT). */
+export function profileInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+}
+
+export function resolveProfilePhoto(profile: OperatorProfile, authPicture?: string | null) {
+  return profile.photo || authPicture || null;
 }
 
 export async function fileToProfilePhoto(file: File): Promise<string> {

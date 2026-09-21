@@ -85,16 +85,16 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     name: 'ERP da loja',
     tagline: 'Estoque, pessoas e financeiro',
     summary:
-      'Produtos, clientes, fornecedores, vendedores, tabelas de preço, lotes, kits e financeiro — o núcleo da operação.',
+      'Produtos, PDV, estoque com balanço e movimentos, pessoas, boletos e financeiro — o núcleo da operação.',
     audience: 'Lojas que cresceram além da planilha e precisam de um único painel.',
     features: [
-      'Estoque, atributos, kits e lotes',
-      'Clientes, fornecedores e funcionários',
-      'Tabelas de preço e pagamentos',
-      'Financeiro e permissões por usuário',
+      'Estoque com balanço, movimentos, mín/máx e custo',
+      'PDV/caixa no mesmo contrato do ERP',
+      'Clientes, fornecedores, funcionários e permissões',
+      'Tabelas de preço, boletos e financeiro',
     ],
-    href: '/painel',
-    cta: 'Conhecer o painel',
+    href: '/erp',
+    cta: 'Abrir ERP',
     accent: '#0e7490',
   },
   {
@@ -134,15 +134,15 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'crm',
     name: 'CRM Marthi',
-    tagline: 'Funil, WhatsApp e rede de vendedores',
+    tagline: 'Uso interno da equipe Marthi',
     summary:
-      'Kanban de negócios, claim exclusivo de leads, chat e perfil do vendedor. Cliente Marthi só após fechar e pagar.',
-    audience: 'Times comerciais e parceiros que captam lead na homepage e no parceiro.',
+      'Kanban, conversas e perfil do vendedor Marthi. Ferramenta interna do time comercial — não faz parte do plano da loja.',
+    audience: 'Vendedores e comercial Marthi.',
     features: [
       'Funil: primeiro contato → pagamento → fechamento',
-      'Puxar lead = atendimento exclusivo',
-      'WhatsApp e timeline no negócio',
-      'Vira cliente Marthi só depois de pagar',
+      'Conversas com leads e entre a equipe',
+      'Perfil do vendedor na rede interna',
+      'Claim exclusivo de lead',
     ],
     href: '/crm',
     cta: 'Abrir CRM',
@@ -153,11 +153,11 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     name: 'Painel da loja',
     tagline: 'O centro de comando',
     summary:
-      'Atalhos para PDV, totem, OS, clientes, estoque, plano e ajuda. É de onde a operação diária acontece.',
+      'Atalhos para PDV, totem, OS, ERP, plano e ajuda. É de onde a gestão acompanha a operação.',
     audience: 'Gestores e equipe operacional da loja.',
     features: [
       'Dashboard e atalhos por módulo',
-      'Clientes e pedidos',
+      'Perfil do operador unificado (foto e contato)',
       'Configuração de plano e permissões',
       'Ajuda e suporte Marthi',
     ],
@@ -186,7 +186,7 @@ export const MARTHI_SEGMENTS = [
   {
     id: 'comercial',
     name: 'Time comercial',
-    text: 'CRM com funil, WhatsApp e rede de vendedores Marthi.',
+    text: 'CRM interno Marthi — funil e rede da equipe comercial.',
   },
 ] as const;
 

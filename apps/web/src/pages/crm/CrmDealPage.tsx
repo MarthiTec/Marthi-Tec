@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   addCrmActivity,
   claimCrmLead,
@@ -690,38 +691,39 @@ export function CrmDealPage() {
             <form className="crm-wa__form" onSubmit={sendChat}>
               <div className="crm-wa__numbers">
                 <label>
-                  <select
+                  <AdminPicker
+                    label="Número de origem"
+                    compact
                     value={waOrigin}
-                    onChange={(e) => setWaOrigin(e.target.value)}
-                    aria-label="Número de origem"
-                  >
-                    <option value="">Selecione o número de origem</option>
-                    {originOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Selecione o número de origem"
+                    options={[
+                      { value: '', label: 'Selecione o número de origem' },
+                      ...originOptions,
+                    ]}
+                    onChange={setWaOrigin}
+                  />
                 </label>
                 <label>
-                  <select
+                  <AdminPicker
+                    label="Número de destino"
+                    compact
                     value={waDest}
-                    onChange={(e) => setWaDest(e.target.value)}
-                    aria-label="Número de destino"
-                  >
-                    <option value="">Selecione o número de destino</option>
-                    {destOptions.length === 0 ? (
-                      <option value="" disabled>
-                        Lead sem WhatsApp cadastrado
-                      </option>
-                    ) : (
-                      destOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    placeholder={
+                      destOptions.length === 0
+                        ? 'Lead sem WhatsApp cadastrado'
+                        : 'Selecione o número de destino'
+                    }
+                    options={
+                      destOptions.length === 0
+                        ? [{ value: '', label: 'Lead sem WhatsApp cadastrado' }]
+                        : [
+                            { value: '', label: 'Selecione o número de destino' },
+                            ...destOptions,
+                          ]
+                    }
+                    onChange={setWaDest}
+                    disabled={destOptions.length === 0}
+                  />
                 </label>
               </div>
 

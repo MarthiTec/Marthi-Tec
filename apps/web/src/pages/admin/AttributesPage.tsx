@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
   CrudListBar,
+  CrudNameButton,
   CrudRowActions,
   crudFormTitle,
   matchesQuery,
@@ -16,15 +18,16 @@ import {
   saveAttributes,
   type ProductAttribute,
 } from '../../data/attributeStore';
+import { hasCapability, isTotemCatalogPath } from '../../data/moduleCapabilities';
 
-function emptyForm(): Omit<ProductAttribute, 'id'> {
+function emptyForm(preferTotem = false): Omit<ProductAttribute, 'id'> {
   return {
     name: '',
     values: [],
     priceDeltas: {},
     useOnTotem: true,
     filterOnTotem: true,
-    useOnStock: true,
+    useOnStock: !preferTotem,
     sort: 10,
     active: true,
   };
@@ -44,8 +47,12 @@ const REFRESH_EVENTS = [
 ] as const;
 
 export function AttributesPage() {
+  const location = useLocation();
+  const totemSurface = isTotemCatalogPath(location.pathname);
+  const catalogFull = hasCapability('catalog.full');
+
   const [items, setItems] = useState(() => getAttributes());
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => emptyForm(totemSurface));
   const [valueDraft, setValueDraft] = useState('');
   const [deltaDraft, setDeltaDraft] = useState('0');
   const [mode, setMode] = useState<Mode>('new');
@@ -72,9 +79,10 @@ export function AttributesPage() {
       items.filter(
         (item) =>
           matchesStatus(item.active, status) &&
-          matchesQuery(`${item.name} ${item.values.join(' ')}`, query),
+          matchesQuery(`${item.name} ${item.values.join(' ')}`, query) &&
+          (!totemSurface || item.useOnTotem || item.filterOnTotem),
       ),
-    [items, query, status],
+    [items, query, status, totemSurface],
   );
 
   async function persist(next: ProductAttribute[]) {
@@ -89,7 +97,7 @@ export function AttributesPage() {
   }
 
   function resetForm() {
-    setForm(emptyForm());
+    setForm(emptyForm(totemSurface));
     setValueDraft('');
     setDeltaDraft('0');
     setSelectedId(null);
@@ -115,13 +123,18 @@ export function AttributesPage() {
 
   async function submit() {
     if (readOnly || atLimit || !form.name.trim() || form.values.length === 0) return;
+    const payload = {
+      ...form,
+      useOnTotem: totemSurface ? true : form.useOnTotem,
+      filterOnTotem: totemSurface ? form.filterOnTotem || form.useOnTotem : form.filterOnTotem,
+    };
     try {
       if (mode === 'edit' && selectedId) {
-        await persist(items.map((item) => (item.id === selectedId ? { ...item, ...form } : item)));
+        await persist(items.map((item) => (item.id === selectedId ? { ...item, ...payload } : item)));
       } else {
         await persist([
           {
-            ...form,
+            ...payload,
             id: `ATTR-${Date.now().toString(36).toUpperCase()}`,
             sort: items.length + 1,
           },
@@ -166,10 +179,16 @@ export function AttributesPage() {
         <h2>{crudFormTitle(mode, 'atributo')}</h2>
         {error ? <p className="qty-low">{error}</p> : null}
         <p>
-          Até {MAX_ATTRIBUTES} atributos. Celular usa cor e capacidade; roupa, cor e tamanho; ótica,
-          armação e lente. O estoque guarda o preço de cada combinação (128 GB ≠ 256 GB). Valores
-          como retirada usam o ajuste abaixo, somado na hora no totem.
+          {totemSurface
+            ? `Até ${MAX_ATTRIBUTES} atributos para filtros e opções do totem (cor, capacidade, etc.). O ajuste de preço entra na combinação na vitrine.`
+            : `Até ${MAX_ATTRIBUTES} atributos. Celular usa cor e capacidade; roupa, cor e tamanho; ótica, armação e lente. O estoque guarda o preço de cada combinação (128 GB ≠ 256 GB). Valores como retirada usam o ajuste abaixo, somado na hora no totem.`}
         </p>
+        {totemSurface && catalogFull ? (
+          <p className="empty">
+            Mesmo cadastro do ERP ·{' '}
+            <Link to="/erp/atributos">Abrir atributos no ERP</Link>
+          </p>
+        ) : null}
         <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
           <label>
             Atributo
@@ -300,15 +319,17 @@ export function AttributesPage() {
             />
             Filtro no totem
           </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.useOnStock}
-              disabled={atLimit || readOnly}
-              onChange={(e) => setForm({ ...form, useOnStock: e.target.checked })}
-            />
-            Usar no estoque
-          </label>
+          {!totemSurface || catalogFull ? (
+            <label>
+              <input
+                type="checkbox"
+                checked={form.useOnStock}
+                disabled={atLimit || readOnly}
+                onChange={(e) => setForm({ ...form, useOnStock: e.target.checked })}
+              />
+              Usar no estoque
+            </label>
+          ) : null}
         </div>
 
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
@@ -375,7 +396,9 @@ export function AttributesPage() {
             ) : (
               filtered.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.name}</td>
+                  <td>
+                    <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
+                  </td>
                   <td>
                     {item.values
                       .map((value) => {
@@ -394,9 +417,8 @@ export function AttributesPage() {
                       .join(' · ') || '—'}
                   </td>
                   <td>{item.active ? 'Ativo' : 'Inativo'}</td>
-                  <td>
+                  <td className="admin-table__actions">
                     <CrudRowActions
-                      onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
                       onDelete={() => void remove(item)}
                     />

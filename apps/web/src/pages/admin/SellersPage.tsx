@@ -3,6 +3,7 @@ import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
   CrudListBar,
+  CrudNameButton,
   CrudRowActions,
   crudFormTitle,
   matchesQuery,
@@ -211,13 +212,14 @@ export function SellersPage() {
             ) : (
               filtered.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.name}</td>
+                  <td>
+                    <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
+                  </td>
                   <td>{item.phone || '—'}</td>
                   <td>{item.commissionPercent}%</td>
                   <td>{item.active ? 'Ativo' : 'Inativo'}</td>
-                  <td>
+                  <td className="admin-table__actions">
                     <CrudRowActions
-                      onView={() => loadItem(item, 'view')}
                       onEdit={() => loadItem(item, 'edit')}
                       onDelete={() => remove(item)}
                     />

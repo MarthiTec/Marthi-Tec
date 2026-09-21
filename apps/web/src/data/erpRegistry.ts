@@ -401,11 +401,18 @@ export function employeeHasArea(employee: Employee | null, area: AccessArea) {
 }
 
 export function pathToAccessArea(pathname: string): AccessArea | null {
+  // Catálogo lite do Totem (produtos/atributos) fica sob área totem — não exige erp_stock.
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'pdv';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
-  if (pathname.startsWith('/painel/clientes')) return 'erp_customers';
+  if (pathname.startsWith('/erp/clientes') || pathname.startsWith('/painel/clientes')) {
+    return 'erp_customers';
+  }
   if (
+    pathname.startsWith('/erp/produtos') ||
+    pathname.startsWith('/erp/kits') ||
+    pathname.startsWith('/erp/lotes') ||
+    pathname.startsWith('/erp/almoxarifado') ||
     pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
     pathname.startsWith('/painel/kits') ||
@@ -414,16 +421,43 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   ) {
     return 'erp_stock';
   }
-  if (pathname.startsWith('/painel/atributos')) return 'erp_attrs';
-  if (pathname.startsWith('/painel/tabelas')) return 'erp_prices';
+  if (pathname.startsWith('/erp/atributos') || pathname.startsWith('/painel/atributos')) {
+    return 'erp_attrs';
+  }
+  if (pathname.startsWith('/erp/tabelas') || pathname.startsWith('/painel/tabelas')) {
+    return 'erp_prices';
+  }
   if (pathname.startsWith('/painel/pagamentos')) return 'erp_payments';
-  if (pathname.startsWith('/painel/financeiro')) return 'erp_finance';
-  if (pathname.startsWith('/painel/vendedores')) return 'erp_sellers';
-  if (pathname.startsWith('/painel/fornecedores')) return 'erp_suppliers';
-  if (pathname.startsWith('/painel/funcionarios') || pathname.startsWith('/painel/permissoes')) {
+  if (
+    pathname.startsWith('/erp/financeiro') ||
+    pathname.startsWith('/erp/boletos') ||
+    pathname.startsWith('/painel/financeiro')
+  ) {
+    return 'erp_finance';
+  }
+  if (pathname.startsWith('/erp/vendedores') || pathname.startsWith('/painel/vendedores')) {
+    return 'erp_sellers';
+  }
+  if (pathname.startsWith('/erp/fornecedores') || pathname.startsWith('/painel/fornecedores')) {
+    return 'erp_suppliers';
+  }
+  if (
+    pathname.startsWith('/erp/funcionarios') ||
+    pathname.startsWith('/erp/permissoes') ||
+    pathname.startsWith('/painel/funcionarios') ||
+    pathname.startsWith('/painel/permissoes')
+  ) {
     return 'erp_employees';
   }
-  if (pathname.startsWith('/painel/auditoria')) return 'erp_audit';
+  if (
+    pathname.startsWith('/erp/auditoria') ||
+    pathname.startsWith('/erp/relatorios') ||
+    pathname.startsWith('/painel/auditoria') ||
+    pathname.startsWith('/painel/erp') ||
+    pathname === '/erp'
+  ) {
+    return 'erp_audit';
+  }
   if (pathname.startsWith('/painel/notas') || pathname.startsWith('/fiscal/nfe')) return 'erp_invoices';
   if (
     pathname.startsWith('/fiscal') ||

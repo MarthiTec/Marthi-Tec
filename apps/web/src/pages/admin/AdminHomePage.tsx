@@ -43,6 +43,12 @@ export function AdminHomePage() {
               Abrir PDV
             </Link>
           ) : null}
+          {hasModule('erp') ? (
+            <Link to="/erp" className="btn btn--ghost">
+              <AdminIcon name="ops" />
+              Abrir ERP
+            </Link>
+          ) : null}
           {hasModule('os') ? (
             <Link to="/os" className="btn btn--ghost">
               <AdminIcon name="wrench" />
@@ -61,22 +67,19 @@ export function AdminHomePage() {
               Abrir e-commerce
             </Link>
           ) : null}
-            <Link to="/painel/crm" className="btn btn--ghost">
-              <AdminIcon name="people" />
-              Visão CRM
-            </Link>
-            <Link to="/crm" className="btn btn--ghost">
-              Abrir CRM
-            </Link>
+          <Link to="/crm" className="btn btn--ghost">
+            <AdminIcon name="people" />
+            Abrir CRM
+          </Link>
           {hasModule('totem') ? (
             <Link to="/totem" className="btn btn--ghost">
               <AdminIcon name="totem" />
               Abrir Totem
             </Link>
           ) : null}
-          <Link to="/painel/financeiro" className="btn btn--ghost">
+          <Link to="/painel/erp" className="btn btn--ghost">
             <AdminIcon name="ops" />
-            Financeiro
+            Visão ERP
           </Link>
         </div>
       </div>
@@ -294,33 +297,58 @@ export function AdminHomePage() {
 
         <article className="admin-card">
           <h2>Atalhos da loja</h2>
-          <p>Sistemas da loja e cadastros do dia a dia.</p>
+          <p>Consulta no painel · operação nos apps independentes (um Abrir por sistema).</p>
           <div className="admin-toolbar admin-toolbar--stack">
             {hasModule('erp') ? (
-              <Link to="/caixa" className="btn btn--primary">
-                <AdminIcon name="cart" />
-                Abrir PDV / Caixa
-              </Link>
+              <>
+                <Link to="/caixa" className="btn btn--primary">
+                  <AdminIcon name="cart" />
+                  Abrir PDV
+                </Link>
+                <Link to="/painel/pdv" className="btn btn--ghost">
+                  Fila do totem
+                </Link>
+                <Link to="/painel/pedidos" className="btn btn--ghost">
+                  Consultar vendas
+                </Link>
+              </>
             ) : null}
             {hasModule('totem') ? (
-              <Link to="/totem" className="btn btn--ghost">
-                <AdminIcon name="totem" />
-                Abrir Totem
-              </Link>
-            ) : null}
-            {hasModule('totem') ? (
-              <Link to="/painel/totem" className="btn btn--ghost">
-                Configurar totem
-              </Link>
+              <>
+                <Link to="/totem" className="btn btn--ghost">
+                  <AdminIcon name="totem" />
+                  Abrir Totem
+                </Link>
+                <Link to="/painel/totem" className="btn btn--ghost">
+                  Dados do totem
+                </Link>
+              </>
             ) : null}
             {hasModule('os') ? (
               <>
-                <Link to="/painel/os" className="btn btn--ghost">
-                  <AdminIcon name="wrench" />
-                  Quadro OS (painel)
-                </Link>
                 <Link to="/os" className="btn btn--ghost">
+                  <AdminIcon name="wrench" />
                   Abrir oficina
+                </Link>
+                <Link to="/painel/os" className="btn btn--ghost">
+                  Visão OS
+                </Link>
+                <Link to="/painel/os/agenda" className="btn btn--ghost">
+                  Agenda
+                </Link>
+              </>
+            ) : null}
+            {hasModule('fiscal') ? (
+              <>
+                <Link to="/fiscal" className="btn btn--ghost">
+                  <AdminIcon name="fiscal" />
+                  Abrir emissor
+                </Link>
+                <Link to="/painel/fiscal" className="btn btn--ghost">
+                  Visão fiscal
+                </Link>
+                <Link to="/painel/notas" className="btn btn--ghost">
+                  Notas emitidas
                 </Link>
               </>
             ) : null}
@@ -330,38 +358,26 @@ export function AdminHomePage() {
                   <AdminIcon name="store" />
                   Abrir e-commerce
                 </Link>
-                <Link to="/ecommerce/pedidos" className="btn btn--ghost">
-                  Pedidos online
-                </Link>
-                <Link to="/ecommerce/mercadolivre" className="btn btn--ghost">
-                  Mercado Livre
-                </Link>
-                <Link to="/ecommerce/tray" className="btn btn--ghost">
-                  Tray (hub)
+                <Link to="/painel/ecommerce" className="btn btn--ghost">
+                  Visão e-commerce
                 </Link>
               </>
             ) : null}
-            <Link to="/painel/crm" className="btn btn--ghost">
+            <Link to="/crm" className="btn btn--ghost">
               <AdminIcon name="people" />
-              Visão CRM (painel)
-            </Link>
-            <Link to="/crm" className="btn btn--primary">
               Abrir CRM
+            </Link>
+            <Link to="/painel/crm" className="btn btn--ghost">
+              Visão CRM
             </Link>
             {hasModule('erp') ? (
               <>
-                <Link to="/painel/financeiro?tab=receber" className="btn btn--ghost">
-                  Contas a receber
+                <Link to="/erp" className="btn btn--ghost">
+                  <AdminIcon name="ops" />
+                  Abrir ERP
                 </Link>
-                <Link to="/painel/financeiro?tab=pagar" className="btn btn--ghost">
-                  Contas a pagar
-                </Link>
-                <Link to="/painel/financeiro?tab=dre" className="btn btn--ghost">
-                  DRE
-                </Link>
-                <Link to="/painel/produtos" className="btn btn--ghost">
-                  <AdminIcon name="box" />
-                  Produtos
+                <Link to="/painel/erp" className="btn btn--ghost">
+                  Visão e ajustes ERP
                 </Link>
               </>
             ) : null}

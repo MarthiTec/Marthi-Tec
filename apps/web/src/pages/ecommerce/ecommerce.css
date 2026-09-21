@@ -2,6 +2,8 @@
   --ink: #12151a;
   --mute: #6b7280;
   --line: #d8dde3;
+  --accent: #db2777;
+  --accent-rgb: 219, 39, 119;
   --teal: #0f766e;
   --amber: #b45309;
   --side: #101820;
@@ -11,7 +13,7 @@
   display: grid;
   grid-template-rows: 52px minmax(0, 1fr);
   background:
-    radial-gradient(900px 420px at 0% 0%, rgba(180, 83, 9, 0.07), transparent 55%),
+    radial-gradient(900px 420px at 0% 0%, rgba(var(--accent-rgb), 0.07), transparent 55%),
     #eef1f4;
   color: var(--ink);
 }
@@ -44,8 +46,8 @@
 
 .ecommerce-app__menu-btn:hover,
 .ecommerce-app.is-nav-open .ecommerce-app__menu-btn {
-  background: rgba(180, 83, 9, 0.35);
-  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(var(--accent-rgb), 0.35);
+  border-color: rgba(244, 114, 182, 0.4);
 }
 
 .ecommerce-app__menu-btn .admin-ico {
@@ -124,7 +126,9 @@
   flex-direction: column;
   gap: 4px;
   padding: 14px 10px;
-  background: var(--side);
+  background:
+    radial-gradient(520px 280px at -12% -8%, rgba(var(--accent-rgb), 0.3), transparent 58%),
+    linear-gradient(180deg, #161e27 0%, var(--side) 48%, #0e141a 100%);
   color: #e8eef4;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   overflow: auto;
@@ -159,15 +163,25 @@
 }
 
 .ecommerce-app__side-close {
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  font: inherit;
-  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
+}
+
+.ecommerce-app__side-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ecommerce-app__side-close .admin-ico {
+  width: 18px;
+  height: 18px;
 }
 
 .ecommerce-app__side-label {
@@ -179,7 +193,7 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
-.ecommerce-app__side a {
+.ecommerce-app__side a:not(.user-chip) {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -193,13 +207,13 @@
   font-weight: 650;
 }
 
-.ecommerce-app__side a:hover {
+.ecommerce-app__side a:not(.user-chip):hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
-.ecommerce-app__side a.is-active {
-  background: rgba(180, 83, 9, 0.42);
+.ecommerce-app__side a:not(.user-chip).is-active {
+  background: rgba(var(--accent-rgb), 0.42);
   color: #fff;
 }
 

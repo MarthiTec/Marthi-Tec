@@ -103,8 +103,10 @@ export function hasModule(id: PartnerModuleId) {
 }
 
 export function moduleForPath(pathname: string): PartnerModuleId | null {
+  // Inclui /painel/totem/produtos e /atributos (catálogo lite sem exigir ERP).
   if (pathname.startsWith('/totem') || pathname.startsWith('/painel/totem')) return 'totem';
   if (pathname.startsWith('/caixa')) return 'erp';
+  if (pathname.startsWith('/erp') || pathname.startsWith('/painel/erp')) return 'erp';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (
     pathname.startsWith('/fiscal') ||
@@ -115,7 +117,9 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
   ) {
     return 'fiscal';
   }
-  if (pathname.startsWith('/ecommerce')) return 'ecommerce';
+  if (pathname.startsWith('/ecommerce') || pathname.startsWith('/painel/ecommerce')) {
+    return 'ecommerce';
+  }
   if (
     pathname.startsWith('/painel/pdv') ||
     pathname.startsWith('/painel/pedidos') ||

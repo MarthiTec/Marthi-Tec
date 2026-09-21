@@ -2,15 +2,19 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
-import { ensureCrmSellerProfile, resolveCrmSeller } from '../../data/crmStore';
+import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
+import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import '../admin/admin.css';
 import './crm.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
-  '/crm': { kicker: 'Marthi CRM', title: 'Negócios' },
+  '/crm': { kicker: 'Marthi CRM', title: 'Central · Negócios' },
+  '/crm/conversas': { kicker: 'Marthi CRM', title: 'Conversas' },
   '/crm/perfil': { kicker: 'Marthi CRM', title: 'Meu perfil' },
+  '/crm/conta': { kicker: 'Marthi CRM', title: 'Meu perfil' },
   '/crm/rede': { kicker: 'Marthi CRM', title: 'Rede Marthi' },
 };
 
@@ -28,25 +32,40 @@ function isMobileNav() {
 export function CrmLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const seller = useMemo(
     () => resolveCrmSeller(user?.name, user?.email),
     [user?.name, user?.email],
   );
-  const profile = useMemo(
-    () => ensureCrmSellerProfile(seller.sellerId, seller.sellerName),
-    [seller.sellerId, seller.sellerName],
-  );
+
+  useEffect(() => {
+    ensureCrmSellerProfile(seller.sellerId, seller.sellerName);
+  }, [seller.sellerId, seller.sellerName]);
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
 
+  const [inboxTick, setInboxTick] = useState(0);
+  const unanswered = useMemo(
+    () => crmInboxUnansweredCount(seller.sellerId),
+    [seller.sellerId, inboxTick, location.pathname],
+  );
+
+  useEffect(() => {
+    function refresh() {
+      setInboxTick((value) => value + 1);
+    }
+    window.addEventListener('marthi-crm-updated', refresh);
+    return () => window.removeEventListener('marthi-crm-updated', refresh);
+  }, []);
+
   const title = resolveTitle(location.pathname);
 
   useEffect(() => {
+    if (loading) return;
     if (!user) navigate('/login?next=/crm', { replace: true });
-  }, [navigate, user]);
+  }, [loading, navigate, user]);
 
   useEffect(() => {
     if (isMobileNav()) setNavOpen(false);
@@ -75,6 +94,18 @@ export function CrmLayout() {
     navigate('/');
   }
 
+  if (loading) {
+    return (
+      <div className="crm-app">
+        <p className="empty" style={{ padding: 24 }}>
+          Carregando CRM…
+        </p>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
   return (
     <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'}`}>
       <header className="crm-app__top">
@@ -92,9 +123,6 @@ export function CrmLayout() {
         <BrandLogo variant="mark" className="crm-app__mark" />
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>
-          <span>
-            @{profile.handle} · {profile.displayName}
-          </span>
         </div>
         <button
           type="button"
@@ -120,17 +148,36 @@ export function CrmLayout() {
 
       <div className="crm-app__shell">
         <aside className="crm-app__side" aria-hidden={!navOpen}>
-          <p className="crm-app__side-label">CRM</p>
+          <div className="crm-app__side-head">
+            <strong>Navegação</strong>
+            <button
+              type="button"
+              className="crm-app__side-close"
+              title="Central do CRM"
+              aria-label="Ir para a central do CRM"
+              onClick={() => {
+                setNavOpen(false);
+                navigate('/crm');
+              }}
+            >
+              <AdminIcon name="home" />
+            </button>
+          </div>
+
+          <UserChip to="/crm/perfil" />
+
           <NavLink to="/crm" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
-            <AdminIcon name="ops" />
-            Negócios
+            <AdminIcon name="home" />
+            Central
           </NavLink>
+          <p className="crm-app__side-label">CRM</p>
           <NavLink
-            to="/crm/perfil"
+            to="/crm/conversas"
             className={({ isActive }) => (isActive ? 'is-active' : undefined)}
           >
             <AdminIcon name="people" />
-            Meu perfil
+            Conversas
+            {unanswered > 0 ? <em className="crm-nav-badge">{unanswered}</em> : null}
           </NavLink>
           <NavLink
             to="/crm/rede"
@@ -138,18 +185,6 @@ export function CrmLayout() {
           >
             <AdminIcon name="people" />
             Rede Marthi
-          </NavLink>
-          <p className="crm-app__side-label">Painel da loja</p>
-          <NavLink to="/painel" className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
-            <AdminIcon name="home" />
-            Abrir painel
-          </NavLink>
-          <NavLink
-            to="/painel/crm"
-            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
-          >
-            <AdminIcon name="ops" />
-            Visão CRM no painel
           </NavLink>
         </aside>
 
@@ -194,6 +229,8 @@ export function CrmLayout() {
           </form>
         </div>
       ) : null}
+
+      <CrmSellerAlerts />
     </div>
   );
 }

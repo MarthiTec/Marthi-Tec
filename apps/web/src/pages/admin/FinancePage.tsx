@@ -423,7 +423,7 @@ function ExtratoPanel({
                 <td>{item.label}</td>
                 <td>
                   {item.refId?.startsWith('OS-') ? (
-                    <Link to={`/painel/os/${item.refId}`}>{item.refId}</Link>
+                    <Link to={`/os/${item.refId}`}>{item.refId}</Link>
                   ) : (
                     item.refId || '—'
                   )}

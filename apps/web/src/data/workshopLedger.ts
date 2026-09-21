@@ -7,6 +7,7 @@ import {
   type StockItem,
   type StockKind,
 } from './adminStore';
+import { applyStockMovement, logStockMovements } from './stockLedger';
 import {
   getWorkOrder,
   listWorkOrders,
@@ -91,14 +92,21 @@ export async function consumeStockOnWorkOrder(
   if (!stock) return { ok: false, error: 'Item de estoque não encontrado.' };
   if (stock.qty < qty) return { ok: false, error: `Estoque insuficiente (${stock.qty} disponível).` };
 
-  const unitCost = stock.cost;
+  const unitCost = stock.avgCost || stock.cost;
   const unitPrice = sellPrice ?? stock.price;
   const costTotal = unitCost * qty;
 
-  const state = getAdminState();
-  saveStock(
-    state.stock.map((item) => (item.id === stockId ? { ...item, qty: item.qty - qty } : item)),
-  );
+  const move = applyStockMovement({
+    stockId,
+    type: 'os',
+    qty,
+    direction: -1,
+    unitCost,
+    note: `OS ${osId} · peça`,
+    refId: osId,
+    skipAvgCost: true,
+  });
+  if (!move.ok) return { ok: false, error: move.error };
 
   const finance = await addFinance({
     type: 'out',
@@ -152,12 +160,17 @@ export async function removeWorkOrderLine(
     return { ok: false, error: 'Só linhas de peça com estoque podem ser estornadas assim.' };
   }
 
-  const state = getAdminState();
-  saveStock(
-    state.stock.map((item) =>
-      item.id === line.stockId ? { ...item, qty: item.qty + line.qty } : item,
-    ),
-  );
+  const move = applyStockMovement({
+    stockId: line.stockId,
+    type: 'return',
+    qty: line.qty,
+    direction: 1,
+    unitCost: line.unitCost,
+    note: `OS ${osId} · estorno peça`,
+    refId: osId,
+    skipAvgCost: true,
+  });
+  if (!move.ok) return { ok: false, error: move.error };
 
   await addFinance({
     type: 'in',
@@ -229,8 +242,12 @@ export async function purchaseAssetFromWorkOrder(
     attrs: {},
     qty: 1,
     minQty: 0,
+    maxQty: 5,
     cost: input.cost,
+    avgCost: input.cost,
     price: input.price ?? Math.round(input.cost * 1.35 * 100) / 100,
+    lastPurchaseAt: new Date().toISOString(),
+    lastPurchaseCost: input.cost,
     kind: input.kind ?? 'device',
     condition: 'refurbished',
     sourceWorkOrderId: osId,
@@ -245,6 +262,20 @@ export async function purchaseAssetFromWorkOrder(
 
   const state = getAdminState();
   saveStock([stockItem, ...state.stock]);
+  logStockMovements([
+    {
+      stockId: stockItem.id,
+      stockName: stockItem.name,
+      sku: stockItem.sku,
+      type: 'purchase',
+      qty: 1,
+      direction: 1,
+      unitCost: input.cost,
+      balanceAfter: 1,
+      note: `OS ${osId} · compra recondicionado`,
+      refId: osId,
+    },
+  ]);
 
   const finance = await addFinance({
     type: 'out',

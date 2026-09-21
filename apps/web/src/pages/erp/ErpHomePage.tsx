@@ -1,0 +1,115 @@
+import { Link } from 'react-router-dom';
+import { getAdminState } from '../../data/adminStore';
+import { boletoSnapshot } from '../../data/boletoStore';
+import { listEmployees } from '../../data/erpRegistry';
+import { money, payablesOpenTotal, receivablesOpenTotal } from '../../data/financeBook';
+import { stockBalanceSnapshot } from '../../data/stockLedger';
+
+const CARDS = [
+  {
+    to: '/erp/balanco',
+    tag: 'Estoque',
+    title: 'Balanço e alertas',
+    text: 'Saldo, mín/máx, custo médio, markup, margem e última compra.',
+  },
+  {
+    to: '/erp/movimentos',
+    tag: 'Estoque',
+    title: 'Movimentação',
+    text: 'Compras, vendas, OS, inventário e histórico de saldos.',
+  },
+  {
+    to: '/erp/produtos',
+    tag: 'Produtos',
+    title: 'Cadastro',
+    text: 'SKUs, preços, kits, lotes e almoxarifado.',
+  },
+  {
+    to: '/erp/clientes',
+    tag: 'Pessoas',
+    title: 'Clientes e equipe',
+    text: 'Clientes, funcionários, permissões, vendedores e fornecedores.',
+  },
+  {
+    to: '/erp/financeiro',
+    tag: 'Financeiro',
+    title: 'Contas e tesouraria',
+    text: 'A pagar, a receber, contas bancárias, antecipados e DRE.',
+  },
+  {
+    to: '/erp/boletos',
+    tag: 'Cobrança',
+    title: 'Boletos Pix e híbridos',
+    text: 'Emissão de boleto Pix, boleto bancário e híbrido no financeiro.',
+  },
+  {
+    to: '/erp/relatorios',
+    tag: 'Retaguarda',
+    title: 'Relatórios',
+    text: 'Visões rápidas de estoque, financeiro e acessos.',
+  },
+  {
+    to: '/erp/tabelas',
+    tag: 'Preço',
+    title: 'Tabelas de preço',
+    text: 'Tipos de preço (percentuais) sobre o preço base do estoque.',
+  },
+] as const;
+
+export function ErpHomePage() {
+  const stock = getAdminState().stock;
+  const snap = stockBalanceSnapshot(stock);
+  const users = listEmployees(true).filter((item) => item.isSystemUser).length;
+  const boletos = boletoSnapshot();
+
+  return (
+    <div className="erp-home">
+      <p className="empty" style={{ margin: 0 }}>
+        Retaguarda da loja: cadastros, estoque, financeiro, boletos e relatórios. PDV e fiscal ficam
+        nos apps de operação.
+      </p>
+
+      <div className="admin-grid">
+        <article className="admin-card">
+          <h2>SKUs</h2>
+          <strong>{snap.skus}</strong>
+          <p>{snap.units} unidades em saldo.</p>
+        </article>
+        <article className="admin-card">
+          <h2>Estoque baixo</h2>
+          <strong className={snap.low ? 'qty-low' : ''}>{snap.low}</strong>
+          <p>
+            {snap.over} acima do máx · valor a custo {money(snap.inventory)}
+          </p>
+        </article>
+        <article className="admin-card">
+          <h2>A receber</h2>
+          <strong>{money(receivablesOpenTotal())}</strong>
+          <p>Títulos em aberto.</p>
+        </article>
+        <article className="admin-card">
+          <h2>Boletos abertos</h2>
+          <strong>{boletos.open}</strong>
+          <p>
+            {money(boletos.openAmount)} · {users} usuários do sistema
+          </p>
+        </article>
+      </div>
+
+      <div className="erp-home__grid">
+        {CARDS.map((card) => (
+          <Link key={card.to} to={card.to} className="erp-home__card">
+            <em>{card.tag}</em>
+            <strong>{card.title}</strong>
+            <span>{card.text}</span>
+          </Link>
+        ))}
+      </div>
+
+      <p className="empty" style={{ margin: 0 }}>
+        A pagar em aberto: {money(payablesOpenTotal())}. Ajustes rápidos de preço e senha ficam no{' '}
+        <Link to="/painel/erp">painel administrativo</Link>.
+      </p>
+    </div>
+  );
+}

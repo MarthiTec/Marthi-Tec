@@ -5,9 +5,44 @@
 import { listDemoLeads, type DemoLead, DEMO_PRODUCT_LABEL } from './demoLeadStore';
 import { listSellers, type Seller } from './erpRegistry';
 import { getAdminState, upsertCustomer } from './adminStore';
+import { getOperatorProfile } from './operatorProfile';
 
 const STORAGE_KEY = 'marthi.crm.v2';
 export const CRM_EVENT = 'marthi-crm-updated';
+export const CRM_ALERT_EVENT = 'marthi-crm-alert';
+export const CRM_ALERT_STORAGE_KEY = 'marthi.crm.alert';
+
+export type CrmSellerAlert = {
+  id: string;
+  kind: 'lead' | 'message';
+  title: string;
+  body: string;
+  leadId: string;
+  createdAt: string;
+};
+
+function emitCrmSellerAlert(input: {
+  kind: 'lead' | 'message';
+  title: string;
+  body: string;
+  leadId: string;
+}) {
+  if (typeof window === 'undefined') return;
+  const alert: CrmSellerAlert = {
+    id: uid('ALERT'),
+    kind: input.kind,
+    title: input.title,
+    body: input.body.slice(0, 180),
+    leadId: input.leadId,
+    createdAt: now(),
+  };
+  try {
+    localStorage.setItem(CRM_ALERT_STORAGE_KEY, JSON.stringify(alert));
+  } catch {
+    /* quota */
+  }
+  window.dispatchEvent(new CustomEvent(CRM_ALERT_EVENT, { detail: alert }));
+}
 
 export const CRM_INTEREST_OPTIONS = [
   'Totem de autoatendimento',
@@ -933,6 +968,8 @@ export function createCrmLead(input: {
   hideContact?: boolean;
   ownerSellerId?: string | null;
   ownerName?: string;
+  /** Não dispara toast/som (ex.: chat homepage que já notifica a mensagem). */
+  quiet?: boolean;
 }): { ok: true; lead: CrmLead } | { ok: false; error: string } {
   const name = input.name.trim();
   if (name.length < 2) return { ok: false, error: 'Informe o nome do lead.' };
@@ -999,6 +1036,16 @@ export function createCrmLead(input: {
     });
   }
   save(state);
+  if (!input.quiet && input.source !== 'manual') {
+    emitCrmSellerAlert({
+      kind: 'lead',
+      title: lead.name,
+      body: [CRM_SOURCE_LABEL[lead.source], lead.interest || lead.notes]
+        .filter(Boolean)
+        .join(' · '),
+      leadId: lead.id,
+    });
+  }
   return { ok: true, lead };
 }
 
@@ -1130,26 +1177,46 @@ export function moveCrmLead(
   leadId: string,
   stage: CrmStage,
   sellerId: string,
+  sellerName?: string,
 ): { ok: true; lead: CrmLead } | { ok: false; error: string } {
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
   const lead = state.leads[index];
-  if (!lead.ownerSellerId) {
-    return { ok: false, error: 'Puxe o lead antes de mover no funil.' };
-  }
-  if (lead.ownerSellerId !== sellerId) {
-    return { ok: false, error: `Só ${lead.ownerName} pode mover este lead.` };
+  const stamped = now();
+  let working = lead;
+
+  if (!working.ownerSellerId) {
+    if (!sellerName?.trim()) {
+      return { ok: false, error: 'Puxe o lead antes de mover no funil.' };
+    }
+    working = {
+      ...working,
+      ownerSellerId: sellerId,
+      ownerName: sellerName.trim(),
+      claimedAt: stamped,
+      updatedAt: stamped,
+    };
+    pushActivity(state, {
+      leadId: working.id,
+      kind: 'system',
+      title: 'Lead puxado',
+      body: `${working.ownerName} assumiu o atendimento ao mover no funil.`,
+      fromSellerId: sellerId,
+      fromName: working.ownerName,
+      createdAt: stamped,
+    });
+  } else if (working.ownerSellerId !== sellerId) {
+    return { ok: false, error: `Só ${working.ownerName} pode mover este lead.` };
   }
 
-  const stamped = now();
   state.leads[index] = {
-    ...lead,
+    ...working,
     stage,
     updatedAt: stamped,
   };
   pushActivity(state, {
-    leadId: lead.id,
+    leadId: working.id,
     kind: 'system',
     title: stage === 'won' ? 'Negócio fechado' : 'Etapa alterada',
     body:
@@ -1159,7 +1226,7 @@ export function moveCrmLead(
           ? 'Link de pagamento enviado. Aguardando confirmação.'
           : `Movido para ${CRM_STAGE_LABEL[stage]}.`,
     fromSellerId: sellerId,
-    fromName: lead.ownerName,
+    fromName: working.ownerName,
     createdAt: stamped,
   });
   save(state);
@@ -1271,7 +1338,9 @@ export function ensureCrmSellerProfile(
 ): CrmSellerProfile {
   const existing = getCrmSellerProfile(sellerId);
   if (existing) return existing;
-  const handle = fallbackName
+  const op = getOperatorProfile(fallbackName);
+  const seedName = op.displayName.trim() || fallbackName;
+  const handle = seedName
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -1280,14 +1349,14 @@ export function ensureCrmSellerProfile(
     .slice(0, 24) || 'vendedor';
   const profile: CrmSellerProfile = {
     sellerId,
-    displayName: fallbackName,
+    displayName: seedName,
     handle,
-    bio: 'Vendedor Marthi — configure seu perfil na rede CRM.',
-    avatarUrl: '',
+    bio: 'Vendedor Marthi — complete seu perfil no CRM interno.',
+    avatarUrl: op.photo ?? '',
     coverUrl: '',
     city: '',
     specialty: 'Comercial',
-    whatsapp: '',
+    whatsapp: op.phone,
     instagram: '',
     linkedin: '',
     website: '',
@@ -1558,21 +1627,36 @@ export function sendLeadMessage(input: {
   text: string;
   /** Simula resposta do lead (MVP). */
   asLead?: boolean;
+  /** Não dispara toast/som. */
+  quiet?: boolean;
 }): { ok: true; message: CrmMessage } | { ok: false; error: string } {
   const text = input.text.trim();
   if (!text) return { ok: false, error: 'Digite a mensagem.' };
   const state = load();
-  const lead = state.leads.find((item) => item.id === input.leadId);
-  if (!lead) return { ok: false, error: 'Lead não encontrado.' };
-  if (!lead.ownerSellerId) {
-    return { ok: false, error: 'Puxe o lead antes de conversar.' };
-  }
-  if (lead.ownerSellerId !== input.sellerId) {
+  const index = state.leads.findIndex((item) => item.id === input.leadId);
+  if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
+  let lead = state.leads[index];
+
+  if (input.asLead) {
+    // Cliente/lead pode falar mesmo sem dono (canal aberto).
+  } else if (!lead.ownerSellerId) {
+    // Responder no inbox puxa o lead automaticamente.
+    lead = {
+      ...lead,
+      ownerSellerId: input.sellerId,
+      ownerName: input.sellerName,
+      claimedAt: lead.claimedAt ?? now(),
+      stage: lead.stage === 'leads' ? 'attending' : lead.stage,
+      updatedAt: now(),
+    };
+    state.leads[index] = lead;
+  } else if (lead.ownerSellerId !== input.sellerId) {
     return {
       ok: false,
       error: `Este lead é de ${lead.ownerName}. Só ele pode conversar.`,
     };
   }
+
   const message: CrmMessage = {
     id: uid('MSG'),
     kind: 'lead',
@@ -1584,16 +1668,193 @@ export function sendLeadMessage(input: {
     createdAt: now(),
   };
   state.messages.push(message);
+  state.leads[index] = { ...state.leads[index], updatedAt: now() };
   pushActivity(state, {
     leadId: input.leadId,
     kind: 'message',
-    title: input.asLead ? 'Mensagem do lead' : 'Mensagem enviada',
+    title: input.asLead ? 'Mensagem do cliente' : 'Mensagem enviada',
     body: text,
     fromSellerId: input.asLead ? null : input.sellerId,
     fromName: input.asLead ? lead.name : input.sellerName,
   });
   save(state);
+  if (input.asLead && !input.quiet) {
+    emitCrmSellerAlert({
+      kind: 'message',
+      title: lead.name,
+      body: text,
+      leadId: lead.id,
+    });
+  }
   return { ok: true, message };
+}
+
+/**
+ * Canal público (homepage): cliente inicia/continua conversa com a equipe comercial.
+ * Cria lead de contato se necessário e grava mensagem como fromLead.
+ */
+export function postHomepageCrmChat(input: {
+  name: string;
+  whatsapp: string;
+  email?: string;
+  text: string;
+  leadId?: string;
+}): { ok: true; lead: CrmLead; message: CrmMessage } | { ok: false; error: string } {
+  const name = input.name.trim();
+  const whatsapp = input.whatsapp.trim();
+  const text = input.text.trim();
+  if (!name) return { ok: false, error: 'Informe seu nome.' };
+  if (whatsapp.replace(/\D/g, '').length < 8) {
+    return { ok: false, error: 'Informe um WhatsApp válido.' };
+  }
+  if (!text) return { ok: false, error: 'Digite a mensagem.' };
+
+  const phoneKey = whatsapp.replace(/\D/g, '');
+  let lead: CrmLead | null = null;
+  let createdFresh = false;
+
+  if (input.leadId) {
+    lead = getCrmLead(input.leadId);
+  }
+  if (!lead) {
+    lead =
+      listCrmLeads().find(
+        (item) =>
+          item.source === 'contact' &&
+          item.whatsapp.replace(/\D/g, '') === phoneKey &&
+          item.stage !== 'lost' &&
+          item.stage !== 'won',
+      ) ?? null;
+  }
+  if (!lead) {
+    const created = createCrmLead({
+      name,
+      email: input.email,
+      whatsapp,
+      source: 'contact',
+      interest: 'Chat homepage',
+      notes: text,
+      stage: 'leads',
+      externalRef: `chat:${phoneKey}`,
+      quiet: true,
+    });
+    if (!created.ok) return created;
+    lead = created.lead;
+    createdFresh = true;
+  }
+
+  const result = sendLeadMessage({
+    leadId: lead.id,
+    sellerId: lead.ownerSellerId || 'GUEST',
+    sellerName: lead.ownerName || 'Canal aberto',
+    text,
+    asLead: true,
+    quiet: true,
+  });
+  if (!result.ok) return result;
+  emitCrmSellerAlert({
+    kind: createdFresh ? 'lead' : 'message',
+    title: name,
+    body: text,
+    leadId: lead.id,
+  });
+  const fresh = getCrmLead(lead.id);
+  if (!fresh) return { ok: false, error: 'Lead sumiu após a mensagem.' };
+  return { ok: true, lead: fresh, message: result.message };
+}
+
+export type CrmInboxThread = {
+  id: string;
+  kind: 'lead' | 'sellers';
+  title: string;
+  subtitle: string;
+  preview: string;
+  updatedAt: string;
+  unanswered: boolean;
+  unreadFromClient: boolean;
+  leadId?: string;
+  peerSellerId?: string;
+  peerSellerName?: string;
+  channel: string;
+  value?: number;
+};
+
+/** Threads do inbox (estilo canais abertos): clientes + colegas. */
+export function listCrmInboxThreads(sellerId: string): CrmInboxThread[] {
+  const state = load();
+  const threads: CrmInboxThread[] = [];
+
+  for (const lead of state.leads) {
+    if (lead.stage === 'lost') continue;
+    const msgs = state.messages
+      .filter((item) => item.kind === 'lead' && item.leadId === lead.id)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const last = msgs[msgs.length - 1];
+    const lastFromClient = Boolean(last?.fromLead);
+    const isMine = lead.ownerSellerId === sellerId;
+    const isPool = !lead.ownerSellerId;
+    const unanswered = lastFromClient || (isPool && msgs.length > 0);
+
+    if (!msgs.length && !isMine && !(isPool && lead.source === 'contact')) continue;
+    if (lead.ownerSellerId && !isMine && !unanswered) continue;
+
+    threads.push({
+      id: `lead:${lead.id}`,
+      kind: 'lead',
+      title: lead.name,
+      subtitle: lead.interest || CRM_SOURCE_LABEL[lead.source],
+      preview: last?.text || lead.notes || 'Aguardando primeiro contato…',
+      updatedAt: last?.createdAt || lead.updatedAt,
+      unanswered,
+      unreadFromClient: lastFromClient,
+      leadId: lead.id,
+      channel: CRM_SOURCE_LABEL[lead.source],
+      value: lead.value,
+    });
+  }
+
+  const peerKeys = new Set<string>();
+  for (const msg of state.messages) {
+    if (msg.kind !== 'sellers' || !msg.sellerPairKey) continue;
+    const [a, b] = msg.sellerPairKey.split('::');
+    if (a !== sellerId && b !== sellerId) continue;
+    peerKeys.add(msg.sellerPairKey);
+  }
+  for (const key of peerKeys) {
+    const [a, b] = key.split('::');
+    const peerId = a === sellerId ? b : a;
+    const msgs = state.messages
+      .filter((item) => item.kind === 'sellers' && item.sellerPairKey === key)
+      .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+    const last = msgs[msgs.length - 1];
+    if (!last) continue;
+    const peerName =
+      last.fromSellerId === peerId
+        ? last.fromName
+        : listSellers(true).find((item) => item.id === peerId)?.name || 'Colega';
+    threads.push({
+      id: `sellers:${key}`,
+      kind: 'sellers',
+      title: peerName,
+      subtitle: 'Chat interno',
+      preview: last.text,
+      updatedAt: last.createdAt,
+      unanswered: last.fromSellerId !== sellerId,
+      unreadFromClient: false,
+      peerSellerId: peerId,
+      peerSellerName: peerName,
+      channel: 'Interno',
+    });
+  }
+
+  return threads.sort((a, b) => {
+    if (a.unanswered !== b.unanswered) return a.unanswered ? -1 : 1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+
+export function crmInboxUnansweredCount(sellerId: string) {
+  return listCrmInboxThreads(sellerId).filter((item) => item.unanswered).length;
 }
 
 export function sendSellerMessage(input: {

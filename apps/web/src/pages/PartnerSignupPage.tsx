@@ -169,7 +169,7 @@ export function PartnerSignupPage() {
     if (current === 1 && !form.planId) return 'Selecione um plano.';
     if (current === 2) {
       if (form.modules.length === 0) {
-        return 'Escolha ao menos um módulo (Totem, OS, ERP ou Emissor Fiscal).';
+        return 'Escolha ao menos um módulo (Totem, OS, ERP/PDV, Fiscal ou E-commerce).';
       }
       if (lockedAllModules && form.modules.length < PARTNER_MODULES.length) {
         return 'No plano Golden todos os módulos ficam liberados.';
@@ -380,10 +380,10 @@ export function PartnerSignupPage() {
             <h1>O que você quer usar?</h1>
             <p className="partner__lead">
               {lockedAllModules
-                ? 'No Golden todos os módulos já vêm liberados e integrados.'
+                ? 'No Golden todos os módulos já vêm liberados e integrados. O painel da loja já está incluso.'
                 : form.planId === 'bronze'
-                  ? 'No Bronze escolha apenas 1 módulo.'
-                  : 'No Silver escolha até 2 módulos.'}
+                  ? 'No Bronze escolha 1 módulo. O painel da loja já está incluso em qualquer plano.'
+                  : 'No Silver escolha até 2 módulos. O painel da loja já está incluso em qualquer plano.'}
             </p>
             <p className="partner__module-count">
               {lockedAllModules
@@ -412,6 +412,9 @@ export function PartnerSignupPage() {
                 );
               })}
             </div>
+            <p className="partner__platform-note">
+              Incluso em todo plano: <strong>Painel da loja</strong> (perfil do operador e gestão).
+            </p>
           </section>
         )}
 

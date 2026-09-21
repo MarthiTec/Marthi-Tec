@@ -42,12 +42,13 @@ export function CrmNetworkPage() {
   return (
     <section className="crm-network">
       <p className="crm-network__lead">
-        Rede Marthi — perfis públicos de vendedores. Leads fechados só viram cliente após pagar.
+        Rede interna Marthi — perfis dos vendedores da equipe. Leads fechados só viram cliente após
+        pagar.
       </p>
 
       <div className="crm-network__toolbar">
         <Link className="btn btn--primary" to="/crm/perfil">
-          {mine ? 'Editar meu perfil' : 'Criar meu perfil'}
+          {mine ? 'Editar meu perfil' : 'Configurar meu perfil'}
         </Link>
         <Link className="btn btn--ghost" to="/crm">
           Voltar aos negócios

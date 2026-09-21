@@ -14,6 +14,7 @@ import {
   syncEcommerceChannel,
   type EcommerceChannelId,
 } from '../../data/ecommerceStore';
+import { OperatorAccountPage } from '../shared/OperatorAccountPage';
 
 const VALID: EcommerceChannelId[] = ['mercadolivre', 'shopee', 'ifood', 'amazon', 'tray'];
 
@@ -23,6 +24,9 @@ function isChannelId(value: string | undefined): value is EcommerceChannelId {
 
 export function EcommerceChannelPage() {
   const { channelId: raw } = useParams();
+  if (raw === 'conta' || raw === 'perfil') {
+    return <OperatorAccountPage />;
+  }
   const channelId = isChannelId(raw) ? raw : null;
   const [tick, setTick] = useState(0);
   const [creds, setCreds] = useState<Record<string, string>>({});
