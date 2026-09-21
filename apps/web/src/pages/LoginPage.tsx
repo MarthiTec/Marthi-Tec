@@ -3,17 +3,21 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
+import { userIsStoreAdmin } from '../data/erpRegistry';
 
-function safeNext(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/painel';
+function safeNext(value: string | null, isAdmin: boolean) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return isAdmin ? '/painel' : '/';
+  }
+  if (value === '/painel' && !isAdmin) return '/';
   return value;
 }
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = safeNext(params.get('next'));
   const { user, loading, providers, loginWithPassword, loginWithGoogle } = useAuth();
+  const next = safeNext(params.get('next'), userIsStoreAdmin(user?.email));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);

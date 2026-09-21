@@ -71,6 +71,8 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
+  object-fit: contain;
+  display: block;
 }
 
 .ecommerce-app__brand {
@@ -111,7 +113,7 @@
 
 .ecommerce-app__shell {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 268px minmax(0, 1fr);
   min-height: 0;
   height: 100%;
   transition: grid-template-columns 0.2s ease;
@@ -436,7 +438,7 @@
     top: 52px;
     left: 0;
     bottom: 0;
-    width: min(280px, 88vw);
+    width: min(268px, 88vw);
     z-index: 40;
     transform: translateX(-105%);
     opacity: 1;

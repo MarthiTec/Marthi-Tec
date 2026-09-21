@@ -126,7 +126,7 @@
   left: 0;
   bottom: 0;
   z-index: 70;
-  width: min(280px, 88vw);
+  width: min(268px, 88vw);
   display: flex;
   flex-direction: column;
   background:
@@ -155,7 +155,7 @@
 /* Perfil: painel lateral encaixado como no ERP */
 .os-app.is-profile-dock .os-app__workspace {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 268px minmax(0, 1fr);
 }
 
 .os-app.is-profile-dock .os-app__ops-drawer {
@@ -243,11 +243,10 @@
   cursor: pointer;
 }
 
-.os-app__ops-central .admin-ico {
+.os-app__ops-nav button .admin-ico {
   width: 18px;
   height: 18px;
-  margin-left: 12px;
-  margin-right: 4px;
+  flex-shrink: 0;
 }
 
 .os-app__ops-nav button:hover {
@@ -298,18 +297,18 @@
   min-height: 0;
   overflow: auto;
   padding: 8px 20px 24px;
-  color: #12151a;
+  color: inherit;
 }
 
 .os-app__content .admin-page {
   max-width: none;
   margin: 0;
   padding: 0;
-  color: #12151a;
+  color: inherit;
 }
 
 .os-app__content .op-profile {
-  color: #12151a;
+  color: inherit;
 }
 
 .os-app .pdv__modal {

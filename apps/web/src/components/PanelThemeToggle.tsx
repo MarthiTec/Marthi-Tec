@@ -13,7 +13,7 @@ export function PanelThemeToggle({ className = '' }: PanelThemeToggleProps) {
     <div className={`panel-theme ${className}`} role="group" aria-label="Tema da operação">
       <p className="panel-theme__label">
         Tema da operação
-        <em>Claro ou escuro em todos os apps desta conta.</em>
+        <em>Claro ou escuro neste perfil, em todos os apps.</em>
       </p>
       <div className="panel-theme__switch">
         <button

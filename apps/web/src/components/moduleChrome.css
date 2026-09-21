@@ -1,0 +1,66 @@
+.module-side-foot {
+  margin-top: auto;
+  display: grid;
+  gap: 8px;
+  padding: 12px 8px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.module-side-foot__link {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  color: #e0f2fe;
+  font: inherit;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.module-side-foot__link:hover,
+.module-side-foot__link.is-active {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #fff;
+}
+
+.module-side-foot__link .admin-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.screen-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mute, #6b7280);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.screen-back:hover {
+  color: var(--ink, #12151a);
+}
+
+.admin__top .screen-back {
+  margin: 0 8px 0 0;
+  color: var(--mute);
+}
+
+.is-theme-dark .screen-back:hover,
+.admin--dark .admin__top .screen-back:hover {
+  color: #fff;
+}

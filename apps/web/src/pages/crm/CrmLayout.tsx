@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
@@ -175,17 +177,6 @@ export function CrmLayout() {
             }}
           />
 
-          <NavLink
-            to="/crm/perfil"
-            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
-            onClick={() => {
-              if (isMobileNav()) setNavOpen(false);
-            }}
-          >
-            <AdminIcon name="people" />
-            Meu perfil
-          </NavLink>
-
           <NavLink to="/crm" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />
             Central
@@ -206,11 +197,13 @@ export function CrmLayout() {
             <AdminIcon name="people" />
             Rede Marthi
           </NavLink>
+          <ModuleSideFoot />
         </aside>
 
         <div className="crm-app__main">
           <header className="crm-app__heading">
             <div>
+              <ScreenBackButton home="/crm" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { UserChip } from '../../components/UserChip';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
@@ -692,6 +693,7 @@ export function CaixaPage() {
             <span>Fechamento</span>
           </button>
         </nav>
+        <ModuleSideFoot />
       </aside>
 
       {profileOpen ? (

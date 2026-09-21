@@ -74,6 +74,9 @@ type VerticalPreset = Pick<
   | 'offerFulfillment'
   | 'printTicket'
   | 'audioAssist'
+  | 'keyboardPlacement'
+  | 'attractGradientColor'
+  | 'shareStockWithErp'
 >;
 
 export const TOTEM_VERTICALS: {
@@ -95,6 +98,9 @@ export const TOTEM_VERTICALS: {
       offerFulfillment: false,
       printTicket: false,
       audioAssist: false,
+      keyboardPlacement: 'bottom',
+      attractGradientColor: '#0f766e',
+      shareStockWithErp: false,
     },
     copy: {
       kioskSubtitle: 'Quiosque de venda',
@@ -132,6 +138,9 @@ export const TOTEM_VERTICALS: {
       offerFulfillment: true,
       printTicket: true,
       audioAssist: true,
+      keyboardPlacement: 'bottom',
+      attractGradientColor: '#b45309',
+      shareStockWithErp: true,
     },
     copy: {
       kioskSubtitle: 'Faça seu pedido',
@@ -169,6 +178,9 @@ export const TOTEM_VERTICALS: {
       offerFulfillment: false,
       printTicket: false,
       audioAssist: false,
+      keyboardPlacement: 'top',
+      attractGradientColor: '#166534',
+      shareStockWithErp: true,
     },
     copy: {
       kioskSubtitle: 'Retire no balcão',
@@ -206,6 +218,9 @@ export const TOTEM_VERTICALS: {
       offerFulfillment: false,
       printTicket: false,
       audioAssist: false,
+      keyboardPlacement: 'top',
+      attractGradientColor: '#1e3a8a',
+      shareStockWithErp: false,
     },
     copy: {
       kioskSubtitle: 'Quiosque de venda · Shopping',
@@ -243,6 +258,9 @@ export const TOTEM_VERTICALS: {
       offerFulfillment: false,
       printTicket: false,
       audioAssist: true,
+      keyboardPlacement: 'top',
+      attractGradientColor: '#9f1239',
+      shareStockWithErp: true,
     },
     copy: {
       kioskSubtitle: 'Vitrine da loja',

@@ -1,3 +1,5 @@
+import { syncThemeForProfile, type PanelTheme } from './panelThemeStore';
+
 const STORAGE_KEY = 'marthi.operator.profile';
 export const PROFILE_EVENT = 'marthi-profile-updated';
 
@@ -9,11 +11,23 @@ export type OperatorProfile = {
   email: string;
   phone: string;
   address: string;
+  /** Tema da operação — segue este perfil em todos os apps. */
+  theme: PanelTheme;
 };
 
 const DEFAULT_ROLE = 'Operador';
 
 let memoryProfile: OperatorProfile | null = null;
+
+function fallbackTheme(): PanelTheme {
+  try {
+    const raw = localStorage.getItem('marthi.panel.theme.v1');
+    if (raw === 'dark' || raw === 'light') return raw;
+  } catch {
+    /* ignore */
+  }
+  return 'light';
+}
 
 function emptyProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile {
   return {
@@ -23,6 +37,7 @@ function emptyProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile
     email: fallbackEmail,
     phone: '',
     address: '',
+    theme: fallbackTheme(),
   };
 }
 
@@ -38,6 +53,7 @@ function normalizeProfile(
     email: partial.email?.trim() || fallbackEmail,
     phone: partial.phone?.trim() || '',
     address: partial.address?.trim() || '',
+    theme: partial.theme === 'dark' || partial.theme === 'light' ? partial.theme : fallbackTheme(),
   };
 }
 
@@ -60,10 +76,11 @@ export function getOperatorProfile(fallbackName: string, fallbackEmail = ''): Op
 export function replaceOperatorProfileCache(profile: OperatorProfile) {
   memoryProfile = normalizeProfile(profile, profile.displayName, profile.email);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
+  syncThemeForProfile(memoryProfile.email || memoryProfile.displayName, memoryProfile.theme);
 }
 
 export async function saveOperatorProfile(
-  profile: OperatorProfile,
+  profile: Omit<OperatorProfile, 'theme'> & { theme?: PanelTheme },
   options?: { allowRole?: boolean },
 ) {
   const current = getOperatorProfile(profile.displayName, profile.email);
@@ -71,6 +88,7 @@ export async function saveOperatorProfile(
     {
       ...profile,
       role: options?.allowRole ? profile.role : current.role,
+      theme: profile.theme || current.theme,
     },
     profile.displayName,
     profile.email,
@@ -79,9 +97,10 @@ export async function saveOperatorProfile(
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
     const { apiPutOperatorProfile } = await import('../services/erpApi');
-    const saved = await apiPutOperatorProfile(next);
+    const { theme, ...apiBody } = next;
+    const saved = await apiPutOperatorProfile(apiBody);
     const merged = normalizeProfile(
-      { ...next, ...saved },
+      { ...next, ...saved, theme },
       next.displayName,
       next.email,
     );

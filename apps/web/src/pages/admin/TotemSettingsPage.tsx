@@ -96,6 +96,9 @@ export function TotemSettingsPage() {
     setOfferFulfillment(preset.offerFulfillment);
     setPrintTicket(preset.printTicket);
     setAudioAssist(preset.audioAssist);
+    setKeyboardPlacement(preset.keyboardPlacement);
+    setAttractGradientColor(preset.attractGradientColor);
+    setShareStockWithErp(preset.shareStockWithErp);
     markDirty();
   }
 

@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
@@ -162,17 +164,6 @@ export function FiscalLayout() {
           />
 
           <NavLink
-            to="/fiscal/perfil"
-            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
-            onClick={() => {
-              if (isMobileNav()) setNavOpen(false);
-            }}
-          >
-            <AdminIcon name="people" />
-            Meu perfil
-          </NavLink>
-
-          <NavLink
             to="/fiscal"
             end
             className={({ isActive }) => (isActive ? 'is-active' : undefined)}
@@ -212,11 +203,13 @@ export function FiscalLayout() {
             NFC-e (cupom) fica no PDV / Caixa — não é emitida por aqui.{' '}
             <NavLink to="/caixa">Abrir caixa</NavLink>
           </p>
+          <ModuleSideFoot />
         </aside>
 
         <div className="fiscal-app__main">
           <header className="fiscal-app__heading">
             <div>
+              <ScreenBackButton home="/fiscal" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>

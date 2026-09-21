@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
@@ -162,17 +164,6 @@ export function EcommerceLayout() {
             }}
           />
 
-          <NavLink
-            to="/ecommerce/perfil"
-            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
-            onClick={() => {
-              if (isMobileNav()) setNavOpen(false);
-            }}
-          >
-            <AdminIcon name="people" />
-            Meu perfil
-          </NavLink>
-
           <NavLink to="/ecommerce" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />
             Central
@@ -213,11 +204,13 @@ export function EcommerceLayout() {
               {item.label}
             </NavLink>
           ))}
+          <ModuleSideFoot />
         </aside>
 
         <div className="ecommerce-app__main">
           <header className="ecommerce-app__heading">
             <div>
+              <ScreenBackButton home="/ecommerce" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>

@@ -64,6 +64,22 @@ function uniqueSorted(values: string[]) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+function customerFirstName(value: string) {
+  return value.trim().split(/\s+/).filter(Boolean)[0] ?? '';
+}
+
+function customerWelcomeLine(fullName: string, hello: string, shop: string) {
+  const first = customerFirstName(fullName);
+  if (!first) return `${hello}. ${shop} te dá as boas-vindas.`;
+  const options = [
+    `${hello}, ${first}! ${shop} te dá as boas-vindas.`,
+    `Que bom te ver, ${first}. ${hello}.`,
+    `${first}, fique à vontade. ${shop} preparou a vitrine para você.`,
+    `Olá, ${first}. Estamos felizes com a sua visita.`,
+  ];
+  return options[first.charCodeAt(0) % options.length];
+}
+
 function startStep(settings: TotemSettings): Step {
   if (settings.showAttractScreen) return 'attract';
   return settings.mode !== 'catalog' && settings.askCustomerName ? 'welcome' : 'catalog';
@@ -319,16 +335,30 @@ export function TotemPage() {
       return;
     }
     if (step === 'catalog') {
-      speakTotem(catalogOnly ? copy.footerCatalog : collectNameUpFront ? copy.footerNamed : copy.footerKiosk, true);
+      const first = customerFirstName(name);
+      if (collectNameUpFront && first) {
+        speakTotem(`${customerWelcomeLine(name, greeting, storeName)} Escolha o que você quer.`, true);
+        return;
+      }
+      speakTotem(catalogOnly ? copy.footerCatalog : copy.footerKiosk, true);
       return;
     }
     if (step === 'checkout' && selection) {
-      speakTotem(`Confira ${selection.product.name} e confirme o pedido.`, true);
+      const first = customerFirstName(name);
+      speakTotem(
+        first
+          ? `${first}, confira ${selection.product.name} e confirme o pedido.`
+          : `Confira ${selection.product.name} e confirme o pedido.`,
+        true,
+      );
       return;
     }
     if (step === 'done') {
+      const first = customerFirstName(name);
       speakTotem(
-        senha ? `${copy.doneTitle}. Senha ${senha.split('').join(' ')}. ${copy.doneHint}` : `${copy.doneTitle}. ${copy.doneHint}`,
+        senha
+          ? `${first ? `Obrigado, ${first}. ` : ''}${copy.doneTitle}. Senha ${senha.split('').join(' ')}. ${copy.doneHint}`
+          : `${first ? `Obrigado, ${first}. ` : ''}${copy.doneTitle}. ${copy.doneHint}`,
         true,
       );
     }
@@ -454,6 +484,43 @@ export function TotemPage() {
     resetToHome();
   }
 
+  function goTotemBack() {
+    bumpIdle();
+    if (step === 'done') {
+      resetToHome();
+      return;
+    }
+    if (step === 'checkout') {
+      setSelection(null);
+      setStep('catalog');
+      return;
+    }
+    if (step === 'catalog') {
+      if (collectNameUpFront && sessionMode !== 'catalog') {
+        setStep('welcome');
+        return;
+      }
+      if (showAttractScreen) {
+        setSessionMode(null);
+        setStep('attract');
+      }
+      return;
+    }
+    if (step === 'welcome' && showAttractScreen) {
+      setSessionMode(null);
+      setStep('attract');
+    }
+  }
+
+  const showTotemBack =
+    step === 'checkout' ||
+    step === 'done' ||
+    (step === 'welcome' && showAttractScreen) ||
+    (step === 'catalog' && (collectNameUpFront || showAttractScreen));
+
+  const namedHello = collectNameUpFront ? customerFirstName(name) : '';
+  const namedWelcome = namedHello ? customerWelcomeLine(name, greeting, storeName) : '';
+
   function requestExit() {
     setExitPassword('');
     setExitError(null);
@@ -532,10 +599,34 @@ export function TotemPage() {
         ) : (
           <BrandLogo variant="mark" className="totem__mark" />
         )}
-        <div className="totem__top-meta">
-          <strong>{storeName}</strong>
-          <span>{catalogOnly ? copy.catalogSubtitle : copy.kioskSubtitle}</span>
-        </div>
+        {namedHello ? (
+          <div className="totem__top-meta">
+            <strong>{storeName}</strong>
+            <span>
+              {greeting}, {namedHello}
+            </span>
+          </div>
+        ) : (
+          <div className="totem__top-meta">
+            <strong>{storeName}</strong>
+            <span>{catalogOnly ? copy.catalogSubtitle : copy.kioskSubtitle}</span>
+          </div>
+        )}
+        {showTotemBack ? (
+          <button type="button" className="totem__back" onClick={goTotemBack}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M15 5 8 12l7 7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Voltar
+          </button>
+        ) : null}
         {audioAssist ? (
           <button
             type="button"
@@ -951,15 +1042,6 @@ export function TotemPage() {
 
       {step === 'checkout' && selection && (
         <section className="totem__checkout">
-          <button
-            type="button"
-            className="totem-link"
-            onClick={() => setStep('catalog')}
-            disabled={submitting}
-          >
-            ← Voltar ao catálogo
-          </button>
-
           <div className="totem__checkout-card">
             <ProductCarousel
               images={selection.product.images}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAccess } from '../../data/auditLog';
@@ -164,6 +165,10 @@ export function AdminLayout() {
 
   const userEmail = user.email;
   const isAdmin = userIsStoreAdmin(userEmail);
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   function toggleGroup(id: string) {
     if (collapsed) {
@@ -354,6 +359,7 @@ export function AdminLayout() {
             </span>
           </button>
           <div className="admin__title">
+            <ScreenBackButton home="/painel" />
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
           </div>

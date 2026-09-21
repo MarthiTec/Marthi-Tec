@@ -225,3 +225,78 @@
   border-color: rgba(255, 255, 255, 0.08);
   color: var(--ink, #e8eef4);
 }
+
+.is-theme-dark .os-app__content,
+.is-theme-dark .caixa-app__content,
+.is-theme-dark .os-app__content .admin-page,
+.is-theme-dark .os-app__content .op-profile {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .os-col,
+.is-theme-dark .crm-col {
+  background: #1a222c;
+  box-shadow: none;
+}
+
+.is-theme-dark .os-col.is-drop-target,
+.is-theme-dark .crm-col.is-drop-target {
+  background: rgba(45, 212, 191, 0.1);
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.is-theme-dark .os-col__head h2,
+.is-theme-dark .os-board-hint {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .os-col__head span {
+  background: #121820;
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .os-ticket,
+.is-theme-dark .crm-card {
+  background: var(--card, #171e27);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .os-ticket p,
+.is-theme-dark .os-ticket__meta {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .os-hotkeys kbd {
+  background: #121820;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .os-consult__cols article,
+.is-theme-dark .ecommerce-home__kpi,
+.is-theme-dark .ecommerce-home__card,
+.is-theme-dark .erp-home__card,
+.is-theme-dark .fiscal-home__card {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .admin-toolbar input {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.is-theme-dark .os-lock__card,
+.is-theme-dark .caixa-lock__card,
+.is-theme-dark .erp-lock__card,
+.is-theme-dark .fiscal-lock__card,
+.is-theme-dark .ecommerce-lock__card,
+.is-theme-dark .crm-lock__card {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}

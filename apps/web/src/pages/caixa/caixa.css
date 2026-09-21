@@ -80,7 +80,7 @@
   left: 0;
   bottom: 0;
   z-index: 70;
-  width: min(280px, 88vw);
+  width: min(268px, 88vw);
   display: flex;
   flex-direction: column;
   background:
@@ -108,7 +108,7 @@
 
 .caixa-app.is-profile-dock .caixa-app__workspace {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 268px minmax(0, 1fr);
 }
 
 .caixa-app.is-profile-dock .caixa-app__ops-drawer {
@@ -161,7 +161,7 @@
   min-height: 0;
   overflow: auto;
   padding: 8px 20px 24px;
-  color: #12151a;
+  color: inherit;
 }
 
 .caixa-app__ops-head {
@@ -233,11 +233,10 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.caixa-app__ops-central .admin-ico {
+.caixa-app__ops-nav button .admin-ico {
   width: 18px;
   height: 18px;
-  margin-left: 12px;
-  margin-right: 2px;
+  flex-shrink: 0;
 }
 
 .caixa-app__ops-nav button:disabled {

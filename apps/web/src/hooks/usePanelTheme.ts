@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PROFILE_EVENT } from '../data/operatorProfile';
 import {
   getPanelTheme,
   PANEL_THEME_EVENT,
@@ -7,7 +8,7 @@ import {
   type PanelTheme,
 } from '../data/panelThemeStore';
 
-/** Tema do painel principal (claro/escuro). Outros módulos ainda não usam. */
+/** Tema claro/escuro do perfil — vale em todos os apps da mesma conta. */
 export function usePanelTheme() {
   const [theme, setTheme] = useState<PanelTheme>(() => getPanelTheme());
 
@@ -16,9 +17,11 @@ export function usePanelTheme() {
       setTheme(getPanelTheme());
     }
     window.addEventListener(PANEL_THEME_EVENT, refresh);
+    window.addEventListener(PROFILE_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
       window.removeEventListener(PANEL_THEME_EVENT, refresh);
+      window.removeEventListener(PROFILE_EVENT, refresh);
       window.removeEventListener('storage', refresh);
     };
   }, []);

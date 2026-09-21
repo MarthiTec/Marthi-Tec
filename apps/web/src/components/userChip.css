@@ -78,43 +78,38 @@ button.user-chip {
 
 .user-chip-stack {
   display: grid;
-  gap: 0;
-  width: auto;
+  gap: 6px;
+  width: 100%;
   align-self: stretch;
-  margin: 10px 0 4px;
+  margin: 4px 0 8px;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .admin__sidebar > .user-chip-stack {
-  margin: 10px 0 4px;
-}
-
-.admin__sidebar > .user-chip-stack > .user-chip--sidebar {
-  margin: 0 10px 0;
+  width: auto;
+  margin: 10px 10px 8px;
 }
 
 .erp-app__side > .user-chip-stack,
 .fiscal-app__side > .user-chip-stack,
 .ecommerce-app__side > .user-chip-stack,
 .crm-app__side > .user-chip-stack {
-  margin: 0 0 6px;
+  margin: 4px 0 8px;
 }
 
-.erp-app__side > .user-chip-stack > .user-chip--sidebar,
-.fiscal-app__side > .user-chip-stack > .user-chip--sidebar,
-.ecommerce-app__side > .user-chip-stack > .user-chip--sidebar,
-.crm-app__side > .user-chip-stack > .user-chip--sidebar {
-  margin: 4px 0 0;
-}
-
-.os-app__ops-drawer > .user-chip-stack,
-.caixa-app__ops-drawer > .user-chip-stack {
+.os-app__ops-drawer > .user-chip-stack {
+  width: 100%;
   margin: 8px 0 4px;
+  padding: 0 10px;
+  box-sizing: border-box;
 }
 
-.os-app__ops-drawer > .user-chip-stack > .user-chip--sidebar,
-.caixa-app__ops-drawer > .user-chip-stack > .user-chip--sidebar {
-  margin: 0 10px 0;
+.caixa-app__ops-drawer > .user-chip-stack {
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 0 12px;
+  box-sizing: border-box;
 }
 
 .user-chip__photo img {
@@ -162,13 +157,13 @@ button.user-chip {
   white-space: nowrap;
 }
 
-/* Mesma largura/padding do chip do painel principal */
+/* Mesma largura dos botões da lateral */
 .user-chip--sidebar {
   display: flex;
-  width: auto;
+  width: 100%;
   align-self: stretch;
   box-sizing: border-box;
-  margin: 10px 10px 4px;
+  margin: 0;
   padding: 8px 12px;
   border-radius: 12px;
 }
@@ -179,18 +174,27 @@ button.user-chip {
   font-size: 0.8rem;
 }
 
-/* Laterais já têm padding horizontal — só margem vertical */
+.admin__sidebar > .user-chip--sidebar {
+  width: auto;
+  margin: 10px 10px 4px;
+}
+
 .erp-app__side > .user-chip--sidebar,
 .fiscal-app__side > .user-chip--sidebar,
 .ecommerce-app__side > .user-chip--sidebar,
 .crm-app__side > .user-chip--sidebar {
-  margin: 4px 0 10px;
+  margin: 0;
 }
 
-/* Drawers OS/Caixa: mesma caixa do painel (280px + 10px inset) */
 .os-app__ops-drawer > .user-chip--sidebar,
 .caixa-app__ops-drawer > .user-chip--sidebar {
-  margin: 8px 10px 6px;
+  margin: 0;
+}
+
+.user-chip-stack .presence-ctl,
+.user-chip-stack .presence-ctl--compact {
+  margin: 0;
+  width: 100%;
 }
 
 .user-chip--topbar {

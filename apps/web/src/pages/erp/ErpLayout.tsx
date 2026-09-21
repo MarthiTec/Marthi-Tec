@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
@@ -203,17 +205,6 @@ export function ErpLayout() {
             }}
           />
 
-          <NavLink
-            to="/erp/perfil"
-            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
-            onClick={() => {
-              if (isMobileNav()) setNavOpen(false);
-            }}
-          >
-            <AdminIcon name="people" />
-            Meu perfil
-          </NavLink>
-
           <NavLink to="/erp" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />
             Central
@@ -235,11 +226,13 @@ export function ErpLayout() {
             PDV, totem e emissão fiscal ficam nos apps próprios.{' '}
             <NavLink to="/caixa">Caixa</NavLink> · <NavLink to="/fiscal">Fiscal</NavLink>
           </p>
+          <ModuleSideFoot />
         </aside>
 
         <div className="erp-app__main">
           <header className="erp-app__heading">
             <div>
+              <ScreenBackButton home="/erp" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ModuleSideFoot } from '../../components/ModuleSideFoot';
+import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
@@ -255,10 +257,6 @@ export function OsLayout() {
           </div>
           <UserChip to="/os/perfil" />
           <nav className="os-app__ops-nav" aria-label="Operações da oficina">
-            <button type="button" className="os-app__ops-central" onClick={() => go('/os/perfil')}>
-              <AdminIcon name="people" />
-              <span>Meu perfil</span>
-            </button>
             <button type="button" className="os-app__ops-central" onClick={() => go('/os')}>
               <AdminIcon name="home" />
               <span>Central</span>
@@ -296,11 +294,13 @@ export function OsLayout() {
               <span>Quadro da oficina</span>
             </button>
           </nav>
+          <ModuleSideFoot />
         </aside>
 
         <div className="os-app__body">
           <header className="os-app__heading">
             <div>
+              <ScreenBackButton home="/os" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>
