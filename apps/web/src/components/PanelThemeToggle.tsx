@@ -5,15 +5,15 @@ type PanelThemeToggleProps = {
   className?: string;
 };
 
-/** Alterna claro/escuro — aplicado só no painel principal por enquanto. */
+/** Tema claro/escuro da operação — vale no painel e em todos os módulos. */
 export function PanelThemeToggle({ className = '' }: PanelThemeToggleProps) {
   const { theme, setTheme } = usePanelTheme();
 
   return (
-    <div className={`panel-theme ${className}`} role="group" aria-label="Tema do painel">
+    <div className={`panel-theme ${className}`} role="group" aria-label="Tema da operação">
       <p className="panel-theme__label">
-        Tema do painel
-        <em>Só no painel principal por enquanto · outros módulos seguem claros.</em>
+        Tema da operação
+        <em>Claro ou escuro em todos os apps desta conta.</em>
       </p>
       <div className="panel-theme__switch">
         <button

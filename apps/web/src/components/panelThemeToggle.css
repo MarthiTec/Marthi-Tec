@@ -53,27 +53,33 @@
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
 }
 
+.is-theme-dark .panel-theme__label,
 .admin.admin--dark .panel-theme__label {
   color: #cbd5e1;
 }
 
+.is-theme-dark .panel-theme__label em,
 .admin.admin--dark .panel-theme__label em {
   color: #94a3b8;
 }
 
+.is-theme-dark .panel-theme__switch,
 .admin.admin--dark .panel-theme__switch {
   border-color: rgba(148, 163, 184, 0.28);
   background: rgba(15, 23, 42, 0.55);
 }
 
+.is-theme-dark .panel-theme__switch button,
 .admin.admin--dark .panel-theme__switch button {
   color: #94a3b8;
 }
 
+.is-theme-dark .panel-theme__switch button:hover,
 .admin.admin--dark .panel-theme__switch button:hover {
   color: #e2e8f0;
 }
 
+.is-theme-dark .panel-theme__switch button.is-active,
 .admin.admin--dark .panel-theme__switch button.is-active {
   background: #1e293b;
   color: #f8fafc;

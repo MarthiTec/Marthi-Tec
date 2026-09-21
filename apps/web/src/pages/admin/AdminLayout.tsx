@@ -195,7 +195,7 @@ export function AdminLayout() {
   return (
     <div
       className={`admin ${menuOpen ? 'is-menu-open' : ''} ${collapsed ? 'is-collapsed' : ''} ${
-        isDark ? 'admin--dark' : ''
+        isDark ? 'admin--dark is-theme-dark' : ''
       }`}
     >
       <aside className="admin__sidebar">

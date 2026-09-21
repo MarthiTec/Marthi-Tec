@@ -8,6 +8,7 @@ import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
 import './erp.css';
 
@@ -74,6 +75,7 @@ export function ErpLayout() {
   const location = useLocation();
   const { user } = useAuth();
   usePresenceSession('erp');
+  const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -144,7 +146,7 @@ export function ErpLayout() {
   }
 
   return (
-    <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'}`}>
+    <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="erp-app__top">
         <button
           type="button"

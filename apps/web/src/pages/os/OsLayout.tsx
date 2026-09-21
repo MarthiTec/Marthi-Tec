@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import '../admin/admin.css';
 import './os.css';
@@ -44,6 +45,7 @@ export function OsLayout() {
   const location = useLocation();
   const { user } = useAuth();
   usePresenceSession('os');
+  const { isDark } = usePanelTheme();
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
@@ -197,7 +199,9 @@ export function OsLayout() {
 
   return (
     <div
-      className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''} ${isProfile ? 'is-profile-dock' : ''}`}
+      className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''} ${isProfile ? 'is-profile-dock' : ''} ${
+        isDark ? 'is-theme-dark' : ''
+      }`}
     >
       <header className="os-app__top">
         <button

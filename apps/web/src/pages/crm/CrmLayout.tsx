@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import '../admin/admin.css';
 import './crm.css';
@@ -35,6 +36,7 @@ export function CrmLayout() {
   const location = useLocation();
   const { user, loading } = useAuth();
   usePresenceSession('crm');
+  const { isDark } = usePanelTheme();
   const seller = useMemo(
     () => resolveCrmSeller(user?.name, user?.email),
     [user?.name, user?.email],
@@ -98,7 +100,7 @@ export function CrmLayout() {
 
   if (loading) {
     return (
-      <div className="crm-app">
+      <div className={`crm-app ${isDark ? 'is-theme-dark' : ''}`}>
         <p className="empty" style={{ padding: 24 }}>
           Carregando CRM…
         </p>
@@ -109,7 +111,7 @@ export function CrmLayout() {
   if (!user) return null;
 
   return (
-    <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'}`}>
+    <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="crm-app__top">
         <button
           type="button"

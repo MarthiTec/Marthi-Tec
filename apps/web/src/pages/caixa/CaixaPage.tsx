@@ -28,6 +28,7 @@ import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { CaixaPanelHost, type CaixaPanel } from './CaixaPanels';
 import '../admin/admin.css';
 import './caixa.css';
@@ -86,6 +87,7 @@ export function CaixaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   usePresenceSession('caixa');
+  const { isDark } = usePanelTheme();
   const operatorName = user?.name ?? 'Operador';
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -569,7 +571,9 @@ export function CaixaPage() {
 
   return (
     <div
-      className={`caixa-app ${opsMenuOpen ? 'is-ops-open' : ''} ${profileOpen ? 'is-profile-dock' : ''}`}
+      className={`caixa-app ${opsMenuOpen ? 'is-ops-open' : ''} ${profileOpen ? 'is-profile-dock' : ''} ${
+        isDark ? 'is-theme-dark' : ''
+      }`}
     >
       <header className="caixa-app__top">
         <button

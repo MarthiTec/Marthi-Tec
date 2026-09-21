@@ -1,0 +1,227 @@
+/**
+ * Tema escuro compartilhado dos apps operacionais.
+ * Ative com a classe `is-theme-dark` (ou `admin--dark` no painel) na raiz do shell.
+ */
+
+.erp-app.is-theme-dark,
+.fiscal-app.is-theme-dark,
+.ecommerce-app.is-theme-dark,
+.crm-app.is-theme-dark,
+.os-app.is-theme-dark,
+.caixa-app.is-theme-dark {
+  --ink: #e8eef4;
+  --mute: #94a3b8;
+  --line: rgba(148, 163, 184, 0.22);
+  --surface: #0f141a;
+  --card: #171e27;
+  --card-2: #1c2430;
+  background:
+    radial-gradient(900px 420px at 100% 0%, rgba(var(--accent-rgb), 0.1), transparent 55%),
+    var(--surface);
+  color: var(--ink);
+}
+
+.is-theme-dark .admin-card,
+.is-theme-dark .admin-card--form {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.is-theme-dark .admin-card h2,
+.is-theme-dark .admin-card h3 {
+  color: #94a3b8;
+}
+
+.is-theme-dark .admin-card strong {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .admin-card p,
+.is-theme-dark .empty {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .admin__kicker,
+.is-theme-dark .erp-app__heading .admin__kicker,
+.is-theme-dark .fiscal-app__heading .admin__kicker,
+.is-theme-dark .ecommerce-app__heading .admin__kicker,
+.is-theme-dark .crm-app__heading .admin__kicker,
+.is-theme-dark .os-app__heading .admin__kicker,
+.is-theme-dark .caixa-app__heading .admin__kicker {
+  color: #2dd4bf;
+}
+
+.is-theme-dark .erp-app__heading h1,
+.is-theme-dark .fiscal-app__heading h1,
+.is-theme-dark .ecommerce-app__heading h1,
+.is-theme-dark .crm-app__heading h1,
+.is-theme-dark .os-app__heading h1,
+.is-theme-dark .caixa-app__heading h1 {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .admin-table {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .admin-table th {
+  color: #94a3b8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .admin-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.is-theme-dark .admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.is-theme-dark .btn--ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.is-theme-dark .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.is-theme-dark input,
+.is-theme-dark select,
+.is-theme-dark textarea {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.is-theme-dark input::placeholder,
+.is-theme-dark textarea::placeholder {
+  color: #64748b;
+}
+
+.is-theme-dark .op-profile {
+  --op-ink: #e8eef4;
+  --op-mute: #94a3b8;
+  --op-line: rgba(148, 163, 184, 0.22);
+}
+
+.is-theme-dark .op-profile__card,
+.is-theme-dark .op-profile__form {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.is-theme-dark .op-profile__form-head {
+  background: rgba(15, 23, 42, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.is-theme-dark .op-profile__form-head h3,
+.is-theme-dark .op-profile__info h2 {
+  color: #f1f5f9;
+}
+
+.is-theme-dark .op-profile__form-head p,
+.is-theme-dark .op-profile__meta,
+.is-theme-dark .op-profile__address,
+.is-theme-dark .op-profile__lead {
+  color: #94a3b8;
+}
+
+.is-theme-dark .op-profile__grid label,
+.is-theme-dark .op-profile__fieldset legend {
+  color: #cbd5e1;
+}
+
+.is-theme-dark .op-profile__grid input {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.is-theme-dark .op-profile__badge {
+  background: rgba(45, 212, 191, 0.14);
+  color: #99f6e4;
+}
+
+.is-theme-dark .op-profile__role-lock {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.is-theme-dark .presence-ctl {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.is-theme-dark .presence-ctl__trigger,
+.is-theme-dark .presence-ctl__copy strong,
+.is-theme-dark .presence-ctl__short {
+  color: #e2e8f0;
+}
+
+.is-theme-dark .presence-ctl__copy em {
+  color: #94a3b8;
+}
+
+.is-theme-dark .presence-ctl__menu {
+  background: #1c2430;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.is-theme-dark .price-red {
+  color: #fb7185;
+}
+
+.is-theme-dark .qty-low {
+  color: #fca5a5;
+}
+
+/* CRM social profile */
+.is-theme-dark .crm-profile__card,
+.is-theme-dark .crm-profile__form,
+.is-theme-dark .crm-board,
+.is-theme-dark .crm-deal,
+.is-theme-dark .crm-inbox {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .crm-profile__form-head {
+  background: rgba(15, 23, 42, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.is-theme-dark .crm-kanban__col,
+.is-theme-dark .crm-deal-card {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* OS / Caixa panels */
+.is-theme-dark .os-panel,
+.is-theme-dark .caixa-panel,
+.is-theme-dark .os-app__ops-drawer,
+.is-theme-dark .caixa-app__ops-drawer {
+  background: var(--card, #171e27);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .pdv,
+.is-theme-dark .pdv__panel {
+  background: var(--card, #171e27);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .pdv__item,
+.is-theme-dark .pdv__scan {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}

@@ -8,6 +8,7 @@ import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
 import './ecommerce.css';
 
@@ -49,6 +50,7 @@ export function EcommerceLayout() {
   const location = useLocation();
   const { user } = useAuth();
   usePresenceSession('ecommerce');
+  const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -103,7 +105,7 @@ export function EcommerceLayout() {
   }
 
   return (
-    <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'}`}>
+    <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="ecommerce-app__top">
         <button
           type="button"

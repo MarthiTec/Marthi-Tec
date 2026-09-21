@@ -11,6 +11,7 @@ import {
   notifyProfileUpdated,
   saveOperatorProfile,
 } from '../../data/operatorProfile';
+import { PanelThemeToggle } from '../../components/PanelThemeToggle';
 
 type SellerCtx = { sellerId: string; sellerName: string };
 
@@ -516,6 +517,11 @@ export function CrmProfilePage() {
               </span>
             </label>
           </div>
+        </fieldset>
+
+        <fieldset className="crm-profile__fieldset">
+          <legend>Aparência</legend>
+          <PanelThemeToggle />
         </fieldset>
 
         <footer className="crm-profile__form-foot">

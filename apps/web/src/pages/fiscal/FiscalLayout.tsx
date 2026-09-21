@@ -8,6 +8,7 @@ import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
 import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
 import './fiscal.css';
 
@@ -44,6 +45,7 @@ export function FiscalLayout() {
   const location = useLocation();
   const { user } = useAuth();
   usePresenceSession('fiscal');
+  const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
@@ -98,7 +100,7 @@ export function FiscalLayout() {
   }
 
   return (
-    <div className={`fiscal-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'}`}>
+    <div className={`fiscal-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="fiscal-app__top">
         <button
           type="button"
