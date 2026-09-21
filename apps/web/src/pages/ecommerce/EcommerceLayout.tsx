@@ -153,7 +153,23 @@ export function EcommerceLayout() {
             </button>
           </div>
 
-          <UserChip to="/ecommerce/perfil" />
+          <UserChip
+            to="/ecommerce/perfil"
+            onOpen={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          />
+
+          <NavLink
+            to="/ecommerce/perfil"
+            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
+            onClick={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          >
+            <AdminIcon name="people" />
+            Meu perfil
+          </NavLink>
 
           <NavLink to="/ecommerce" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />

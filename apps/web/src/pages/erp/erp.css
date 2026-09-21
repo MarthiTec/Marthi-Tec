@@ -197,7 +197,14 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
-.erp-app__side a:not(.user-chip) {
+.erp-app__side a.user-chip,
+.erp-app__side .user-chip-stack {
+  width: 100%;
+  margin: 4px 0 10px;
+  flex-shrink: 0;
+}
+
+.erp-app__side > a {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -216,12 +223,12 @@
   text-align: left;
 }
 
-.erp-app__side a:not(.user-chip):hover {
+.erp-app__side > a:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
-.erp-app__side a:not(.user-chip).is-active {
+.erp-app__side > a.is-active {
   background: rgba(var(--accent-rgb), 0.45);
   color: #fff;
 }

@@ -175,7 +175,14 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
-.crm-app__side a:not(.user-chip),
+.crm-app__side a.user-chip,
+.crm-app__side .user-chip-stack {
+  width: 100%;
+  margin: 4px 0 10px;
+  flex-shrink: 0;
+}
+
+.crm-app__side > a,
 .crm-app__side button.crm-nav {
   display: flex;
   align-items: center;
@@ -195,7 +202,13 @@
   text-align: left;
 }
 
-.crm-app__side a:not(.user-chip).is-active,
+.crm-app__side > a:hover,
+.crm-app__side button.crm-nav:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.crm-app__side > a.is-active,
 .crm-app__side button.crm-nav.is-active {
   background: rgba(var(--accent-rgb), 0.45);
   color: #fff;

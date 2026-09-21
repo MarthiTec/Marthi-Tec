@@ -193,7 +193,14 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
-.ecommerce-app__side a:not(.user-chip) {
+.ecommerce-app__side a.user-chip,
+.ecommerce-app__side .user-chip-stack {
+  width: 100%;
+  margin: 4px 0 10px;
+  flex-shrink: 0;
+}
+
+.ecommerce-app__side > a {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -207,12 +214,12 @@
   font-weight: 650;
 }
 
-.ecommerce-app__side a:not(.user-chip):hover {
+.ecommerce-app__side > a:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
-.ecommerce-app__side a:not(.user-chip).is-active {
+.ecommerce-app__side > a.is-active {
   background: rgba(var(--accent-rgb), 0.42);
   color: #fff;
 }

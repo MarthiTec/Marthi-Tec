@@ -475,6 +475,24 @@
   background: linear-gradient(180deg, transparent, rgba(8, 12, 16, 0.55));
 }
 
+.admin__link--foot-accent {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  font-weight: 750;
+}
+
+.admin__link--foot-accent:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.admin__link--foot-accent.is-active {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
 .admin__logout {
   min-height: 40px;
   padding: 0 12px;

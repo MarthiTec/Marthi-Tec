@@ -197,7 +197,14 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
-.fiscal-app__side a:not(.user-chip),
+.fiscal-app__side a.user-chip,
+.fiscal-app__side .user-chip-stack {
+  width: 100%;
+  margin: 4px 0 10px;
+  flex-shrink: 0;
+}
+
+.fiscal-app__side > a,
 .fiscal-app__side button.fiscal-app__nav {
   display: flex;
   align-items: center;
@@ -217,13 +224,13 @@
   text-align: left;
 }
 
-.fiscal-app__side a:not(.user-chip):hover,
+.fiscal-app__side > a:hover,
 .fiscal-app__side button.fiscal-app__nav:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
-.fiscal-app__side a:not(.user-chip).is-active,
+.fiscal-app__side > a.is-active,
 .fiscal-app__side button.fiscal-app__nav.is-active {
   background: rgba(var(--accent-rgb), 0.42);
   color: #fff;
@@ -593,6 +600,12 @@
 }
 
 @media (max-width: 900px) {
+  .fiscal-app__heading,
+  .fiscal-app__content {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
   .fiscal-app__shell {
     grid-template-columns: 1fr;
   }

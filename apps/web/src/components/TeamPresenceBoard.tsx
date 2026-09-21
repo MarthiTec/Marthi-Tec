@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { profileInitials } from '../data/operatorProfile';
 import {
   presenceDetailLabel,
@@ -6,6 +7,11 @@ import {
 } from '../data/presenceStore';
 import { useTeamPresence } from '../hooks/usePresence';
 import './presenceBoard.css';
+
+type TeamPresenceBoardProps = {
+  /** No Dashboard, linka para o menu Operações. */
+  linkToOperations?: boolean;
+};
 
 function PresenceAvatar({ entry }: { entry: TeamPresence }) {
   const mark = profileInitials(entry.displayName);
@@ -56,8 +62,8 @@ function PresenceRow({
   );
 }
 
-/** Quem está logado, onde e com qual disponibilidade — visão do painel. */
-export function TeamPresenceBoard() {
+/** Quem está logado, onde e com qual disponibilidade. */
+export function TeamPresenceBoard({ linkToOperations = false }: TeamPresenceBoardProps) {
   const { rows, userKey } = useTeamPresence();
   const activeCount = rows.filter(
     (item) => item.module !== 'offline' && item.availability === 'active',
@@ -73,6 +79,12 @@ export function TeamPresenceBoard() {
           <h2>Equipe na operação</h2>
           <p>
             Foto, status e módulo em tempo real — o mesmo perfil que você ajusta em cada app.
+            {linkToOperations ? (
+              <>
+                {' '}
+                <Link to="/painel/operacoes">Abrir em Operações</Link>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="presence-board__stats">

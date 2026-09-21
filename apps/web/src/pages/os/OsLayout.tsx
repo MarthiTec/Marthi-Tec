@@ -251,6 +251,10 @@ export function OsLayout() {
           </div>
           <UserChip to="/os/perfil" />
           <nav className="os-app__ops-nav" aria-label="Operações da oficina">
+            <button type="button" className="os-app__ops-central" onClick={() => go('/os/perfil')}>
+              <AdminIcon name="people" />
+              <span>Meu perfil</span>
+            </button>
             <button type="button" className="os-app__ops-central" onClick={() => go('/os')}>
               <AdminIcon name="home" />
               <span>Central</span>

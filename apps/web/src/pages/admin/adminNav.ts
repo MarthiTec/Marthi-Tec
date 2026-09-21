@@ -111,6 +111,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 ];
 
 export function navGroupForPath(pathname: string, search = '') {
+  if (pathname.startsWith('/painel/operacoes')) return 'operacoes';
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (
     pathname.startsWith('/painel/pdv') ||

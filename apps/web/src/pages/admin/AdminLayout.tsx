@@ -22,6 +22,7 @@ const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'ERP', title: 'Painel da operação' },
+  '/painel/operacoes': { kicker: 'Operações', title: 'Equipe na loja' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/totem': { kicker: 'Totem', title: 'Dados do totem' },
   '/painel/totem/produtos': { kicker: 'Totem', title: 'Catálogo do totem' },
@@ -292,11 +293,23 @@ export function AdminLayout() {
         </nav>
 
         <div className="admin__sidebar-foot">
+          <NavLink
+            to="/painel/operacoes"
+            title="Operações"
+            className={({ isActive }) =>
+              `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
+            }
+          >
+            <AdminIcon name="ops" />
+            <span className="admin__link-label">Operações</span>
+          </NavLink>
           {isAdmin ? (
             <NavLink
               to="/painel/ajuda"
               title="Central de ajuda"
-              className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+              className={({ isActive }) =>
+                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
+              }
             >
               <AdminIcon name="help" />
               <span className="admin__link-label">Central de ajuda</span>
@@ -306,7 +319,9 @@ export function AdminLayout() {
             <NavLink
               to="/painel/plano"
               title="Plano da loja"
-              className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+              className={({ isActive }) =>
+                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
+              }
             >
               <AdminIcon name="plan" />
               <span className="admin__link-label">Plano da loja</span>

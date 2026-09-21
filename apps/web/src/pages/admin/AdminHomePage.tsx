@@ -10,7 +10,6 @@ import { getOperatorProfile } from '../../data/operatorProfile';
 import { ticketVariation } from '../../data/posQueueStore';
 import { hasModule } from '../../data/storePlan';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
-import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { usePosTickets } from './usePosTickets';
 
 export function AdminHomePage() {
@@ -39,57 +38,12 @@ export function AdminHomePage() {
           <h1 className="dash-hero__title">Dashboard</h1>
         </div>
         <div className="dash-hero__launch">
-          <div className="dash-hero__presence">
-            <PresenceStatusControl />
-          </div>
-          {hasModule('erp') ? (
-            <Link to="/caixa" className="btn btn--primary">
-              <AdminIcon name="cart" />
-              Abrir PDV
-            </Link>
-          ) : null}
-          {hasModule('erp') ? (
-            <Link to="/erp" className="btn btn--ghost">
-              <AdminIcon name="ops" />
-              Abrir ERP
-            </Link>
-          ) : null}
-          {hasModule('os') ? (
-            <Link to="/os" className="btn btn--ghost">
-              <AdminIcon name="wrench" />
-              Abrir oficina
-            </Link>
-          ) : null}
-          {hasModule('fiscal') ? (
-            <Link to="/fiscal" className="btn btn--ghost">
-              <AdminIcon name="fiscal" />
-              Abrir emissor
-            </Link>
-          ) : null}
-          {hasModule('ecommerce') ? (
-            <Link to="/ecommerce" className="btn btn--ghost">
-              <AdminIcon name="store" />
-              Abrir e-commerce
-            </Link>
-          ) : null}
-          <Link to="/crm" className="btn btn--ghost">
-            <AdminIcon name="people" />
-            Abrir CRM
-          </Link>
-          {hasModule('totem') ? (
-            <Link to="/totem" className="btn btn--ghost">
-              <AdminIcon name="totem" />
-              Abrir Totem
-            </Link>
-          ) : null}
-          <Link to="/painel/erp" className="btn btn--ghost">
+          <Link to="/painel/operacoes" className="btn btn--primary">
             <AdminIcon name="ops" />
-            Visão ERP
+            Operações
           </Link>
         </div>
       </div>
-
-      <TeamPresenceBoard />
 
       <div className="admin-grid">
         <article className="admin-card">
@@ -304,90 +258,12 @@ export function AdminHomePage() {
 
         <article className="admin-card">
           <h2>Atalhos da loja</h2>
-          <p>Consulta no painel · operação nos apps independentes (um Abrir por sistema).</p>
+          <p>PDV, ERP, OS, fiscal e demais canais ficam em Operações.</p>
           <div className="admin-toolbar admin-toolbar--stack">
-            {hasModule('erp') ? (
-              <>
-                <Link to="/caixa" className="btn btn--primary">
-                  <AdminIcon name="cart" />
-                  Abrir PDV
-                </Link>
-                <Link to="/painel/pdv" className="btn btn--ghost">
-                  Fila do totem
-                </Link>
-                <Link to="/painel/pedidos" className="btn btn--ghost">
-                  Consultar vendas
-                </Link>
-              </>
-            ) : null}
-            {hasModule('totem') ? (
-              <>
-                <Link to="/totem" className="btn btn--ghost">
-                  <AdminIcon name="totem" />
-                  Abrir Totem
-                </Link>
-                <Link to="/painel/totem" className="btn btn--ghost">
-                  Dados do totem
-                </Link>
-              </>
-            ) : null}
-            {hasModule('os') ? (
-              <>
-                <Link to="/os" className="btn btn--ghost">
-                  <AdminIcon name="wrench" />
-                  Abrir oficina
-                </Link>
-                <Link to="/painel/os" className="btn btn--ghost">
-                  Visão OS
-                </Link>
-                <Link to="/painel/os/agenda" className="btn btn--ghost">
-                  Agenda
-                </Link>
-              </>
-            ) : null}
-            {hasModule('fiscal') ? (
-              <>
-                <Link to="/fiscal" className="btn btn--ghost">
-                  <AdminIcon name="fiscal" />
-                  Abrir emissor
-                </Link>
-                <Link to="/painel/fiscal" className="btn btn--ghost">
-                  Visão fiscal
-                </Link>
-                <Link to="/painel/notas" className="btn btn--ghost">
-                  Notas emitidas
-                </Link>
-              </>
-            ) : null}
-            {hasModule('ecommerce') ? (
-              <>
-                <Link to="/ecommerce" className="btn btn--ghost">
-                  <AdminIcon name="store" />
-                  Abrir e-commerce
-                </Link>
-                <Link to="/painel/ecommerce" className="btn btn--ghost">
-                  Visão e-commerce
-                </Link>
-              </>
-            ) : null}
-            <Link to="/crm" className="btn btn--ghost">
-              <AdminIcon name="people" />
-              Abrir CRM
+            <Link to="/painel/operacoes" className="btn btn--primary">
+              <AdminIcon name="ops" />
+              Abrir Operações
             </Link>
-            <Link to="/painel/crm" className="btn btn--ghost">
-              Visão CRM
-            </Link>
-            {hasModule('erp') ? (
-              <>
-                <Link to="/erp" className="btn btn--ghost">
-                  <AdminIcon name="ops" />
-                  Abrir ERP
-                </Link>
-                <Link to="/painel/erp" className="btn btn--ghost">
-                  Visão e ajustes ERP
-                </Link>
-              </>
-            ) : null}
             {isAdmin ? (
               <>
                 <Link to="/painel/plano" className="btn btn--ghost">
@@ -408,6 +284,8 @@ export function AdminHomePage() {
           )}
         </article>
       </div>
+
+      <TeamPresenceBoard linkToOperations />
     </section>
   );
 }

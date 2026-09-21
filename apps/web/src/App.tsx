@@ -34,6 +34,7 @@ import { TotemSettingsPage } from './pages/admin/TotemSettingsPage';
 import { TotemInsightsPage } from './pages/admin/TotemInsightsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminHomePage } from './pages/admin/AdminHomePage';
+import { OperationsPage } from './pages/admin/OperationsPage';
 import { CrmPanelPage } from './pages/admin/CrmPanelPage';
 import { EcommercePanelPage } from './pages/admin/EcommercePanelPage';
 import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
@@ -141,6 +142,7 @@ export function App() {
         </Route>
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
+          <Route path="operacoes" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="totem" element={<TotemInsightsPage />} />

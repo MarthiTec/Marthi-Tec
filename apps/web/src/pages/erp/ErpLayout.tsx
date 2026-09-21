@@ -194,7 +194,23 @@ export function ErpLayout() {
             </button>
           </div>
 
-          <UserChip to="/erp/perfil" />
+          <UserChip
+            to="/erp/perfil"
+            onOpen={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          />
+
+          <NavLink
+            to="/erp/perfil"
+            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
+            onClick={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          >
+            <AdminIcon name="people" />
+            Meu perfil
+          </NavLink>
 
           <NavLink to="/erp" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />

@@ -166,7 +166,23 @@ export function CrmLayout() {
             </button>
           </div>
 
-          <UserChip to="/crm/perfil" />
+          <UserChip
+            to="/crm/perfil"
+            onOpen={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          />
+
+          <NavLink
+            to="/crm/perfil"
+            className={({ isActive }) => (isActive ? 'is-active' : undefined)}
+            onClick={() => {
+              if (isMobileNav()) setNavOpen(false);
+            }}
+          >
+            <AdminIcon name="people" />
+            Meu perfil
+          </NavLink>
 
           <NavLink to="/crm" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />
