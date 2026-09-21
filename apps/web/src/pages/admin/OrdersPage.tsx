@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
-import { getAdminState, type SalesOrder } from '../../data/adminStore';
+import { ADMIN_STATE_EVENT, getAdminState, type SalesOrder } from '../../data/adminStore';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import {
   emitNfeFromSale,
   FISCAL_KIND_LABEL,
@@ -28,6 +29,21 @@ export function OrdersPage() {
   const [filter, setFilter] = useState<Filter>('sold');
   const [query, setQuery] = useState('');
   const { tickets } = usePosTickets();
+
+  useEffect(() => {
+    function refreshState() {
+      setOrders(getAdminState().orders);
+      setDocs(listFiscalDocuments());
+    }
+    for (const event of [ADMIN_STATE_EVENT, ERP_BOOTSTRAP_EVENT, 'marthi-stock'] as const) {
+      window.addEventListener(event, refreshState);
+    }
+    return () => {
+      for (const event of [ADMIN_STATE_EVENT, ERP_BOOTSTRAP_EVENT, 'marthi-stock'] as const) {
+        window.removeEventListener(event, refreshState);
+      }
+    };
+  }, []);
 
   const rows = useMemo(() => {
     const sold = orders
