@@ -33,6 +33,8 @@ export type OperationShortcut = {
 
 const DEFAULT_OPS: OperationShortcut[] = [
   { id: 'pdv', label: 'Abrir PDV', href: '/caixa', color: '#1d4ed8', active: true, icon: 'cart', sortOrder: 10 },
+  { id: 'mesa', label: 'Mesas / garçom', href: '/mesa', color: '#b45309', active: true, icon: 'ops', sortOrder: 15 },
+  { id: 'cozinha', label: 'Tela da cozinha', href: '/cozinha', color: '#ca8a04', active: true, icon: 'ops', sortOrder: 16 },
   { id: 'erp', label: 'Abrir ERP', href: '/erp', color: '#0e7490', active: true, icon: 'ops', sortOrder: 20 },
   { id: 'pdv-fila', label: 'Fila do totem', href: '/painel/pdv', color: '#1d4ed8', active: true, icon: 'cart', sortOrder: 30 },
   { id: 'vendas', label: 'Consultar vendas', href: '/painel/pedidos', color: '#334155', active: true, icon: 'search', sortOrder: 40 },
@@ -116,7 +118,14 @@ function save(items: OperationShortcut[]) {
 }
 
 export function listOperationShortcuts() {
-  return loadRaw();
+  const items = loadRaw();
+  const missing = DEFAULT_OPS.filter((def) => !items.some((item) => item.id === def.id));
+  if (!missing.length) return items;
+  const merged = [...items, ...missing.map((item) => ({ ...item }))].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'pt-BR'),
+  );
+  save(merged);
+  return merged;
 }
 
 export function operationStatusColor(active: boolean) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
@@ -27,7 +27,8 @@ import { listSellers } from '../../data/erpRegistry';
 import { emitNfeFromSale, emitSaleCheckoutDocument, FISCAL_KIND_LABEL } from '../../data/fiscalDocuments';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
-import { getTotemExitPassword } from '../../data/totemSettings';
+import { getTotemExitPassword, getTotemSettings } from '../../data/totemSettings';
+import { enqueueKitchenOrder } from '../../data/kitchenOrderStore';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { CaixaPanelHost, type CaixaPanel } from './CaixaPanels';
@@ -348,6 +349,25 @@ export function CaixaPage() {
       if (order) {
         registerCashSale(saleTotal, operatorName, `Venda ${order.id}`);
         refreshCash();
+        const settings = getTotemSettings();
+        const foodOps =
+          settings.vertical === 'food' || settings.printTicket || settings.offerFulfillment;
+        if (foodOps && pricedLines.length) {
+          try {
+            enqueueKitchenOrder({
+              channel: 'balcao',
+              customerName: saleCustomer,
+              sourceTicketId: order.id,
+              lines: pricedLines.map((line) => ({
+                name: line.name,
+                qty: line.qty,
+                detail: line.imei ? `IMEI ${line.imei}` : '',
+              })),
+            });
+          } catch {
+            /* não bloqueia a venda */
+          }
+        }
       }
 
       let docMsg = '';
@@ -647,6 +667,14 @@ export function CaixaPage() {
               <AdminIcon name="home" />
               <span>Central</span>
             </button>
+            <Link to="/mesa" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
+              <AdminIcon name="ops" />
+              <span>Mesas / garçom</span>
+            </Link>
+            <Link to="/cozinha" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
+              <AdminIcon name="ops" />
+              <span>Tela da cozinha</span>
+            </Link>
           <button type="button" onClick={() => openPanel('sales')}>
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>

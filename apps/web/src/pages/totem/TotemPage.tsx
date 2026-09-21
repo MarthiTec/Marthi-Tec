@@ -779,6 +779,7 @@ export function TotemPage() {
       {step === 'catalog' && (
         <section className="totem__floor totem__floor--topnav">
           <div className="totem__stage" ref={searchPanelRef}>
+            {namedWelcome ? <p className="totem__hello">{namedWelcome}</p> : null}
             <div className="totem__search-panel">
               {copy.showBrandFilters ? (
                 <div className="totem__toolbar totem__toolbar--quiet">

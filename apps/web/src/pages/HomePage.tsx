@@ -283,6 +283,18 @@ export function HomePage() {
                   <span>{user ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
                 </Link>
               ) : null}
+              {showCaixa || showTotem ? (
+                <Link to="/mesa" className="launch-card">
+                  <strong>Mesas</strong>
+                  <span>Garçom lança pedido no tablet</span>
+                </Link>
+              ) : null}
+              {showCaixa || showTotem ? (
+                <Link to="/cozinha" className="launch-card">
+                  <strong>Cozinha</strong>
+                  <span>Fila ao vivo na TV da cozinha</span>
+                </Link>
+              ) : null}
               {showOs ? (
                 <Link to={user ? '/os' : '/login?next=/os'} className="launch-card">
                   <strong>Ordem de serviço</strong>

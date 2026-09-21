@@ -7,6 +7,8 @@ import { ProductsPage } from './pages/ProductsPage';
 import { PartnerSignupPage } from './pages/PartnerSignupPage';
 import { TotemPage } from './pages/totem/TotemPage';
 import { CaixaPage } from './pages/caixa/CaixaPage';
+import { MesaPage } from './pages/mesa/MesaPage';
+import { CozinhaPage } from './pages/cozinha/CozinhaPage';
 import { OsLayout } from './pages/os/OsLayout';
 import { FiscalLayout } from './pages/fiscal/FiscalLayout';
 import { FiscalHomePage } from './pages/fiscal/FiscalHomePage';
@@ -82,6 +84,8 @@ export function App() {
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />
         <Route path="/totem" element={<TotemPage />} />
         <Route path="/caixa" element={<CaixaPage />} />
+        <Route path="/mesa" element={<MesaPage />} />
+        <Route path="/cozinha" element={<CozinhaPage />} />
         <Route path="/os" element={<OsLayout />}>
           <Route index element={<WorkOrdersPage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />

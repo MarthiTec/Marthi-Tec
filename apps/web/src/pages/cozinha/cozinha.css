@@ -1,0 +1,332 @@
+.kds-app {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: 56px minmax(0, 1fr);
+  background: #0a0d12;
+  color: #f1f5f9;
+}
+
+.kds-app__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: #12181f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kds-app__mark {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.kds-app__brand {
+  min-width: 0;
+}
+
+.kds-app__brand strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.kds-app__brand span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.kds-app__stats {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.kds-app__stats strong {
+  color: #fff;
+  margin-left: 4px;
+}
+
+.kds-app__link,
+.kds-app__exit {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.kds-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kds-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 18px;
+  background: #141a22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.kds-col[data-status='queued'] .kds-col__head {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.kds-col[data-status='preparing'] .kds-col__head {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+
+.kds-col[data-status='ready'] .kds-col__head {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+.kds-col__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  flex-shrink: 0;
+}
+
+.kds-col__head h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.kds-col__head span {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+.kds-col__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.kds-empty {
+  margin: 24px 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.9rem;
+}
+
+.kds-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #1c2430;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+}
+
+.kds-card.is-urgent {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25);
+}
+
+.kds-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.kds-card__senha {
+  font-size: 1.8rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.kds-card__time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: #fbbf24;
+  font-size: 1.05rem;
+}
+
+.kds-card__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.kds-card__meta em {
+  font-style: normal;
+  font-weight: 800;
+  color: #fb923c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+}
+
+.kds-card__lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.kds-card__lines li {
+  display: grid;
+  gap: 2px;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.kds-card__lines small {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.8rem;
+}
+
+.kds-card__lines small.is-note {
+  color: #fcd34d;
+}
+
+.kds-card__note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+  font-size: 0.88rem;
+}
+
+.kds-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kds-btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  border: none;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kds-btn--primary {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.kds-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.kds-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.kds-lock__card {
+  width: min(400px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 18px;
+  background: #171e27;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.kds-lock__card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.kds-lock__card input {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #0f141a;
+  color: #fff;
+  font: inherit;
+}
+
+.kds-lock__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.kds-lock__actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kds-lock__actions button[type='submit'] {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: transparent;
+}
+
+.kds-alert {
+  margin: 0;
+  color: #fca5a5;
+}
+
+@media (max-width: 980px) {
+  .kds-board {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .kds-app__stats {
+    display: none;
+  }
+}

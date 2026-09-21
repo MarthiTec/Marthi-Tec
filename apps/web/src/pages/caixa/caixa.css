@@ -211,7 +211,8 @@
   flex: 1;
 }
 
-.caixa-app__ops-nav button {
+.caixa-app__ops-nav button,
+.caixa-app__ops-nav a.caixa-app__ops-central {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -227,6 +228,8 @@
   font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .caixa-app__ops-nav button:hover:not(:disabled) {

@@ -1,5 +1,8 @@
 import { enqueueTotemLead } from '../data/posQueueStore';
+import { enqueueKitchenOrder } from '../data/kitchenOrderStore';
 import type { PickedAttribute } from '../data/attributeStore';
+import { formatPicked } from '../data/attributeStore';
+import { getTotemSettings } from '../data/totemSettings';
 import { edgeApiUrl } from './config';
 
 const API_URL = edgeApiUrl();
@@ -17,9 +20,35 @@ export type TotemLeadRequest = {
   priceLabel: string;
 };
 
+function shouldSendToKitchen() {
+  const settings = getTotemSettings();
+  return settings.vertical === 'food' || settings.printTicket || settings.offerFulfillment;
+}
+
 export async function submitTotemLead(payload: TotemLeadRequest) {
   const ticket = enqueueTotemLead(payload);
   let customerNotified = false;
+
+  if (shouldSendToKitchen()) {
+    try {
+      enqueueKitchenOrder({
+        channel: 'totem',
+        customerName: payload.customerName,
+        sourceTicketId: ticket.id,
+        lines: [
+          {
+            name: payload.productName,
+            qty: 1,
+            detail:
+              formatPicked(payload.attributes ?? []) ||
+              [payload.color, payload.storage, payload.fulfillment].filter(Boolean).join(' · '),
+          },
+        ],
+      });
+    } catch {
+      /* fila local não deve bloquear o pedido do totem */
+    }
+  }
 
   try {
     const response = await fetch(`${API_URL}/api/v1/totem/leads`, {
