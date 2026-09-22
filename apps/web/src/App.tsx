@@ -148,6 +148,7 @@ export function App() {
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
           <Route path="operacoes" element={<OperationsPage />} />
+          <Route path="operacoes/usuarios" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="totem" element={<TotemInsightsPage />} />
@@ -173,7 +174,7 @@ export function App() {
           <Route path="financeiro" element={<Navigate to="/erp/financeiro" replace />} />
           <Route path="vendedores" element={<Navigate to="/erp/vendedores" replace />} />
           <Route path="fornecedores" element={<Navigate to="/erp/fornecedores" replace />} />
-          <Route path="funcionarios" element={<Navigate to="/erp/funcionarios" replace />} />
+          <Route path="funcionarios" element={<Navigate to="/painel/operacoes/usuarios" replace />} />
           <Route path="permissoes" element={<Navigate to="/erp/permissoes" replace />} />
           <Route path="auditoria" element={<Navigate to="/erp/auditoria" replace />} />
           <Route path="classificacao-fiscal" element={<FiscalClassPage />} />

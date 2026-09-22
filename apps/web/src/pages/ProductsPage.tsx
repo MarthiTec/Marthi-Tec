@@ -10,13 +10,14 @@ import {
   type MarthiProductId,
 } from '../data/marthiProducts';
 import { isStoreContracted } from '../data/demoLeadStore';
+import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
 import { ingestContactLeadToCrm } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import './home.css';
 import './products.css';
 
-const WHATSAPP_HREF = 'https://wa.me/5524981244253';
-const INSTAGRAM_HREF = 'https://instagram.com/marthi.tecnologia';
+const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
+const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
 
 function IconWhatsApp() {
   return (
@@ -157,7 +158,7 @@ export function ProductsPage() {
       `Produto de interesse: ${active.name}`,
     ].join('\n');
     setContactFeedback('Recebido! Abrindo WhatsApp…');
-    window.open(`${WHATSAPP_HREF}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    window.open(marthiWhatsAppHref(text), '_blank', 'noopener,noreferrer');
     setContactName('');
     setContactPhone('');
   }
@@ -167,9 +168,8 @@ export function ProductsPage() {
       <div className="site__glow" aria-hidden="true" />
 
       <header className="site__nav">
-        <Link to="/" className="site__nav-brand" aria-label="Marthi Tecnologia">
-          <BrandLogo variant="mark" className="site__nav-mark" />
-          <span>Marthi Tecnologia</span>
+        <Link to="/" className="site__nav-brand site__nav-brand--lockup" aria-label="Marthi Tecnologia">
+          <BrandLogo variant="lockup" className="site__nav-lockup" />
         </Link>
         <button
           type="button"
@@ -183,26 +183,23 @@ export function ProductsPage() {
           <i />
         </button>
         <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
-          <Link to="/" onClick={() => setNavOpen(false)}>
-            Home
-          </Link>
           <Link to="/produtos" aria-current="page" onClick={() => setNavOpen(false)}>
-            Nossos produtos
+            Produtos
           </Link>
           <Link to="/#planos" onClick={() => setNavOpen(false)}>
             Planos
           </Link>
-          <Link to="/#trabalhe-conosco" onClick={() => setNavOpen(false)}>
-            Trabalhe conosco
+          <Link to="/#sobre" onClick={() => setNavOpen(false)}>
+            Sobre nós
           </Link>
           <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" onClick={() => setNavOpen(false)}>
             Contato
           </a>
-          <Link to="/login" onClick={() => setNavOpen(false)}>
-            Entrar
-          </Link>
           <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
-            Solicitar demonstração
+            Solicitar demo
+          </Link>
+          <Link to="/login" className="site__nav-login" onClick={() => setNavOpen(false)}>
+            Entrar
           </Link>
         </nav>
       </header>
@@ -217,12 +214,24 @@ export function ProductsPage() {
               plano e opere a loja em um só ecossistema.
             </p>
             <div className="products-hero__actions">
-              <Link to="/parceiro" className="btn btn--primary">
+              <a href="#catalogo" className="btn btn--primary btn--with-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"
+                  />
+                </svg>
+                Explorar catálogo
+              </a>
+              <Link to="/parceiro" className="btn btn--ghost btn--with-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 2v2H5V6h14zM5 18v-8h14v8H5zm2-2h4v-1.5H7V16zm6 0h4v-1.5h-4V16zM7 12.5h10V11H7v1.5z"
+                  />
+                </svg>
                 Montar meu plano
               </Link>
-              <a href="#catalogo" className="btn btn--ghost">
-                Ver catálogo
-              </a>
             </div>
           </div>
           <div className="products-hero__visual" aria-hidden="true">
@@ -306,12 +315,24 @@ export function ProductsPage() {
               <div className="products-catalog__cta">
                 <button
                   type="button"
-                  className="btn btn--primary"
+                  className="btn btn--primary btn--with-icon"
                   onClick={() => openProduct(active)}
                 >
-                  {active.cta ?? 'Saiba mais'}
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
+                    />
+                  </svg>
+                  {active.cta ?? 'Abrir módulo'}
                 </button>
-                <Link to="/parceiro" className="btn btn--ghost">
+                <Link to="/parceiro" className="btn btn--ghost btn--with-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
+                    />
+                  </svg>
                   Incluir no plano
                 </Link>
               </div>
@@ -382,16 +403,17 @@ export function ProductsPage() {
 
       <footer className="site__footer">
         <div className="site__footer-brand">
-          <BrandLogo variant="mark" className="site__footer-mark" />
+          <BrandLogo variant="lockup" className="site__footer-lockup" />
           <div>
-            <strong>Marthi Tecnologia</strong>
-            <span>Produtos para a operação completa da loja.</span>
+            <strong>{MARTHI_COMPANY.legalName}</strong>
+            <span>{MARTHI_COMPANY.addressLine}</span>
+            <a href={MARTHI_COMPANY.emailHref}>{MARTHI_COMPANY.email}</a>
           </div>
         </div>
         <nav className="site__footer-links" aria-label="Links rápidos">
           <Link to="/">Home</Link>
-          <Link to="/produtos">Nossos produtos</Link>
-          <Link to="/parceiro">Ser parceiro</Link>
+          <Link to="/produtos">Produtos</Link>
+          <Link to="/parceiro">Solicitar demo</Link>
           <a href={INSTAGRAM_HREF} target="_blank" rel="noreferrer">
             Instagram
           </a>

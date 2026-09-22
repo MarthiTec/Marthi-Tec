@@ -10,6 +10,10 @@ export type TotemLeadPayload = {
   payment: string;
   installment: string | null;
   priceLabel: string;
+  /** Número da loja (painel). Tem prioridade sobre EVOLUTION_STORE_NUMBER. */
+  storeWhatsApp?: string;
+  notifyCustomer?: boolean;
+  locationLabel?: string;
 };
 
 function onlyDigits(value: string): string {
@@ -28,8 +32,11 @@ export function normalizeBrazilPhone(phone: string): string {
   return digits;
 }
 
-export function buildTotemLeadMessage(lead: TotemLeadPayload): string {
-  const location = env.TOTEM_LOCATION_LABEL;
+export function buildTotemLeadMessage(
+  lead: TotemLeadPayload,
+  locationLabel?: string,
+): string {
+  const location = (locationLabel ?? env.TOTEM_LOCATION_LABEL)?.trim() || '';
   const paymentLine =
     lead.payment === 'Parcelado' && lead.installment
       ? `${lead.payment} (${lead.installment})`
@@ -104,14 +111,16 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
   storeMessageId: unknown;
   customerNotified: boolean;
 }> {
-  const storeNumber = env.EVOLUTION_STORE_NUMBER;
+  const storeNumber = lead.storeWhatsApp?.trim() || env.EVOLUTION_STORE_NUMBER;
   if (!storeNumber) {
-    const error = new Error('Número da loja não configurado (EVOLUTION_STORE_NUMBER).');
+    const error = new Error(
+      'Número da loja não configurado. Informe o WhatsApp em Painel → Totem → WhatsApp, ou EVOLUTION_STORE_NUMBER.',
+    );
     (error as Error & { status: number }).status = 501;
     throw error;
   }
 
-  const message = buildTotemLeadMessage(lead);
+  const message = buildTotemLeadMessage(lead, lead.locationLabel);
   const storeResult = await sendEvolutionText(storeNumber, message);
 
   if (!storeResult.ok) {
@@ -121,8 +130,13 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
     throw error;
   }
 
+  const shouldNotify =
+    typeof lead.notifyCustomer === 'boolean'
+      ? lead.notifyCustomer
+      : Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
+
   let customerNotified = false;
-  if (env.EVOLUTION_NOTIFY_CUSTOMER) {
+  if (shouldNotify) {
     const customerMsg = [
       `Olá, ${lead.customerName}! 👋`,
       '',

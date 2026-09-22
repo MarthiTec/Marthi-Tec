@@ -75,6 +75,11 @@ export function TotemSettingsPage() {
   const [offerFulfillment, setOfferFulfillment] = useState(() => initial.offerFulfillment);
   const [printTicket, setPrintTicket] = useState(() => initial.printTicket);
   const [audioAssist, setAudioAssist] = useState(() => initial.audioAssist);
+  const [storeWhatsApp, setStoreWhatsApp] = useState(() => initial.storeWhatsApp);
+  const [notifyCustomerOnLead, setNotifyCustomerOnLead] = useState(
+    () => initial.notifyCustomerOnLead,
+  );
+  const [locationLabel, setLocationLabel] = useState(() => initial.locationLabel);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,6 +136,9 @@ export function TotemSettingsPage() {
         offerFulfillment,
         printTicket,
         audioAssist,
+        storeWhatsApp,
+        notifyCustomerOnLead,
+        locationLabel,
       });
       setError(null);
       setSaved(true);
@@ -576,6 +584,66 @@ export function TotemSettingsPage() {
             <span>Só itens com “Exibir no totem” e quantidade &gt; 0.</span>
           </button>
         </div>
+      </article>
+
+      <article className="admin-card admin-card--form">
+        <h2>WhatsApp do Totem (Evolution)</h2>
+        <p>
+          O QR Code é lido <strong>uma vez</strong> no Evolution Manager (
+          <a href="https://marthi-tec.discloud.app" target="_blank" rel="noreferrer">
+            marthi-tec.discloud.app
+          </a>
+          ): pareia o chip/WhatsApp da instância Marthi. Depois disso, o sistema só usa a API
+          (URL + instância + API key no servidor) para <strong>enviar</strong> mensagens.
+        </p>
+        <p>
+          Aqui no painel a loja informa o número que vai <strong>receber</strong> o lead do totem —
+          não é preciso escanear QR de novo por loja. Trabalhe conosco / suporte usam o número
+          comercial Marthi (mesmo Evolution, outro destino).
+        </p>
+        <div className="admin-form">
+          <label>
+            WhatsApp da loja (com DDI)
+            <input
+              type="tel"
+              inputMode="tel"
+              value={storeWhatsApp}
+              placeholder="5524999999999"
+              onChange={(event) => {
+                setStoreWhatsApp(event.target.value.replace(/\D/g, '').slice(0, 15));
+                markDirty();
+              }}
+            />
+          </label>
+          <label>
+            Local / shopping (opcional na mensagem)
+            <input
+              type="text"
+              value={locationLabel}
+              maxLength={80}
+              placeholder="Ex.: Shopping Olga Sola, Três Rios"
+              onChange={(event) => {
+                setLocationLabel(event.target.value);
+                markDirty();
+              }}
+            />
+          </label>
+          <label className="admin-check">
+            <input
+              type="checkbox"
+              checked={notifyCustomerOnLead}
+              onChange={(event) => {
+                setNotifyCustomerOnLead(event.target.checked);
+                markDirty();
+              }}
+            />
+            <span>Também avisar o cliente no WhatsApp após o pedido</span>
+          </label>
+        </div>
+        <p className="empty" style={{ marginTop: 8 }}>
+          Sem número salvo, o pedido ainda abre no PDV, mas o WhatsApp não dispara. Se a Evolution
+          estiver desconectada, reconecte pelo QR no Manager.
+        </p>
       </article>
 
       <article className="admin-card admin-card--form">

@@ -128,10 +128,44 @@ export function PartnerSignupPage() {
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
+  const [cepStatus, setCepStatus] = useState<string | null>(null);
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
   const lockedAllModules = planIncludesAllModules(form.planId);
+
+  async function lookupCep(raw: string) {
+    const digits = onlyDigits(raw);
+    if (digits.length !== 8) {
+      setCepStatus(null);
+      return;
+    }
+    setCepStatus('Buscando CEP…');
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = (await res.json()) as {
+        erro?: boolean;
+        logradouro?: string;
+        bairro?: string;
+        localidade?: string;
+        uf?: string;
+      };
+      if (data.erro) {
+        setCepStatus('CEP não encontrado. Preencha o endereço manualmente.');
+        return;
+      }
+      setForm((current) => ({
+        ...current,
+        street: data.logradouro?.trim() || current.street,
+        district: data.bairro?.trim() || current.district,
+        city: data.localidade?.trim() || current.city,
+        state: data.uf?.trim() || current.state,
+      }));
+      setCepStatus('Endereço preenchido pelo CEP.');
+    } catch {
+      setCepStatus('Não foi possível consultar o CEP agora.');
+    }
+  }
 
   function patch<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -286,11 +320,12 @@ export function PartnerSignupPage() {
     return (
       <div className="partner">
         <div className="partner__shell partner__shell--success">
-          <BrandLogo variant="mark" className="partner__mark" />
+          <BrandLogo variant="lockup" className="partner__lockup" />
           <h1>Cadastro enviado</h1>
           <p>
             Recebemos o interesse de <strong>{form.tradeName}</strong> no plano{' '}
-            <strong>{selectedPlan.name}</strong>.
+            <strong>{selectedPlan.name}</strong> ({selectedPlan.price}
+            {selectedPlan.period}).
           </p>
           <p className="partner__protocol">
             Protocolo: <strong>{protocol}</strong>
@@ -316,10 +351,10 @@ export function PartnerSignupPage() {
           ← Voltar
         </Link>
         <div className="partner__brand">
-          <BrandLogo variant="mark" className="partner__mark" />
+          <BrandLogo variant="lockup" className="partner__lockup" />
           <div>
             <strong>Cadastro de parceiro</strong>
-            <span>Marthi Tecnologia</span>
+            <span>Contrate e liberamos a loja</span>
           </div>
         </div>
       </header>
@@ -332,7 +367,7 @@ export function PartnerSignupPage() {
           { id: 4, label: 'Pagamento' },
         ].map((item) => (
           <li key={item.id} className={step === item.id ? 'is-active' : step > item.id ? 'is-done' : ''}>
-            <span>{item.id}</span>
+            <span>{step > item.id ? '✓' : item.id}</span>
             {item.label}
           </li>
         ))}
@@ -348,22 +383,36 @@ export function PartnerSignupPage() {
         {step === 1 && (
           <section className="partner__section">
             <h1>Qual plano você quer aderir?</h1>
-            <p className="partner__lead">Escolha o ritmo do contrato. Você pode ajustar os módulos na próxima etapa.</p>
+            <p className="partner__lead">
+              Escolha o ritmo do contrato. Os módulos você ajusta na próxima etapa — o painel da loja
+              já vem incluso em todos.
+            </p>
             <div className="partner__plans">
               {PLANS.map((plan) => (
                 <button
                   key={plan.id}
                   type="button"
-                  className={`partner-plan partner-plan--${plan.id} ${form.planId === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
+                  className={`partner-plan partner-plan--${plan.id} ${form.planId === plan.id ? 'is-active' : ''}`}
                   onClick={() => selectPlan(plan.id)}
                 >
-                  {'featured' in plan && plan.featured ? <span>Mais escolhido</span> : null}
+                  {'featured' in plan && plan.featured ? (
+                    <span className="partner-plan__badge">Mais escolhido</span>
+                  ) : (
+                    <span className="partner-plan__badge" style={{ visibility: 'hidden' }}>
+                      —
+                    </span>
+                  )}
                   <h2>{plan.name}</h2>
                   <p className="partner-plan__price">
                     {plan.price}
                     <small>{plan.period}</small>
                   </p>
                   <p>{plan.blurb}</p>
+                  <ul className="partner-plan__features">
+                    {plan.features.slice(0, 3).map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
                   <small className="partner-plan__limit">
                     {planIncludesAllModules(plan.id)
                       ? 'Módulos: todos integrados'
@@ -504,10 +553,17 @@ export function PartnerSignupPage() {
                 CEP
                 <input
                   value={form.zipCode}
-                  onChange={(e) => patch('zipCode', maskZip(e.target.value))}
+                  onChange={(e) => {
+                    const next = maskZip(e.target.value);
+                    patch('zipCode', next);
+                    if (onlyDigits(next).length === 8) void lookupCep(next);
+                    else setCepStatus(null);
+                  }}
+                  onBlur={() => void lookupCep(form.zipCode)}
                   inputMode="numeric"
                   required
                 />
+                {cepStatus ? <span className="partner__hint">{cepStatus}</span> : null}
               </label>
               <label className="partner__span-2">
                 Endereço (logradouro)
@@ -699,10 +755,17 @@ export function PartnerSignupPage() {
                   CEP
                   <input
                     value={form.zipCode}
-                    onChange={(e) => patch('zipCode', maskZip(e.target.value))}
+                    onChange={(e) => {
+                      const next = maskZip(e.target.value);
+                      patch('zipCode', next);
+                      if (onlyDigits(next).length === 8) void lookupCep(next);
+                      else setCepStatus(null);
+                    }}
+                    onBlur={() => void lookupCep(form.zipCode)}
                     inputMode="numeric"
                     required
                   />
+                  {cepStatus ? <span className="partner__hint">{cepStatus}</span> : null}
                 </label>
                 <label className="partner__span-2">
                   Endereço
@@ -754,8 +817,18 @@ export function PartnerSignupPage() {
               </div>
             )}
 
-            <div className="partner__pay" style={{ marginTop: 20 }}>
-              <h2 style={{ fontSize: '1rem', margin: '0 0 10px' }}>Forma de pagamento</h2>
+            <div className="partner__total">
+              <span>
+                Plano {selectedPlan.name} · mensalidade
+              </span>
+              <strong>
+                {selectedPlan.price}
+                {selectedPlan.period}
+              </strong>
+            </div>
+
+            <div className="partner__pay">
+              <h2>Forma de pagamento</h2>
               <div className="partner__doc-type" role="group" aria-label="Pagamento">
                 <button
                   type="button"
@@ -773,8 +846,9 @@ export function PartnerSignupPage() {
                 </button>
               </div>
               {payMethod === 'pix' ? (
-                <p className="partner__lead" style={{ marginTop: 12 }}>
-                  Ao confirmar, geramos um PIX (simulado) e liberamos o onboarding da loja.
+                <p className="partner__lead" style={{ marginTop: 12, marginBottom: 0 }}>
+                  Ao confirmar, geramos um PIX (simulado nesta etapa) e liberamos o onboarding da
+                  loja. Em produção o valor cai no gateway.
                 </p>
               ) : (
                 <div className="partner__grid" style={{ marginTop: 12 }}>
@@ -827,7 +901,9 @@ export function PartnerSignupPage() {
             </button>
           ) : (
             <button type="submit" className="btn btn--primary" disabled={submitting}>
-              {submitting ? 'Processando…' : 'Pagar e concluir'}
+              {submitting
+                ? 'Processando…'
+                : `Pagar ${selectedPlan.price}${selectedPlan.period} e concluir`}
             </button>
           )}
         </div>

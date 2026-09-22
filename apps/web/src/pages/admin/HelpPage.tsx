@@ -2,11 +2,10 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { useAuth } from '../../contexts/AuthContext';
+import { MARTHI_COMPANY, marthiWhatsAppHref } from '../../data/companyContact';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
 
-const WHATSAPP_HREF = 'https://wa.me/5524981244253';
-const INSTAGRAM_HREF = 'https://instagram.com/marthi.tecnologia';
 const SUPPORT_KEY = 'marthi_support_tickets';
 
 type SupportTicket = {
@@ -43,10 +42,9 @@ export function HelpPage() {
   const [tickets, setTickets] = useState(() => loadTickets());
 
   const waHref = useMemo(() => {
-    const text = encodeURIComponent(
+    return marthiWhatsAppHref(
       `Olá Marthi, sou ${profile.displayName} (${user?.email ?? ''}). Preciso de ajuda no painel.`,
     );
-    return `${WHATSAPP_HREF}?text=${text}`;
   }, [profile.displayName, user?.email]);
 
   if (!isAdmin) {
@@ -96,14 +94,25 @@ export function HelpPage() {
       <div className="admin-grid help-grid">
         <article className="admin-card">
           <h2>Falar com a Marthi</h2>
-          <p>Totem, painel, plano ou ajuste operacional.</p>
+          <p>
+            Sede: {MARTHI_COMPANY.addressLine}. Totem, painel, plano ou ajuste operacional.
+          </p>
           <div className="admin-toolbar admin-toolbar--stack">
             <a href={waHref} className="btn btn--primary" target="_blank" rel="noreferrer">
               <AdminIcon name="whatsapp" />
-              WhatsApp (24) 98124-4253
+              WhatsApp {MARTHI_COMPANY.whatsappDisplay}
             </a>
-            <a href={INSTAGRAM_HREF} className="btn btn--ghost" target="_blank" rel="noreferrer">
-              Instagram · @marthi.tecnologia
+            <a href={MARTHI_COMPANY.emailHref} className="btn btn--ghost">
+              <AdminIcon name="mail" />
+              {MARTHI_COMPANY.email}
+            </a>
+            <a
+              href={MARTHI_COMPANY.instagramHref}
+              className="btn btn--ghost"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Instagram · @{MARTHI_COMPANY.instagramHandle}
             </a>
           </div>
         </article>

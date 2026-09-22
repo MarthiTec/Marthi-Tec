@@ -89,9 +89,9 @@ export function PermissionsPage() {
         <h2>Permissões de acesso</h2>
         <p>
           Cadastre quem é usuário do sistema em{' '}
-          <Link to="/erp/funcionarios">Funcionários</Link> (marque “É usuário do sistema”) e
-          ajuste aqui as áreas liberadas. Apenas administradores gerenciam permissões e o plano da
-          loja.
+          <Link to="/painel/operacoes/usuarios">Operações → Usuários</Link> (marque “É usuário do
+          sistema”) e ajuste aqui as áreas liberadas. Apenas administradores gerenciam permissões e
+          o plano da loja.
         </p>
         {me ? (
           <p className="empty">

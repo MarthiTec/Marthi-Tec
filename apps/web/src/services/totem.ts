@@ -18,6 +18,10 @@ export type TotemLeadRequest = {
   payment: string;
   installment: string | null;
   priceLabel: string;
+  /** Destino WhatsApp da loja (painel). Sobrescreve EVOLUTION_STORE_NUMBER. */
+  storeWhatsApp?: string;
+  notifyCustomer?: boolean;
+  locationLabel?: string;
 };
 
 function shouldSendToKitchen() {
@@ -28,6 +32,14 @@ function shouldSendToKitchen() {
 export async function submitTotemLead(payload: TotemLeadRequest) {
   const ticket = enqueueTotemLead(payload);
   let customerNotified = false;
+  const settings = getTotemSettings();
+  const body = {
+    ...payload,
+    storeWhatsApp: payload.storeWhatsApp || settings.storeWhatsApp || undefined,
+    notifyCustomer:
+      payload.notifyCustomer ?? settings.notifyCustomerOnLead,
+    locationLabel: payload.locationLabel || settings.locationLabel || undefined,
+  };
 
   if (shouldSendToKitchen()) {
     try {
@@ -54,7 +66,7 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     const response = await fetch(`${API_URL}/api/v1/totem/leads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(2500),
     });
     const json = (await response.json()) as {

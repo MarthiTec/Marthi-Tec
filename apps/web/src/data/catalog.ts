@@ -2,7 +2,7 @@ export const PLANS = [
   {
     id: 'bronze',
     name: 'Bronze',
-    price: 'R$ 297',
+    price: 'R$ 197',
     period: '/mês',
     blurb: '1 módulo + painel da loja. Ideal para começar enxuto.',
     maxModules: 1,
@@ -18,7 +18,7 @@ export const PLANS = [
   {
     id: 'silver',
     name: 'Silver',
-    price: 'R$ 597',
+    price: 'R$ 497',
     period: '/mês',
     blurb: 'Até 2 módulos + time no painel e permissões.',
     featured: true,
@@ -35,8 +35,8 @@ export const PLANS = [
   {
     id: 'golden',
     name: 'Golden',
-    price: 'Sob consulta',
-    period: '',
+    price: 'R$ 597',
+    period: '/mês',
     blurb: 'Tudo liberado: Totem, OS, ERP/PDV, Fiscal e E-commerce.',
     maxModules: 5,
     allModules: true,

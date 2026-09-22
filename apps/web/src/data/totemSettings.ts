@@ -44,6 +44,15 @@ export type TotemSettings = {
   printTicket: boolean;
   /** Áudio de acessibilidade (voz em português). */
   audioAssist: boolean;
+  /**
+   * WhatsApp da loja que recebe o lead do totem (DDI+DDD+número, ex.: 5524999999999).
+   * O Evolution envia a mensagem PARA este número a partir da instância Marthi.
+   */
+  storeWhatsApp: string;
+  /** Se true, o cliente também recebe um aviso no WhatsApp após o pedido no totem. */
+  notifyCustomerOnLead: boolean;
+  /** Texto opcional na mensagem (ex.: Shopping Olga Sola, Três Rios). */
+  locationLabel: string;
 };
 
 export type TotemCopy = {
@@ -328,6 +337,9 @@ export function defaultTotemSettings(): TotemSettings {
     offerFulfillment: general.preset.offerFulfillment,
     printTicket: general.preset.printTicket,
     audioAssist: general.preset.audioAssist,
+    storeWhatsApp: '',
+    notifyCustomerOnLead: false,
+    locationLabel: '',
   };
 }
 
@@ -403,7 +415,15 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     offerFulfillment: Boolean(parsed?.offerFulfillment),
     printTicket: Boolean(parsed?.printTicket),
     audioAssist: Boolean(parsed?.audioAssist),
+    storeWhatsApp: normalizeWhatsAppDigits(parsed?.storeWhatsApp),
+    notifyCustomerOnLead: Boolean(parsed?.notifyCustomerOnLead),
+    locationLabel: typeof parsed?.locationLabel === 'string' ? parsed.locationLabel.trim().slice(0, 80) : '',
   };
+}
+
+function normalizeWhatsAppDigits(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\D/g, '').slice(0, 15);
 }
 
 function readStored(): Partial<TotemSettings> | null {
@@ -446,6 +466,9 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     offerFulfillment: patch.offerFulfillment ?? base?.offerFulfillment,
     printTicket: patch.printTicket ?? base?.printTicket,
     audioAssist: patch.audioAssist ?? base?.audioAssist,
+    storeWhatsApp: patch.storeWhatsApp ?? base?.storeWhatsApp,
+    notifyCustomerOnLead: patch.notifyCustomerOnLead ?? base?.notifyCustomerOnLead,
+    locationLabel: patch.locationLabel ?? base?.locationLabel,
   });
 }
 
@@ -490,6 +513,9 @@ export async function saveTotemSettings(input: Partial<TotemSettings>) {
       offerFulfillment: saved.offerFulfillment ?? next.offerFulfillment,
       printTicket: saved.printTicket ?? next.printTicket,
       audioAssist: saved.audioAssist ?? next.audioAssist,
+      storeWhatsApp: saved.storeWhatsApp ?? next.storeWhatsApp,
+      notifyCustomerOnLead: saved.notifyCustomerOnLead ?? next.notifyCustomerOnLead,
+      locationLabel: saved.locationLabel ?? next.locationLabel,
     });
   }
   return replaceTotemSettings(next);

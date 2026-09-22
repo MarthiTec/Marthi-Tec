@@ -99,7 +99,40 @@ export function saveDemoLead(input: {
 }
 
 export function grantDemoAccess(product: DemoProduct, leadId: string) {
-  sessionStorage.setItem(ACCESS_KEY, JSON.stringify({ product, leadId, at: Date.now() }));
+  let products: DemoProduct[] = [product];
+  try {
+    const raw = sessionStorage.getItem(ACCESS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { product?: string; products?: string[]; leadId?: string };
+      const prev = Array.isArray(parsed.products)
+        ? parsed.products
+        : parsed.product
+          ? [parsed.product]
+          : [];
+      products = [...new Set([...prev, product])].filter((item): item is DemoProduct =>
+        ['totem', 'caixa', 'os', 'erp'].includes(item),
+      );
+    }
+  } catch {
+    products = [product];
+  }
+  sessionStorage.setItem(
+    ACCESS_KEY,
+    JSON.stringify({ product, products, leadId, at: Date.now() }),
+  );
+}
+
+/** Libera demos + loja contratada (Golden) para apresentação ao vivo com o cliente. */
+export function enableLivePresentation(options?: { leadId?: string }) {
+  const leadId = options?.leadId ?? `LIVE-${Date.now().toString(36).toUpperCase()}`;
+  for (const product of ['totem', 'caixa', 'os', 'erp'] as DemoProduct[]) {
+    grantDemoAccess(product, leadId);
+  }
+  markStoreContracted();
+  void import('./storePlan').then(({ replaceStoreEntitlement, defaultEntitlement }) => {
+    replaceStoreEntitlement(defaultEntitlement());
+  });
+  return leadId;
 }
 
 export function hasDemoAccess(product: DemoProduct) {
@@ -107,8 +140,13 @@ export function hasDemoAccess(product: DemoProduct) {
   try {
     const raw = sessionStorage.getItem(ACCESS_KEY);
     if (!raw) return false;
-    const parsed = JSON.parse(raw) as { product?: string; at?: number };
-    if (parsed.product !== product) return false;
+    const parsed = JSON.parse(raw) as { product?: string; products?: string[]; at?: number };
+    const allowed = Array.isArray(parsed.products)
+      ? parsed.products
+      : parsed.product
+        ? [parsed.product]
+        : [];
+    if (!allowed.includes(product)) return false;
     // sessão de demo válida por 8h
     if (typeof parsed.at === 'number' && Date.now() - parsed.at > 8 * 60 * 60 * 1000) {
       return false;

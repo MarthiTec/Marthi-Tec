@@ -45,7 +45,7 @@ export function TotemAttractScene({
           {storeLogo ? (
             <img src={storeLogo} alt="" className="totem-attract__logo" />
           ) : (
-            <BrandLogo variant="hero" className="totem-attract__logo totem-attract__logo--brand" />
+            <BrandLogo variant="mark" className="totem-attract__logo totem-attract__logo--mark" />
           )}
         </div>
         <p className="totem-attract__hello">{greeting}</p>

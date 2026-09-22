@@ -164,15 +164,16 @@ body.totem-html-scroll #root {
 }
 
 .totem-attract__mark {
-  width: min(38vw, 196px);
-  height: min(38vw, 196px);
-  border-radius: 36px;
+  width: min(28vw, 120px);
+  height: min(28vw, 120px);
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(18px);
+  overflow: hidden;
 }
 
 .totem-attract__logo {
@@ -182,8 +183,15 @@ body.totem-html-scroll #root {
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.28));
 }
 
+.totem-attract__logo--mark {
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  filter: none;
+}
+
 .totem-attract__logo--brand {
-  filter: brightness(0) invert(1) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.28));
+  filter: none;
 }
 
 .totem-attract__hello {

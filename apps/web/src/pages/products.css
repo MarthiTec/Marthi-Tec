@@ -45,13 +45,39 @@
 .products-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
+}
+
+.products-hero__actions .btn--primary {
+  background: #0f766e;
+  border-color: #0f766e;
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.35);
+}
+
+.products-hero__actions .btn--primary:hover {
+  background: #0d9488;
 }
 
 .products-hero__actions .btn--ghost {
   border-color: rgba(255, 255, 255, 0.28);
   color: #fff;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.products-hero__actions .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn--with-icon svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .products-hero__visual {

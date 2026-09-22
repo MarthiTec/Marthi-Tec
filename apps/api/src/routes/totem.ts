@@ -15,6 +15,9 @@ const leadSchema = z.object({
   payment: z.string().trim().min(1),
   installment: z.string().trim().nullable().optional(),
   priceLabel: z.string().trim().min(1),
+  storeWhatsApp: z.string().trim().min(10).optional(),
+  notifyCustomer: z.boolean().optional(),
+  locationLabel: z.string().trim().max(80).optional(),
 });
 
 totemRouter.post('/api/v1/totem/leads', async (req, res, next) => {

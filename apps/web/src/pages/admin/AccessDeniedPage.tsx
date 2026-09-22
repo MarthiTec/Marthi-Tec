@@ -14,7 +14,8 @@ export function AccessDeniedPage({ pathname }: { pathname: string }) {
         </p>
         <p>
           Peça a um administrador para liberar a área no cadastro de{' '}
-          <Link to="/painel/funcionarios">Funcionários</Link>, vinculando o e-mail do seu login.
+          <Link to="/painel/operacoes/usuarios">Operações → Usuários</Link>, vinculando o e-mail do
+          seu login.
         </p>
         <div className="admin-toolbar admin-toolbar--stack">
           <Link to="/painel" className="btn btn--primary">

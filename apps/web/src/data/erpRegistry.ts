@@ -401,6 +401,7 @@ export function employeeHasArea(employee: Employee | null, area: AccessArea) {
 }
 
 export function pathToAccessArea(pathname: string): AccessArea | null {
+  if (pathname.startsWith('/painel/operacoes')) return null;
   // Catálogo lite do Totem (produtos/atributos) fica sob área totem — não exige erp_stock.
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'pdv';
@@ -519,6 +520,19 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
     ];
   }
   return [];
+}
+
+export function resolveAppHome(userEmail: string | null | undefined): string {
+  if (userIsStoreAdmin(userEmail)) return '/painel';
+  const employee = findEmployeeByUserEmail(userEmail);
+  if (!employee) return '/painel';
+  const areas = employee.accessAreas;
+  if (areas.includes('pdv')) return '/caixa';
+  if (areas.includes('os')) return '/os';
+  if (areas.includes('erp_fiscal') || areas.includes('erp_invoices')) return '/fiscal';
+  if (areas.includes('ecommerce')) return '/ecommerce';
+  if (areas.includes('totem')) return '/painel/totem';
+  return '/painel';
 }
 
 /** Administrador da loja (role admin) — ou bootstrap sem usuários vinculados. */

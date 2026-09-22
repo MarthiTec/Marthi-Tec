@@ -1,18 +1,26 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import { PLANS } from '../data/catalog';
 import { MARTHI_PRODUCTS } from '../data/marthiProducts';
-import { isStoreContracted } from '../data/demoLeadStore';
+import {
+  enableLivePresentation,
+  hasDemoAccess,
+  isStoreContracted,
+} from '../data/demoLeadStore';
+import {
+  MARTHI_COMPANY,
+  marthiWhatsAppHref,
+} from '../data/companyContact';
 import { ingestSellerApplicantToCrm, listLeadMessages, postHomepageCrmChat } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import './home.css';
 import './products.css';
 
-const WHATSAPP_HREF = 'https://wa.me/5524981244253';
-const INSTAGRAM_HREF = 'https://instagram.com/marthi.tecnologia';
+const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
+const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
 
 const HOME_PRODUCT_IDS = ['totem', 'pdv', 'os', 'fiscal', 'ecommerce', 'crm', 'erp', 'painel'] as const;
 
@@ -49,12 +57,14 @@ function IconLabel({ icon, children }: { icon: ReactNode; children: ReactNode })
 
 export function HomePage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('silver');
   const [helpOpen, setHelpOpen] = useState(false);
   const [contracted, setContracted] = useState(() => isStoreContracted());
   const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
     null,
   );
+  const [liveReady, setLiveReady] = useState(false);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactMsg, setContactMsg] = useState('');
@@ -74,6 +84,12 @@ export function HomePage() {
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
   const showFiscal = contracted && hasModule('fiscal');
+  /** Em apresentação ao vivo, abre módulos direto (sem pedir login). */
+  const liveOpen =
+    liveReady || hasDemoAccess('totem') || hasDemoAccess('caixa') || hasDemoAccess('os');
+  const caixaHref = user || liveOpen ? '/caixa' : '/login?next=/caixa';
+  const osHref = user || liveOpen ? '/os' : '/login?next=/os';
+  const fiscalHref = user || liveOpen ? '/fiscal' : '/login?next=/fiscal';
 
   const homeProducts = HOME_PRODUCT_IDS.map(
     (id) => MARTHI_PRODUCTS.find((item) => item.id === id)!,
@@ -96,6 +112,18 @@ export function HomePage() {
   }, [user]);
 
   useEffect(() => {
+    const live = searchParams.get('live');
+    if (live === '1' || live === 'totem') {
+      enableLivePresentation();
+      setContracted(true);
+      setLiveReady(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('live');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (!helpOpen) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') setHelpOpen(false);
@@ -115,9 +143,8 @@ export function HomePage() {
       <div className="site__glow" aria-hidden="true" />
 
       <header className="site__nav">
-        <a href="#topo" className="site__nav-brand" aria-label="Marthi Tecnologia">
-          <BrandLogo variant="mark" className="site__nav-mark" />
-          <span>Marthi Tecnologia</span>
+        <a href="#topo" className="site__nav-brand site__nav-brand--lockup" aria-label="Marthi Tecnologia">
+          <BrandLogo variant="lockup" className="site__nav-lockup" />
         </a>
         <button
           type="button"
@@ -132,13 +159,13 @@ export function HomePage() {
         </button>
         <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
           <Link to="/produtos" onClick={() => setNavOpen(false)}>
-            Nossos produtos
+            Produtos
           </Link>
           <a href="#planos" onClick={() => setNavOpen(false)}>
             Planos
           </a>
-          <a href="#contato" onClick={() => setNavOpen(false)}>
-            Canal CRM
+          <a href="#sobre" onClick={() => setNavOpen(false)}>
+            Sobre nós
           </a>
           <button
             type="button"
@@ -150,64 +177,11 @@ export function HomePage() {
           >
             Contato
           </button>
-          {showCaixa ? (
-            <Link to={user ? '/caixa' : '/login?next=/caixa'} onClick={() => setNavOpen(false)}>
-              Caixa
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="site__nav-link"
-              onClick={() => {
-                openDemo('caixa', '/caixa');
-                setNavOpen(false);
-              }}
-            >
-              Demo caixa
-            </button>
-          )}
-          {showOs ? (
-            <Link to={user ? '/os' : '/login?next=/os'} onClick={() => setNavOpen(false)}>
-              OS
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="site__nav-link"
-              onClick={() => {
-                openDemo('os', '/os');
-                setNavOpen(false);
-              }}
-            >
-              Demo OS
-            </button>
-          )}
-          {showFiscal ? (
-            <Link to={user ? '/fiscal' : '/login?next=/fiscal'} onClick={() => setNavOpen(false)}>
-              Fiscal
-            </Link>
-          ) : null}
-          {showTotem ? (
-            <Link to="/totem" onClick={() => setNavOpen(false)}>
-              Totem
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="site__nav-link"
-              onClick={() => {
-                openDemo('totem', '/totem');
-                setNavOpen(false);
-              }}
-            >
-              Demo totem
-            </button>
-          )}
-          <Link to="/login" onClick={() => setNavOpen(false)}>
-            Entrar
-          </Link>
           <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
-            Solicitar demonstração
+            Solicitar demo
+          </Link>
+          <Link to="/login" className="site__nav-login" onClick={() => setNavOpen(false)}>
+            Entrar
           </Link>
         </nav>
       </header>
@@ -236,15 +210,22 @@ export function HomePage() {
             <h2 id="site-help-title">Estamos aqui para ajudar.</h2>
             <div className="site-help__block">
               <strong>Fale com a Marthi</strong>
-              <p>Totem, painel, CRM ou cadastro de parceiro.</p>
+              <p>
+                Sede: {MARTHI_COMPANY.addressLine}. Totem, painel, CRM ou cadastro de parceiro.
+              </p>
               <a href={WHATSAPP_HREF} className="btn btn--whatsapp" target="_blank" rel="noreferrer">
-                <IconLabel icon={<IconWhatsApp />}>WhatsApp (24) 98124-4253</IconLabel>
+                <IconLabel icon={<IconWhatsApp />}>
+                  WhatsApp {MARTHI_COMPANY.whatsappDisplay}
+                </IconLabel>
+              </a>
+              <a href={MARTHI_COMPANY.emailHref} className="btn btn--ghost">
+                {MARTHI_COMPANY.email}
               </a>
             </div>
             <div className="site-help__block">
               <strong>Instagram</strong>
               <a href={INSTAGRAM_HREF} className="btn btn--ghost" target="_blank" rel="noreferrer">
-                <IconLabel icon={<IconInstagram />}>@marthi.tecnologia</IconLabel>
+                <IconLabel icon={<IconInstagram />}>@{MARTHI_COMPANY.instagramHandle}</IconLabel>
               </a>
             </div>
           </div>
@@ -252,35 +233,126 @@ export function HomePage() {
       ) : null}
 
       <main id="topo">
+        {liveReady ? (
+          <p className="site-live-banner" role="status">
+            Modo apresentação ativo · Totem, PDV e OS liberados nesta sessão.
+            <Link to="/totem">Abrir Totem agora</Link>
+          </p>
+        ) : null}
+
         <section className="hero">
           <div className="hero__media" aria-hidden="false">
             <img src="/home/mulher-app.jpg" alt="" />
             <div className="hero__veil" />
+            <div className="hero__grain" aria-hidden />
           </div>
           <div className="hero__copy">
-            <p className="hero__brand">Marthi</p>
-            <h1>A operação da sua loja, completa.</h1>
+            <p className="hero__brand" aria-label="Marthi">
+              Marthi
+            </p>
+            <h1>Tecnologia que coloca a loja no comando.</h1>
             <p>
-              Totem, PDV, OS, ERP, fiscal, e-commerce e CRM — novos negócios, um só ecossistema.
+              Totem, PDV, OS, fiscal e e-commerce no mesmo ritmo — feitos para o varejo brasileiro
+              operar com clareza.
             </p>
             <div className="hero__actions">
-              <Link to="/produtos" className="btn btn--primary">
-                Nossos produtos
-              </Link>
-              <Link to="/parceiro" className="btn btn--ghost hero__ghost">
+              <Link to="/parceiro" className="btn btn--primary btn--hero">
                 Solicitar demonstração
               </Link>
+              <Link to="/produtos" className="btn btn--ghost hero__ghost">
+                Ver produtos
+              </Link>
             </div>
+          </div>
+        </section>
+
+        <section id="totem" className="spotlight" aria-labelledby="spotlight-title">
+          <div className="spotlight__inner">
+            <div className="spotlight__copy">
+              <p className="eyebrow">Produto em destaque</p>
+              <h2 id="spotlight-title">Totem de autoatendimento</h2>
+              <p>
+                O cliente escolhe no touch, a loja recebe o interesse no WhatsApp e no painel.
+                Ideal para varejo, assistência e showroom — sem fila no balcão.
+              </p>
+              <ul className="spotlight__list">
+                <li>Catálogo touch com fotos e opções</li>
+                <li>Lead automático no WhatsApp da loja</li>
+                <li>Insights de conversão no painel</li>
+                <li>Marca da loja personalizável</li>
+              </ul>
+              <div className="spotlight__actions">
+                {showTotem ? (
+                  <Link to="/totem" className="btn btn--primary">
+                    Experimentar agora
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => openDemo('totem', '/totem')}
+                  >
+                    Ver demo do Totem
+                  </button>
+                )}
+                <Link to="/parceiro" className="btn btn--ghost">
+                  Falar com a Marthi
+                </Link>
+              </div>
+            </div>
+            <div className="spotlight__stage" aria-hidden="true">
+              <div className="spotlight__glow" />
+              <figure className="spotlight__device spotlight__device--back">
+                <img src="/totem/iphone-15/2.svg" alt="" />
+              </figure>
+              <figure className="spotlight__device spotlight__device--mid">
+                <img src="/totem/iphone-16-pro/1.svg" alt="" />
+              </figure>
+              <figure className="spotlight__device spotlight__device--front">
+                <img src="/totem/iphone-16-pro-max/3.svg" alt="" />
+              </figure>
+              <p className="spotlight__caption">Catálogo touch · lead na hora · painel da loja</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="journey" aria-labelledby="journey-title">
+          <div className="journey__inner">
+            <p className="eyebrow">Como funciona</p>
+            <h2 id="journey-title">Da vitrine ao fechamento, sem fricção.</h2>
+            <ol className="journey__steps">
+              <li>
+                <span className="journey__num">01</span>
+                <strong>Cliente escolhe</strong>
+                <p>Totem touch ou balcão — o mesmo catálogo, com fotos e opções reais.</p>
+              </li>
+              <li>
+                <span className="journey__num">02</span>
+                <strong>A loja recebe</strong>
+                <p>WhatsApp, painel e PDV sincronizados com o interesse ou o pedido.</p>
+              </li>
+              <li>
+                <span className="journey__num">03</span>
+                <strong>Equipe opera</strong>
+                <p>OS, fiscal e e-commerce no mesmo ecossistema — gestão com autoridade.</p>
+              </li>
+            </ol>
           </div>
         </section>
 
         {(showCaixa || showTotem || showOs || showFiscal) && (
           <section className="section section--launch" aria-label="Acesso rápido">
             <div className="launch-row">
+              {showTotem ? (
+                <Link to="/totem" className="launch-card launch-card--accent">
+                  <strong>Totem</strong>
+                  <span>Abrir autoatendimento</span>
+                </Link>
+              ) : null}
               {showCaixa ? (
-                <Link to={user ? '/caixa' : '/login?next=/caixa'} className="launch-card">
+                <Link to={caixaHref} className="launch-card">
                   <strong>Caixa / PDV</strong>
-                  <span>{user ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
+                  <span>{user || liveOpen ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
                 </Link>
               ) : null}
               {showCaixa || showTotem ? (
@@ -296,40 +368,36 @@ export function HomePage() {
                 </Link>
               ) : null}
               {showOs ? (
-                <Link to={user ? '/os' : '/login?next=/os'} className="launch-card">
+                <Link to={osHref} className="launch-card">
                   <strong>Ordem de serviço</strong>
-                  <span>{user ? 'Abrir oficina' : 'Entrar e abrir a oficina'}</span>
+                  <span>{user || liveOpen ? 'Abrir oficina' : 'Entrar e abrir a oficina'}</span>
                 </Link>
               ) : null}
               {showFiscal ? (
-                <Link to={user ? '/fiscal' : '/login?next=/fiscal'} className="launch-card">
+                <Link to={fiscalHref} className="launch-card">
                   <strong>Emissor Fiscal</strong>
-                  <span>{user ? 'Abrir NF-e / NFS-e / CT-e / MDF-e' : 'Entrar e abrir o emissor'}</span>
-                </Link>
-              ) : null}
-              {showTotem ? (
-                <Link to="/totem" className="launch-card">
-                  <strong>Totem</strong>
-                  <span>Abrir autoatendimento</span>
+                  <span>
+                    {user || liveOpen ? 'Abrir NF-e / NFS-e / CT-e / MDF-e' : 'Entrar e abrir o emissor'}
+                  </span>
                 </Link>
               ) : null}
             </div>
           </section>
         )}
 
-        <section className="split" aria-labelledby="split-title">
+        <section id="sobre" className="split" aria-labelledby="split-title">
           <figure className="split__photo">
             <img src="/home/equipe.jpg" alt="Equipe da loja colaborando no painel" />
           </figure>
           <div className="split__copy">
-            <p className="eyebrow">Na operação</p>
-            <h2 id="split-title">Da vitrine ao marketplace, sem fricção.</h2>
+            <p className="eyebrow">Sobre nós</p>
+            <h2 id="split-title">Construímos a operação completa da loja.</h2>
             <p>
-              O cliente escolhe no totem. A loja vende no caixa, atende na OS, emite nota, sincroniza
-              canais e fecha negócios no CRM.
+              A Marthi une totem, PDV, OS, fiscal e e-commerce para o varejo vender e atender sem
+              fricção entre canais — com painel, permissões e marca da loja.
             </p>
             <Link to="/produtos" className="btn btn--primary">
-              Ver tudo que atendemos
+              Conhecer os produtos
             </Link>
           </div>
         </section>
@@ -445,8 +513,8 @@ export function HomePage() {
                   .filter(Boolean)
                   .join('\n');
                 setJobFeedback('Abrindo WhatsApp… Candidatura também entrou no CRM.');
-                window.open(
-                  `${WHATSAPP_HREF}?text=${encodeURIComponent(text)}`,
+                  window.open(
+                  marthiWhatsAppHref(text),
                   '_blank',
                   'noopener,noreferrer',
                 );
@@ -505,25 +573,41 @@ export function HomePage() {
             <p className="eyebrow">Canal CRM</p>
             <h2>Converse com um vendedor Marthi.</h2>
             <p className="empty" style={{ marginTop: 8 }}>
-              Canal direto na plataforma — a mensagem chega no CRM da equipe comercial, como uma
-              rede social de atendimento.
+              Sede em {MARTHI_COMPANY.city} — {MARTHI_COMPANY.venue}, {MARTHI_COMPANY.district}. A
+              mensagem chega no CRM da equipe comercial.
             </p>
           </div>
           <div className="contact__grid">
+            <article>
+              <p className="contact__kicker">Sede</p>
+              <h3>{MARTHI_COMPANY.venue}</h3>
+              <p className="contact__meta">
+                {MARTHI_COMPANY.district} · {MARTHI_COMPANY.city} — {MARTHI_COMPANY.stateUf}
+              </p>
+            </article>
             <article>
               <p className="contact__kicker">
                 <IconLabel icon={<IconWhatsApp />}>WhatsApp</IconLabel>
               </p>
               <h3>Fale com a Marthi</h3>
               <a href={WHATSAPP_HREF} className="btn btn--whatsapp" target="_blank" rel="noreferrer">
-                <IconLabel icon={<IconWhatsApp />}>Conversar · (24) 98124-4253</IconLabel>
+                <IconLabel icon={<IconWhatsApp />}>
+                  Conversar · {MARTHI_COMPANY.whatsappDisplay}
+                </IconLabel>
+              </a>
+            </article>
+            <article>
+              <p className="contact__kicker">E-mail</p>
+              <h3>{MARTHI_COMPANY.email}</h3>
+              <a href={MARTHI_COMPANY.emailHref} className="btn btn--ghost">
+                Enviar e-mail
               </a>
             </article>
             <article>
               <p className="contact__kicker">
                 <IconLabel icon={<IconInstagram />}>Instagram</IconLabel>
               </p>
-              <h3>@marthi.tecnologia</h3>
+              <h3>@{MARTHI_COMPANY.instagramHandle}</h3>
               <a href={INSTAGRAM_HREF} className="btn btn--ghost" target="_blank" rel="noreferrer">
                 <IconLabel icon={<IconInstagram />}>Abrir Instagram</IconLabel>
               </a>
@@ -613,16 +697,17 @@ export function HomePage() {
 
       <footer className="site__footer">
         <div className="site__footer-brand">
-          <BrandLogo variant="mark" className="site__footer-mark" />
+          <BrandLogo variant="lockup" className="site__footer-lockup" />
           <div>
-            <strong>Marthi Tecnologia</strong>
-            <span>Totem, painel, CRM e o próximo passo do ERP.</span>
+            <strong>{MARTHI_COMPANY.legalName}</strong>
+            <span>{MARTHI_COMPANY.addressLine}</span>
+            <a href={MARTHI_COMPANY.emailHref}>{MARTHI_COMPANY.email}</a>
           </div>
         </div>
         <nav className="site__footer-links" aria-label="Links rápidos">
-          <Link to="/produtos">Nossos produtos</Link>
+          <Link to="/produtos">Produtos</Link>
           <a href="#planos">Planos</a>
-          <a href="#trabalhe-conosco">Trabalhe conosco</a>
+          <a href="#sobre">Sobre nós</a>
           <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer">
             <IconLabel icon={<IconWhatsApp />}>WhatsApp</IconLabel>
           </a>

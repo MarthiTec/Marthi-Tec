@@ -1117,6 +1117,33 @@ export function ingestSellerApplicantToCrm(input: {
   });
 }
 
+/** Interesse em contratar — cadastro pelo login / Solicitar demo leve. */
+export function ingestContractInterestToCrm(input: {
+  name: string;
+  email: string;
+  whatsapp: string;
+  company?: string;
+  notes?: string;
+}) {
+  const email = input.email.trim().toLowerCase();
+  const company = (input.company ?? '').trim();
+  return createCrmLead({
+    name: input.name,
+    email,
+    whatsapp: input.whatsapp,
+    source: 'partner',
+    interest: 'Contratar sistema Marthi',
+    notes: [
+      company ? `Empresa: ${company}` : '',
+      email ? `E-mail: ${email}` : '',
+      (input.notes ?? '').trim(),
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    externalRef: `contract:${email || input.whatsapp.replace(/\D/g, '')}`,
+  });
+}
+
 /**
  * Puxar lead do pool. Só um vendedor por vez.
  * Se já tiver dono diferente → bloqueia.

@@ -1,16 +1,18 @@
 type BrandLogoProps = {
-  variant?: 'mark' | 'wordmark' | 'full' | 'hero';
+  variant?: 'mark' | 'wordmark' | 'full' | 'hero' | 'lockup';
   className?: string;
 };
 
 const sources = {
-  mark: '/brand/logo-mark.png?v=4',
+  mark: '/brand/logo-mark.png?v=5',
   wordmark: '/brand/wordmark.png',
-  full: '/brand/logo-hero.png',
-  hero: '/brand/logo-hero.png',
+  /** Lockup completo transparente (MT + Marthi Tecnologia). */
+  full: '/brand/logo-lockup.png?v=2',
+  hero: '/brand/logo-lockup.png?v=2',
+  lockup: '/brand/logo-lockup.png?v=2',
 } as const;
 
-export function BrandLogo({ variant = 'hero', className }: BrandLogoProps) {
+export function BrandLogo({ variant = 'mark', className }: BrandLogoProps) {
   const mark = variant === 'mark';
   return (
     <img

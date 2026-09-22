@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { TeamUsersSection } from '../../components/TeamUsersSection';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
@@ -36,6 +37,7 @@ const EMPTY_DRAFT: Draft = {
 
 /** Atalhos configuráveis + presença da equipe. */
 export function OperationsPage() {
+  const location = useLocation();
   const [items, setItems] = useState(() => listOperationShortcuts());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -52,6 +54,12 @@ export function OperationsPage() {
       window.removeEventListener('storage', refresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (!location.pathname.endsWith('/usuarios')) return;
+    const el = document.getElementById('usuarios-loja');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [location.pathname]);
 
   function openCreate() {
     setEditing(true);
@@ -133,6 +141,10 @@ export function OperationsPage() {
           <div className="dash-hero__presence">
             <PresenceStatusControl />
           </div>
+          <Link to="/painel/operacoes/usuarios" className="btn btn--ghost">
+            <AdminIcon name="people" />
+            Usuários
+          </Link>
           <button type="button" className="btn btn--primary" onClick={openCreate}>
             <AdminIcon name="plus" />
             Nova operação
@@ -323,6 +335,8 @@ export function OperationsPage() {
       </article>
 
       <TeamPresenceBoard />
+
+      <TeamUsersSection variant="operations" id="usuarios-loja" />
     </section>
   );
 }
