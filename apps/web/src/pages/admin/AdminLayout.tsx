@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
@@ -97,11 +98,12 @@ function readCollapsed() {
 }
 
 export function AdminLayout() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
   usePresenceSession('painel');
   const { isDark } = usePanelTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
   const [openGroups, setOpenGroups] = useState<string[]>(() => {
@@ -337,9 +339,14 @@ export function AdminLayout() {
               <span className="admin__link-label">Plano da loja</span>
             </NavLink>
           ) : null}
-          <button type="button" className="admin__logout" onClick={logout} title="Sair">
+          <button
+            type="button"
+            className="admin__logout"
+            onClick={() => setLogoutOpen(true)}
+            title="Encerrar sessão Marthi"
+          >
             <AdminIcon name="logout" />
-            <span className="admin__link-label">Sair</span>
+            <span className="admin__link-label">Log-out</span>
           </button>
         </div>
       </aside>
@@ -385,6 +392,13 @@ export function AdminLayout() {
           onClick={() => setMenuOpen(false)}
         />
       ) : null}
+
+      <ExitOrLogoutDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        appName="Painel"
+        logoutOnly
+      />
     </div>
   );
 }

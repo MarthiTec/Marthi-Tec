@@ -10,9 +10,11 @@ import {
 import { logAccess } from '../data/auditLog';
 import { markStoreContracted } from '../data/demoLeadStore';
 import { bootstrapErpFromApi } from '../data/erpBootstrap';
+import { markPresenceOffline } from '../data/presenceStore';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
+  isLocalMarthiStaffToken,
   loginWithGoogle as apiLoginWithGoogle,
   loginWithPassword as apiLoginWithPassword,
   type AuthProviders,
@@ -48,12 +50,19 @@ async function applySession(
   localStorage.setItem(STORAGE_KEY, session.token);
   setToken(session.token);
   setUser(session.user);
-  markStoreContracted();
+  if (!isLocalMarthiStaffToken(session.token)) {
+    markStoreContracted();
+  }
   logAccess({
     actorName: session.user.name,
     actorEmail: session.user.email,
     action: 'login',
   });
+  if (isLocalMarthiStaffToken(session.token)) {
+    setErpReady(true);
+    setErpError(null);
+    return;
+  }
   const ok = await bootstrapErpFromApi();
   setErpReady(ok);
   setErpError(ok ? null : 'Não foi possível sincronizar o ERP. Tentaremos de novo.');
@@ -107,10 +116,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setUser(current);
         }
-        const ok = await bootstrapErpFromApi();
-        if (active) {
-          setErpReady(ok);
-          setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+        if (isLocalMarthiStaffToken(saved)) {
+          if (active) {
+            setErpReady(true);
+            setErpError(null);
+          }
+        } else {
+          const ok = await bootstrapErpFromApi();
+          if (active) {
+            setErpReady(ok);
+            setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+          }
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -142,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     if (user) {
+      markPresenceOffline(user.email, user.name);
       logAccess({
         actorName: user.name,
         actorEmail: user.email,

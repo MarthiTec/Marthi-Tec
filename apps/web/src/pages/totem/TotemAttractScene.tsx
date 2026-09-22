@@ -1,5 +1,9 @@
 import { BrandLogo } from '../../components/BrandLogo';
-import { hexToRgbChannel, normalizeHexColor } from '../../data/totemSettings';
+import {
+  hexToRgbChannel,
+  normalizeHexColor,
+  type TotemAttractLayout,
+} from '../../data/totemSettings';
 import './totem.css';
 
 export function TotemAttractScene({
@@ -8,6 +12,7 @@ export function TotemAttractScene({
   greeting,
   gradientColor,
   backgroundImage,
+  layout = 'standard',
   preview = false,
   onStartOrder,
   onBrowseCatalog,
@@ -17,17 +22,26 @@ export function TotemAttractScene({
   greeting: string;
   gradientColor: string;
   backgroundImage: string | null;
+  layout?: TotemAttractLayout;
   preview?: boolean;
   onStartOrder?: () => void;
   onBrowseCatalog?: () => void;
 }) {
   const color = normalizeHexColor(gradientColor);
   const hasPhoto = Boolean(backgroundImage);
+  const logoPromo = layout === 'logoPromo';
   const name = storeName.trim() || 'Sua Loja';
 
   return (
     <section
-      className={`totem-attract ${hasPhoto ? 'totem-attract--photo' : ''} ${preview ? 'totem-attract--preview' : ''}`}
+      className={[
+        'totem-attract',
+        hasPhoto ? 'totem-attract--photo' : '',
+        logoPromo ? 'totem-attract--logo-promo' : '',
+        preview ? 'totem-attract--preview' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{
         ['--attract-color' as string]: color,
         ['--attract-rgb' as string]: hexToRgbChannel(color),
@@ -36,24 +50,37 @@ export function TotemAttractScene({
     >
       <div className="totem-attract__photo" aria-hidden />
       <div className="totem-attract__wash" aria-hidden />
-      <div className="totem-attract__glow" aria-hidden />
-      <div className="totem-attract__glow totem-attract__glow--two" aria-hidden />
+      {!logoPromo ? (
+        <>
+          <div className="totem-attract__glow" aria-hidden />
+          <div className="totem-attract__glow totem-attract__glow--two" aria-hidden />
+        </>
+      ) : null}
       <div className="totem-attract__grain" aria-hidden />
 
       <div className="totem-attract__brand">
         <div className="totem-attract__mark">
           {storeLogo ? (
-            <img src={storeLogo} alt="" className="totem-attract__logo" />
+            <img src={storeLogo} alt={name} className="totem-attract__logo" />
           ) : (
             <BrandLogo variant="mark" className="totem-attract__logo totem-attract__logo--mark" />
           )}
         </div>
-        <p className="totem-attract__hello">{greeting}</p>
-        <h1>{name}</h1>
-        <p className="totem-attract__hint">
-          Toque para começar
-          <span className="totem-attract__pulse" aria-hidden />
-        </p>
+        {!logoPromo ? <p className="totem-attract__hello">{greeting}</p> : null}
+        {logoPromo && storeLogo ? (
+          <p className="totem-attract__hint totem-attract__hint--soft">
+            Toque para começar
+            <span className="totem-attract__pulse" aria-hidden />
+          </p>
+        ) : (
+          <>
+            <h1>{name}</h1>
+            <p className="totem-attract__hint">
+              Toque para começar
+              <span className="totem-attract__pulse" aria-hidden />
+            </p>
+          </>
+        )}
       </div>
 
       <div className="totem-attract__actions">

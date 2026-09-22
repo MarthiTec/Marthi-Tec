@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { useAuth } from '../../contexts/AuthContext';
+import { logAction } from '../../data/auditLog';
 import {
   adjustStockQty,
   cancelPosSaleOrder,
@@ -7,12 +9,21 @@ import {
   findStockMatches,
   getAdminState,
   getOrderById,
+  restorePosSaleOrder,
   searchOrders,
   upsertCustomer,
   type Customer,
   type SalesOrder,
   type StockItem,
 } from '../../data/adminStore';
+import {
+  hoursLeftLabel,
+  listCanceledSalesWithinWindow,
+  markCanceledSaleRestored,
+  registerCanceledSale,
+  type CanceledSaleEntry,
+  CANCELED_SALES_EVENT,
+} from '../../data/canceledSalesStore';
 import {
   addCashAporte,
   addCashSangria,
@@ -48,6 +59,7 @@ import {
   reprintFiscalDocument,
 } from '../../data/fiscalDocuments';
 import { hasModule } from '../../data/storePlan';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -108,6 +120,7 @@ function formatDisplay(iso: string) {
 
 export type CaixaPanel =
   | 'sales'
+  | 'canceled'
   | 'open'
   | 'aporte'
   | 'sangria'
@@ -138,6 +151,7 @@ export function CaixaPanelHost(props: PanelProps) {
       <button type="button" className="pdv__modal-backdrop" aria-label="Fechar" onClick={onClose} />
       <div className="admin-card pdv__modal-card pdv__modal-card--wide">
         {panel === 'sales' ? <SalesPanel {...props} /> : null}
+        {panel === 'canceled' ? <CanceledSalesPanel {...props} /> : null}
         {panel === 'open' ? <OpenPanel {...props} /> : null}
         {panel === 'aporte' || panel === 'sangria' ? <SupplyPanel {...props} kind={panel} /> : null}
         {panel === 'movements' ? <MovementsPanel {...props} /> : null}
@@ -153,6 +167,8 @@ export function CaixaPanelHost(props: PanelProps) {
 }
 
 function SalesPanel({ onClose, onDone, onError }: PanelProps) {
+  const { user } = useAuth();
+  const { confirm, dialog } = useConfirmDialog();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<SalesOrder | null>(null);
   const [tick, setTick] = useState(0);
@@ -205,23 +221,41 @@ function SalesPanel({ onClose, onDone, onError }: PanelProps) {
     );
   }
 
-  function cancelSale() {
+  async function cancelSale() {
     if (!selected) return;
-    if (!window.confirm(`Cancelar a venda ${selected.id}?`)) return;
+    const ok = await confirm({
+      title: 'Cancelar venda?',
+      message: `Tem certeza que deseja cancelar a venda ${selected.id}? Ela ficará disponível para estorno por 24 horas.`,
+      confirmLabel: 'Cancelar venda',
+      danger: true,
+    });
+    if (!ok) return;
     const fiscalCancel = cancelFiscalDocumentForSale(selected.id);
     const result = cancelPosSaleOrder(selected.id);
     if (!result.ok) {
       onError(result.error);
       return;
     }
+    registerCanceledSale({
+      order: result.order,
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+    });
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'pdv.venda.cancelar',
+      detail: `${result.order.id} · ${money(result.order.amount)} · estorno 24h`,
+    });
     refresh();
     onDone(
-      `Venda ${result.order.id} cancelada${fiscalCancel.ok ? ` · ${FISCAL_KIND_LABEL[fiscalCancel.document.kind]} cancelada` : ''}`,
+      `Venda ${result.order.id} cancelada (estorno 24h)${fiscalCancel.ok ? ` · ${FISCAL_KIND_LABEL[fiscalCancel.document.kind]} cancelada` : ''}`,
     );
   }
 
   return (
     <div className="caixa-panel caixa-panel--sales">
+      {dialog}
       <div className="caixa-panel__head">
         <h2>Consultar vendas</h2>
         <p className="empty">Busque por pedido, cliente, produto ou pagamento.</p>
@@ -337,7 +371,7 @@ function SalesPanel({ onClose, onDone, onError }: PanelProps) {
             <button
               type="button"
               className="btn btn--ghost"
-              onClick={cancelSale}
+              onClick={() => void cancelSale()}
               disabled={selected.status === 'cancelled'}
             >
               Cancelar venda
@@ -354,6 +388,109 @@ function SalesPanel({ onClose, onDone, onError }: PanelProps) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
+  const { user } = useAuth();
+  const { confirm, dialog } = useConfirmDialog();
+  const [entries, setEntries] = useState<CanceledSaleEntry[]>(() => listCanceledSalesWithinWindow());
+
+  useEffect(() => {
+    function refresh() {
+      setEntries(listCanceledSalesWithinWindow());
+    }
+    refresh();
+    window.addEventListener(CANCELED_SALES_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(CANCELED_SALES_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  async function restore(entry: CanceledSaleEntry) {
+    const ok = await confirm({
+      title: 'Estornar cancelamento?',
+      message: `Tem certeza que deseja restaurar a venda ${entry.orderId}? O cancelamento será revertido.`,
+      confirmLabel: 'Restaurar venda',
+      danger: false,
+    });
+    if (!ok) return;
+    const result = restorePosSaleOrder(entry.orderId, entry.snapshot);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    markCanceledSaleRestored(entry.id);
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'pdv.venda.restaurar',
+      detail: `${result.order.id} · ${money(result.order.amount)} · estorno do cancelamento`,
+    });
+    setEntries(listCanceledSalesWithinWindow());
+    onDone(`Venda ${result.order.id} restaurada (estorno do cancelamento).`);
+  }
+
+  return (
+    <div className="caixa-panel caixa-panel--canceled">
+      {dialog}
+      <div className="caixa-panel__head">
+        <h2>Vendas canceladas (24h)</h2>
+        <p className="empty">
+          Cancelamentos recentes ficam aqui por 24 horas para possível estorno. Depois são removidos
+          automaticamente.
+        </p>
+      </div>
+      <div className="caixa-panel__table">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Cliente</th>
+              <th>Valor</th>
+              <th>Cancelado em</th>
+              <th>Expira em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  <p className="empty">Nenhuma venda cancelada na janela de 24h.</p>
+                </td>
+              </tr>
+            ) : (
+              entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>{entry.orderId}</td>
+                  <td>{entry.snapshot.customerName}</td>
+                  <td className="price-red">{money(entry.snapshot.amount)}</td>
+                  <td>{formatDisplay(entry.canceledAt)}</td>
+                  <td>{hoursLeftLabel(entry.expiresAt)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => void restore(entry)}
+                    >
+                      Restaurar
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--primary" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
     </div>
   );
 }
@@ -568,6 +705,7 @@ function SupplyPanel({
 type CashSupplyMovement = CashMovement & { kind: 'aporte' | 'sangria' };
 
 function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const { confirm, dialog } = useConfirmDialog();
   const employees = useMemo(() => listEmployees(true), []);
   const rows = useMemo(
     () =>
@@ -636,7 +774,15 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
     onDone('Movimento atualizado e saldo recalculado.');
   }
 
-  function remove(id: string) {
+  async function remove(id: string) {
+    const row = rows.find((item) => item.id === id);
+    const ok = await confirm({
+      title: 'Excluir movimento?',
+      message: `Tem certeza que deseja excluir este ${row ? CASH_KIND_LABEL[row.kind].toLowerCase() : 'movimento'}? O saldo do caixa será recalculado.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    });
+    if (!ok) return;
     const result = deleteCashMovement(id);
     if (!result.ok) {
       onError(result.error);
@@ -649,6 +795,7 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
 
   return (
     <div className="caixa-panel caixa-panel--fit">
+      {dialog}
       <div className="caixa-panel__head">
         <h2>Sangrias e aportes</h2>
         <p className="empty">Consulte, edite no grid ou exclua lançamentos do caixa aberto.</p>
@@ -800,7 +947,7 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
                                     type="button"
                                     className="btn btn--ghost"
                                     disabled={Boolean(editingId)}
-                                    onClick={() => remove(row.id)}
+                                    onClick={() => void remove(row.id)}
                                   >
                                     Excluir
                                   </button>
@@ -1136,6 +1283,7 @@ function ExchangePanel({ operatorName, onClose, onDone, onError, onRefresh }: Pa
 }
 
 function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+  const { confirm, dialog } = useConfirmDialog();
   const [mode, setMode] = useState<'issue' | 'redeem' | 'list'>('list');
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
@@ -1147,6 +1295,23 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
   function refresh() {
     setCredits(listStoreCredits());
     onRefresh();
+  }
+
+  async function cancelCredit(creditId: string, code: string) {
+    const ok = await confirm({
+      title: 'Cancelar vale?',
+      message: `Tem certeza que deseja cancelar o vale ${code}? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Cancelar vale',
+      danger: true,
+    });
+    if (!ok) return;
+    const result = cancelStoreCredit(creditId);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    refresh();
+    onDone(`Vale ${code} cancelado.`);
   }
 
   function issue(event: FormEvent) {
@@ -1186,6 +1351,7 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
 
   return (
     <div className="caixa-panel caixa-panel--fit">
+      {dialog}
       <div className="caixa-panel__head">
         <h2>Vale-compra</h2>
       </div>
@@ -1228,14 +1394,7 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
                         <button
                           type="button"
                           className="btn btn--ghost"
-                          onClick={() => {
-                            const result = cancelStoreCredit(credit.id);
-                            if (!result.ok) onError(result.error);
-                            else {
-                              refresh();
-                              onDone(`Vale ${credit.code} cancelado.`);
-                            }
-                          }}
+                          onClick={() => void cancelCredit(credit.id, credit.code)}
                         >
                           Cancelar
                         </button>

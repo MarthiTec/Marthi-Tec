@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
@@ -10,7 +11,6 @@ import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } fro
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import '../admin/admin.css';
 import './crm.css';
 
@@ -49,8 +49,6 @@ export function CrmLayout() {
   }, [seller.sellerId, seller.sellerName]);
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
 
   const [inboxTick, setInboxTick] = useState(0);
   const unanswered = useMemo(
@@ -91,15 +89,6 @@ export function CrmLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
-  }
-
   if (loading) {
     return (
       <div className={`crm-app ${isDark ? 'is-theme-dark' : ''}`}>
@@ -130,15 +119,7 @@ export function CrmLayout() {
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>
         </div>
-        <button
-          type="button"
-          className="crm-app__exit"
-          onClick={() => {
-            setExitOpen(true);
-            setExitPassword('');
-            setExitError(null);
-          }}
-        >
+        <button type="button" className="crm-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>
       </header>
@@ -214,34 +195,12 @@ export function CrmLayout() {
         </div>
       </div>
 
-      {exitOpen ? (
-        <div className="crm-lock" role="dialog" aria-modal="true">
-          <form className="crm-lock__card" onSubmit={confirmExit}>
-            <h2 style={{ margin: 0 }}>Saída protegida</h2>
-            <p className="empty" style={{ margin: 0 }}>
-              Digite a senha da loja para sair do CRM.
-            </p>
-            {exitError ? <p className="qty-low">{exitError}</p> : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-              />
-            </label>
-            <div className="admin-toolbar">
-              <button type="button" className="btn btn--ghost" onClick={() => setExitOpen(false)}>
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Sair
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="CRM"
+        exitActionLabel="Sair do CRM"
+      />
 
       <CrmSellerAlerts />
     </div>

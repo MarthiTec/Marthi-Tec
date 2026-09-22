@@ -1,14 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -80,8 +80,6 @@ export function ErpLayout() {
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
 
   const title = TITLES[location.pathname] ?? {
     kicker: 'ERP',
@@ -118,21 +116,6 @@ export function ErpLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
 
-  function requestExit() {
-    setExitOpen(true);
-    setExitPassword('');
-    setExitError(null);
-  }
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
-  }
-
   function renderNav(items: NavItem[]) {
     return items.map((item) => (
       <NavLink
@@ -166,7 +149,7 @@ export function ErpLayout() {
         <div className="erp-app__brand">
           <strong>Marthi ERP</strong>
         </div>
-        <button type="button" className="erp-app__exit" onClick={requestExit}>
+        <button type="button" className="erp-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>
       </header>
@@ -243,45 +226,12 @@ export function ErpLayout() {
         </div>
       </div>
 
-      {exitOpen ? (
-        <div className="erp-lock" role="dialog" aria-modal="true" aria-labelledby="erp-exit-title">
-          <form className="erp-lock__card" onSubmit={confirmExit}>
-            <h2 id="erp-exit-title">Saída protegida</h2>
-            <p>Digite a senha da loja para sair do ERP. O operador não acessa o painel por aqui.</p>
-            {exitError ? (
-              <p className="pdv__alert" role="alert">
-                {exitError}
-              </p>
-            ) : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-                autoComplete="current-password"
-              />
-            </label>
-            <div className="erp-lock__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setExitOpen(false);
-                  setExitPassword('');
-                  setExitError(null);
-                }}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Sair do ERP
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="ERP"
+        exitActionLabel="Sair do ERP"
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { UserChip } from '../../components/UserChip';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
@@ -27,7 +28,7 @@ import { listSellers } from '../../data/erpRegistry';
 import { emitNfeFromSale, emitSaleCheckoutDocument, FISCAL_KIND_LABEL } from '../../data/fiscalDocuments';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
-import { getTotemExitPassword, getTotemSettings } from '../../data/totemSettings';
+import { getTotemSettings } from '../../data/totemSettings';
 import { enqueueKitchenOrder } from '../../data/kitchenOrderStore';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
@@ -92,8 +93,6 @@ export function CaixaPage() {
   const { isDark } = usePanelTheme();
   const operatorName = user?.name ?? 'Operador';
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
   const initial = getAdminState();
   const [customers, setCustomers] = useState(initial.customers);
   const [stock, setStock] = useState(initial.stock);
@@ -415,17 +414,6 @@ export function CaixaPage() {
 
   function requestExit() {
     setExitOpen(true);
-    setExitPassword('');
-    setExitError(null);
-  }
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta. Só a loja pode sair do PDV.');
-      return;
-    }
-    navigate(user ? '/painel' : '/');
   }
 
   useEffect(() => {
@@ -553,6 +541,16 @@ export function CaixaPage() {
           openPanelRef.current('sales');
           return;
         }
+        if (key === 'e') {
+          event.preventDefault();
+          openPanelRef.current('canceled');
+          return;
+        }
+        if (key === 'e') {
+          event.preventDefault();
+          openPanelRef.current('canceled');
+          return;
+        }
         if (key === 'v') {
           event.preventDefault();
           if (cashOpen) openPanelRef.current('vale');
@@ -678,6 +676,14 @@ export function CaixaPage() {
           <button type="button" onClick={() => openPanel('sales')}>
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
+          </button>
+          <button type="button" onClick={() => openPanel('canceled')}>
+            <kbd>Alt+E</kbd>
+            <span>Estorno (24h)</span>
+          </button>
+          <button type="button" onClick={() => openPanel('canceled')}>
+            <kbd>Alt+E</kbd>
+            <span>Estorno (24h)</span>
           </button>
           <button type="button" disabled={!cashOpen} onClick={() => openPanel('exchange')}>
             <kbd>F6</kbd>
@@ -1122,44 +1128,16 @@ export function CaixaPage() {
       )}
       </div>
 
-      {exitOpen ? (
-        <div className="caixa-lock" role="dialog" aria-modal="true" aria-labelledby="caixa-exit-title">
-          <form className="caixa-lock__card" onSubmit={confirmExit}>
-            <h2 id="caixa-exit-title">Saída protegida</h2>
-            <p>Digite a senha da loja para sair do PDV. O operador não acessa o painel por aqui.</p>
-            {exitError ? (
-              <p className="pdv__alert" role="alert">
-                {exitError}
-              </p>
-            ) : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-                autoComplete="current-password"
-              />
-            </label>
-            <div className="caixa-lock__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setExitOpen(false);
-                  focusCode();
-                }}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Sair do PDV
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => {
+          setExitOpen(false);
+          focusCode();
+        }}
+        appName="PDV"
+        exitActionLabel="Sair do PDV"
+        afterExitTo={user ? '/painel' : '/'}
+      />
     </div>
   );
 }

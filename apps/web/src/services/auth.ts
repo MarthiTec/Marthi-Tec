@@ -1,7 +1,12 @@
+import {
+  getMarthiStaffDemoCredentials,
+  matchesMarthiStaffLogin,
+} from '../data/marthiStaff';
 import { nestApiUrl } from './config';
 import { readJson } from './http';
 
 const API_URL = nestApiUrl();
+const MARTHI_STAFF_TOKEN_PREFIX = 'marthi-staff-local:';
 
 export type AuthUser = {
   id: string;
@@ -30,6 +35,24 @@ type ApiErrorBody = {
   };
 };
 
+function issueLocalMarthiStaffSession(): AuthSession {
+  const creds = getMarthiStaffDemoCredentials();
+  return {
+    token: `${MARTHI_STAFF_TOKEN_PREFIX}${creds.email}`,
+    user: {
+      id: `marthi-staff:${creds.email}`,
+      email: creds.email,
+      name: creds.name,
+      picture: null,
+      provider: 'password',
+    },
+  };
+}
+
+export function isLocalMarthiStaffToken(token: string | null | undefined) {
+  return Boolean(token?.startsWith(MARTHI_STAFF_TOKEN_PREFIX));
+}
+
 async function parseAuth<T>(response: Response): Promise<T> {
   const json = await readJson<T | ApiErrorBody>(response);
   if (!response.ok || (json as ApiErrorBody).success === false) {
@@ -47,6 +70,23 @@ export async function fetchAuthProviders(): Promise<AuthProviders> {
 }
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthSession> {
+  if (matchesMarthiStaffLogin(email, password)) {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (response.ok) {
+        const json = await parseAuth<{ success: true; data: AuthSession }>(response);
+        return json.data;
+      }
+    } catch {
+      /* API indisponível — usa sessão local de staff */
+    }
+    return issueLocalMarthiStaffSession();
+  }
+
   const response = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -67,6 +107,9 @@ export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
 }
 
 export async function fetchCurrentUser(token: string): Promise<AuthUser> {
+  if (isLocalMarthiStaffToken(token)) {
+    return issueLocalMarthiStaffSession().user;
+  }
   const response = await fetch(`${API_URL}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });

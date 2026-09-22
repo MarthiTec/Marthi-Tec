@@ -153,6 +153,7 @@ export function TotemPage() {
   const [attractGradientColor, setAttractGradientColor] = useState(
     () => getTotemSettings().attractGradientColor,
   );
+  const [attractLayout, setAttractLayout] = useState(() => getTotemSettings().attractLayout);
   const [keyboardPlacement, setKeyboardPlacement] = useState<TotemKeyboardPlacement>(
     () => getTotemSettings().keyboardPlacement,
   );
@@ -401,6 +402,7 @@ export function TotemPage() {
       setStoreLogo(settings.storeLogo);
       setAttractBackground(settings.attractBackground);
       setAttractGradientColor(settings.attractGradientColor);
+      setAttractLayout(settings.attractLayout);
       setKeyboardPlacement(settings.keyboardPlacement);
       setRequiredExitPassword(settings.exitPassword);
       setCardAttrs(totemCardAttributes());
@@ -657,6 +659,7 @@ export function TotemPage() {
           greeting={greeting}
           gradientColor={attractGradientColor}
           backgroundImage={attractBackground}
+          layout={attractLayout}
           onStartOrder={beginOrder}
           onBrowseCatalog={beginCatalogBrowse}
         />
@@ -1194,9 +1197,13 @@ export function TotemPage() {
 
       {exitOpen && (
         <div className="totem-lock" role="dialog" aria-modal="true" aria-labelledby="totem-exit-title">
-          <form className="totem-lock__card" onSubmit={confirmExit}>
+          <form
+            id="totem-exit-form"
+            className="totem-lock__card"
+            onSubmit={confirmExit}
+          >
             <h2 id="totem-exit-title">Saída protegida</h2>
-            <p>Digite a senha da loja para fechar o totem. Clientes não devem sair desta tela.</p>
+            <p>Digite a senha da loja no teclado abaixo para fechar o totem.</p>
             {exitError && (
               <p className="totem__error" role="alert">
                 {exitError}
@@ -1207,15 +1214,37 @@ export function TotemPage() {
               <input
                 type="password"
                 value={exitPassword}
-                onChange={(e) => {
-                  setExitPassword(e.target.value);
-                  setExitError(null);
-                }}
-                autoFocus
-                autoComplete="current-password"
-                placeholder="Senha da loja"
+                readOnly
+                inputMode="none"
+                autoComplete="off"
+                placeholder="Use o teclado virtual"
+                aria-describedby="totem-exit-kb"
               />
             </label>
+            <div className="totem-lock__kb" id="totem-exit-kb">
+              <TotemKeyboard
+                onKey={(char) => {
+                  setExitPassword((current) => `${current}${char}`.slice(0, 32));
+                  setExitError(null);
+                }}
+                onBackspace={() => {
+                  setExitPassword((current) => current.slice(0, -1));
+                  setExitError(null);
+                }}
+                onSpace={() => {
+                  setExitPassword((current) => `${current} `.slice(0, 32));
+                  setExitError(null);
+                }}
+                onClear={() => {
+                  setExitPassword('');
+                  setExitError(null);
+                }}
+                onClose={() => {
+                  const form = document.getElementById('totem-exit-form') as HTMLFormElement | null;
+                  form?.requestSubmit();
+                }}
+              />
+            </div>
             <div className="totem-lock__actions">
               <button
                 type="button"

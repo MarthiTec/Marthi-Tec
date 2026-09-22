@@ -72,6 +72,9 @@ import { WarehousePage } from './pages/admin/WarehousePage';
 import { PermissionsPage } from './pages/admin/PermissionsPage';
 import { HelpPage } from './pages/admin/HelpPage';
 import { OperatorAccountPage } from './pages/shared/OperatorAccountPage';
+import { MarthiLayout } from './pages/marthi/MarthiLayout';
+import { MarthiDashboardPage } from './pages/marthi/MarthiDashboardPage';
+import { MarthiClientsPage } from './pages/marthi/MarthiClientsPage';
 
 export function App() {
   return (
@@ -86,6 +89,11 @@ export function App() {
         <Route path="/caixa" element={<CaixaPage />} />
         <Route path="/mesa" element={<MesaPage />} />
         <Route path="/cozinha" element={<CozinhaPage />} />
+        <Route path="/marthi" element={<MarthiLayout />}>
+          <Route index element={<MarthiDashboardPage />} />
+          <Route path="clientes" element={<MarthiClientsPage />} />
+        </Route>
+        <Route path="/painel-marthi" element={<Navigate to="/marthi" replace />} />
         <Route path="/os" element={<OsLayout />}>
           <Route index element={<WorkOrdersPage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />

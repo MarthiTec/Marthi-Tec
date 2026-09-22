@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { getAdminState, type StockItem } from '../../data/adminStore';
 import {
   CHANNEL_LABEL,
@@ -12,7 +13,6 @@ import {
   seatTable,
   type RestaurantTable,
 } from '../../data/kitchenOrderStore';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import './mesa.css';
 
@@ -36,7 +36,6 @@ function menuItems(stock: StockItem[]) {
 }
 
 export function MesaPage() {
-  const navigate = useNavigate();
   const { isDark } = usePanelTheme();
   const [tables, setTables] = useState(() => listRestaurantTables());
   const [activeOrders, setActiveOrders] = useState(() => listKitchenOrders({ activeOnly: true }));
@@ -48,8 +47,6 @@ export function MesaPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
 
   const stock = useMemo(() => menuItems(getAdminState().stock), []);
   const selected = selectedId ? tables.find((item) => item.id === selectedId) ?? null : null;
@@ -166,15 +163,6 @@ export function MesaPage() {
     setMessage(`${selected.label} liberada.`);
     setCart([]);
     setGuestName('');
-  }
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
   }
 
   const tableOrders = selected
@@ -332,32 +320,12 @@ export function MesaPage() {
         </section>
       </div>
 
-      {exitOpen ? (
-        <div className="mesa-lock" role="dialog" aria-modal="true">
-          <form className="mesa-lock__card" onSubmit={confirmExit}>
-            <h2>Saída protegida</h2>
-            <p>Digite a senha da loja para sair do controle de mesas.</p>
-            {exitError ? <p className="mesa-alert">{exitError}</p> : null}
-            <label className="mesa-field">
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-              />
-            </label>
-            <div className="mesa-lock__actions">
-              <button type="button" className="mesa-btn mesa-btn--ghost" onClick={() => setExitOpen(false)}>
-                Cancelar
-              </button>
-              <button type="submit" className="mesa-btn mesa-btn--primary">
-                Sair
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="Mesas"
+        exitActionLabel="Sair das mesas"
+      />
     </div>
   );
 }

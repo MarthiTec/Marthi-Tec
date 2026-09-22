@@ -1,14 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -55,8 +55,6 @@ export function EcommerceLayout() {
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
 
   const title = TITLES[location.pathname] ?? {
     kicker: 'E-commerce',
@@ -93,17 +91,6 @@ export function EcommerceLayout() {
 
   function requestExit() {
     setExitOpen(true);
-    setExitPassword('');
-    setExitError(null);
-  }
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
   }
 
   return (
@@ -221,50 +208,12 @@ export function EcommerceLayout() {
         </div>
       </div>
 
-      {exitOpen ? (
-        <div
-          className="ecommerce-lock"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ecommerce-exit-title"
-        >
-          <form className="ecommerce-lock__card" onSubmit={confirmExit}>
-            <h2 id="ecommerce-exit-title">Saída protegida</h2>
-            <p>Digite a senha da loja para sair do e-commerce.</p>
-            {exitError ? (
-              <p className="pdv__alert" role="alert">
-                {exitError}
-              </p>
-            ) : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-                autoComplete="current-password"
-              />
-            </label>
-            <div className="ecommerce-lock__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setExitOpen(false);
-                  setExitPassword('');
-                  setExitError(null);
-                }}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Sair
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="e-commerce"
+        exitActionLabel="Sair"
+      />
     </div>
   );
 }

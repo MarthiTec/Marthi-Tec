@@ -309,6 +309,16 @@ export function PartnerSignupPage() {
           planName: selectedPlan.name,
         });
       });
+      void import('../data/marthiClientsStore').then(({ ingestPartnerSignupToMarthiClients }) => {
+        ingestPartnerSignupToMarthiClients({
+          protocol: result.id,
+          tradeName: form.tradeName.trim() || form.legalName.trim(),
+          email: form.email.trim(),
+          planId: form.planId,
+          modules: form.modules,
+          notes: form.notes.trim() || `Cadastro parceiro · ${selectedPlan.name}`,
+        });
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao enviar cadastro.');
     } finally {

@@ -5,6 +5,7 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
 import { ingestContractInterestToCrm } from '../data/crmStore';
 import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
+import { isMarthiStaffEmail } from '../data/marthiStaff';
 
 type AuthView = 'login' | 'forgot' | 'signup';
 
@@ -13,7 +14,13 @@ function safeNext(value: string | null, email: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
     return fallback;
   }
-  if (value === '/painel' && !userIsStoreAdmin(email)) return fallback;
+  if (value.startsWith('/marthi')) {
+    if (!isMarthiStaffEmail(email)) return fallback;
+    return value;
+  }
+  if (value === '/painel' && !userIsStoreAdmin(email) && !isMarthiStaffEmail(email)) {
+    return fallback;
+  }
   return value;
 }
 

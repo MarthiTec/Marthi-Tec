@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
@@ -49,8 +49,6 @@ export function OsLayout() {
   usePresenceSession('os');
   const { isDark } = usePanelTheme();
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
   const [opsMenuOpen, setOpsMenuOpen] = useState(false);
   const [panel, setPanel] = useState<OsPanel>(null);
   const openPanelRef = useRef<(next: Exclude<OsPanel, null>) => void>(() => undefined);
@@ -98,8 +96,6 @@ export function OsLayout() {
         if (exitOpen) {
           event.preventDefault();
           setExitOpen(false);
-          setExitPassword('');
-          setExitError(null);
           return;
         }
         if (panel) {
@@ -186,17 +182,6 @@ export function OsLayout() {
 
   function requestExit() {
     setExitOpen(true);
-    setExitPassword('');
-    setExitError(null);
-  }
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
   }
 
   return (
@@ -326,45 +311,12 @@ export function OsLayout() {
         />
       ) : null}
 
-      {exitOpen ? (
-        <div className="os-lock" role="dialog" aria-modal="true" aria-labelledby="os-exit-title">
-          <form className="os-lock__card" onSubmit={confirmExit}>
-            <h2 id="os-exit-title">Saída protegida</h2>
-            <p>Digite a senha da loja para sair da oficina. O operador não acessa o painel por aqui.</p>
-            {exitError ? (
-              <p className="pdv__alert" role="alert">
-                {exitError}
-              </p>
-            ) : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-                autoComplete="current-password"
-              />
-            </label>
-            <div className="os-lock__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setExitOpen(false);
-                  setExitPassword('');
-                  setExitError(null);
-                }}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Sair da oficina
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="oficina"
+        exitActionLabel="Sair da oficina"
+      />
     </div>
   );
 }

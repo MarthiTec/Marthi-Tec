@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import {
   CHANNEL_LABEL,
   formatElapsed,
@@ -11,7 +12,6 @@ import {
   type KitchenOrder,
   type KitchenStatus,
 } from '../../data/kitchenOrderStore';
-import { getTotemExitPassword } from '../../data/totemSettings';
 import './cozinha.css';
 
 const COLUMNS: { id: KitchenStatus; title: string; action?: KitchenStatus; actionLabel?: string }[] = [
@@ -81,12 +81,9 @@ function OrderCard({
 }
 
 export function CozinhaPage() {
-  const navigate = useNavigate();
   const [orders, setOrders] = useState(() => listKitchenOrders({ activeOnly: true }));
   const [tick, setTick] = useState(0);
   const [exitOpen, setExitOpen] = useState(false);
-  const [exitPassword, setExitPassword] = useState('');
-  const [exitError, setExitError] = useState<string | null>(null);
 
   useEffect(() => {
     function refresh() {
@@ -116,15 +113,6 @@ export function CozinhaPage() {
     }
     return map;
   }, [orders]);
-
-  function confirmExit(event: FormEvent) {
-    event.preventDefault();
-    if (exitPassword.trim() !== getTotemExitPassword()) {
-      setExitError('Senha incorreta.');
-      return;
-    }
-    navigate('/');
-  }
 
   return (
     <div className="kds-app">
@@ -178,30 +166,12 @@ export function CozinhaPage() {
         ))}
       </div>
 
-      {exitOpen ? (
-        <div className="kds-lock" role="dialog" aria-modal="true">
-          <form className="kds-lock__card" onSubmit={confirmExit}>
-            <h2>Saída protegida</h2>
-            <p>Digite a senha da loja para sair da tela da cozinha.</p>
-            {exitError ? <p className="kds-alert">{exitError}</p> : null}
-            <label>
-              Senha
-              <input
-                type="password"
-                value={exitPassword}
-                onChange={(e) => setExitPassword(e.target.value)}
-                autoFocus
-              />
-            </label>
-            <div className="kds-lock__actions">
-              <button type="button" onClick={() => setExitOpen(false)}>
-                Cancelar
-              </button>
-              <button type="submit">Sair</button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <ExitOrLogoutDialog
+        open={exitOpen}
+        onClose={() => setExitOpen(false)}
+        appName="Cozinha"
+        exitActionLabel="Sair da cozinha"
+      />
     </div>
   );
 }

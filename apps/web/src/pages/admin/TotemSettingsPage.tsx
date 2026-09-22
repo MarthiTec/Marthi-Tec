@@ -12,6 +12,7 @@ import {
   totemCopy,
   verticalPreset,
   TOTEM_VERTICALS,
+  type TotemAttractLayout,
   type TotemColumns,
   type TotemKeyboardPlacement,
   type TotemMode,
@@ -69,6 +70,7 @@ export function TotemSettingsPage() {
   const [storeLogo, setStoreLogo] = useState(() => initial.storeLogo);
   const [attractBackground, setAttractBackground] = useState(() => initial.attractBackground);
   const [attractGradientColor, setAttractGradientColor] = useState(() => initial.attractGradientColor);
+  const [attractLayout, setAttractLayout] = useState<TotemAttractLayout>(() => initial.attractLayout);
   const [keyboardPlacement, setKeyboardPlacement] = useState<TotemKeyboardPlacement>(
     () => initial.keyboardPlacement,
   );
@@ -131,6 +133,7 @@ export function TotemSettingsPage() {
         storeLogo,
         attractBackground,
         attractGradientColor,
+        attractLayout,
         keyboardPlacement,
         askCustomerName,
         offerFulfillment,
@@ -196,10 +199,11 @@ export function TotemSettingsPage() {
       </article>
 
       <article className="admin-card">
-        <h2>Tela de boas-vindas</h2>
+        <h2>Tela de boas-vindas · logo e propaganda</h2>
         <p>
-          Tela cheia com a logo da loja, esperando o cliente. Dá para usar uma foto de fundo ou só um
-          gradiente na cor da loja. Depois de 2 minutos sem toque, o totem volta para cá.
+          Tela cheia esperando o cliente. Ideal enquanto o mix de produtos ainda é pequeno: destaque
+          a logo da loja e uma propaganda de fundo. Depois de 2 minutos sem toque, o totem volta para
+          cá.
         </p>
         <div className="plan-picker">
           <button
@@ -225,6 +229,35 @@ export function TotemSettingsPage() {
             <span>O totem já abre nos produtos, como um catálogo direto.</span>
           </button>
         </div>
+        {showAttractScreen ? (
+          <div className="plan-picker" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className={`plan-picker__card ${attractLayout === 'logoPromo' ? 'is-active' : ''}`}
+              onClick={() => {
+                setAttractLayout('logoPromo');
+                markDirty();
+              }}
+            >
+              <strong>Logo + propaganda</strong>
+              <span>
+                Logo grande da loja e a arte de fundo bem visível. Bom quando ainda há poucos itens no
+                catálogo.
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`plan-picker__card ${attractLayout === 'standard' ? 'is-active' : ''}`}
+              onClick={() => {
+                setAttractLayout('standard');
+                markDirty();
+              }}
+            >
+              <strong>Abertura padrão</strong>
+              <span>Nome da loja, saudação e lavagem colorida por cima do fundo.</span>
+            </button>
+          </div>
+        ) : null}
         <div className="admin-form" style={{ marginTop: 16 }}>
           <label>
             Nome da loja na tela
@@ -256,7 +289,7 @@ export function TotemSettingsPage() {
             />
           </label>
           <label className="span-2">
-            Foto de fundo
+            Propaganda de fundo (foto / arte)
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -267,6 +300,7 @@ export function TotemSettingsPage() {
                 void fileToAttractBackground(file)
                   .then((dataUrl) => {
                     setAttractBackground(dataUrl);
+                    setAttractLayout('logoPromo');
                     markDirty();
                   })
                   .catch(() => setError('Não foi possível ler a imagem de fundo.'));
@@ -296,14 +330,15 @@ export function TotemSettingsPage() {
                 markDirty();
               }}
             >
-              Remover foto de fundo
+              Remover propaganda de fundo
             </button>
           ) : null}
         </div>
         <div className="totem-color-field">
           <p>Cor do gradiente</p>
           <span>
-            Sem foto, a tela inteira usa essa cor. Com foto, ela vira a lavagem por cima da imagem.
+            Sem propaganda, a tela inteira usa essa cor. Com propaganda, ela vira a lavagem suave por
+            cima da imagem.
           </span>
           <div className="totem-color-swatches">
             {ATTRACT_COLOR_PRESETS.map((item) => (
@@ -341,6 +376,7 @@ export function TotemSettingsPage() {
             greeting={storeGreeting()}
             gradientColor={attractGradientColor}
             backgroundImage={attractBackground}
+            layout={attractLayout}
           />
         ) : null}
       </article>

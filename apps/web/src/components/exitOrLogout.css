@@ -1,0 +1,156 @@
+.exit-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 14, 20, 0.55);
+  padding: 20px;
+}
+
+.exit-dialog__card {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(16, 20, 24, 0.1);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  color: #101418;
+}
+
+.exit-dialog__card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.exit-dialog__card > p {
+  margin: 0;
+  color: #5c6b66;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.exit-dialog__card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: #334155;
+}
+
+.exit-dialog__card input[type='password'] {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(16, 20, 24, 0.14);
+  font: inherit;
+}
+
+.exit-dialog__error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #b00020;
+  font-size: 0.9rem;
+}
+
+.exit-dialog__choices {
+  display: grid;
+  gap: 10px;
+}
+
+.exit-dialog__choice {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(16, 20, 24, 0.12);
+  background: #f8faf9;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.exit-dialog__choice:hover {
+  border-color: #101418;
+  background: #fff;
+}
+
+.exit-dialog__choice strong {
+  font-size: 1rem;
+}
+
+.exit-dialog__choice span {
+  color: #5c6b66;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.exit-dialog__choice--logout {
+  border-color: rgba(185, 28, 28, 0.25);
+  background: #fff5f5;
+}
+
+.exit-dialog__choice--logout:hover {
+  border-color: #b91c1c;
+  background: #fee2e2;
+}
+
+.exit-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.exit-dialog__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exit-dialog__logout .admin-ico {
+  width: 16px;
+  height: 16px;
+}
+
+.is-theme-dark .exit-dialog__card,
+.admin--dark .exit-dialog__card {
+  background: #1a2332;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e8eef6;
+}
+
+.is-theme-dark .exit-dialog__card > p,
+.admin--dark .exit-dialog__card > p,
+.is-theme-dark .exit-dialog__choice span,
+.admin--dark .exit-dialog__choice span {
+  color: #94a3b8;
+}
+
+.is-theme-dark .exit-dialog__choice,
+.admin--dark .exit-dialog__choice {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e8eef6;
+}
+
+.is-theme-dark .exit-dialog__choice:hover,
+.admin--dark .exit-dialog__choice:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.is-theme-dark .exit-dialog__card input[type='password'],
+.admin--dark .exit-dialog__card input[type='password'] {
+  background: #0f172a;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eef6;
+}

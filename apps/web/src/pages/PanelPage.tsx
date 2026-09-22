@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
+import { ExitOrLogoutDialog } from '../components/ExitOrLogoutDialog';
 import { useAuth } from '../contexts/AuthContext';
 
 export function PanelPage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   if (loading) {
     return (
@@ -29,8 +32,8 @@ export function PanelPage() {
             {user.name} · {user.provider === 'google' ? 'Google' : 'E-mail'}
           </span>
         </div>
-        <button type="button" className="btn btn--ghost" onClick={logout}>
-          Sair
+        <button type="button" className="btn btn--ghost" onClick={() => setLogoutOpen(true)}>
+          Log-out
         </button>
       </header>
 
@@ -54,6 +57,13 @@ export function PanelPage() {
           totem).
         </p>
       </main>
+
+      <ExitOrLogoutDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        appName="Painel"
+        logoutOnly
+      />
     </div>
   );
 }

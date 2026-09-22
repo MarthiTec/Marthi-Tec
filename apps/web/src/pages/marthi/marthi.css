@@ -1,0 +1,62 @@
+.marthi-ops .admin__side-foot {
+  margin-top: auto;
+  padding: 12px 14px 16px;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.marthi-ops .admin__logout span {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.marthi-plan-dist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.marthi-plan-dist span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--mute, #6b7280);
+}
+
+.marthi-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.marthi-pill--ok,
+.marthi-pill--online {
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+}
+
+.marthi-pill--late {
+  background: rgba(185, 28, 28, 0.12);
+  color: #b91c1c;
+}
+
+.marthi-pill--offline {
+  background: rgba(100, 116, 139, 0.14);
+  color: #64748b;
+}
+
+.marthi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.marthi-actions .btn {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  min-height: 32px;
+}

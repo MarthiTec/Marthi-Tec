@@ -792,6 +792,29 @@ export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrd
   return { ok: true, order };
 }
 
+/** Reverte cancelamento (estorno) — restaura status `sold` e remove lançamento de cancelamento. */
+export function restorePosSaleOrder(
+  orderId: string,
+  snapshot?: SalesOrder,
+): { ok: true; order: SalesOrder } | { ok: false; error: string } {
+  const state = load();
+  let order = state.orders.find((item) => item.id === orderId);
+  if (!order && snapshot) {
+    order = { ...snapshot, status: 'sold' };
+    state.orders.unshift(order);
+  }
+  if (!order) return { ok: false, error: 'Venda não encontrada para restaurar.' };
+  if (order.status !== 'cancelled' && order.status !== 'sold') {
+    return { ok: false, error: 'Só é possível restaurar vendas canceladas.' };
+  }
+  order.status = 'sold';
+  state.finance = state.finance.filter(
+    (item) => !(item.source === 'pos' && item.refId === orderId && item.type === 'out' && item.label.includes('Cancelamento')),
+  );
+  save(state);
+  return { ok: true, order };
+}
+
 export async function upsertCustomer(
   input: Omit<Customer, 'id' | 'createdAt'> & { id?: string },
 ): Promise<AdminState> {

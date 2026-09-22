@@ -3,6 +3,11 @@ export type TotemColumns = 1 | 2 | 3 | 4;
 export type TotemVertical = 'general' | 'food' | 'retail' | 'phones' | 'optics';
 /** De pé / tela alta → teclado no topo. Cintura / balcão → teclado embaixo. */
 export type TotemKeyboardPlacement = 'top' | 'bottom';
+/**
+ * standard = abertura completa com lavagens coloridas.
+ * logoPromo = destaque na logo da loja + propaganda de fundo (ideal sem mix grande).
+ */
+export type TotemAttractLayout = 'standard' | 'logoPromo';
 
 export const TOTEM_DINE_ID = 'TOTEM-DINE';
 export const TOTEM_DINE_OPTIONS = ['Consumir no local', 'Retirada'] as const;
@@ -26,10 +31,15 @@ export type TotemSettings = {
   storeName: string;
   /** Logo da loja (data URL). Sem arquivo, usa a marca Marthi. */
   storeLogo: string | null;
-  /** Foto de fundo da tela de abertura (data URL). */
+  /** Foto / propaganda de fundo da tela de abertura (data URL). */
   attractBackground: string | null;
   /** Cor base do gradiente quando não há foto, e da lavagem sobre a foto. */
   attractGradientColor: string;
+  /**
+   * Como montar a tela de abertura.
+   * logoPromo = logo grande da loja + propaganda bem visível ao fundo.
+   */
+  attractLayout: TotemAttractLayout;
   /**
    * Onde o teclado virtual aparece.
    * top = totem grande / de pé (alcance na altura do peito).
@@ -332,6 +342,7 @@ export function defaultTotemSettings(): TotemSettings {
     storeLogo: null,
     attractBackground: null,
     attractGradientColor: DEFAULT_ATTRACT_GRADIENT,
+    attractLayout: 'standard',
     keyboardPlacement: 'bottom',
     askCustomerName: general.preset.askCustomerName,
     offerFulfillment: general.preset.offerFulfillment,
@@ -355,6 +366,10 @@ function normalizeExitPassword(value: unknown): string {
   if (typeof value !== 'string') return DEFAULT_EXIT;
   const trimmed = value.trim();
   return trimmed || DEFAULT_EXIT;
+}
+
+export function normalizeAttractLayout(value: unknown): TotemAttractLayout {
+  return value === 'logoPromo' ? 'logoPromo' : 'standard';
 }
 
 export function normalizeKeyboardPlacement(value: unknown): TotemKeyboardPlacement {
@@ -410,6 +425,7 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     storeLogo,
     attractBackground: normalizeDataImage(parsed?.attractBackground),
     attractGradientColor: normalizeHexColor(parsed?.attractGradientColor),
+    attractLayout: normalizeAttractLayout(parsed?.attractLayout),
     keyboardPlacement: normalizeKeyboardPlacement(parsed?.keyboardPlacement),
     askCustomerName: Boolean(parsed?.askCustomerName),
     offerFulfillment: Boolean(parsed?.offerFulfillment),
@@ -461,6 +477,7 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     storeLogo: patch.storeLogo !== undefined ? patch.storeLogo : base?.storeLogo,
     attractBackground: patch.attractBackground !== undefined ? patch.attractBackground : base?.attractBackground,
     attractGradientColor: patch.attractGradientColor ?? base?.attractGradientColor,
+    attractLayout: patch.attractLayout ?? base?.attractLayout,
     keyboardPlacement: patch.keyboardPlacement ?? base?.keyboardPlacement,
     askCustomerName: patch.askCustomerName ?? base?.askCustomerName,
     offerFulfillment: patch.offerFulfillment ?? base?.offerFulfillment,
@@ -508,6 +525,7 @@ export async function saveTotemSettings(input: Partial<TotemSettings>) {
       storeLogo: saved.storeLogo ?? next.storeLogo,
       attractBackground: saved.attractBackground ?? next.attractBackground,
       attractGradientColor: saved.attractGradientColor ?? next.attractGradientColor,
+      attractLayout: saved.attractLayout ?? next.attractLayout,
       keyboardPlacement: saved.keyboardPlacement ?? next.keyboardPlacement,
       askCustomerName: saved.askCustomerName ?? next.askCustomerName,
       offerFulfillment: saved.offerFulfillment ?? next.offerFulfillment,

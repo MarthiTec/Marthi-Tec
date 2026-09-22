@@ -1,4 +1,5 @@
 import type { PartnerModuleId } from './catalog';
+import { isMarthiStaffEmail } from './marthiStaff';
 
 const STORAGE_KEY = 'marthi.erp.registry.v1';
 
@@ -523,6 +524,7 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
 }
 
 export function resolveAppHome(userEmail: string | null | undefined): string {
+  if (isMarthiStaffEmail(userEmail)) return '/marthi';
   if (userIsStoreAdmin(userEmail)) return '/painel';
   const employee = findEmployeeByUserEmail(userEmail);
   if (!employee) return '/painel';
