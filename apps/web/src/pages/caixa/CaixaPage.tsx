@@ -48,3 +48,14 @@ import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { CaixaPanelHost, type CaixaPanel } from './CaixaPanels';
 import { CaixaPaymentSplit } from './CaixaPaymentSplit';
+import {
+  createSplit,
+  describeSplit,
+  isVoucherPayment,
+  roundMoney,
+  summarizeSplit,
+  syncSingleSplit,
+  type SplitPayment,
+} from './paymentSplit';
+import '../admin/admin.css';
+import './caixa.css';
