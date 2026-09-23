@@ -162,3 +162,95 @@ function formatPendingQty(qty: number) {
     ? String(qty)
     : qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
+
+export function CaixaPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  usePresenceSession('caixa');
+  const { isDark } = usePanelTheme();
+  const operatorName = user?.name ?? 'Operador';
+  const [exitOpen, setExitOpen] = useState(false);
+  const initial = getAdminState();
+  const [customers, setCustomers] = useState(initial.customers);
+  const [stock, setStock] = useState(initial.stock);
+  const tables = initial.priceTables.filter((item) => item.active);
+  const payments = useMemo(() => {
+    const list = getAdminState().payments.filter((item) => item.active);
+    if (list.some((item) => isVoucherPayment(item))) return list;
+    return [
+      ...list,
+      {
+        id: 'PAY-VC',
+        name: 'Vale Crédito',
+        type: 'other' as const,
+        priceTableId: tables[0]?.id ?? 'TAB-VISTA',
+        maxInstallments: 1,
+        active: true,
+      },
+    ];
+  }, [tables]);
+  const [code, setCode] = useState('');
+  const [lines, setLines] = useState<CartLine[]>([]);
+  const [customerId, setCustomerId] = useState('');
+  const [customerName, setCustomerName] = useState(CONSUMIDOR_FINAL);
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [walkIn, setWalkIn] = useState(true);
+  const [customerPickOpen, setCustomerPickOpen] = useState(false);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [deletePrompt, setDeletePrompt] = useState<{ key: string } | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [askCpf, setAskCpf] = useState(false);
+  const [customerCpf, setCustomerCpf] = useState('');
+  const defaultPayment = payments[0];
+  const [splits, setSplits] = useState<SplitPayment[]>(() => [
+    createSplit(defaultPayment?.id ?? ''),
+  ]);
+  /** Enquanto o operador não rateia, a única forma acompanha o total sozinha. */
+  const [splitTouched, setSplitTouched] = useState(false);
+  const [defaultTableId, setDefaultTableId] = useState(
+    defaultPayment?.priceTableId && tables.some((item) => item.id === defaultPayment.priceTableId)
+      ? defaultPayment.priceTableId
+      : (tables[0]?.id ?? ''),
+  );
+  const [discount, setDiscount] = useState(0);
+  const [discountMode, setDiscountMode] = useState<MoneyMode>('money');
+  const [surcharge, setSurcharge] = useState(0);
+  const [surchargeMode, setSurchargeMode] = useState<MoneyMode>('money');
+  const [sellerId, setSellerId] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [lastOrderAmount, setLastOrderAmount] = useState(0);
+  const [lastChange, setLastChange] = useState(0);
+  const [lastCustomerName, setLastCustomerName] = useState('');
+  const [cashSession, setCashSession] = useState<CashSession | null>(() => getOpenCashSession());
+  const [panel, setPanel] = useState<CaixaPanel>(null);
+  const [exchangeOrderId, setExchangeOrderId] = useState<string | null>(null);
+  const [opsMenuOpen, setOpsMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [drawerFlash, setDrawerFlash] = useState<string | null>(null);
+  const [lineAdjKey, setLineAdjKey] = useState<string | null>(null);
+  const [lineTableKey, setLineTableKey] = useState<string | null>(null);
+  const [cashSettings, setCashSettings] = useState(() => getCashSettings());
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const fiscalOn = hasModule('fiscal');
+  const isAdmin = userIsStoreAdmin(user?.email);
+  const sellers = useMemo(() => listSellers(true), []);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const linesRef = useRef(lines);
+  const finishRef = useRef<() => void>(() => undefined);
+  const addSplitRef = useRef<() => void>(() => undefined);
+  const openPanelRef = useRef<(op: Exclude<CaixaPanel, null>) => void>(() => undefined);
+  const quickStock = useMemo(() => stock.filter((item) => item.qty > 0).slice(0, 10), [stock]);
+  const codeParsed = useMemo(() => parseCodeInput(code), [code]);
+  const searchMatches = useMemo(() => {
+    if (codeParsed.waitingForCode) return [] as StockItem[];
+    const needle = codeParsed.code.trim();
+    if (needle.length < 1) return [] as StockItem[];
+    return findStockMatches(needle, 8);
+  }, [codeParsed]);
+  const pendingQty = codeParsed.qty;
+  const codePlaceholder =
+    pendingQty != null
+      ? `${formatPendingQty(pendingQty)}*SKU Enter`
+      : '12*SKU Enter · código ou barras';
