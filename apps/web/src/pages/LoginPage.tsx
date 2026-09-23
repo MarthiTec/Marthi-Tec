@@ -10,15 +10,21 @@ import { isMarthiStaffEmail } from '../data/marthiStaff';
 type AuthView = 'login' | 'forgot' | 'signup';
 
 function safeNext(value: string | null, email: string | null | undefined) {
+  /** Conta Marthi sempre entra no painel administrativo interno. */
+  if (isMarthiStaffEmail(email)) {
+    if (value?.startsWith('/admin')) return value;
+    if (value?.startsWith('/marthi')) return value.replace(/^\/marthi/, '/admin');
+    return '/admin';
+  }
+
   const fallback = resolveAppHome(email);
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
     return fallback;
   }
-  if (value.startsWith('/marthi')) {
-    if (!isMarthiStaffEmail(email)) return fallback;
-    return value;
+  if (value.startsWith('/admin') || value.startsWith('/marthi')) {
+    return fallback;
   }
-  if (value === '/painel' && !userIsStoreAdmin(email) && !isMarthiStaffEmail(email)) {
+  if (value === '/painel' && !userIsStoreAdmin(email)) {
     return fallback;
   }
   return value;
@@ -65,8 +71,8 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const sessionEmail = email.trim().toLowerCase();
-      await loginWithPassword(sessionEmail, password);
-      navigate(safeNext(nextParam, sessionEmail), { replace: true });
+      const sessionUser = await loginWithPassword(sessionEmail, password);
+      navigate(safeNext(nextParam, sessionUser.email || sessionEmail), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
     } finally {
@@ -79,8 +85,8 @@ export function LoginPage() {
     setFeedback(null);
     setSubmitting(true);
     try {
-      await loginWithGoogle(idToken);
-      navigate(safeNext(nextParam, null), { replace: true });
+      const sessionUser = await loginWithGoogle(idToken);
+      navigate(safeNext(nextParam, sessionUser.email), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha no login com Google.');
     } finally {

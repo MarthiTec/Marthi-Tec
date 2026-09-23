@@ -29,6 +29,7 @@ export type CashMovement = {
   beneficiaryType?: CashBeneficiaryType;
   beneficiaryId?: string;
   beneficiaryName?: string;
+  orderId?: string;
   createdAt: string;
   operatorName: string;
 };
@@ -60,6 +61,21 @@ export function cashBeneficiaryLabel(movement: Pick<CashMovement, 'beneficiaryTy
   return movement.beneficiaryName?.trim() || 'Loja';
 }
 
+export type CashCloseBreakdown = {
+  countedCash: number;
+  countedPix: number;
+  countedDebit: number;
+  countedCredit: number;
+  countedCheck: number;
+  countedDeposit: number;
+  countedOther: number;
+  confirmedSangria: boolean;
+  confirmedAporte: boolean;
+  confirmedExchange: boolean;
+  confirmedVale: boolean;
+  receiptsChecked: boolean;
+};
+
 export type CashSession = {
   id: string;
   openedAt: string;
@@ -68,6 +84,7 @@ export type CashSession = {
   expectedCash: number;
   countedCash?: number;
   difference?: number;
+  closeBreakdown?: CashCloseBreakdown;
   operatorName: string;
   movements: CashMovement[];
   status: 'open' | 'closed';
@@ -411,7 +428,12 @@ export function listCashMovements(kinds?: CashMovementKind[]) {
   return session.movements.filter((item) => kinds.includes(item.kind));
 }
 
-export function registerCashSale(amount: number, operatorName: string, note?: string) {
+export function registerCashSale(
+  amount: number,
+  operatorName: string,
+  note?: string,
+  orderId?: string,
+) {
   const value = Math.max(0, Number(amount) || 0);
   if (value <= 0) return { ok: false as const, error: 'Valor inválido.' };
   return mutateOpen((session) => {
@@ -421,11 +443,26 @@ export function registerCashSale(amount: number, operatorName: string, note?: st
       kind: 'sale',
       amount: value,
       note: note?.trim() || 'Venda PDV',
+      orderId: orderId?.trim() || undefined,
       createdAt: new Date().toISOString(),
       operatorName: operatorName || session.operatorName,
     });
     return { ok: true };
   });
+}
+
+export function findCashSessionForOrder(orderId: string): CashSession | null {
+  const needle = orderId.trim();
+  if (!needle) return null;
+  for (const session of listCashSessions()) {
+    const hit = session.movements.some(
+      (item) =>
+        item.kind === 'sale' &&
+        (item.orderId === needle || item.note.includes(needle)),
+    );
+    if (hit) return session;
+  }
+  return null;
 }
 
 export function issueStoreCredit(input: {
@@ -599,26 +636,106 @@ export function registerExchange(input: {
   return { ok: true, exchange, credit };
 }
 
+export type CashSessionSummary = {
+  openingFloat: number;
+  salesTotal: number;
+  saleCount: number;
+  aportes: number;
+  aporteCount: number;
+  sangrias: number;
+  sangriaCount: number;
+  exchanges: number;
+  exchangeCount: number;
+  vales: number;
+  valeCount: number;
+  expectedCash: number;
+  expectedFinal: number;
+};
+
+export function summarizeCashSession(session: CashSession): CashSessionSummary {
+  let salesTotal = 0;
+  let saleCount = 0;
+  let aportes = 0;
+  let aporteCount = 0;
+  let sangrias = 0;
+  let sangriaCount = 0;
+  let exchanges = 0;
+  let exchangeCount = 0;
+  let vales = 0;
+  let valeCount = 0;
+
+  for (const row of session.movements) {
+    if (row.kind === 'sale') {
+      salesTotal += row.amount;
+      saleCount += 1;
+    } else if (row.kind === 'aporte') {
+      aportes += row.amount;
+      aporteCount += 1;
+    } else if (row.kind === 'sangria') {
+      sangrias += row.amount;
+      sangriaCount += 1;
+    } else if (row.kind === 'exchange') {
+      exchanges += row.amount;
+      exchangeCount += 1;
+    } else if (row.kind === 'vale') {
+      vales += row.amount;
+      valeCount += 1;
+    }
+  }
+
+  return {
+    openingFloat: session.openingFloat,
+    salesTotal: roundMoney(salesTotal),
+    saleCount,
+    aportes: roundMoney(aportes),
+    aporteCount,
+    sangrias: roundMoney(sangrias),
+    sangriaCount,
+    exchanges: roundMoney(exchanges),
+    exchangeCount,
+    vales: roundMoney(vales),
+    valeCount,
+    expectedCash: roundMoney(session.expectedCash),
+    expectedFinal: roundMoney(session.expectedCash),
+  };
+}
+
 export function closeCashSession(input: {
   countedCash: number;
   operatorName: string;
   note?: string;
   closedAt?: string;
+  breakdown?: CashCloseBreakdown;
 }) {
   const counted = Math.max(0, Number(input.countedCash) || 0);
   return mutateOpen((session) => {
     const closedAt = nowIso(input.closedAt);
     session.countedCash = counted;
-    session.difference = counted - session.expectedCash;
+    session.difference = roundMoney(counted - session.expectedCash);
     session.closedAt = closedAt;
     session.status = 'closed';
+    if (input.breakdown) {
+      session.closeBreakdown = { ...input.breakdown, countedCash: counted };
+    }
+    const parts = [
+      `Fechamento · esperado ${session.expectedCash.toFixed(2)}`,
+      `contado ${counted.toFixed(2)}`,
+      `dif ${session.difference.toFixed(2)}`,
+    ];
+    if (input.breakdown) {
+      parts.push(
+        `pix ${input.breakdown.countedPix.toFixed(2)}`,
+        `déb ${input.breakdown.countedDebit.toFixed(2)}`,
+        `créd ${input.breakdown.countedCredit.toFixed(2)}`,
+        `chq ${input.breakdown.countedCheck.toFixed(2)}`,
+        `dep ${input.breakdown.countedDeposit.toFixed(2)}`,
+      );
+    }
     session.movements.push({
       id: uid('MOV'),
       kind: 'close',
       amount: counted,
-      note:
-        input.note?.trim() ||
-        `Fechamento · esperado ${session.expectedCash.toFixed(2)} · contado ${counted.toFixed(2)} · dif ${session.difference.toFixed(2)}`,
+      note: input.note?.trim() || parts.join(' · '),
       createdAt: closedAt,
       operatorName: input.operatorName || session.operatorName,
     });
@@ -642,6 +759,7 @@ export function reopenCashSession(input: {
   session.closedAt = undefined;
   session.countedCash = undefined;
   session.difference = undefined;
+  session.closeBreakdown = undefined;
   session.reopenCount += 1;
   session.operatorName = input.operatorName.trim() || session.operatorName;
   session.movements.push({

@@ -108,6 +108,10 @@
 
 .caixa-app.is-profile-dock .caixa-app__workspace {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.caixa-app.is-profile-dock.is-ops-open .caixa-app__workspace {
   grid-template-columns: 268px minmax(0, 1fr);
 }
 
@@ -119,13 +123,14 @@
   width: 100%;
   max-width: none;
   height: 100%;
-  transform: none;
+  transform: translateX(-105%);
   box-shadow: none;
   z-index: 1;
 }
 
+.caixa-app.is-profile-dock.is-ops-open .caixa-app__ops-drawer,
 .caixa-app.is-profile-dock .caixa-app__ops-drawer.is-open {
-  transform: none;
+  transform: translateX(0);
 }
 
 .caixa-app.is-profile-dock .caixa-app__ops-backdrop {
@@ -141,6 +146,11 @@
   color: #12151a;
 }
 
+.caixa-app.is-theme-dark .caixa-app__body {
+  background: #0f141a;
+  color: #e8eef4;
+}
+
 .caixa-app__heading {
   display: flex;
   flex-wrap: wrap;
@@ -150,11 +160,27 @@
   padding: 14px 18px 0;
 }
 
+.caixa-app__heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .caixa-app__heading h1 {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: inherit;
+}
+
+.caixa-app.is-theme-dark .caixa-app__heading h1 {
+  color: #f1f5f9;
+}
+
+.caixa-app.is-theme-dark .caixa-app__heading .admin__kicker {
+  color: rgb(var(--accent-rgb, 45, 212, 191));
 }
 
 .caixa-app__content {
@@ -162,6 +188,10 @@
   overflow: auto;
   padding: 8px 20px 24px;
   color: inherit;
+}
+
+.caixa-app.is-theme-dark .caixa-app__content {
+  color: #e8eef4;
 }
 
 .caixa-app__ops-head {
@@ -209,6 +239,29 @@
   padding: 12px;
   overflow: auto;
   flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.caixa-app__ops-nav:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.caixa-app__ops-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.caixa-app__ops-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.caixa-app__ops-nav::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.caixa-app__ops-nav:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .caixa-app__ops-nav button,
@@ -308,13 +361,93 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+.caixa-app__top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.caixa-app__shortcuts {
+  position: relative;
+}
+
+.caixa-app__shortcuts-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #171e27;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+.caixa-app__shortcuts-menu p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.caixa-app__shortcuts-menu kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.caixa-app__cash-pill {
+  display: grid;
+  gap: 2px;
+  margin: 0 12px 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.caixa-app__cash-pill strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.caixa-app__cash-pill span {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.35;
+}
+
+.caixa-app__cash-pill.is-open {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.caixa-app__cash-pill.is-closed {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+}
+
 .caixa-app .admin-page.pdv--caixa {
   height: 100%;
   max-height: 100%;
   min-height: 0;
-  padding: 10px 14px 12px;
-  gap: 10px;
-  grid-template-rows: auto minmax(0, 1fr);
+  padding: 8px 12px 10px;
+  gap: 8px;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -374,10 +507,345 @@
   margin-top: 4px;
 }
 
+.pdv__form--compact {
+  gap: 8px;
+}
+
+.pdv__code-field {
+  position: relative;
+}
+
+.pdv__suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.caixa-app.is-theme-dark .pdv__suggest {
+  background: #171e27;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.pdv__suggest-hit {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pdv__suggest-hit:hover,
+.pdv__suggest-hit:focus-visible {
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.12);
+  outline: none;
+}
+
+.pdv__suggest-hit strong {
+  font-size: 0.9rem;
+}
+
+.pdv__suggest-hit span {
+  font-size: 0.75rem;
+  color: var(--mute, #6b7280);
+}
+
+.pdv__pay-row,
+.pdv__cpf-seller-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.pdv__cpf-seller-row {
+  align-items: end;
+}
+
+.pdv__cpf-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pdv__cpf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--mute, #6b7280);
+  cursor: pointer;
+  text-align: left;
+}
+
+.pdv__cpf-radio {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 2px solid rgba(148, 163, 184, 0.85);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 0 transparent;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pdv__cpf-toggle.is-on .pdv__cpf-radio {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  box-shadow: none;
+}
+
+.caixa-app.is-theme-dark .pdv__cpf-radio {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.caixa-app.is-theme-dark .pdv__cpf-toggle.is-on .pdv__cpf-radio {
+  border-color: #60a5fa;
+  background: #60a5fa;
+  box-shadow: none;
+}
+
+.pdv__cpf-inline {
+  min-height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+.pdv__cpf-inline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pdv__pay-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.pdv__line-table {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mute, #6b7280);
+}
+
+.pdv__line-table select {
+  min-height: 36px;
+  width: 100%;
+  max-width: 220px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+.pdv__vale-slot {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--mute, #6b7280);
+}
+
+.pdv__vale-btn {
+  min-height: 40px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdv__adj-input {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 0 !important;
+  align-items: stretch;
+  width: 100%;
+}
+
+.pdv--caixa .pdv__adj-input input,
+.pdv--caixa .admin-form .pdv__adj-input input {
+  min-height: 40px;
+  width: 100% !important;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--line, #d8dde3) !important;
+  border-right: 0 !important;
+  border-radius: 10px 0 0 10px !important;
+  font: inherit;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+.pdv__adj-toggle {
+  min-height: 40px;
+  min-width: 44px;
+  padding: 0 6px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 0 10px 10px 0;
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.1);
+  color: var(--accent, #1d4ed8);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pdv__adj-toggle:hover {
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.18);
+}
+
+.pdv__pay-adj {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pdv--caixa .pdv__side--caixa .pdv__pay-adj label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mute, #6b7280);
+  min-width: 0;
+}
+
+.pdv__line-actions {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pdv__line-ico {
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+}
+
+.pdv__line-ico.is-on {
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.16);
+}
+
+.pdv__ico-img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+.pdv__ico-img--foot {
+  width: 18px;
+  height: 18px;
+  filter: invert(1);
+}
+
+.caixa-app.is-theme-dark .pdv__ico-img {
+  filter: invert(1);
+}
+
+.caixa-app.is-theme-dark .pdv__ico-img--foot {
+  filter: invert(1);
+}
+
+.pdv__line-adj {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line, #d8dde3);
+}
+
+.pdv__line-adj label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mute, #6b7280);
+}
+
+.pdv__line-adj .pdv__adj-input input {
+  min-height: 34px;
+  font-size: 0.85rem;
+}
+
+.pdv__line-adj .pdv__adj-toggle {
+  min-height: 34px;
+  min-width: 40px;
+  font-size: 0.72rem;
+}
+
+.pdv__price-edit {
+  min-height: 36px;
+  width: 100%;
+  max-width: 110px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+.pdv__totals {
+  gap: 4px;
+}
+
 @media (max-width: 1100px) {
   .caixa-app {
     height: auto;
     max-height: none;
+    min-height: 100dvh;
     overflow: auto;
   }
 
@@ -385,5 +853,228 @@
     height: auto;
     max-height: none;
     overflow: visible;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* —— Uso em celular (cliente só com smartphone) —— */
+@media (max-width: 820px) {
+  .caixa-app__top {
+    min-height: 52px;
+    padding: 0 10px;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .caixa-app__ops-btn {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .caixa-app__ops-btn kbd {
+    display: none;
+  }
+
+  .caixa-app__ops-drawer {
+    width: min(100vw - 28px, 320px);
+  }
+
+  .caixa-app__ops-nav button,
+  .caixa-app__ops-nav a.caixa-app__ops-central {
+    min-height: 52px;
+    font-size: 0.95rem;
+    padding: 0 14px;
+  }
+
+  .caixa-app__ops-nav kbd {
+    display: none;
+  }
+
+  .caixa-app__content {
+    padding: 8px 10px 20px;
+  }
+
+  .caixa-app.is-profile-dock .caixa-app__workspace,
+  .caixa-app.is-profile-dock.is-ops-open .caixa-app__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .caixa-app.is-profile-dock .caixa-app__ops-drawer {
+    position: fixed;
+    inset: 52px 0 0;
+    width: min(100vw - 28px, 320px);
+    z-index: 70;
+    transform: translateX(-105%);
+    box-shadow: 12px 0 32px rgba(0, 0, 0, 0.35);
+  }
+
+  .caixa-app.is-profile-dock .caixa-app__ops-drawer.is-open {
+    transform: translateX(0);
+  }
+
+  .caixa-app.is-profile-dock .caixa-app__ops-backdrop {
+    display: block;
+  }
+}
+
+@media (max-width: 820px) {
+  .pdv--caixa .pdv__caixa-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .pdv--caixa .pdv__caixa-bar .pdv__hotkeys,
+  .pdv--caixa .pdv__desk-only {
+    display: none !important;
+  }
+
+  .pdv--caixa .pdv__caixa-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .pdv--caixa .pdv__caixa-main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .pdv--caixa .pdv__scan,
+  .pdv--caixa .pdv__quick--caixa,
+  .pdv--caixa .pdv__cart--caixa,
+  .pdv--caixa .pdv__side--caixa {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .pdv--caixa .pdv__code {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pdv--caixa .pdv__code .btn,
+  .pdv--caixa .pdv__pay-btn,
+  .pdv--caixa .pdv__actions .btn,
+  .pdv--caixa .pdv__consumer-btn {
+    min-height: 48px;
+    width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .pdv--caixa .pdv__code-field input {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .pdv--caixa .pdv__chips {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .pdv--caixa .pdv__chip {
+    min-height: 64px;
+    padding: 10px;
+    border-radius: 14px;
+    justify-content: flex-start;
+  }
+
+  .pdv--caixa .pdv__chip-key {
+    display: none;
+  }
+
+  .pdv--caixa .pdv__chip-name {
+    font-size: 0.82rem;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .pdv--caixa .pdv__cart-scroll {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table thead {
+    display: none;
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table,
+  .pdv--caixa .pdv__cart-scroll .admin-table tbody,
+  .pdv--caixa .pdv__cart-scroll .admin-table tr,
+  .pdv--caixa .pdv__cart-scroll .admin-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line, #d8dde3);
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table td {
+    border: 0;
+    padding: 4px 0;
+  }
+
+  .pdv--caixa .pdv__cart-scroll .admin-table td:nth-child(1) {
+    font-weight: 700;
+  }
+
+  .pdv--caixa .pdv__qty {
+    min-height: 44px;
+    min-width: 72px;
+    font-size: 1rem;
+  }
+
+  .pdv--caixa .pdv__side--caixa {
+    position: sticky;
+    bottom: 0;
+    z-index: 8;
+    margin: 0 -10px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.18);
+    background: var(--card, #fff);
+  }
+
+  .caixa-app.is-theme-dark .pdv--caixa .pdv__side--caixa {
+    background: var(--card, #171e27);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .pdv--caixa .pdv__form--caixa {
+    grid-template-columns: 1fr;
+  }
+
+  .pdv--caixa .admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pdv--caixa .pdv__actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pdv--caixa .pdv__modal {
+    padding: 8px;
+    align-items: end;
+  }
+
+  .pdv--caixa .pdv__modal-card,
+  .pdv--caixa .pdv__modal-card--wide {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 18px 18px 0 0;
   }
 }

@@ -438,7 +438,7 @@
     top: 52px;
     left: 0;
     bottom: 0;
-    width: min(268px, 88vw);
+    width: min(300px, 90vw);
     z-index: 40;
     transform: translateX(-105%);
     opacity: 1;
@@ -464,9 +464,34 @@
     display: block;
     position: fixed;
     inset: 52px 0 0;
-    z-index: 30;
+    z-index: 35;
     border: 0;
-    background: rgba(10, 14, 20, 0.45);
-    cursor: pointer;
+    background: rgba(10, 14, 18, 0.45);
+  }
+
+  .erp-app__top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .erp-app__nav a,
+  .erp-app__nav button {
+    min-height: 48px;
+  }
+
+  .erp-app__content {
+    padding: 12px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .erp-app .admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-app .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .erp-app .btn {
+    min-height: 44px;
   }
 }

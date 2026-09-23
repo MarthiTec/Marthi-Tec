@@ -26,6 +26,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/lotes': { kicker: 'Produtos', title: 'Lotes / Rastro' },
   '/erp/almoxarifado': { kicker: 'Produtos', title: 'Almoxarifado' },
   '/erp/tabelas': { kicker: 'Produtos', title: 'Tabelas de preço' },
+  '/erp/campanhas': { kicker: 'Produtos', title: 'Campanhas de desconto' },
   '/erp/clientes': { kicker: 'Pessoas', title: 'Clientes' },
   '/erp/funcionarios': { kicker: 'Pessoas', title: 'Funcionários' },
   '/erp/permissoes': { kicker: 'Pessoas', title: 'Permissões de acesso' },
@@ -48,6 +49,7 @@ const NAV_PRODUCTS: NavItem[] = [
   { to: '/erp/lotes', label: 'Lotes / Rastro', icon: 'box' },
   { to: '/erp/almoxarifado', label: 'Almoxarifado', icon: 'box' },
   { to: '/erp/tabelas', label: 'Tabelas de preço', icon: 'ops' },
+  { to: '/erp/campanhas', label: 'Campanhas', icon: 'ops' },
 ];
 
 const NAV_PEOPLE: NavItem[] = [

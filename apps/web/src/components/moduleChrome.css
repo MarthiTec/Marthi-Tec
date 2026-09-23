@@ -21,6 +21,9 @@
   font-weight: 750;
   text-decoration: none;
   cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
 }
 
 .module-side-foot__link:hover,

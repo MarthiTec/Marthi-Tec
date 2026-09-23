@@ -11,8 +11,10 @@ import {
   getOrderById,
   restorePosSaleOrder,
   searchOrders,
+  updatePosSaleOrder,
   upsertCustomer,
   type Customer,
+  type PaymentMethod,
   type SalesOrder,
   type StockItem,
 } from '../../data/adminStore';
@@ -33,6 +35,7 @@ import {
   CASH_KIND_LABEL,
   closeCashSession,
   deleteCashMovement,
+  findCashSessionForOrder,
   issueStoreCredit,
   listCashSessions,
   listStoreCredits,
@@ -41,14 +44,22 @@ import {
   redeemStoreCredit,
   registerExchange,
   reopenCashSession,
+  getOpenCashSession,
   SANGRIA_REASONS,
+  summarizeCashSession,
   updateCashMovement,
   type CashBeneficiaryType,
+  type CashCloseBreakdown,
   type CashMovement,
   type CashSession,
   type ExchangeLine,
 } from '../../data/cashRegisterStore';
-import { listEmployees } from '../../data/erpRegistry';
+import {
+  getCashSettings,
+  updateCashSettings,
+  type CashSettings,
+} from '../../data/cashSettings';
+import { listEmployees, userIsStoreAdmin } from '../../data/erpRegistry';
 import { lookupCep, maskCep } from '../../services/cep';
 import {
   cancelFiscalDocumentForSale,
@@ -118,6 +129,37 @@ function formatDisplay(iso: string) {
   return new Date(iso).toLocaleString('pt-BR');
 }
 
+type ClosePayChannel = 'cash' | 'pix' | 'debit' | 'credit' | 'check' | 'deposit' | 'other';
+
+function classifySalePayment(payment: string, methods: PaymentMethod[]): ClosePayChannel {
+  const blob = payment.toLowerCase();
+  if (/cheque|cheq/.test(blob)) return 'check';
+  if (/dep[oó]sito|transfer/.test(blob)) return 'deposit';
+  if (/pix/.test(blob)) return 'pix';
+  if (/d[eé]bito|debit/.test(blob)) return 'debit';
+  if (/cr[eé]dito|credit|cart[aã]o/.test(blob) && !/d[eé]bito/.test(blob)) return 'credit';
+  if (/dinheiro|esp[eé]cie|cash/.test(blob)) return 'cash';
+  const matched = methods.find((item) => blob.includes(item.name.toLowerCase()));
+  if (matched?.type === 'cash') return 'cash';
+  if (matched?.type === 'pix') return 'pix';
+  if (matched?.type === 'debit') return 'debit';
+  if (matched?.type === 'credit') return 'credit';
+  return 'other';
+}
+
+function parseMoneyInput(value: string) {
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  if (raw.includes(',')) {
+    return Math.max(0, Number(raw.replace(/\./g, '').replace(',', '.')) || 0);
+  }
+  return Math.max(0, Number(raw.replace(/\s/g, '')) || 0);
+}
+
+function formatMoneyField(value: number) {
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export type CaixaPanel =
   | 'sales'
   | 'canceled'
@@ -131,16 +173,19 @@ export type CaixaPanel =
   | 'sessions'
   | 'price'
   | 'customer'
+  | 'settings'
   | null;
 
 type PanelProps = {
   panel: Exclude<CaixaPanel, null>;
   operatorName: string;
   cashSession: CashSession | null;
+  exchangeOrderId?: string | null;
   onClose: () => void;
   onDone: (message: string) => void;
   onError: (message: string) => void;
   onRefresh: () => void;
+  onOpenExchange?: (orderId: string) => void;
   onCustomerCreated?: (customer: Customer) => void;
 };
 
@@ -161,34 +206,111 @@ export function CaixaPanelHost(props: PanelProps) {
         {panel === 'sessions' ? <SessionsPanel {...props} /> : null}
         {panel === 'price' ? <PricePanel {...props} /> : null}
         {panel === 'customer' ? <CustomerQuickPanel {...props} /> : null}
+        {panel === 'settings' ? <CashSettingsPanel {...props} /> : null}
       </div>
     </div>
   );
 }
 
-function SalesPanel({ onClose, onDone, onError }: PanelProps) {
+function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
   const { user } = useAuth();
   const { confirm, dialog } = useConfirmDialog();
   const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sessionFilter, setSessionFilter] = useState('');
   const [selected, setSelected] = useState<SalesOrder | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDocument, setEditDocument] = useState('');
+  const [editPayment, setEditPayment] = useState('');
+  const [editItems, setEditItems] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editAt, setEditAt] = useState('');
   const [tick, setTick] = useState(0);
   const fiscalOn = hasModule('fiscal');
-  const hits = useMemo(() => searchOrders(query, 40), [query, tick]);
+  const sessions = useMemo(() => listCashSessions(), [tick]);
+  const hits = useMemo(() => {
+    const base = searchOrders({
+      query,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      limit: 120,
+    });
+    if (!sessionFilter) return base.slice(0, 60);
+    return base
+      .filter((order) => {
+        if (order.cashSessionId === sessionFilter) return true;
+        return findCashSessionForOrder(order.id)?.id === sessionFilter;
+      })
+      .slice(0, 60);
+  }, [query, dateFrom, dateTo, sessionFilter, tick]);
   const fiscal = selected
     ? getLatestFiscalDocumentForRef('sale', selected.id)
     : null;
+  const selectedSession =
+    selected?.cashSessionId
+      ? sessions.find((item) => item.id === selected.cashSessionId) ?? null
+      : selected
+        ? findCashSessionForOrder(selected.id)
+        : null;
   const canEmitNfce =
     Boolean(selected) &&
     selected?.status === 'sold' &&
     fiscalOn &&
     (!fiscal || fiscal.kind === 'receipt' || fiscal.status === 'cancelled' || fiscal.status === 'error');
+  const canEdit = Boolean(selected && selected.status === 'sold');
+  const canExchange = Boolean(selected && selected.status === 'sold' && onOpenExchange);
 
   function refresh() {
     setTick((value) => value + 1);
     if (selected) {
       const next = getOrderById(selected.id);
       setSelected(next);
+      if (next && editing) startEdit(next);
     }
+  }
+
+  function startEdit(order: SalesOrder) {
+    setEditing(true);
+    setEditName(order.customerName);
+    setEditDocument(order.customerDocument ?? '');
+    setEditPayment(order.payment);
+    setEditItems(order.productName);
+    setEditAmount(String(order.amount));
+    setEditAt(formatDateTimeLocal(order.createdAt));
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
+  function saveEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    const result = updatePosSaleOrder({
+      orderId: selected.id,
+      customerName: editName,
+      customerDocument: editDocument,
+      payment: editPayment,
+      productName: editItems,
+      amount: Number(editAmount.replace(',', '.')) || 0,
+      createdAt: editAt,
+    });
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    logAction({
+      actorName: user?.name ?? 'Operador',
+      actorEmail: user?.email ?? '',
+      action: 'pdv.venda.editar',
+      detail: `${result.order.id} · ${money(result.order.amount)}`,
+    });
+    setSelected(result.order);
+    setEditing(false);
+    setTick((value) => value + 1);
+    onDone(`Venda ${result.order.id} atualizada.`);
   }
 
   function reprint() {
@@ -253,133 +375,274 @@ function SalesPanel({ onClose, onDone, onError }: PanelProps) {
     );
   }
 
+  function sessionLabel(order: SalesOrder) {
+    if (order.cashSessionId) return order.cashSessionId;
+    return findCashSessionForOrder(order.id)?.id ?? '—';
+  }
+
   return (
     <div className="caixa-panel caixa-panel--sales">
       {dialog}
       <div className="caixa-panel__head">
         <h2>Consultar vendas</h2>
-        <p className="empty">Busque por pedido, cliente, produto ou pagamento.</p>
+        <p className="empty">
+          Filtre por data/hora e caixa. Edite, emita NFC-e ou abra uma troca a partir da venda.
+        </p>
       </div>
-      <label className="caixa-panel__full">
-        Buscar
-        <input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setSelected(null);
-          }}
-          placeholder="PED-… / Maria / iPhone / Pix"
-          autoFocus
-        />
-      </label>
-      <div className="caixa-panel__table">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Pedido</th>
-              <th>Cliente</th>
-              <th>Itens</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Quando</th>
-            </tr>
-          </thead>
-          <tbody>
-            {hits.length === 0 ? (
-              <tr>
-                <td colSpan={6}>
-                  <p className="empty">{query ? 'Nenhuma venda encontrada.' : 'Nenhuma venda ainda.'}</p>
-                </td>
-              </tr>
-            ) : (
-              hits.map((order) => {
-                const doc = getLatestFiscalDocumentForRef('sale', order.id);
-                return (
-                  <tr
-                    key={order.id}
-                    className={selected?.id === order.id ? 'is-selected' : ''}
-                    onClick={() => setSelected(order)}
-                  >
-                    <td>{order.id}</td>
-                    <td>{order.customerName}</td>
-                    <td>{order.productName}</td>
-                    <td className="price-red">{money(order.amount)}</td>
-                    <td>
-                      {order.status === 'cancelled'
-                        ? 'Cancelada'
-                        : doc
-                          ? FISCAL_STATUS_LABEL[doc.status]
-                          : 'Sem DF-e'}
-                    </td>
-                    <td>{formatDisplay(order.createdAt)}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+
+      <div className="caixa-panel__filters">
+        <label className="caixa-panel__full">
+          Buscar
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelected(null);
+              setEditing(false);
+            }}
+            placeholder="PED-… / Maria / iPhone / Pix"
+            autoFocus
+          />
+        </label>
+        <label>
+          De
+          <input
+            type="datetime-local"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setSelected(null);
+              setEditing(false);
+            }}
+          />
+        </label>
+        <label>
+          Até
+          <input
+            type="datetime-local"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setSelected(null);
+              setEditing(false);
+            }}
+          />
+        </label>
+        <label>
+          Caixa
+          <select
+            value={sessionFilter}
+            onChange={(e) => {
+              setSessionFilter(e.target.value);
+              setSelected(null);
+              setEditing(false);
+            }}
+          >
+            <option value="">Todos os caixas</option>
+            {sessions.map((session) => (
+              <option key={session.id} value={session.id}>
+                {session.id} · {session.status === 'open' ? 'Aberto' : 'Fechado'} ·{' '}
+                {formatDisplay(session.openedAt)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="caixa-sales-list" role="list">
+        {hits.length === 0 ? (
+          <p className="empty caixa-sales-list__empty">
+            {query || dateFrom || dateTo || sessionFilter
+              ? 'Nenhuma venda encontrada com esses filtros.'
+              : 'Nenhuma venda ainda.'}
+          </p>
+        ) : (
+          hits.map((order) => {
+            const doc = getLatestFiscalDocumentForRef('sale', order.id);
+            const status =
+              order.status === 'cancelled'
+                ? 'Cancelada'
+                : doc
+                  ? FISCAL_STATUS_LABEL[doc.status]
+                  : 'Sem DF-e';
+            return (
+              <button
+                key={order.id}
+                type="button"
+                role="listitem"
+                className={`caixa-sales-card ${selected?.id === order.id ? 'is-selected' : ''}`}
+                onClick={() => {
+                  setSelected(order);
+                  setEditing(false);
+                }}
+              >
+                <div className="caixa-sales-card__top">
+                  <strong>{order.id}</strong>
+                  <span className="price-red">{money(order.amount)}</span>
+                </div>
+                <div className="caixa-sales-card__meta">
+                  <span>{order.customerName}</span>
+                  <span>{sessionLabel(order)}</span>
+                </div>
+                <div className="caixa-sales-card__foot">
+                  <em>{order.productName}</em>
+                  <span>
+                    {status} · {formatDisplay(order.createdAt)}
+                  </span>
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
 
       {selected ? (
         <div className="caixa-panel__detail">
-          <div className="caixa-panel__summary">
-            <div>
-              <span>Pedido</span>
-              <strong>{selected.id}</strong>
-            </div>
-            <div>
-              <span>Cliente</span>
-              <strong>{selected.customerName}</strong>
-            </div>
-            <div>
-              <span>Documento</span>
-              <strong>{selected.customerDocument || '—'}</strong>
-            </div>
-            <div>
-              <span>Pagamento</span>
-              <strong>{selected.payment}</strong>
-            </div>
-            <div>
-              <span>SEFAZ / DF-e</span>
-              <strong className={fiscal?.status === 'authorized' ? 'pdv__ok' : undefined}>
-                {fiscal
-                  ? `${FISCAL_KIND_LABEL[fiscal.kind]} · ${FISCAL_STATUS_LABEL[fiscal.status]}`
-                  : 'Sem documento fiscal'}
-              </strong>
-            </div>
-            <div>
-              <span>Total</span>
-              <strong className="price-red">{money(selected.amount)}</strong>
-            </div>
-          </div>
-          {fiscal ? (
-            <p className="empty caixa-panel__fiscal-note">
-              {fiscal.kind !== 'receipt'
-                ? `Nº ${fiscal.number}/${fiscal.series} · chave ${fiscal.accessKey.slice(0, 20)}…`
-                : `Notinha ${fiscal.number}`}
-            </p>
-          ) : null}
-          <div className="caixa-panel__actions">
-            <button type="button" className="btn btn--ghost" onClick={reprint} disabled={!fiscal}>
-              Reimprimir
-            </button>
-            {canEmitNfce ? (
-              <button type="button" className="btn btn--ghost" onClick={emitNfce}>
-                Emitir NFC-e
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => void cancelSale()}
-              disabled={selected.status === 'cancelled'}
-            >
-              Cancelar venda
-            </button>
-            <button type="button" className="btn btn--primary" onClick={onClose}>
-              Fechar
-            </button>
-          </div>
+          {editing ? (
+            <form className="caixa-panel__edit" onSubmit={saveEdit}>
+              <div className="caixa-panel__grid">
+                <label className="caixa-panel__full">
+                  Cliente
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+                </label>
+                <label>
+                  Documento
+                  <input
+                    value={editDocument}
+                    onChange={(e) => setEditDocument(e.target.value)}
+                    placeholder="CPF/CNPJ"
+                  />
+                </label>
+                <label>
+                  Valor
+                  <input
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    inputMode="decimal"
+                    required
+                  />
+                </label>
+                <label className="caixa-panel__full">
+                  Pagamento
+                  <input
+                    value={editPayment}
+                    onChange={(e) => setEditPayment(e.target.value)}
+                    required
+                  />
+                </label>
+                <label className="caixa-panel__full">
+                  Itens
+                  <input value={editItems} onChange={(e) => setEditItems(e.target.value)} required />
+                </label>
+                <label className="caixa-panel__full">
+                  Data/hora da venda
+                  <input
+                    type="datetime-local"
+                    value={editAt}
+                    onChange={(e) => setEditAt(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <div className="caixa-panel__actions">
+                <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
+                  Descartar
+                </button>
+                <button type="submit" className="btn btn--primary">
+                  Salvar edição
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div className="caixa-panel__summary">
+                <div>
+                  <span>Pedido</span>
+                  <strong>{selected.id}</strong>
+                </div>
+                <div>
+                  <span>Cliente</span>
+                  <strong>{selected.customerName}</strong>
+                </div>
+                <div>
+                  <span>Documento</span>
+                  <strong>{selected.customerDocument || '—'}</strong>
+                </div>
+                <div>
+                  <span>Pagamento</span>
+                  <strong>{selected.payment}</strong>
+                </div>
+                <div>
+                  <span>Caixa</span>
+                  <strong>
+                    {selectedSession
+                      ? `${selectedSession.id} · ${selectedSession.status === 'open' ? 'Aberto' : 'Fechado'}`
+                      : sessionLabel(selected)}
+                  </strong>
+                </div>
+                <div>
+                  <span>SEFAZ / DF-e</span>
+                  <strong className={fiscal?.status === 'authorized' ? 'pdv__ok' : undefined}>
+                    {fiscal
+                      ? `${FISCAL_KIND_LABEL[fiscal.kind]} · ${FISCAL_STATUS_LABEL[fiscal.status]}`
+                      : 'Sem documento fiscal'}
+                  </strong>
+                </div>
+                <div>
+                  <span>Quando</span>
+                  <strong>{formatDisplay(selected.createdAt)}</strong>
+                </div>
+                <div>
+                  <span>Total</span>
+                  <strong className="price-red">{money(selected.amount)}</strong>
+                </div>
+              </div>
+              {fiscal ? (
+                <p className="empty caixa-panel__fiscal-note">
+                  {fiscal.kind !== 'receipt'
+                    ? `Nº ${fiscal.number}/${fiscal.series} · chave ${fiscal.accessKey.slice(0, 20)}…`
+                    : `Notinha ${fiscal.number}`}
+                </p>
+              ) : null}
+              <div className="caixa-panel__actions">
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => startEdit(selected)}
+                  disabled={!canEdit}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => onOpenExchange?.(selected.id)}
+                  disabled={!canExchange}
+                >
+                  Criar troca
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={reprint} disabled={!fiscal}>
+                  Reimprimir
+                </button>
+                {canEmitNfce ? (
+                  <button type="button" className="btn btn--ghost" onClick={emitNfce}>
+                    Emitir NFC-e
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => void cancelSale()}
+                  disabled={selected.status === 'cancelled'}
+                >
+                  Cancelar venda
+                </button>
+                <button type="button" className="btn btn--primary" onClick={onClose}>
+                  Fechar
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="pdv__modal-actions">
@@ -974,7 +1237,14 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
   );
 }
 
-function ExchangePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+function ExchangePanel({
+  operatorName,
+  exchangeOrderId,
+  onClose,
+  onDone,
+  onError,
+  onRefresh,
+}: PanelProps) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SalesOrder[]>([]);
   const [order, setOrder] = useState<SalesOrder | null>(null);
@@ -999,6 +1269,18 @@ function ExchangePanel({ operatorName, onClose, onDone, onError, onRefresh }: Pa
   useEffect(() => {
     setStockHits(findStockMatches(stockQuery, 8));
   }, [stockQuery]);
+
+  useEffect(() => {
+    if (!exchangeOrderId) return;
+    const initial = getOrderById(exchangeOrderId);
+    if (!initial || initial.status !== 'sold') return;
+    setOrder(initial);
+    setQuery(initial.id);
+    setHits([]);
+    setReturnLines(returnLinesFromOrder(initial));
+    setOutLines([]);
+    setTarget('out');
+  }, [exchangeOrderId]);
 
   function pickOrder(item: SalesOrder) {
     setOrder(item);
@@ -1469,25 +1751,146 @@ function ClosePanel({
   onError,
   onRefresh,
 }: PanelProps) {
-  const [counted, setCounted] = useState(
-    cashSession ? String(cashSession.expectedCash) : '0',
+  const summary = useMemo(
+    () => (cashSession ? summarizeCashSession(cashSession) : null),
+    [cashSession],
   );
+  const paymentMethods = useMemo(() => getAdminState().payments, []);
+  const channelExpected = useMemo(() => {
+    const totals: Record<ClosePayChannel, number> = {
+      cash: 0,
+      pix: 0,
+      debit: 0,
+      credit: 0,
+      check: 0,
+      deposit: 0,
+      other: 0,
+    };
+    if (!cashSession) return totals;
+    const orders = getAdminState().orders.filter(
+      (order) =>
+        order.status === 'sold' &&
+        (order.cashSessionId === cashSession.id ||
+          findCashSessionForOrder(order.id)?.id === cashSession.id),
+    );
+    for (const order of orders) {
+      totals[classifySalePayment(order.payment, paymentMethods)] += order.amount;
+    }
+    return {
+      cash: roundMoney(totals.cash),
+      pix: roundMoney(totals.pix),
+      debit: roundMoney(totals.debit),
+      credit: roundMoney(totals.credit),
+      check: roundMoney(totals.check),
+      deposit: roundMoney(totals.deposit),
+      other: roundMoney(totals.other),
+    };
+  }, [cashSession, paymentMethods]);
+
+  const expectedDrawer = cashSession?.expectedCash ?? 0;
+  const showExpected = getCashSettings().showExpectedOnClose;
+  const [countedCash, setCountedCash] = useState(() => formatMoneyField(expectedDrawer));
+  const [countedPix, setCountedPix] = useState(() => formatMoneyField(channelExpected.pix));
+  const [countedDebit, setCountedDebit] = useState(() => formatMoneyField(channelExpected.debit));
+  const [countedCredit, setCountedCredit] = useState(() => formatMoneyField(channelExpected.credit));
+  const [countedCheck, setCountedCheck] = useState(() => formatMoneyField(channelExpected.check));
+  const [countedDeposit, setCountedDeposit] = useState(() =>
+    formatMoneyField(channelExpected.deposit),
+  );
+  const [countedOther, setCountedOther] = useState(() => formatMoneyField(channelExpected.other));
   const [at, setAt] = useState(formatDateTimeLocal());
   const [note, setNote] = useState('');
-  const expected = cashSession?.expectedCash ?? 0;
-  const diff = (Number(counted.replace(',', '.')) || 0) - expected;
+  const [confirmSangria, setConfirmSangria] = useState(false);
+  const [confirmAporte, setConfirmAporte] = useState(false);
+  const [confirmExchange, setConfirmExchange] = useState(false);
+  const [confirmVale, setConfirmVale] = useState(false);
+  const [receiptsChecked, setReceiptsChecked] = useState(false);
+
+  const cashCount = parseMoneyInput(countedCash);
+  const pixCount = parseMoneyInput(countedPix);
+  const debitCount = parseMoneyInput(countedDebit);
+  const creditCount = parseMoneyInput(countedCredit);
+  const checkCount = parseMoneyInput(countedCheck);
+  const depositCount = parseMoneyInput(countedDeposit);
+  const otherCount = parseMoneyInput(countedOther);
+
+  const cashDiff = roundMoney(cashCount - expectedDrawer);
+  const pixDiff = roundMoney(pixCount - channelExpected.pix);
+  const debitDiff = roundMoney(debitCount - channelExpected.debit);
+  const creditDiff = roundMoney(creditCount - channelExpected.credit);
+  const checkDiff = roundMoney(checkCount - channelExpected.check);
+  const depositDiff = roundMoney(depositCount - channelExpected.deposit);
+  const otherDiff = roundMoney(otherCount - channelExpected.other);
+  const channelExpectedTotal = roundMoney(
+    channelExpected.pix +
+      channelExpected.debit +
+      channelExpected.credit +
+      channelExpected.check +
+      channelExpected.deposit +
+      channelExpected.other,
+  );
+  const channelCountedTotal = roundMoney(
+    pixCount + debitCount + creditCount + checkCount + depositCount + otherCount,
+  );
+  const channelDiffTotal = roundMoney(channelCountedTotal - channelExpectedTotal);
+
+  const movements = cashSession?.movements ?? [];
+  const sangrias = movements.filter((row) => row.kind === 'sangria');
+  const aportes = movements.filter((row) => row.kind === 'aporte');
+  const exchanges = movements.filter((row) => row.kind === 'exchange');
+  const vales = movements.filter((row) => row.kind === 'vale');
+
+  const needSangria = sangrias.length > 0;
+  const needAporte = aportes.length > 0;
+  const needExchange = exchanges.length > 0;
+  const needVale = vales.length > 0;
+  const checksOk =
+    receiptsChecked &&
+    (!needSangria || confirmSangria) &&
+    (!needAporte || confirmAporte) &&
+    (!needExchange || confirmExchange) &&
+    (!needVale || confirmVale);
 
   function openDrawer() {
     openCashDrawer(operatorName, 'Contagem no fechamento');
   }
 
+  function markAllChecked(on: boolean) {
+    if (needSangria) setConfirmSangria(on);
+    if (needAporte) setConfirmAporte(on);
+    if (needExchange) setConfirmExchange(on);
+    if (needVale) setConfirmVale(on);
+    setReceiptsChecked(on);
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (!checksOk) {
+      onError('Confirme os movimentos e notinhas (ou marque Tudo conferido).');
+      return;
+    }
+    const breakdown: CashCloseBreakdown = {
+      countedCash: cashCount,
+      countedPix: pixCount,
+      countedDebit: debitCount,
+      countedCredit: creditCount,
+      countedCheck: checkCount,
+      countedDeposit: depositCount,
+      countedOther: otherCount,
+      confirmedSangria: !needSangria || confirmSangria,
+      confirmedAporte: !needAporte || confirmAporte,
+      confirmedExchange: !needExchange || confirmExchange,
+      confirmedVale: !needVale || confirmVale,
+      receiptsChecked,
+    };
     const result = closeCashSession({
-      countedCash: Number(counted.replace(',', '.')) || 0,
+      countedCash: cashCount,
       operatorName,
-      note,
+      note:
+        note.trim() ||
+        `Prestação · gaveta ${money(cashCount)} (dif ${money(cashDiff)}) · canais ${money(channelCountedTotal)} (dif ${money(channelDiffTotal)})`,
       closedAt: at,
+      breakdown,
     });
     if (!result.ok) {
       onError(result.error);
@@ -1495,112 +1898,438 @@ function ClosePanel({
     }
     onRefresh();
     onDone(
-      `Caixa fechado · esperado ${money(expected)} · contado ${money(Number(counted) || 0)} · dif ${money(diff)}`,
+      `Caixa fechado · gaveta ${money(cashCount)} (dif ${money(cashDiff)}) · canais dif ${money(channelDiffTotal)}`,
     );
     onClose();
   }
 
-  const movements = cashSession?.movements ?? [];
+  function diffClass(value: number) {
+    return value === 0 ? 'pdv__ok' : 'pdv__alert';
+  }
+
+  function moneyField(
+    label: string,
+    expected: number,
+    value: string,
+    setValue: (next: string) => void,
+    diff: number,
+    autoFocus = false,
+  ) {
+    return (
+      <label>
+        {label}
+        <small className={showExpected ? undefined : 'caixa-close__esp-slot'}>
+          {showExpected ? `Esp. ${money(expected)}` : '\u00a0'}
+        </small>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => setValue(formatMoneyField(parseMoneyInput(value)))}
+          autoFocus={autoFocus}
+          required={autoFocus}
+        />
+        <em className={diffClass(diff)}>{money(diff)}</em>
+      </label>
+    );
+  }
 
   return (
-    <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
-      <div className="caixa-panel__head">
-        <h2>Fechamento de caixa</h2>
-      </div>
-      <div className="caixa-panel__summary">
+    <form className="caixa-panel caixa-panel--fit caixa-panel--close" onSubmit={submit}>
+      <div className="caixa-panel__head caixa-close__head">
         <div>
-          <span>Caixa</span>
-          <strong>{cashSession?.id ?? '—'}</strong>
+          <h2>Fechamento de caixa</h2>
+          <p className="empty">
+            {cashSession?.id ?? '—'} · {cashSession?.operatorName ?? operatorName} · Tab nos valores · Enter fecha
+          </p>
         </div>
-        <div>
-          <span>Operador</span>
-          <strong>{cashSession?.operatorName ?? operatorName}</strong>
-        </div>
-        <div>
-          <span>Aberto em</span>
-          <strong>{cashSession ? formatDisplay(cashSession.openedAt) : '—'}</strong>
-        </div>
-        <div>
-          <span>Esperado</span>
-          <strong>{money(expected)}</strong>
-        </div>
+        <label className="caixa-close__ok-all">
+          <input
+            type="checkbox"
+            checked={checksOk}
+            onChange={(e) => markAllChecked(e.target.checked)}
+          />
+          <span>Tudo conferido</span>
+        </label>
       </div>
 
-      <div className="caixa-panel__table">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Movimento</th>
-              <th>Valor</th>
-              <th>Quando</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movements.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  {CASH_KIND_LABEL[row.kind]}
-                  {row.reason ? ` · ${row.reason}` : row.note ? ` · ${row.note}` : ''}
-                  {row.kind === 'sangria' || row.kind === 'aporte'
-                    ? ` · ${cashBeneficiaryLabel(row)}`
-                    : ''}
-                </td>
-                <td>{money(row.amount)}</td>
-                <td>{formatDisplay(row.createdAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="caixa-close">
+        <div className="caixa-close__work">
+          <div className="caixa-close__chips" role="group" aria-label="Validar movimentos">
+            <label
+              className={`caixa-close__chip ${!needSangria || confirmSangria ? 'is-on' : ''} ${!needSangria ? 'is-skip' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={!needSangria || confirmSangria}
+                disabled={!needSangria}
+                onChange={(e) => setConfirmSangria(e.target.checked)}
+              />
+              Sangria {sangrias.length} · {money(summary?.sangrias ?? 0)}
+            </label>
+            <label
+              className={`caixa-close__chip ${!needAporte || confirmAporte ? 'is-on' : ''} ${!needAporte ? 'is-skip' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={!needAporte || confirmAporte}
+                disabled={!needAporte}
+                onChange={(e) => setConfirmAporte(e.target.checked)}
+              />
+              Aporte {aportes.length} · {money(summary?.aportes ?? 0)}
+            </label>
+            <label
+              className={`caixa-close__chip ${!needExchange || confirmExchange ? 'is-on' : ''} ${!needExchange ? 'is-skip' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={!needExchange || confirmExchange}
+                disabled={!needExchange}
+                onChange={(e) => setConfirmExchange(e.target.checked)}
+              />
+              Troca {exchanges.length} · {money(summary?.exchanges ?? 0)}
+            </label>
+            <label
+              className={`caixa-close__chip ${!needVale || confirmVale ? 'is-on' : ''} ${!needVale ? 'is-skip' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={!needVale || confirmVale}
+                disabled={!needVale}
+                onChange={(e) => setConfirmVale(e.target.checked)}
+              />
+              Vale {vales.length} · {money(summary?.vales ?? 0)}
+            </label>
+            <label className={`caixa-close__chip ${receiptsChecked ? 'is-on' : ''}`}>
+              <input
+                type="checkbox"
+                checked={receiptsChecked}
+                onChange={(e) => setReceiptsChecked(e.target.checked)}
+              />
+              Notinhas
+            </label>
+          </div>
 
-      <div className="caixa-panel__footer">
-        <div className="caixa-panel__grid">
-          <label>
-            Valor contado na gaveta
-            <input
-              type="number"
-              step="0.01"
-              value={counted}
-              onChange={(e) => setCounted(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Data/hora fechamento
-            <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
-          </label>
-          <label className="caixa-panel__full">
-            Observação
-            <input value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
+          <div className="caixa-close__counts">
+            {moneyField('Dinheiro gaveta', expectedDrawer, countedCash, setCountedCash, cashDiff, true)}
+            {moneyField('Pix', channelExpected.pix, countedPix, setCountedPix, pixDiff)}
+            {moneyField('Débito', channelExpected.debit, countedDebit, setCountedDebit, debitDiff)}
+            {moneyField('Crédito', channelExpected.credit, countedCredit, setCountedCredit, creditDiff)}
+            {moneyField('Cheque', channelExpected.check, countedCheck, setCountedCheck, checkDiff)}
+            {moneyField(
+              'Depósito',
+              channelExpected.deposit,
+              countedDeposit,
+              setCountedDeposit,
+              depositDiff,
+            )}
+            {moneyField('Outros', channelExpected.other, countedOther, setCountedOther, otherDiff)}
+            <label>
+              Fechamento
+              <small className="caixa-close__esp-slot">&nbsp;</small>
+              <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
+              <em className="caixa-close__esp-slot">&nbsp;</em>
+            </label>
+            <label className="caixa-close__note">
+              Obs.
+              <small>Opcional</small>
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Pendência…" />
+            </label>
+          </div>
+
+          <details className="caixa-close__details">
+            <summary>Extrato ({movements.length})</summary>
+            <div className="caixa-panel__table caixa-panel__table--compact">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Movimento</th>
+                    <th>Valor</th>
+                    <th>Quando</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.length === 0 ? (
+                    <tr>
+                      <td colSpan={3}>
+                        <p className="empty">Sem movimentos.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    movements.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          {CASH_KIND_LABEL[row.kind]}
+                          {row.reason ? ` · ${row.reason}` : row.note ? ` · ${row.note}` : ''}
+                          {row.kind === 'sangria' || row.kind === 'aporte'
+                            ? ` · ${cashBeneficiaryLabel(row)}`
+                            : ''}
+                        </td>
+                        <td>{money(row.amount)}</td>
+                        <td>{formatDisplay(row.createdAt)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <div className="caixa-close__actions">
+            {!checksOk ? (
+              <p className="pdv__alert">Marque Tudo conferido (ou os chips) e Enter para fechar.</p>
+            ) : (
+              <p className={diffClass(cashDiff)}>
+                Dif. gaveta {money(cashDiff)} · canais {money(channelDiffTotal)}
+              </p>
+            )}
+            <div className="pdv__modal-actions">
+              <button type="button" className="btn btn--ghost" onClick={openDrawer}>
+                Abrir gaveta
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn--primary" disabled={!checksOk}>
+                Confirmar fechamento
+              </button>
+            </div>
+          </div>
         </div>
-        <p className={diff === 0 ? 'pdv__ok' : 'pdv__alert'}>Diferença: {money(diff)}</p>
-        <div className="pdv__modal-actions">
-          <button type="button" className="btn btn--ghost" onClick={openDrawer}>
-            Abrir gaveta
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={onClose}>
-            Cancelar
-          </button>
-          <button type="submit" className="btn btn--primary">
-            Confirmar fechamento
-          </button>
-        </div>
+
+        <aside className="caixa-close__rail" aria-label="Resumo do fechamento">
+          <h3>Resumo</h3>
+          <div className="caixa-close__card">
+            <span>Saldo inicial</span>
+            <strong>{money(summary?.openingFloat ?? 0)}</strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Vendas</span>
+            <strong>
+              {money(summary?.salesTotal ?? 0)} · {summary?.saleCount ?? 0}
+            </strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Esp. gaveta</span>
+            <strong>{money(expectedDrawer)}</strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Contado</span>
+            <strong>{money(cashCount)}</strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Dif. gaveta</span>
+            <strong className={diffClass(cashDiff)}>{money(cashDiff)}</strong>
+          </div>
+          <div className="caixa-close__divider" />
+          <div className="caixa-close__card">
+            <span>Canais esp.</span>
+            <strong>{money(channelExpectedTotal)}</strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Canais cont.</span>
+            <strong>{money(channelCountedTotal)}</strong>
+          </div>
+          <div className="caixa-close__card">
+            <span>Dif. canais</span>
+            <strong className={diffClass(channelDiffTotal)}>{money(channelDiffTotal)}</strong>
+          </div>
+        </aside>
       </div>
     </form>
   );
 }
 
-function SessionsPanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelProps) {
+function CashSettingsPanel({ onClose, onDone }: PanelProps) {
+  const { user } = useAuth();
+  const isAdmin = userIsStoreAdmin(user?.email);
+  const [form, setForm] = useState<CashSettings>(() => getCashSettings());
+
+  function patch<K extends keyof CashSettings>(key: K, value: CashSettings[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function save(event: FormEvent) {
+    event.preventDefault();
+    const next = updateCashSettings(
+      isAdmin
+        ? form
+        : {
+            drawerEnabled: form.drawerEnabled,
+            drawerPort: form.drawerPort,
+            scaleEnabled: form.scaleEnabled,
+            scalePort: form.scalePort,
+            printerEnabled: form.printerEnabled,
+            printerName: form.printerName,
+          },
+    );
+    setForm(next);
+    onDone('Configurações do caixa salvas.');
+    onClose();
+  }
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={save}>
+      <div className="caixa-panel__head">
+        <h2>Configurações do caixa</h2>
+        <p className="empty">Gaveta, balança, impressora{isAdmin ? ' e opções administrativas' : ''}.</p>
+      </div>
+      <div className="caixa-panel__body">
+        <fieldset className="caixa-settings__set">
+          <legend>Periféricos</legend>
+          <label className="caixa-panel__check">
+            <input
+              type="checkbox"
+              checked={form.drawerEnabled}
+              onChange={(e) => patch('drawerEnabled', e.target.checked)}
+            />
+            <span>Gaveta habilitada</span>
+          </label>
+          <label>
+            Porta / identificação da gaveta
+            <input
+              value={form.drawerPort}
+              onChange={(e) => patch('drawerPort', e.target.value)}
+              placeholder="COM3, USB…"
+              disabled={!form.drawerEnabled}
+            />
+          </label>
+          <label className="caixa-panel__check">
+            <input
+              type="checkbox"
+              checked={form.scaleEnabled}
+              onChange={(e) => patch('scaleEnabled', e.target.checked)}
+            />
+            <span>Balança habilitada</span>
+          </label>
+          <label>
+            Porta da balança
+            <input
+              value={form.scalePort}
+              onChange={(e) => patch('scalePort', e.target.value)}
+              placeholder="COM4…"
+              disabled={!form.scaleEnabled}
+            />
+          </label>
+          <label className="caixa-panel__check">
+            <input
+              type="checkbox"
+              checked={form.printerEnabled}
+              onChange={(e) => patch('printerEnabled', e.target.checked)}
+            />
+            <span>Impressora habilitada</span>
+          </label>
+          <label>
+            Nome da impressora
+            <input
+              value={form.printerName}
+              onChange={(e) => patch('printerName', e.target.value)}
+              placeholder="EPSON TM-T20…"
+              disabled={!form.printerEnabled}
+            />
+          </label>
+        </fieldset>
+
+        {isAdmin ? (
+          <fieldset className="caixa-settings__set">
+            <legend>Administrativo</legend>
+            <label className="caixa-panel__check">
+              <input
+                type="checkbox"
+                checked={form.showExpectedOnClose}
+                onChange={(e) => patch('showExpectedOnClose', e.target.checked)}
+              />
+              <span>Exibir saldo esperado no fechamento (Esp.)</span>
+            </label>
+            <p className="empty">
+              Desligado: o operador conta sem ver o valor do sistema — evita “colar” o esperado.
+            </p>
+            <label className="caixa-panel__check">
+              <input
+                type="checkbox"
+                checked={form.requirePasswordToDeleteItem}
+                onChange={(e) => patch('requirePasswordToDeleteItem', e.target.checked)}
+              />
+              <span>Exigir senha para excluir item do carrinho</span>
+            </label>
+            <label>
+              Senha de exclusão
+              <input
+                type="password"
+                value={form.deleteItemPassword}
+                onChange={(e) => patch('deleteItemPassword', e.target.value)}
+                disabled={!form.requirePasswordToDeleteItem}
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="caixa-panel__check">
+              <input
+                type="checkbox"
+                checked={form.allowEditUnitPrice}
+                onChange={(e) => patch('allowEditUnitPrice', e.target.checked)}
+              />
+              <span>Permitir editar preço unitário no PDV</span>
+            </label>
+            <p className="empty">
+              Balança ligada: produtos em <strong>KG</strong> entram com o peso lido automaticamente.
+            </p>
+          </fieldset>
+        ) : (
+          <p className="empty">Opções administrativas só aparecem para perfil administrador.</p>
+        )}
+      </div>
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary">
+          Salvar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function SessionsPanel({ operatorName, cashSession, onClose, onDone, onError, onRefresh }: PanelProps) {
   const [sessions, setSessions] = useState(() => listCashSessions());
   const [selected, setSelected] = useState<CashSession | null>(null);
+  const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const openNow = cashSession?.status === 'open' ? cashSession : getOpenCashSession();
+  const canReopenAny = !openNow;
 
   function refresh() {
     setSessions(listCashSessions());
     onRefresh();
   }
 
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo
+      ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? `${dateTo}T23:59:59.999` : dateTo).getTime()
+      : null;
+
+    return sessions.filter((session) => {
+      if (statusFilter !== 'all' && session.status !== statusFilter) return false;
+      const opened = new Date(session.openedAt).getTime();
+      if (fromTs != null && !Number.isNaN(fromTs) && opened < fromTs) return false;
+      if (toTs != null && !Number.isNaN(toTs) && opened > toTs) return false;
+      if (!needle) return true;
+      const blob =
+        `${session.id} ${session.operatorName} ${session.status} ${session.closedAt ?? ''}`.toLowerCase();
+      return blob.includes(needle);
+    });
+  }, [sessions, query, dateFrom, dateTo, statusFilter]);
+
   function reopen(id: string) {
+    if (!canReopenAny) {
+      onError('Feche o caixa atual antes de reabrir um caixa antigo.');
+      return;
+    }
     const result = reopenCashSession({ sessionId: id, operatorName });
     if (!result.ok) {
       onError(result.error);
@@ -1612,54 +2341,138 @@ function SessionsPanel({ operatorName, onClose, onDone, onError, onRefresh }: Pa
   }
 
   return (
-    <div className="caixa-panel caixa-panel--fit">
+    <div className="caixa-panel caixa-panel--fit caixa-panel--sessions">
       <div className="caixa-panel__head">
         <h2>Consulta de caixas</h2>
-        <p className="empty">Histórico de aberturas. Reabra um caixa fechado se necessário.</p>
+        <p className="empty">
+          Filtre por data, status ou operador.
+          {canReopenAny
+            ? ' Reabrir só aparece em caixas fechados enquanto não houver caixa aberto.'
+            : ' Há um caixa aberto — reabrir fica bloqueado até o fechamento.'}
+        </p>
       </div>
-      <div className="caixa-panel__table">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Caixa</th>
-              <th>Status</th>
-              <th>Operador</th>
-              <th>Aberto</th>
-              <th>Esperado</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((session) => (
-              <tr key={session.id}>
-                <td>
-                  <button type="button" className="btn btn--ghost" onClick={() => setSelected(session)}>
-                    {session.id}
+
+      <div className="caixa-panel__filters">
+        <label className="caixa-panel__full">
+          Buscar
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelected(null);
+            }}
+            placeholder="CX-… / operador"
+            autoFocus
+          />
+        </label>
+        <label>
+          De
+          <input
+            type="datetime-local"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setSelected(null);
+            }}
+          />
+        </label>
+        <label>
+          Até
+          <input
+            type="datetime-local"
+            value={dateTo}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setSelected(null);
+            }}
+          />
+        </label>
+        <label>
+          Status
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as 'all' | 'open' | 'closed');
+              setSelected(null);
+            }}
+          >
+            <option value="all">Todos</option>
+            <option value="open">Abertos</option>
+            <option value="closed">Fechados</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="caixa-sales-list" role="list">
+        {filtered.length === 0 ? (
+          <p className="empty caixa-sales-list__empty">
+            {sessions.length === 0
+              ? 'Nenhum caixa registrado ainda.'
+              : 'Nenhum caixa encontrado com esses filtros.'}
+          </p>
+        ) : (
+          filtered.map((session) => {
+            const isCurrent = openNow?.id === session.id;
+            const showReopen = session.status === 'closed' && canReopenAny && !isCurrent;
+            return (
+              <div
+                key={session.id}
+                role="listitem"
+                className={`caixa-sales-card caixa-session-card ${selected?.id === session.id ? 'is-selected' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="caixa-session-card__main"
+                  onClick={() => setSelected(session)}
+                >
+                  <div className="caixa-sales-card__top">
+                    <strong>{session.id}</strong>
+                    <span className={session.status === 'open' ? 'pdv__ok' : undefined}>
+                      {session.status === 'open' ? 'Aberto' : 'Fechado'}
+                    </span>
+                  </div>
+                  <div className="caixa-sales-card__meta">
+                    <span>{session.operatorName}</span>
+                    <span>{money(session.expectedCash)}</span>
+                  </div>
+                  <div className="caixa-sales-card__foot">
+                    <em>Aberto {formatDisplay(session.openedAt)}</em>
+                    <span>
+                      {isCurrent
+                        ? 'Atual'
+                        : session.closedAt
+                          ? `Fechado ${formatDisplay(session.closedAt)}`
+                          : '—'}
+                    </span>
+                  </div>
+                </button>
+                {showReopen ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary caixa-session-card__reopen"
+                    onClick={() => reopen(session.id)}
+                  >
+                    Reabrir
                   </button>
-                </td>
-                <td>{session.status === 'open' ? 'Aberto' : 'Fechado'}</td>
-                <td>{session.operatorName}</td>
-                <td>{formatDisplay(session.openedAt)}</td>
-                <td>{money(session.expectedCash)}</td>
-                <td>
-                  {session.status === 'closed' ? (
-                    <button type="button" className="btn btn--primary" onClick={() => reopen(session.id)}>
-                      Reabrir
-                    </button>
-                  ) : (
-                    <span className="empty">Atual</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                ) : null}
+                {session.status === 'closed' && !canReopenAny ? (
+                  <span className="empty caixa-session-card__hint">Feche o atual para reabrir</span>
+                ) : null}
+              </div>
+            );
+          })
+        )}
       </div>
+
       {selected ? (
         <div className="caixa-panel__summary">
           <div>
-            <span>Detalhe</span>
+            <span>Caixa</span>
             <strong>{selected.id}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong>{selected.status === 'open' ? 'Aberto' : 'Fechado'}</strong>
           </div>
           <div>
             <span>Fechado</span>
@@ -1681,8 +2494,19 @@ function SessionsPanel({ operatorName, onClose, onDone, onError, onRefresh }: Pa
             <span>Movimentos</span>
             <strong>{selected.movements.length}</strong>
           </div>
+          {selected.closeBreakdown ? (
+            <div>
+              <span>Canais no fechamento</span>
+              <strong>
+                Pix {money(selected.closeBreakdown.countedPix)} · Déb{' '}
+                {money(selected.closeBreakdown.countedDebit)} · Créd{' '}
+                {money(selected.closeBreakdown.countedCredit)}
+              </strong>
+            </div>
+          ) : null}
         </div>
       ) : null}
+
       <div className="pdv__modal-actions">
         <button type="button" className="btn btn--primary" onClick={onClose}>
           Fechar

@@ -80,6 +80,26 @@ export function HomePage() {
   const [jobFeedback, setJobFeedback] = useState('');
   const [navOpen, setNavOpen] = useState(false);
 
+  const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os'>('erp');
+
+  const showcaseImage =
+    showcase === 'pdv'
+      ? '/home/showcase-pdv.jpg'
+      : showcase === 'erp'
+        ? '/home/showcase-erp.jpg'
+        : showcase === 'painel'
+          ? '/home/showcase-painel.jpg'
+          : '/home/showcase-os.jpg';
+
+  const showcaseCaption =
+    showcase === 'pdv'
+      ? 'PDV · Caixa na loja'
+      : showcase === 'erp'
+        ? 'Marthi ERP · Retaguarda da loja'
+        : showcase === 'painel'
+          ? 'Painel da operação · KPIs e gráficos'
+          : 'Marthi OS · Quadro da oficina';
+
   const showCaixa = contracted && hasModule('erp');
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
@@ -153,6 +173,9 @@ export function HomePage() {
           <a href="#planos" onClick={() => setNavOpen(false)}>
             Planos
           </a>
+          <a href="#telas" onClick={() => setNavOpen(false)}>
+            Telas
+          </a>
           <a href="#sobre" onClick={() => setNavOpen(false)}>
             Sobre nós
           </a>
@@ -213,8 +236,8 @@ export function HomePage() {
               ×
             </button>
             <div className="site-help__faces" aria-hidden="true">
-              <img src="/home/mulher-app.jpg" alt="" />
-              <img src="/home/equipe.jpg" alt="" />
+              <img src="/home/showcase-pdv.jpg" alt="" />
+              <img src="/home/showcase-os.jpg" alt="" />
             </div>
             <h2 id="site-help-title">Estamos aqui para ajudar.</h2>
             <div className="site-help__block">
@@ -251,7 +274,7 @@ export function HomePage() {
 
         <section className="hero">
           <div className="hero__media" aria-hidden="false">
-            <img src="/home/mulher-app.jpg" alt="" />
+            <img src="/home/showcase-pdv.jpg" alt="" />
             <div className="hero__veil" />
             <div className="hero__grain" aria-hidden />
           </div>
@@ -349,6 +372,139 @@ export function HomePage() {
           </div>
         </section>
 
+        <section id="telas" className="showcase" aria-labelledby="showcase-title">
+          <div className="showcase__inner">
+            <div className="showcase__copy">
+              <p className="eyebrow">Por dentro do sistema</p>
+              <h2 id="showcase-title">ERP, painel e oficina — as telas reais da loja.</h2>
+              <p>
+                Retaguarda dark da Marthi ERP, painel de operação e quadro da oficina. Troque as
+                abas e veja o visual que a equipe usa no dia a dia.
+              </p>
+              <div className="showcase__tabs" role="tablist" aria-label="Telas do sistema">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'erp'}
+                  className={showcase === 'erp' ? 'is-active' : ''}
+                  onClick={() => setShowcase('erp')}
+                >
+                  ERP Retaguarda
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'painel'}
+                  className={showcase === 'painel' ? 'is-active' : ''}
+                  onClick={() => setShowcase('painel')}
+                >
+                  Painel
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'pdv'}
+                  className={showcase === 'pdv' ? 'is-active' : ''}
+                  onClick={() => setShowcase('pdv')}
+                >
+                  PDV / Caixa
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'os'}
+                  className={showcase === 'os' ? 'is-active' : ''}
+                  onClick={() => setShowcase('os')}
+                >
+                  Oficina / OS
+                </button>
+              </div>
+              <ul className="showcase__bullets">
+                {showcase === 'erp' ? (
+                  <>
+                    <li>Retaguarda: estoque, clientes, financeiro e boletos</li>
+                    <li>Cards de módulos com atalho direto para cada área</li>
+                    <li>Alertas de estoque baixo e títulos em aberto</li>
+                  </>
+                ) : null}
+                {showcase === 'painel' ? (
+                  <>
+                    <li>Fila do PDV, vendas, caixa e tesouraria em um só painel</li>
+                    <li>Gráficos de rendimento, curva de receita e metas</li>
+                    <li>Operações rápidas para a equipe no balcão</li>
+                  </>
+                ) : null}
+                {showcase === 'pdv' ? (
+                  <>
+                    <li>Caixa livre com busca por SKU e estoque rápido</li>
+                    <li>Pagamento, CPF na nota, desconto e acréscimo</li>
+                    <li>Atalhos de teclado pensados para o balcão</li>
+                  </>
+                ) : null}
+                {showcase === 'os' ? (
+                  <>
+                    <li>Quadro Kanban: aberta, diagnóstico, aguardando, em serviço, pronta</li>
+                    <li>Resumo da oficina e atalhos de nova OS</li>
+                    <li>Integração com estoque e caixa</li>
+                  </>
+                ) : null}
+              </ul>
+              <div className="showcase__actions">
+                {showcase === 'erp' ? (
+                  <Link to={user ? '/erp' : '/login?next=/erp'} className="btn btn--primary">
+                    Abrir ERP
+                  </Link>
+                ) : null}
+                {showcase === 'painel' ? (
+                  <Link to={user ? '/painel' : '/login?next=/painel'} className="btn btn--primary">
+                    Abrir painel
+                  </Link>
+                ) : null}
+                {showcase === 'pdv' ? (
+                  showCaixa || liveOpen ? (
+                    <Link to={caixaHref} className="btn btn--primary">
+                      Abrir PDV
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => openDemo('caixa', '/caixa')}
+                    >
+                      Ver demo do PDV
+                    </button>
+                  )
+                ) : null}
+                {showcase === 'os' ? (
+                  showOs || liveOpen ? (
+                    <Link to={osHref} className="btn btn--primary">
+                      Abrir OS
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => openDemo('os', '/os')}
+                    >
+                      Ver demo da OS
+                    </button>
+                  )
+                ) : null}
+                <Link to="/parceiro" className="btn btn--ghost">
+                  Solicitar demonstração
+                </Link>
+              </div>
+            </div>
+
+            <div className="showcase__stage">
+              <figure className="showcase__photo">
+                <img src={showcaseImage} alt={showcaseCaption} />
+              </figure>
+              <p className="showcase__caption">{showcaseCaption}</p>
+            </div>
+          </div>
+        </section>
+
         {(showCaixa || showTotem || showOs || showFiscal) && (
           <section className="section section--launch" aria-label="Acesso rápido">
             <div className="launch-row">
@@ -396,7 +552,7 @@ export function HomePage() {
 
         <section id="sobre" className="split" aria-labelledby="split-title">
           <figure className="split__photo">
-            <img src="/home/equipe.jpg" alt="Equipe da loja colaborando no painel" />
+            <img src="/home/showcase-painel.jpg" alt="Painel Marthi na operação da loja" />
           </figure>
           <div className="split__copy">
             <p className="eyebrow">Sobre nós</p>

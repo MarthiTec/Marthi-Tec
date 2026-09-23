@@ -5,7 +5,7 @@
 
 const DEFAULT_STAFF_EMAIL = 'marthi.tecnologia@gmail.com';
 
-/** E-mails com acesso ao Painel Marthi (`/marthi`). */
+/** E-mails com acesso ao Painel Marthi (`/admin`). */
 export const MARTHI_STAFF_EMAILS = [
   DEFAULT_STAFF_EMAIL,
   (import.meta.env.VITE_AUTH_MARTHI_EMAIL as string | undefined)?.trim().toLowerCase(),
@@ -39,5 +39,7 @@ export function getMarthiStaffDemoCredentials() {
 
 export function matchesMarthiStaffLogin(email: string, password: string) {
   const creds = getMarthiStaffDemoCredentials();
-  return normalizeStaffEmail(email) === creds.email && password === creds.password;
+  return (
+    normalizeStaffEmail(email) === creds.email && password.trim() === creds.password
+  );
 }

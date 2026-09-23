@@ -524,7 +524,7 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
 }
 
 export function resolveAppHome(userEmail: string | null | undefined): string {
-  if (isMarthiStaffEmail(userEmail)) return '/marthi';
+  if (isMarthiStaffEmail(userEmail)) return '/admin';
   if (userIsStoreAdmin(userEmail)) return '/painel';
   const employee = findEmployeeByUserEmail(userEmail);
   if (!employee) return '/painel';

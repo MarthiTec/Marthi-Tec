@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
@@ -27,6 +27,7 @@ import { ErpBoletosPage } from './pages/erp/ErpBoletosPage';
 import { ErpReportsPage } from './pages/erp/ErpReportsPage';
 import { StockBalancePage } from './pages/erp/StockBalancePage';
 import { StockMovementsPage } from './pages/erp/StockMovementsPage';
+import { PromoCampaignsPage } from './pages/erp/PromoCampaignsPage';
 import { CrmLayout } from './pages/crm/CrmLayout';
 import { CrmBoardPage } from './pages/crm/CrmBoardPage';
 import { CrmDealPage } from './pages/crm/CrmDealPage';
@@ -76,6 +77,12 @@ import { MarthiLayout } from './pages/marthi/MarthiLayout';
 import { MarthiDashboardPage } from './pages/marthi/MarthiDashboardPage';
 import { MarthiClientsPage } from './pages/marthi/MarthiClientsPage';
 
+function LegacyMarthiRedirect() {
+  const location = useLocation();
+  const suffix = location.pathname.replace(/^\/marthi/, '') || '';
+  return <Navigate to={`/admin${suffix}${location.search}`} replace />;
+}
+
 export function App() {
   return (
     <AuthProvider>
@@ -89,11 +96,12 @@ export function App() {
         <Route path="/caixa" element={<CaixaPage />} />
         <Route path="/mesa" element={<MesaPage />} />
         <Route path="/cozinha" element={<CozinhaPage />} />
-        <Route path="/marthi" element={<MarthiLayout />}>
+        <Route path="/admin" element={<MarthiLayout />}>
           <Route index element={<MarthiDashboardPage />} />
           <Route path="clientes" element={<MarthiClientsPage />} />
         </Route>
-        <Route path="/painel-marthi" element={<Navigate to="/marthi" replace />} />
+        <Route path="/marthi/*" element={<LegacyMarthiRedirect />} />
+        <Route path="/painel-marthi" element={<Navigate to="/admin" replace />} />
         <Route path="/os" element={<OsLayout />}>
           <Route index element={<WorkOrdersPage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />
@@ -143,6 +151,7 @@ export function App() {
           <Route path="lotes" element={<LotsPage />} />
           <Route path="almoxarifado" element={<WarehousePage />} />
           <Route path="tabelas" element={<PriceTablesPage />} />
+          <Route path="campanhas" element={<PromoCampaignsPage />} />
           <Route path="clientes" element={<CustomersPage />} />
           <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="permissoes" element={<PermissionsPage />} />

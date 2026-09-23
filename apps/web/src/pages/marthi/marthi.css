@@ -1,14 +1,35 @@
-.marthi-ops .admin__side-foot {
-  margin-top: auto;
-  padding: 12px 14px 16px;
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.marthi-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+  margin-bottom: 14px;
 }
 
-.marthi-ops .admin__logout span {
-  font-size: 0.85rem;
-  font-weight: 600;
+.marthi-toolbar__field {
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--mute, #6b7280);
+}
+
+.marthi-toolbar__field--grow {
+  flex: 1 1 280px;
+  min-width: min(100%, 280px);
+}
+
+.marthi-toolbar__field input,
+.marthi-toolbar__field select {
+  min-height: 40px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0 12px;
+  font: inherit;
+  background: var(--panel, #fff);
+  color: inherit;
 }
 
 .marthi-plan-dist {
@@ -52,11 +73,115 @@
 .marthi-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .marthi-actions .btn {
   font-size: 0.8rem;
-  padding: 6px 10px;
-  min-height: 32px;
+  padding: 0 12px;
+  min-height: 36px;
+}
+
+.marthi-edit {
+  margin-bottom: 16px;
+}
+
+.marthi-modules {
+  display: grid;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--mute, #6b7280);
+}
+
+.marthi-modules__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.marthi-modules__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.marthi-modules__item input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 0;
+  flex: 0 0 18px;
+  border: 2px solid rgba(148, 163, 184, 0.55);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+}
+
+.marthi-modules__item input[type='checkbox']::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  box-shadow: inset 1em 1em #0f766e;
+  transform-origin: center;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.marthi-modules__item input[type='checkbox']:checked {
+  border-color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+}
+
+.marthi-modules__item input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+
+.marthi-modules__hint {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+}
+
+.marthi-row {
+  cursor: pointer;
+}
+
+.marthi-row:hover td {
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.admin--dark .marthi-modules__item input[type='checkbox'],
+.is-theme-dark .marthi-modules__item input[type='checkbox'] {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.admin--dark .marthi-modules__item input[type='checkbox']:checked,
+.is-theme-dark .marthi-modules__item input[type='checkbox']:checked {
+  background: rgba(45, 212, 191, 0.18);
+  border-color: #2dd4bf;
+}
+
+.admin--dark .marthi-modules__item input[type='checkbox']::before,
+.is-theme-dark .marthi-modules__item input[type='checkbox']::before {
+  box-shadow: inset 1em 1em #2dd4bf;
+}
+
+.admin--dark .marthi-toolbar__field input,
+.admin--dark .marthi-toolbar__field select,
+.is-theme-dark .marthi-toolbar__field input,
+.is-theme-dark .marthi-toolbar__field select {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e5e7eb;
 }

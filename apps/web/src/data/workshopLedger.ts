@@ -250,6 +250,7 @@ export async function purchaseAssetFromWorkOrder(
     lastPurchaseCost: input.cost,
     kind: input.kind ?? 'device',
     condition: 'refurbished',
+    unit: 'UN',
     sourceWorkOrderId: osId,
     showOnTotem: false,
     images: [],

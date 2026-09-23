@@ -32,8 +32,8 @@ type AuthContextValue = {
   erpReady: boolean;
   erpError: string | null;
   providers: AuthProviders | null;
-  loginWithPassword: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<AuthUser>;
+  loginWithGoogle: (idToken: string) => Promise<AuthUser>;
   logout: () => void;
   refreshErp: () => Promise<void>;
 };
@@ -149,11 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithPassword = useCallback(async (email: string, password: string) => {
     const session = await apiLoginWithPassword(email, password);
     await applySession(session, setToken, setUser, setErpReady, setErpError);
+    return session.user;
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {
     const session = await apiLoginWithGoogle(idToken);
     await applySession(session, setToken, setUser, setErpReady, setErpError);
+    return session.user;
   }, []);
 
   const logout = useCallback(() => {

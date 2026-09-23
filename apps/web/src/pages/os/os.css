@@ -494,6 +494,57 @@
   }
 
   .os-app__content {
-    padding: 10px 14px 20px;
+    padding: 10px 12px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .os-app__ops-btn kbd {
+    display: none;
+  }
+
+  .os-app__ops-btn {
+    min-height: 44px;
+  }
+
+  .os-board {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 8px;
+  }
+
+  .os-col {
+    flex: 0 0 min(86vw, 320px);
+    scroll-snap-align: start;
+    max-height: none;
+    min-height: 60dvh;
+  }
+
+  .os-ticket {
+    min-height: 72px;
+  }
+
+  .os-hotkeys {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .os-hotkeys__cta {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .os-app__ops-nav button {
+    min-height: 52px;
+  }
+
+  .os-app__ops-nav kbd {
+    display: none;
+  }
+
+  .os-app__ops-drawer {
+    width: min(100vw - 28px, 320px);
   }
 }

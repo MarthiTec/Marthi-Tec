@@ -192,6 +192,7 @@ export function StockPage() {
       lastPurchaseCost: item.lastPurchaseCost,
       kind: item.kind,
       condition: item.condition,
+      unit: item.unit ?? 'UN',
       sourceWorkOrderId: item.sourceWorkOrderId,
       showOnTotem: item.showOnTotem,
       images: [...(item.images ?? [])],
@@ -288,6 +289,15 @@ export function StockPage() {
             ]}
             onChange={(value) => setForm({ ...form, condition: value as StockCondition })}
           />
+          <AdminPicker
+            label="Unidade"
+            value={form.unit ?? 'UN'}
+            options={[
+              { value: 'UN', label: 'UN · inteiro' },
+              { value: 'KG', label: 'KG · pesado' },
+            ]}
+            onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
+          />
           <label className="span-2">
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
@@ -346,9 +356,11 @@ export function StockPage() {
             />
           ))}
           <label>
-            Quantidade
+            Quantidade ({form.unit === 'KG' ? 'KG' : 'UN'})
             <input
               type="number"
+              min={0}
+              step={form.unit === 'KG' ? 0.001 : 1}
               value={form.qty}
               onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
             />
@@ -662,7 +674,8 @@ export function StockPage() {
                     {item.imei ? ` · IMEI ${item.imei}` : ''}
                   </td>
                   <td>
-                    {STOCK_KIND_LABEL[item.kind]} · {STOCK_CONDITION_LABEL[item.condition]}
+                    {STOCK_KIND_LABEL[item.kind]} · {STOCK_CONDITION_LABEL[item.condition]} ·{' '}
+                    {item.unit ?? 'UN'}
                   </td>
                   <td>{item.showOnTotem ? 'Sim' : 'Não'}</td>
                   <td>
@@ -673,7 +686,9 @@ export function StockPage() {
                       [item.color, item.capacity].filter(Boolean).join(' · ') ||
                       '—'}
                   </td>
-                  <td className={item.qty <= item.minQty ? 'qty-low' : ''}>{item.qty}</td>
+                  <td className={item.qty <= item.minQty ? 'qty-low' : ''}>
+                    {item.qty} {item.unit ?? 'UN'}
+                  </td>
                   <td>
                     {item.minQty}/{item.maxQty || '—'}
                   </td>
@@ -720,6 +735,7 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     lastPurchaseCost: 0,
     kind: 'device',
     condition: 'new',
+    unit: 'UN',
     showOnTotem: true,
     images: [],
     supplierId: '',

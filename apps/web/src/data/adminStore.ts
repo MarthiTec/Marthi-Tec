@@ -40,6 +40,8 @@ export type Customer = {
 
 export type StockKind = 'part' | 'device' | 'supply';
 export type StockCondition = 'new' | 'used' | 'refurbished';
+/** UN = inteiro; KG = pesado (aceita qty fracionada / balança). */
+export type StockUnit = 'UN' | 'KG';
 
 export type StockItem = {
   id: string;
@@ -66,6 +68,8 @@ export type StockItem = {
   lastPurchaseCost: number;
   kind: StockKind;
   condition: StockCondition;
+  /** Unidade de medida: UN (inteiro) ou KG (pesado). */
+  unit: StockUnit;
   sourceWorkOrderId?: string;
   /** Se o item aparece no catálogo do totem quando o estoque é compartilhado. */
   showOnTotem: boolean;
@@ -82,6 +86,17 @@ export type StockItem = {
   /** Produto é kit (composições em /kits). */
   isKit?: boolean;
 };
+
+export function isWeighedUnit(unit: StockUnit | undefined) {
+  return unit === 'KG';
+}
+
+export function normalizeSaleQty(qty: number, unit: StockUnit | undefined) {
+  const raw = Number(qty);
+  if (!Number.isFinite(raw) || raw <= 0) return isWeighedUnit(unit) ? 0.001 : 1;
+  if (isWeighedUnit(unit)) return Math.round(raw * 1000) / 1000;
+  return Math.max(1, Math.round(raw));
+}
 
 export type PriceTable = {
   id: string;
@@ -111,6 +126,8 @@ export type SalesOrder = {
   sellerId: string;
   sellerName: string;
   createdAt: string;
+  /** Sessão de caixa em que a venda foi registrada. */
+  cashSessionId?: string;
 };
 
 export type FinanceSource = 'manual' | 'pos' | 'os_part' | 'os_purchase' | 'os_revenue' | 'os_reversal';
@@ -190,6 +207,22 @@ function seedPayments(): PaymentMethod[] {
       maxInstallments: 12,
       active: true,
     },
+    {
+      id: 'PAY-VR',
+      name: 'Vale Refeição',
+      type: 'other',
+      priceTableId: 'TAB-VISTA',
+      maxInstallments: 1,
+      active: true,
+    },
+    {
+      id: 'PAY-VC',
+      name: 'Vale Crédito',
+      type: 'other',
+      priceTableId: 'TAB-VISTA',
+      maxInstallments: 1,
+      active: true,
+    },
   ];
 }
 
@@ -199,6 +232,7 @@ function variantSku(
     | 'attrs'
     | 'kind'
     | 'condition'
+    | 'unit'
     | 'sourceWorkOrderId'
     | 'showOnTotem'
     | 'images'
@@ -212,6 +246,7 @@ function variantSku(
         StockItem,
         | 'kind'
         | 'condition'
+        | 'unit'
         | 'sourceWorkOrderId'
         | 'showOnTotem'
         | 'images'
@@ -533,6 +568,7 @@ function normalizeStock(item: StockItem): StockItem {
       Number(item.lastPurchaseCost) > 0 ? Number(item.lastPurchaseCost) : cost,
     kind: item.kind ?? (looksLikeDevice ? 'device' : 'part'),
     condition: item.condition ?? 'new',
+    unit: item.unit === 'KG' ? 'KG' : 'UN',
     sourceWorkOrderId: item.sourceWorkOrderId,
     showOnTotem: item.showOnTotem ?? looksLikeDevice,
     images: images.length ? images : defaultImagesForName(item.name),
@@ -756,20 +792,108 @@ export function adjustStockQty(stockId: string, delta: number) {
   return { ok: true as const, item };
 }
 
-export function searchOrders(query: string, limit = 12) {
-  const needle = query.trim().toLowerCase();
-  const orders = load().orders.filter((item) => item.status === 'sold' || item.status === 'cancelled');
-  if (!needle) return orders.slice(0, limit);
-  return orders
+export type OrderSearchFilters = {
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  cashSessionId?: string;
+  limit?: number;
+};
+
+function parseFilterBound(value: string, endOfDay: boolean) {
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return new Date(`${raw}T${endOfDay ? '23:59:59.999' : '00:00:00'}`).getTime();
+  }
+  const stamp = new Date(raw).getTime();
+  return Number.isNaN(stamp) ? null : stamp;
+}
+
+export function searchOrders(queryOrFilters: string | OrderSearchFilters = '', limit = 12) {
+  const filters: OrderSearchFilters =
+    typeof queryOrFilters === 'string'
+      ? { query: queryOrFilters, limit }
+      : { ...queryOrFilters, limit: queryOrFilters.limit ?? limit };
+  const needle = (filters.query ?? '').trim().toLowerCase();
+  const fromTs = filters.dateFrom ? parseFilterBound(filters.dateFrom, false) : null;
+  const toTs = filters.dateTo ? parseFilterBound(filters.dateTo, true) : null;
+  const sessionId = (filters.cashSessionId ?? '').trim();
+  const cap = filters.limit ?? limit;
+
+  return load()
+    .orders.filter((item) => item.status === 'sold' || item.status === 'cancelled')
     .filter((item) => {
-      const blob = `${item.id} ${item.customerName} ${item.customerDocument ?? ''} ${item.productName} ${item.payment} ${item.status}`.toLowerCase();
+      if (sessionId && item.cashSessionId !== sessionId) return false;
+      const created = new Date(item.createdAt).getTime();
+      if (fromTs != null && !Number.isNaN(created) && created < fromTs) return false;
+      if (toTs != null && !Number.isNaN(created) && created > toTs) return false;
+      if (!needle) return true;
+      const blob =
+        `${item.id} ${item.customerName} ${item.customerDocument ?? ''} ${item.productName} ${item.payment} ${item.status} ${item.cashSessionId ?? ''}`.toLowerCase();
       return blob.includes(needle);
     })
-    .slice(0, limit);
+    .slice(0, cap);
 }
 
 export function getOrderById(id: string) {
   return load().orders.find((item) => item.id === id) ?? null;
+}
+
+export function attachOrderCashSession(orderId: string, cashSessionId: string) {
+  const state = load();
+  const order = state.orders.find((item) => item.id === orderId);
+  if (!order) return { ok: false as const, error: 'Venda não encontrada.' };
+  order.cashSessionId = cashSessionId;
+  save(state);
+  return { ok: true as const, order };
+}
+
+export function updatePosSaleOrder(input: {
+  orderId: string;
+  customerName?: string;
+  customerDocument?: string;
+  payment?: string;
+  amount?: number;
+  productName?: string;
+  createdAt?: string;
+}): { ok: true; order: SalesOrder } | { ok: false; error: string } {
+  const state = load();
+  const order = state.orders.find((item) => item.id === input.orderId);
+  if (!order) return { ok: false, error: 'Venda não encontrada.' };
+  if (order.status !== 'sold') return { ok: false, error: 'Só é possível editar vendas finalizadas.' };
+
+  if (input.customerName !== undefined) {
+    const name = input.customerName.trim();
+    if (!name) return { ok: false, error: 'Informe o nome do cliente.' };
+    order.customerName = name;
+  }
+  if (input.customerDocument !== undefined) {
+    order.customerDocument = input.customerDocument.replace(/\D/g, '');
+  }
+  if (input.payment !== undefined) {
+    const payment = input.payment.trim();
+    if (!payment) return { ok: false, error: 'Informe a forma de pagamento.' };
+    order.payment = payment;
+  }
+  if (input.productName !== undefined) {
+    const productName = input.productName.trim();
+    if (!productName) return { ok: false, error: 'Informe os itens da venda.' };
+    order.productName = productName;
+  }
+  if (input.amount !== undefined) {
+    const amount = Math.max(0, Number(input.amount) || 0);
+    if (amount <= 0) return { ok: false, error: 'Informe um valor válido.' };
+    order.amount = amount;
+  }
+  if (input.createdAt !== undefined) {
+    const stamp = new Date(input.createdAt).getTime();
+    if (Number.isNaN(stamp)) return { ok: false, error: 'Data/hora inválida.' };
+    order.createdAt = new Date(stamp).toISOString();
+  }
+
+  save(state);
+  return { ok: true, order };
 }
 
 export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrder } | { ok: false; error: string } {
