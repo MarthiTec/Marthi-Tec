@@ -53,7 +53,7 @@
 @@ -585,9 +635,9 @@
          customerName: saleCustomer,
          customerPhone: walkIn ? '' : customerPhone.trim(),
-         customerDocument: saleCpf;
+         customerDocument: saleCpf,
 -        paymentName: `${payment.name}${installmentLabel}`,
 +        paymentName: paymentLabel,
          priceTableName: saleTable.name,
