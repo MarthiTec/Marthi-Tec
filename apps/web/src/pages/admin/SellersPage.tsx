@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -12,6 +12,7 @@ import {
 } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import {
   listSellers,
   removeSeller,
@@ -38,6 +39,18 @@ export function SellersPage() {
   const [form, setForm] = useState(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
   const [selectedId, setSelectedId] = useState<string | undefined>();
+
+  useEffect(() => {
+    function refresh() {
+      setItems(listSellers());
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-erp-registry-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-erp-registry-updated', refresh);
+    };
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -70,9 +83,9 @@ export function SellersPage() {
     });
   }
 
-  function submit() {
+  async function submit() {
     if (readOnly || !form.name.trim()) return;
-    const next = upsertSeller({ ...form, id: mode === 'edit' ? selectedId : undefined });
+    const next = await upsertSeller({ ...form, id: mode === 'edit' ? selectedId : undefined });
     setItems(next.sellers);
     logAction({
       actorName: user?.name ?? 'Operador',
@@ -83,9 +96,10 @@ export function SellersPage() {
     resetForm();
   }
 
-  function remove(item: Seller) {
+  async function remove(item: Seller) {
     if (!confirmDelete(`o vendedor ${item.name}`)) return;
-    setItems(removeSeller(item.id).sellers);
+    const next = await removeSeller(item.id);
+    setItems(next.sellers);
     logAction({
       actorName: user?.name ?? 'Operador',
       actorEmail: user?.email ?? '',

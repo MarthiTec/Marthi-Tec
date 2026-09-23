@@ -12,6 +12,7 @@ import { replaceWorkOrders } from './osStore';
 import { replaceOperatorProfileCache } from './operatorProfile';
 import { replaceStoreEntitlement } from './storePlan';
 import { replaceTotemSettings } from './totemSettings';
+import { hydrateErpRegistryFromApi } from './erpRegistry';
 import {
   apiGetOperatorProfile,
   apiGetStorePlan,
@@ -21,11 +22,13 @@ import {
   apiListFinance,
   apiListOrders,
   apiListPayments,
+  apiListPosTickets,
   apiListPriceTables,
   apiListStock,
   apiListWorkOrders,
 } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
+import { replaceQueueTickets } from './posQueueStore';
 
 export const ERP_BOOTSTRAP_EVENT = 'marthi-erp-bootstrap';
 
@@ -74,6 +77,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       plan,
       totemSettings,
       profile,
+      posTickets,
     ] = await Promise.all([
       apiListCustomers(),
       apiListStock(),
@@ -86,7 +90,9 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       apiGetStorePlan(),
       apiGetTotemSettings(),
       apiGetOperatorProfile(),
+      apiListPosTickets(),
     ]);
+    await hydrateErpRegistryFromApi();
 
     replaceAdminState({
       customers: customers as Customer[],
@@ -101,6 +107,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
     replaceStoreEntitlement(plan);
     replaceTotemSettings(totemSettings);
     replaceOperatorProfileCache(profile);
+    replaceQueueTickets(posTickets.items ?? []);
 
     setBootstrap({ loading: false, ready: true, error: null });
     return true;

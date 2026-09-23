@@ -48,20 +48,26 @@ export function listQueueTickets() {
   return load();
 }
 
+/** Substitui a fila local pelos tickets do Nest (bootstrap / sync). */
+export function replaceQueueTickets(items: QueueTicket[]) {
+  save(Array.isArray(items) ? items.slice(0, 300) : []);
+}
+
 export function enqueueTotemLead(
   input: Omit<QueueTicket, 'id' | 'status' | 'createdAt' | 'closedAt' | 'source'> & {
     source?: QueueTicket['source'];
+    id?: string;
   },
 ) {
   const ticket: QueueTicket = {
     ...input,
     source: input.source ?? 'totem',
-    id: uid(),
+    id: input.id ?? uid(),
     status: 'open',
     createdAt: new Date().toISOString(),
     closedAt: null,
   };
-  save([ticket, ...load()]);
+  save([ticket, ...load().filter((item) => item.id !== ticket.id)]);
   return ticket;
 }
 

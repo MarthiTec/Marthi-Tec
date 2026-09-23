@@ -336,3 +336,194 @@ export function apiGetOperatorProfile() {
 export function apiPutOperatorProfile(body: Partial<OperatorProfile>) {
   return nestPut<OperatorProfile>('/me/profile', body);
 }
+
+/* ── Fase 3 P0: Registry ───────────────────────────────── */
+
+export type AccessArea =
+  | 'totem'
+  | 'pdv'
+  | 'os'
+  | 'erp_customers'
+  | 'erp_stock'
+  | 'erp_attrs'
+  | 'erp_prices'
+  | 'erp_payments'
+  | 'erp_finance'
+  | 'erp_sellers'
+  | 'erp_suppliers'
+  | 'erp_employees'
+  | 'erp_audit'
+  | 'erp_invoices'
+  | 'erp_fiscal'
+  | 'ecommerce'
+  | 'erp_plan';
+
+export type ApiSeller = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  document: string;
+  commissionPercent: number;
+  active: boolean;
+  employeeId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiSupplier = {
+  id: string;
+  name: string;
+  tradeName: string;
+  document: string;
+  phone: string;
+  email: string;
+  city: string;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiEmployee = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  document: string;
+  role: 'admin' | 'manager' | 'operator' | 'seller';
+  isSystemUser: boolean;
+  userEmail: string;
+  accessAreas: AccessArea[];
+  active: boolean;
+  sellerId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiMeAccess = {
+  role: ApiEmployee['role'];
+  accessAreas: AccessArea[];
+  employeeId?: string;
+  sellerId?: string;
+};
+
+export type ApiPosTicket = {
+  id: string;
+  source: 'totem' | 'manual';
+  status: 'open' | 'sold' | 'cancelled';
+  customerName: string;
+  customerPhone: string;
+  productName: string;
+  attributes?: Array<{ id: string; name: string; value: string }>;
+  color: string;
+  storage: string;
+  fulfillment: string;
+  payment: string;
+  installment: string | null;
+  priceLabel: string;
+  createdAt: string;
+  closedAt: string | null;
+};
+
+export function apiListSellers(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiSeller[]>(`/sellers${qs}`);
+}
+
+export function apiCreateSeller(body: Omit<ApiSeller, 'id' | 'createdAt' | 'updatedAt'>) {
+  return nestPost<ApiSeller>('/sellers', body);
+}
+
+export function apiUpdateSeller(id: string, body: Partial<Omit<ApiSeller, 'id' | 'createdAt' | 'updatedAt'>>) {
+  return nestPatch<ApiSeller>(`/sellers/${id}`, body);
+}
+
+export function apiDeleteSeller(id: string) {
+  return nestDelete<ApiSeller>(`/sellers/${id}`);
+}
+
+export function apiListSuppliers(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiSupplier[]>(`/suppliers${qs}`);
+}
+
+export function apiCreateSupplier(body: Omit<ApiSupplier, 'id' | 'createdAt' | 'updatedAt'>) {
+  return nestPost<ApiSupplier>('/suppliers', body);
+}
+
+export function apiUpdateSupplier(
+  id: string,
+  body: Partial<Omit<ApiSupplier, 'id' | 'createdAt' | 'updatedAt'>>,
+) {
+  return nestPatch<ApiSupplier>(`/suppliers/${id}`, body);
+}
+
+export function apiDeleteSupplier(id: string) {
+  return nestDelete<ApiSupplier>(`/suppliers/${id}`);
+}
+
+export function apiListEmployees(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiEmployee[]>(`/employees${qs}`);
+}
+
+export function apiCreateEmployee(body: Omit<ApiEmployee, 'id' | 'createdAt' | 'updatedAt'>) {
+  return nestPost<ApiEmployee>('/employees', body);
+}
+
+export function apiUpdateEmployee(
+  id: string,
+  body: Partial<Omit<ApiEmployee, 'id' | 'createdAt' | 'updatedAt'>>,
+) {
+  return nestPatch<ApiEmployee>(`/employees/${id}`, body);
+}
+
+export function apiDeleteEmployee(id: string) {
+  return nestDelete<ApiEmployee>(`/employees/${id}`);
+}
+
+export function apiGetMeAccess() {
+  return nestGet<ApiMeAccess>('/me/access');
+}
+
+/* ── Fase 3 P0: Totem leads + POS tickets ──────────────── */
+
+export function apiSubmitTotemLead(body: {
+  customerName: string;
+  customerPhone: string;
+  productName: string;
+  attributes?: Array<{ id: string; name: string; value: string }>;
+  color: string;
+  storage: string;
+  fulfillment: string;
+  payment: string;
+  installment: string | null;
+  priceLabel: string;
+}) {
+  return nestPost<{ id: string; customerNotified?: boolean }>('/totem/leads', body);
+}
+
+export function apiListPosTickets(status?: ApiPosTicket['status']) {
+  const qs = status ? `?status=${status}` : '';
+  return nestGet<{ items: ApiPosTicket[] }>(`/pos/tickets${qs}`);
+}
+
+export function apiCreatePosTicket(body: {
+  customerName: string;
+  customerPhone: string;
+  productName: string;
+  attributes?: Array<{ id: string; name: string; value: string }>;
+  color?: string;
+  storage?: string;
+  fulfillment?: string;
+  payment: string;
+  installment?: string | null;
+  priceLabel?: string;
+}) {
+  return nestPost<ApiPosTicket>('/pos/tickets', body);
+}
+
+export function apiPatchPosTicket(id: string, status: ApiPosTicket['status']) {
+  return nestPatch<ApiPosTicket>(`/pos/tickets/${id}`, { status });
+}

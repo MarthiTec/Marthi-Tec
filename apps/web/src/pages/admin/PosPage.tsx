@@ -48,7 +48,7 @@ export function PosPage() {
           </Link>
         </div>
       </article>
-      {error && <p className="empty">{error} Suba a API (`npm run dev:api`) para receber o totem.</p>}
+      {error && <p className="empty">{error} Verifique a conexão com a API Nest.</p>}
       {loading && <p className="empty">Atualizando fila…</p>}
       {open.length === 0 && !loading ? (
         <p className="empty">Nenhum ticket aberto. Faça um fluxo no totem para testar.</p>

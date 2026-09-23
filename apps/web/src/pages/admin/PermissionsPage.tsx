@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import {
   ACCESS_AREA_LABEL,
   ALL_ACCESS_AREAS,
@@ -24,6 +25,22 @@ export function PermissionsPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    function refresh() {
+      const users = listEmployees().filter((item) => item.isSystemUser);
+      setItems(users);
+      setSelectedId((current) =>
+        current && users.some((item) => item.id === current) ? current : users[0]?.id ?? null,
+      );
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-erp-registry-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-erp-registry-updated', refresh);
+    };
+  }, []);
+
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
     [items, selectedId],
@@ -43,8 +60,8 @@ export function PermissionsPage() {
     saveEmployee({ ...selected, accessAreas });
   }
 
-  function saveEmployee(next: Employee) {
-    const result = upsertEmployee({
+  async function saveEmployee(next: Employee) {
+    const result = await upsertEmployee({
       id: next.id,
       name: next.name,
       phone: next.phone,

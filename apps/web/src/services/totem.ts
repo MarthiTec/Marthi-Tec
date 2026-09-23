@@ -1,11 +1,9 @@
-import { enqueueTotemLead } from '../data/posQueueStore';
 import { enqueueKitchenOrder } from '../data/kitchenOrderStore';
 import type { PickedAttribute } from '../data/attributeStore';
 import { formatPicked } from '../data/attributeStore';
+import { enqueueTotemLead } from '../data/posQueueStore';
 import { getTotemSettings } from '../data/totemSettings';
-import { edgeApiUrl } from './config';
-
-const API_URL = edgeApiUrl();
+import { apiSubmitTotemLead } from './erpApi';
 
 export type TotemLeadRequest = {
   customerName: string;
@@ -30,23 +28,37 @@ function shouldSendToKitchen() {
 }
 
 export async function submitTotemLead(payload: TotemLeadRequest) {
-  const ticket = enqueueTotemLead(payload);
   let customerNotified = false;
-  const settings = getTotemSettings();
-  const body = {
-    ...payload,
-    storeWhatsApp: payload.storeWhatsApp || settings.storeWhatsApp || undefined,
-    notifyCustomer:
-      payload.notifyCustomer ?? settings.notifyCustomerOnLead,
-    locationLabel: payload.locationLabel || settings.locationLabel || undefined,
-  };
+  let ticketId: string;
+
+  try {
+    const result = await apiSubmitTotemLead({
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      productName: payload.productName,
+      attributes: payload.attributes,
+      color: payload.color,
+      storage: payload.storage,
+      fulfillment: payload.fulfillment,
+      payment: payload.payment,
+      installment: payload.installment,
+      priceLabel: payload.priceLabel,
+    });
+    ticketId = result.id;
+    customerNotified = Boolean(result.customerNotified);
+    enqueueTotemLead({ ...payload, source: 'totem', id: ticketId });
+  } catch {
+    const ticket = enqueueTotemLead(payload);
+    ticketId = ticket.id;
+    customerNotified = false;
+  }
 
   if (shouldSendToKitchen()) {
     try {
       enqueueKitchenOrder({
         channel: 'totem',
         customerName: payload.customerName,
-        sourceTicketId: ticket.id,
+        sourceTicketId: ticketId,
         lines: [
           {
             name: payload.productName,
@@ -62,21 +74,5 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     }
   }
 
-  try {
-    const response = await fetch(`${API_URL}/api/v1/totem/leads`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(2500),
-    });
-    const json = (await response.json()) as {
-      success?: boolean;
-      data?: { customerNotified?: boolean };
-    };
-    customerNotified = Boolean(json.data?.customerNotified);
-  } catch {
-    customerNotified = false;
-  }
-
-  return { ticketId: ticket.id, customerNotified };
+  return { ticketId, customerNotified };
 }

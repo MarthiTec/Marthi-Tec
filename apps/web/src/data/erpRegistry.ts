@@ -1,5 +1,23 @@
 import type { PartnerModuleId } from './catalog';
 import { isMarthiStaffEmail } from './marthiStaff';
+import {
+  apiCreateEmployee,
+  apiCreateSeller,
+  apiCreateSupplier,
+  apiDeleteEmployee,
+  apiDeleteSeller,
+  apiDeleteSupplier,
+  apiListEmployees,
+  apiListSellers,
+  apiListSuppliers,
+  apiUpdateEmployee,
+  apiUpdateSeller,
+  apiUpdateSupplier,
+  type ApiEmployee,
+  type ApiSeller,
+  type ApiSupplier,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.erp.registry.v1';
 
@@ -213,6 +231,83 @@ function save(state: RegistryState) {
   window.dispatchEvent(new Event('marthi-erp-registry-updated'));
 }
 
+/** Substitui fatias do registry (bootstrap Nest). */
+export function replaceErpRegistry(partial: Partial<RegistryState>) {
+  const state = load();
+  save({
+    sellers: partial.sellers ?? state.sellers,
+    suppliers: partial.suppliers ?? state.suppliers,
+    employees: partial.employees ?? state.employees,
+  });
+}
+
+function mapSeller(row: ApiSeller): Seller {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone ?? '',
+    email: row.email ?? '',
+    document: row.document ?? '',
+    commissionPercent: Number(row.commissionPercent ?? 0),
+    active: row.active,
+    employeeId: row.employeeId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapSupplier(row: ApiSupplier): Supplier {
+  return {
+    id: row.id,
+    name: row.name,
+    tradeName: row.tradeName ?? '',
+    document: row.document ?? '',
+    phone: row.phone ?? '',
+    email: row.email ?? '',
+    city: row.city ?? '',
+    notes: row.notes ?? '',
+    active: row.active,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapEmployee(row: ApiEmployee): Employee {
+  const areas = (row.accessAreas ?? []).filter((a): a is AccessArea =>
+    ALL_ACCESS_AREAS.includes(a as AccessArea),
+  );
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone ?? '',
+    email: row.email ?? '',
+    document: row.document ?? '',
+    role: row.role,
+    isSystemUser: row.isSystemUser,
+    userEmail: row.userEmail ?? '',
+    accessAreas: areas,
+    active: row.active,
+    sellerId: row.sellerId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** Hidrata sellers/suppliers/employees a partir do Nest (Fase 3 P0). */
+export async function hydrateErpRegistryFromApi() {
+  if (!isNestAuthed()) return;
+  const [sellers, suppliers, employees] = await Promise.all([
+    apiListSellers(),
+    apiListSuppliers(),
+    apiListEmployees(),
+  ]);
+  replaceErpRegistry({
+    sellers: sellers.map(mapSeller),
+    suppliers: suppliers.map(mapSupplier),
+    employees: employees.map(mapEmployee),
+  });
+}
+
 export function getErpRegistry() {
   return load();
 }
@@ -244,9 +339,33 @@ export function getEmployee(id: string) {
   return load().employees.find((item) => item.id === id) ?? null;
 }
 
-export function upsertSeller(
+export async function upsertSeller(
   input: Omit<Seller, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
-) {
+): Promise<RegistryState> {
+  if (isNestAuthed()) {
+    const body = {
+      name: input.name.trim(),
+      phone: (input.phone ?? '').trim(),
+      email: (input.email ?? '').trim(),
+      document: (input.document ?? '').trim(),
+      commissionPercent: Math.max(0, Math.min(100, Number(input.commissionPercent ?? 0) || 0)),
+      active: input.active ?? true,
+      employeeId: input.employeeId,
+    };
+    const row = input.id
+      ? await apiUpdateSeller(input.id, body)
+      : await apiCreateSeller(body);
+    const mapped = mapSeller(row);
+    const state = load();
+    const idx = state.sellers.findIndex((item) => item.id === mapped.id);
+    state.sellers =
+      idx >= 0
+        ? state.sellers.map((item) => (item.id === mapped.id ? mapped : item))
+        : [mapped, ...state.sellers];
+    save(state);
+    return state;
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -268,9 +387,34 @@ export function upsertSeller(
   return state;
 }
 
-export function upsertSupplier(
+export async function upsertSupplier(
   input: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
-) {
+): Promise<RegistryState> {
+  if (isNestAuthed()) {
+    const body = {
+      name: input.name.trim(),
+      tradeName: (input.tradeName ?? '').trim(),
+      document: (input.document ?? '').trim(),
+      phone: (input.phone ?? '').trim(),
+      email: (input.email ?? '').trim(),
+      city: (input.city ?? '').trim(),
+      notes: (input.notes ?? '').trim(),
+      active: input.active ?? true,
+    };
+    const row = input.id
+      ? await apiUpdateSupplier(input.id, body)
+      : await apiCreateSupplier(body);
+    const mapped = mapSupplier(row);
+    const state = load();
+    const idx = state.suppliers.findIndex((item) => item.id === mapped.id);
+    state.suppliers =
+      idx >= 0
+        ? state.suppliers.map((item) => (item.id === mapped.id ? mapped : item))
+        : [mapped, ...state.suppliers];
+    save(state);
+    return state;
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -292,21 +436,30 @@ export function upsertSupplier(
   return state;
 }
 
-export function removeSeller(id: string) {
+export async function removeSeller(id: string): Promise<RegistryState> {
+  if (isNestAuthed()) {
+    await apiDeleteSeller(id);
+  }
   const state = load();
   state.sellers = state.sellers.filter((item) => item.id !== id);
   save(state);
   return state;
 }
 
-export function removeSupplier(id: string) {
+export async function removeSupplier(id: string): Promise<RegistryState> {
+  if (isNestAuthed()) {
+    await apiDeleteSupplier(id);
+  }
   const state = load();
   state.suppliers = state.suppliers.filter((item) => item.id !== id);
   save(state);
   return state;
 }
 
-export function removeEmployee(id: string) {
+export async function removeEmployee(id: string): Promise<RegistryState> {
+  if (isNestAuthed()) {
+    await apiDeleteEmployee(id);
+  }
   const state = load();
   state.employees = state.employees.filter((item) => item.id !== id);
   save(state);
@@ -317,11 +470,9 @@ export type EmployeeSaveResult =
   | { ok: true; state: RegistryState; employee: Employee }
   | { ok: false; error: string };
 
-export function upsertEmployee(
+export async function upsertEmployee(
   input: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
-): EmployeeSaveResult {
-  const state = load();
-  const stamp = now();
+): Promise<EmployeeSaveResult> {
   const email = normalizeEmail(input.email);
   const userEmail = input.isSystemUser ? normalizeEmail(input.userEmail || input.email) : '';
 
@@ -329,6 +480,45 @@ export function upsertEmployee(
   if (input.isSystemUser && !userEmail) {
     return { ok: false, error: 'Funcionário usuário precisa de e-mail de login.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const areas =
+        input.role === 'admin'
+          ? defaultAdminAreas()
+          : input.accessAreas.filter((area) => ALL_ACCESS_AREAS.includes(area));
+      const body = {
+        name: input.name.trim(),
+        phone: (input.phone ?? '').trim(),
+        email,
+        document: (input.document ?? '').trim(),
+        role: input.role,
+        isSystemUser: input.isSystemUser,
+        userEmail,
+        accessAreas: areas,
+        active: input.active ?? true,
+        sellerId: input.sellerId,
+      };
+      const row = input.id
+        ? await apiUpdateEmployee(input.id, body)
+        : await apiCreateEmployee(body);
+      const mapped = mapEmployee(row);
+      const state = load();
+      const idx = state.employees.findIndex((item) => item.id === mapped.id);
+      state.employees =
+        idx >= 0
+          ? state.employees.map((item) => (item.id === mapped.id ? mapped : item))
+          : [mapped, ...state.employees];
+      save(state);
+      return { ok: true, state, employee: mapped };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao salvar funcionário.';
+      return { ok: false, error: message };
+    }
+  }
+
+  const state = load();
+  const stamp = now();
 
   if (input.isSystemUser && userEmail) {
     const clash = state.employees.find(

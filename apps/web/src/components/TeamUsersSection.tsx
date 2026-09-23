@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from './AdminPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { logAction } from '../data/auditLog';
+import { ERP_BOOTSTRAP_EVENT } from '../data/erpBootstrap';
 import {
   ACCESS_AREA_LABEL,
   ALL_ACCESS_AREAS,
@@ -87,6 +88,18 @@ export function TeamUsersSection({ variant, id }: Props) {
   const [editingId, setEditingId] = useState<string | undefined>();
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    function refresh() {
+      setItems(listEmployees());
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-erp-registry-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-erp-registry-updated', refresh);
+    };
+  }, []);
+
   const areaOptions = variant === 'operations' ? planAreas : ALL_ACCESS_AREAS;
 
   const filtered = useMemo(() => {
@@ -108,10 +121,10 @@ export function TeamUsersSection({ variant, id }: Props) {
     });
   }
 
-  function submit() {
+  async function submit() {
     setError('');
     const accessAreas = form.accessAreas.filter((area) => areaOptions.includes(area));
-    const result = upsertEmployee({
+    const result = await upsertEmployee({
       ...form,
       id: editingId,
       sellerId: form.sellerId || undefined,
