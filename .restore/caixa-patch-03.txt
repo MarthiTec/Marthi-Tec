@@ -1,0 +1,98 @@
++          saleCash > 0 ? `dinheiro ${money(saleCash)}` : null,
++          saleChange > 0 ? `troco ${money(saleChange)}` : null,
++        ]
++          .filter(Boolean)
++          .join(' · ');
++        const cashSale = registerCashSale(saleTotal, operatorName, cashNote, order.id, {
++          cashAmount: saleCash,
++        });
+         if (cashSale.ok) {
+           attachOrderCashSession(order.id, cashSale.session.id);
+         }
++        if (saleCash > 0) {
++          openCashDrawer(operatorName, `Venda ${order.id} em dinheiro`);
++        }
+         refreshCash();
+         const settings = getTotemSettings();
+         const foodOps =
+@@ -669,7 +731,10 @@
+       }
+ 
+       setError(null);
+-      setMessage(`Pedido ${order?.id ?? ''} · ${money(saleTotal)}${docMsg}`);
++      const changeMsg = saleChange > 0 ? ` · troco ${money(saleChange)}` : '';
++      setMessage(
++        `Pedido ${order?.id ?? ''} · ${money(saleTotal)} · ${paymentLabel}${changeMsg}${docMsg}`,
++      );
+       focusCode();
+     } catch (err) {
+       setError(err instanceof Error ? err.message : 'Falha ao fechar a venda.');
+@@ -677,6 +742,7 @@
+   }
+ 
+   finishRef.current = finish;
++  addSplitRef.current = addSplit;
+ 
+   function emitFiscal(asNfce: boolean) {
+     if (!lastOrderId) return;
+@@ -831,9 +897,9 @@
+           openPanelRef.current('canceled');
+           return;
+         }
+-        if (key === 'e') {
++        if (key === 'p') {
+           event.preventDefault();
+-          openPanelRef.current('canceled');
++          addSplitRef.current();
+           return;
+         }
+         if (key === 'v') {
+@@ -945,6 +1011,9 @@
+                   </p>
+                 ) : null}
+                 <p>
++                  <kbd>Alt+P</kbd> forma pgto.
++                </p>
++                <p>
+                   <kbd>Alt+1…9</kbd> estoque
+                 </p>
+                 <p>
+@@ -1541,44 +1610,16 @@
+                 onChange={setSellerId}
+               />
+             </div>
+-            <div className="span-2 pdv__pay-row">
+-              <AdminPicker
+-                label="Pagamento"
+-                value={paymentId}
+-                options={payments.map((item) => ({
+-                  value: item.id,
+-                  label: paymentShortLabel(item),
+-                }))}
+-                onChange={onPaymentChange}
++            <div className="span-2">
++              <CaixaPaymentSplit
++                payments={payments}
++                rows={splitRows}
++                summary={paySummary}
++                onPatch={patchSplit}
++                onAdd={addSplit}
++                onRemove={removeSplit}
++                onOpenVale={() => openPanel('vale')}
+               />
+-              {voucherPay ? (
+-                <label className="pdv__vale-slot">
+-                  Vale
+-                  <button
+-                    type="button"
+-                    className="btn btn--ghost pdv__vale-btn"
+-                    onClick={() => openPanel('vale')}
+-                    title="Consultar ou cadastrar vale crédito"
+-                  >
+-                    Consultar / cadastrar
+-                  </button>
+-                </label>
+-              ) : paymentMaxInstallments(payment) > 1 ? (
+-                <AdminPicker
+-                  label="Parcelas"
+-                  value={String(Math.min(installments, paymentMaxInstallments(payment)))}
