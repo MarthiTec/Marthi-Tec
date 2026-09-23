@@ -1,0 +1,30 @@
+name: restore-caixa-page
+on:
+  push:
+    branches: [cursor/caixa-page-completa-690d]
+    paths:
+      - '.restore/**'
+      - '.github/workflows/restore-caixa-page.yml'
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore verbatim CaixaPage
+        run: |
+          set -euo pipefail
+          git checkout 13b0ce893a9b9f2534055f5c797509a2c2519fbd -- apps/web/src/pages/caixa/CaixaPage.tsx
+          cat .restore/caixa-patch-*.txt > /tmp/caixa_restore.patch
+          git apply --verbose /tmp/caixa_restore.patch
+          python3 -c "from pathlib import Path; t=Path('apps/web/src/pages/caixa/CaixaPage.tsx').read_text(encoding='utf-8'); need=['Estoque r\u00e1pido','caixa-app__ops-drawer','F2 \u00b7 Confirmar venda','CaixaPaymentSplit','Alt+P','enqueueKitchenOrder','pdv__cart-table']; miss=[n for n in need if n not in t];
+raise SystemExit('missing '+str(miss)) if miss else print('ok', t.count(chr(10)), len(t.encode()))"
+          rm -rf .restore .github/workflows/restore-caixa-page.yml
+          git config user.name MarthiTec
+          git config user.email marthi.tecnologia@gmail.com
+          git add -A
+          git commit -m "Restore full CaixaPage with cart, ops drawer, and payment split"
+          git push
