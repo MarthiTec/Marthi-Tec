@@ -1,0 +1,98 @@
+--- a/apps/web/src/pages/caixa/CaixaPage.tsx
++++ b/apps/web/src/pages/caixa/CaixaPage.tsx
+@@ -1,4 +1,3 @@
+-
+ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+ import { Link, useNavigate } from 'react-router-dom';
+ import { AdminIcon } from '../../components/AdminIcons';
+@@ -19,12 +18,12 @@
+   normalizeSaleQty,
+   stockItemImages,
+   type Customer,
+-  type PaymentMethod,
+   type StockItem,
+   type StockUnit,
+ } from '../../data/adminStore';
+ import {
+   getOpenCashSession,
++  openCashDrawer,
+   registerCashSale,
+   type CashSession,
+ } from '../../data/cashRegisterStore';
+@@ -48,6 +47,16 @@
+ import { usePresenceSession } from '../../hooks/usePresence';
+ import { usePanelTheme } from '../../hooks/usePanelTheme';
+ import { CaixaPanelHost, type CaixaPanel } from './CaixaPanels';
++import { CaixaPaymentSplit } from './CaixaPaymentSplit';
++import {
++  createSplit,
++  describeSplit,
++  isVoucherPayment,
++  roundMoney,
++  summarizeSplit,
++  syncSingleSplit,
++  type SplitPayment,
++} from './paymentSplit';
+ import '../admin/admin.css';
+ import './caixa.css';
+ 
+@@ -117,36 +126,6 @@
+   return scannedImei && item.imei ? `imei:${item.imei}` : `stk:${item.id}`;
+ }
+ 
+-function paymentShortLabel(method: PaymentMethod) {
+-  switch (method.type) {
+-    case 'cash':
+-      return 'Dinheiro';
+-    case 'pix':
+-      return 'Pix';
+-    case 'debit':
+-      return 'Débito';
+-    case 'credit':
+-      return 'Crédito';
+-    default:
+-      return method.name;
+-  }
+-}
+-
+-function isVoucherPayment(method: PaymentMethod | undefined) {
+-  if (!method) return false;
+-  if (method.id === 'PAY-VC') return true;
+-  return /vale\s*cr[eé]dito/i.test(method.name);
+-}
+-
+-function paymentMaxInstallments(method: PaymentMethod | undefined) {
+-  if (!method) return 1;
+-  if (isVoucherPayment(method)) return 1;
+-  const n = Number(method.maxInstallments);
+-  if (Number.isFinite(n) && n > 1) return Math.floor(n);
+-  if (method.type === 'credit') return 12;
+-  return 1;
+-}
+-
+ /** Aceita `12*`, `12*SKU`, `12x SKU`, `1,5x código`. */
+ function parseCodeInput(raw: string): { qty: number | null; code: string; waitingForCode: boolean } {
+   const trimmed = raw.trim();
+@@ -223,13 +202,16 @@
+   const [askCpf, setAskCpf] = useState(false);
+   const [customerCpf, setCustomerCpf] = useState('');
+   const defaultPayment = payments[0];
+-  const [paymentId, setPaymentId] = useState(defaultPayment?.id ?? '');
++  const [splits, setSplits] = useState<SplitPayment[]>(() => [
++    createSplit(defaultPayment?.id ?? ''),
++  ]);
++  /** Enquanto o operador não rateia, a única forma acompanha o total sozinha. */
++  const [splitTouched, setSplitTouched] = useState(false);
+   const [defaultTableId, setDefaultTableId] = useState(
+     defaultPayment?.priceTableId && tables.some((item) => item.id === defaultPayment.priceTableId)
+       ? defaultPayment.priceTableId
+       : (tables[0]?.id ?? ''),
+   );
+-  const [installments, setInstallments] = useState(1);
+   const [discount, setDiscount] = useState(0);
+   const [discountMode, setDiscountMode] = useState<MoneyMode>('money');
+   const [surcharge, setSurcharge] = useState(0);
+@@ -239,6 +221,7 @@
+   const [error, setError] = useState<string | null>(null);
+   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+   const [lastOrderAmount, setLastOrderAmount] = useState(0);
