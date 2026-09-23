@@ -13,7 +13,8 @@ jobs:
       - name: Restore verbatim CaixaPage
         run: |
           set -euxo pipefail
-          curl -fsSL https://raw.githubusercontent.com/MarthiTec/Marthi-Tec/13b0ce893a9b9f2534055f5c797509a2c2519fbd/apps/web/src/pages/caixa/CaixaPage.tsx -o apps/web/src/pages/caixa/CaixaPage.tsx
+          curl -fsSL https://raw.githubusercontent.com/MarthiTec/Marthi-Tec/13b0ce893a9b9f2534055f5c797509a2c2519fbd/apps/web/src/pages/caixa/CaixaPage.tsx -o /tmp/caixa_raw.tsx
+          python3 -c 'from pathlib import Path; p=Path("/tmp/caixa_raw.tsx"); Path("apps/web/src/pages/caixa/CaixaPage.tsx").write_text("\n"+p.read_text(encoding="utf-8"), encoding="utf-8")'
           wc -l apps/web/src/pages/caixa/CaixaPage.tsx
           cat .restore/caixa-patch-00.txt .restore/caixa-patch-01.txt .restore/caixa-patch-02.txt .restore/caixa-patch-03.txt .restore/caixa-patch-04.txt > /tmp/caixa_restore.patch
           git apply --verbose /tmp/caixa_restore.patch
