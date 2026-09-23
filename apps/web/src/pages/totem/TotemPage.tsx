@@ -32,6 +32,7 @@ import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../dat
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemAttractScene } from './TotemAttractScene';
+import { TotemFooter } from './TotemFooter';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
 import {
@@ -80,6 +81,22 @@ function customerWelcomeLine(fullName: string, hello: string, shop: string) {
   return options[first.charCodeAt(0) % options.length];
 }
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function maskTotemPhone(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+}
+
 function startStep(settings: TotemSettings): Step {
   if (settings.showAttractScreen) return 'attract';
   return settings.mode !== 'catalog' && settings.askCustomerName ? 'welcome' : 'catalog';
@@ -124,6 +141,8 @@ export function TotemPage() {
   const [brand, setBrand] = useState<BrandFilter>('all');
   const [search, setSearch] = useState('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [checkoutKb, setCheckoutKb] = useState<'name' | 'phone' | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [configs, setConfigs] = useState<Record<number, CardConfig>>({});
@@ -149,6 +168,8 @@ export function TotemPage() {
   const [showAttractScreen, setShowAttractScreen] = useState(() => getTotemSettings().showAttractScreen);
   const [storeName, setStoreName] = useState(() => getTotemSettings().storeName);
   const [storeLogo, setStoreLogo] = useState(() => getTotemSettings().storeLogo);
+  const [storeWhatsApp, setStoreWhatsApp] = useState(() => getTotemSettings().storeWhatsApp);
+  const [locationLabel, setLocationLabel] = useState(() => getTotemSettings().locationLabel);
   const [attractBackground, setAttractBackground] = useState(() => getTotemSettings().attractBackground);
   const [attractGradientColor, setAttractGradientColor] = useState(
     () => getTotemSettings().attractGradientColor,
@@ -168,6 +189,8 @@ export function TotemPage() {
   const showDineIn = offerFulfillment && !catalogOnly;
   const collectNameUpFront = askCustomerName && !catalogOnly;
   const canPrintTicket = printTicket && !catalogOnly;
+  const askPhoneOnCheckout = !catalogOnly;
+  const phoneRequired = askPhoneOnCheckout && !canPrintTicket;
   const copy = totemCopy(vertical);
   const senha = ticketId ? ticketSenha(ticketId) : '';
   const greeting = storeGreeting();
@@ -190,7 +213,8 @@ export function TotemPage() {
     (step === 'welcome' && name.trim() !== '') ||
     (step !== 'welcome' && name.trim() !== '') ||
     phone.trim() !== '' ||
-    exitOpen;
+    exitOpen ||
+    contactOpen;
 
   function bumpIdle() {
     setIdleTick((current) => current + 1);
@@ -210,6 +234,8 @@ export function TotemPage() {
     setSelection(null);
     setName('');
     setPhone('');
+    setCheckoutKb(null);
+    setContactOpen(false);
     setError(null);
     setSubmitting(false);
     setExitOpen(false);
@@ -284,7 +310,42 @@ export function TotemPage() {
       resetToHome();
     }, FILTER_IDLE_MS);
     return () => window.clearTimeout(timer);
-  }, [awayFromHome, idleTick, step, hasActiveQuery, selection, name, phone, exitOpen, search, brand, filters]);
+  }, [
+    awayFromHome,
+    idleTick,
+    step,
+    hasActiveQuery,
+    selection,
+    name,
+    phone,
+    exitOpen,
+    search,
+    brand,
+    filters,
+    checkoutKb,
+    contactOpen,
+  ]);
+
+  useEffect(() => {
+    if (step !== 'checkout') {
+      setCheckoutKb(null);
+      return;
+    }
+    if (catalogOnly) return;
+    if (!name.trim()) {
+      setCheckoutKb('name');
+    } else if (phoneRequired && onlyDigits(phone).length < 10) {
+      setCheckoutKb('phone');
+    }
+  }, [step, catalogOnly, phoneRequired]);
+
+  useEffect(() => {
+    if (!checkoutKb || step !== 'checkout') return;
+    const node = document.getElementById('totem-checkout-kb');
+    window.setTimeout(() => {
+      node?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  }, [checkoutKb, step]);
 
   useEffect(() => {
     function onActivity() {
@@ -400,6 +461,8 @@ export function TotemPage() {
       setShowAttractScreen(settings.showAttractScreen);
       setStoreName(settings.storeName);
       setStoreLogo(settings.storeLogo);
+      setStoreWhatsApp(settings.storeWhatsApp);
+      setLocationLabel(settings.locationLabel);
       setAttractBackground(settings.attractBackground);
       setAttractGradientColor(settings.attractGradientColor);
       setAttractLayout(settings.attractLayout);
@@ -551,8 +614,19 @@ export function TotemPage() {
 
   async function handleWhatsAppSubmit() {
     if (!selection) return;
+    if (!name.trim()) {
+      setError('Informe seu nome para confirmar o pedido.');
+      setCheckoutKb('name');
+      return;
+    }
+    if (phoneRequired && onlyDigits(phone).length < 10) {
+      setError('Informe um telefone com DDD para confirmar o pedido.');
+      setCheckoutKb('phone');
+      return;
+    }
     setError(null);
     setSubmitting(true);
+    setCheckoutKb(null);
 
     const priceLabel =
       !copy.showInstallments || selection.payment === 'À vista'
@@ -700,12 +774,10 @@ export function TotemPage() {
                   Nome
                   <input
                     value={name}
-                    onChange={(e) => {
-                      bumpIdle();
-                      setName(e.target.value);
-                    }}
-                    placeholder="Seu nome"
+                    readOnly
+                    inputMode="none"
                     autoComplete="off"
+                    placeholder="Use o teclado virtual"
                   />
                 </label>
                 <button
@@ -730,12 +802,10 @@ export function TotemPage() {
                   Nome
                   <input
                     value={name}
-                    onChange={(e) => {
-                      bumpIdle();
-                      setName(e.target.value);
-                    }}
-                    placeholder="Seu nome"
+                    readOnly
+                    inputMode="none"
                     autoComplete="off"
+                    placeholder="Use o teclado virtual"
                   />
                 </label>
               </div>
@@ -1071,33 +1141,105 @@ export function TotemPage() {
                 </p>
               )}
 
-              {collectNameUpFront ? (
-                <p className="totem__summary-name">
-                  Ticket para <strong>{name.trim()}</strong>
-                </p>
-              ) : (
-                <label className="totem-field">
-                  Digite seu nome e sobrenome
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Seu nome"
-                    disabled={submitting}
-                  />
-                </label>
-              )}
+              {!catalogOnly ? (
+                <>
+                  {collectNameUpFront && name.trim() ? (
+                    <p className="totem__summary-name">
+                      Pedido de <strong>{name.trim()}</strong>
+                    </p>
+                  ) : null}
 
-              {!collectNameUpFront && !canPrintTicket ? (
-                <label className="totem-field">
-                  Digite seu telefone com DDD
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(24) 99999-9999"
-                    inputMode="tel"
-                    disabled={submitting}
-                  />
-                </label>
+                  <label
+                    className={`totem-field${checkoutKb === 'name' ? ' totem-field--focus' : ''}`}
+                  >
+                    Digite seu nome e sobrenome
+                    <input
+                      value={name}
+                      readOnly
+                      inputMode="none"
+                      autoComplete="off"
+                      placeholder="Toque para digitar seu nome"
+                      disabled={submitting}
+                      onFocus={() => {
+                        bumpIdle();
+                        setCheckoutKb('name');
+                      }}
+                      onClick={() => {
+                        bumpIdle();
+                        setCheckoutKb('name');
+                      }}
+                    />
+                  </label>
+
+                  {askPhoneOnCheckout ? (
+                    <label
+                      className={`totem-field${checkoutKb === 'phone' ? ' totem-field--focus' : ''}`}
+                    >
+                      Digite seu telefone com DDD
+                      <input
+                        value={phone}
+                        readOnly
+                        inputMode="none"
+                        autoComplete="off"
+                        placeholder="(24) 99999-9999"
+                        disabled={submitting}
+                        onFocus={() => {
+                          bumpIdle();
+                          setCheckoutKb('phone');
+                        }}
+                        onClick={() => {
+                          bumpIdle();
+                          setCheckoutKb('phone');
+                        }}
+                      />
+                    </label>
+                  ) : null}
+
+                  {checkoutKb ? (
+                    <div className="totem__checkout-kb" id="totem-checkout-kb">
+                      <TotemKeyboard
+                        mode={checkoutKb === 'phone' ? 'numeric' : 'letters'}
+                        onKey={(char) => {
+                          bumpIdle();
+                          if (checkoutKb === 'name') {
+                            if (!/^[A-Za-z]$/.test(char)) return;
+                            setName((current) => `${current}${char.toUpperCase()}`.slice(0, 40));
+                            return;
+                          }
+                          if (!/^\d$/.test(char)) return;
+                          setPhone((current) => maskTotemPhone(onlyDigits(current + char)));
+                        }}
+                        onBackspace={() => {
+                          bumpIdle();
+                          if (checkoutKb === 'name') {
+                            setName((current) => current.slice(0, -1));
+                            return;
+                          }
+                          setPhone((current) => maskTotemPhone(onlyDigits(current).slice(0, -1)));
+                        }}
+                        onSpace={() => {
+                          bumpIdle();
+                          if (checkoutKb === 'name') {
+                            setName((current) => `${current} `.slice(0, 40));
+                          }
+                        }}
+                        onClear={() => {
+                          bumpIdle();
+                          if (checkoutKb === 'name') setName('');
+                          else setPhone('');
+                        }}
+                        onClose={() => {
+                          bumpIdle();
+                          if (checkoutKb === 'name' && askPhoneOnCheckout && !phone.trim()) {
+                            setCheckoutKb('phone');
+                            return;
+                          }
+                          setCheckoutKb(null);
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </>
               ) : null}
 
               {copy.showInstallments ? (
@@ -1139,8 +1281,8 @@ export function TotemPage() {
                 className="totem-btn totem-btn--primary totem-btn--block"
                 disabled={
                   submitting ||
-                  (collectNameUpFront && !name.trim()) ||
-                  (!collectNameUpFront && !canPrintTicket && (!name.trim() || phone.trim().length < 8))
+                  !name.trim() ||
+                  (phoneRequired && onlyDigits(phone).length < 10)
                 }
                 onClick={() => void handleWhatsAppSubmit()}
               >
@@ -1190,9 +1332,16 @@ export function TotemPage() {
       )}
 
       {step !== 'attract' ? (
-      <footer className="totem__hint">
-        {catalogOnly ? copy.footerCatalog : collectNameUpFront ? copy.footerNamed : copy.footerKiosk}
-      </footer>
+        <TotemFooter
+          hint={
+            catalogOnly ? copy.footerCatalog : collectNameUpFront ? copy.footerNamed : copy.footerKiosk
+          }
+          open={contactOpen}
+          onOpenChange={(open) => {
+            bumpIdle();
+            setContactOpen(open);
+          }}
+        />
       ) : null}
 
       {exitOpen && (

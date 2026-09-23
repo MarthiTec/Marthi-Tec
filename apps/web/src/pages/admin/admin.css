@@ -2321,6 +2321,197 @@
   background: #f5f5f7;
 }
 
+.plan-picker__card--with-thumb {
+  gap: 10px;
+}
+
+.totem-attract-thumb {
+  height: 148px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 20, 24, 0.08);
+  pointer-events: none;
+}
+
+.totem-attract-thumb .totem-attract--preview {
+  min-height: 148px;
+  height: 148px;
+  margin: 0;
+  border-radius: 0;
+  padding: 12px 10px;
+  gap: 8px;
+}
+
+.totem-attract-thumb .totem-attract__mark {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+  padding: 6px;
+}
+
+.totem-attract-thumb .totem-attract--logo-promo .totem-attract__mark {
+  width: 64px !important;
+  height: 64px !important;
+}
+
+.totem-attract-thumb .totem-attract__hello,
+.totem-attract-thumb .totem-attract__hint {
+  display: none;
+}
+
+.totem-attract-thumb h1 {
+  font-size: 0.95rem !important;
+  margin: 0;
+}
+
+.totem-attract-thumb .totem-attract__actions {
+  gap: 6px;
+}
+
+.totem-attract-thumb .totem-attract__cta {
+  min-height: 28px !important;
+  border-radius: 10px !important;
+  font-size: 0.68rem !important;
+  padding: 0 8px;
+}
+
+.totem-screen-preview {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #f3f5f7 0%, #ebeff3 100%);
+}
+
+.totem-screen-preview__bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.totem-screen-preview__bar span {
+  display: block;
+  color: var(--mute);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.totem-screen-preview__bar strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.totem-screen-preview__bar em {
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.totem-screen-preview__stage {
+  display: grid;
+  place-items: center;
+}
+
+.totem-screen-preview__bezel {
+  width: min(100%, 420px);
+  padding: 14px 14px 18px;
+  border-radius: 28px;
+  background: linear-gradient(160deg, #2a2f38 0%, #12151c 100%);
+  box-shadow:
+    0 22px 48px rgba(16, 20, 24, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.totem-screen-preview__glass {
+  aspect-ratio: 9 / 16;
+  max-height: min(68vh, 640px);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.totem-screen-preview__glass .totem-attract--preview {
+  min-height: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  padding: clamp(18px, 4vw, 28px) clamp(14px, 3vw, 22px);
+}
+
+.totem-screen-preview__catalog {
+  height: 100%;
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  background: #f5f5f7;
+  color: #111;
+}
+
+.totem-screen-preview__catalog header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.totem-screen-preview__catalog header strong {
+  font-size: 1.05rem;
+}
+
+.totem-screen-preview__catalog header span {
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.totem-screen-preview__hint {
+  margin: 12px 0 0;
+  color: var(--mute);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.admin.admin--dark .totem-preview,
+.admin.admin--dark .totem-screen-preview {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.admin.admin--dark .totem-screen-preview__bar strong,
+.admin.admin--dark .totem-preview__bar strong {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .totem-screen-preview__bar span,
+.admin.admin--dark .totem-preview__bar span,
+.admin.admin--dark .totem-screen-preview__hint,
+.admin.admin--dark .totem-preview__note {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .totem-attract-thumb {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .totem-preview__card {
+  background: #1c2430;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e8eef4;
+}
+
 .totem-preview__bar {
   display: flex;
   justify-content: space-between;
@@ -4618,4 +4809,142 @@ select.caixa-mov-input {
 .admin.admin--dark .dash-charts .admin-card,
 .admin.admin--dark .dash-kpis .admin-card {
   background: var(--card);
+}
+
+/* Pickers / cards de opção (Totem config, plano, módulos) */
+.admin.admin--dark .plan-picker__card,
+.admin.admin--dark .module-picker__item,
+.admin.admin--dark .totem-rig-card {
+  background: var(--card-2);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: var(--ink);
+}
+
+.admin.admin--dark .plan-picker__card strong,
+.admin.admin--dark .module-picker__item strong,
+.admin.admin--dark .totem-rig-card strong {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .plan-picker__card span,
+.admin.admin--dark .module-picker__item em,
+.admin.admin--dark .totem-rig-card span {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .totem-rig-card em {
+  color: #5eead4;
+}
+
+.admin.admin--dark .plan-picker__card.is-active,
+.admin.admin--dark .module-picker__item.is-active,
+.admin.admin--dark .totem-rig-card.is-active {
+  border-color: #2dd4bf;
+  box-shadow: inset 0 0 0 2px #2dd4bf;
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.admin.admin--dark .module-picker__item.is-active {
+  background: rgba(45, 212, 191, 0.12);
+}
+
+.admin.admin--dark .totem-rig {
+  background: #121820;
+}
+
+.admin.admin--dark .totem-rig.is-active {
+  background: rgba(15, 118, 110, 0.22);
+}
+
+.admin.admin--dark .totem-color-field p {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .totem-color-field span {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .totem-color-custom {
+  color: #cbd5e1;
+}
+
+/* Planos metal — mantêm gradiente e texto escuro legível */
+.admin.admin--dark .plan-picker__card--bronze {
+  background: linear-gradient(145deg, #f3e0c8 0%, #d4a574 42%, #a66b3b 100%);
+  border-color: rgba(122, 72, 32, 0.4);
+  color: #3b2414;
+  box-shadow: none;
+}
+
+.admin.admin--dark .plan-picker__card--bronze strong,
+.admin.admin--dark .plan-picker__card--bronze span {
+  color: #3b2414;
+}
+
+.admin.admin--dark .plan-picker__card--bronze span {
+  color: rgba(59, 36, 20, 0.8);
+}
+
+.admin.admin--dark .plan-picker__card--silver {
+  background: linear-gradient(145deg, #f7f8fa 0%, #d8dee8 48%, #9aa5b5 100%);
+  border-color: rgba(100, 116, 139, 0.4);
+  color: #1f2937;
+  box-shadow: none;
+}
+
+.admin.admin--dark .plan-picker__card--silver strong,
+.admin.admin--dark .plan-picker__card--silver span {
+  color: #1f2937;
+}
+
+.admin.admin--dark .plan-picker__card--silver span {
+  color: rgba(31, 41, 55, 0.75);
+}
+
+.admin.admin--dark .plan-picker__card--golden {
+  background: linear-gradient(145deg, #fff4c8 0%, #f0c14a 45%, #c99216 100%);
+  border-color: rgba(168, 112, 12, 0.4);
+  color: #4a3200;
+  box-shadow: none;
+}
+
+.admin.admin--dark .plan-picker__card--golden strong,
+.admin.admin--dark .plan-picker__card--golden span {
+  color: #4a3200;
+}
+
+.admin.admin--dark .plan-picker__card--golden span {
+  color: rgba(74, 50, 0, 0.78);
+}
+
+.admin.admin--dark .plan-picker__card--bronze.is-active,
+.admin.admin--dark .plan-picker__card--silver.is-active,
+.admin.admin--dark .plan-picker__card--golden.is-active {
+  box-shadow: inset 0 0 0 2px #0f172a;
+  border-color: #0f172a;
+}
+
+.admin.admin--dark .admin-form label,
+.admin.admin--dark .admin-form > label {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .erp-access__item,
+.admin.admin--dark .admin-picker,
+.admin.admin--dark .admin-note-box {
+  color: var(--ink);
+}
+
+.admin.admin--dark code {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .partner-plan,
+.admin.admin--dark .admin-table__name-btn {
+  color: var(--ink);
+}
+
+.admin.admin--dark .admin-table__name-btn {
+  background: transparent;
 }

@@ -233,12 +233,23 @@ export function TotemSettingsPage() {
           <div className="plan-picker" style={{ marginTop: 12 }}>
             <button
               type="button"
-              className={`plan-picker__card ${attractLayout === 'logoPromo' ? 'is-active' : ''}`}
+              className={`plan-picker__card plan-picker__card--with-thumb ${attractLayout === 'logoPromo' ? 'is-active' : ''}`}
               onClick={() => {
                 setAttractLayout('logoPromo');
                 markDirty();
               }}
             >
+              <div className="totem-attract-thumb" aria-hidden>
+                <TotemAttractScene
+                  preview
+                  storeName={storeName}
+                  storeLogo={storeLogo}
+                  greeting={storeGreeting()}
+                  gradientColor={attractGradientColor}
+                  backgroundImage={attractBackground}
+                  layout="logoPromo"
+                />
+              </div>
               <strong>Logo + propaganda</strong>
               <span>
                 Logo grande da loja e a arte de fundo bem visível. Bom quando ainda há poucos itens no
@@ -247,12 +258,23 @@ export function TotemSettingsPage() {
             </button>
             <button
               type="button"
-              className={`plan-picker__card ${attractLayout === 'standard' ? 'is-active' : ''}`}
+              className={`plan-picker__card plan-picker__card--with-thumb ${attractLayout === 'standard' ? 'is-active' : ''}`}
               onClick={() => {
                 setAttractLayout('standard');
                 markDirty();
               }}
             >
+              <div className="totem-attract-thumb" aria-hidden>
+                <TotemAttractScene
+                  preview
+                  storeName={storeName}
+                  storeLogo={storeLogo}
+                  greeting={storeGreeting()}
+                  gradientColor={attractGradientColor}
+                  backgroundImage={attractBackground}
+                  layout="standard"
+                />
+              </div>
               <strong>Abertura padrão</strong>
               <span>Nome da loja, saudação e lavagem colorida por cima do fundo.</span>
             </button>
@@ -368,17 +390,66 @@ export function TotemSettingsPage() {
             </label>
           </div>
         </div>
-        {showAttractScreen ? (
-          <TotemAttractScene
-            preview
-            storeName={storeName}
-            storeLogo={storeLogo}
-            greeting={storeGreeting()}
-            gradientColor={attractGradientColor}
-            backgroundImage={attractBackground}
-            layout={attractLayout}
-          />
-        ) : null}
+
+        <div className="totem-screen-preview" aria-label="Pré-visualização da tela de abertura do totem">
+          <div className="totem-screen-preview__bar">
+            <div>
+              <span>Pré-visualização ao vivo</span>
+              <strong>
+                {showAttractScreen
+                  ? attractLayout === 'logoPromo'
+                    ? 'Tela de abertura · Logo + propaganda'
+                    : 'Tela de abertura · Padrão'
+                  : 'Sem abertura · vai direto ao catálogo'}
+              </strong>
+            </div>
+            <em>Como o cliente vê no totem</em>
+          </div>
+          <div className="totem-screen-preview__stage">
+            <div className="totem-screen-preview__bezel">
+              <div className="totem-screen-preview__glass">
+                {showAttractScreen ? (
+                  <TotemAttractScene
+                    preview
+                    storeName={storeName}
+                    storeLogo={storeLogo}
+                    greeting={storeGreeting()}
+                    gradientColor={attractGradientColor}
+                    backgroundImage={attractBackground}
+                    layout={attractLayout}
+                  />
+                ) : (
+                  <div className="totem-screen-preview__catalog">
+                    <header>
+                      <strong>{storeName.trim() || 'Sua Loja'}</strong>
+                      <span>Catálogo</span>
+                    </header>
+                    <div
+                      className="totem-preview__grid"
+                      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+                    >
+                      {copy.previewItems.map((item) => (
+                        <article key={item.name} className="totem-preview__card">
+                          <div className="totem-preview__media" />
+                          <strong>{item.name}</strong>
+                          <span>{item.price}</span>
+                        </article>
+                      ))}
+                    </div>
+                    <p className="totem-preview__note" style={{ margin: '10px 0 0' }}>
+                      Sem tela de abertura o totem já mostra os produtos.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="totem-screen-preview__hint">
+            {showAttractScreen
+              ? 'Altere logo, propaganda, layout ou cor — o preview atualiza na hora. Depois salve as configurações.'
+              : 'Se quiser a logo e a propaganda em tela cheia, ative “Com tela de abertura” acima.'}
+          </p>
+        </div>
       </article>
 
       <article className="admin-card">

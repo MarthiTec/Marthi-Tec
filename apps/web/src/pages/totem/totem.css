@@ -1061,6 +1061,162 @@ body.totem-html-scroll #root {
   z-index: 15;
 }
 
+.totem-foot {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  background: linear-gradient(180deg, #232326 0%, #141416 100%);
+  color: #fff;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.totem-foot__hint {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(0.88rem, 1.4vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.35;
+}
+
+.totem-foot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.totem-foot__btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.totem-foot__btn:hover,
+.totem-foot__btn.is-active {
+  background: rgba(45, 212, 191, 0.22);
+  border-color: rgba(45, 212, 191, 0.55);
+}
+
+.totem-foot-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.totem-foot-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.totem-foot-sheet__card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: min(80vh, 640px);
+  overflow: auto;
+  border-radius: 22px;
+  background: #fff;
+  color: #12151a;
+  padding: 22px 20px 24px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  display: grid;
+  gap: 14px;
+}
+
+.totem-foot-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.totem-foot-sheet__head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.totem-foot-sheet__close {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(18, 21, 26, 0.12);
+  background: #f3f4f6;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.totem-foot-sheet__body {
+  display: grid;
+  gap: 12px;
+}
+
+.totem-foot-sheet__lead {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.totem-foot-sheet__body > p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.totem-foot-sheet__block {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f5f5f7;
+  border: 1px solid rgba(18, 21, 26, 0.06);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.totem-foot-sheet__block span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.totem-foot-sheet__block strong {
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+  word-break: break-word;
+}
+
+.totem-foot-sheet__meta {
+  font-size: 0.82rem !important;
+  color: #6b7280 !important;
+}
+
 .totem__welcome {
   flex: 1;
   display: grid;
@@ -1261,6 +1417,29 @@ body.totem-html-scroll #root {
   font-size: 1.05rem;
   color: #1d1d1f;
   background: #fff;
+}
+
+.totem-field--focus input {
+  border-color: #1d1d1f;
+  box-shadow: 0 0 0 3px rgba(29, 29, 31, 0.12);
+  outline: none;
+}
+
+.totem-field input[readonly] {
+  cursor: pointer;
+  caret-color: transparent;
+}
+
+.totem__checkout-kb {
+  margin-top: 2px;
+  padding: 10px;
+  border-radius: 18px;
+  background: #f5f5f7;
+  border: 1px solid #e5e5ea;
+}
+
+.totem__checkout-kb .totem-kb {
+  margin: 0;
 }
 
 .totem__prices {
@@ -1471,6 +1650,24 @@ body.totem-html-scroll #root {
   min-width: 100px;
   background: #0a84ff;
   font-size: 0.9rem;
+}
+
+.totem-kb--numeric .totem-kb__rows {
+  max-width: 320px;
+}
+
+.totem-kb--numeric .totem-kb__row {
+  flex-wrap: nowrap;
+}
+
+.totem-kb__key--num {
+  min-width: 72px;
+  min-height: 56px;
+  font-size: 1.35rem;
+}
+
+.totem-kb--letters .totem-kb__rows {
+  max-width: 900px;
 }
 
 @media (max-width: 1180px) {

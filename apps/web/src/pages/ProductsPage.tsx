@@ -171,17 +171,6 @@ export function ProductsPage() {
         <Link to="/" className="site__nav-brand site__nav-brand--lockup" aria-label="Marthi Tecnologia">
           <BrandLogo variant="lockup" className="site__nav-lockup" />
         </Link>
-        <button
-          type="button"
-          className="site__nav-burger"
-          aria-expanded={navOpen}
-          aria-label="Abrir menu"
-          onClick={() => setNavOpen((open) => !open)}
-        >
-          <i />
-          <i />
-          <i />
-        </button>
         <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
           <Link to="/produtos" aria-current="page" onClick={() => setNavOpen(false)}>
             Produtos
@@ -198,10 +187,30 @@ export function ProductsPage() {
           <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
             Solicitar demo
           </Link>
-          <Link to="/login" className="site__nav-login" onClick={() => setNavOpen(false)}>
+          <Link
+            to="/login"
+            className="site__nav-login site__nav-login--mobile"
+            onClick={() => setNavOpen(false)}
+          >
             Entrar
           </Link>
         </nav>
+        <div className="site__nav-end">
+          <Link to="/login" className="site__nav-login site__nav-login--desk" onClick={() => setNavOpen(false)}>
+            Entrar
+          </Link>
+          <button
+            type="button"
+            className="site__nav-burger"
+            aria-expanded={navOpen}
+            aria-label="Abrir menu"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <i />
+            <i />
+            <i />
+          </button>
+        </div>
       </header>
 
       <main>
