@@ -766,3 +766,193 @@ export function CaixaPage() {
   function requestExit() {
     setExitOpen(true);
   }
+
+  useEffect(() => {
+    focusCode();
+    function onCashUpdated() {
+      refreshCash();
+    }
+    window.addEventListener('marthi-cash-updated', onCashUpdated);
+    return () => window.removeEventListener('marthi-cash-updated', onCashUpdated);
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+      const inCodeField = target === codeRef.current;
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+
+      if (event.key === 'Insert') {
+        event.preventDefault();
+        if (panel) setPanel(null);
+        setOpsMenuOpen(false);
+        setCode('');
+        setError(null);
+        focusCode();
+        return;
+      }
+
+      if (event.key === 'F2') {
+        event.preventDefault();
+        finishRef.current();
+        return;
+      }
+      if (event.key === 'F3') {
+        event.preventDefault();
+        focusCode();
+        return;
+      }
+      if (event.key === 'F4' && fiscalOn && lastOrderId) {
+        event.preventDefault();
+        emitFiscal(true);
+        return;
+      }
+      if (event.key === 'F6') {
+        event.preventDefault();
+        if (cashOpen) openPanelRef.current('exchange');
+        return;
+      }
+      if (event.key === 'F7') {
+        event.preventDefault();
+        openPanelRef.current(cashOpen ? 'movements' : 'open');
+        return;
+      }
+      if (event.key === 'F8') {
+        event.preventDefault();
+        if (cashOpen) openPanelRef.current('sangria');
+        return;
+      }
+      if (event.key === 'F9') {
+        event.preventDefault();
+        if (cashOpen) openPanelRef.current('aporte');
+        return;
+      }
+      if (event.key === 'F10') {
+        event.preventDefault();
+        if (cashOpen) openPanelRef.current('close');
+        return;
+      }
+      if (event.key === 'F11') {
+        event.preventDefault();
+        openPanelRef.current('price');
+        return;
+      }
+      if (event.key === 'F12') {
+        event.preventDefault();
+        openPanelRef.current('sessions');
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (exitOpen) {
+          event.preventDefault();
+          setExitOpen(false);
+          focusCode();
+          return;
+        }
+        if (profileOpen) {
+          event.preventDefault();
+          setProfileOpen(false);
+          focusCode();
+          return;
+        }
+        if (panel) {
+          event.preventDefault();
+          setPanel(null);
+          focusCode();
+          return;
+        }
+        if (opsMenuOpen) {
+          event.preventDefault();
+          setOpsMenuOpen(false);
+          focusCode();
+          return;
+        }
+        if (inCodeField || !typing) {
+          setCode('');
+          setError(null);
+          focusCode();
+        }
+        return;
+      }
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        if (key === 'o') {
+          event.preventDefault();
+          setOpsMenuOpen((open) => !open);
+          return;
+        }
+        if (key === 'c') {
+          event.preventDefault();
+          openPanelRef.current('sales');
+          return;
+        }
+        if (key === 'e') {
+          event.preventDefault();
+          openPanelRef.current('canceled');
+          return;
+        }
+        if (key === 'p') {
+          event.preventDefault();
+          addSplitRef.current();
+          return;
+        }
+        if (key === 'v') {
+          event.preventDefault();
+          if (cashOpen) openPanelRef.current('vale');
+          return;
+        }
+        if (key === 'n') {
+          event.preventDefault();
+          openPanelRef.current('customer');
+          return;
+        }
+        if (/^[1-9]$/.test(key)) {
+          event.preventDefault();
+          const item = quickStock[Number(key) - 1];
+          if (item) addItem(item, false);
+          return;
+        }
+      }
+
+      // Enter no código vazio fecha a venda; Tab/Enter nos botões seguem o navegador
+      if (event.key === 'Enter' && inCodeField && !code.trim() && linesRef.current.length > 0) {
+        event.preventDefault();
+        finishRef.current();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fiscalOn, lastOrderId, quickStock, code, cashOpen, panel, exitOpen, opsMenuOpen, profileOpen]);
+
+  useEffect(() => {
+    function onDrawer() {
+      setDrawerFlash('Gaveta aberta (sinal enviado)');
+      window.setTimeout(() => setDrawerFlash(null), 2500);
+    }
+    window.addEventListener('marthi-cash-drawer', onDrawer);
+    return () => window.removeEventListener('marthi-cash-drawer', onDrawer);
+  }, []);
+
+  useEffect(() => {
+    if (!shortcutsOpen) return;
+    function onDoc(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('.caixa-app__shortcuts')) return;
+      setShortcutsOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setShortcutsOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [shortcutsOpen]);
