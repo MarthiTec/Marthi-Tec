@@ -168,8 +168,6 @@ export function TotemPage() {
   const [showAttractScreen, setShowAttractScreen] = useState(() => getTotemSettings().showAttractScreen);
   const [storeName, setStoreName] = useState(() => getTotemSettings().storeName);
   const [storeLogo, setStoreLogo] = useState(() => getTotemSettings().storeLogo);
-  const [storeWhatsApp, setStoreWhatsApp] = useState(() => getTotemSettings().storeWhatsApp);
-  const [locationLabel, setLocationLabel] = useState(() => getTotemSettings().locationLabel);
   const [attractBackground, setAttractBackground] = useState(() => getTotemSettings().attractBackground);
   const [attractGradientColor, setAttractGradientColor] = useState(
     () => getTotemSettings().attractGradientColor,
@@ -461,8 +459,6 @@ export function TotemPage() {
       setShowAttractScreen(settings.showAttractScreen);
       setStoreName(settings.storeName);
       setStoreLogo(settings.storeLogo);
-      setStoreWhatsApp(settings.storeWhatsApp);
-      setLocationLabel(settings.locationLabel);
       setAttractBackground(settings.attractBackground);
       setAttractGradientColor(settings.attractGradientColor);
       setAttractLayout(settings.attractLayout);
