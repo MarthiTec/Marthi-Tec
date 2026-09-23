@@ -23,6 +23,8 @@ export type CashMovement = {
   id: string;
   kind: CashMovementKind;
   amount: number;
+  /** Venda: parte do `amount` recebida em dinheiro (o que entra na gaveta). */
+  cashAmount?: number;
   note: string;
   /** Motivo fixo (papelaria, lanche…). */
   reason?: string;
@@ -433,15 +435,23 @@ export function registerCashSale(
   operatorName: string,
   note?: string,
   orderId?: string,
+  options?: { cashAmount?: number },
 ) {
-  const value = Math.max(0, Number(amount) || 0);
+  const value = roundMoney(Math.max(0, Number(amount) || 0));
   if (value <= 0) return { ok: false as const, error: 'Valor inválido.' };
+  // Só o que foi pago em dinheiro entra na gaveta; cartão e Pix são conferidos
+  // por canal no fechamento.
+  const cashValue =
+    options?.cashAmount === undefined
+      ? value
+      : Math.min(value, roundMoney(Math.max(0, options.cashAmount)));
   return mutateOpen((session) => {
-    session.expectedCash += value;
+    session.expectedCash = roundMoney(session.expectedCash + cashValue);
     session.movements.push({
       id: uid('MOV'),
       kind: 'sale',
       amount: value,
+      cashAmount: cashValue,
       note: note?.trim() || 'Venda PDV',
       orderId: orderId?.trim() || undefined,
       createdAt: new Date().toISOString(),

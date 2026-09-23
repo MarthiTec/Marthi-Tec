@@ -1,0 +1,345 @@
+.pdv-split {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.pdv-split__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pdv-split__head h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mute, #6b7280);
+}
+
+.pdv-split__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px dashed rgba(var(--accent-rgb, 29, 78, 216), 0.45);
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.08);
+  color: var(--accent, #1d4ed8);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pdv-split__add:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.16);
+}
+
+.pdv-split__add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pdv-split__add kbd {
+  padding: 1px 5px;
+  border: 1px solid rgba(var(--accent-rgb, 29, 78, 216), 0.3);
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.caixa-app.is-theme-dark .pdv-split__add kbd {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.pdv-split__rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pdv-split__row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.caixa-app.is-theme-dark .pdv-split__row {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pdv-split__row.is-cash {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.pdv-split__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.pdv-split__main.is-multi {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+}
+
+.pdv-split__amount,
+.pdv-split__tender {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--mute, #6b7280);
+}
+
+.pdv--caixa .pdv-split__amount input,
+.pdv--caixa .pdv-split__tender input,
+.pdv--caixa .admin-form .pdv-split__amount input,
+.pdv--caixa .admin-form .pdv-split__tender input {
+  min-height: 40px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+.pdv-split__drop {
+  width: 36px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--red, #d70015);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pdv-split__drop:hover {
+  background: rgba(215, 0, 21, 0.1);
+}
+
+.caixa-app.is-theme-dark .pdv-split__drop {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #fca5a5;
+}
+
+.pdv-split__rest,
+.pdv-split__vale {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pdv-split__rest:hover,
+.pdv-split__vale:hover {
+  background: rgba(var(--accent-rgb, 29, 78, 216), 0.1);
+}
+
+.caixa-app.is-theme-dark .pdv-split__rest,
+.caixa-app.is-theme-dark .pdv-split__vale {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.pdv-split__cash {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(16, 185, 129, 0.4);
+}
+
+.pdv-split__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pdv-split__notes button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pdv-split__notes button:hover,
+.pdv-split__notes button.is-on {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.pdv-split__change {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--mute, #6b7280);
+}
+
+.pdv-split__change strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.pdv-split__change.is-on {
+  color: #047857;
+}
+
+.caixa-app.is-theme-dark .pdv-split__change.is-on {
+  color: #6ee7b7;
+}
+
+.pdv-split__warn {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--red, #d70015);
+}
+
+.pdv-split__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.05);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--mute, #6b7280);
+}
+
+.caixa-app.is-theme-dark .pdv-split__status {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pdv-split__status strong {
+  margin-left: 4px;
+  font-size: 0.92rem;
+  color: var(--ink, #12151a);
+}
+
+.caixa-app.is-theme-dark .pdv-split__status strong {
+  color: #e8eef4;
+}
+
+.pdv-split__status .is-warn,
+.pdv-split__status .is-warn strong {
+  color: var(--red, #d70015);
+}
+
+.pdv-split__status .is-ok {
+  color: #047857;
+}
+
+.caixa-app.is-theme-dark .pdv-split__status .is-ok {
+  color: #6ee7b7;
+}
+
+.pdv__total-change dt,
+.pdv__total-change dd {
+  color: #047857 !important;
+  font-weight: 800;
+}
+
+.pdv__total-change dd {
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.caixa-app.is-theme-dark .pdv__total-change dt,
+.caixa-app.is-theme-dark .pdv__total-change dd {
+  color: #6ee7b7 !important;
+}
+
+.pdv__change-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  font-weight: 800;
+}
+
+.pdv__change-banner strong {
+  font-size: 1.4rem;
+  letter-spacing: -0.02em;
+}
+
+.caixa-app.is-theme-dark .pdv__change-banner {
+  color: #6ee7b7;
+}
+
+@media (max-width: 820px) {
+  .pdv-split__main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pdv-split__main.is-multi {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .pdv-split__main.is-multi > .admin-picker {
+    grid-column: 1 / -1;
+  }
+
+  .pdv-split__drop {
+    width: 44px;
+    height: 48px;
+  }
+
+  .pdv--caixa .pdv-split__amount input,
+  .pdv--caixa .pdv-split__tender input {
+    min-height: 48px;
+    font-size: 1.05rem;
+  }
+
+  .pdv-split__notes button {
+    min-height: 40px;
+    font-size: 0.85rem;
+  }
+}
