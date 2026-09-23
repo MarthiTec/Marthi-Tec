@@ -59,3 +59,59 @@ import {
 } from './paymentSplit';
 import '../admin/admin.css';
 import './caixa.css';
+
+const CONSUMIDOR_FINAL = 'Consumidor Final';
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function formatCpf(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function isValidCpf(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += Number(cpf[i]) * (10 - i);
+  let dig = (sum * 10) % 11;
+  if (dig === 10) dig = 0;
+  if (dig !== Number(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i += 1) sum += Number(cpf[i]) * (11 - i);
+  dig = (sum * 10) % 11;
+  if (dig === 10) dig = 0;
+  return dig === Number(cpf[10]);
+}
+
+type MoneyMode = 'money' | 'percent';
+
+type CartLine = {
+  key: string;
+  stockId: string;
+  name: string;
+  sku: string;
+  imei: string;
+  qty: number;
+  unit: StockUnit;
+  basePrice: number;
+  unitPrice: number;
+  priceTableId: string;
+  lineDiscount: number;
+  lineDiscountMode: MoneyMode;
+  lineSurcharge: number;
+  lineSurchargeMode: MoneyMode;
+  /** Campanha aplicada (faixa / brinde). */
+  promoLabel?: string;
+};
+
+function money(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
