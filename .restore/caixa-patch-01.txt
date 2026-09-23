@@ -1,0 +1,89 @@
++  const [lastChange, setLastChange] = useState(0);
+   const [lastCustomerName, setLastCustomerName] = useState('');
+   const [cashSession, setCashSession] = useState<CashSession | null>(() => getOpenCashSession());
+   const [panel, setPanel] = useState<CaixaPanel>(null);
+@@ -256,6 +239,7 @@
+   const codeRef = useRef<HTMLInputElement>(null);
+   const linesRef = useRef(lines);
+   const finishRef = useRef<() => void>(() => undefined);
++  const addSplitRef = useRef<() => void>(() => undefined);
+   const openPanelRef = useRef<(op: Exclude<CaixaPanel, null>) => void>(() => undefined);
+   const quickStock = useMemo(() => stock.filter((item) => item.qty > 0).slice(0, 10), [stock]);
+   const codeParsed = useMemo(() => parseCodeInput(code), [code]);
+@@ -289,10 +273,8 @@
+     };
+   }, []);
+ 
+-  const payment = payments.find((item) => item.id === paymentId);
+   const seller = sellers.find((item) => item.id === sellerId);
+   const cashOpen = Boolean(cashSession);
+-  const voucherPay = isVoucherPayment(payment);
+ 
+   const pricedLines = useMemo(
+     () =>
+@@ -342,6 +324,24 @@
+   const discountMoney = cartDiscount + itemsDiscount;
+   const surchargeMoney = cartSurcharge + itemsSurcharge;
+   const total = Math.max(0, subtotal - discountMoney + surchargeMoney);
++  const unitCount = pricedLines.reduce(
++    (sum, line) => sum + (isWeighedUnit(line.unit) ? 0 : line.qty),
++    0,
++  );
++  const weighedQty = pricedLines.reduce(
++    (sum, line) => sum + (isWeighedUnit(line.unit) ? line.qty : 0),
++    0,
++  );
++
++  const splitRows = useMemo(
++    () => syncSingleSplit(splits, total, splitTouched),
++    [splits, total, splitTouched],
++  );
++  const paySummary = useMemo(
++    () => summarizeSplit(splitRows, payments, total),
++    [splitRows, payments, total],
++  );
++  const primaryPayment = payments.find((item) => item.id === splitRows[0]?.methodId);
+ 
+   linesRef.current = lines;
+ 
+@@ -535,13 +535,48 @@
+     focusCode();
+   }
+ 
+-  function onPaymentChange(id: string) {
+-    setPaymentId(id);
+-    const method = payments.find((item) => item.id === id);
+-    if (method?.priceTableId && tables.some((item) => item.id === method.priceTableId)) {
+-      setDefaultTableId(method.priceTableId);
++  function resetSplits() {
++    setSplits([createSplit(payments[0]?.id ?? '')]);
++    setSplitTouched(false);
++  }
++
++  function patchSplit(
++    key: string,
++    patch: Partial<SplitPayment>,
++    options?: { touch?: boolean },
++  ) {
++    if (options?.touch) setSplitTouched(true);
++    setSplits(splitRows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
++    setError(null);
++    // A tabela de preço continua seguindo a forma principal, como antes.
++    if (patch.methodId && splitRows[0]?.key === key) {
++      const method = payments.find((item) => item.id === patch.methodId);
++      if (method?.priceTableId && tables.some((item) => item.id === method.priceTableId)) {
++        setDefaultTableId(method.priceTableId);
++      }
+     }
+-    setInstallments(1);
++  }
++
++  function addSplit() {
++    if (!payments.length) return;
++    const used = new Set(splitRows.map((row) => row.methodId));
++    const next = payments.find((item) => !used.has(item.id)) ?? payments[0];
++    const rest = Math.max(
++      0,
++      roundMoney(total - splitRows.reduce((sum, row) => sum + row.amount, 0)),
++    );
++    setSplitTouched(true);
