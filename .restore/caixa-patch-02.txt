@@ -1,0 +1,93 @@
++    setSplits([...splitRows, createSplit(next.id, rest)]);
++    setError(null);
++  }
++
++  function removeSplit(key: string) {
++    const left = splitRows.filter((row) => row.key !== key);
++    if (!left.length) return;
++    // Voltando a uma forma só, o valor volta a acompanhar o total sozinho.
++    setSplitTouched(left.length > 1);
++    setSplits(left);
++    setError(null);
+   }
+ 
+   async function finish() {
+@@ -555,10 +590,24 @@
+       openPanel('open');
+       return;
+     }
+-    if (!payment || !tables.length) {
++    if (!primaryPayment || !tables.length) {
+       setError('Cadastre tabela de preço e forma de pagamento no ERP antes de vender.');
+       return;
+     }
++    if (!paySummary.settled) {
++      if (paySummary.remaining > 0.005) {
++        setError(`Falta receber ${money(paySummary.remaining)} para fechar a venda.`);
++      } else if (paySummary.remaining < -0.005) {
++        setError(
++          `As formas de pagamento somam ${money(-paySummary.remaining)} acima do total.`,
++        );
++      } else {
++        setError(
++          `Valor recebido em dinheiro é ${money(paySummary.missingTender)} menor que o lançado.`,
++        );
++      }
++      return;
++    }
+     const saleTable =
+       tables.find((item) => item.id === defaultTableId) ??
+       tables.find((item) => item.id === pricedLines[0]?.priceTableId) ??
+@@ -574,8 +623,9 @@
+         return;
+       }
+     }
+-    const installmentLabel =
+-      paymentMaxInstallments(payment) > 1 && installments > 1 ? ` ${installments}x` : '';
++    const paymentLabel = describeSplit(splitRows, payments);
++    const saleChange = paySummary.change;
++    const saleCash = paySummary.cashDue;
+     const saleTotal = total;
+     const saleCustomer = walkIn || !customerName.trim() ? CONSUMIDOR_FINAL : customerName.trim();
+     const saleCpf = askCpf ? cpfDigits : '';
+@@ -585,9 +635,9 @@
+         customerName: saleCustomer,
+         customerPhone: walkIn ? '' : customerPhone.trim(),
+         customerDocument: saleCpf;
+-        paymentName: `${payment.name}${installmentLabel}`,
++        paymentName: paymentLabel,
+         priceTableName: saleTable.name,
+-        paymentMethodId: payment.id,
++        paymentMethodId: primaryPayment.id,
+         priceTableId: saleTable.id,
+         discount: discountMoney,
+         surcharge: surchargeMoney,
+@@ -604,6 +654,7 @@
+       const order = state.orders[0];
+       setLastOrderId(order?.id ?? null);
+       setLastOrderAmount(saleTotal);
++      setLastChange(saleChange);
+       setLastCustomerName(saleCustomer || order?.customerName || CONSUMIDOR_FINAL);
+       setStock(state.stock);
+       setCustomers(state.customers);
+@@ -615,12 +666,11 @@
+       setLineAdjKey(null);
+       setLineTableKey(null);
+       setSellerId('');
+-      setInstallments(1);
+       setAskCpf(false);
+       setCustomerCpf('');
+       pickCustomer(undefined);
+       setWalkIn(true);
+-      setPaymentId(payments[0]?.id ?? '');
++      resetSplits();
+       setDefaultTableId(
+         payments[0]?.priceTableId && tables.some((item) => item.id === payments[0].priceTableId)
+           ? payments[0].priceTableId
+@@ -628,10 +678,22 @@
+       );
+ 
+       if (order) {
+-        const cashSale = registerCashSale(saleTotal, operatorName, `Venda ${order.id}`, order.id);
++        const cashNote = [
++          `Venda ${order.id}`,
