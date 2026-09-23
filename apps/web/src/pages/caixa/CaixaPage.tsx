@@ -1,1 +1,1 @@
-PLACEHOLDER_READ_FROM_FILE
+USE_FILE_/workspace/.marthi/apps/web/src/pages/caixa/CaixaPage.tsx
