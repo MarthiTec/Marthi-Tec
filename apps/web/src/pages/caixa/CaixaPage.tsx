@@ -743,3 +743,26 @@ export function CaixaPage() {
 
   finishRef.current = finish;
   addSplitRef.current = addSplit;
+
+  function emitFiscal(asNfce: boolean) {
+    if (!lastOrderId) return;
+    const result = emitNfeFromSale({
+      orderId: lastOrderId,
+      customerName: lastCustomerName,
+      amount: lastOrderAmount,
+      asNfce,
+    });
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    setMessage(
+      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} autorizada (simulação).`,
+    );
+    focusCode();
+  }
+
+  function requestExit() {
+    setExitOpen(true);
+  }
