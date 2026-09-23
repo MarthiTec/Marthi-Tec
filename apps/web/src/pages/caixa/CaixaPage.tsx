@@ -254,3 +254,116 @@ export function CaixaPage() {
     pendingQty != null
       ? `${formatPendingQty(pendingQty)}*SKU Enter`
       : '12*SKU Enter · código ou barras';
+
+  useEffect(() => {
+    if (!hasDemoAccess('caixa') && !user) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate, user]);
+
+  useEffect(() => {
+    const sync = () => setCashSettings(getCashSettings());
+    window.addEventListener(CASH_SETTINGS_EVENT, sync);
+    window.addEventListener('storage', sync);
+    window.addEventListener(PROMO_EVENT, sync);
+    return () => {
+      window.removeEventListener(CASH_SETTINGS_EVENT, sync);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(PROMO_EVENT, sync);
+    };
+  }, []);
+
+  const seller = sellers.find((item) => item.id === sellerId);
+  const cashOpen = Boolean(cashSession);
+
+  const pricedLines = useMemo(
+    () =>
+      lines.map((line) => {
+        const lineTable =
+          tables.find((item) => item.id === line.priceTableId) ??
+          tables.find((item) => item.id === defaultTableId) ??
+          tables[0];
+        let unitPrice = applyPriceTable(line.basePrice, lineTable);
+        let lineBase = Math.round(unitPrice * line.qty * 100) / 100;
+        let promoLabel = '';
+        const campaigns = findCampaignsForStock(line.stockId);
+        const tier = campaigns.find((item) => item.kind === 'tier' && item.tiers.length > 0);
+        if (tier) {
+          lineBase = applyTierTotal(line.qty, unitPrice, tier.tiers);
+          unitPrice = line.qty > 0 ? Math.round((lineBase / line.qty) * 100) / 100 : unitPrice;
+          promoLabel = tier.name;
+        }
+        const gift = campaigns.find((item) => item.kind === 'gift');
+        if (gift && line.qty >= gift.giftMinQty) {
+          promoLabel = promoLabel
+            ? `${promoLabel} · ${gift.name}`
+            : `${gift.name} (brinde ≥${gift.giftMinQty})`;
+        }
+        const disc = moneyAdj(lineBase, line.lineDiscount, line.lineDiscountMode);
+        const sur = moneyAdj(lineBase, line.lineSurcharge, line.lineSurchargeMode);
+        const lineTotal = Math.max(0, lineBase - disc + sur);
+        return {
+          ...line,
+          unitPrice,
+          lineBase,
+          lineDiscMoney: disc,
+          lineSurMoney: sur,
+          lineTotal,
+          promoLabel,
+          tableName: lineTable?.name ?? '',
+        };
+      }),
+    [lines, tables, defaultTableId],
+  );
+
+  const subtotal = pricedLines.reduce((sum, line) => sum + line.lineBase, 0);
+  const itemsDiscount = pricedLines.reduce((sum, line) => sum + line.lineDiscMoney, 0);
+  const itemsSurcharge = pricedLines.reduce((sum, line) => sum + line.lineSurMoney, 0);
+  const cartDiscount = moneyAdj(subtotal, discount, discountMode);
+  const cartSurcharge = moneyAdj(subtotal, surcharge, surchargeMode);
+  const discountMoney = cartDiscount + itemsDiscount;
+  const surchargeMoney = cartSurcharge + itemsSurcharge;
+  const total = Math.max(0, subtotal - discountMoney + surchargeMoney);
+  const unitCount = pricedLines.reduce(
+    (sum, line) => sum + (isWeighedUnit(line.unit) ? 0 : line.qty),
+    0,
+  );
+  const weighedQty = pricedLines.reduce(
+    (sum, line) => sum + (isWeighedUnit(line.unit) ? line.qty : 0),
+    0,
+  );
+
+  const splitRows = useMemo(
+    () => syncSingleSplit(splits, total, splitTouched),
+    [splits, total, splitTouched],
+  );
+  const paySummary = useMemo(
+    () => summarizeSplit(splitRows, payments, total),
+    [splitRows, payments, total],
+  );
+  const primaryPayment = payments.find((item) => item.id === splitRows[0]?.methodId);
+
+  linesRef.current = lines;
+
+  function refreshCash() {
+    setCashSession(getOpenCashSession());
+    setStock(getAdminState().stock);
+  }
+
+  function focusCode() {
+    window.requestAnimationFrame(() => {
+      const input = codeRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
+  }
+
+  function openPanel(next: Exclude<CaixaPanel, null>) {
+    setOpsMenuOpen(false);
+    if (next !== 'exchange') setExchangeOrderId(null);
+    setPanel(next);
+    setError(null);
+  }
+
+  openPanelRef.current = openPanel;
