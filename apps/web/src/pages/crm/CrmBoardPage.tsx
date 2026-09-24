@@ -18,6 +18,7 @@ import {
   listLeadMessages,
   listSellerMessages,
   moveCrmLead,
+  refreshCrmLeadThreadFromApi,
   resetCrmMockLeads,
   sendLeadMessage,
   sendSellerMessage,
@@ -195,8 +196,8 @@ export function CrmBoardPage() {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function claim(lead: CrmLead) {
-    const result = claimCrmLead(lead.id, me.sellerId, me.sellerName);
+  async function claim(lead: CrmLead) {
+    const result = await claimCrmLead(lead.id, me.sellerId, me.sellerName);
     if (!result.ok) {
       flashErr(result.error);
       return;
@@ -216,13 +217,14 @@ export function CrmBoardPage() {
     }
     setDock({ type: 'lead', leadId: lead.id });
     setChatText('');
+    void refreshCrmLeadThreadFromApi(lead.id).then(() => setTick((value) => value + 1));
   }
 
-  function onDrop(stage: CrmStage) {
+  async function onDrop(stage: CrmStage) {
     if (!draggingId) return;
     const dragged = leads.find((item) => item.id === draggingId);
     const wasPool = Boolean(dragged && !dragged.ownerSellerId);
-    const result = moveCrmLead(draggingId, stage, me.sellerId, me.sellerName);
+    const result = await moveCrmLead(draggingId, stage, me.sellerId, me.sellerName);
     setDraggingId(null);
     setOverStage(null);
     if (!result.ok) {
@@ -241,11 +243,11 @@ export function CrmBoardPage() {
     setTick((value) => value + 1);
   }
 
-  function sendChat(event: FormEvent) {
+  async function sendChat(event: FormEvent) {
     event.preventDefault();
     if (!dock) return;
     if (dock.type === 'lead') {
-      const result = sendLeadMessage({
+      const result = await sendLeadMessage({
         leadId: dock.leadId,
         sellerId: me.sellerId,
         sellerName: me.sellerName,
@@ -259,7 +261,7 @@ export function CrmBoardPage() {
       setTick((value) => value + 1);
       return;
     }
-    const result = sendSellerMessage({
+    const result = await sendSellerMessage({
       fromSellerId: me.sellerId,
       fromName: me.sellerName,
       toSellerId: dock.peerId,
@@ -273,9 +275,9 @@ export function CrmBoardPage() {
     setTick((value) => value + 1);
   }
 
-  function simulateLeadReply() {
+  async function simulateLeadReply() {
     if (dock?.type !== 'lead') return;
-    const result = sendLeadMessage({
+    const result = await sendLeadMessage({
       leadId: dock.leadId,
       sellerId: me.sellerId,
       sellerName: me.sellerName,
@@ -290,9 +292,9 @@ export function CrmBoardPage() {
     setTick((value) => value + 1);
   }
 
-  function createLead(event: FormEvent) {
+  async function createLead(event: FormEvent) {
     event.preventDefault();
-    const result = createCrmLead({
+    const result = await createCrmLead({
       name: draft.name,
       email: draft.email,
       whatsapp: draft.whatsapp,
@@ -606,12 +608,13 @@ export function CrmBoardPage() {
                             onClick={() => {
                               const note = window.prompt('Nova atividade / observação');
                               if (!note) return;
-                              const result = addCrmLeadNote(lead.id, note, me.sellerId);
-                              if (!result.ok) flashErr(result.error);
-                              else {
-                                flashOk('Atividade registrada.');
-                                setTick((value) => value + 1);
-                              }
+                              void addCrmLeadNote(lead.id, note, me.sellerId).then((result) => {
+                                if (!result.ok) flashErr(result.error);
+                                else {
+                                  flashOk('Atividade registrada.');
+                                  setTick((value) => value + 1);
+                                }
+                              });
                             }}
                           >
                             + Atividade
@@ -667,8 +670,11 @@ export function CrmBoardPage() {
                   step="0.01"
                   defaultValue={leadDock.value}
                   onBlur={(e) => {
-                    updateCrmLeadValue(leadDock.id, Number(e.target.value) || 0, me.sellerId);
-                    setTick((value) => value + 1);
+                    void updateCrmLeadValue(
+                      leadDock.id,
+                      Number(e.target.value) || 0,
+                      me.sellerId,
+                    ).then(() => setTick((value) => value + 1));
                   }}
                 />
               </label>

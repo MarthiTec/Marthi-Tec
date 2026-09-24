@@ -12,9 +12,11 @@ import {
   CRM_STAGE_LABEL,
   ensureCrmSellerProfile,
   getCrmLead,
+  getCrmSellerProfile,
   listCrmActivities,
   listLeadMessages,
   moveCrmLead,
+  refreshCrmLeadThreadFromApi,
   sendLeadMessage,
   updateCrmLeadDetails,
   whatsappHref,
@@ -101,10 +103,35 @@ export function CrmDealPage() {
   const lead = useMemo(() => getCrmLead(id), [id, tick]);
   const activities = useMemo(() => (lead ? listCrmActivities(lead.id) : []), [lead, tick]);
   const leadMessages = useMemo(() => (lead ? listLeadMessages(lead.id) : []), [lead, tick]);
-  const profile = useMemo(
-    () => ensureCrmSellerProfile(me.sellerId, me.sellerName),
-    [me.sellerId, me.sellerName, tick],
-  );
+  const profile = useMemo(() => {
+    return (
+      getCrmSellerProfile(me.sellerId) ?? {
+        sellerId: me.sellerId,
+        displayName: me.sellerName,
+        handle: '',
+        bio: '',
+        avatarUrl: '',
+        coverUrl: '',
+        city: '',
+        specialty: 'Comercial',
+        whatsapp: '',
+        instagram: '',
+        linkedin: '',
+        website: '',
+        publicProfile: true,
+        updatedAt: new Date().toISOString(),
+      }
+    );
+  }, [me.sellerId, me.sellerName, tick]);
+
+  useEffect(() => {
+    void ensureCrmSellerProfile(me.sellerId, me.sellerName).then(() => setTick((v) => v + 1));
+  }, [me.sellerId, me.sellerName]);
+
+  useEffect(() => {
+    if (!id) return;
+    void refreshCrmLeadThreadFromApi(id).then(() => setTick((v) => v + 1));
+  }, [id]);
 
   const mine = Boolean(lead && lead.ownerSellerId === me.sellerId);
   const locked = Boolean(lead?.ownerSellerId && !mine);
@@ -157,9 +184,9 @@ export function CrmDealPage() {
     setMessage('');
   }
 
-  function claim() {
+  async function claim() {
     if (!lead) return;
-    const result = claimCrmLead(lead.id, me.sellerId, me.sellerName);
+    const result = await claimCrmLead(lead.id, me.sellerId, me.sellerName);
     if (!result.ok) {
       flashErr(result.error);
       return;
@@ -168,13 +195,13 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function setStage(stage: CrmStage) {
+  async function setStage(stage: CrmStage) {
     if (!lead) return;
     if (!mine) {
       flashErr(locked ? `Só ${lead.ownerName} pode mover.` : 'Puxe o lead antes de mover.');
       return;
     }
-    const result = moveCrmLead(lead.id, stage, me.sellerId);
+    const result = await moveCrmLead(lead.id, stage, me.sellerId);
     if (!result.ok) {
       flashErr(result.error);
       return;
@@ -198,9 +225,9 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function saveValue() {
+  async function saveValue() {
     if (!lead || !mine) return;
-    const result = updateCrmLeadDetails(lead.id, me.sellerId, {
+    const result = await updateCrmLeadDetails(lead.id, me.sellerId, {
       value: Number(valueDraft) || 0,
     });
     if (!result.ok) {
@@ -211,14 +238,14 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function patchField(
+  async function patchField(
     field: 'graduation' | 'polo' | 'sourceInfo' | 'interest',
     current: string,
   ) {
     if (!lead || !mine) return;
     const next = window.prompt('Alterar valor', current);
     if (next === null) return;
-    const result = updateCrmLeadDetails(lead.id, me.sellerId, { [field]: next });
+    const result = await updateCrmLeadDetails(lead.id, me.sellerId, { [field]: next });
     if (!result.ok) {
       flashErr(result.error);
       return;
@@ -226,10 +253,10 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function submitActivity(event: FormEvent) {
+  async function submitActivity(event: FormEvent) {
     event.preventDefault();
     if (!lead) return;
-    const result = addCrmActivity({
+    const result = await addCrmActivity({
       leadId: lead.id,
       kind: composerKind,
       body: composerText,
@@ -247,7 +274,7 @@ export function CrmDealPage() {
     setTick((value) => value + 1);
   }
 
-  function sendChat(event: FormEvent) {
+  async function sendChat(event: FormEvent) {
     event.preventDefault();
     if (!lead) return;
     if (!waOrigin) {
@@ -264,7 +291,7 @@ export function CrmDealPage() {
       flashErr('Digite sua mensagem ou anexe um arquivo.');
       return;
     }
-    const result = sendLeadMessage({
+    const result = await sendLeadMessage({
       leadId: lead.id,
       sellerId: me.sellerId,
       sellerName: me.sellerName,
@@ -462,10 +489,9 @@ export function CrmDealPage() {
                       type="button"
                       title={lead.hideContact ? 'Mostrar contato' : 'Ocultar contato'}
                       onClick={() => {
-                        updateCrmLeadDetails(lead.id, me.sellerId, {
+                        void updateCrmLeadDetails(lead.id, me.sellerId, {
                           hideContact: !lead.hideContact,
-                        });
-                        setTick((v) => v + 1);
+                        }).then(() => setTick((v) => v + 1));
                       }}
                     >
                       {lead.hideContact ? '👁' : '🔒'}
@@ -874,15 +900,16 @@ export function CrmDealPage() {
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => {
-                    const result = sendLeadMessage({
+                    void sendLeadMessage({
                       leadId: lead.id,
                       sellerId: me.sellerId,
                       sellerName: me.sellerName,
                       text: 'Olá! Recebi sua mensagem.',
                       asLead: true,
+                    }).then((result) => {
+                      if (!result.ok) flashErr(result.error);
+                      else setTick((v) => v + 1);
                     });
-                    if (!result.ok) flashErr(result.error);
-                    else setTick((v) => v + 1);
                   }}
                 >
                   Simular resposta do lead

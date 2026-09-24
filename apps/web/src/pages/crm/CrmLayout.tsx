@@ -45,7 +45,7 @@ export function CrmLayout() {
   );
 
   useEffect(() => {
-    ensureCrmSellerProfile(seller.sellerId, seller.sellerName);
+    void ensureCrmSellerProfile(seller.sellerId, seller.sellerName);
   }, [seller.sellerId, seller.sellerName]);
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);

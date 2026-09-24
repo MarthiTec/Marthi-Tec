@@ -1373,3 +1373,329 @@ export function apiPutTaxTables(body: {
 export function apiSyncTaxTables() {
   return nestPost<ApiTaxTables>('/fiscal/tax-tables/sync');
 }
+
+/* ── Fase 3 P3: CRM ────────────────────────────────────── */
+
+export type ApiCrmStage = 'leads' | 'waiting' | 'attending' | 'payment' | 'won' | 'lost';
+export type ApiCrmLeadSource = 'demo' | 'partner' | 'contact' | 'manual' | 'careers';
+export type ApiCrmActivityKind =
+  | 'activity'
+  | 'comment'
+  | 'message'
+  | 'schedule'
+  | 'task'
+  | 'system';
+
+export type ApiCrmLead = {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+  source: ApiCrmLeadSource;
+  interest: string;
+  value: number;
+  stage: ApiCrmStage;
+  ownerSellerId: string | null;
+  ownerName: string;
+  claimedAt?: string | null;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  externalRef?: string;
+  customerId?: string;
+  paidAt?: string | null;
+  graduation?: string;
+  polo?: string;
+  sourceInfo?: string;
+  hideContact?: boolean;
+};
+
+export type ApiCrmActivity = {
+  id: string;
+  leadId: string;
+  kind: ApiCrmActivityKind;
+  title: string;
+  body: string;
+  fromSellerId: string | null;
+  fromName: string;
+  createdAt: string;
+  dueAt?: string | null;
+};
+
+export type ApiCrmMessage = {
+  id: string;
+  kind: 'lead' | 'sellers';
+  leadId?: string;
+  sellerPairKey?: string;
+  fromSellerId: string | null;
+  fromName: string;
+  fromLead?: boolean;
+  text: string;
+  body?: string;
+  createdAt: string;
+};
+
+export type ApiCrmSellerProfile = {
+  sellerId: string;
+  displayName: string;
+  handle: string;
+  bio: string;
+  avatarUrl: string;
+  coverUrl: string;
+  city: string;
+  specialty: string;
+  whatsapp: string;
+  instagram: string;
+  linkedin: string;
+  website: string;
+  publicProfile: boolean;
+  updatedAt: string;
+};
+
+export function apiListCrmLeads(stage?: ApiCrmStage) {
+  const qs = stage ? `?stage=${stage}` : '';
+  return nestGet<ApiCrmLead[]>(`/crm/leads${qs}`);
+}
+
+export function apiGetCrmLead(id: string) {
+  return nestGet<ApiCrmLead>(`/crm/leads/${id}`);
+}
+
+export function apiCreateCrmLead(body: {
+  name: string;
+  email?: string;
+  whatsapp?: string;
+  source: ApiCrmLeadSource;
+  interest?: string;
+  value?: number;
+  notes?: string;
+  externalRef?: string;
+  stage?: ApiCrmStage;
+  graduation?: string;
+  polo?: string;
+  sourceInfo?: string;
+  hideContact?: boolean;
+  ownerSellerId?: string;
+}) {
+  return nestPost<ApiCrmLead>('/crm/leads', body);
+}
+
+export function apiUpdateCrmLead(
+  id: string,
+  body: Partial<{
+    name: string;
+    email: string;
+    whatsapp: string;
+    interest: string;
+    value: number;
+    notes: string;
+    graduation: string;
+    polo: string;
+    sourceInfo: string;
+    hideContact: boolean;
+  }>,
+) {
+  return nestPatch<ApiCrmLead>(`/crm/leads/${id}`, body);
+}
+
+export function apiClaimCrmLead(id: string, body: { sellerId: string }) {
+  return nestPost<ApiCrmLead>(`/crm/leads/${id}/claim`, body);
+}
+
+export function apiMoveCrmLead(id: string, body: { stage: ApiCrmStage; sellerId?: string }) {
+  return nestPost<ApiCrmLead>(`/crm/leads/${id}/move`, body);
+}
+
+export function apiListCrmActivities(leadId: string) {
+  return nestGet<ApiCrmActivity[]>(`/crm/leads/${leadId}/activities`);
+}
+
+export function apiCreateCrmActivity(
+  leadId: string,
+  body: {
+    kind: Exclude<ApiCrmActivityKind, 'system'>;
+    title?: string;
+    body: string;
+    sellerId: string;
+    dueAt?: string;
+  },
+) {
+  return nestPost<ApiCrmActivity>(`/crm/leads/${leadId}/activities`, body);
+}
+
+export function apiListCrmLeadMessages(leadId: string) {
+  return nestGet<ApiCrmMessage[]>(`/crm/leads/${leadId}/messages`);
+}
+
+export function apiSendCrmLeadMessage(
+  leadId: string,
+  body: { text?: string; body?: string; sellerId: string; asLead?: boolean },
+) {
+  return nestPost<ApiCrmMessage>(`/crm/leads/${leadId}/messages`, body);
+}
+
+export function apiListCrmSellerMessages(sellerA: string, sellerB: string) {
+  const params = new URLSearchParams({ sellerA, sellerB });
+  return nestGet<ApiCrmMessage[]>(`/crm/messages/sellers?${params}`);
+}
+
+export function apiSendCrmSellerMessage(body: {
+  fromSellerId: string;
+  toSellerId: string;
+  text?: string;
+  body?: string;
+}) {
+  return nestPost<ApiCrmMessage>('/crm/messages/sellers', body);
+}
+
+export function apiGetCrmProfile(sellerId: string) {
+  return nestGet<ApiCrmSellerProfile>(`/crm/profiles/${sellerId}`);
+}
+
+export function apiPutCrmProfile(
+  sellerId: string,
+  body: {
+    displayName: string;
+    handle?: string;
+    bio?: string;
+    avatarUrl?: string;
+    coverUrl?: string;
+    city?: string;
+    specialty?: string;
+    whatsapp?: string;
+    instagram?: string;
+    linkedin?: string;
+    website?: string;
+    publicProfile?: boolean;
+  },
+) {
+  return nestPut<ApiCrmSellerProfile>(`/crm/profiles/${sellerId}`, body);
+}
+
+/* ── Fase 3 P3: E-commerce ─────────────────────────────── */
+
+export type ApiEcommerceChannelId =
+  | 'mercadolivre'
+  | 'shopee'
+  | 'ifood'
+  | 'amazon'
+  | 'tray';
+
+export type ApiEcommerceChannel = {
+  id: ApiEcommerceChannelId;
+  kind: 'marketplace' | 'hub';
+  name: string;
+  blurb: string;
+  status: 'disconnected' | 'connecting' | 'connected' | 'error';
+  storeName: string;
+  lastSyncAt: string;
+  message: string;
+  openOrders: number;
+  activeListings: number;
+  credentials: Record<string, string>;
+};
+
+export type ApiEcommerceListing = {
+  id: string;
+  channelId: ApiEcommerceChannelId;
+  stockId: string;
+  externalId: string;
+  title: string;
+  sku: string;
+  price: number;
+  qty: number;
+  images: string[];
+  status: 'active' | 'paused' | 'error' | 'draft';
+  syncedAt: string;
+  message: string;
+};
+
+export type ApiEcommerceOrder = {
+  id: string;
+  channelId: ApiEcommerceChannelId;
+  externalId: string;
+  customerName: string;
+  amount: number;
+  status: 'new' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  createdAt: string;
+  stockId?: string;
+  listingId?: string;
+  qty?: number;
+};
+
+export function apiListEcommerceChannels() {
+  return nestGet<ApiEcommerceChannel[]>('/ecommerce/channels');
+}
+
+export function apiGetEcommerceChannel(id: ApiEcommerceChannelId) {
+  return nestGet<ApiEcommerceChannel>(`/ecommerce/channels/${id}`);
+}
+
+export function apiPutEcommerceChannel(
+  id: ApiEcommerceChannelId,
+  body: { storeName?: string; credentials?: Record<string, string> },
+) {
+  return nestPut<ApiEcommerceChannel>(`/ecommerce/channels/${id}`, body);
+}
+
+export function apiConnectEcommerceChannel(
+  id: ApiEcommerceChannelId,
+  body?: { credentials?: Record<string, string> },
+) {
+  return nestPost<ApiEcommerceChannel>(`/ecommerce/channels/${id}/connect`, body ?? {});
+}
+
+export function apiDisconnectEcommerceChannel(id: ApiEcommerceChannelId) {
+  return nestPost<ApiEcommerceChannel>(`/ecommerce/channels/${id}/disconnect`);
+}
+
+export function apiSyncEcommerceChannel(id: ApiEcommerceChannelId) {
+  return nestPost<ApiEcommerceChannel>(`/ecommerce/channels/${id}/sync`);
+}
+
+export function apiListEcommerceListings(channelId?: ApiEcommerceChannelId) {
+  const qs = channelId ? `?channelId=${channelId}` : '';
+  return nestGet<ApiEcommerceListing[]>(`/ecommerce/listings${qs}`);
+}
+
+export function apiGetEcommerceListing(id: string) {
+  return nestGet<ApiEcommerceListing>(`/ecommerce/listings/${id}`);
+}
+
+export function apiCreateEcommerceListing(body: {
+  channelId: ApiEcommerceChannelId;
+  stockId: string;
+  externalId?: string;
+  title?: string;
+  sku?: string;
+  price?: number;
+  qty?: number;
+  images?: string[];
+  status?: ApiEcommerceListing['status'];
+}) {
+  return nestPost<ApiEcommerceListing>('/ecommerce/listings', body);
+}
+
+export function apiUpdateEcommerceListing(
+  id: string,
+  body: Partial<{
+    title: string;
+    sku: string;
+    price: number;
+    qty: number;
+    images: string[];
+    status: ApiEcommerceListing['status'];
+    message: string;
+  }>,
+) {
+  return nestPatch<ApiEcommerceListing>(`/ecommerce/listings/${id}`, body);
+}
+
+export function apiDeleteEcommerceListing(id: string) {
+  return nestDelete<{ id: string; deleted: boolean }>(`/ecommerce/listings/${id}`);
+}
+
+export function apiListEcommerceOrders(channelId?: ApiEcommerceChannelId) {
+  const qs = channelId ? `?channelId=${channelId}` : '';
+  return nestGet<ApiEcommerceOrder[]>(`/ecommerce/orders${qs}`);
+}

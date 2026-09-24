@@ -41,7 +41,7 @@ export function EcommerceListingsPage() {
 
   const activeChannel = (channelId || channels[0]?.id || '') as EcommerceChannelId | '';
 
-  function publish() {
+  async function publish() {
     setError('');
     setMessage('');
     if (!activeChannel) {
@@ -52,7 +52,7 @@ export function EcommerceListingsPage() {
       setError('Selecione um produto do estoque.');
       return;
     }
-    const result = publishStockToChannel(activeChannel, stockId);
+    const result = await publishStockToChannel(activeChannel, stockId);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -61,14 +61,14 @@ export function EcommerceListingsPage() {
     setTick((value) => value + 1);
   }
 
-  function syncAll() {
+  async function syncAll() {
     setError('');
     setMessage('');
     if (!activeChannel) {
       setError('Selecione um canal conectado.');
       return;
     }
-    const result = syncEcommerceChannel(activeChannel);
+    const result = await syncEcommerceChannel(activeChannel);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -200,8 +200,7 @@ export function EcommerceListingsPage() {
                       type="button"
                       className="btn btn--ghost"
                       onClick={() => {
-                        pauseListing(item.id);
-                        setTick((value) => value + 1);
+                        void pauseListing(item.id).then(() => setTick((value) => value + 1));
                       }}
                     >
                       Pausar
@@ -210,8 +209,7 @@ export function EcommerceListingsPage() {
                       type="button"
                       className="btn btn--ghost"
                       onClick={() => {
-                        removeListing(item.id);
-                        setTick((value) => value + 1);
+                        void removeListing(item.id).then(() => setTick((value) => value + 1));
                       }}
                     >
                       Remover

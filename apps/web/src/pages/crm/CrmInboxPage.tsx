@@ -8,6 +8,8 @@ import {
   listCrmInboxThreads,
   listLeadMessages,
   listSellerMessages,
+  refreshCrmLeadThreadFromApi,
+  refreshCrmSellerMessagesFromApi,
   sendLeadMessage,
   sendSellerMessage,
   type CrmInboxThread,
@@ -120,13 +122,20 @@ export function CrmInboxPage() {
     setActiveId(thread.id);
     setText('');
     setError('');
+    if (thread.kind === 'lead' && thread.leadId) {
+      void refreshCrmLeadThreadFromApi(thread.leadId).then(() => setTick((value) => value + 1));
+    } else if (thread.peerSellerId) {
+      void refreshCrmSellerMessagesFromApi(me.sellerId, thread.peerSellerId).then(() =>
+        setTick((value) => value + 1),
+      );
+    }
   }
 
-  function send(event: FormEvent) {
+  async function send(event: FormEvent) {
     event.preventDefault();
     if (!active || locked) return;
     if (active.kind === 'lead' && active.leadId) {
-      const result = sendLeadMessage({
+      const result = await sendLeadMessage({
         leadId: active.leadId,
         sellerId: me.sellerId,
         sellerName: me.sellerName,
@@ -141,7 +150,7 @@ export function CrmInboxPage() {
       return;
     }
     if (active.peerSellerId) {
-      const result = sendSellerMessage({
+      const result = await sendSellerMessage({
         fromSellerId: me.sellerId,
         fromName: me.sellerName,
         toSellerId: active.peerSellerId,

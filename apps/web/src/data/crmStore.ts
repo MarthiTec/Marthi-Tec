@@ -6,6 +6,26 @@ import { listDemoLeads, type DemoLead, DEMO_PRODUCT_LABEL } from './demoLeadStor
 import { listSellers, type Seller } from './erpRegistry';
 import { getAdminState, upsertCustomer } from './adminStore';
 import { getOperatorProfile } from './operatorProfile';
+import { isNestAuthed } from '../services/nestClient';
+import {
+  apiClaimCrmLead,
+  apiCreateCrmActivity,
+  apiCreateCrmLead,
+  apiGetCrmProfile,
+  apiListCrmActivities,
+  apiListCrmLeadMessages,
+  apiListCrmLeads,
+  apiListCrmSellerMessages,
+  apiMoveCrmLead,
+  apiPutCrmProfile,
+  apiSendCrmLeadMessage,
+  apiSendCrmSellerMessage,
+  apiUpdateCrmLead,
+  type ApiCrmActivity,
+  type ApiCrmLead,
+  type ApiCrmMessage,
+  type ApiCrmSellerProfile,
+} from '../services/erpApi';
 
 const STORAGE_KEY = 'marthi.crm.v2';
 export const CRM_EVENT = 'marthi-crm-updated';
@@ -223,14 +243,190 @@ function hoursAgo(hours: number) {
   return new Date(Date.now() - hours * 3600_000).toISOString();
 }
 
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function mapLead(row: ApiCrmLead): CrmLead {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email ?? '',
+    whatsapp: row.whatsapp ?? '',
+    source: row.source,
+    interest: row.interest ?? '',
+    value: row.value ?? 0,
+    stage: row.stage,
+    ownerSellerId: row.ownerSellerId ?? null,
+    ownerName: row.ownerName ?? '',
+    claimedAt: row.claimedAt ?? undefined,
+    notes: row.notes ?? '',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    externalRef: row.externalRef,
+    customerId: row.customerId,
+    paidAt: row.paidAt ?? undefined,
+    graduation: row.graduation ?? undefined,
+    polo: row.polo ?? undefined,
+    sourceInfo: row.sourceInfo ?? undefined,
+    hideContact: Boolean(row.hideContact),
+  };
+}
+
+function mapActivity(row: ApiCrmActivity): CrmActivity {
+  return {
+    id: row.id,
+    leadId: row.leadId,
+    kind: row.kind,
+    title: row.title ?? '',
+    body: row.body ?? '',
+    fromSellerId: row.fromSellerId ?? null,
+    fromName: row.fromName ?? '',
+    createdAt: row.createdAt,
+    dueAt: row.dueAt ?? undefined,
+  };
+}
+
+function mapMessage(row: ApiCrmMessage): CrmMessage {
+  return {
+    id: row.id,
+    kind: row.kind === 'sellers' ? 'sellers' : 'lead',
+    leadId: row.leadId,
+    sellerPairKey: row.sellerPairKey,
+    fromSellerId: row.fromSellerId ?? null,
+    fromName: row.fromName ?? '',
+    fromLead: Boolean(row.fromLead),
+    text: row.text ?? row.body ?? '',
+    createdAt: row.createdAt,
+  };
+}
+
+function mapProfile(row: ApiCrmSellerProfile): CrmSellerProfile {
+  return {
+    sellerId: row.sellerId,
+    displayName: row.displayName,
+    handle: row.handle ?? '',
+    bio: row.bio ?? '',
+    avatarUrl: row.avatarUrl ?? '',
+    coverUrl: row.coverUrl ?? '',
+    city: row.city ?? '',
+    specialty: row.specialty ?? '',
+    whatsapp: row.whatsapp ?? '',
+    instagram: row.instagram ?? '',
+    linkedin: row.linkedin ?? '',
+    website: row.website ?? '',
+    publicProfile: Boolean(row.publicProfile),
+    updatedAt: row.updatedAt,
+  };
+}
+
+function putLead(state: State, lead: CrmLead) {
+  const idx = state.leads.findIndex((item) => item.id === lead.id);
+  if (idx >= 0) state.leads[idx] = lead;
+  else state.leads = [lead, ...state.leads];
+}
+
+function putActivity(state: State, activity: CrmActivity) {
+  const idx = state.activities.findIndex((item) => item.id === activity.id);
+  if (idx >= 0) state.activities[idx] = activity;
+  else state.activities = [activity, ...state.activities];
+}
+
+function putMessage(state: State, message: CrmMessage) {
+  const idx = state.messages.findIndex((item) => item.id === message.id);
+  if (idx >= 0) state.messages[idx] = message;
+  else state.messages = [...state.messages, message];
+}
+
+function putProfile(state: State, profile: CrmSellerProfile) {
+  const idx = state.profiles.findIndex((item) => item.sellerId === profile.sellerId);
+  if (idx >= 0) state.profiles[idx] = profile;
+  else state.profiles = [profile, ...state.profiles];
+}
+
+/** Substitui fatias do CRM (bootstrap Nest). */
+export function replaceCrmState(partial: Partial<State>) {
+  const state = load();
+  save({
+    leads: partial.leads ?? state.leads,
+    messages: partial.messages ?? state.messages,
+    profiles: partial.profiles ?? state.profiles,
+    activities: partial.activities ?? state.activities,
+    migratedDemo: partial.migratedDemo ?? state.migratedDemo,
+    seededMocks: partial.seededMocks ?? state.seededMocks,
+  });
+}
+
+export async function hydrateCrmFromApi() {
+  if (!isNestAuthed()) return;
+  const leads = await apiListCrmLeads();
+  const mapped = leads.map(mapLead);
+  // Nest é a fonte de verdade: remove mocks locais e mantém mensagens/atividades só se ainda forem do Nest.
+  const nestLeadIds = new Set(mapped.map((item) => item.id));
+  const state = load();
+  replaceCrmState({
+    leads: mapped,
+    messages: state.messages.filter(
+      (item) => item.kind === 'sellers' || (item.leadId && nestLeadIds.has(item.leadId)),
+    ).filter((item) => !item.leadId?.startsWith('CRM-MOCK')),
+    activities: state.activities.filter(
+      (item) => nestLeadIds.has(item.leadId) && !item.leadId.startsWith('CRM-MOCK'),
+    ),
+    profiles: state.profiles,
+    migratedDemo: true,
+    seededMocks: true,
+  });
+}
+
+/** Carrega atividades + mensagens de um lead sob demanda. */
+export async function refreshCrmLeadThreadFromApi(leadId: string) {
+  if (!isNestAuthed()) return;
+  try {
+    const [activities, messages] = await Promise.all([
+      apiListCrmActivities(leadId),
+      apiListCrmLeadMessages(leadId),
+    ]);
+    const state = load();
+    state.activities = [
+      ...activities.map(mapActivity),
+      ...state.activities.filter((item) => item.leadId !== leadId),
+    ];
+    state.messages = [
+      ...state.messages.filter((item) => !(item.kind === 'lead' && item.leadId === leadId)),
+      ...messages.map(mapMessage),
+    ];
+    save(state);
+  } catch {
+    /* keep cache */
+  }
+}
+
+export async function refreshCrmSellerMessagesFromApi(sellerA: string, sellerB: string) {
+  if (!isNestAuthed()) return;
+  try {
+    const messages = await apiListCrmSellerMessages(sellerA, sellerB);
+    const key = sellerPairKey(sellerA, sellerB);
+    const state = load();
+    state.messages = [
+      ...state.messages.filter((item) => !(item.kind === 'sellers' && item.sellerPairKey === key)),
+      ...messages.map(mapMessage),
+    ];
+    save(state);
+  } catch {
+    /* keep cache */
+  }
+}
+
 function load(): State {
   try {
     // Migra v1 → v2 se ainda existir no browser.
     const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem('marthi.crm.v1');
+    const nestMode = isNestAuthed();
     if (!raw) {
       const initial = empty();
-      let boot = migrateDemoLeads(initial);
-      boot = seedMockLeads(boot);
+      let boot = nestMode ? initial : migrateDemoLeads(initial);
+      if (!nestMode) boot = seedMockLeads(boot);
+      else boot = { ...boot, migratedDemo: true, seededMocks: true };
       save(boot);
       return load();
     }
@@ -244,13 +440,21 @@ function load(): State {
       seededMocks: Boolean(parsed.seededMocks),
     };
     let dirty = false;
-    if (!state.migratedDemo) {
-      state = migrateDemoLeads(state);
-      dirty = true;
-    }
-    if (!state.seededMocks) {
-      state = seedMockLeads(state);
-      dirty = true;
+    if (nestMode) {
+      // Nest authed: nunca injeta CRM-MOCK-* e marca seed como feito.
+      if (!state.seededMocks) {
+        state = { ...state, seededMocks: true, migratedDemo: true };
+        dirty = true;
+      }
+    } else {
+      if (!state.migratedDemo) {
+        state = migrateDemoLeads(state);
+        dirty = true;
+      }
+      if (!state.seededMocks) {
+        state = seedMockLeads(state);
+        dirty = true;
+      }
     }
     if (dirty) save(state);
     return state;
@@ -900,6 +1104,7 @@ function seedMockLeads(state: State): State {
 
 /** Reinsere leads mocados (útil se o board estiver vazio). */
 export function resetCrmMockLeads(): { ok: true; added: number } {
+  if (isNestAuthed()) return { ok: true, added: 0 };
   const state = load();
   state.seededMocks = false;
   const before = state.leads.length;
@@ -952,7 +1157,7 @@ export function resolveCrmSeller(
   };
 }
 
-export function createCrmLead(input: {
+export async function createCrmLead(input: {
   name: string;
   email?: string;
   whatsapp?: string;
@@ -970,9 +1175,52 @@ export function createCrmLead(input: {
   ownerName?: string;
   /** Não dispara toast/som (ex.: chat homepage que já notifica a mensagem). */
   quiet?: boolean;
-}): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+}): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
   const name = input.name.trim();
   if (name.length < 2) return { ok: false, error: 'Informe o nome do lead.' };
+
+  if (isNestAuthed()) {
+    try {
+      if (input.externalRef) {
+        const existing = load().leads.find((item) => item.externalRef === input.externalRef);
+        if (existing) return { ok: true, lead: existing };
+      }
+      const row = await apiCreateCrmLead({
+        name,
+        email: input.email?.trim() || undefined,
+        whatsapp: input.whatsapp?.trim() || undefined,
+        source: input.source,
+        interest: input.interest?.trim() || undefined,
+        value: input.value !== undefined ? Math.max(0, input.value) : undefined,
+        notes: input.notes?.trim() || undefined,
+        externalRef: input.externalRef || undefined,
+        stage: input.stage,
+        graduation: input.graduation?.trim() || undefined,
+        polo: input.polo?.trim() || undefined,
+        sourceInfo: input.sourceInfo?.trim() || undefined,
+        hideContact: input.hideContact,
+        ownerSellerId: input.ownerSellerId || undefined,
+      });
+      const lead = mapLead(row);
+      const state = load();
+      putLead(state, lead);
+      save(state);
+      if (!input.quiet && input.source !== 'manual') {
+        emitCrmSellerAlert({
+          kind: 'lead',
+          title: lead.name,
+          body: [CRM_SOURCE_LABEL[lead.source], lead.interest || lead.notes]
+            .filter(Boolean)
+            .join(' · '),
+          leadId: lead.id,
+        });
+      }
+      return { ok: true, lead };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao criar lead.') };
+    }
+  }
+
   const state = load();
   if (input.externalRef) {
     const dup = state.leads.find((item) => item.externalRef === input.externalRef);
@@ -1050,7 +1298,7 @@ export function createCrmLead(input: {
 }
 
 /** Homepage demo → CRM. */
-export function ingestDemoLeadToCrm(demo: DemoLead) {
+export async function ingestDemoLeadToCrm(demo: DemoLead) {
   return createCrmLead({
     name: `${demo.firstName} ${demo.lastName}`.trim(),
     email: demo.email,
@@ -1061,7 +1309,7 @@ export function ingestDemoLeadToCrm(demo: DemoLead) {
   });
 }
 
-export function ingestPartnerLeadToCrm(input: {
+export async function ingestPartnerLeadToCrm(input: {
   protocol: string;
   tradeName: string;
   contactName: string;
@@ -1080,7 +1328,7 @@ export function ingestPartnerLeadToCrm(input: {
   });
 }
 
-export function ingestContactLeadToCrm(input: {
+export async function ingestContactLeadToCrm(input: {
   name: string;
   email?: string;
   whatsapp?: string;
@@ -1097,7 +1345,7 @@ export function ingestContactLeadToCrm(input: {
 }
 
 /** Candidato a vendedor — homepage Trabalhe conosco. */
-export function ingestSellerApplicantToCrm(input: {
+export async function ingestSellerApplicantToCrm(input: {
   name: string;
   whatsapp: string;
   city?: string;
@@ -1118,7 +1366,7 @@ export function ingestSellerApplicantToCrm(input: {
 }
 
 /** Interesse em contratar — cadastro pelo login / Solicitar demo leve. */
-export function ingestContractInterestToCrm(input: {
+export async function ingestContractInterestToCrm(input: {
   name: string;
   email: string;
   whatsapp: string;
@@ -1148,11 +1396,24 @@ export function ingestContractInterestToCrm(input: {
  * Puxar lead do pool. Só um vendedor por vez.
  * Se já tiver dono diferente → bloqueia.
  */
-export function claimCrmLead(
+export async function claimCrmLead(
   leadId: string,
   sellerId: string,
   sellerName: string,
-): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiClaimCrmLead(leadId, { sellerId });
+      const lead = mapLead(row);
+      const state = load();
+      putLead(state, lead);
+      save(state);
+      return { ok: true, lead };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao puxar lead.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1200,12 +1461,28 @@ export function canSellerAccessLeadChat(lead: CrmLead, sellerId: string) {
   return Boolean(lead.ownerSellerId && lead.ownerSellerId === sellerId);
 }
 
-export function moveCrmLead(
+export async function moveCrmLead(
   leadId: string,
   stage: CrmStage,
   sellerId: string,
   sellerName?: string,
-): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiMoveCrmLead(leadId, {
+        stage,
+        sellerId,
+      });
+      const lead = mapLead(row);
+      const state = load();
+      putLead(state, lead);
+      save(state);
+      return { ok: true, lead };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao mover lead.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1293,15 +1570,41 @@ export async function confirmCrmLeadPaidAsCustomer(
     return { ok: false, error: 'Não foi possível criar o cliente Marthi.' };
   }
   const stamped = now();
+  const notes = lead.notes
+    ? `${lead.notes}\n[Pagamento confirmado · cliente ${created.customerId}]`
+    : `[Pagamento confirmado · cliente ${created.customerId}]`;
+
+  if (isNestAuthed()) {
+    try {
+      if (lead.stage !== 'won') {
+        await apiMoveCrmLead(leadId, { stage: 'won', sellerId });
+      }
+      const row = await apiUpdateCrmLead(leadId, { notes });
+      const mapped = mapLead(row);
+      const next: CrmLead = {
+        ...mapped,
+        stage: 'won',
+        paidAt: stamped,
+        customerId: created.customerId,
+        notes,
+        updatedAt: stamped,
+      };
+      const nestState = load();
+      putLead(nestState, next);
+      save(nestState);
+      return { ok: true, lead: next, customerId: created.customerId };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao confirmar pagamento.') };
+    }
+  }
+
   state.leads[index] = {
     ...lead,
     stage: 'won',
     paidAt: stamped,
     customerId: created.customerId,
     updatedAt: stamped,
-    notes: lead.notes
-      ? `${lead.notes}\n[Pagamento confirmado · cliente ${created.customerId}]`
-      : `[Pagamento confirmado · cliente ${created.customerId}]`,
+    notes,
   };
   pushActivity(state, {
     leadId: lead.id,
@@ -1321,7 +1624,7 @@ export async function closeCrmLeadAsCustomer(
   leadId: string,
   sellerId: string,
 ): Promise<{ ok: true; lead: CrmLead; customerId: string } | { ok: false; error: string }> {
-  const moved = moveCrmLead(leadId, 'won', sellerId);
+  const moved = await moveCrmLead(leadId, 'won', sellerId);
   if (!moved.ok) return moved;
   return confirmCrmLeadPaidAsCustomer(leadId, sellerId);
 }
@@ -1359,12 +1662,26 @@ export function getCrmSellerProfile(sellerId: string): CrmSellerProfile | null {
   return load().profiles.find((item) => item.sellerId === sellerId) ?? null;
 }
 
-export function ensureCrmSellerProfile(
+export async function ensureCrmSellerProfile(
   sellerId: string,
   fallbackName: string,
-): CrmSellerProfile {
+): Promise<CrmSellerProfile> {
   const existing = getCrmSellerProfile(sellerId);
   if (existing) return existing;
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiGetCrmProfile(sellerId);
+      const profile = mapProfile(row);
+      const state = load();
+      putProfile(state, profile);
+      save(state);
+      return profile;
+    } catch {
+      /* fallback local below */
+    }
+  }
+
   const op = getOperatorProfile(fallbackName);
   const seedName = op.displayName.trim() || fallbackName;
   const handle = seedName
@@ -1396,9 +1713,9 @@ export function ensureCrmSellerProfile(
   return profile;
 }
 
-export function saveCrmSellerProfile(
+export async function saveCrmSellerProfile(
   input: Partial<CrmSellerProfile> & { sellerId: string; displayName: string },
-): { ok: true; profile: CrmSellerProfile } | { ok: false; error: string } {
+): Promise<{ ok: true; profile: CrmSellerProfile } | { ok: false; error: string }> {
   const displayName = input.displayName.trim();
   if (displayName.length < 2) return { ok: false, error: 'Informe o nome de exibição.' };
   let handle = (input.handle ?? displayName)
@@ -1409,6 +1726,32 @@ export function saveCrmSellerProfile(
     .replace(/^\.|\.$/g, '')
     .slice(0, 24);
   if (!handle) return { ok: false, error: 'Informe um @handle válido.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutCrmProfile(input.sellerId, {
+        displayName,
+        handle,
+        bio: input.bio,
+        avatarUrl: input.avatarUrl,
+        coverUrl: input.coverUrl,
+        city: input.city,
+        specialty: input.specialty,
+        whatsapp: input.whatsapp,
+        instagram: input.instagram,
+        linkedin: input.linkedin,
+        website: input.website,
+        publicProfile: input.publicProfile,
+      });
+      const profile = mapProfile(row);
+      const state = load();
+      putProfile(state, profile);
+      save(state);
+      return { ok: true, profile };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar perfil.') };
+    }
+  }
 
   const state = load();
   const conflict = state.profiles.find(
@@ -1470,11 +1813,24 @@ export function listCrmWonLeads() {
   return load().leads.filter((item) => item.stage === 'won');
 }
 
-export function updateCrmLeadValue(
+export async function updateCrmLeadValue(
   leadId: string,
   value: number,
   sellerId: string,
-): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiUpdateCrmLead(leadId, { value: Math.max(0, value) });
+      const lead = mapLead(row);
+      const state = load();
+      putLead(state, lead);
+      save(state);
+      return { ok: true, lead };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao atualizar valor.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1487,7 +1843,7 @@ export function updateCrmLeadValue(
   return { ok: true, lead: state.leads[index] };
 }
 
-export function updateCrmLeadDetails(
+export async function updateCrmLeadDetails(
   leadId: string,
   sellerId: string,
   patch: Partial<
@@ -1504,7 +1860,30 @@ export function updateCrmLeadDetails(
       | 'whatsapp'
     >
   >,
-): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const body: Parameters<typeof apiUpdateCrmLead>[1] = {};
+      if (patch.value !== undefined) body.value = Math.max(0, patch.value);
+      if (patch.interest !== undefined) body.interest = patch.interest.trim();
+      if (patch.graduation !== undefined) body.graduation = patch.graduation.trim();
+      if (patch.polo !== undefined) body.polo = patch.polo.trim();
+      if (patch.sourceInfo !== undefined) body.sourceInfo = patch.sourceInfo.trim();
+      if (patch.notes !== undefined) body.notes = patch.notes;
+      if (patch.hideContact !== undefined) body.hideContact = patch.hideContact;
+      if (patch.email !== undefined) body.email = patch.email.trim().toLowerCase();
+      if (patch.whatsapp !== undefined) body.whatsapp = patch.whatsapp.replace(/\D/g, '');
+      const row = await apiUpdateCrmLead(leadId, body);
+      const lead = mapLead(row);
+      const state = load();
+      putLead(state, lead);
+      save(state);
+      return { ok: true, lead };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao atualizar lead.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1566,7 +1945,7 @@ export function listCrmActivities(leadId: string) {
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function addCrmActivity(input: {
+export async function addCrmActivity(input: {
   leadId: string;
   kind: Exclude<CrmActivityKind, 'system'>;
   title?: string;
@@ -1574,9 +1953,31 @@ export function addCrmActivity(input: {
   sellerId: string;
   sellerName: string;
   dueAt?: string;
-}): { ok: true; activity: CrmActivity } | { ok: false; error: string } {
+}): Promise<{ ok: true; activity: CrmActivity } | { ok: false; error: string }> {
   const body = input.body.trim();
   if (!body) return { ok: false, error: 'Descreva a atividade.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateCrmActivity(input.leadId, {
+        kind: input.kind,
+        title: input.title?.trim() || undefined,
+        body,
+        sellerId: input.sellerId,
+        dueAt: input.dueAt || undefined,
+      });
+      const activity = mapActivity(row);
+      const state = load();
+      putActivity(state, activity);
+      const lead = state.leads.find((item) => item.id === input.leadId);
+      if (lead) putLead(state, { ...lead, updatedAt: now() });
+      save(state);
+      return { ok: true, activity };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar atividade.') };
+    }
+  }
+
   const state = load();
   const lead = state.leads.find((item) => item.id === input.leadId);
   if (!lead) return { ok: false, error: 'Lead não encontrado.' };
@@ -1606,11 +2007,38 @@ export function addCrmActivity(input: {
   return { ok: true, activity };
 }
 
-export function addCrmLeadNote(
+export async function addCrmLeadNote(
   leadId: string,
   note: string,
   sellerId: string,
-): { ok: true; lead: CrmLead } | { ok: false; error: string } {
+): Promise<{ ok: true; lead: CrmLead } | { ok: false; error: string }> {
+  const line = note.trim();
+  if (!line) return { ok: false, error: 'Informe a observação.' };
+
+  if (isNestAuthed()) {
+    try {
+      const activity = await apiCreateCrmActivity(leadId, {
+        kind: 'comment',
+        title: 'Observação',
+        body: line,
+        sellerId,
+      });
+      const state = load();
+      putActivity(state, mapActivity(activity));
+      const lead = state.leads.find((item) => item.id === leadId);
+      if (!lead) return { ok: false, error: 'Lead não encontrado.' };
+      const stamp = new Date().toLocaleString('pt-BR');
+      const notes = lead.notes ? `${lead.notes}\n[${stamp}] ${line}` : `[${stamp}] ${line}`;
+      const row = await apiUpdateCrmLead(leadId, { notes });
+      const mapped = mapLead(row);
+      putLead(state, mapped);
+      save(state);
+      return { ok: true, lead: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao anotar no lead.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1618,8 +2046,6 @@ export function addCrmLeadNote(
   if (lead.ownerSellerId !== sellerId) {
     return { ok: false, error: 'Só o responsável pode anotar neste lead.' };
   }
-  const line = note.trim();
-  if (!line) return { ok: false, error: 'Informe a observação.' };
   const stamp = new Date().toLocaleString('pt-BR');
   state.leads[index] = {
     ...lead,
@@ -1647,7 +2073,7 @@ export function listSellerMessages(sellerA: string, sellerB: string) {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export function sendLeadMessage(input: {
+export async function sendLeadMessage(input: {
   leadId: string;
   sellerId: string;
   sellerName: string;
@@ -1656,9 +2082,40 @@ export function sendLeadMessage(input: {
   asLead?: boolean;
   /** Não dispara toast/som. */
   quiet?: boolean;
-}): { ok: true; message: CrmMessage } | { ok: false; error: string } {
+}): Promise<{ ok: true; message: CrmMessage } | { ok: false; error: string }> {
   const text = input.text.trim();
   if (!text) return { ok: false, error: 'Digite a mensagem.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiSendCrmLeadMessage(input.leadId, {
+        text,
+        sellerId: input.sellerId,
+        asLead: input.asLead,
+      });
+      const message = mapMessage(row);
+      const state = load();
+      putMessage(state, message);
+      const lead = state.leads.find((item) => item.id === input.leadId);
+      if (lead) {
+        // claim automático pode ter ocorrido no Nest — refetch leve via patch updatedAt
+        putLead(state, { ...lead, updatedAt: now() });
+      }
+      save(state);
+      if (input.asLead && !input.quiet && lead) {
+        emitCrmSellerAlert({
+          kind: 'message',
+          title: lead.name,
+          body: text,
+          leadId: lead.id,
+        });
+      }
+      return { ok: true, message };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao enviar mensagem.') };
+    }
+  }
+
   const state = load();
   const index = state.leads.findIndex((item) => item.id === input.leadId);
   if (index < 0) return { ok: false, error: 'Lead não encontrado.' };
@@ -1720,13 +2177,13 @@ export function sendLeadMessage(input: {
  * Canal público (homepage): cliente inicia/continua conversa com a equipe comercial.
  * Cria lead de contato se necessário e grava mensagem como fromLead.
  */
-export function postHomepageCrmChat(input: {
+export async function postHomepageCrmChat(input: {
   name: string;
   whatsapp: string;
   email?: string;
   text: string;
   leadId?: string;
-}): { ok: true; lead: CrmLead; message: CrmMessage } | { ok: false; error: string } {
+}): Promise<{ ok: true; lead: CrmLead; message: CrmMessage } | { ok: false; error: string }> {
   const name = input.name.trim();
   const whatsapp = input.whatsapp.trim();
   const text = input.text.trim();
@@ -1754,7 +2211,7 @@ export function postHomepageCrmChat(input: {
       ) ?? null;
   }
   if (!lead) {
-    const created = createCrmLead({
+    const created = await createCrmLead({
       name,
       email: input.email,
       whatsapp,
@@ -1770,10 +2227,13 @@ export function postHomepageCrmChat(input: {
     createdFresh = true;
   }
 
-  const result = sendLeadMessage({
+  const result = await sendLeadMessage({
     leadId: lead.id,
-    sellerId: lead.ownerSellerId || 'GUEST',
-    sellerName: lead.ownerName || 'Canal aberto',
+    sellerId:
+      lead.ownerSellerId ||
+      listSellers(true)[0]?.id ||
+      'GUEST',
+    sellerName: lead.ownerName || listSellers(true)[0]?.name || 'Canal aberto',
     text,
     asLead: true,
     quiet: true,
@@ -1884,17 +2344,35 @@ export function crmInboxUnansweredCount(sellerId: string) {
   return listCrmInboxThreads(sellerId).filter((item) => item.unanswered).length;
 }
 
-export function sendSellerMessage(input: {
+export async function sendSellerMessage(input: {
   fromSellerId: string;
   fromName: string;
   toSellerId: string;
   text: string;
-}): { ok: true; message: CrmMessage } | { ok: false; error: string } {
+}): Promise<{ ok: true; message: CrmMessage } | { ok: false; error: string }> {
   const text = input.text.trim();
   if (!text) return { ok: false, error: 'Digite a mensagem.' };
   if (input.fromSellerId === input.toSellerId) {
     return { ok: false, error: 'Escolha outro vendedor.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiSendCrmSellerMessage({
+        fromSellerId: input.fromSellerId,
+        toSellerId: input.toSellerId,
+        text,
+      });
+      const message = mapMessage(row);
+      const state = load();
+      putMessage(state, message);
+      save(state);
+      return { ok: true, message };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao enviar mensagem.') };
+    }
+  }
+
   const state = load();
   const message: CrmMessage = {
     id: uid('MSG'),

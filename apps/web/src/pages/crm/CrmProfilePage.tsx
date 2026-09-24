@@ -3,6 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom';
 import {
   CRM_EVENT,
   ensureCrmSellerProfile,
+  getCrmSellerProfile,
   saveCrmSellerProfile,
   type CrmSellerProfile,
 } from '../../data/crmStore';
@@ -127,16 +128,40 @@ export function CrmProfilePage() {
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const coverFileRef = useRef<HTMLInputElement | null>(null);
   const avatarWrapRef = useRef<HTMLDivElement | null>(null);
-  const profile = useMemo(
-    () => ensureCrmSellerProfile(me.sellerId, me.sellerName),
-    [me.sellerId, me.sellerName, tick],
-  );
+  const profile = useMemo(() => {
+    return (
+      getCrmSellerProfile(me.sellerId) ?? {
+        sellerId: me.sellerId,
+        displayName: me.sellerName,
+        handle: '',
+        bio: '',
+        avatarUrl: '',
+        coverUrl: '',
+        city: '',
+        specialty: 'Comercial',
+        whatsapp: '',
+        instagram: '',
+        linkedin: '',
+        website: '',
+        publicProfile: true,
+        updatedAt: new Date().toISOString(),
+      }
+    );
+  }, [me.sellerId, me.sellerName, tick]);
   const [form, setForm] = useState<CrmSellerProfile>(profile);
 
   useEffect(() => {
-    setForm(ensureCrmSellerProfile(me.sellerId, me.sellerName));
+    void ensureCrmSellerProfile(me.sellerId, me.sellerName).then((next) => {
+      setForm(next);
+      setDirty(false);
+      setTick((value) => value + 1);
+    });
+  }, [me.sellerId, me.sellerName]);
+
+  useEffect(() => {
+    setForm(profile);
     setDirty(false);
-  }, [me.sellerId, me.sellerName, tick]);
+  }, [profile]);
 
   useEffect(() => {
     function refresh() {
@@ -189,9 +214,9 @@ export function CrmProfilePage() {
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = saveCrmSellerProfile(form);
+    const result = await saveCrmSellerProfile(form);
     if (!result.ok) {
       setError(result.error);
       setMessage('');
@@ -212,10 +237,12 @@ export function CrmProfilePage() {
   }
 
   function reset() {
-    setForm(ensureCrmSellerProfile(me.sellerId, me.sellerName));
-    setDirty(false);
-    setError('');
-    setMessage('');
+    void ensureCrmSellerProfile(me.sellerId, me.sellerName).then((next) => {
+      setForm(next);
+      setDirty(false);
+      setError('');
+      setMessage('');
+    });
   }
 
   return (

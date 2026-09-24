@@ -9,6 +9,22 @@ import {
   stockItemImages,
   type StockItem,
 } from './adminStore';
+import { isNestAuthed } from '../services/nestClient';
+import {
+  apiConnectEcommerceChannel,
+  apiCreateEcommerceListing,
+  apiDeleteEcommerceListing,
+  apiDisconnectEcommerceChannel,
+  apiListEcommerceChannels,
+  apiListEcommerceListings,
+  apiListEcommerceOrders,
+  apiPutEcommerceChannel,
+  apiSyncEcommerceChannel,
+  apiUpdateEcommerceListing,
+  type ApiEcommerceChannel,
+  type ApiEcommerceListing,
+  type ApiEcommerceOrder,
+} from '../services/erpApi';
 
 const STORAGE_KEY = 'marthi.ecommerce.v2';
 
@@ -283,13 +299,104 @@ const SEED_ORDERS: EcommerceOrder[] = [
   },
 ];
 
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function mapChannel(row: ApiEcommerceChannel): EcommerceChannel {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    blurb: row.blurb,
+    status: row.status,
+    storeName: row.storeName ?? '',
+    lastSyncAt: row.lastSyncAt ?? '',
+    message: row.message ?? '',
+    openOrders: row.openOrders ?? 0,
+    activeListings: row.activeListings ?? 0,
+    credentials: {
+      ...emptyCredentials(row.id),
+      ...(row.credentials ?? {}),
+    },
+  };
+}
+
+function mapListing(row: ApiEcommerceListing): EcommerceListing {
+  return {
+    id: row.id,
+    channelId: row.channelId,
+    stockId: row.stockId,
+    externalId: row.externalId,
+    title: row.title,
+    sku: row.sku,
+    price: row.price,
+    qty: row.qty,
+    images: Array.isArray(row.images) ? row.images : [],
+    status: row.status,
+    syncedAt: row.syncedAt ?? '',
+    message: row.message ?? '',
+  };
+}
+
+function mapOrder(row: ApiEcommerceOrder): EcommerceOrder {
+  return {
+    id: row.id,
+    channelId: row.channelId,
+    externalId: row.externalId,
+    customerName: row.customerName,
+    amount: row.amount,
+    status: row.status,
+    createdAt: row.createdAt,
+    stockId: row.stockId,
+    listingId: row.listingId,
+    qty: row.qty,
+  };
+}
+
+function putChannel(state: State, channel: EcommerceChannel) {
+  const idx = state.channels.findIndex((item) => item.id === channel.id);
+  if (idx >= 0) state.channels[idx] = channel;
+  else state.channels = [...state.channels, channel];
+}
+
+function putListing(state: State, listing: EcommerceListing) {
+  const idx = state.listings.findIndex((item) => item.id === listing.id);
+  if (idx >= 0) state.listings[idx] = listing;
+  else state.listings = [listing, ...state.listings];
+}
+
+/** Substitui fatias do e-commerce (bootstrap Nest). */
+export function replaceEcommerceState(partial: Partial<State>) {
+  const state = load();
+  save({
+    channels: partial.channels ?? state.channels,
+    orders: partial.orders ?? state.orders,
+    listings: partial.listings ?? state.listings,
+  });
+}
+
+export async function hydrateEcommerceFromApi() {
+  if (!isNestAuthed()) return;
+  const [channels, listings, orders] = await Promise.all([
+    apiListEcommerceChannels(),
+    apiListEcommerceListings(),
+    apiListEcommerceOrders(),
+  ]);
+  replaceEcommerceState({
+    channels: mergeChannels(channels.map(mapChannel)),
+    listings: listings.map(mapListing),
+    orders: orders.map(mapOrder),
+  });
+}
+
 function seed(): State {
   return {
     channels: SEED_CHANNELS.map((item) => ({
       ...item,
       credentials: { ...item.credentials },
     })),
-    orders: [...SEED_ORDERS],
+    orders: isNestAuthed() ? [] : [...SEED_ORDERS],
     listings: [],
   };
 }
@@ -297,6 +404,7 @@ function seed(): State {
 function load(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const nestMode = isNestAuthed();
     // migrate from v1 if present
     if (!raw) {
       const legacy = localStorage.getItem('marthi.ecommerce.channels.v1');
@@ -305,7 +413,11 @@ function load(): State {
         const next = mergeChannels(parsed.channels);
         const state: State = {
           channels: next,
-          orders: Array.isArray(parsed.orders) ? parsed.orders : SEED_ORDERS,
+          orders: Array.isArray(parsed.orders)
+            ? parsed.orders
+            : nestMode
+              ? []
+              : SEED_ORDERS,
           listings: [],
         };
         save(state);
@@ -318,7 +430,17 @@ function load(): State {
     const parsed = JSON.parse(raw) as Partial<State>;
     return {
       channels: mergeChannels(parsed.channels),
-      orders: Array.isArray(parsed.orders) && parsed.orders.length ? parsed.orders : SEED_ORDERS,
+      orders: Array.isArray(parsed.orders)
+        ? nestMode && parsed.orders.some((item) => item.id.startsWith('ECO-'))
+          ? parsed.orders.filter((item) => !item.id.startsWith('ECO-'))
+          : parsed.orders.length
+            ? parsed.orders
+            : nestMode
+              ? []
+              : SEED_ORDERS
+        : nestMode
+          ? []
+          : SEED_ORDERS,
       listings: Array.isArray(parsed.listings) ? parsed.listings : [],
     };
   } catch {
@@ -401,17 +523,34 @@ export function ecommerceSnapshot() {
   };
 }
 
-export function saveChannelCredentials(
+export async function saveChannelCredentials(
   id: EcommerceChannelId,
   credentials: Record<string, string>,
-): { ok: true; channel: EcommerceChannel } | { ok: false; error: string } {
-  const state = load();
-  const index = state.channels.findIndex((item) => item.id === id);
-  if (index < 0) return { ok: false, error: 'Canal inválido.' };
+): Promise<{ ok: true; channel: EcommerceChannel } | { ok: false; error: string }> {
   const cleaned: Record<string, string> = { ...emptyCredentials(id) };
   for (const field of CHANNEL_CREDENTIAL_FIELDS[id]) {
     cleaned[field.key] = String(credentials[field.key] ?? '').trim();
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutEcommerceChannel(id, {
+        storeName: cleaned.storeName || undefined,
+        credentials: cleaned,
+      });
+      const channel = mapChannel(row);
+      const state = load();
+      putChannel(state, channel);
+      save(state);
+      return { ok: true, channel };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar credenciais.') };
+    }
+  }
+
+  const state = load();
+  const index = state.channels.findIndex((item) => item.id === id);
+  if (index < 0) return { ok: false, error: 'Canal inválido.' };
   state.channels[index] = {
     ...state.channels[index],
     credentials: cleaned,
@@ -430,10 +569,25 @@ function missingRequired(id: EcommerceChannelId, credentials: Record<string, str
 }
 
 /** Valida campos obrigatórios e marca o canal como conectado (MVP local). */
-export function connectEcommerceChannel(
+export async function connectEcommerceChannel(
   id: EcommerceChannelId,
   credentials?: Record<string, string>,
-): { ok: true; channel: EcommerceChannel } | { ok: false; error: string } {
+): Promise<{ ok: true; channel: EcommerceChannel } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiConnectEcommerceChannel(id, {
+        credentials: credentials ?? undefined,
+      });
+      const channel = mapChannel(row);
+      const state = load();
+      putChannel(state, channel);
+      save(state);
+      return { ok: true, channel };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao conectar canal.') };
+    }
+  }
+
   const state = load();
   const index = state.channels.findIndex((item) => item.id === id);
   if (index < 0) return { ok: false, error: 'Canal inválido.' };
@@ -462,7 +616,20 @@ export function connectEcommerceChannel(
   return { ok: true, channel };
 }
 
-export function disconnectEcommerceChannel(id: EcommerceChannelId) {
+export async function disconnectEcommerceChannel(id: EcommerceChannelId) {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiDisconnectEcommerceChannel(id);
+      const channel = mapChannel(row);
+      const state = load();
+      putChannel(state, channel);
+      save(state);
+      return { ok: true as const, channel };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao desconectar.') };
+    }
+  }
+
   const state = load();
   const index = state.channels.findIndex((item) => item.id === id);
   if (index < 0) return { ok: false as const, error: 'Canal inválido.' };
@@ -500,10 +667,32 @@ function patchStock(stockId: string, patch: Partial<Pick<StockItem, 'qty' | 'pri
 }
 
 /** Publica / atualiza anúncio a partir do item de estoque (exige imagem). */
-export function publishStockToChannel(
+export async function publishStockToChannel(
   channelId: EcommerceChannelId,
   stockId: string,
-): { ok: true; listing: EcommerceListing } | { ok: false; error: string } {
+): Promise<{ ok: true; listing: EcommerceListing } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateEcommerceListing({ channelId, stockId });
+      const listing = mapListing(row);
+      const state = load();
+      putListing(state, listing);
+      refreshChannelCounts(state, channelId);
+      const cIdx = state.channels.findIndex((item) => item.id === channelId);
+      if (cIdx >= 0) {
+        state.channels[cIdx] = {
+          ...state.channels[cIdx],
+          lastSyncAt: listing.syncedAt || new Date().toISOString(),
+          message: `Anúncio ${listing.externalId} sincronizado com o estoque.`,
+        };
+      }
+      save(state);
+      return { ok: true, listing };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao publicar anúncio.') };
+    }
+  }
+
   const channel = getEcommerceChannel(channelId);
   if (!channel || channel.status !== 'connected') {
     return { ok: false, error: 'Conecte o canal antes de publicar.' };
@@ -558,7 +747,24 @@ export function publishStockToChannel(
   return { ok: true, listing };
 }
 
-export function pauseListing(listingId: string) {
+export async function pauseListing(listingId: string) {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiUpdateEcommerceListing(listingId, {
+        status: 'paused',
+        message: 'Anúncio pausado.',
+      });
+      const listing = mapListing(row);
+      const state = load();
+      putListing(state, listing);
+      refreshChannelCounts(state, listing.channelId);
+      save(state);
+      return { ok: true as const, listing };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao pausar anúncio.') };
+    }
+  }
+
   const state = load();
   const idx = state.listings.findIndex((item) => item.id === listingId);
   if (idx < 0) return { ok: false as const, error: 'Anúncio não encontrado.' };
@@ -573,7 +779,32 @@ export function pauseListing(listingId: string) {
   return { ok: true as const, listing: state.listings[idx] };
 }
 
-export function removeListing(listingId: string) {
+export async function removeListing(listingId: string) {
+  if (isNestAuthed()) {
+    try {
+      const state = load();
+      const listing = state.listings.find((item) => item.id === listingId);
+      await apiDeleteEcommerceListing(listingId);
+      if (listing) {
+        state.listings = state.listings.filter((item) => item.id !== listingId);
+        refreshChannelCounts(state, listing.channelId);
+        save(state);
+      } else {
+        const [channels, listings] = await Promise.all([
+          apiListEcommerceChannels(),
+          apiListEcommerceListings(),
+        ]);
+        replaceEcommerceState({
+          channels: mergeChannels(channels.map(mapChannel)),
+          listings: listings.map(mapListing),
+        });
+      }
+      return { ok: true as const };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao remover anúncio.') };
+    }
+  }
+
   const state = load();
   const listing = state.listings.find((item) => item.id === listingId);
   if (!listing) return { ok: false as const, error: 'Anúncio não encontrado.' };
@@ -588,7 +819,23 @@ export function removeListing(listingId: string) {
  * - Anúncios ativos recebem qty, preço e imagens do estoque.
  * - Pedidos pagos vinculados baixam estoque uma vez (ref no message).
  */
-export function syncEcommerceChannel(id: EcommerceChannelId) {
+export async function syncEcommerceChannel(id: EcommerceChannelId) {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiSyncEcommerceChannel(id);
+      const channel = mapChannel(row);
+      const listings = await apiListEcommerceListings(id);
+      const state = load();
+      putChannel(state, channel);
+      const other = state.listings.filter((item) => item.channelId !== id);
+      state.listings = [...listings.map(mapListing), ...other];
+      save(state);
+      return { ok: true as const, channel, updated: 0, skippedNoImage: 0 };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao sincronizar canal.') };
+    }
+  }
+
   const state = load();
   const index = state.channels.findIndex((item) => item.id === id);
   if (index < 0) return { ok: false as const, error: 'Canal inválido.' };

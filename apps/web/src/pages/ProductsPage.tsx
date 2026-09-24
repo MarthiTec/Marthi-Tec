@@ -139,9 +139,9 @@ export function ProductsPage() {
     navigate(product.href);
   }
 
-  function submitInterest(event: FormEvent) {
+  async function submitInterest(event: FormEvent) {
     event.preventDefault();
-    const result = ingestContactLeadToCrm({
+    const result = await ingestContactLeadToCrm({
       name: contactName,
       whatsapp: contactPhone,
       message: `Interesse em produtos Marthi · foco: ${active.name}`,

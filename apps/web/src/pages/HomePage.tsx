@@ -655,9 +655,9 @@ export function HomePage() {
             </div>
             <form
               className="careers__form"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
-                const result = ingestSellerApplicantToCrm({
+                const result = await ingestSellerApplicantToCrm({
                   name: jobName,
                   whatsapp: jobPhone,
                   city: jobCity,
@@ -800,9 +800,9 @@ export function HomePage() {
               <form
                 className="admin-form"
                 style={{ marginTop: 12 }}
-                onSubmit={(event) => {
+                onSubmit={async (event) => {
                   event.preventDefault();
-                  const result = postHomepageCrmChat({
+                  const result = await postHomepageCrmChat({
                     name: contactName,
                     whatsapp: contactPhone,
                     text: contactMsg,

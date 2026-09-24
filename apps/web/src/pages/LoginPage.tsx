@@ -107,11 +107,11 @@ export function LoginPage() {
     );
   }
 
-  function handleSignup(event: FormEvent<HTMLFormElement>) {
+  async function handleSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setFeedback(null);
-    const result = ingestContractInterestToCrm({
+    const result = await ingestContractInterestToCrm({
       name,
       email,
       whatsapp,

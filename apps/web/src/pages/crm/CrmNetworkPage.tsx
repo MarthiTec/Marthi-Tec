@@ -24,7 +24,7 @@ export function CrmNetworkPage() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    ensureCrmSellerProfile(me.sellerId, me.sellerName);
+    void ensureCrmSellerProfile(me.sellerId, me.sellerName);
     function refresh() {
       setTick((value) => value + 1);
     }

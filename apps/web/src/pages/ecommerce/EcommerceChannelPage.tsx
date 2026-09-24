@@ -68,10 +68,10 @@ export function EcommerceChannelPage() {
     setCreds((current) => ({ ...current, [key]: value }));
   }
 
-  function saveCreds() {
+  async function saveCreds() {
     setError('');
     setMessage('');
-    const result = saveChannelCredentials(channelId!, creds);
+    const result = await saveChannelCredentials(channelId!, creds);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -80,15 +80,15 @@ export function EcommerceChannelPage() {
     setTick((value) => value + 1);
   }
 
-  function connect() {
+  async function connect() {
     setError('');
     setMessage('');
-    const saved = saveChannelCredentials(channelId!, creds);
+    const saved = await saveChannelCredentials(channelId!, creds);
     if (!saved.ok) {
       setError(saved.error);
       return;
     }
-    const result = connectEcommerceChannel(channelId!, creds);
+    const result = await connectEcommerceChannel(channelId!, creds);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -97,14 +97,14 @@ export function EcommerceChannelPage() {
     setTick((value) => value + 1);
   }
 
-  function disconnect() {
-    disconnectEcommerceChannel(channelId!);
+  async function disconnect() {
+    await disconnectEcommerceChannel(channelId!);
     setMessage('Canal desconectado (credenciais mantidas).');
     setTick((value) => value + 1);
   }
 
-  function sync() {
-    const result = syncEcommerceChannel(channelId!);
+  async function sync() {
+    const result = await syncEcommerceChannel(channelId!);
     if (!result.ok) {
       setError(result.error);
       return;
