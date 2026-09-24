@@ -24,6 +24,8 @@ import { hydrateTaxTablesFromApi } from './fiscalTaxTables';
 import { hydrateInvoicesFromApi } from './invoiceStore';
 import { hydrateCrmFromApi } from './crmStore';
 import { hydrateEcommerceFromApi } from './ecommerceStore';
+import { hydrateAuditFromApi } from './auditLog';
+import { hydrateTotemAnalyticsFromApi } from './totemAnalyticsStore';
 import {
   apiGetOperatorProfile,
   apiGetStorePlan,
@@ -114,6 +116,8 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       hydrateTaxTablesFromApi(),
       hydrateCrmFromApi(),
       hydrateEcommerceFromApi(),
+      hydrateAuditFromApi(),
+      hydrateTotemAnalyticsFromApi(),
     ]);
 
     replaceAdminState({

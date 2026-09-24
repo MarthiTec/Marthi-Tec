@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { POS_QUEUE_EVENT } from '../../data/posQueueStore';
 import {
   getTotemBuyersToday,
   getTotemClickRanking,
   getTotemDayStats,
+  hydrateTotemAnalyticsFromApi,
   TOTEM_ANALYTICS_EVENT,
   type TotemBuyerRow,
   type TotemDayStats,
@@ -28,16 +30,23 @@ export function TotemInsightsPage() {
   }
 
   useEffect(() => {
+    void hydrateTotemAnalyticsFromApi().then(refresh).catch(() => refresh());
     function onUpdate() {
       refresh();
     }
     window.addEventListener(TOTEM_ANALYTICS_EVENT, onUpdate);
     window.addEventListener(POS_QUEUE_EVENT, onUpdate);
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, onUpdate);
     window.addEventListener('storage', onUpdate);
+    const timer = window.setInterval(() => {
+      void hydrateTotemAnalyticsFromApi().then(refresh).catch(() => undefined);
+    }, 15000);
     return () => {
       window.removeEventListener(TOTEM_ANALYTICS_EVENT, onUpdate);
       window.removeEventListener(POS_QUEUE_EVENT, onUpdate);
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, onUpdate);
       window.removeEventListener('storage', onUpdate);
+      window.clearInterval(timer);
     };
   }, []);
 

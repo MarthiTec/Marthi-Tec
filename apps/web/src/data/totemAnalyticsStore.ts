@@ -1,6 +1,12 @@
-/** Analytics locais do totem: cliques, propostas e agregados do dia. */
+/** Analytics do totem: cliques locais + ranking/stats do Nest quando autenticado. */
 
 import { listQueueTickets, type QueueTicket } from './posQueueStore';
+import {
+  apiGetTotemAnalyticsSummary,
+  apiTrackTotemClick,
+  type ApiTotemAnalyticsSummary,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.totem.analytics.v1';
 export const TOTEM_ANALYTICS_EVENT = 'marthi-totem-analytics';
@@ -15,6 +21,8 @@ export type TotemClickEvent = {
 type AnalyticsState = {
   clicks: TotemClickEvent[];
 };
+
+let summaryCache: ApiTotemAnalyticsSummary | null = null;
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5)}`;
@@ -55,15 +63,38 @@ function phoneKey(phone: string) {
   return phone.replace(/\D/g, '');
 }
 
+function emitAnalytics() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(TOTEM_ANALYTICS_EVENT));
+  }
+}
+
+export function replaceTotemAnalyticsSummary(summary: ApiTotemAnalyticsSummary | null) {
+  summaryCache = summary;
+  emitAnalytics();
+}
+
+export async function hydrateTotemAnalyticsFromApi() {
+  if (!isNestAuthed()) return;
+  const summary = await apiGetTotemAnalyticsSummary();
+  replaceTotemAnalyticsSummary(summary);
+}
+
 export function trackTotemProductClick(input: { productId: string | number; productName: string }) {
+  const productId = String(input.productId);
+  const productName = input.productName.trim() || 'Produto';
   const state = load();
   state.clicks.unshift({
     id: uid('CLK'),
-    productId: String(input.productId),
-    productName: input.productName.trim() || 'Produto',
+    productId,
+    productName,
     createdAt: new Date().toISOString(),
   });
   save(state);
+
+  void apiTrackTotemClick({ productId, productName }).catch(() => {
+    /* offline / API down — mantém local */
+  });
 }
 
 export function listTotemClicks() {
@@ -78,6 +109,9 @@ export type TotemProductRank = {
 };
 
 export function getTotemClickRanking(limit = 10): TotemProductRank[] {
+  if (summaryCache?.ranking?.length) {
+    return summaryCache.ranking.slice(0, limit);
+  }
   const today = todayKey();
   const map = new Map<string, TotemProductRank>();
   for (const click of load().clicks) {
@@ -112,6 +146,9 @@ function isTotemTicket(ticket: QueueTicket) {
 }
 
 export function getTotemBuyersToday(): TotemBuyerRow[] {
+  if (summaryCache?.buyersToday) {
+    return summaryCache.buyersToday;
+  }
   const today = todayKey();
   const tickets = listQueueTickets().filter(isTotemTicket);
   const sold = tickets.filter((item) => item.status === 'sold');
@@ -159,6 +196,15 @@ export type TotemDayStats = {
 };
 
 export function getTotemDayStats(): TotemDayStats {
+  if (summaryCache) {
+    return {
+      clicksToday: summaryCache.clicksToday,
+      proposalsToday: summaryCache.proposalsToday,
+      soldToday: summaryCache.soldToday,
+      openToday: summaryCache.openToday,
+      uniqueBuyersToday: summaryCache.uniqueBuyersToday,
+    };
+  }
   const today = todayKey();
   const clicksToday = load().clicks.filter((item) => dayKey(item.createdAt) === today).length;
   const tickets = listQueueTickets().filter(isTotemTicket);

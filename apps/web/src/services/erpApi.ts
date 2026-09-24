@@ -1699,3 +1699,83 @@ export function apiListEcommerceOrders(channelId?: ApiEcommerceChannelId) {
   const qs = channelId ? `?channelId=${channelId}` : '';
   return nestGet<ApiEcommerceOrder[]>(`/ecommerce/orders${qs}`);
 }
+
+/* ── Fase 3 P4: Audit + Totem analytics ────────────────── */
+
+export type ApiAuditKind = 'access' | 'action';
+
+export type ApiAuditEntry = {
+  id: string;
+  kind: ApiAuditKind;
+  at: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  detail: string;
+  path: string;
+};
+
+export type ApiTotemProductRank = {
+  productId: string;
+  productName: string;
+  clicks: number;
+  clicksToday: number;
+};
+
+export type ApiTotemBuyerRow = {
+  customerName: string;
+  customerPhone: string;
+  purchasesToday: number;
+  purchasesTotal: number;
+  lastPurchaseAt: string;
+  productsToday: string[];
+};
+
+export type ApiTotemAnalyticsSummary = {
+  ranking: ApiTotemProductRank[];
+  clicksToday: number;
+  clicksTotal: number;
+  proposalsToday: number;
+  soldToday: number;
+  openToday: number;
+  uniqueBuyersToday: number;
+  buyersToday: ApiTotemBuyerRow[];
+};
+
+export function apiListAudit(query?: {
+  kind?: ApiAuditKind;
+  from?: string;
+  to?: string;
+  q?: string;
+}) {
+  const params = new URLSearchParams();
+  if (query?.kind) params.set('kind', query.kind);
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  if (query?.q) params.set('q', query.q);
+  const qs = params.toString();
+  return nestGet<ApiAuditEntry[]>(`/audit${qs ? `?${qs}` : ''}`);
+}
+
+export function apiCreateAudit(body: {
+  kind: ApiAuditKind;
+  actorName?: string;
+  actorEmail?: string;
+  action: string;
+  detail?: string;
+  path?: string;
+}) {
+  return nestPost<ApiAuditEntry>('/audit', body);
+}
+
+/** Público — sem Bearer (loja seed no Nest). */
+export function apiTrackTotemClick(body: { productId: string; productName: string }) {
+  return nestPost<{ id: string; productId: string; productName: string; createdAt: string }>(
+    '/totem/analytics/clicks',
+    body,
+  );
+}
+
+export function apiGetTotemAnalyticsSummary() {
+  return nestGet<ApiTotemAnalyticsSummary>('/totem/analytics/summary');
+}

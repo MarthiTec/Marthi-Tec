@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import {
+  AUDIT_EVENT,
   clearAuditLog,
   listAuditEntries,
   type AuditEntry,
   type AuditKind,
 } from '../../data/auditLog';
 import { logAction } from '../../data/auditLog';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 
 export function AuditPage() {
   const { user } = useAuth();
@@ -19,8 +21,12 @@ export function AuditPage() {
     function refresh() {
       setEntries(listAuditEntries());
     }
-    window.addEventListener('marthi-audit-updated', refresh);
-    return () => window.removeEventListener('marthi-audit-updated', refresh);
+    window.addEventListener(AUDIT_EVENT, refresh);
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    return () => {
+      window.removeEventListener(AUDIT_EVENT, refresh);
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -52,8 +58,8 @@ export function AuditPage() {
       <article className="admin-card">
         <h2>Auditoria e acessos</h2>
         <p>
-          Registro local de login/logout e ações sensíveis (cadastros, notas). Em produção isso
-          migra para o backend.
+          Registro de login/logout e ações sensíveis. Com sessão Nest, os eventos são persistidos no
+          banco e hidratados no bootstrap.
         </p>
         <div className="admin-toolbar">
           <input
