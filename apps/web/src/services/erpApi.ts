@@ -333,8 +333,12 @@ export function apiGetOperatorProfile() {
   return nestGet<OperatorProfile>('/me/profile');
 }
 
-export function apiPutOperatorProfile(body: Partial<OperatorProfile>) {
-  return nestPut<OperatorProfile>('/me/profile', body);
+export function apiPutOperatorProfile(body: {
+  displayName?: string;
+  role?: string;
+  photo?: string | null;
+}) {
+  return nestPut<Pick<OperatorProfile, 'displayName' | 'role' | 'photo'>>('/me/profile', body);
 }
 
 /* ── Fase 3 P0: Registry ───────────────────────────────── */

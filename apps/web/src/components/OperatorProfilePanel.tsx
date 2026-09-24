@@ -93,8 +93,12 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
       );
       setSaved(true);
       notifyProfileUpdated();
-    } catch {
-      setPhotoError('Não foi possível salvar o perfil. Tente de novo.');
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Não foi possível salvar o perfil. Tente de novo.';
+      setPhotoError(message);
       setSaved(false);
     }
   }

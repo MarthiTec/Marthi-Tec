@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   AUDIT_EVENT,
   clearAuditLog,
+  hydrateAuditFromApi,
   listAuditEntries,
   type AuditEntry,
   type AuditKind,
@@ -21,6 +22,7 @@ export function AuditPage() {
     function refresh() {
       setEntries(listAuditEntries());
     }
+    void hydrateAuditFromApi().then(refresh).catch(() => refresh());
     window.addEventListener(AUDIT_EVENT, refresh);
     window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
     return () => {

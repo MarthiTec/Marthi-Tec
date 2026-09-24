@@ -97,10 +97,20 @@ export async function saveOperatorProfile(
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
     const { apiPutOperatorProfile } = await import('../services/erpApi');
-    const { theme, ...apiBody } = next;
-    const saved = await apiPutOperatorProfile(apiBody);
+    // Nest UpdateOperatorProfileDto: só displayName | role | photo (forbidNonWhitelisted).
+    const saved = await apiPutOperatorProfile({
+      displayName: next.displayName,
+      role: next.role,
+      photo: next.photo,
+    });
     const merged = normalizeProfile(
-      { ...next, ...saved, theme },
+      {
+        ...next,
+        displayName: saved.displayName ?? next.displayName,
+        role: saved.role ?? next.role,
+        photo: saved.photo !== undefined ? saved.photo : next.photo,
+        theme: next.theme,
+      },
       next.displayName,
       next.email,
     );
