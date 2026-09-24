@@ -5,7 +5,18 @@
  *
  * Browser: caminhos são preferência do cliente (agente/Nest grava no disco).
  * Cloud: preferência para sincronizar no backend Marthi.
+ * Dual-path: Nest quando autenticado; senão localStorage.
  */
+
+import {
+  apiAppendFiscalLog,
+  apiGetFiscalIssuerSettings,
+  apiListFiscalLogs,
+  apiPutFiscalIssuerSettings,
+  type ApiFiscalIssuerSettings,
+  type ApiFiscalLogEntry,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.fiscal.issuer.v1';
 const LOG_KEY = 'marthi.fiscal.logs.v1';
@@ -156,6 +167,137 @@ function save(settings: FiscalIssuerSettings) {
   window.dispatchEvent(new Event('marthi-fiscal-issuer-updated'));
 }
 
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function mapIssuer(
+  row: ApiFiscalIssuerSettings,
+  previous: FiscalIssuerSettings = load(),
+): FiscalIssuerSettings {
+  return {
+    emitenteName: row.emitenteName ?? '',
+    cnpj: row.cnpj ?? '',
+    ie: row.ie ?? '',
+    im: row.im ?? '',
+    cMun: row.cMun ?? '',
+    municipio: row.municipio ?? '',
+    uf: row.uf ?? '',
+    certificateFileName: row.certificateFileName ?? '',
+    certificateBase64: row.certificateBase64 ?? '',
+    // GET nunca devolve senha/token — preserva o cache local se o Nest já tem segredo.
+    certificatePassword: row.certificatePassword?.trim()
+      ? row.certificatePassword
+      : row.hasCertificatePassword
+        ? previous.certificatePassword
+        : '',
+    cscId: row.cscId ?? '',
+    cscToken: row.cscToken?.trim()
+      ? row.cscToken
+      : row.hasCscToken
+        ? previous.cscToken
+        : '',
+    environment: row.environment ?? 'homologacao',
+    nfeSeries: row.nfeSeries ?? '1',
+    nfceSeries: row.nfceSeries ?? '1',
+    nfseSeries: row.nfseSeries ?? '1',
+    cteSeries: row.cteSeries ?? '1',
+    mdfeSeries: row.mdfeSeries ?? '1',
+    cbsRateBase: row.cbsRateBase ?? 0,
+    ibsRateBase: row.ibsRateBase ?? 0,
+    issqnRateDefault: row.issqnRateDefault ?? 0,
+    issqnRetainedRate: row.issqnRetainedRate ?? 0,
+    issqnMunicipalCode: row.issqnMunicipalCode ?? '',
+    storageMode: row.storageMode ?? 'both',
+    localRootPath: row.localRootPath ?? '',
+    localXmlPath: row.localXmlPath ?? '',
+    localLogPath: row.localLogPath ?? '',
+    localPdfPath: row.localPdfPath ?? '',
+    localPdvPath: row.localPdvPath ?? '',
+    cloudEnabled: row.cloudEnabled ?? true,
+    cloudBucketHint: row.cloudBucketHint ?? '',
+    updatedAt: row.updatedAt ?? '',
+  };
+}
+
+function mapLog(row: ApiFiscalLogEntry): FiscalLogEntry {
+  return {
+    id: row.id,
+    at: row.at,
+    family: row.family,
+    action: row.action,
+    detail: row.detail,
+    refId: row.refId,
+  };
+}
+
+function issuerBodyFromSettings(
+  settings: FiscalIssuerSettings,
+  options?: { includeSecrets?: boolean; clearSecrets?: boolean },
+) {
+  const body: Parameters<typeof apiPutFiscalIssuerSettings>[0] = {
+    emitenteName: settings.emitenteName,
+    cnpj: settings.cnpj,
+    ie: settings.ie,
+    im: settings.im,
+    cMun: settings.cMun,
+    municipio: settings.municipio,
+    uf: settings.uf,
+    certificateFileName: settings.certificateFileName,
+    certificateBase64: settings.certificateBase64,
+    cscId: settings.cscId,
+    environment: settings.environment,
+    nfeSeries: settings.nfeSeries,
+    nfceSeries: settings.nfceSeries,
+    nfseSeries: settings.nfseSeries,
+    cteSeries: settings.cteSeries,
+    mdfeSeries: settings.mdfeSeries,
+    cbsRateBase: settings.cbsRateBase,
+    ibsRateBase: settings.ibsRateBase,
+    issqnRateDefault: settings.issqnRateDefault,
+    issqnRetainedRate: settings.issqnRetainedRate,
+    issqnMunicipalCode: settings.issqnMunicipalCode,
+    storageMode: settings.storageMode,
+    localRootPath: settings.localRootPath,
+    localXmlPath: settings.localXmlPath,
+    localLogPath: settings.localLogPath,
+    localPdfPath: settings.localPdfPath,
+    localPdvPath: settings.localPdvPath,
+    cloudEnabled: settings.cloudEnabled,
+    cloudBucketHint: settings.cloudBucketHint,
+  };
+  if (options?.clearSecrets) {
+    body.certificatePassword = '';
+    body.cscToken = '';
+  } else if (options?.includeSecrets !== false) {
+    if (settings.certificatePassword.trim()) {
+      body.certificatePassword = settings.certificatePassword;
+    }
+    if (settings.cscToken.trim()) {
+      body.cscToken = settings.cscToken;
+    }
+  }
+  return body;
+}
+
+export function replaceFiscalIssuerSettings(settings: FiscalIssuerSettings) {
+  save(settings);
+}
+
+export function replaceFiscalLogs(entries: FiscalLogEntry[]) {
+  saveLogs(entries);
+}
+
+export async function hydrateFiscalIssuerFromApi() {
+  if (!isNestAuthed()) return;
+  const [issuer, logs] = await Promise.all([
+    apiGetFiscalIssuerSettings(),
+    apiListFiscalLogs(),
+  ]);
+  replaceFiscalIssuerSettings(mapIssuer(issuer));
+  replaceFiscalLogs(logs.map(mapLog));
+}
+
 export function getFiscalIssuerSettings() {
   return load();
 }
@@ -171,9 +313,9 @@ export function resolveFiscalPaths(settings = load()) {
   };
 }
 
-export function saveFiscalIssuerSettings(
+export async function saveFiscalIssuerSettings(
   patch: Partial<FiscalIssuerSettings>,
-): { ok: true; settings: FiscalIssuerSettings } | { ok: false; error: string } {
+): Promise<{ ok: true; settings: FiscalIssuerSettings } | { ok: false; error: string }> {
   const current = load();
   const next: FiscalIssuerSettings = {
     ...current,
@@ -209,6 +351,17 @@ export function saveFiscalIssuerSettings(
     next.cloudEnabled = false;
   }
 
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutFiscalIssuerSettings(issuerBodyFromSettings(next));
+      const mapped = mapIssuer(row, next);
+      save(mapped);
+      return { ok: true, settings: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar emissor.') };
+    }
+  }
+
   save(next);
   return { ok: true, settings: next };
 }
@@ -224,7 +377,7 @@ export function applyRootPathCascade(root: string): Partial<FiscalIssuerSettings
   };
 }
 
-export function clearCertificate(): FiscalIssuerSettings {
+export async function clearCertificate(): Promise<FiscalIssuerSettings> {
   const next = {
     ...load(),
     certificateFileName: '',
@@ -232,6 +385,21 @@ export function clearCertificate(): FiscalIssuerSettings {
     certificatePassword: '',
     updatedAt: new Date().toISOString(),
   };
+  if (isNestAuthed()) {
+    try {
+      const body = issuerBodyFromSettings(next, { includeSecrets: false });
+      body.certificateFileName = '';
+      body.certificateBase64 = '';
+      body.certificatePassword = '';
+      const row = await apiPutFiscalIssuerSettings(body);
+      const mapped = mapIssuer(row, next);
+      mapped.certificatePassword = '';
+      save(mapped);
+      return mapped;
+    } catch {
+      // fallback local
+    }
+  }
   save(next);
   return next;
 }
@@ -302,12 +470,31 @@ export function listFiscalLogs(limit = 50) {
   return loadLogs().slice(0, limit);
 }
 
-export function appendFiscalLog(input: {
+export async function appendFiscalLog(input: {
   family: FiscalDocFamily;
   action: string;
   detail: string;
   refId?: string;
 }) {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiAppendFiscalLog({
+        family: input.family,
+        action: input.action,
+        detail: input.detail,
+        refId: input.refId,
+      });
+      const entry = mapLog(row);
+      const entries = loadLogs();
+      entries.unshift(entry);
+      saveLogs(entries);
+      window.dispatchEvent(new Event('marthi-fiscal-logs-updated'));
+      return entry;
+    } catch {
+      // fallback local
+    }
+  }
+
   const entries = loadLogs();
   const entry: FiscalLogEntry = {
     id: `LOG-${Date.now().toString(36).toUpperCase()}`,
@@ -374,7 +561,7 @@ export function archiveFiscalXml(input: {
       .filter(Boolean)
       .join(' · '),
     refId: input.refId,
-  });
+  }).catch(() => undefined);
 
   return { ok: true as const, pathHint, cloudQueued: shouldCloud };
 }

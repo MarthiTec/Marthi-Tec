@@ -765,14 +765,14 @@ function OpenPanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
   const [note, setNote] = useState('');
   const [drawerMsg, setDrawerMsg] = useState<string | null>(null);
 
-  function openDrawer() {
-    openCashDrawer(name || operatorName, 'Contagem antes da abertura');
+  async function openDrawer() {
+    await openCashDrawer(name || operatorName, 'Contagem antes da abertura');
     setDrawerMsg('Sinal enviado à gaveta (simulado). Conte o dinheiro e informe o valor.');
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = openCashSession({
+    const result = await openCashSession({
       openingFloat: Number(amount.replace(',', '.')) || 0,
       operatorName: name,
       note,
@@ -859,7 +859,7 @@ function SupplyPanel({
   const [beneficiaryType, setBeneficiaryType] = useState<CashBeneficiaryType>('store');
   const [employeeId, setEmployeeId] = useState('');
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (beneficiaryType === 'employee' && !employeeId) {
       onError('Selecione o funcionário.');
@@ -876,7 +876,7 @@ function SupplyPanel({
       operatorName,
       at,
     };
-    const result = kind === 'aporte' ? addCashAporte(payload) : addCashSangria(payload);
+    const result = kind === 'aporte' ? await addCashAporte(payload) : await addCashSangria(payload);
     if (!result.ok) {
       onError(result.error);
       return;
@@ -1347,13 +1347,13 @@ function ExchangePanel({
     setStockHits([]);
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!order && !query.trim()) {
       onError('Busque a venda (número, cliente ou produto).');
       return;
     }
-    const result = registerExchange({
+    const result = await registerExchange({
       orderId: order?.id || query.trim(),
       customerName: order?.customerName || 'Cliente',
       customerPhone: '',
@@ -1596,9 +1596,9 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
     onDone(`Vale ${code} cancelado.`);
   }
 
-  function issue(event: FormEvent) {
+  async function issue(event: FormEvent) {
     event.preventDefault();
-    const result = issueStoreCredit({
+    const result = await issueStoreCredit({
       customerName,
       customerPhone: phone,
       amount: Number(amount.replace(',', '.')) || 0,
@@ -1615,9 +1615,9 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
     setMode('list');
   }
 
-  function redeem(event: FormEvent) {
+  async function redeem(event: FormEvent) {
     event.preventDefault();
-    const result = redeemStoreCredit({
+    const result = await redeemStoreCredit({
       code,
       amount: Number(amount.replace(',', '.')) || 0,
       operatorName,
@@ -1851,8 +1851,8 @@ function ClosePanel({
     (!needExchange || confirmExchange) &&
     (!needVale || confirmVale);
 
-  function openDrawer() {
-    openCashDrawer(operatorName, 'Contagem no fechamento');
+  async function openDrawer() {
+    await openCashDrawer(operatorName, 'Contagem no fechamento');
   }
 
   function markAllChecked(on: boolean) {
@@ -1863,7 +1863,7 @@ function ClosePanel({
     setReceiptsChecked(on);
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!checksOk) {
       onError('Confirme os movimentos e notinhas (ou marque Tudo conferido).');
@@ -1883,7 +1883,7 @@ function ClosePanel({
       confirmedVale: !needVale || confirmVale,
       receiptsChecked,
     };
-    const result = closeCashSession({
+    const result = await closeCashSession({
       countedCash: cashCount,
       operatorName,
       note:
@@ -2325,12 +2325,12 @@ function SessionsPanel({ operatorName, cashSession, onClose, onDone, onError, on
     });
   }, [sessions, query, dateFrom, dateTo, statusFilter]);
 
-  function reopen(id: string) {
+  async function reopen(id: string) {
     if (!canReopenAny) {
       onError('Feche o caixa atual antes de reabrir um caixa antigo.');
       return;
     }
-    const result = reopenCashSession({ sessionId: id, operatorName });
+    const result = await reopenCashSession({ sessionId: id, operatorName });
     if (!result.ok) {
       onError(result.error);
       return;

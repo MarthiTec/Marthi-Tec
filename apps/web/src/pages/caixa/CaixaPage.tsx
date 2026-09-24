@@ -692,7 +692,7 @@ export function CaixaPage() {
           attachOrderCashSession(order.id, cashSale.session.id);
         }
         if (saleCash > 0) {
-          openCashDrawer(operatorName, `Venda ${order.id} em dinheiro`);
+          void openCashDrawer(operatorName, `Venda ${order.id} em dinheiro`);
         }
         refreshCash();
         const settings = getTotemSettings();

@@ -20,8 +20,8 @@ export function CfopPage() {
   const [rate, setRate] = useState('2');
   const [error, setError] = useState('');
 
-  function saveCfop() {
-    const result = upsertCfop({ code, description, operation, active: true });
+  async function saveCfop() {
+    const result = await upsertCfop({ code, description, operation, active: true });
     if (!result.ok) {
       setError(result.error);
       return;
@@ -32,8 +32,8 @@ export function CfopPage() {
     setError('');
   }
 
-  function saveFecp() {
-    const result = upsertFecp({
+  async function saveFecp() {
+    const result = await upsertFecp({
       uf,
       description: fecpDesc,
       rate: Number(rate.replace(',', '.')) || 0,

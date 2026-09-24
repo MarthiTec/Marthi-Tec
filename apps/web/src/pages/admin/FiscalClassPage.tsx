@@ -32,8 +32,8 @@ export function FiscalClassPage() {
   const [editingId, setEditingId] = useState<string | undefined>();
   const [error, setError] = useState('');
 
-  function submit() {
-    const result = upsertFiscalClassification({ ...form, id: editingId });
+  async function submit() {
+    const result = await upsertFiscalClassification({ ...form, id: editingId });
     if (!result.ok) {
       setError(result.error);
       return;

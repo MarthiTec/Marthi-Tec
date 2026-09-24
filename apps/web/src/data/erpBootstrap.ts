@@ -14,7 +14,13 @@ import { replaceStoreEntitlement } from './storePlan';
 import { replaceTotemSettings } from './totemSettings';
 import { hydrateErpRegistryFromApi } from './erpRegistry';
 import { hydrateFinanceBookFromApi } from './financeBook';
-import { hydrateWarehouseCatalogFromApi } from './fiscalCatalog';
+import { hydrateCashFromApi } from './cashRegisterStore';
+import {
+  hydrateFiscalCatalogFromApi,
+  hydrateWarehouseCatalogFromApi,
+} from './fiscalCatalog';
+import { hydrateFiscalIssuerFromApi } from './fiscalIssuerStore';
+import { hydrateTaxTablesFromApi } from './fiscalTaxTables';
 import { hydrateInvoicesFromApi } from './invoiceStore';
 import {
   apiGetOperatorProfile,
@@ -99,7 +105,11 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       hydrateErpRegistryFromApi(),
       hydrateFinanceBookFromApi(),
       hydrateWarehouseCatalogFromApi(),
+      hydrateFiscalCatalogFromApi(),
       hydrateInvoicesFromApi(),
+      hydrateCashFromApi(),
+      hydrateFiscalIssuerFromApi(),
+      hydrateTaxTablesFromApi(),
     ]);
 
     replaceAdminState({

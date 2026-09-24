@@ -384,7 +384,7 @@ export function emitNfseFromOs(
     xml,
     refId: input.workOrderId,
   });
-  appendFiscalLog({
+  void appendFiscalLog({
     family: 'nfse',
     action: 'transmitir',
     detail: `${document.number}/${document.series} · DPS ${dpsId} · ${NFSE_ENV_LABEL[environment]}`,
@@ -522,7 +522,7 @@ export function transmitNfeForInvoice(
     xml: buildNfeXmlStub(document),
     refId: input.invoiceId,
   });
-  appendFiscalLog({
+  void appendFiscalLog({
     family,
     action: 'transmitir',
     detail: `${document.number}/${document.series} · prot. ${receipt} · ${SEFAZ_ENV_LABEL[issuer.environment]}`,
@@ -565,7 +565,7 @@ export function consultNfeStatus(
     xmlDigest: document.nfe?.xmlDigest || xmlDigest(),
   };
   save(state);
-  appendFiscalLog({
+  void appendFiscalLog({
     family: document.kind === 'nfce' ? 'nfce' : 'nfe',
     action: 'consultar',
     detail: `${document.nfe?.statusCode} — ${document.nfe?.statusMessage}`,
@@ -603,7 +603,7 @@ export function cancelNfeDocument(
     };
   }
   save(state);
-  appendFiscalLog({
+  void appendFiscalLog({
     family: document.kind === 'nfce' ? 'nfce' : 'nfe',
     action: 'cancelar',
     detail: justification.trim(),
@@ -827,7 +827,7 @@ export function emitNfseStandalone(
     xml: buildNfseXmlStub(document),
     refId,
   });
-  appendFiscalLog({
+  void appendFiscalLog({
     family: 'nfse',
     action: 'transmitir',
     detail: `${document.number}/${document.series} · avulsa · DPS ${dpsId}`,
@@ -884,7 +884,7 @@ export function emitCteDocument(
   };
   state.documents.unshift(document);
   save(state);
-  appendFiscalLog({
+  void appendFiscalLog({
     family: 'cte',
     action: 'transmitir',
     detail: `${document.number}/${document.series} · ${document.customerName}`,
@@ -942,7 +942,7 @@ export function emitMdfeDocument(
   };
   state.documents.unshift(document);
   save(state);
-  appendFiscalLog({
+  void appendFiscalLog({
     family: 'mdfe',
     action: 'transmitir',
     detail: `${document.number}/${document.series} · ${document.customerName}`,

@@ -1,16 +1,28 @@
 /** Catálogo fiscal e de almoxarifado (MVP localStorage). */
 
 import {
+  apiCreateCfop,
+  apiCreateFecp,
+  apiCreateFiscalClassification,
   apiCreateKit,
   apiCreateLot,
   apiCreateWarehouse,
   apiCreateWarehouseMove,
+  apiListCfops,
+  apiListFecps,
+  apiListFiscalClassifications,
   apiListKits,
   apiListLots,
   apiListWarehouseMoves,
   apiListWarehouses,
+  apiUpdateCfop,
+  apiUpdateFecp,
+  apiUpdateFiscalClassification,
   apiUpdateKit,
   apiUpdateWarehouse,
+  type ApiCfopCode,
+  type ApiFecpRule,
+  type ApiFiscalClassification,
   type ApiProductKit,
   type ApiProductLot,
   type ApiWarehouse,
@@ -361,7 +373,51 @@ function nestError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-/** Substitui fatias de almoxarifado (bootstrap Nest). Fiscal P2 permanece local. */
+function mapClassification(row: ApiFiscalClassification): FiscalClassification {
+  return {
+    id: row.id,
+    name: row.name,
+    ncm: row.ncm,
+    cstIcms: row.cstIcms ?? '',
+    cClasTrib: row.cClasTrib ?? '',
+    icmsRate: row.icmsRate ?? 0,
+    ipiCst: row.ipiCst ?? '',
+    ipiRate: row.ipiRate ?? 0,
+    pisCst: row.pisCst ?? '',
+    pisRate: row.pisRate ?? 0,
+    cofinsCst: row.cofinsCst ?? '',
+    cofinsRate: row.cofinsRate ?? 0,
+    ibsRate: row.ibsRate ?? 0,
+    cbsRate: row.cbsRate ?? 0,
+    defaultCfopId: row.defaultCfopId ?? '',
+    notes: row.notes ?? '',
+    active: row.active,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapCfop(row: ApiCfopCode): CfopCode {
+  return {
+    id: row.id,
+    code: row.code,
+    description: row.description,
+    operation: row.operation,
+    active: row.active,
+  };
+}
+
+function mapFecp(row: ApiFecpRule): FecpRule {
+  return {
+    id: row.id,
+    uf: row.uf,
+    description: row.description,
+    rate: row.rate,
+    active: row.active,
+  };
+}
+
+/** Substitui fatias de almoxarifado (bootstrap Nest). */
 export function replaceWarehouseCatalog(partial: {
   warehouses?: Warehouse[];
   lots?: ProductLot[];
@@ -378,6 +434,21 @@ export function replaceWarehouseCatalog(partial: {
   });
 }
 
+/** Substitui fatias fiscais (classificações / CFOP / FECP). */
+export function replaceFiscalCatalogPartial(partial: {
+  classifications?: FiscalClassification[];
+  cfops?: CfopCode[];
+  fecps?: FecpRule[];
+}) {
+  const state = load();
+  save({
+    ...state,
+    classifications: partial.classifications ?? state.classifications,
+    cfops: partial.cfops ?? state.cfops,
+    fecps: partial.fecps ?? state.fecps,
+  });
+}
+
 export async function hydrateWarehouseCatalogFromApi() {
   if (!isNestAuthed()) return;
   const [warehouses, lots, kits, moves] = await Promise.all([
@@ -391,6 +462,20 @@ export async function hydrateWarehouseCatalogFromApi() {
     lots: lots.map(mapLot),
     kits: kits.map(mapKit),
     moves: moves.map(mapMove),
+  });
+}
+
+export async function hydrateFiscalCatalogFromApi() {
+  if (!isNestAuthed()) return;
+  const [classifications, cfops, fecps] = await Promise.all([
+    apiListFiscalClassifications(),
+    apiListCfops(),
+    apiListFecps(),
+  ]);
+  replaceFiscalCatalogPartial({
+    classifications: classifications.map(mapClassification),
+    cfops: cfops.map(mapCfop),
+    fecps: fecps.map(mapFecp),
   });
 }
 
@@ -434,11 +519,64 @@ export function listWarehouseMoves() {
   return load().moves.sort((a, b) => b.at.localeCompare(a.at));
 }
 
-export function upsertFiscalClassification(
+export async function upsertFiscalClassification(
   input: Omit<FiscalClassification, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
-): CatalogResult<FiscalClassification> {
+): Promise<CatalogResult<FiscalClassification>> {
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome da classificação.' };
   if (!input.ncm.trim()) return { ok: false, error: 'Informe o NCM.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        name: input.name.trim(),
+        ncm: input.ncm.trim(),
+        cstIcms: input.cstIcms?.trim() || undefined,
+        cClasTrib: input.cClasTrib?.trim() || undefined,
+        icmsRate: input.icmsRate,
+        ipiCst: input.ipiCst?.trim() || undefined,
+        ipiRate: input.ipiRate,
+        pisCst: input.pisCst?.trim() || undefined,
+        pisRate: input.pisRate,
+        cofinsCst: input.cofinsCst?.trim() || undefined,
+        cofinsRate: input.cofinsRate,
+        ibsRate: input.ibsRate,
+        cbsRate: input.cbsRate,
+        defaultCfopId: input.defaultCfopId?.trim() || undefined,
+        notes: input.notes?.trim() || undefined,
+        active: input.active,
+      };
+      const row = input.id
+        ? await apiUpdateFiscalClassification(input.id, body)
+        : await apiCreateFiscalClassification({
+            name: body.name,
+            ncm: body.ncm,
+            cstIcms: body.cstIcms ?? '',
+            cClasTrib: body.cClasTrib ?? '',
+            icmsRate: body.icmsRate ?? 0,
+            ipiCst: body.ipiCst ?? '',
+            ipiRate: body.ipiRate ?? 0,
+            pisCst: body.pisCst ?? '',
+            pisRate: body.pisRate ?? 0,
+            cofinsCst: body.cofinsCst ?? '',
+            cofinsRate: body.cofinsRate ?? 0,
+            ibsRate: body.ibsRate ?? 0,
+            cbsRate: body.cbsRate ?? 0,
+            defaultCfopId: body.defaultCfopId ?? '',
+            notes: body.notes ?? '',
+            active: body.active ?? true,
+          });
+      const mapped = mapClassification(row);
+      const state = load();
+      const idx = state.classifications.findIndex((item) => item.id === mapped.id);
+      if (idx >= 0) state.classifications[idx] = mapped;
+      else state.classifications = [mapped, ...state.classifications];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar classificação.') };
+    }
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -472,10 +610,32 @@ export function upsertFiscalClassification(
   return { ok: true, data: created };
 }
 
-export function upsertCfop(
+export async function upsertCfop(
   input: Omit<CfopCode, 'id'> & { id?: string },
-): CatalogResult<CfopCode> {
+): Promise<CatalogResult<CfopCode>> {
   if (!input.code.trim()) return { ok: false, error: 'Informe o código CFOP.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        code: input.code.trim(),
+        description: input.description.trim(),
+        operation: input.operation,
+        active: input.active,
+      };
+      const row = input.id ? await apiUpdateCfop(input.id, body) : await apiCreateCfop(body);
+      const mapped = mapCfop(row);
+      const state = load();
+      const idx = state.cfops.findIndex((item) => item.id === mapped.id);
+      if (idx >= 0) state.cfops[idx] = mapped;
+      else state.cfops = [mapped, ...state.cfops];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar CFOP.') };
+    }
+  }
+
   const state = load();
   if (input.id) {
     const current = state.cfops.find((item) => item.id === input.id);
@@ -502,10 +662,32 @@ export function upsertCfop(
   return { ok: true, data: created };
 }
 
-export function upsertFecp(
+export async function upsertFecp(
   input: Omit<FecpRule, 'id'> & { id?: string },
-): CatalogResult<FecpRule> {
+): Promise<CatalogResult<FecpRule>> {
   if (!input.uf.trim()) return { ok: false, error: 'Informe a UF.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        uf: input.uf.trim().toUpperCase(),
+        description: input.description.trim(),
+        rate: input.rate,
+        active: input.active,
+      };
+      const row = input.id ? await apiUpdateFecp(input.id, body) : await apiCreateFecp(body);
+      const mapped = mapFecp(row);
+      const state = load();
+      const idx = state.fecps.findIndex((item) => item.id === mapped.id);
+      if (idx >= 0) state.fecps[idx] = mapped;
+      else state.fecps = [mapped, ...state.fecps];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar FECP.') };
+    }
+  }
+
   const state = load();
   if (input.id) {
     const current = state.fecps.find((item) => item.id === input.id);

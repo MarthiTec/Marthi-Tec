@@ -965,3 +965,411 @@ export function apiPostStockInvoice(id: string) {
 export function apiCancelStockInvoice(id: string) {
   return nestPost<ApiInvoice>(`/stock-invoices/${id}/cancel`);
 }
+
+/* ── Fase 3 P2: Cash register ──────────────────────────── */
+
+export type ApiCashMovement = {
+  id: string;
+  kind: string;
+  amount: number;
+  note: string;
+  reason?: string;
+  beneficiaryType?: 'store' | 'employee';
+  beneficiaryId?: string;
+  beneficiaryName?: string;
+  createdAt: string;
+  operatorName: string;
+};
+
+export type ApiCashSession = {
+  id: string;
+  openedAt: string;
+  closedAt?: string;
+  openingFloat: number;
+  expectedCash: number;
+  countedCash?: number;
+  difference?: number;
+  operatorName: string;
+  status: 'open' | 'closed';
+  reopenCount: number;
+  movements: ApiCashMovement[];
+};
+
+export type ApiStoreCredit = {
+  id: string;
+  code: string;
+  customerName: string;
+  customerPhone: string;
+  amount: number;
+  remaining: number;
+  note: string;
+  createdAt: string;
+  operatorName: string;
+  status: 'open' | 'used' | 'cancelled';
+  orderId?: string;
+};
+
+export type ApiExchangeLine = {
+  stockId: string;
+  name: string;
+  sku?: string;
+  qty: number;
+  unitPrice: number;
+};
+
+export type ApiExchangeRecord = {
+  id: string;
+  orderId: string;
+  customerName: string;
+  customerPhone: string;
+  returnLines: ApiExchangeLine[];
+  outLines: ApiExchangeLine[];
+  returnTotal: number;
+  outTotal: number;
+  cashDelta: number;
+  creditId?: string;
+  note: string;
+  createdAt: string;
+  operatorName: string;
+};
+
+export function apiListCashSessions() {
+  return nestGet<ApiCashSession[]>('/cash/sessions');
+}
+
+export function apiGetOpenCashSession() {
+  return nestGet<ApiCashSession | null>('/cash/sessions/open');
+}
+
+export function apiGetCashSession(id: string) {
+  return nestGet<ApiCashSession>(`/cash/sessions/${id}`);
+}
+
+export function apiOpenCashSession(body: {
+  openingFloat: number;
+  operatorName: string;
+  note?: string;
+  openedAt?: string;
+}) {
+  return nestPost<ApiCashSession>('/cash/sessions/open', body);
+}
+
+export function apiCashAporte(
+  id: string,
+  body: {
+    amount: number;
+    note?: string;
+    reason?: string;
+    beneficiaryType?: 'store' | 'employee';
+    beneficiaryId?: string;
+    beneficiaryName?: string;
+    operatorName?: string;
+    at?: string;
+  },
+) {
+  return nestPost<ApiCashSession>(`/cash/sessions/${id}/aporte`, body);
+}
+
+export function apiCashSangria(
+  id: string,
+  body: {
+    amount: number;
+    note?: string;
+    reason?: string;
+    beneficiaryType?: 'store' | 'employee';
+    beneficiaryId?: string;
+    beneficiaryName?: string;
+    operatorName?: string;
+    at?: string;
+  },
+) {
+  return nestPost<ApiCashSession>(`/cash/sessions/${id}/sangria`, body);
+}
+
+export function apiCashDrawer(id: string, body?: { note?: string; operatorName?: string }) {
+  return nestPost<ApiCashSession>(`/cash/sessions/${id}/drawer`, body ?? {});
+}
+
+export function apiCloseCashSession(
+  id: string,
+  body: { countedCash: number; operatorName: string; note?: string },
+) {
+  return nestPost<ApiCashSession>(`/cash/sessions/${id}/close`, body);
+}
+
+export function apiReopenCashSession(id: string, body: { operatorName: string; note?: string }) {
+  return nestPost<ApiCashSession>(`/cash/sessions/${id}/reopen`, body);
+}
+
+export function apiListStoreCredits() {
+  return nestGet<ApiStoreCredit[]>('/cash/credits');
+}
+
+export function apiCreateStoreCredit(body: {
+  customerName: string;
+  customerPhone?: string;
+  amount: number;
+  note?: string;
+  operatorName?: string;
+  orderId?: string;
+  affectCash?: boolean;
+}) {
+  return nestPost<ApiStoreCredit>('/cash/credits', body);
+}
+
+export function apiUseStoreCredit(
+  id: string,
+  body: { amount: number; operatorName?: string },
+) {
+  return nestPost<ApiStoreCredit>(`/cash/credits/${id}/use`, body);
+}
+
+export function apiListCashExchanges() {
+  return nestGet<ApiExchangeRecord[]>('/cash/exchanges');
+}
+
+export function apiCreateCashExchange(body: {
+  orderId: string;
+  customerName: string;
+  customerPhone?: string;
+  returnLines: ApiExchangeLine[];
+  outLines: ApiExchangeLine[];
+  note?: string;
+  operatorName?: string;
+  settleAs?: 'cash' | 'credit';
+}) {
+  return nestPost<ApiExchangeRecord>('/cash/exchanges', body);
+}
+
+/* ── Fase 3 P2: Fiscal catalog (classifications / CFOP / FECP) ── */
+
+export type ApiFiscalClassification = {
+  id: string;
+  name: string;
+  ncm: string;
+  cstIcms: string;
+  cClasTrib: string;
+  icmsRate: number;
+  ipiCst: string;
+  ipiRate: number;
+  pisCst: string;
+  pisRate: number;
+  cofinsCst: string;
+  cofinsRate: number;
+  ibsRate: number;
+  cbsRate: number;
+  defaultCfopId: string;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiCfopCode = {
+  id: string;
+  code: string;
+  description: string;
+  operation: 'in_same' | 'in_other' | 'out_same' | 'out_other' | 'other';
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ApiFecpRule = {
+  id: string;
+  uf: string;
+  description: string;
+  rate: number;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export function apiListFiscalClassifications(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiFiscalClassification[]>(`/fiscal-classifications${qs}`);
+}
+
+export function apiCreateFiscalClassification(
+  body: Omit<ApiFiscalClassification, 'id' | 'createdAt' | 'updatedAt'>,
+) {
+  return nestPost<ApiFiscalClassification>('/fiscal-classifications', body);
+}
+
+export function apiUpdateFiscalClassification(
+  id: string,
+  body: Partial<Omit<ApiFiscalClassification, 'id' | 'createdAt' | 'updatedAt'>>,
+) {
+  return nestPatch<ApiFiscalClassification>(`/fiscal-classifications/${id}`, body);
+}
+
+export function apiListCfops(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiCfopCode[]>(`/cfops${qs}`);
+}
+
+export function apiCreateCfop(body: {
+  code: string;
+  description: string;
+  operation: ApiCfopCode['operation'];
+  active?: boolean;
+}) {
+  return nestPost<ApiCfopCode>('/cfops', body);
+}
+
+export function apiUpdateCfop(
+  id: string,
+  body: Partial<{
+    code: string;
+    description: string;
+    operation: ApiCfopCode['operation'];
+    active: boolean;
+  }>,
+) {
+  return nestPatch<ApiCfopCode>(`/cfops/${id}`, body);
+}
+
+export function apiListFecps(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiFecpRule[]>(`/fecps${qs}`);
+}
+
+export function apiCreateFecp(body: {
+  uf: string;
+  description: string;
+  rate: number;
+  active?: boolean;
+}) {
+  return nestPost<ApiFecpRule>('/fecps', body);
+}
+
+export function apiUpdateFecp(
+  id: string,
+  body: Partial<{ uf: string; description: string; rate: number; active: boolean }>,
+) {
+  return nestPatch<ApiFecpRule>(`/fecps/${id}`, body);
+}
+
+/* ── Fase 3 P2: Fiscal issuer + logs + tax tables ──────── */
+
+export type ApiFiscalIssuerSettings = {
+  emitenteName: string;
+  cnpj: string;
+  ie: string;
+  im: string;
+  cMun: string;
+  municipio: string;
+  uf: string;
+  certificateFileName: string;
+  certificateBase64: string;
+  certificatePassword: string;
+  hasCertificatePassword?: boolean;
+  cscId: string;
+  cscToken: string;
+  hasCscToken?: boolean;
+  environment: 'homologacao' | 'producao';
+  nfeSeries: string;
+  nfceSeries: string;
+  nfseSeries: string;
+  cteSeries: string;
+  mdfeSeries: string;
+  cbsRateBase: number;
+  ibsRateBase: number;
+  issqnRateDefault: number;
+  issqnRetainedRate: number;
+  issqnMunicipalCode: string;
+  storageMode: 'local' | 'cloud' | 'both';
+  localRootPath: string;
+  localXmlPath: string;
+  localLogPath: string;
+  localPdfPath: string;
+  localPdvPath: string;
+  cloudEnabled: boolean;
+  cloudBucketHint: string;
+  updatedAt: string;
+};
+
+export type ApiFiscalLogEntry = {
+  id: string;
+  at: string;
+  family: 'nfe' | 'nfce' | 'nfse' | 'cte' | 'mdfe' | 'other';
+  action: string;
+  detail: string;
+  refId?: string;
+};
+
+export type ApiFiscalCstCode = {
+  code: string;
+  name: string;
+  description: string;
+  active: boolean;
+};
+
+export type ApiFiscalCClassTrib = {
+  code: string;
+  name: string;
+  cstCode: string;
+  description: string;
+  linkLc?: string;
+  active: boolean;
+};
+
+export type ApiTaxTables = {
+  csts: ApiFiscalCstCode[];
+  cClassTribs: ApiFiscalCClassTrib[];
+  lastSyncAt: string;
+  lastSyncSource: 'seed' | 'api' | 'manual';
+  lastSyncMessage: string;
+};
+
+export function apiGetFiscalIssuerSettings() {
+  return nestGet<ApiFiscalIssuerSettings>('/fiscal/issuer-settings');
+}
+
+export function apiPutFiscalIssuerSettings(
+  body: Partial<
+    Omit<ApiFiscalIssuerSettings, 'updatedAt' | 'hasCertificatePassword' | 'hasCscToken'>
+  >,
+) {
+  return nestPut<ApiFiscalIssuerSettings>('/fiscal/issuer-settings', body);
+}
+
+export function apiListFiscalLogs() {
+  return nestGet<ApiFiscalLogEntry[]>('/fiscal/logs');
+}
+
+export function apiAppendFiscalLog(body: {
+  family: ApiFiscalLogEntry['family'];
+  action: string;
+  detail: string;
+  refId?: string;
+}) {
+  return nestPost<ApiFiscalLogEntry>('/fiscal/logs', body);
+}
+
+export function apiGetTaxTables() {
+  return nestGet<ApiTaxTables>('/fiscal/tax-tables');
+}
+
+export function apiPutTaxTables(body: {
+  csts: Array<{
+    code: string;
+    name: string;
+    description?: string;
+    active?: boolean;
+  }>;
+  cClassTribs: Array<{
+    code: string;
+    name: string;
+    cstCode?: string;
+    description?: string;
+    linkLc?: string;
+    active?: boolean;
+  }>;
+}) {
+  return nestPut<ApiTaxTables>('/fiscal/tax-tables', body);
+}
+
+export function apiSyncTaxTables() {
+  return nestPost<ApiTaxTables>('/fiscal/tax-tables/sync');
+}

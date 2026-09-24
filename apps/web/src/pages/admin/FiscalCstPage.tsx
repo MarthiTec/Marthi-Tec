@@ -68,8 +68,8 @@ export function FiscalCstPage() {
     setMessage(result.message);
   }
 
-  function saveCst() {
-    const result = upsertFiscalCst({ code: cstCode, name: cstName, description: '' });
+  async function saveCst() {
+    const result = await upsertFiscalCst({ code: cstCode, name: cstName, description: '' });
     if (!result.ok) {
       setError(result.error);
       return;
@@ -83,12 +83,12 @@ export function FiscalCstPage() {
     setTick((value) => value + 1);
   }
 
-  function saveCClass() {
+  async function saveCClass() {
     if (!selected) {
       setError('Selecione um CST à esquerda.');
       return;
     }
-    const result = upsertFiscalCClassTrib({
+    const result = await upsertFiscalCClassTrib({
       code: cClassCode,
       name: cClassName,
       cstCode: selected.code,
@@ -122,8 +122,8 @@ export function FiscalCstPage() {
           <button
             type="button"
             className="btn btn--ghost"
-            onClick={() => {
-              resetTaxTablesToSeed();
+            onClick={async () => {
+              await resetTaxTablesToSeed();
               setSelectedCode(null);
               setTick((value) => value + 1);
               setMessage('Seed restaurado.');

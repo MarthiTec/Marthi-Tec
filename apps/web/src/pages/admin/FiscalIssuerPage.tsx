@@ -68,8 +68,8 @@ export function FiscalIssuerPage() {
     }
   }
 
-  function save() {
-    const result = saveFiscalIssuerSettings(form);
+  async function save() {
+    const result = await saveFiscalIssuerSettings(form);
     if (!result.ok) {
       setError(result.error);
       setMessage('');
@@ -81,8 +81,8 @@ export function FiscalIssuerPage() {
     setLogTick((value) => value + 1);
   }
 
-  function removeCert() {
-    const next = clearCertificate();
+  async function removeCert() {
+    const next = await clearCertificate();
     setForm(next);
     setMessage('Certificado removido.');
     setError('');

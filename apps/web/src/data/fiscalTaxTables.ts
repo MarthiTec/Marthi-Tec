@@ -3,7 +3,16 @@
  * Fonte oficial: API Conformidade Fácil SVRS
  * https://cff.svrs.rs.gov.br/api/v1/consultas/classTrib
  * (produção exige certificado ICP-Brasil mTLS — no browser usamos cache local + tentativa).
+ * Dual-path: Nest quando autenticado; senão localStorage / fetch browser.
  */
+
+import {
+  apiGetTaxTables,
+  apiPutTaxTables,
+  apiSyncTaxTables,
+  type ApiTaxTables,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.fiscal.tax-tables.v1';
 
@@ -122,6 +131,61 @@ function save(state: TaxTablesState) {
   window.dispatchEvent(new Event('marthi-fiscal-tax-tables-updated'));
 }
 
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function mapTaxTables(row: ApiTaxTables): TaxTablesState {
+  return {
+    csts: (row.csts ?? []).map((item) => ({
+      code: item.code,
+      name: item.name,
+      description: item.description ?? '',
+      active: item.active ?? true,
+    })),
+    cClassTribs: (row.cClassTribs ?? []).map((item) => ({
+      code: item.code,
+      name: item.name,
+      cstCode: item.cstCode ?? item.code.slice(0, 3),
+      description: item.description ?? '',
+      linkLc: item.linkLc,
+      active: item.active ?? true,
+    })),
+    lastSyncAt: row.lastSyncAt ?? '',
+    lastSyncSource: row.lastSyncSource ?? 'manual',
+    lastSyncMessage: row.lastSyncMessage ?? '',
+  };
+}
+
+function taxTablesBody(state: TaxTablesState) {
+  return {
+    csts: state.csts.map((item) => ({
+      code: item.code,
+      name: item.name,
+      description: item.description || undefined,
+      active: item.active,
+    })),
+    cClassTribs: state.cClassTribs.map((item) => ({
+      code: item.code,
+      name: item.name,
+      cstCode: item.cstCode || undefined,
+      description: item.description || undefined,
+      linkLc: item.linkLc || undefined,
+      active: item.active,
+    })),
+  };
+}
+
+export function replaceTaxTables(state: TaxTablesState) {
+  save(state);
+}
+
+export async function hydrateTaxTablesFromApi() {
+  if (!isNestAuthed()) return;
+  const row = await apiGetTaxTables();
+  replaceTaxTables(mapTaxTables(row));
+}
+
 export function getTaxTablesMeta() {
   const state = load();
   return {
@@ -144,9 +208,9 @@ export function listFiscalCClassTribs(activeOnly = false, cstCode?: string) {
   return activeOnly ? items.filter((item) => item.active) : items;
 }
 
-export function upsertFiscalCst(
+export async function upsertFiscalCst(
   input: Omit<FiscalCstCode, 'active'> & { active?: boolean },
-): { ok: true; item: FiscalCstCode } | { ok: false; error: string } {
+): Promise<{ ok: true; item: FiscalCstCode } | { ok: false; error: string }> {
   const code = input.code.replace(/\D/g, '').padStart(3, '0').slice(0, 3);
   if (code.length !== 3) return { ok: false, error: 'CST deve ter 3 dígitos.' };
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome do CST.' };
@@ -162,13 +226,26 @@ export function upsertFiscalCst(
   else state.csts.push(next);
   state.lastSyncSource = 'manual';
   state.lastSyncMessage = `CST ${code} atualizado manualmente.`;
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutTaxTables(taxTablesBody(state));
+      const mapped = mapTaxTables(row);
+      save(mapped);
+      const item = mapped.csts.find((rowItem) => rowItem.code === code) ?? next;
+      return { ok: true, item };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar CST.') };
+    }
+  }
+
   save(state);
   return { ok: true, item: next };
 }
 
-export function upsertFiscalCClassTrib(
+export async function upsertFiscalCClassTrib(
   input: Omit<FiscalCClassTrib, 'active'> & { active?: boolean },
-): { ok: true; item: FiscalCClassTrib } | { ok: false; error: string } {
+): Promise<{ ok: true; item: FiscalCClassTrib } | { ok: false; error: string }> {
   const code = input.code.replace(/\D/g, '').padStart(6, '0').slice(0, 6);
   if (code.length !== 6) return { ok: false, error: 'cClassTrib deve ter 6 dígitos.' };
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome do cClassTrib.' };
@@ -186,6 +263,19 @@ export function upsertFiscalCClassTrib(
   else state.cClassTribs.push(next);
   state.lastSyncSource = 'manual';
   state.lastSyncMessage = `cClassTrib ${code} atualizado manualmente.`;
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutTaxTables(taxTablesBody(state));
+      const mapped = mapTaxTables(row);
+      save(mapped);
+      const item = mapped.cClassTribs.find((rowItem) => rowItem.code === code) ?? next;
+      return { ok: true, item };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar cClassTrib.') };
+    }
+  }
+
   save(state);
   return { ok: true, item: next };
 }
@@ -243,6 +333,21 @@ function mapApiPayload(raw: unknown): { csts: FiscalCstCode[]; cClassTribs: Fisc
 export async function syncTaxTablesFromGovApi(): Promise<
   { ok: true; count: number; message: string } | { ok: false; error: string }
 > {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiSyncTaxTables();
+      const mapped = mapTaxTables(row);
+      save(mapped);
+      return {
+        ok: true,
+        count: mapped.cClassTribs.length,
+        message: mapped.lastSyncMessage || `Sync Nest · ${mapped.csts.length} CST · ${mapped.cClassTribs.length} cClassTrib.`,
+      };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao sincronizar tabelas no Nest.') };
+    }
+  }
+
   try {
     const response = await fetch(CCLASSTRIB_API_URL, {
       method: 'GET',
@@ -286,10 +391,22 @@ export async function syncTaxTablesFromGovApi(): Promise<
   }
 }
 
-export function resetTaxTablesToSeed() {
+export async function resetTaxTablesToSeed() {
   const initial = seed();
   initial.lastSyncAt = new Date().toISOString();
   initial.lastSyncMessage = 'Tabelas restauradas para o seed Marthi.';
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPutTaxTables(taxTablesBody(initial));
+      const mapped = mapTaxTables(row);
+      save(mapped);
+      return mapped;
+    } catch {
+      // fallback local
+    }
+  }
+
   save(initial);
   return initial;
 }

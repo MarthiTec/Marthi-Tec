@@ -1,4 +1,24 @@
-/** Sessão de caixa do PDV (localStorage) + vales e trocas. */
+/** Sessão de caixa do PDV (localStorage) + vales e trocas. Dual-path Nest. */
+
+import {
+  apiCashAporte,
+  apiCashDrawer,
+  apiCashSangria,
+  apiCloseCashSession,
+  apiCreateCashExchange,
+  apiCreateStoreCredit,
+  apiGetOpenCashSession,
+  apiListCashExchanges,
+  apiListCashSessions,
+  apiListStoreCredits,
+  apiOpenCashSession,
+  apiReopenCashSession,
+  apiUseStoreCredit,
+  type ApiCashSession,
+  type ApiExchangeRecord,
+  type ApiStoreCredit,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.cash.register.v2';
 const LEGACY_KEY = 'marthi.cash.register.v1';
@@ -186,6 +206,145 @@ function save(state: State) {
   window.dispatchEvent(new Event('marthi-cash-updated'));
 }
 
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function mapMovement(row: ApiCashSession['movements'][number]): CashMovement {
+  return {
+    id: row.id,
+    kind: row.kind as CashMovementKind,
+    amount: row.amount,
+    note: row.note ?? '',
+    reason: row.reason,
+    beneficiaryType: row.beneficiaryType,
+    beneficiaryId: row.beneficiaryId,
+    beneficiaryName: row.beneficiaryName,
+    createdAt: row.createdAt,
+    operatorName: row.operatorName,
+  };
+}
+
+function mapSession(row: ApiCashSession): CashSession {
+  return {
+    id: row.id,
+    openedAt: row.openedAt,
+    closedAt: row.closedAt,
+    openingFloat: row.openingFloat,
+    expectedCash: row.expectedCash,
+    countedCash: row.countedCash,
+    difference: row.difference,
+    operatorName: row.operatorName,
+    status: row.status,
+    reopenCount: row.reopenCount ?? 0,
+    movements: Array.isArray(row.movements) ? row.movements.map(mapMovement) : [],
+  };
+}
+
+function mapCredit(row: ApiStoreCredit): StoreCredit {
+  return {
+    id: row.id,
+    code: row.code,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone ?? '',
+    amount: row.amount,
+    remaining: row.remaining,
+    note: row.note ?? '',
+    createdAt: row.createdAt,
+    operatorName: row.operatorName,
+    status: row.status,
+    orderId: row.orderId,
+  };
+}
+
+function mapExchange(row: ApiExchangeRecord): ExchangeRecord {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone ?? '',
+    returnLines: (row.returnLines ?? []).map((line) => ({
+      stockId: line.stockId,
+      name: line.name,
+      sku: line.sku ?? '',
+      qty: line.qty,
+      unitPrice: line.unitPrice,
+    })),
+    outLines: (row.outLines ?? []).map((line) => ({
+      stockId: line.stockId,
+      name: line.name,
+      sku: line.sku ?? '',
+      qty: line.qty,
+      unitPrice: line.unitPrice,
+    })),
+    returnTotal: row.returnTotal,
+    outTotal: row.outTotal,
+    cashDelta: row.cashDelta,
+    creditId: row.creditId,
+    note: row.note ?? '',
+    createdAt: row.createdAt,
+    operatorName: row.operatorName,
+  };
+}
+
+function putSession(state: State, session: CashSession) {
+  const idx = state.sessions.findIndex((item) => item.id === session.id);
+  if (idx >= 0) state.sessions[idx] = session;
+  else state.sessions = [session, ...state.sessions];
+}
+
+function putCredit(state: State, credit: StoreCredit) {
+  const idx = state.credits.findIndex((item) => item.id === credit.id);
+  if (idx >= 0) state.credits[idx] = credit;
+  else state.credits = [credit, ...state.credits];
+}
+
+/** Substitui fatias do caixa (bootstrap Nest). */
+export function replaceCashRegister(partial: Partial<State>) {
+  const state = load();
+  save({
+    sessions: partial.sessions ?? state.sessions,
+    credits: partial.credits ?? state.credits,
+    exchanges: partial.exchanges ?? state.exchanges,
+  });
+}
+
+export async function hydrateCashFromApi() {
+  if (!isNestAuthed()) return;
+  const [sessions, credits, exchanges] = await Promise.all([
+    apiListCashSessions(),
+    apiListStoreCredits(),
+    apiListCashExchanges(),
+  ]);
+  replaceCashRegister({
+    sessions: sessions.map(mapSession),
+    credits: credits.map(mapCredit),
+    exchanges: exchanges.map(mapExchange),
+  });
+}
+
+/** Atualiza a sessão aberta a partir da API Nest. */
+export async function refreshOpenCashSessionFromApi() {
+  if (!isNestAuthed()) return getOpenCashSession();
+  try {
+    const row = await apiGetOpenCashSession();
+    const state = load();
+    if (!row) {
+      for (const session of state.sessions) {
+        if (session.status === 'open') session.status = 'closed';
+      }
+      save(state);
+      return null;
+    }
+    const mapped = mapSession(row);
+    putSession(state, mapped);
+    save(state);
+    return mapped;
+  } catch {
+    return getOpenCashSession();
+  }
+}
+
 export function getOpenCashSession() {
   return load().sessions.find((item) => item.status === 'open') ?? null;
 }
@@ -206,7 +365,38 @@ export function listExchanges() {
   return load().exchanges;
 }
 
-export function openCashDrawer(operatorName: string, note?: string) {
+export async function openCashDrawer(operatorName: string, note?: string) {
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (open) {
+      try {
+        const row = await apiCashDrawer(open.id, {
+          note: note?.trim() || undefined,
+          operatorName: operatorName || undefined,
+        });
+        const mapped = mapSession(row);
+        const state = load();
+        putSession(state, mapped);
+        save(state);
+        const stamp = new Date().toISOString();
+        window.dispatchEvent(new CustomEvent('marthi-cash-drawer', { detail: { at: stamp } }));
+        const movement =
+          mapped.movements.filter((item) => item.kind === 'drawer').at(-1) ??
+          ({
+            id: uid('MOV'),
+            kind: 'drawer' as const,
+            amount: 0,
+            note: note?.trim() || 'Abertura de gaveta para contagem',
+            createdAt: stamp,
+            operatorName: operatorName || 'Operador',
+          } satisfies CashMovement);
+        return { ok: true as const, movement };
+      } catch (error) {
+        return { ok: false as const, error: nestError(error, 'Falha ao abrir gaveta.') };
+      }
+    }
+  }
+
   const state = load();
   const session = state.sessions.find((item) => item.status === 'open');
   const stamp = new Date().toISOString();
@@ -226,12 +416,32 @@ export function openCashDrawer(operatorName: string, note?: string) {
   return { ok: true as const, movement };
 }
 
-export function openCashSession(input: {
+export async function openCashSession(input: {
   openingFloat: number;
   operatorName: string;
   note?: string;
   openedAt?: string;
-}): { ok: true; session: CashSession } | { ok: false; error: string } {
+}): Promise<{ ok: true; session: CashSession } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiOpenCashSession({
+        openingFloat: Math.max(0, Number(input.openingFloat) || 0),
+        operatorName: input.operatorName.trim() || 'Operador',
+        note: input.note?.trim() || undefined,
+        openedAt: input.openedAt?.trim() || undefined,
+      });
+      const mapped = mapSession(row);
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      const stamp = new Date().toISOString();
+      window.dispatchEvent(new CustomEvent('marthi-cash-drawer', { detail: { at: stamp } }));
+      return { ok: true, session: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao abrir caixa.') };
+    }
+  }
+
   if (getOpenCashSession()) {
     return { ok: false, error: 'Já existe um caixa aberto. Feche ou consulte os caixas.' };
   }
@@ -259,7 +469,7 @@ export function openCashSession(input: {
   const state = load();
   state.sessions.unshift(session);
   save(state);
-  openCashDrawer(session.operatorName, 'Gaveta na abertura');
+  await openCashDrawer(session.operatorName, 'Gaveta na abertura');
   return { ok: true, session };
 }
 
@@ -275,7 +485,7 @@ function mutateOpen(
   return { ok: true, session };
 }
 
-export function addCashAporte(input: {
+export async function addCashAporte(input: {
   amount: number;
   note?: string;
   reason?: string;
@@ -293,6 +503,31 @@ export function addCashAporte(input: {
     beneficiaryType === 'employee'
       ? input.beneficiaryName?.trim() || 'Funcionário'
       : input.beneficiaryName?.trim() || 'Loja';
+
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (!open) return { ok: false as const, error: 'Abra o caixa antes de continuar.' };
+    try {
+      const row = await apiCashAporte(open.id, {
+        amount,
+        note: input.note?.trim() || undefined,
+        reason,
+        beneficiaryType,
+        beneficiaryId: beneficiaryType === 'employee' ? input.beneficiaryId : undefined,
+        beneficiaryName,
+        operatorName: input.operatorName || undefined,
+        at: input.at?.trim() || undefined,
+      });
+      const mapped = mapSession(row);
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true as const, session: mapped };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao registrar aporte.') };
+    }
+  }
+
   return mutateOpen((session) => {
     const at = nowIso(input.at);
     session.expectedCash += amount;
@@ -312,7 +547,7 @@ export function addCashAporte(input: {
   });
 }
 
-export function addCashSangria(input: {
+export async function addCashSangria(input: {
   amount: number;
   note?: string;
   reason?: string;
@@ -330,6 +565,31 @@ export function addCashSangria(input: {
     beneficiaryType === 'employee'
       ? input.beneficiaryName?.trim() || 'Funcionário'
       : input.beneficiaryName?.trim() || 'Loja';
+
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (!open) return { ok: false as const, error: 'Abra o caixa antes de continuar.' };
+    try {
+      const row = await apiCashSangria(open.id, {
+        amount,
+        note: input.note?.trim() || undefined,
+        reason,
+        beneficiaryType,
+        beneficiaryId: beneficiaryType === 'employee' ? input.beneficiaryId : undefined,
+        beneficiaryName,
+        operatorName: input.operatorName || undefined,
+        at: input.at?.trim() || undefined,
+      });
+      const mapped = mapSession(row);
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true as const, session: mapped };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao registrar sangria.') };
+    }
+  }
+
   return mutateOpen((session) => {
     if (amount > session.expectedCash) {
       return { ok: false, error: 'Sangria maior que o saldo esperado do caixa.' };
@@ -475,7 +735,7 @@ export function findCashSessionForOrder(orderId: string): CashSession | null {
   return null;
 }
 
-export function issueStoreCredit(input: {
+export async function issueStoreCredit(input: {
   customerName: string;
   customerPhone?: string;
   amount: number;
@@ -483,9 +743,32 @@ export function issueStoreCredit(input: {
   operatorName: string;
   orderId?: string;
   affectCash?: boolean;
-}): { ok: true; credit: StoreCredit } | { ok: false; error: string } {
+}): Promise<{ ok: true; credit: StoreCredit } | { ok: false; error: string }> {
   const amount = Math.abs(Number(input.amount) || 0);
   if (amount <= 0) return { ok: false, error: 'Informe o valor do vale.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateStoreCredit({
+        customerName: input.customerName.trim() || 'Cliente',
+        customerPhone: input.customerPhone?.trim() || undefined,
+        amount,
+        note: input.note?.trim() || undefined,
+        operatorName: input.operatorName || undefined,
+        orderId: input.orderId,
+        affectCash: input.affectCash,
+      });
+      const credit = mapCredit(row);
+      const state = load();
+      putCredit(state, credit);
+      save(state);
+      await refreshOpenCashSessionFromApi();
+      return { ok: true, credit };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao emitir vale.') };
+    }
+  }
+
   const credit: StoreCredit = {
     id: uid('VALE'),
     code: `VC-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
@@ -523,13 +806,31 @@ export function issueStoreCredit(input: {
   return { ok: true, credit };
 }
 
-export function redeemStoreCredit(input: {
+export async function redeemStoreCredit(input: {
   code: string;
   amount: number;
   operatorName: string;
-}): { ok: true; credit: StoreCredit } | { ok: false; error: string } {
+}): Promise<{ ok: true; credit: StoreCredit } | { ok: false; error: string }> {
   const code = input.code.trim().toUpperCase();
   const amount = Math.abs(Number(input.amount) || 0);
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiUseStoreCredit(code, {
+        amount,
+        operatorName: input.operatorName || undefined,
+      });
+      const credit = mapCredit(row);
+      const state = load();
+      putCredit(state, credit);
+      save(state);
+      await refreshOpenCashSessionFromApi();
+      return { ok: true, credit };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao resgatar vale.') };
+    }
+  }
+
   const state = load();
   const credit = state.credits.find((item) => item.code === code || item.id === code);
   if (!credit || credit.status !== 'open') return { ok: false, error: 'Vale não encontrado ou já usado.' };
@@ -558,6 +859,7 @@ export function redeemStoreCredit(input: {
 }
 
 export function cancelStoreCredit(id: string) {
+  // Nest ainda não expõe cancelamento de vale — permanece local.
   const state = load();
   const credit = state.credits.find((item) => item.id === id);
   if (!credit) return { ok: false as const, error: 'Vale não encontrado.' };
@@ -567,7 +869,7 @@ export function cancelStoreCredit(id: string) {
   return { ok: true as const, credit };
 }
 
-export function registerExchange(input: {
+export async function registerExchange(input: {
   orderId: string;
   customerName: string;
   customerPhone?: string;
@@ -576,12 +878,49 @@ export function registerExchange(input: {
   note?: string;
   operatorName: string;
   settleAs: 'cash' | 'credit';
-}):
+}): Promise<
   | { ok: true; exchange: ExchangeRecord; credit?: StoreCredit }
-  | { ok: false; error: string } {
+  | { ok: false; error: string }
+> {
   if (!input.returnLines.length && !input.outLines.length) {
     return { ok: false, error: 'Informe produtos de devolução e/ou saída.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateCashExchange({
+        orderId: input.orderId.trim(),
+        customerName: input.customerName.trim() || 'Cliente',
+        customerPhone: input.customerPhone?.trim() || undefined,
+        returnLines: input.returnLines.map((line) => ({
+          stockId: line.stockId,
+          name: line.name,
+          sku: line.sku || undefined,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+        })),
+        outLines: input.outLines.map((line) => ({
+          stockId: line.stockId,
+          name: line.name,
+          sku: line.sku || undefined,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+        })),
+        note: input.note?.trim() || undefined,
+        operatorName: input.operatorName || undefined,
+        settleAs: input.settleAs,
+      });
+      const exchange = mapExchange(row);
+      await hydrateCashFromApi();
+      const credit = exchange.creditId
+        ? load().credits.find((item) => item.id === exchange.creditId)
+        : undefined;
+      return { ok: true, exchange: load().exchanges.find((item) => item.id === exchange.id) ?? exchange, credit };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar troca.') };
+    }
+  }
+
   const returnTotal = roundMoney(
     input.returnLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0),
   );
@@ -595,7 +934,7 @@ export function registerExchange(input: {
   const useCredit = input.settleAs === 'credit' && cashDelta < 0;
 
   if (useCredit) {
-    const issued = issueStoreCredit({
+    const issued = await issueStoreCredit({
       customerName: input.customerName,
       customerPhone: input.customerPhone,
       amount: Math.abs(cashDelta),
@@ -710,7 +1049,7 @@ export function summarizeCashSession(session: CashSession): CashSessionSummary {
   };
 }
 
-export function closeCashSession(input: {
+export async function closeCashSession(input: {
   countedCash: number;
   operatorName: string;
   note?: string;
@@ -718,6 +1057,29 @@ export function closeCashSession(input: {
   breakdown?: CashCloseBreakdown;
 }) {
   const counted = Math.max(0, Number(input.countedCash) || 0);
+
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (!open) return { ok: false as const, error: 'Abra o caixa antes de continuar.' };
+    try {
+      const row = await apiCloseCashSession(open.id, {
+        countedCash: counted,
+        operatorName: input.operatorName.trim() || 'Operador',
+        note: input.note?.trim() || undefined,
+      });
+      const mapped = mapSession(row);
+      if (input.breakdown) {
+        mapped.closeBreakdown = { ...input.breakdown, countedCash: counted };
+      }
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true as const, session: mapped };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Falha ao fechar caixa.') };
+    }
+  }
+
   return mutateOpen((session) => {
     const closedAt = nowIso(input.closedAt);
     session.countedCash = counted;
@@ -753,11 +1115,27 @@ export function closeCashSession(input: {
   });
 }
 
-export function reopenCashSession(input: {
+export async function reopenCashSession(input: {
   sessionId: string;
   operatorName: string;
   note?: string;
-}): { ok: true; session: CashSession } | { ok: false; error: string } {
+}): Promise<{ ok: true; session: CashSession } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiReopenCashSession(input.sessionId, {
+        operatorName: input.operatorName.trim() || 'Operador',
+        note: input.note?.trim() || undefined,
+      });
+      const mapped = mapSession(row);
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true, session: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao reabrir caixa.') };
+    }
+  }
+
   if (getOpenCashSession()) {
     return { ok: false, error: 'Feche o caixa atual antes de reabrir outro.' };
   }
