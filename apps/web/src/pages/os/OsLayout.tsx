@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
+import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
@@ -147,7 +148,7 @@ export function OsLayout() {
       }
 
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
-        if (key === 'o') {
+        if (key === 'm') {
           event.preventDefault();
           setOpsMenuOpen((open) => !open);
           return;
@@ -191,17 +192,7 @@ export function OsLayout() {
       }`}
     >
       <header className="os-app__top">
-        <button
-          type="button"
-          className="os-app__ops-btn"
-          aria-label="Operações da oficina · Alt+O"
-          aria-expanded={opsMenuOpen}
-          title="Operações · Alt+O"
-          onClick={() => setOpsMenuOpen((open) => !open)}
-        >
-          <AdminIcon name="ops" />
-          <kbd>Alt+O</kbd>
-        </button>
+        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
         <BrandLogo variant="mark" className="os-app__mark" />
         <div className="os-app__brand">
           <strong>Marthi OS</strong>

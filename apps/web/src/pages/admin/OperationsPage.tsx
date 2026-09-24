@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { TeamUsersSection } from '../../components/TeamUsersSection';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
+import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import {
@@ -286,16 +287,12 @@ export function OperationsPage() {
                   {editing ? (
                     <div className="ops-tile__panel" style={{ borderColor: `${item.color}55` }}>
                       {card}
-                      <div className="ops-tile__edit">
-                        <button type="button" className="btn btn--ghost" onClick={() => openEdit(item)}>
-                          Editar
-                        </button>
+                      <div className="ops-tile__edit crud-actions">
+                        <CrudIconButton action="edit" onClick={() => openEdit(item)} />
                         <button type="button" className="btn btn--ghost" onClick={() => toggleActive(item)}>
                           {item.active ? 'Desativar' : 'Ativar'}
                         </button>
-                        <button type="button" className="btn btn--ghost" onClick={() => remove(item)}>
-                          <AdminIcon name="trash" />
-                        </button>
+                        <CrudIconButton action="delete" onClick={() => remove(item)} />
                       </div>
                     </div>
                   ) : item.active ? (

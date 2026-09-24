@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
+import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
@@ -33,7 +34,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/vendedores': { kicker: 'Pessoas', title: 'Vendedores' },
   '/erp/fornecedores': { kicker: 'Pessoas', title: 'Fornecedores' },
   '/erp/financeiro': { kicker: 'Financeiro', title: 'Financeiro da loja' },
-  '/erp/boletos': { kicker: 'Financeiro', title: 'Boletos Pix e híbridos' },
+  '/erp/boletos': { kicker: 'Financeiro', title: 'Boletos' },
   '/erp/relatorios': { kicker: 'Retaguarda', title: 'Relatórios' },
   '/erp/auditoria': { kicker: 'Retaguarda', title: 'Auditoria' },
 };
@@ -135,18 +136,7 @@ export function ErpLayout() {
   return (
     <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="erp-app__top">
-        <button
-          type="button"
-          className="erp-app__menu-btn"
-          aria-label={navOpen ? 'Fechar menu do ERP' : 'Abrir menu do ERP'}
-          aria-expanded={navOpen}
-          title="Menu · Alt+M"
-          onClick={() => setNavOpen((open) => !open)}
-        >
-          <AdminIcon name="ops" />
-          <span>{navOpen ? 'Fechar' : 'Menu'}</span>
-          <kbd>Alt+M</kbd>
-        </button>
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi ERP</strong>
@@ -221,6 +211,7 @@ export function ErpLayout() {
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>
+            <div id="panel-page-actions" className="erp-app__heading-actions" />
           </header>
           <div className="erp-app__content">
             <Outlet />

@@ -33,14 +33,20 @@ const CARDS = [
   {
     to: '/erp/financeiro',
     tag: 'Financeiro',
-    title: 'Contas e tesouraria',
-    text: 'A pagar, a receber, contas bancárias, antecipados e DRE.',
+    title: 'Hub financeiro',
+    text: 'Operação, boletos, conciliação bancária, remessa/retorno CNAB e configurações.',
   },
   {
-    to: '/erp/boletos',
+    to: '/erp/financeiro?section=boletos',
     tag: 'Cobrança',
     title: 'Boletos Pix e híbridos',
-    text: 'Emissão de boleto Pix, boleto bancário e híbrido no financeiro.',
+    text: 'Emita boleto bancário, Pix ou híbrido e baixe com lançamento no extrato.',
+  },
+  {
+    to: '/erp/financeiro?section=arquivos',
+    tag: 'CNAB',
+    title: 'Remessa e retorno',
+    text: 'Gere remessa, importe retorno e configure pastas/convênio no financeiro.',
   },
   {
     to: '/erp/relatorios',

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CrudIconButton } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
@@ -604,15 +605,12 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
                     : `Notinha ${fiscal.number}`}
                 </p>
               ) : null}
-              <div className="caixa-panel__actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
+              <div className="caixa-panel__actions crud-actions">
+                <CrudIconButton
+                  action="edit"
                   onClick={() => startEdit(selected)}
                   disabled={!canEdit}
-                >
-                  Editar
-                </button>
+                />
                 <button
                   type="button"
                   className="btn btn--ghost"
@@ -1197,24 +1195,18 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
                                   </button>
                                 </>
                               ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="btn btn--ghost"
+                                <div className="crud-actions">
+                                  <CrudIconButton
+                                    action="edit"
                                     disabled={Boolean(editingId)}
                                     onClick={() => startEdit(row)}
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn--ghost"
+                                  />
+                                  <CrudIconButton
+                                    action="delete"
                                     disabled={Boolean(editingId)}
                                     onClick={() => void remove(row.id)}
-                                  >
-                                    Excluir
-                                  </button>
-                                </>
+                                  />
+                                </div>
                               )}
                             </div>
                           </div>

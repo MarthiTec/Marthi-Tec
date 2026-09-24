@@ -142,8 +142,16 @@ export function resolveProfilePhoto(profile: OperatorProfile, authPicture?: stri
 }
 
 export async function fileToProfilePhoto(file: File): Promise<string> {
+  return fileToSquareImage(file, 256);
+}
+
+/** Foto de produto (quadrada, maior) para vitrine / cadastro. */
+export async function fileToProductImage(file: File): Promise<string> {
+  return fileToSquareImage(file, 512);
+}
+
+async function fileToSquareImage(file: File, size: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
-  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -158,5 +166,5 @@ export async function fileToProfilePhoto(file: File): Promise<string> {
   const height = bitmap.height * scale;
   ctx.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
   bitmap.close();
-  return canvas.toDataURL('image/jpeg', 0.84);
+  return canvas.toDataURL('image/jpeg', 0.86);
 }

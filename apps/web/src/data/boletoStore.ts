@@ -13,6 +13,10 @@ export type Boleto = {
   description: string;
   amount: number;
   dueDate: string;
+  bankAccountId?: string;
+  nossoNumero?: string;
+  remessaBatchId?: string;
+  receivableId?: string;
   pixCopyPaste?: string;
   digitableLine?: string;
   barcode?: string;
@@ -121,6 +125,8 @@ export function createBoleto(input: {
   description: string;
   amount: number;
   dueDate: string;
+  bankAccountId?: string;
+  receivableId?: string;
 }) {
   const items = load();
   const id = uid();
@@ -133,6 +139,8 @@ export function createBoleto(input: {
     description: input.description.trim(),
     amount: input.amount,
     dueDate: input.dueDate,
+    bankAccountId: input.bankAccountId,
+    receivableId: input.receivableId,
     createdAt: new Date().toISOString(),
   };
 
@@ -152,6 +160,35 @@ export function createBoleto(input: {
   items.unshift(boleto);
   save(items);
   return boleto;
+}
+
+export function attachBoletoToRemessa(
+  boletoIds: string[],
+  remessaBatchId: string,
+  nossoNumeros: Record<string, string>,
+) {
+  const items = load();
+  let changed = false;
+  for (const item of items) {
+    if (!boletoIds.includes(item.id)) continue;
+    item.remessaBatchId = remessaBatchId;
+    item.nossoNumero = nossoNumeros[item.id] ?? item.nossoNumero;
+    changed = true;
+  }
+  if (changed) save(items);
+}
+
+export function listOpenBankBoletos() {
+  return listBoletos().filter(
+    (item) => item.status === 'open' && (item.kind === 'bank' || item.kind === 'hybrid'),
+  );
+}
+
+export function findBoletoByNossoNumero(nossoNumero: string) {
+  const needle = nossoNumero.replace(/\D/g, '');
+  return (
+    listBoletos().find((item) => (item.nossoNumero ?? '').replace(/\D/g, '') === needle) ?? null
+  );
 }
 
 export function markBoletoPaid(id: string) {

@@ -379,35 +379,74 @@
   right: 0;
   z-index: 80;
   display: grid;
-  gap: 6px;
-  min-width: 180px;
-  padding: 10px 12px;
+  gap: 2px;
+  min-width: 240px;
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   background: #171e27;
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
 }
 
+.caixa-app__shortcuts-label {
+  margin: 8px 4px 4px;
+  padding: 0 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.caixa-app__shortcuts-label:first-child {
+  margin-top: 2px;
+}
+
+.caixa-app__shortcuts-menu button,
 .caixa-app__shortcuts-menu p {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   margin: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  cursor: pointer;
+}
+
+.caixa-app__shortcuts-menu button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.caixa-app__shortcuts-menu button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.caixa-app__shortcuts-menu button.is-danger {
+  color: #fda4af;
 }
 
 .caixa-app__shortcuts-menu kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
+  min-width: 64px;
   padding: 2px 6px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 6px;
   font-size: 0.7rem;
   font-weight: 700;
   color: #fff;
+  flex-shrink: 0;
 }
 
 .caixa-app__cash-pill {
@@ -742,10 +781,134 @@
   background: rgba(var(--accent-rgb, 29, 78, 216), 0.18);
 }
 
-.pdv__pay-adj {
+.pdv-client {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.pdv-client__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pdv-client__head h3 {
   margin: 0;
-  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mute, #6b7280);
+}
+
+.pdv-client__card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.55);
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.06);
+  box-shadow:
+    inset 3px 0 0 #3b82f6,
+    0 0 0 1px rgba(59, 130, 246, 0.18),
+    0 0 18px rgba(59, 130, 246, 0.22);
+}
+
+.caixa-app.is-theme-dark .pdv-client__card {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow:
+    inset 3px 0 0 #60a5fa,
+    0 0 0 1px rgba(96, 165, 250, 0.22),
+    0 0 22px rgba(59, 130, 246, 0.35);
+}
+
+.pdv-client.has-detail .pdv-client__card,
+.pdv-client.is-open .pdv-client__card {
+  border-color: rgba(59, 130, 246, 0.7);
+  box-shadow:
+    inset 3px 0 0 #2563eb,
+    0 0 0 1px rgba(59, 130, 246, 0.28),
+    0 0 22px rgba(59, 130, 246, 0.28);
+}
+
+.caixa-app.is-theme-dark .pdv-client.has-detail .pdv-client__card,
+.caixa-app.is-theme-dark .pdv-client.is-open .pdv-client__card {
+  border-color: rgba(147, 197, 253, 0.65);
+  box-shadow:
+    inset 3px 0 0 #93c5fd,
+    0 0 0 1px rgba(147, 197, 253, 0.25),
+    0 0 26px rgba(96, 165, 250, 0.4);
+}
+
+.pdv-client__summary {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 2px;
   border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pdv-client__summary:hover {
+  opacity: 0.92;
+}
+
+.pdv-client__summary strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #1d4ed8;
+}
+
+.caixa-app.is-theme-dark .pdv-client__summary strong {
+  color: #93c5fd;
+}
+
+.pdv-client__summary span {
+  color: var(--mute, #6b7280);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.caixa-app.is-theme-dark .pdv-client__summary span {
+  color: #94a3b8;
+}
+
+.pdv-client__card .pdv__consumer {
+  margin: 0;
+}
+
+.pdv-client__card .pdv__cpf-seller-row {
+  margin: 0;
+}
+
+.pdv__client-panel {
+  display: none;
+}
+
+.pdv__pay-adj {
+  margin: 8px 0 0;
+  padding: 0 0 10px;
+  border: 0;
+  border-bottom: 1px dashed var(--line, #d8dde3);
+}
+
+.pdv__pay-adj.pdv__line-adj {
+  margin-top: 8px;
+  padding-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: 10px;
+  border-top: 0;
+  border-bottom: 1px dashed var(--line, #d8dde3);
 }
 
 .pdv--caixa .pdv__side--caixa .pdv__pay-adj label {
@@ -755,6 +918,95 @@
   font-weight: 700;
   color: var(--mute, #6b7280);
   min-width: 0;
+  padding-left: 2px;
+}
+
+.pdv__totals--caixa {
+  margin-top: 10px;
+  gap: 6px;
+  padding: 2px 0 0;
+}
+
+.pdv__totals--caixa > div {
+  align-items: baseline;
+  min-height: 22px;
+  font-size: 0.84rem;
+}
+
+.pdv__totals--caixa dt {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.pdv__totals--caixa dd {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.pdv__totals-meta dd {
+  font-weight: 600;
+}
+
+.pdv__totals-hint {
+  color: var(--mute, #6b7280);
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+.pdv__totals-disc dd {
+  color: #f87171;
+}
+
+.pdv__totals-plus dd {
+  color: #34d399;
+}
+
+.pdv__totals--caixa .pdv__total {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.pdv__totals--caixa .pdv__total dt {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: inherit;
+}
+
+.pdv__totals--caixa .pdv__total dd {
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.pdv__totals-paid {
+  margin-top: 2px;
+}
+
+.pdv__totals-paid dt,
+.pdv__totals-paid dd {
+  color: inherit;
+  font-weight: 700;
+}
+
+.pdv__totals-lack dd,
+.pdv__total-change dd {
+  font-weight: 800;
+}
+
+.caixa-app.is-theme-dark .pdv__pay-adj.pdv__line-adj {
+  border-bottom-color: rgba(255, 255, 255, 0.16);
+}
+
+.caixa-app.is-theme-dark .pdv__totals--caixa .pdv__total {
+  border-top-color: rgba(255, 255, 255, 0.14);
+}
+
+.caixa-app.is-theme-dark .pdv__totals-disc dd {
+  color: #fca5a5;
+}
+
+.caixa-app.is-theme-dark .pdv__totals-plus dd {
+  color: #6ee7b7;
 }
 
 .pdv__line-actions {
@@ -838,7 +1090,7 @@
 }
 
 .pdv__totals {
-  gap: 4px;
+  gap: 6px;
 }
 
 @media (max-width: 1100px) {
@@ -1077,4 +1329,316 @@
     max-height: min(92dvh, 100%);
     border-radius: 18px 18px 0 0;
   }
+}
+
+/* —— Modo claro: cara de caixa (dark mode permanece intacto) —— */
+.caixa-app:not(.is-theme-dark) {
+  --ink: #0f172a;
+  --mute: #475569;
+  --line: #c5ced8;
+  --card: #ffffff;
+  --surface: #e8eef3;
+  --accent: #1d4ed8;
+  --accent-rgb: 29, 78, 216;
+  background:
+    radial-gradient(820px 380px at 100% -10%, rgba(29, 78, 216, 0.1), transparent 55%),
+    linear-gradient(180deg, #dfe7ef 0%, #e8eef3 42%, #eef2f6 100%);
+  color: var(--ink);
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__body,
+.caixa-app:not(.is-theme-dark) .caixa-app__content {
+  background: transparent;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-page.pdv--caixa {
+  background: transparent;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-card,
+.caixa-app:not(.is-theme-dark) .pdv__scan,
+.caixa-app:not(.is-theme-dark) .pdv__quick--caixa,
+.caixa-app:not(.is-theme-dark) .pdv__cart--caixa,
+.caixa-app:not(.is-theme-dark) .pdv__side--caixa {
+  background: var(--card);
+  border: 1px solid #b8c4d1;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__side--caixa > h2,
+.caixa-app:not(.is-theme-dark) .pdv__quick h3,
+.caixa-app:not(.is-theme-dark) .pdv__cart h3,
+.caixa-app:not(.is-theme-dark) .pdv-client__head h3,
+.caixa-app:not(.is-theme-dark) .pdv-split__head h3 {
+  color: #1e3a5f;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__side--caixa > h2 {
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(29, 78, 216, 0.2);
+  font-size: 0.82rem;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__quick .empty,
+.caixa-app:not(.is-theme-dark) .pdv__cart .empty,
+.caixa-app:not(.is-theme-dark) .empty {
+  color: #64748b;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__chip {
+  border-color: #c5ced8;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fa 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__chip:hover {
+  border-color: rgba(29, 78, 216, 0.45);
+  background: #eff6ff;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__chip-key {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__chip-name {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__code-field input,
+.caixa-app:not(.is-theme-dark) .admin-form input,
+.caixa-app:not(.is-theme-dark) .pdv__cpf-inline,
+.caixa-app:not(.is-theme-dark) .pdv-split__amount input,
+.caixa-app:not(.is-theme-dark) .pdv-split__tender input,
+.caixa-app:not(.is-theme-dark) .pdv__adj-input input {
+  background: #f8fafc !important;
+  border-color: #b8c4d1 !important;
+  color: #0f172a !important;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__code-field input:focus,
+.caixa-app:not(.is-theme-dark) .admin-form input:focus,
+.caixa-app:not(.is-theme-dark) .pdv-split__amount input:focus,
+.caixa-app:not(.is-theme-dark) .pdv__adj-input input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  background: #fff !important;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-picker__caption,
+.caixa-app:not(.is-theme-dark) .pdv-split__amount,
+.caixa-app:not(.is-theme-dark) .pdv-split__tender,
+.caixa-app:not(.is-theme-dark) .pdv--caixa .pdv__side--caixa .pdv__pay-adj label {
+  color: #334155;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-picker__trigger {
+  background: #f8fafc;
+  border-color: #b8c4d1;
+  color: #0f172a;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-picker.is-open .admin-picker__trigger,
+.caixa-app:not(.is-theme-dark) .admin-picker:focus-within .admin-picker__trigger {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+  background: #fff;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-client__card {
+  background: #eff6ff;
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow:
+    inset 3px 0 0 #2563eb,
+    0 0 0 1px rgba(37, 99, 235, 0.16),
+    0 0 16px rgba(37, 99, 235, 0.18);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__row {
+  background: #f3f6f9;
+  border-color: #c5ced8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-client.has-detail .pdv-client__card,
+.caixa-app:not(.is-theme-dark) .pdv-client.is-open .pdv-client__card {
+  background: #dbeafe;
+  border-color: rgba(29, 78, 216, 0.65);
+  box-shadow:
+    inset 3px 0 0 #1d4ed8,
+    0 0 0 1px rgba(29, 78, 216, 0.2),
+    0 0 18px rgba(37, 99, 235, 0.22);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-client__summary strong {
+  color: #1e40af;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-client__summary span {
+  color: #475569;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__consumer-btn.is-active {
+  border-color: rgba(29, 78, 216, 0.45);
+  background: #eff6ff;
+  color: #1e3a8a;
+  box-shadow: inset 3px 0 0 #1d4ed8;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__add {
+  background: #eff6ff;
+  border-color: rgba(29, 78, 216, 0.45);
+  color: #1d4ed8;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__add:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__add kbd {
+  border-color: rgba(29, 78, 216, 0.3);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__status {
+  background: #e8eef5;
+  border: 1px solid #c5ced8;
+  color: #475569;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__status strong {
+  color: #0f172a;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv-split__status .is-ok {
+  color: #047857;
+  font-weight: 800;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals--caixa > div {
+  color: #475569;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals--caixa dt {
+  color: #334155;
+  font-weight: 700;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals--caixa dd {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals-hint {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals--caixa .pdv__total {
+  border-top-color: #b8c4d1;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals--caixa .pdv__total dt {
+  color: #0f172a;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals-disc dd {
+  color: #b91c1c;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__totals-plus dd {
+  color: #047857;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__pay-adj.pdv__line-adj {
+  border-bottom-color: #b8c4d1;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__adj-toggle {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-table th {
+  color: #1e3a5f;
+  background: #e8eef5;
+  border-bottom-color: #b8c4d1;
+  letter-spacing: 0.04em;
+}
+
+.caixa-app:not(.is-theme-dark) .admin-table td {
+  color: #0f172a;
+  border-bottom-color: #d8dee6;
+}
+
+.caixa-app:not(.is-theme-dark) .price-red,
+.caixa-app:not(.is-theme-dark) .pdv--caixa .admin-table .price-red,
+.caixa-app:not(.is-theme-dark) .pdv--caixa .pdv__total .price-red {
+  color: #c41e3a !important;
+}
+
+.caixa-app:not(.is-theme-dark) .btn--primary {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: #1e40af;
+  box-shadow: 0 6px 14px rgba(29, 78, 216, 0.28);
+}
+
+.caixa-app:not(.is-theme-dark) .btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.caixa-app:not(.is-theme-dark) .btn--ghost {
+  border-color: #b8c4d1;
+  background: #f8fafc;
+  color: #1e3a5f;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__cpf-toggle {
+  color: #334155;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__cpf-radio {
+  border-color: #64748b;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv__cpf-toggle.is-on .pdv__cpf-radio {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-menu {
+  background: #fff;
+  border-color: #d0d7e0;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-label {
+  color: #64748b;
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-menu button {
+  color: #1e293b;
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-menu button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-menu button.is-danger {
+  color: #be123c;
+}
+
+.caixa-app:not(.is-theme-dark) .caixa-app__shortcuts-menu kbd {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
 }

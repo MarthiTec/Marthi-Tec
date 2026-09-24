@@ -28,16 +28,20 @@ export function CrudListBar({
 }: CrudListBarProps) {
   return (
     <div className="admin-toolbar crud-bar">
-      <label className="crud-search">
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={placeholder}
-          aria-label="Buscar"
-        />
+      <label className="admin-field crud-search-field">
+        Buscar
+        <span className="crud-search">
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={placeholder}
+            aria-label="Buscar"
+          />
+        </span>
       </label>
       {status !== undefined && onStatusChange ? (
-        <div className="crud-filter">
+        <label className="admin-field crud-filter-field">
+          {statusLabel}
           <AdminPicker
             compact
             label={statusLabel}
@@ -49,11 +53,11 @@ export function CrudListBar({
             ]}
             onChange={(value) => onStatusChange(value as CrudStatusFilter)}
           />
-        </div>
+        </label>
       ) : null}
       {extra}
       {onNew ? (
-        <button type="button" className="btn btn--primary" onClick={onNew}>
+        <button type="button" className="btn btn--primary crud-bar__new" onClick={onNew}>
           + {newLabel}
         </button>
       ) : null}
@@ -61,28 +65,54 @@ export function CrudListBar({
   );
 }
 
+type CrudActionKind = 'view' | 'edit' | 'duplicate' | 'delete';
+
+const CRUD_ACTION_ICON: Record<CrudActionKind, { src: string; label: string }> = {
+  view: { src: '/pdv/view.png', label: 'Visualizar' },
+  edit: { src: '/pdv/edit.png', label: 'Editar' },
+  duplicate: { src: '/pdv/duplicate.png', label: 'Duplicar' },
+  delete: { src: '/pdv/trash.png', label: 'Excluir' },
+};
+
+type CrudIconButtonProps = {
+  action: CrudActionKind;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+};
+
+/** Botão de ação padronizado (olho / lápis / duplicar / lixeira). */
+export function CrudIconButton({ action, onClick, disabled, title }: CrudIconButtonProps) {
+  const meta = CRUD_ACTION_ICON[action];
+  return (
+    <button
+      type="button"
+      className={`btn btn--ghost btn--icon crud-ico-btn crud-ico-btn--${action}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? meta.label}
+      aria-label={title ?? meta.label}
+    >
+      <img src={meta.src} alt="" className="crud-ico-img" />
+    </button>
+  );
+}
+
 type CrudRowActionsProps = {
-  /** Preferir clique no nome (`CrudNameButton`) para visualizar. */
   onView?: () => void;
   onEdit: () => void;
+  onDuplicate?: () => void;
   onDelete: () => void;
 };
 
-/** Ações compactas: Editar / Excluir. Visualizar fica no nome da linha. */
-export function CrudRowActions({ onView, onEdit, onDelete }: CrudRowActionsProps) {
+/** Ações compactas: visualizar · editar · duplicar · excluir. */
+export function CrudRowActions({ onView, onEdit, onDuplicate, onDelete }: CrudRowActionsProps) {
   return (
     <div className="crud-actions">
-      {onView ? (
-        <button type="button" className="btn btn--ghost crud-actions__view" onClick={onView}>
-          Ver
-        </button>
-      ) : null}
-      <button type="button" className="btn btn--ghost" onClick={onEdit}>
-        Editar
-      </button>
-      <button type="button" className="btn btn--ghost crud-actions__danger" onClick={onDelete}>
-        Excluir
-      </button>
+      {onView ? <CrudIconButton action="view" onClick={onView} /> : null}
+      <CrudIconButton action="edit" onClick={onEdit} />
+      {onDuplicate ? <CrudIconButton action="duplicate" onClick={onDuplicate} /> : null}
+      <CrudIconButton action="delete" onClick={onDelete} />
     </div>
   );
 }

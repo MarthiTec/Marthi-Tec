@@ -4,6 +4,7 @@ import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
+import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
@@ -201,6 +202,7 @@ export function CaixaPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [askCpf, setAskCpf] = useState(false);
   const [customerCpf, setCustomerCpf] = useState('');
+  const [clientPanelOpen, setClientPanelOpen] = useState(false);
   const defaultPayment = payments[0];
   const [splits, setSplits] = useState<SplitPayment[]>(() => [
     createSplit(defaultPayment?.id ?? ''),
@@ -240,6 +242,7 @@ export function CaixaPage() {
   const linesRef = useRef(lines);
   const finishRef = useRef<() => void>(() => undefined);
   const addSplitRef = useRef<() => void>(() => undefined);
+  const toggleClientPanelRef = useRef<() => void>(() => undefined);
   const openPanelRef = useRef<(op: Exclude<CaixaPanel, null>) => void>(() => undefined);
   const quickStock = useMemo(() => stock.filter((item) => item.qty > 0).slice(0, 10), [stock]);
   const codeParsed = useMemo(() => parseCodeInput(code), [code]);
@@ -275,6 +278,10 @@ export function CaixaPage() {
 
   const seller = sellers.find((item) => item.id === sellerId);
   const cashOpen = Boolean(cashSession);
+  const clientPanelSummary = [
+    askCpf && customerCpf ? `CPF ${customerCpf}` : 'sem CPF na nota',
+    seller ? `Vendedor: ${seller.name}` : 'sem vendedor',
+  ].join(' · ');
 
   const pricedLines = useMemo(
     () =>
@@ -579,6 +586,16 @@ export function CaixaPage() {
     setError(null);
   }
 
+  function toggleClientPanel() {
+    setClientPanelOpen((open) => {
+      if (open) {
+        setCustomerPickOpen(false);
+        return false;
+      }
+      return true;
+    });
+  }
+
   async function finish() {
     if (!pricedLines.length) {
       setError('Informe ao menos um produto.');
@@ -668,6 +685,8 @@ export function CaixaPage() {
       setSellerId('');
       setAskCpf(false);
       setCustomerCpf('');
+      setClientPanelOpen(false);
+      setCustomerPickOpen(false);
       pickCustomer(undefined);
       setWalkIn(true);
       resetSplits();
@@ -743,6 +762,7 @@ export function CaixaPage() {
 
   finishRef.current = finish;
   addSplitRef.current = addSplit;
+  toggleClientPanelRef.current = toggleClientPanel;
 
   function emitFiscal(asNfce: boolean) {
     if (!lastOrderId) return;
@@ -873,6 +893,13 @@ export function CaixaPage() {
           focusCode();
           return;
         }
+        if (clientPanelOpen) {
+          event.preventDefault();
+          setClientPanelOpen(false);
+          setCustomerPickOpen(false);
+          focusCode();
+          return;
+        }
         if (inCodeField || !typing) {
           setCode('');
           setError(null);
@@ -882,7 +909,7 @@ export function CaixaPage() {
       }
 
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
-        if (key === 'o') {
+        if (key === 'm') {
           event.preventDefault();
           setOpsMenuOpen((open) => !open);
           return;
@@ -897,12 +924,18 @@ export function CaixaPage() {
           openPanelRef.current('canceled');
           return;
         }
-        if (key === 'p') {
+        if (key === 'p' || event.code === 'KeyP') {
           event.preventDefault();
           addSplitRef.current();
           return;
         }
-        if (key === 'v') {
+        // Alt+D é reservado pelo Chrome (barra de endereço); usamos também KeyL.
+        if (key === 'd' || key === 'l' || event.code === 'KeyD' || event.code === 'KeyL') {
+          event.preventDefault();
+          toggleClientPanelRef.current();
+          return;
+        }
+        if (key === 'v' || event.code === 'KeyV') {
           event.preventDefault();
           if (cashOpen) openPanelRef.current('vale');
           return;
@@ -926,9 +959,20 @@ export function CaixaPage() {
         finishRef.current();
       }
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [fiscalOn, lastOrderId, quickStock, code, cashOpen, panel, exitOpen, opsMenuOpen, profileOpen]);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [
+    fiscalOn,
+    lastOrderId,
+    quickStock,
+    code,
+    cashOpen,
+    panel,
+    exitOpen,
+    opsMenuOpen,
+    profileOpen,
+    clientPanelOpen,
+  ]);
 
   useEffect(() => {
     function onDrawer() {
@@ -964,17 +1008,7 @@ export function CaixaPage() {
       }`}
     >
       <header className="caixa-app__top">
-        <button
-          type="button"
-          className="caixa-app__ops-btn"
-          aria-label="Operações do caixa · Alt+O"
-          aria-expanded={opsMenuOpen}
-          title="Operações · Alt+O"
-          onClick={() => setOpsMenuOpen((open) => !open)}
-        >
-          <AdminIcon name="ops" />
-          <kbd>Alt+O</kbd>
-        </button>
+        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
         <BrandLogo variant="mark" className="caixa-app__mark" />
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
@@ -993,32 +1027,177 @@ export function CaixaPage() {
             </button>
             {shortcutsOpen ? (
               <div className="caixa-app__shortcuts-menu" role="menu">
-                <p>
+                <p className="caixa-app__shortcuts-label">Venda</p>
+                <button type="button" role="menuitem" onClick={() => { setShortcutsOpen(false); focusCode(); }}>
                   <kbd>Insert</kbd> código
-                </p>
-                <p>
+                </button>
+                <button type="button" role="menuitem" onClick={() => { setShortcutsOpen(false); focusCode(); }}>
                   <kbd>Enter</kbd> incluir
-                </p>
-                <p>
+                </button>
+                <button type="button" role="menuitem" onClick={() => { setShortcutsOpen(false); void finishRef.current(); }}>
                   <kbd>F2</kbd> fechar venda
-                </p>
-                <p>
+                </button>
+                <button type="button" role="menuitem" onClick={() => { setShortcutsOpen(false); focusCode(); }}>
+                  <kbd>F3</kbd> focar código
+                </button>
+                <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Esc</kbd> limpar
-                </p>
+                </button>
                 {fiscalOn ? (
-                  <p>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!lastOrderId}
+                    onClick={() => {
+                      setShortcutsOpen(false);
+                      if (lastOrderId) emitFiscal(true);
+                    }}
+                  >
                     <kbd>F4</kbd> NFC-e
-                  </p>
+                  </button>
                 ) : null}
-                <p>
+                <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Alt+P</kbd> forma pgto.
-                </p>
-                <p>
+                </button>
+                <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
+                  <kbd>Alt+L</kbd> cliente / CPF / vendedor
+                </button>
+                <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Alt+1…9</kbd> estoque
-                </p>
-                <p>
+                </button>
+                <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>12*</kbd> qty + SKU
-                </p>
+                </button>
+
+                <p className="caixa-app__shortcuts-label">Caixa</p>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel(cashOpen ? 'movements' : 'open');
+                  }}
+                >
+                  <kbd>F7</kbd> {cashOpen ? 'movimentos' : 'abrir caixa'}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!cashOpen}
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (cashOpen) openPanel('sangria');
+                  }}
+                >
+                  <kbd>F8</kbd> sangria
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!cashOpen}
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (cashOpen) openPanel('aporte');
+                  }}
+                >
+                  <kbd>F9</kbd> aporte
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!cashOpen}
+                  className="is-danger"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (cashOpen) openPanel('close');
+                  }}
+                >
+                  <kbd>F10</kbd> fechamento
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel('sessions');
+                  }}
+                >
+                  <kbd>F12</kbd> consulta caixas
+                </button>
+
+                <p className="caixa-app__shortcuts-label">Consultas</p>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel('sales');
+                  }}
+                >
+                  <kbd>Alt+C</kbd> consultar vendas
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel('canceled');
+                  }}
+                >
+                  <kbd>Alt+E</kbd> estorno (24h)
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!cashOpen}
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (cashOpen) openPanel('exchange');
+                  }}
+                >
+                  <kbd>F6</kbd> troca
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel('price');
+                  }}
+                >
+                  <kbd>F11</kbd> consulta preço
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    openPanel('customer');
+                  }}
+                >
+                  <kbd>Alt+N</kbd> novo cliente
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!cashOpen}
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (cashOpen) openPanel('vale');
+                  }}
+                >
+                  <kbd>Alt+V</kbd> vale-compra
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    setOpsMenuOpen((open) => !open);
+                  }}
+                >
+                  <kbd>Alt+M</kbd> menu operações
+                </button>
               </div>
             ) : null}
           </div>
@@ -1079,7 +1258,7 @@ export function CaixaPage() {
             ) : (
               <>
                 <strong>Caixa fechado</strong>
-                <span>F7 abre · Alt+O operações</span>
+                <span>F7 abre · Alt+M operações</span>
               </>
             )}
           </div>
@@ -1511,105 +1690,147 @@ export function CaixaPage() {
 
         <aside className="admin-card pdv__side pdv__side--caixa">
           <h2>Pagamento</h2>
-          <div className={`pdv__consumer ${customerPickOpen ? 'is-picking' : ''}`}>
-            <button
-              type="button"
-              className="pdv__consumer-btn is-active"
-              onClick={() => setCustomerPickOpen((open) => !open)}
-              title="Buscar cliente cadastrado"
-            >
-              {walkIn ? 'Consumidor Final' : customerName}
-            </button>
-            <span className="empty">
-              {walkIn
-                ? 'Venda avulsa · clique para buscar cliente'
-                : `${customerPhone || 'Cliente cadastrado'} · clique para trocar`}
-            </span>
-            {customerPickOpen ? (
-              <div className="pdv__customer-pick">
-                <input
-                  value={customerQuery}
-                  onChange={(e) => setCustomerQuery(e.target.value)}
-                  placeholder="Buscar nome ou telefone…"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  className={`pdv__customer-hit ${walkIn ? 'is-active' : ''}`}
-                  onClick={() => {
-                    pickCustomer(undefined);
-                    setCustomerPickOpen(false);
-                    setCustomerQuery('');
-                  }}
-                >
-                  <strong>Consumidor Final</strong>
-                  <span>Venda avulsa sem cadastro</span>
-                </button>
-                {customers
-                  .filter((customer) => {
-                    const needle = customerQuery.trim().toLowerCase();
-                    if (!needle) return true;
-                    return `${customer.name} ${customer.phone} ${customer.document ?? ''}`
-                      .toLowerCase()
-                      .includes(needle);
-                  })
-                  .slice(0, 8)
-                  .map((customer) => (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      className={`pdv__customer-hit ${customerId === customer.id ? 'is-active' : ''}`}
-                      onClick={() => {
-                        pickCustomer(customer);
-                        setCustomerPickOpen(false);
-                        setCustomerQuery('');
-                      }}
-                    >
-                      <strong>{customer.name}</strong>
-                      <span>{customer.phone || 'Sem telefone'}</span>
-                    </button>
-                  ))}
-              </div>
-            ) : null}
-          </div>
-          <div className="admin-form pdv__form pdv__form--caixa pdv__form--compact">
-            <div className="span-2 pdv__cpf-seller-row">
-              <div className="pdv__cpf-block">
-                <button
-                  type="button"
-                  className={`pdv__cpf-toggle${askCpf ? ' is-on' : ''}`}
-                  aria-pressed={askCpf}
-                  onClick={() => {
-                    setAskCpf((prev) => {
-                      if (prev) setCustomerCpf('');
-                      return !prev;
-                    });
-                  }}
-                >
-                  <span className="pdv__cpf-radio" aria-hidden />
-                  <span>CPF na nota</span>
-                </button>
-                <input
-                  className="pdv__cpf-inline"
-                  value={customerCpf}
-                  inputMode="numeric"
-                  placeholder="000.000.000-00"
-                  disabled={!askCpf}
-                  onChange={(e) => setCustomerCpf(formatCpf(e.target.value))}
-                  aria-label="CPF na nota"
-                />
-              </div>
-              <AdminPicker
-                label="Vendedor"
-                value={sellerId}
-                placeholder="Sem vendedor"
-                options={[
-                  { value: '', label: 'Sem vendedor' },
-                  ...sellers.map((item) => ({ value: item.id, label: item.name })),
-                ]}
-                onChange={setSellerId}
-              />
+
+          <section
+            className={`pdv-client${clientPanelOpen ? ' is-open' : ''}${
+              !walkIn || askCpf || sellerId ? ' has-detail' : ''
+            }`}
+            aria-label="Dados do cliente"
+          >
+            <div className="pdv-client__head">
+              <h3>Dados do cliente</h3>
+              <button
+                type="button"
+                className="pdv-split__add"
+                aria-expanded={clientPanelOpen}
+                title="Exibir ou ocultar cliente, CPF e vendedor · Alt+L"
+                onClick={toggleClientPanel}
+              >
+                {clientPanelOpen ? 'Ocultar' : 'Exibir'}
+                <kbd>Alt+L</kbd>
+              </button>
             </div>
+
+            <div className={`pdv-client__card${customerPickOpen ? ' is-picking' : ''}`}>
+              {clientPanelOpen ? (
+                <>
+                  <div className={`pdv__consumer ${customerPickOpen ? 'is-picking' : ''}`}>
+                    <button
+                      type="button"
+                      className="pdv__consumer-btn is-active"
+                      onClick={() => setCustomerPickOpen((open) => !open)}
+                      title="Buscar cliente cadastrado"
+                    >
+                      {walkIn ? 'Consumidor Final' : customerName}
+                    </button>
+                    <span className="empty">
+                      {walkIn
+                        ? 'Venda avulsa · clique para buscar cliente'
+                        : `${customerPhone || 'Cliente cadastrado'} · clique para trocar`}
+                    </span>
+                    {customerPickOpen ? (
+                      <div className="pdv__customer-pick">
+                        <input
+                          value={customerQuery}
+                          onChange={(e) => setCustomerQuery(e.target.value)}
+                          placeholder="Buscar nome ou telefone…"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className={`pdv__customer-hit ${walkIn ? 'is-active' : ''}`}
+                          onClick={() => {
+                            pickCustomer(undefined);
+                            setCustomerPickOpen(false);
+                            setCustomerQuery('');
+                          }}
+                        >
+                          <strong>Consumidor Final</strong>
+                          <span>Venda avulsa sem cadastro</span>
+                        </button>
+                        {customers
+                          .filter((customer) => {
+                            const needle = customerQuery.trim().toLowerCase();
+                            if (!needle) return true;
+                            return `${customer.name} ${customer.phone} ${customer.document ?? ''}`
+                              .toLowerCase()
+                              .includes(needle);
+                          })
+                          .slice(0, 8)
+                          .map((customer) => (
+                            <button
+                              key={customer.id}
+                              type="button"
+                              className={`pdv__customer-hit ${
+                                customerId === customer.id ? 'is-active' : ''
+                              }`}
+                              onClick={() => {
+                                pickCustomer(customer);
+                                setCustomerPickOpen(false);
+                                setCustomerQuery('');
+                              }}
+                            >
+                              <strong>{customer.name}</strong>
+                              <span>{customer.phone || 'Sem telefone'}</span>
+                            </button>
+                          ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="pdv__cpf-seller-row">
+                    <div className="pdv__cpf-block">
+                      <button
+                        type="button"
+                        className={`pdv__cpf-toggle${askCpf ? ' is-on' : ''}`}
+                        aria-pressed={askCpf}
+                        onClick={() => {
+                          setAskCpf((prev) => {
+                            if (prev) setCustomerCpf('');
+                            return !prev;
+                          });
+                        }}
+                      >
+                        <span className="pdv__cpf-radio" aria-hidden />
+                        <span>CPF na nota</span>
+                      </button>
+                      <input
+                        className="pdv__cpf-inline"
+                        value={customerCpf}
+                        inputMode="numeric"
+                        placeholder="000.000.000-00"
+                        disabled={!askCpf}
+                        onChange={(e) => setCustomerCpf(formatCpf(e.target.value))}
+                        aria-label="CPF na nota"
+                      />
+                    </div>
+                    <AdminPicker
+                      label="Vendedor"
+                      value={sellerId}
+                      placeholder="Sem vendedor"
+                      options={[
+                        { value: '', label: 'Sem vendedor' },
+                        ...sellers.map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      onChange={setSellerId}
+                    />
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="pdv-client__summary"
+                  onClick={toggleClientPanel}
+                  title="Exibir dados do cliente · Alt+L"
+                >
+                  <strong>{walkIn ? 'Consumidor Final' : customerName}</strong>
+                  <span>{clientPanelSummary}</span>
+                </button>
+              )}
+            </div>
+          </section>
+
+          <div className="admin-form pdv__form pdv__form--caixa pdv__form--compact">
             <div className="span-2">
               <CaixaPaymentSplit
                 payments={payments}
@@ -1669,36 +1890,44 @@ export function CaixaPage() {
             </div>
           </div>
 
-          <dl className="pdv__totals">
-            <div>
+          <dl className="pdv__totals pdv__totals--caixa">
+            <div className="pdv__totals-meta">
               <dt>Itens</dt>
               <dd>
-                {pricedLines.length} · {formatQty(unitCount, 'UN')} un
-                {weighedQty > 0 ? ` · ${formatQty(weighedQty, 'KG')} kg` : ''}
+                {pricedLines.length}
+                <span className="pdv__totals-hint">
+                  {' '}
+                  · {formatQty(unitCount, 'UN')} un
+                  {weighedQty > 0 ? ` · ${formatQty(weighedQty, 'KG')} kg` : ''}
+                </span>
               </dd>
             </div>
             <div>
               <dt>Subtotal</dt>
               <dd>{money(subtotal)}</dd>
             </div>
-            <div>
-              <dt>Descontos</dt>
-              <dd>−{money(discountMoney)}</dd>
-            </div>
-            <div>
-              <dt>Acréscimos</dt>
-              <dd>+{money(surchargeMoney)}</dd>
-            </div>
+            {discountMoney > 0 ? (
+              <div className="pdv__totals-disc">
+                <dt>Descontos</dt>
+                <dd>−{money(discountMoney)}</dd>
+              </div>
+            ) : null}
+            {surchargeMoney > 0 ? (
+              <div className="pdv__totals-plus">
+                <dt>Acréscimos</dt>
+                <dd>+{money(surchargeMoney)}</dd>
+              </div>
+            ) : null}
             <div className="pdv__total">
               <dt>Total</dt>
               <dd className="price-red">{money(total)}</dd>
             </div>
-            <div>
+            <div className="pdv__totals-paid">
               <dt>Pago</dt>
               <dd>{money(paySummary.allocated)}</dd>
             </div>
             {paySummary.remaining > 0.005 ? (
-              <div>
+              <div className="pdv__totals-lack">
                 <dt>Falta</dt>
                 <dd className="price-red">{money(paySummary.remaining)}</dd>
               </div>

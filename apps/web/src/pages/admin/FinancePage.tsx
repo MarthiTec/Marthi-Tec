@@ -43,6 +43,24 @@ import {
   type TreasuryKind,
 } from '../../data/financeBook';
 import { listSuppliers } from '../../data/erpRegistry';
+import { boletoSnapshot } from '../../data/boletoStore';
+import { conciliationSnapshot } from '../../data/bankFinanceFiles';
+import {
+  FinanceBoletosPanel,
+  FinanceConciliacaoPanel,
+  FinanceConfigPanel,
+  FinanceRemessaRetornoPanel,
+} from '../erp/finance/FinanceHubPanels';
+
+const SECTIONS = [
+  { id: 'operacao', label: 'Operação', hint: 'Extrato, títulos e DRE' },
+  { id: 'boletos', label: 'Boletos', hint: 'Emitir e baixar cobranças' },
+  { id: 'conciliacao', label: 'Conciliação', hint: 'Extrato do banco' },
+  { id: 'arquivos', label: 'Remessa e retorno', hint: 'CNAB 240/400' },
+  { id: 'config', label: 'Configurações', hint: 'Pastas e convênio' },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]['id'];
 
 const TABS = [
   { id: 'resumo', label: 'Resumo' },
@@ -63,7 +81,14 @@ const REFRESH_EVENTS = [
   'marthi-erp-bootstrap',
   'marthi-stock',
   'marthi-finance-book-updated',
+  'marthi-boletos',
+  'marthi-bank-files',
 ] as const;
+
+function parseSection(value: string | null): SectionId {
+  const match = SECTIONS.find((item) => item.id === value);
+  return match?.id ?? 'operacao';
+}
 
 function parseTab(value: string | null): TabId {
   const match = TABS.find((tab) => tab.id === value);
@@ -78,6 +103,7 @@ function parseMoney(raw: string) {
 export function FinancePage() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
+  const section = parseSection(params.get('section'));
   const tab = parseTab(params.get('tab'));
   const [tick, setTick] = useState(0);
   const [message, setMessage] = useState('');
@@ -91,6 +117,8 @@ export function FinancePage() {
   const advances = useMemo(() => listAdvances(), [tick]);
   const suppliers = useMemo(() => listSuppliers(true), []);
   const dre = useMemo(() => buildDre(), [tick]);
+  const boletos = useMemo(() => boletoSnapshot(), [tick]);
+  const conciliation = useMemo(() => conciliationSnapshot(), [tick]);
 
   useEffect(() => {
     function onRefresh() {
@@ -122,8 +150,19 @@ export function FinancePage() {
     });
   }
 
+  function setSection(next: SectionId) {
+    const copy = new URLSearchParams(params);
+    if (next === 'operacao') copy.delete('section');
+    else copy.set('section', next);
+    if (next !== 'operacao') copy.delete('tab');
+    setParams(copy, { replace: true });
+    setMessage('');
+    setError('');
+  }
+
   function setTab(next: TabId) {
     const copy = new URLSearchParams(params);
+    copy.delete('section');
     if (next === 'resumo') copy.delete('tab');
     else copy.set('tab', next);
     setParams(copy, { replace: true });
@@ -132,107 +171,196 @@ export function FinancePage() {
   }
 
   return (
-    <section className="admin-page">
-      <div className="fin-tabs" role="tablist" aria-label="Financeiro">
-        {TABS.map((item) => (
+    <section className="admin-page fin-hub">
+      <header className="fin-hub-intro">
+        <div>
+          <p className="admin__kicker">Tesouraria da loja</p>
+          <h2 className="fin-hub-intro__title">Financeiro</h2>
+          <p>
+            Operação diária, boletos, conciliação e arquivos CNAB em um só lugar — do lançamento até
+            o retorno do banco.
+          </p>
+        </div>
+        <div className="fin-hub-intro__stats">
+          <div>
+            <span>Boletos abertos</span>
+            <strong>{boletos.open}</strong>
+            <em>{money(boletos.openAmount)}</em>
+          </div>
+          <div>
+            <span>Conciliação</span>
+            <strong>{conciliation.pending}</strong>
+            <em>pendente(s)</em>
+          </div>
+          <div>
+            <span>Tesouraria</span>
+            <strong>{money(totalTreasury())}</strong>
+            <em>contas</em>
+          </div>
+        </div>
+      </header>
+
+      <nav className="fin-sections" aria-label="Áreas do financeiro">
+        {SECTIONS.map((item) => (
           <button
             key={item.id}
             type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            className={`fin-tabs__btn${tab === item.id ? ' is-active' : ''}`}
-            onClick={() => setTab(item.id)}
+            className={`fin-sections__btn${section === item.id ? ' is-active' : ''}`}
+            onClick={() => setSection(item.id)}
           >
-            {item.label}
+            <strong>{item.label}</strong>
+            <span>{item.hint}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
       {message ? <p className="empty">{message}</p> : null}
       {error ? <p className="qty-low">{error}</p> : null}
 
-      {tab === 'resumo' ? (
-        <ResumoPanel
-          cashBalance={cashBalance}
-          treasuryTotal={totalTreasury()}
-          payables={payablesOpenTotal()}
-          receivables={receivablesOpenTotal()}
-          dre={dre}
-          onGo={setTab}
-        />
+      {section === 'operacao' ? (
+        <>
+          <div className="fin-tabs" role="tablist" aria-label="Operação financeira">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                className={`fin-tabs__btn${tab === item.id ? ' is-active' : ''}`}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'resumo' ? (
+            <ResumoPanel
+              cashBalance={cashBalance}
+              treasuryTotal={totalTreasury()}
+              payables={payablesOpenTotal()}
+              receivables={receivablesOpenTotal()}
+              dre={dre}
+              boletosOpen={boletos.open}
+              boletosAmount={boletos.openAmount}
+              conciliationPending={conciliation.pending}
+              onGo={setTab}
+              onSection={setSection}
+            />
+          ) : null}
+
+          {tab === 'extrato' ? (
+            <ExtratoPanel
+              onError={setError}
+              onSaved={() => {
+                refresh('Movimento lançado.');
+                audit('financeiro.extrato', 'Lançamento manual');
+              }}
+            />
+          ) : null}
+
+          {tab === 'pagar' ? (
+            <PagarPanel
+              accounts={accounts}
+              suppliers={suppliers}
+              items={payables}
+              onError={setError}
+              onSaved={(note) => {
+                refresh(note);
+                audit('financeiro.pagar', note);
+              }}
+            />
+          ) : null}
+
+          {tab === 'receber' ? (
+            <ReceberPanel
+              accounts={accounts}
+              items={receivables}
+              onError={setError}
+              onSaved={(note) => {
+                refresh(note);
+                audit('financeiro.receber', note);
+              }}
+            />
+          ) : null}
+
+          {tab === 'contas' ? (
+            <ContasPanel
+              accounts={accounts}
+              onError={setError}
+              onSaved={(note) => {
+                refresh(note);
+                audit('financeiro.conta', note);
+              }}
+            />
+          ) : null}
+
+          {tab === 'tesouraria' ? (
+            <TesourariaPanel
+              accounts={accounts}
+              moves={treasury}
+              onError={setError}
+              onSaved={(note) => {
+                refresh(note);
+                audit('financeiro.tesouraria', note);
+              }}
+            />
+          ) : null}
+
+          {tab === 'antecipados' ? (
+            <AntecipadosPanel
+              accounts={accounts}
+              items={advances}
+              onError={setError}
+              onSaved={(note) => {
+                refresh(note);
+                audit('financeiro.antecipado', note);
+              }}
+            />
+          ) : null}
+
+          {tab === 'dre' ? <DrePanel month={dre.month} lines={dre.lines} result={dre.result} /> : null}
+        </>
       ) : null}
 
-      {tab === 'extrato' ? (
-        <ExtratoPanel
-          onError={setError}
-          onSaved={() => {
-            refresh('Movimento lançado.');
-            audit('financeiro.extrato', 'Lançamento manual');
-          }}
-        />
-      ) : null}
-
-      {tab === 'pagar' ? (
-        <PagarPanel
-          accounts={accounts}
-          suppliers={suppliers}
-          items={payables}
-          onError={setError}
-          onSaved={(note) => {
+      {section === 'boletos' ? (
+        <FinanceBoletosPanel
+          onMessage={(note) => {
             refresh(note);
-            audit('financeiro.pagar', note);
+            audit('financeiro.boleto', note);
           }}
-        />
-      ) : null}
-
-      {tab === 'receber' ? (
-        <ReceberPanel
-          accounts={accounts}
-          items={receivables}
           onError={setError}
-          onSaved={(note) => {
-            refresh(note);
-            audit('financeiro.receber', note);
-          }}
         />
       ) : null}
 
-      {tab === 'contas' ? (
-        <ContasPanel
-          accounts={accounts}
+      {section === 'conciliacao' ? (
+        <FinanceConciliacaoPanel
+          onMessage={(note) => {
+            refresh(note);
+            audit('financeiro.conciliacao', note);
+          }}
           onError={setError}
-          onSaved={(note) => {
-            refresh(note);
-            audit('financeiro.conta', note);
-          }}
         />
       ) : null}
 
-      {tab === 'tesouraria' ? (
-        <TesourariaPanel
-          accounts={accounts}
-          moves={treasury}
+      {section === 'arquivos' ? (
+        <FinanceRemessaRetornoPanel
+          onMessage={(note) => {
+            refresh(note);
+            audit('financeiro.cnab', note);
+          }}
           onError={setError}
-          onSaved={(note) => {
-            refresh(note);
-            audit('financeiro.tesouraria', note);
-          }}
         />
       ) : null}
 
-      {tab === 'antecipados' ? (
-        <AntecipadosPanel
-          accounts={accounts}
-          items={advances}
-          onError={setError}
-          onSaved={(note) => {
+      {section === 'config' ? (
+        <FinanceConfigPanel
+          onMessage={(note) => {
             refresh(note);
-            audit('financeiro.antecipado', note);
+            audit('financeiro.config', note);
           }}
         />
       ) : null}
-
-      {tab === 'dre' ? <DrePanel month={dre.month} lines={dre.lines} result={dre.result} /> : null}
     </section>
   );
 }
@@ -243,14 +371,22 @@ function ResumoPanel({
   payables,
   receivables,
   dre,
+  boletosOpen,
+  boletosAmount,
+  conciliationPending,
   onGo,
+  onSection,
 }: {
   cashBalance: number;
   treasuryTotal: number;
   payables: number;
   receivables: number;
   dre: ReturnType<typeof buildDre>;
+  boletosOpen: number;
+  boletosAmount: number;
+  conciliationPending: number;
   onGo: (tab: TabId) => void;
+  onSection: (section: SectionId) => void;
 }) {
   return (
     <>
@@ -276,6 +412,38 @@ function ResumoPanel({
           <p>Em aberto / parcial.</p>
         </article>
       </div>
+
+      <div className="admin-grid fin-hub-quick">
+        <article className="admin-card fin-hub-quick__card">
+          <h2>Boletos</h2>
+          <strong>{boletosOpen}</strong>
+          <p>{money(boletosAmount)} em aberto</p>
+          <button type="button" className="btn btn--primary" onClick={() => onSection('boletos')}>
+            Emitir / gerenciar
+          </button>
+        </article>
+        <article className="admin-card fin-hub-quick__card">
+          <h2>Conciliação</h2>
+          <strong>{conciliationPending}</strong>
+          <p>movimentos pendentes</p>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => onSection('conciliacao')}
+          >
+            Conciliar extrato
+          </button>
+        </article>
+        <article className="admin-card fin-hub-quick__card">
+          <h2>CNAB</h2>
+          <strong>Remessa</strong>
+          <p>Gerar arquivo e processar retorno</p>
+          <button type="button" className="btn btn--ghost" onClick={() => onSection('arquivos')}>
+            Abrir arquivos
+          </button>
+        </article>
+      </div>
+
       <article className="admin-card">
         <div className="dash-card__head">
           <h2>DRE do mês ({dre.month})</h2>
@@ -312,6 +480,9 @@ function ResumoPanel({
           </button>
           <button type="button" className="btn btn--ghost" onClick={() => onGo('antecipados')}>
             Antecipados
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={() => onSection('config')}>
+            Config. arquivos
           </button>
         </div>
       </article>

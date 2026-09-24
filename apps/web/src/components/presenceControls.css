@@ -88,6 +88,35 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
+.presence-ctl__menu--portal {
+  position: fixed;
+  left: auto;
+  right: auto;
+  top: auto;
+  z-index: 1200;
+  width: 248px;
+  min-width: 248px;
+}
+
+.presence-ctl__menu--light {
+  background: #fff;
+  border-color: #d8dde3;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.presence-ctl__menu--light .presence-ctl__menu-label {
+  color: #94a3b8;
+}
+
+.presence-ctl__menu--light button {
+  color: #12151a;
+}
+
+.presence-ctl__menu--light button:hover,
+.presence-ctl__menu--light button.is-current {
+  background: #f1f5f9;
+}
+
 .presence-ctl__menu-label {
   margin: 4px 6px 2px;
   font-size: 0.64rem;

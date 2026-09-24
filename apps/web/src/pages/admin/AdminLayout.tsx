@@ -371,6 +371,7 @@ export function AdminLayout() {
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
           </div>
+          <div id="panel-page-actions" className="admin__heading-actions" />
         </header>
 
         <div className="admin__main">

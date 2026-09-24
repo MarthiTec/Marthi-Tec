@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CrudIconButton } from '../../components/CrudKit';
 import {
   listCfops,
   listFiscalClassifications,
@@ -229,10 +230,10 @@ export function FiscalClassPage() {
                 <td>
                   {item.ibsRate}% / {item.cbsRate}%
                 </td>
-                <td>
-                  <button type="button" className="btn btn--ghost" onClick={() => edit(item.id)}>
-                    Editar
-                  </button>
+                <td className="admin-table__actions">
+                  <div className="crud-actions">
+                    <CrudIconButton action="edit" onClick={() => edit(item.id)} />
+                  </div>
                 </td>
               </tr>
             ))}

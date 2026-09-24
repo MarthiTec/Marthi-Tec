@@ -229,8 +229,8 @@ export function OsHotkeysBar({
   const navigate = useNavigate();
   return (
     <div className="pdv__hotkeys os-hotkeys" aria-label="Atalhos da oficina">
-      <kbd>Alt+O</kbd>
-      <span>operações</span>
+      <kbd>Alt+M</kbd>
+      <span>menu</span>
       <button type="button" className="os-hotkeys__hit" onClick={() => navigate('/os/nova')}>
         <kbd>F2</kbd>
         <span>nova OS</span>

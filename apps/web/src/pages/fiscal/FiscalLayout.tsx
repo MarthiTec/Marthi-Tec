@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
+import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
@@ -91,18 +92,7 @@ export function FiscalLayout() {
   return (
     <div className={`fiscal-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="fiscal-app__top">
-        <button
-          type="button"
-          className="fiscal-app__menu-btn"
-          aria-label={navOpen ? 'Fechar menu do emissor' : 'Abrir menu do emissor'}
-          aria-expanded={navOpen}
-          title="Menu · Alt+M"
-          onClick={() => setNavOpen((open) => !open)}
-        >
-          <AdminIcon name="ops" />
-          <span>{navOpen ? 'Fechar' : 'Menu'}</span>
-          <kbd>Alt+M</kbd>
-        </button>
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <BrandLogo variant="mark" className="fiscal-app__mark" />
         <div className="fiscal-app__brand">
           <strong>Marthi Emissor Fiscal</strong>

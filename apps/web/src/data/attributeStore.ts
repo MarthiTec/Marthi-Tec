@@ -1,7 +1,32 @@
 export const ATTR_COR = 'ATTR-COR';
 export const ATTR_CAP = 'ATTR-CAP';
 export const ATTR_RET = 'ATTR-RET';
-export const MAX_ATTRIBUTES = 5;
+export const ATTR_TAM = 'ATTR-TAM';
+export const MAX_ATTRIBUTES = 8;
+
+/** Presets prontos para atributo Tamanho (roupa / calçado). */
+export const SIZE_VALUE_PRESETS: { id: string; label: string; values: string[] }[] = [
+  {
+    id: 'vest-letras',
+    label: 'Vestuário (PP–XG)',
+    values: ['PP', 'P', 'M', 'G', 'GG', 'XG'],
+  },
+  {
+    id: 'vest-num',
+    label: 'Vestuário (36–50)',
+    values: ['36', '38', '40', '42', '44', '46', '48', '50'],
+  },
+  {
+    id: 'calcados',
+    label: 'Calçados (33–45)',
+    values: ['33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'],
+  },
+  {
+    id: 'infantil',
+    label: 'Infantil (2–16)',
+    values: ['2', '4', '6', '8', '10', '12', '14', '16'],
+  },
+];
 
 export type ProductAttribute = {
   id: string;
@@ -61,6 +86,17 @@ export function seedAttributes(): ProductAttribute[] {
       sort: 3,
       active: true,
     },
+    {
+      id: ATTR_TAM,
+      name: 'Tamanho',
+      values: [...SIZE_VALUE_PRESETS[0].values],
+      priceDeltas: {},
+      useOnTotem: true,
+      filterOnTotem: true,
+      useOnStock: true,
+      sort: 4,
+      active: true,
+    },
   ];
 }
 
@@ -103,11 +139,29 @@ function load(): ProductAttribute[] {
         };
       }),
     );
+    let merged = next;
+    if (!merged.some((item) => item.id === ATTR_TAM) && merged.length < MAX_ATTRIBUTES) {
+      merged = sortAttrs([
+        ...merged,
+        {
+          id: ATTR_TAM,
+          name: 'Tamanho',
+          values: [...SIZE_VALUE_PRESETS[0].values],
+          priceDeltas: {},
+          useOnTotem: true,
+          filterOnTotem: true,
+          useOnStock: true,
+          sort: 4,
+          active: true,
+        },
+      ]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    }
     const rawRet = parsed.find((item) => item.id === ATTR_RET);
     if (rawRet && rawRet.priceDeltas?.['Por encomenda'] === undefined) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     }
-    return next;
+    return merged;
   } catch {
     return seedAttributes();
   }

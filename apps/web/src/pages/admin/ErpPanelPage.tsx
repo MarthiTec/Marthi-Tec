@@ -204,7 +204,11 @@ export function ErpPanelPage() {
 
         <article className="admin-card">
           <h2>Senhas de usuário</h2>
-          <p className="empty">Senha local de retaguarda (demo) para usuários do sistema.</p>
+          <p className="empty">
+            Senha local de retaguarda (demo). Também pode definir no cadastro de{' '}
+            <Link to="/erp/funcionarios">Funcionários</Link> ou em{' '}
+            <Link to="/erp/permissoes">Permissões</Link>.
+          </p>
           <form onSubmit={savePassword}>
             <div className="admin-form">
               <AdminPicker

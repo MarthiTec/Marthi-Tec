@@ -216,8 +216,8 @@ export function StockMovementsPage() {
       </article>
 
       <article className="admin-card">
-        <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 10, alignItems: 'end' }}>
-          <label className="admin-field" style={{ flex: '1 1 260px' }}>
+        <div className="admin-toolbar crud-bar">
+          <label className="admin-field crud-filter-field" style={{ flex: '1 1 260px' }}>
             Buscar
             <input
               value={query}
@@ -225,16 +225,19 @@ export function StockMovementsPage() {
               placeholder="Produto, SKU, nota ou referência"
             />
           </label>
-          <AdminPicker
-            compact
-            label="Tipo"
-            value={typeFilter}
-            options={[
-              { value: 'all', label: 'Todos' },
-              ...Object.entries(STOCK_MOVE_LABEL).map(([value, label]) => ({ value, label })),
-            ]}
-            onChange={(value) => setTypeFilter(value as 'all' | StockMoveType)}
-          />
+          <label className="admin-field crud-filter-field" style={{ flex: '0 0 200px' }}>
+            Tipo
+            <AdminPicker
+              compact
+              label="Tipo"
+              value={typeFilter}
+              options={[
+                { value: 'all', label: 'Todos' },
+                ...Object.entries(STOCK_MOVE_LABEL).map(([value, label]) => ({ value, label })),
+              ]}
+              onChange={(value) => setTypeFilter(value as 'all' | StockMoveType)}
+            />
+          </label>
         </div>
         <table className="admin-table">
           <thead>

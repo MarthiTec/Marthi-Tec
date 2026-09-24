@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CrudIconButton } from '../../components/CrudKit';
 import {
   emitNfseFromOs,
   emitNfseStandalone,
@@ -162,10 +163,8 @@ export function FiscalNfsePage() {
             <span>
               {doc.customerName} · R$ {doc.amount.toFixed(2)} · {new Date(doc.createdAt).toLocaleString('pt-BR')}
             </span>
-            <div className="admin-toolbar" style={{ marginTop: 6 }}>
-              <button type="button" className="btn btn--ghost" onClick={() => openDanfePreview(doc)}>
-                Visualizar
-              </button>
+            <div className="admin-toolbar crud-actions" style={{ marginTop: 6 }}>
+              <CrudIconButton action="view" onClick={() => openDanfePreview(doc)} title="Visualizar" />
             </div>
           </article>
         ))}
