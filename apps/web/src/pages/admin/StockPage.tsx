@@ -307,6 +307,10 @@ export function StockPage() {
               />
               Exibir no totem
             </span>
+            <small>
+              Só itens com “Exibir no totem” entram no totem (dados do estoque no banco). Sem
+              catálogo demo.
+            </small>
           </label>
           <label className="span-2">
             Imagens (URLs, uma por linha)

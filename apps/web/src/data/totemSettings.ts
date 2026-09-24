@@ -239,7 +239,7 @@ export const TOTEM_VERTICALS: {
       audioAssist: false,
       keyboardPlacement: 'top',
       attractGradientColor: '#1e3a8a',
-      shareStockWithErp: false,
+      shareStockWithErp: true,
     },
     copy: {
       kioskSubtitle: 'Quiosque de venda · Shopping',

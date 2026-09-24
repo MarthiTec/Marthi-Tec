@@ -473,13 +473,6 @@ function seedStock(): StockItem[] {
   ];
 }
 
-function mergeVariantStock(stock: StockItem[]) {
-  const ids = new Set(stock.map((item) => item.id));
-  const missing = seedStock().filter((item) => !ids.has(item.id));
-  if (!missing.length) return stock.map(normalizeStock);
-  return [...stock.map(normalizeStock), ...missing];
-}
-
 function seed(): AdminState {
   return {
     customers: [
@@ -671,15 +664,11 @@ function load(): AdminState {
       return fresh;
     }
     const next = hydrate(parsed);
+    // Não injeta mais aparelhos demo (seedStock) no localStorage.
     const stockNeedsCodes = (parsed.stock ?? []).some(
       (item) => item.barcode === undefined || item.imei === undefined,
     );
-    const shouldMergeVariants = !localStorage.getItem('marthi.admin.variants.v2');
-    if (shouldMergeVariants) {
-      next.stock = mergeVariantStock(next.stock);
-      localStorage.setItem('marthi.admin.variants.v2', '1');
-    }
-    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes || shouldMergeVariants) {
+    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes) {
       save(next);
     }
     return next;
@@ -741,6 +730,32 @@ function apiErrorMessage(error: unknown, fallback: string) {
   if (error instanceof NestApiError) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+/** Payload Nest Create/UpdateStockDto — sem maxQty/avgCost/unit etc. (forbidNonWhitelisted). */
+function toNestStockBody(item: StockItem) {
+  return {
+    name: item.name,
+    kind: item.kind,
+    sku: item.sku || undefined,
+    barcode: item.barcode || undefined,
+    imei: item.imei || undefined,
+    color: item.color || undefined,
+    capacity: item.capacity || undefined,
+    attrs: item.attrs && Object.keys(item.attrs).length ? item.attrs : undefined,
+    qty: item.qty,
+    minQty: item.minQty,
+    cost: item.cost,
+    price: item.price,
+    condition: item.condition,
+    showOnTotem: item.showOnTotem,
+    images: item.images?.length ? item.images : undefined,
+    supplierId: item.supplierId || undefined,
+    fiscalClassificationId: item.fiscalClassificationId || undefined,
+    warehouseId: item.warehouseId || undefined,
+    trackLot: item.trackLot,
+    isKit: item.isKit,
+  };
 }
 
 export function applyPriceTable(basePrice: number, table: PriceTable | undefined) {
@@ -1087,18 +1102,26 @@ export async function upsertStockItem(
         ...item,
         id: item.id ?? 'STK-TEMP',
       } as StockItem);
-      const { id: _id, ...body } = payload;
+      const body = toNestStockBody(payload);
       const saved = item.id
         ? await apiUpdateStock(item.id, body)
         : await apiCreateStock(body);
       const state = load();
       if (item.id) {
-        state.stock = state.stock.map((row) => (row.id === item.id ? normalizeStock(saved) : row));
+        state.stock = state.stock.map((row) =>
+          row.id === item.id
+            ? normalizeStock({ ...row, ...saved, id: item.id, maxQty: row.maxQty || payload.maxQty })
+            : row,
+        );
       } else {
-        state.stock = [normalizeStock(saved), ...state.stock];
+        state.stock = [
+          normalizeStock({ ...payload, ...saved, id: saved.id, maxQty: payload.maxQty }),
+          ...state.stock,
+        ];
       }
       save(state);
       window.dispatchEvent(new Event(STOCK_EVENT));
+      void import('./totemLiveSync').then(({ notifyTotemLive }) => notifyTotemLive());
       return state;
     } catch (error) {
       throw new Error(apiErrorMessage(error, 'Falha ao salvar estoque.'));
@@ -1118,6 +1141,7 @@ export async function upsertStockItem(
   }
   save(state);
   window.dispatchEvent(new Event(STOCK_EVENT));
+  void import('./totemLiveSync').then(({ notifyTotemLive }) => notifyTotemLive());
   return state;
 }
 

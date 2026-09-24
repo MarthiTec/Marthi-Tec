@@ -1,5 +1,23 @@
 /** Catálogo fiscal e de almoxarifado (MVP localStorage). */
 
+import {
+  apiCreateKit,
+  apiCreateLot,
+  apiCreateWarehouse,
+  apiCreateWarehouseMove,
+  apiListKits,
+  apiListLots,
+  apiListWarehouseMoves,
+  apiListWarehouses,
+  apiUpdateKit,
+  apiUpdateWarehouse,
+  type ApiProductKit,
+  type ApiProductLot,
+  type ApiWarehouse,
+  type ApiWarehouseMove,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
+
 const STORAGE_KEY = 'marthi.fiscal.catalog.v1';
 
 export type FiscalClassification = {
@@ -280,6 +298,102 @@ function save(state: CatalogState) {
   window.dispatchEvent(new Event('marthi-fiscal-updated'));
 }
 
+function mapWarehouse(row: ApiWarehouse): Warehouse {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    address: row.address ?? '',
+    active: row.active,
+  };
+}
+
+function mapLot(row: ApiProductLot): ProductLot {
+  return {
+    id: row.id,
+    stockId: row.stockId,
+    stockName: row.stockName,
+    lotNumber: row.lotNumber,
+    manufacturingDate: row.manufacturingDate ?? '',
+    expiryDate: row.expiryDate ?? '',
+    qty: row.qty,
+    supplierId: row.supplierId ?? '',
+    supplierName: row.supplierName ?? '',
+    warehouseId: row.warehouseId,
+    notes: row.notes ?? '',
+    createdAt: row.createdAt,
+  };
+}
+
+function mapKit(row: ApiProductKit): ProductKit {
+  return {
+    id: row.id,
+    name: row.name,
+    sku: row.sku ?? '',
+    parentStockId: row.parentStockId ?? '',
+    items: (row.items ?? []).map((item) => ({
+      stockId: item.stockId,
+      stockName: item.stockName,
+      qty: item.qty,
+    })),
+    active: row.active,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapMove(row: ApiWarehouseMove): WarehouseMove {
+  return {
+    id: row.id,
+    kind: row.kind,
+    stockId: row.stockId,
+    stockName: row.stockName,
+    fromWarehouseId: row.fromWarehouseId ?? '',
+    toWarehouseId: row.toWarehouseId ?? '',
+    lotId: row.lotId ?? '',
+    qty: row.qty,
+    description: row.note || row.description || '',
+    at: row.at || row.createdAt || now(),
+  };
+}
+
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+/** Substitui fatias de almoxarifado (bootstrap Nest). Fiscal P2 permanece local. */
+export function replaceWarehouseCatalog(partial: {
+  warehouses?: Warehouse[];
+  lots?: ProductLot[];
+  kits?: ProductKit[];
+  moves?: WarehouseMove[];
+}) {
+  const state = load();
+  save({
+    ...state,
+    warehouses: partial.warehouses ?? state.warehouses,
+    lots: partial.lots ?? state.lots,
+    kits: partial.kits ?? state.kits,
+    moves: partial.moves ?? state.moves,
+  });
+}
+
+export async function hydrateWarehouseCatalogFromApi() {
+  if (!isNestAuthed()) return;
+  const [warehouses, lots, kits, moves] = await Promise.all([
+    apiListWarehouses(),
+    apiListLots(),
+    apiListKits(),
+    apiListWarehouseMoves(),
+  ]);
+  replaceWarehouseCatalog({
+    warehouses: warehouses.map(mapWarehouse),
+    lots: lots.map(mapLot),
+    kits: kits.map(mapKit),
+    moves: moves.map(mapMove),
+  });
+}
+
 export type CatalogResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export function listFiscalClassifications(activeOnly = false) {
@@ -411,10 +525,34 @@ export function upsertFecp(
   return { ok: true, data: created };
 }
 
-export function upsertWarehouse(
+export async function upsertWarehouse(
   input: Omit<Warehouse, 'id'> & { id?: string },
-): CatalogResult<Warehouse> {
+): Promise<CatalogResult<Warehouse>> {
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome do almoxarifado.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        name: input.name.trim(),
+        code: input.code.trim() || uid('ALX'),
+        address: input.address.trim(),
+        active: input.active,
+      };
+      const row = input.id
+        ? await apiUpdateWarehouse(input.id, body)
+        : await apiCreateWarehouse(body);
+      const mapped = mapWarehouse(row);
+      const state = load();
+      const idx = state.warehouses.findIndex((item) => item.id === mapped.id);
+      if (idx >= 0) state.warehouses[idx] = mapped;
+      else state.warehouses = [mapped, ...state.warehouses];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar almoxarifado.') };
+    }
+  }
+
   const state = load();
   if (input.id) {
     const current = state.warehouses.find((item) => item.id === input.id);
@@ -441,7 +579,7 @@ export function upsertWarehouse(
   return { ok: true, data: created };
 }
 
-export function createLot(input: {
+export async function createLot(input: {
   stockId: string;
   stockName: string;
   lotNumber: string;
@@ -452,9 +590,34 @@ export function createLot(input: {
   supplierName?: string;
   warehouseId: string;
   notes?: string;
-}): CatalogResult<ProductLot> {
+}): Promise<CatalogResult<ProductLot>> {
   if (!input.lotNumber.trim()) return { ok: false, error: 'Informe o número do lote.' };
   if (!Number.isFinite(input.qty) || input.qty <= 0) return { ok: false, error: 'Quantidade inválida.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateLot({
+        stockId: input.stockId,
+        stockName: input.stockName,
+        lotNumber: input.lotNumber.trim(),
+        manufacturingDate: input.manufacturingDate,
+        expiryDate: input.expiryDate,
+        qty: input.qty,
+        supplierId: input.supplierId,
+        supplierName: input.supplierName,
+        warehouseId: input.warehouseId,
+        notes: input.notes,
+      });
+      const mapped = mapLot(row);
+      const state = load();
+      state.lots = [mapped, ...state.lots.filter((item) => item.id !== mapped.id)];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar lote.') };
+    }
+  }
+
   const state = load();
   if (!state.warehouses.some((item) => item.id === input.warehouseId)) {
     return { ok: false, error: 'Almoxarifado inválido.' };
@@ -478,16 +641,39 @@ export function createLot(input: {
   return { ok: true, data: lot };
 }
 
-export function upsertKit(input: {
+export async function upsertKit(input: {
   id?: string;
   name: string;
   sku: string;
   parentStockId?: string;
   items: ProductKitItem[];
   active: boolean;
-}): CatalogResult<ProductKit> {
+}): Promise<CatalogResult<ProductKit>> {
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome do kit.' };
   if (input.items.length === 0) return { ok: false, error: 'Adicione ao menos um item no kit.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        name: input.name.trim(),
+        sku: input.sku.trim(),
+        parentStockId: input.parentStockId || undefined,
+        items: input.items,
+        active: input.active,
+      };
+      const row = input.id ? await apiUpdateKit(input.id, body) : await apiCreateKit(body);
+      const mapped = mapKit(row);
+      const state = load();
+      const idx = state.kits.findIndex((item) => item.id === mapped.id);
+      if (idx >= 0) state.kits[idx] = mapped;
+      else state.kits = [mapped, ...state.kits];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar kit.') };
+    }
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -521,7 +707,7 @@ export function upsertKit(input: {
   return { ok: true, data: created };
 }
 
-export function createWarehouseMove(input: {
+export async function createWarehouseMove(input: {
   kind: WarehouseMoveKind;
   stockId: string;
   stockName: string;
@@ -530,8 +716,30 @@ export function createWarehouseMove(input: {
   lotId?: string;
   qty: number;
   description?: string;
-}): CatalogResult<WarehouseMove> {
+}): Promise<CatalogResult<WarehouseMove>> {
   if (!Number.isFinite(input.qty) || input.qty <= 0) return { ok: false, error: 'Quantidade inválida.' };
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateWarehouseMove({
+        kind: input.kind,
+        stockId: input.stockId,
+        fromWarehouseId: input.fromWarehouseId || undefined,
+        toWarehouseId: input.toWarehouseId || undefined,
+        lotId: input.lotId || undefined,
+        qty: input.qty,
+        description: (input.description ?? '').trim() || WAREHOUSE_MOVE_LABEL[input.kind],
+      });
+      const mapped = mapMove(row);
+      const state = load();
+      state.moves = [mapped, ...state.moves.filter((item) => item.id !== mapped.id)];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar movimento.') };
+    }
+  }
+
   const move: WarehouseMove = {
     id: uid('WM'),
     kind: input.kind,

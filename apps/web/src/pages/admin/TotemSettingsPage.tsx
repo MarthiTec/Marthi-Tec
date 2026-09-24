@@ -62,7 +62,6 @@ export function TotemSettingsPage() {
   const [mode, setMode] = useState<TotemMode>(() => initial.mode);
   const [exitPassword, setExitPassword] = useState(() => initial.exitPassword);
   const [confirmPassword, setConfirmPassword] = useState(() => initial.exitPassword);
-  const [shareStockWithErp, setShareStockWithErp] = useState(() => initial.shareStockWithErp);
   const [columns, setColumns] = useState<TotemColumns>(() => initial.columns);
   const [askCustomerName, setAskCustomerName] = useState(() => initial.askCustomerName);
   const [showAttractScreen, setShowAttractScreen] = useState(() => initial.showAttractScreen);
@@ -105,7 +104,6 @@ export function TotemSettingsPage() {
     setAudioAssist(preset.audioAssist);
     setKeyboardPlacement(preset.keyboardPlacement);
     setAttractGradientColor(preset.attractGradientColor);
-    setShareStockWithErp(preset.shareStockWithErp);
     markDirty();
   }
 
@@ -126,7 +124,7 @@ export function TotemSettingsPage() {
         vertical,
         mode,
         exitPassword: next,
-        shareStockWithErp,
+        shareStockWithErp: true,
         columns,
         showAttractScreen,
         storeName,
@@ -658,39 +656,9 @@ export function TotemSettingsPage() {
       <article className="admin-card">
         <h2>Estoque do totem</h2>
         <p>
-          Escolha se a tela pública usa o estoque cadastrado (itens com “Exibir no totem”) ou um
-          catálogo demo. Com ERP contratado, é o mesmo cadastro do app ERP.
+          O totem lista <strong>somente</strong> produtos do estoque no banco com “Exibir no totem”
+          marcado. O catálogo demo (iPhones hardcoded / seed de vitrine) foi removido.
         </p>
-        {vertical !== 'phones' && !shareStockWithErp ? (
-          <p className="totem-preview__note">
-            O catálogo demo ainda é de celular. Para lanchonete, livraria ou ótica, use o estoque
-            cadastrado com os produtos do ramo.
-          </p>
-        ) : null}
-        <div className="plan-picker">
-          <button
-            type="button"
-            className={`plan-picker__card ${!shareStockWithErp ? 'is-active' : ''}`}
-            onClick={() => {
-              setShareStockWithErp(false);
-              markDirty();
-            }}
-          >
-            <strong>Catálogo demo</strong>
-            <span>Vitrine de demonstração, sem puxar o estoque cadastrado.</span>
-          </button>
-          <button
-            type="button"
-            className={`plan-picker__card ${shareStockWithErp ? 'is-active' : ''}`}
-            onClick={() => {
-              setShareStockWithErp(true);
-              markDirty();
-            }}
-          >
-            <strong>Usar estoque cadastrado</strong>
-            <span>Só itens com “Exibir no totem” e quantidade &gt; 0.</span>
-          </button>
-        </div>
       </article>
 
       <article className="admin-card admin-card--form">

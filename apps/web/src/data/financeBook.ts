@@ -1,5 +1,30 @@
 import { getAdminState, type FinanceEntry } from './adminStore';
 import { getSupplier } from './erpRegistry';
+import {
+  apiApplyAdvance,
+  apiCreateAdvance,
+  apiCreateBankAccount,
+  apiCreatePayable,
+  apiCreateReceivable,
+  apiCreateTreasury,
+  apiListAdvances,
+  apiListBankAccounts,
+  apiListPayables,
+  apiListReceivables,
+  apiListTreasury,
+  apiPayPayable,
+  apiReceiveReceivable,
+  apiRefundAdvance,
+  apiUpdateBankAccount,
+  apiUpdatePayable,
+  apiUpdateReceivable,
+  type ApiAdvancePayment,
+  type ApiBankAccount,
+  type ApiPayable,
+  type ApiReceivable,
+  type ApiTreasuryMove,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.finance.book.v1';
 
@@ -278,6 +303,143 @@ function save(state: BookState) {
   window.dispatchEvent(new Event('marthi-finance-book-updated'));
 }
 
+function mapAccount(row: ApiBankAccount): BankAccount {
+  return {
+    id: row.id,
+    name: row.name,
+    bank: row.bank ?? '',
+    agency: row.agency ?? '',
+    number: row.number ?? '',
+    type: row.type,
+    initialBalance: row.initialBalance,
+    active: row.active,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapPayable(row: ApiPayable): Payable {
+  return {
+    id: row.id,
+    description: row.description,
+    supplierId: row.supplierId ?? '',
+    supplierName: row.supplierName ?? '',
+    category: row.category ?? '',
+    amount: row.amount,
+    paidAmount: row.paidAmount,
+    dueDate: row.dueDate,
+    status: row.status,
+    accountId: row.accountId,
+    notes: row.notes ?? '',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    paidAt: row.paidAt,
+  };
+}
+
+function mapReceivable(row: ApiReceivable): Receivable {
+  return {
+    id: row.id,
+    description: row.description,
+    customerName: row.customerName ?? '',
+    category: row.category ?? '',
+    amount: row.amount,
+    receivedAmount: row.receivedAmount,
+    dueDate: row.dueDate,
+    status: row.status,
+    accountId: row.accountId,
+    notes: row.notes ?? '',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    receivedAt: row.receivedAt,
+  };
+}
+
+function mapTreasury(row: ApiTreasuryMove): TreasuryMove {
+  return {
+    id: row.id,
+    kind: row.kind,
+    fromAccountId: row.fromAccountId ?? '',
+    toAccountId: row.toAccountId ?? '',
+    amount: row.amount,
+    description: row.description ?? '',
+    at: row.at,
+  };
+}
+
+function mapAdvance(row: ApiAdvancePayment): AdvancePayment {
+  return {
+    id: row.id,
+    kind: row.kind,
+    partyName: row.partyName,
+    amount: row.amount,
+    usedAmount: row.usedAmount,
+    accountId: row.accountId,
+    notes: row.notes ?? '',
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+/** Substitui fatias do livro financeiro (bootstrap Nest). */
+export function replaceFinanceBook(partial: Partial<BookState>) {
+  const state = load();
+  save({
+    accounts: partial.accounts ?? state.accounts,
+    payables: partial.payables ?? state.payables,
+    receivables: partial.receivables ?? state.receivables,
+    treasury: partial.treasury ?? state.treasury,
+    advances: partial.advances ?? state.advances,
+  });
+}
+
+export async function hydrateFinanceBookFromApi() {
+  if (!isNestAuthed()) return;
+  const [accounts, payables, receivables, treasury, advances] = await Promise.all([
+    apiListBankAccounts(),
+    apiListPayables(),
+    apiListReceivables(),
+    apiListTreasury(),
+    apiListAdvances(),
+  ]);
+  replaceFinanceBook({
+    accounts: accounts.map(mapAccount),
+    payables: payables.map(mapPayable),
+    receivables: receivables.map(mapReceivable),
+    treasury: treasury.map(mapTreasury),
+    advances: advances.map(mapAdvance),
+  });
+}
+
+function putAccount(state: BookState, account: BankAccount) {
+  const idx = state.accounts.findIndex((item) => item.id === account.id);
+  if (idx >= 0) state.accounts[idx] = account;
+  else state.accounts = [account, ...state.accounts];
+}
+
+function putPayable(state: BookState, bill: Payable) {
+  const idx = state.payables.findIndex((item) => item.id === bill.id);
+  if (idx >= 0) state.payables[idx] = bill;
+  else state.payables = [bill, ...state.payables];
+}
+
+function putReceivable(state: BookState, bill: Receivable) {
+  const idx = state.receivables.findIndex((item) => item.id === bill.id);
+  if (idx >= 0) state.receivables[idx] = bill;
+  else state.receivables = [bill, ...state.receivables];
+}
+
+function putAdvance(state: BookState, advance: AdvancePayment) {
+  const idx = state.advances.findIndex((item) => item.id === advance.id);
+  if (idx >= 0) state.advances[idx] = advance;
+  else state.advances = [advance, ...state.advances];
+}
+
 export function getFinanceBook() {
   return load();
 }
@@ -352,7 +514,7 @@ export function advancesOpenTotal() {
 
 export type BookResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
 
-export function upsertBankAccount(input: {
+export async function upsertBankAccount(input: {
   id?: string;
   name: string;
   bank: string;
@@ -361,8 +523,33 @@ export function upsertBankAccount(input: {
   type: BankAccountType;
   initialBalance: number;
   active: boolean;
-}): BookResult<BankAccount> {
+}): Promise<BookResult<BankAccount>> {
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome da conta.' };
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        name: input.name.trim(),
+        bank: input.bank.trim(),
+        agency: input.agency.trim(),
+        number: input.number.trim(),
+        type: input.type,
+        initialBalance: Math.max(0, input.initialBalance),
+        active: input.active,
+      };
+      const row = input.id
+        ? await apiUpdateBankAccount(input.id, body)
+        : await apiCreateBankAccount(body);
+      const mapped = mapAccount(row);
+      const state = load();
+      putAccount(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar conta.') };
+    }
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -400,7 +587,7 @@ export function upsertBankAccount(input: {
   return { ok: true, data: created };
 }
 
-export function upsertPayable(input: {
+export async function upsertPayable(input: {
   id?: string;
   description: string;
   supplierId?: string;
@@ -410,12 +597,38 @@ export function upsertPayable(input: {
   dueDate: string;
   accountId: string;
   notes?: string;
-}): BookResult<Payable> {
+}): Promise<BookResult<Payable>> {
   if (!input.description.trim()) return { ok: false, error: 'Informe a descrição.' };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { ok: false, error: 'Valor inválido.' };
   }
   const supplier = input.supplierId ? getSupplier(input.supplierId) : null;
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        description: input.description.trim(),
+        supplierId: input.supplierId ?? '',
+        supplierName: supplier?.name ?? input.supplierName.trim(),
+        category: input.category.trim() || 'Outras despesas',
+        amount: input.amount,
+        dueDate: input.dueDate || today(),
+        accountId: input.accountId,
+        notes: (input.notes ?? '').trim(),
+      };
+      const row = input.id
+        ? await apiUpdatePayable(input.id, body)
+        : await apiCreatePayable(body);
+      const mapped = mapPayable(row);
+      const state = load();
+      putPayable(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar conta a pagar.') };
+    }
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -460,7 +673,7 @@ export function upsertPayable(input: {
   return { ok: true, data: created };
 }
 
-export function upsertReceivable(input: {
+export async function upsertReceivable(input: {
   id?: string;
   description: string;
   customerName: string;
@@ -469,12 +682,37 @@ export function upsertReceivable(input: {
   dueDate: string;
   accountId: string;
   notes?: string;
-}): BookResult<Receivable> {
+}): Promise<BookResult<Receivable>> {
   if (!input.description.trim()) return { ok: false, error: 'Informe a descrição.' };
   if (!input.customerName.trim()) return { ok: false, error: 'Informe o cliente.' };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { ok: false, error: 'Valor inválido.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const body = {
+        description: input.description.trim(),
+        customerName: input.customerName.trim(),
+        category: input.category.trim() || 'Recebimentos',
+        amount: input.amount,
+        dueDate: input.dueDate || today(),
+        accountId: input.accountId,
+        notes: (input.notes ?? '').trim(),
+      };
+      const row = input.id
+        ? await apiUpdateReceivable(input.id, body)
+        : await apiCreateReceivable(body);
+      const mapped = mapReceivable(row);
+      const state = load();
+      putReceivable(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao salvar conta a receber.') };
+    }
+  }
+
   const state = load();
   const stamp = now();
   if (input.id) {
@@ -517,7 +755,20 @@ export function upsertReceivable(input: {
   return { ok: true, data: created };
 }
 
-export function settlePayable(id: string, amount: number): BookResult<Payable> {
+export async function settlePayable(id: string, amount: number): Promise<BookResult<Payable>> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPayPayable(id, { amount });
+      const mapped = mapPayable(row);
+      const state = load();
+      putPayable(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao pagar conta.') };
+    }
+  }
+
   const state = load();
   const current = state.payables.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Conta não encontrada.' };
@@ -540,7 +791,23 @@ export function settlePayable(id: string, amount: number): BookResult<Payable> {
   return { ok: true, data: next };
 }
 
-export function settleReceivable(id: string, amount: number): BookResult<Receivable> {
+export async function settleReceivable(
+  id: string,
+  amount: number,
+): Promise<BookResult<Receivable>> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiReceiveReceivable(id, { amount });
+      const mapped = mapReceivable(row);
+      const state = load();
+      putReceivable(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao receber conta.') };
+    }
+  }
+
   const state = load();
   const current = state.receivables.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Conta não encontrada.' };
@@ -563,7 +830,31 @@ export function settleReceivable(id: string, amount: number): BookResult<Receiva
   return { ok: true, data: next };
 }
 
-export function cancelBill(kind: 'payable' | 'receivable', id: string): BookResult {
+export async function cancelBill(
+  kind: 'payable' | 'receivable',
+  id: string,
+): Promise<BookResult> {
+  if (isNestAuthed()) {
+    try {
+      if (kind === 'payable') {
+        const row = await apiUpdatePayable(id, { status: 'cancelled' });
+        const mapped = mapPayable(row);
+        const state = load();
+        putPayable(state, mapped);
+        save(state);
+      } else {
+        const row = await apiUpdateReceivable(id, { status: 'cancelled' });
+        const mapped = mapReceivable(row);
+        const state = load();
+        putReceivable(state, mapped);
+        save(state);
+      }
+      return { ok: true, data: undefined };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao cancelar conta.') };
+    }
+  }
+
   const state = load();
   if (kind === 'payable') {
     const current = state.payables.find((item) => item.id === id);
@@ -584,17 +875,38 @@ export function cancelBill(kind: 'payable' | 'receivable', id: string): BookResu
   return { ok: true, data: undefined };
 }
 
-export function createTreasuryMove(input: {
+export async function createTreasuryMove(input: {
   kind: TreasuryKind;
   fromAccountId: string;
   toAccountId: string;
   amount: number;
   description: string;
   at?: string;
-}): BookResult<TreasuryMove> {
+}): Promise<BookResult<TreasuryMove>> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { ok: false, error: 'Valor inválido.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateTreasury({
+        kind: input.kind,
+        fromAccountId: input.fromAccountId || undefined,
+        toAccountId: input.toAccountId || undefined,
+        amount: input.amount,
+        description: input.description.trim() || TREASURY_KIND_LABEL[input.kind],
+        at: input.at,
+      });
+      const mapped = mapTreasury(row);
+      const state = load();
+      state.treasury = [mapped, ...state.treasury.filter((item) => item.id !== mapped.id)];
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar tesouraria.') };
+    }
+  }
+
   const state = load();
   const from = state.accounts.find((item) => item.id === input.fromAccountId);
   const to = state.accounts.find((item) => item.id === input.toAccountId);
@@ -622,17 +934,37 @@ export function createTreasuryMove(input: {
   return { ok: true, data: move };
 }
 
-export function createAdvance(input: {
+export async function createAdvance(input: {
   kind: AdvanceKind;
   partyName: string;
   amount: number;
   accountId: string;
   notes?: string;
-}): BookResult<AdvancePayment> {
+}): Promise<BookResult<AdvancePayment>> {
   if (!input.partyName.trim()) return { ok: false, error: 'Informe o cliente/fornecedor.' };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { ok: false, error: 'Valor inválido.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateAdvance({
+        kind: input.kind,
+        partyName: input.partyName.trim(),
+        amount: input.amount,
+        accountId: input.accountId,
+        notes: (input.notes ?? '').trim(),
+      });
+      const mapped = mapAdvance(row);
+      const state = load();
+      putAdvance(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao registrar antecipação.') };
+    }
+  }
+
   const state = load();
   if (!state.accounts.some((item) => item.id === input.accountId)) {
     return { ok: false, error: 'Conta bancária inválida.' };
@@ -655,7 +987,23 @@ export function createAdvance(input: {
   return { ok: true, data: created };
 }
 
-export function applyAdvance(id: string, amount: number): BookResult<AdvancePayment> {
+export async function applyAdvance(
+  id: string,
+  amount: number,
+): Promise<BookResult<AdvancePayment>> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiApplyAdvance(id, { amount });
+      const mapped = mapAdvance(row);
+      const state = load();
+      putAdvance(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao aplicar antecipação.') };
+    }
+  }
+
   const state = load();
   const current = state.advances.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Antecipação não encontrada.' };
@@ -674,7 +1022,20 @@ export function applyAdvance(id: string, amount: number): BookResult<AdvancePaym
   return { ok: true, data: next };
 }
 
-export function refundAdvance(id: string): BookResult<AdvancePayment> {
+export async function refundAdvance(id: string): Promise<BookResult<AdvancePayment>> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiRefundAdvance(id);
+      const mapped = mapAdvance(row);
+      const state = load();
+      putAdvance(state, mapped);
+      save(state);
+      return { ok: true, data: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao estornar antecipação.') };
+    }
+  }
+
   const state = load();
   const current = state.advances.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Antecipação não encontrada.' };

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { listKits, upsertKit, type ProductKitItem } from '../../data/fiscalCatalog';
 
 export function KitsPage() {
@@ -13,6 +14,18 @@ export function KitsPage() {
   const [lineQty, setLineQty] = useState('1');
   const [items, setItems] = useState<ProductKitItem[]>([]);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    function refresh() {
+      setKits(listKits());
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-fiscal-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-fiscal-updated', refresh);
+    };
+  }, []);
 
   function addLine() {
     const product = stock.find((item) => item.id === lineStockId);
@@ -29,8 +42,8 @@ export function KitsPage() {
     });
   }
 
-  function submit() {
-    const result = upsertKit({
+  async function submit() {
+    const result = await upsertKit({
       name,
       sku,
       parentStockId,
@@ -91,7 +104,7 @@ export function KitsPage() {
           <button type="button" className="btn btn--ghost" onClick={addLine}>
             Adicionar item
           </button>
-          <button type="button" className="btn btn--primary" onClick={submit}>
+          <button type="button" className="btn btn--primary" onClick={() => void submit()}>
             Salvar kit
           </button>
         </div>

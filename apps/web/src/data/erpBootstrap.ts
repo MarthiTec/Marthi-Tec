@@ -13,6 +13,9 @@ import { replaceOperatorProfileCache } from './operatorProfile';
 import { replaceStoreEntitlement } from './storePlan';
 import { replaceTotemSettings } from './totemSettings';
 import { hydrateErpRegistryFromApi } from './erpRegistry';
+import { hydrateFinanceBookFromApi } from './financeBook';
+import { hydrateWarehouseCatalogFromApi } from './fiscalCatalog';
+import { hydrateInvoicesFromApi } from './invoiceStore';
 import {
   apiGetOperatorProfile,
   apiGetStorePlan,
@@ -92,7 +95,12 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       apiGetOperatorProfile(),
       apiListPosTickets(),
     ]);
-    await hydrateErpRegistryFromApi();
+    await Promise.all([
+      hydrateErpRegistryFromApi(),
+      hydrateFinanceBookFromApi(),
+      hydrateWarehouseCatalogFromApi(),
+      hydrateInvoicesFromApi(),
+    ]);
 
     replaceAdminState({
       customers: customers as Customer[],

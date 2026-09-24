@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import {
   createWarehouseMove,
   listWarehouseMoves,
@@ -25,8 +26,21 @@ export function WarehousePage() {
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
-  function saveWarehouse() {
-    const result = upsertWarehouse({ name, code, address, active: true });
+  useEffect(() => {
+    function refresh() {
+      setWarehouses(listWarehouses());
+      setMoves(listWarehouseMoves());
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-fiscal-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-fiscal-updated', refresh);
+    };
+  }, []);
+
+  async function saveWarehouse() {
+    const result = await upsertWarehouse({ name, code, address, active: true });
     if (!result.ok) {
       setError(result.error);
       return;
@@ -38,13 +52,13 @@ export function WarehousePage() {
     setError('');
   }
 
-  function saveMove() {
+  async function saveMove() {
     const product = stock.find((item) => item.id === stockId);
     if (!product) {
       setError('Selecione um produto.');
       return;
     }
-    const result = createWarehouseMove({
+    const result = await createWarehouseMove({
       kind,
       stockId: product.id,
       stockName: product.name,
@@ -84,7 +98,7 @@ export function WarehousePage() {
           </label>
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={saveWarehouse}>
+          <button type="button" className="btn btn--primary" onClick={() => void saveWarehouse()}>
             Cadastrar local
           </button>
         </div>
@@ -152,7 +166,7 @@ export function WarehousePage() {
           </label>
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={saveMove}>
+          <button type="button" className="btn btn--primary" onClick={() => void saveMove()}>
             Registrar movimento
           </button>
         </div>

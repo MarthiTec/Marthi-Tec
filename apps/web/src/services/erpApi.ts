@@ -104,11 +104,11 @@ export function apiLookupStock(code: string) {
   return nestGet<StockItem | null>(`/stock/lookup?code=${encodeURIComponent(code)}`);
 }
 
-export function apiCreateStock(body: Omit<StockItem, 'id'>) {
+export function apiCreateStock(body: Record<string, unknown>) {
   return nestPost<StockItem>('/stock', body);
 }
 
-export function apiUpdateStock(id: string, body: Partial<Omit<StockItem, 'id'>>) {
+export function apiUpdateStock(id: string, body: Record<string, unknown>) {
   return nestPatch<StockItem>(`/stock/${id}`, body);
 }
 
@@ -526,4 +526,442 @@ export function apiCreatePosTicket(body: {
 
 export function apiPatchPosTicket(id: string, status: ApiPosTicket['status']) {
   return nestPatch<ApiPosTicket>(`/pos/tickets/${id}`, { status });
+}
+
+/* ── Fase 3 P1: Finance book ───────────────────────────── */
+
+export type ApiBankAccount = {
+  id: string;
+  name: string;
+  bank: string;
+  agency: string;
+  number: string;
+  type: 'checking' | 'savings' | 'cash' | 'digital';
+  initialBalance: number;
+  balance?: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiPayable = {
+  id: string;
+  description: string;
+  supplierId: string;
+  supplierName: string;
+  category: string;
+  amount: number;
+  paidAmount: number;
+  dueDate: string;
+  status: 'open' | 'partial' | 'paid' | 'cancelled';
+  accountId: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string;
+};
+
+export type ApiReceivable = {
+  id: string;
+  description: string;
+  customerName: string;
+  category: string;
+  amount: number;
+  receivedAmount: number;
+  dueDate: string;
+  status: 'open' | 'partial' | 'paid' | 'cancelled';
+  accountId: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  receivedAt?: string;
+};
+
+export type ApiTreasuryMove = {
+  id: string;
+  kind: 'transfer' | 'deposit' | 'withdraw' | 'adjustment';
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  description: string;
+  at: string;
+};
+
+export type ApiAdvancePayment = {
+  id: string;
+  kind: 'customer' | 'supplier';
+  partyName: string;
+  amount: number;
+  usedAmount: number;
+  accountId: string;
+  notes: string;
+  status: 'open' | 'applied' | 'refunded';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function apiListBankAccounts(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiBankAccount[]>(`/bank-accounts${qs}`);
+}
+
+export function apiCreateBankAccount(
+  body: Omit<ApiBankAccount, 'id' | 'createdAt' | 'updatedAt' | 'balance'>,
+) {
+  return nestPost<ApiBankAccount>('/bank-accounts', body);
+}
+
+export function apiUpdateBankAccount(
+  id: string,
+  body: Partial<Omit<ApiBankAccount, 'id' | 'createdAt' | 'updatedAt' | 'balance'>>,
+) {
+  return nestPatch<ApiBankAccount>(`/bank-accounts/${id}`, body);
+}
+
+export function apiDeleteBankAccount(id: string) {
+  return nestDelete<ApiBankAccount>(`/bank-accounts/${id}`);
+}
+
+export function apiListPayables(query?: { status?: ApiPayable['status']; from?: string; to?: string }) {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  const qs = params.toString();
+  return nestGet<ApiPayable[]>(`/payables${qs ? `?${qs}` : ''}`);
+}
+
+export function apiCreatePayable(
+  body: Omit<ApiPayable, 'id' | 'paidAmount' | 'status' | 'createdAt' | 'updatedAt' | 'paidAt'>,
+) {
+  return nestPost<ApiPayable>('/payables', body);
+}
+
+export function apiUpdatePayable(
+  id: string,
+  body: Partial<
+    Omit<ApiPayable, 'id' | 'paidAmount' | 'createdAt' | 'updatedAt' | 'paidAt'> & {
+      status: ApiPayable['status'];
+    }
+  >,
+) {
+  return nestPatch<ApiPayable>(`/payables/${id}`, body);
+}
+
+export function apiPayPayable(
+  id: string,
+  body: { amount: number; accountId?: string; at?: string },
+) {
+  return nestPost<ApiPayable>(`/payables/${id}/pay`, body);
+}
+
+export function apiListReceivables(query?: {
+  status?: ApiReceivable['status'];
+  from?: string;
+  to?: string;
+}) {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.from) params.set('from', query.from);
+  if (query?.to) params.set('to', query.to);
+  const qs = params.toString();
+  return nestGet<ApiReceivable[]>(`/receivables${qs ? `?${qs}` : ''}`);
+}
+
+export function apiCreateReceivable(
+  body: Omit<
+    ApiReceivable,
+    'id' | 'receivedAmount' | 'status' | 'createdAt' | 'updatedAt' | 'receivedAt'
+  >,
+) {
+  return nestPost<ApiReceivable>('/receivables', body);
+}
+
+export function apiUpdateReceivable(
+  id: string,
+  body: Partial<
+    Omit<ApiReceivable, 'id' | 'receivedAmount' | 'createdAt' | 'updatedAt' | 'receivedAt'> & {
+      status: ApiReceivable['status'];
+    }
+  >,
+) {
+  return nestPatch<ApiReceivable>(`/receivables/${id}`, body);
+}
+
+export function apiReceiveReceivable(
+  id: string,
+  body: { amount: number; accountId?: string; at?: string },
+) {
+  return nestPost<ApiReceivable>(`/receivables/${id}/receive`, body);
+}
+
+export function apiListTreasury() {
+  return nestGet<ApiTreasuryMove[]>('/treasury');
+}
+
+export function apiCreateTreasury(body: {
+  kind: ApiTreasuryMove['kind'];
+  fromAccountId?: string;
+  toAccountId?: string;
+  amount: number;
+  description?: string;
+  at?: string;
+}) {
+  return nestPost<ApiTreasuryMove>('/treasury', body);
+}
+
+export function apiListAdvances() {
+  return nestGet<ApiAdvancePayment[]>('/advances');
+}
+
+export function apiCreateAdvance(body: {
+  kind: ApiAdvancePayment['kind'];
+  partyName: string;
+  amount: number;
+  accountId: string;
+  notes?: string;
+}) {
+  return nestPost<ApiAdvancePayment>('/advances', body);
+}
+
+export function apiApplyAdvance(id: string, body: { amount: number }) {
+  return nestPost<ApiAdvancePayment>(`/advances/${id}/apply`, body);
+}
+
+export function apiRefundAdvance(id: string) {
+  return nestPost<ApiAdvancePayment>(`/advances/${id}/refund`);
+}
+
+/* ── Fase 3 P1: Warehouses / lots / kits / moves ───────── */
+
+export type ApiWarehouse = {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ApiProductLot = {
+  id: string;
+  stockId: string;
+  stockName: string;
+  lotNumber: string;
+  manufacturingDate: string;
+  expiryDate: string;
+  qty: number;
+  supplierId: string;
+  supplierName: string;
+  warehouseId: string;
+  notes: string;
+  createdAt: string;
+};
+
+export type ApiProductKit = {
+  id: string;
+  name: string;
+  sku: string;
+  parentStockId: string;
+  items: Array<{ stockId: string; stockName: string; qty: number }>;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiWarehouseMove = {
+  id: string;
+  kind: 'in' | 'out' | 'transfer' | 'adjust';
+  stockId: string;
+  stockName: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  lotId: string;
+  qty: number;
+  note?: string;
+  description?: string;
+  at?: string;
+  createdAt?: string;
+};
+
+export function apiListWarehouses(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiWarehouse[]>(`/warehouses${qs}`);
+}
+
+export function apiCreateWarehouse(body: Omit<ApiWarehouse, 'id' | 'createdAt' | 'updatedAt'>) {
+  return nestPost<ApiWarehouse>('/warehouses', body);
+}
+
+export function apiUpdateWarehouse(
+  id: string,
+  body: Partial<Omit<ApiWarehouse, 'id' | 'createdAt' | 'updatedAt'>>,
+) {
+  return nestPatch<ApiWarehouse>(`/warehouses/${id}`, body);
+}
+
+export function apiDeleteWarehouse(id: string) {
+  return nestDelete<ApiWarehouse>(`/warehouses/${id}`);
+}
+
+export function apiListLots(stockId?: string) {
+  const qs = stockId ? `?stockId=${encodeURIComponent(stockId)}` : '';
+  return nestGet<ApiProductLot[]>(`/lots${qs}`);
+}
+
+export function apiCreateLot(body: {
+  stockId: string;
+  stockName?: string;
+  lotNumber: string;
+  manufacturingDate?: string;
+  expiryDate?: string;
+  qty: number;
+  supplierId?: string;
+  supplierName?: string;
+  warehouseId: string;
+  notes?: string;
+}) {
+  return nestPost<ApiProductLot>('/lots', body);
+}
+
+export function apiUpdateLot(id: string, body: { qty: number }) {
+  return nestPatch<ApiProductLot>(`/lots/${id}`, body);
+}
+
+export function apiListKits(activeOnly?: boolean) {
+  const qs = activeOnly ? '?active=true' : '';
+  return nestGet<ApiProductKit[]>(`/kits${qs}`);
+}
+
+export function apiCreateKit(body: {
+  name: string;
+  sku?: string;
+  parentStockId?: string;
+  items: Array<{ stockId: string; stockName?: string; qty: number }>;
+  active?: boolean;
+}) {
+  return nestPost<ApiProductKit>('/kits', body);
+}
+
+export function apiUpdateKit(
+  id: string,
+  body: {
+    name?: string;
+    sku?: string;
+    parentStockId?: string;
+    items?: Array<{ stockId: string; stockName?: string; qty: number }>;
+    active?: boolean;
+  },
+) {
+  return nestPatch<ApiProductKit>(`/kits/${id}`, body);
+}
+
+export function apiDeleteKit(id: string) {
+  return nestDelete<ApiProductKit>(`/kits/${id}`);
+}
+
+export function apiListWarehouseMoves() {
+  return nestGet<ApiWarehouseMove[]>('/warehouse-moves');
+}
+
+export function apiCreateWarehouseMove(body: {
+  kind: ApiWarehouseMove['kind'];
+  stockId: string;
+  fromWarehouseId?: string;
+  toWarehouseId?: string;
+  lotId?: string;
+  qty: number;
+  note?: string;
+  description?: string;
+  operatorName?: string;
+}) {
+  return nestPost<ApiWarehouseMove>('/warehouse-moves', body);
+}
+
+/* ── Fase 3 P1: Stock invoices ─────────────────────────── */
+
+export type ApiInvoiceLine = {
+  id: string;
+  stockId: string;
+  name: string;
+  qty: number;
+  unitCost: number;
+  unitPrice: number;
+};
+
+export type ApiInvoice = {
+  id: string;
+  kind: 'entry' | 'exit';
+  number: string;
+  status: 'draft' | 'posted' | 'cancelled';
+  documentPurpose: string;
+  supplierId: string;
+  customerName: string;
+  issuedAt: string;
+  notes: string;
+  lines: ApiInvoiceLine[];
+  createdAt: string;
+  updatedAt: string;
+  postedAt?: string;
+};
+
+export function apiListStockInvoices(query?: {
+  kind?: ApiInvoice['kind'];
+  status?: ApiInvoice['status'];
+}) {
+  const params = new URLSearchParams();
+  if (query?.kind) params.set('kind', query.kind);
+  if (query?.status) params.set('status', query.status);
+  const qs = params.toString();
+  return nestGet<ApiInvoice[]>(`/stock-invoices${qs ? `?${qs}` : ''}`);
+}
+
+export function apiGetStockInvoice(id: string) {
+  return nestGet<ApiInvoice>(`/stock-invoices/${id}`);
+}
+
+export function apiCreateStockInvoice(body: {
+  kind: ApiInvoice['kind'];
+  number?: string;
+  documentPurpose?: string;
+  supplierId?: string;
+  customerName?: string;
+  issuedAt?: string;
+  notes?: string;
+}) {
+  return nestPost<ApiInvoice>('/stock-invoices', body);
+}
+
+export function apiUpdateStockInvoice(
+  id: string,
+  body: Partial<{
+    number: string;
+    documentPurpose: string;
+    supplierId: string;
+    customerName: string;
+    issuedAt: string;
+    notes: string;
+  }>,
+) {
+  return nestPatch<ApiInvoice>(`/stock-invoices/${id}`, body);
+}
+
+export function apiAddStockInvoiceLine(
+  id: string,
+  body: { stockId: string; qty: number; unitCost?: number; unitPrice?: number },
+) {
+  return nestPost<ApiInvoice>(`/stock-invoices/${id}/lines`, body);
+}
+
+export function apiRemoveStockInvoiceLine(id: string, lineId: string) {
+  return nestDelete<ApiInvoice>(`/stock-invoices/${id}/lines/${lineId}`);
+}
+
+export function apiPostStockInvoice(id: string) {
+  return nestPost<ApiInvoice>(`/stock-invoices/${id}/post`);
+}
+
+export function apiCancelStockInvoice(id: string) {
+  return nestPost<ApiInvoice>(`/stock-invoices/${id}/cancel`);
 }

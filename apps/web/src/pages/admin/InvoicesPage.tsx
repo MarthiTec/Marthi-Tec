@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAdminState } from '../../data/adminStore';
 import { logAction } from '../../data/auditLog';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { getSupplier, listSuppliers } from '../../data/erpRegistry';
 import {
   cancelNfeDocument,
@@ -72,6 +73,18 @@ export function InvoicesPage() {
     [selected, fiscalTick],
   );
 
+  useEffect(() => {
+    function onRefresh() {
+      setInvoices(listInvoices());
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, onRefresh);
+    window.addEventListener('marthi-invoices-updated', onRefresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, onRefresh);
+      window.removeEventListener('marthi-invoices-updated', onRefresh);
+    };
+  }, []);
+
   function refresh(nextId?: string) {
     const next = listInvoices();
     setInvoices(next);
@@ -88,8 +101,8 @@ export function InvoicesPage() {
     setMessage('');
   }
 
-  function create(kind: InvoiceKind) {
-    const result = createInvoice({
+  async function create(kind: InvoiceKind) {
+    const result = await createInvoice({
       kind,
       supplierId: kind === 'entry' ? suppliers[0]?.id : '',
       customerName: kind === 'exit' ? '' : '',
@@ -108,9 +121,9 @@ export function InvoicesPage() {
     flash('Rascunho criado.');
   }
 
-  function saveDraft(patch: Partial<Invoice>) {
+  async function saveDraft(patch: Partial<Invoice>) {
     if (!selected) return;
-    const result = updateInvoiceDraft(selected.id, patch);
+    const result = await updateInvoiceDraft(selected.id, patch);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -118,12 +131,12 @@ export function InvoicesPage() {
     refresh(selected.id);
   }
 
-  function addLine() {
+  async function addLine() {
     if (!selected || !stockId) {
       fail('Selecione um item do estoque.');
       return;
     }
-    const result = addInvoiceLine(selected.id, { stockId, qty });
+    const result = await addInvoiceLine(selected.id, { stockId, qty });
     if (!result.ok) {
       fail(result.error);
       return;
@@ -134,9 +147,9 @@ export function InvoicesPage() {
     flash('Item adicionado.');
   }
 
-  function post() {
+  async function post() {
     if (!selected) return;
-    const result = postInvoice(selected.id);
+    const result = await postInvoice(selected.id);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -155,9 +168,9 @@ export function InvoicesPage() {
     );
   }
 
-  function cancel() {
+  async function cancel() {
     if (!selected) return;
-    const result = cancelInvoice(selected.id);
+    const result = await cancelInvoice(selected.id);
     if (!result.ok) {
       fail(result.error);
       return;
@@ -307,10 +320,10 @@ export function InvoicesPage() {
           ]}
           onChange={(value) => setKindFilter(value as 'all' | InvoiceKind)}
         />
-        <button type="button" className="btn btn--primary" onClick={() => create('entry')}>
+        <button type="button" className="btn btn--primary" onClick={() => void create('entry')}>
           Nova entrada
         </button>
-        <button type="button" className="btn btn--ghost" onClick={() => create('exit')}>
+        <button type="button" className="btn btn--ghost" onClick={() => void create('exit')}>
           Nova saída
         </button>
         {fiscalOn ? (
@@ -404,7 +417,7 @@ export function InvoicesPage() {
                   <input
                     value={selected.number}
                     disabled={selected.status !== 'draft'}
-                    onChange={(e) => saveDraft({ number: e.target.value })}
+                    onChange={(e) => void saveDraft({ number: e.target.value })}
                   />
                 </label>
                 <label>
@@ -413,7 +426,7 @@ export function InvoicesPage() {
                     type="date"
                     value={selected.issuedAt.slice(0, 10)}
                     disabled={selected.status !== 'draft'}
-                    onChange={(e) => saveDraft({ issuedAt: e.target.value })}
+                    onChange={(e) => void saveDraft({ issuedAt: e.target.value })}
                   />
                 </label>
                 <AdminPicker
@@ -426,7 +439,7 @@ export function InvoicesPage() {
                     label: NFE_DOC_PURPOSE_LABEL[key],
                   }))}
                   onChange={(value) =>
-                    saveDraft({ documentPurpose: value as FiscalDocPurpose })
+                    void saveDraft({ documentPurpose: value as FiscalDocPurpose })
                   }
                 />
                 <p className="span-2 empty" style={{ margin: 0 }}>
@@ -442,7 +455,7 @@ export function InvoicesPage() {
                       value: item.id,
                       label: item.name,
                     }))}
-                    onChange={(value) => saveDraft({ supplierId: value })}
+                    onChange={(value) => void saveDraft({ supplierId: value })}
                   />
                 ) : (
                   <label className="span-2">
@@ -450,7 +463,7 @@ export function InvoicesPage() {
                     <input
                       value={selected.customerName}
                       disabled={selected.status !== 'draft'}
-                      onChange={(e) => saveDraft({ customerName: e.target.value })}
+                      onChange={(e) => void saveDraft({ customerName: e.target.value })}
                     />
                   </label>
                 )}
@@ -459,7 +472,7 @@ export function InvoicesPage() {
                   <textarea
                     value={selected.notes}
                     disabled={selected.status !== 'draft'}
-                    onChange={(e) => saveDraft({ notes: e.target.value })}
+                    onChange={(e) => void saveDraft({ notes: e.target.value })}
                   />
                 </label>
               </div>
@@ -485,7 +498,7 @@ export function InvoicesPage() {
                       onChange={(e) => setQty(Number(e.target.value) || 1)}
                     />
                   </label>
-                  <button type="button" className="btn btn--ghost" onClick={addLine}>
+                  <button type="button" className="btn btn--ghost" onClick={() => void addLine()}>
                     Incluir item
                   </button>
                 </div>
@@ -524,9 +537,11 @@ export function InvoicesPage() {
                               type="button"
                               className="btn btn--ghost"
                               onClick={() => {
-                                const result = removeInvoiceLine(selected.id, line.id);
-                                if (!result.ok) fail(result.error);
-                                else refresh(selected.id);
+                                void (async () => {
+                                  const result = await removeInvoiceLine(selected.id, line.id);
+                                  if (!result.ok) fail(result.error);
+                                  else refresh(selected.id);
+                                })();
                               }}
                             >
                               Remover
@@ -541,12 +556,12 @@ export function InvoicesPage() {
 
               <div className="admin-toolbar" style={{ marginTop: 12 }}>
                 {selected.status === 'draft' ? (
-                  <button type="button" className="btn btn--primary" onClick={post}>
+                  <button type="button" className="btn btn--primary" onClick={() => void post()}>
                     Lançar nota
                   </button>
                 ) : null}
                 {selected.status !== 'cancelled' ? (
-                  <button type="button" className="btn btn--ghost" onClick={cancel}>
+                  <button type="button" className="btn btn--ghost" onClick={() => void cancel()}>
                     Cancelar lançamento
                   </button>
                 ) : null}

@@ -1,11 +1,10 @@
 import { getAdminState, stockItemImages, type StockItem } from '../../data/adminStore';
 import { ATTR_CAP, ATTR_COR, ATTR_RET, totemAttributes } from '../../data/attributeStore';
-import { getTotemSettings } from '../../data/totemSettings';
 import { formatInstallment } from '../../data/variantQuote';
-import { fetchCatalogProducts, type CatalogProduct } from '../../services/products';
+import { apiListStock } from '../../services/erpApi';
+import { isNestAuthed } from '../../services/nestClient';
 import {
   FULFILLMENT_OPTIONS,
-  TOTEM_PRODUCTS,
   type TotemBrand,
   type TotemProduct,
 } from './totemData';
@@ -22,15 +21,6 @@ function guessBrand(name: string): TotemBrand {
   const slug = name.toLowerCase();
   if (slug.includes('xiaomi') || slug.includes('redmi')) return 'xiaomi';
   return 'apple';
-}
-
-function brandFromApi(product: CatalogProduct): TotemBrand {
-  const slug = (product.brandSlug ?? '').toLowerCase();
-  if (slug === 'xiaomi') return 'xiaomi';
-  if (slug === 'apple') return 'apple';
-  const brandId = String(product.brandId ?? '').toLowerCase();
-  if (brandId.includes('xiaomi')) return 'xiaomi';
-  return guessBrand(product.name);
 }
 
 function pushUnique(map: Record<string, string[]>, key: string, value: string) {
@@ -72,7 +62,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
   const groups = new Map<string, StockItem[]>();
   for (const item of items) {
     if (!item.showOnTotem) continue;
-    if (item.qty <= 0) continue;
+    if (item.qty < 0) continue;
     if (item.kind === 'supply') continue;
     const key = item.name.trim();
     if (!key) continue;
@@ -106,60 +96,25 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
   });
 }
 
-function mapApiProduct(product: CatalogProduct): TotemProduct {
-  const attrs = { ...(product.attrs ?? {}) };
-  if (!attrs[ATTR_RET]?.length) {
-    attrs[ATTR_RET] = [...FULFILLMENT_OPTIONS];
-  }
-  const colors = attrs[ATTR_COR]?.length ? attrs[ATTR_COR] : ['—'];
-  const storages = attrs[ATTR_CAP]?.length ? attrs[ATTR_CAP] : ['—'];
-  const cashPrice = Number(product.cashPrice) || 0;
-  const numericId = typeof product.id === 'number' ? product.id : Number(product.id);
-  const id = Number.isFinite(numericId) && numericId > 0 ? numericId : stableId(product.name);
-
-  return {
-    id,
-    name: product.name,
-    brand: brandFromApi(product),
-    storages,
-    colors,
-    cashPrice,
-    installmentLabel: formatInstallment(cashPrice, 12),
-    images: product.images?.length ? product.images : [],
-    attrs: {
-      ...attrs,
-      [ATTR_COR]: colors,
-      [ATTR_CAP]: storages,
-      [ATTR_RET]: attrs[ATTR_RET] ?? [...FULFILLMENT_OPTIONS],
-    },
-  };
-}
-
-/** Catálogo efetivo síncrono: estoque ERP local ou demo hardcoded. */
+/** Só estoque do ERP (itens com “Exibir no totem”). Sem catálogo mock. */
 export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
-  const { shareStockWithErp } = getTotemSettings();
-  if (!shareStockWithErp) return TOTEM_PRODUCTS;
   return groupStockForTotem(getAdminState().stock);
 }
 
 /**
- * Preferência: Nest público → fallback local (estoque ERP ou TOTEM_PRODUCTS).
- * Usar no mount do totem.
+ * Carrega estoque do Nest quando autenticado; senão usa cache local do ERP.
+ * Não usa TOTEM_PRODUCTS nem GET /products (seed/demo).
  */
 export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: number })[]> {
-  const { shareStockWithErp } = getTotemSettings();
-  if (shareStockWithErp) {
-    return groupStockForTotem(getAdminState().stock);
+  if (isNestAuthed()) {
+    try {
+      const stock = await apiListStock();
+      return groupStockForTotem(stock);
+    } catch {
+      return groupStockForTotem(getAdminState().stock);
+    }
   }
-
-  try {
-    const products = await fetchCatalogProducts();
-    const active = products.filter((item) => item.status !== 'inactive');
-    if (active.length === 0) return TOTEM_PRODUCTS;
-    return active.map(mapApiProduct);
-  } catch {
-    return TOTEM_PRODUCTS;
-  }
+  return groupStockForTotem(getAdminState().stock);
 }
 
 export function findStockImageById(stockId: string) {

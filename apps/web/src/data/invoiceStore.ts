@@ -2,6 +2,17 @@ import { getAdminState } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import { applyStockMovement } from './stockLedger';
 import type { FiscalDocPurpose } from './fiscalTaxTables';
+import {
+  apiAddStockInvoiceLine,
+  apiCancelStockInvoice,
+  apiCreateStockInvoice,
+  apiListStockInvoices,
+  apiPostStockInvoice,
+  apiRemoveStockInvoiceLine,
+  apiUpdateStockInvoice,
+  type ApiInvoice,
+} from '../services/erpApi';
+import { isNestAuthed } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.invoices.v1';
 
@@ -80,6 +91,52 @@ function save(state: InvoiceState) {
   window.dispatchEvent(new Event('marthi-invoices-updated'));
 }
 
+function mapInvoice(row: ApiInvoice): Invoice {
+  return {
+    id: row.id,
+    kind: row.kind,
+    number: row.number,
+    status: row.status,
+    documentPurpose: (row.documentPurpose as FiscalDocPurpose) || 'normal',
+    supplierId: row.supplierId ?? '',
+    customerName: row.customerName ?? '',
+    issuedAt: row.issuedAt,
+    notes: row.notes ?? '',
+    lines: (row.lines ?? []).map((line) => ({
+      id: line.id,
+      stockId: line.stockId,
+      name: line.name,
+      qty: line.qty,
+      unitCost: line.unitCost,
+      unitPrice: line.unitPrice,
+    })),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    postedAt: row.postedAt,
+  };
+}
+
+function nestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function putInvoice(state: InvoiceState, invoice: Invoice) {
+  const idx = state.invoices.findIndex((item) => item.id === invoice.id);
+  if (idx >= 0) state.invoices[idx] = invoice;
+  else state.invoices = [invoice, ...state.invoices];
+}
+
+/** Substitui notas (bootstrap Nest). */
+export function replaceInvoices(invoices: Invoice[]) {
+  save({ invoices });
+}
+
+export async function hydrateInvoicesFromApi() {
+  if (!isNestAuthed()) return;
+  const rows = await apiListStockInvoices();
+  replaceInvoices(rows.map(mapInvoice));
+}
+
 export function listInvoices(kind?: InvoiceKind) {
   const items = load().invoices.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return kind ? items.filter((item) => item.kind === kind) : items;
@@ -100,17 +157,39 @@ export type InvoiceResult =
   | { ok: true; invoice: Invoice }
   | { ok: false; error: string };
 
-export function createInvoice(input: {
+export async function createInvoice(input: {
   kind: InvoiceKind;
   number?: string;
   supplierId?: string;
   customerName?: string;
   issuedAt?: string;
   notes?: string;
-}): InvoiceResult {
+}): Promise<InvoiceResult> {
   if (input.kind === 'entry' && input.supplierId && !getSupplier(input.supplierId)) {
     return { ok: false, error: 'Fornecedor inválido.' };
   }
+
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCreateStockInvoice({
+        kind: input.kind,
+        number: input.number,
+        supplierId: input.supplierId,
+        customerName: input.customerName,
+        issuedAt: input.issuedAt,
+        notes: input.notes,
+        documentPurpose: 'normal',
+      });
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao criar nota.') };
+    }
+  }
+
   const stamp = now();
   const invoice: Invoice = {
     id: uid(input.kind === 'entry' ? 'NFE' : 'NFS'),
@@ -132,7 +211,7 @@ export function createInvoice(input: {
   return { ok: true, invoice };
 }
 
-export function updateInvoiceDraft(
+export async function updateInvoiceDraft(
   id: string,
   patch: Partial<
     Pick<
@@ -140,7 +219,30 @@ export function updateInvoiceDraft(
       'number' | 'supplierId' | 'customerName' | 'issuedAt' | 'notes' | 'lines' | 'documentPurpose'
     >
   >,
-): InvoiceResult {
+): Promise<InvoiceResult> {
+  if (isNestAuthed()) {
+    try {
+      if (patch.lines !== undefined) {
+        return { ok: false, error: 'Use add/remove line na API.' };
+      }
+      const row = await apiUpdateStockInvoice(id, {
+        number: patch.number,
+        supplierId: patch.supplierId,
+        customerName: patch.customerName,
+        issuedAt: patch.issuedAt,
+        notes: patch.notes,
+        documentPurpose: patch.documentPurpose,
+      });
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao atualizar nota.') };
+    }
+  }
+
   const state = load();
   const current = state.invoices.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Nota não encontrada.' };
@@ -158,10 +260,28 @@ export function updateInvoiceDraft(
   return { ok: true, invoice };
 }
 
-export function addInvoiceLine(
+export async function addInvoiceLine(
   id: string,
   input: { stockId: string; qty: number; unitCost?: number; unitPrice?: number },
-): InvoiceResult {
+): Promise<InvoiceResult> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiAddStockInvoiceLine(id, {
+        stockId: input.stockId,
+        qty: input.qty,
+        unitCost: input.unitCost,
+        unitPrice: input.unitPrice,
+      });
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao adicionar item.') };
+    }
+  }
+
   const state = load();
   const current = state.invoices.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Nota não encontrada.' };
@@ -180,7 +300,20 @@ export function addInvoiceLine(
   return updateInvoiceDraft(id, { lines: [...current.lines, line] });
 }
 
-export function removeInvoiceLine(id: string, lineId: string): InvoiceResult {
+export async function removeInvoiceLine(id: string, lineId: string): Promise<InvoiceResult> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiRemoveStockInvoiceLine(id, lineId);
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao remover item.') };
+    }
+  }
+
   const current = getInvoice(id);
   if (!current) return { ok: false, error: 'Nota não encontrada.' };
   return updateInvoiceDraft(id, {
@@ -205,7 +338,26 @@ function applyStockDelta(lines: InvoiceLine[], direction: 1 | -1): { ok: true } 
 }
 
 /** Lança a nota: entrada soma estoque; saída baixa. */
-export function postInvoice(id: string): InvoiceResult {
+export async function postInvoice(id: string): Promise<InvoiceResult> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiPostStockInvoice(id);
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      try {
+        const { refreshAdminSlices } = await import('./erpBootstrap');
+        await refreshAdminSlices(['stock']);
+      } catch {
+        /* estoque pode atualizar no próximo bootstrap */
+      }
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao lançar nota.') };
+    }
+  }
+
   const state = load();
   const current = state.invoices.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Nota não encontrada.' };
@@ -230,7 +382,26 @@ export function postInvoice(id: string): InvoiceResult {
   return { ok: true, invoice };
 }
 
-export function cancelInvoice(id: string): InvoiceResult {
+export async function cancelInvoice(id: string): Promise<InvoiceResult> {
+  if (isNestAuthed()) {
+    try {
+      const row = await apiCancelStockInvoice(id);
+      const invoice = mapInvoice(row);
+      const state = load();
+      putInvoice(state, invoice);
+      save(state);
+      try {
+        const { refreshAdminSlices } = await import('./erpBootstrap');
+        await refreshAdminSlices(['stock']);
+      } catch {
+        /* estoque pode atualizar no próximo bootstrap */
+      }
+      return { ok: true, invoice };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao cancelar nota.') };
+    }
+  }
+
   const state = load();
   const current = state.invoices.find((item) => item.id === id);
   if (!current) return { ok: false, error: 'Nota não encontrada.' };

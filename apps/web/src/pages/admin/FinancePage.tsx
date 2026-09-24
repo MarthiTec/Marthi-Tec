@@ -62,6 +62,7 @@ const REFRESH_EVENTS = [
   'marthi-os-state',
   'marthi-erp-bootstrap',
   'marthi-stock',
+  'marthi-finance-book-updated',
 ] as const;
 
 function parseTab(value: string | null): TabId {
@@ -462,8 +463,8 @@ function PagarPanel({
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
 
-  function submit() {
-    const result = upsertPayable({
+  async function submit() {
+    const result = await upsertPayable({
       description,
       supplierId: supplierId || undefined,
       supplierName,
@@ -571,9 +572,11 @@ function PagarPanel({
                           type="button"
                           className="btn btn--ghost"
                           onClick={() => {
-                            const result = settlePayable(item.id, open);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Baixa ${item.id}`);
+                            void (async () => {
+                              const result = await settlePayable(item.id, open);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Baixa ${item.id}`);
+                            })();
                           }}
                         >
                           Pagar
@@ -584,9 +587,11 @@ function PagarPanel({
                           type="button"
                           className="btn btn--ghost crud-actions__danger"
                           onClick={() => {
-                            const result = cancelBill('payable', item.id);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Cancelada ${item.id}`);
+                            void (async () => {
+                              const result = await cancelBill('payable', item.id);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Cancelada ${item.id}`);
+                            })();
                           }}
                         >
                           Cancelar
@@ -622,8 +627,8 @@ function ReceberPanel({
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
 
-  function submit() {
-    const result = upsertReceivable({
+  async function submit() {
+    const result = await upsertReceivable({
       description,
       customerName,
       category,
@@ -719,9 +724,11 @@ function ReceberPanel({
                           type="button"
                           className="btn btn--ghost"
                           onClick={() => {
-                            const result = settleReceivable(item.id, open);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Recebimento ${item.id}`);
+                            void (async () => {
+                              const result = await settleReceivable(item.id, open);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Recebimento ${item.id}`);
+                            })();
                           }}
                         >
                           Receber
@@ -732,9 +739,11 @@ function ReceberPanel({
                           type="button"
                           className="btn btn--ghost crud-actions__danger"
                           onClick={() => {
-                            const result = cancelBill('receivable', item.id);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Cancelada ${item.id}`);
+                            void (async () => {
+                              const result = await cancelBill('receivable', item.id);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Cancelada ${item.id}`);
+                            })();
                           }}
                         >
                           Cancelar
@@ -768,8 +777,8 @@ function ContasPanel({
   const [type, setType] = useState<BankAccountType>('checking');
   const [initialBalance, setInitialBalance] = useState('0');
 
-  function submit() {
-    const result = upsertBankAccount({
+  async function submit() {
+    const result = await upsertBankAccount({
       name,
       bank,
       agency,
@@ -879,8 +888,8 @@ function TesourariaPanel({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
 
-  function submit() {
-    const result = createTreasuryMove({
+  async function submit() {
+    const result = await createTreasuryMove({
       kind,
       fromAccountId: kind === 'deposit' ? '' : fromAccountId,
       toAccountId: kind === 'withdraw' ? '' : toAccountId,
@@ -993,8 +1002,8 @@ function AntecipadosPanel({
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
   const [notes, setNotes] = useState('');
 
-  function submit() {
-    const result = createAdvance({
+  async function submit() {
+    const result = await createAdvance({
       kind,
       partyName,
       amount: parseMoney(amount),
@@ -1079,10 +1088,12 @@ function AntecipadosPanel({
                           type="button"
                           className="btn btn--ghost"
                           onClick={() => {
-                            const open = item.amount - item.usedAmount;
-                            const result = applyAdvance(item.id, open);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Aplicada ${item.id}`);
+                            void (async () => {
+                              const open = item.amount - item.usedAmount;
+                              const result = await applyAdvance(item.id, open);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Aplicada ${item.id}`);
+                            })();
                           }}
                         >
                           Aplicar
@@ -1091,9 +1102,11 @@ function AntecipadosPanel({
                           type="button"
                           className="btn btn--ghost crud-actions__danger"
                           onClick={() => {
-                            const result = refundAdvance(item.id);
-                            if (!result.ok) onError(result.error);
-                            else onSaved(`Estornada ${item.id}`);
+                            void (async () => {
+                              const result = await refundAdvance(item.id);
+                              if (!result.ok) onError(result.error);
+                              else onSaved(`Estornada ${item.id}`);
+                            })();
                           }}
                         >
                           Estornar

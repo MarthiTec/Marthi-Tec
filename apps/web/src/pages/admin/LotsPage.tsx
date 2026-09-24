@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
+import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { listSuppliers } from '../../data/erpRegistry';
 import { createLot, listLots, listWarehouses } from '../../data/fiscalCatalog';
 
 export function LotsPage() {
   const stock = useMemo(() => getAdminState().stock, []);
-  const warehouses = useMemo(() => listWarehouses(true), []);
+  const [warehouses, setWarehouses] = useState(() => listWarehouses(true));
   const suppliers = useMemo(() => listSuppliers(true), []);
   const [lots, setLots] = useState(() => listLots());
   const [stockId, setStockId] = useState(stock.find((item) => item.trackLot)?.id ?? stock[0]?.id ?? '');
@@ -18,14 +19,29 @@ export function LotsPage() {
   const [supplierId, setSupplierId] = useState('');
   const [error, setError] = useState('');
 
-  function submit() {
+  useEffect(() => {
+    function refresh() {
+      const nextWarehouses = listWarehouses(true);
+      setWarehouses(nextWarehouses);
+      setLots(listLots());
+      setWarehouseId((current) => current || nextWarehouses[0]?.id || '');
+    }
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+    window.addEventListener('marthi-fiscal-updated', refresh);
+    return () => {
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
+      window.removeEventListener('marthi-fiscal-updated', refresh);
+    };
+  }, []);
+
+  async function submit() {
     const product = stock.find((item) => item.id === stockId);
     if (!product) {
       setError('Selecione um produto.');
       return;
     }
     const supplier = suppliers.find((item) => item.id === supplierId);
-    const result = createLot({
+    const result = await createLot({
       stockId: product.id,
       stockName: product.name,
       lotNumber,
@@ -100,7 +116,7 @@ export function LotsPage() {
           </label>
         </div>
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
+          <button type="button" className="btn btn--primary" onClick={() => void submit()}>
             Registrar lote
           </button>
         </div>
