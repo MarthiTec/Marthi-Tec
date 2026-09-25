@@ -286,6 +286,114 @@
   color: #64748b;
 }
 
+/* ==========================================================================
+   Dark Mode Support for Operations Page
+   ========================================================================== */
+.admin.admin--dark .ops-page__flash,
+.is-theme-dark .ops-page__flash {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.admin.admin--dark .ops-users--ops,
+.is-theme-dark .ops-users--ops {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin.admin--dark .ops-form__head p,
+.admin.admin--dark .ops-board__head p,
+.is-theme-dark .ops-form__head p,
+.is-theme-dark .ops-board__head p {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .ops-form__grid label,
+.admin.admin--dark .ops-form__status,
+.is-theme-dark .ops-form__grid label,
+.is-theme-dark .ops-form__status {
+  color: #cbd5e1;
+}
+
+.admin.admin--dark .ops-form__grid input,
+.admin.admin--dark .ops-form__grid select,
+.is-theme-dark .ops-form__grid input,
+.is-theme-dark .ops-form__grid select {
+  background: #121820;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .ops-form__grid input:focus,
+.admin.admin--dark .ops-form__grid select:focus,
+.is-theme-dark .ops-form__grid input:focus,
+.is-theme-dark .ops-form__grid select:focus {
+  border-color: #2dd4bf;
+  outline: none;
+}
+
+.admin.admin--dark .ops-status-toggle,
+.is-theme-dark .ops-status-toggle {
+  background: #171e27;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .ops-status-toggle.is-on,
+.is-theme-dark .ops-status-toggle.is-on {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.admin.admin--dark .ops-status-toggle.is-off,
+.is-theme-dark .ops-status-toggle.is-off {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.admin.admin--dark .ops-tile__link,
+.admin.admin--dark .ops-tile__panel,
+.is-theme-dark .ops-tile__link,
+.is-theme-dark .ops-tile__panel {
+  background: #171e27;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .ops-tile__link:hover,
+.is-theme-dark .ops-tile__link:hover {
+  background: #1c2430;
+  border-color: var(--ops-accent, #2dd4bf);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.admin.admin--dark .ops-tile__link.is-disabled,
+.is-theme-dark .ops-tile__link.is-disabled {
+  background: #131922;
+  color: #64748b;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.admin.admin--dark .ops-tile__body small,
+.is-theme-dark .ops-tile__body small {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .ops-tile__status,
+.is-theme-dark .ops-tile__status {
+  box-shadow: 0 0 0 3px rgba(23, 30, 39, 0.9);
+}
+
+.admin.admin--dark .ops-swatch.is-selected,
+.is-theme-dark .ops-swatch.is-selected {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 2px #171e27, 0 0 0 4px #2dd4bf;
+}
+
+/* ==========================================================================
+   Responsive Breakpoints (Tablet & Mobile)
+   ========================================================================== */
 @media (max-width: 900px) {
   .ops-form__grid {
     grid-template-columns: 1fr;
@@ -297,6 +405,26 @@
 
   .dash-hero__launch {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-page .dash-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .ops-page .dash-hero__launch {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ops-page .dash-hero__launch .btn {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
 
@@ -321,3 +449,4 @@
     flex: 1 1 auto;
   }
 }
+
