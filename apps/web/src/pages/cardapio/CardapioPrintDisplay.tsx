@@ -5,24 +5,17 @@ import { listRestaurantTables } from '../../data/kitchenOrderStore';
 import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
 import './cardapioPrint.css';
 
-function CoffeeBeanIcon({ className }: { className: string }) {
+function CornerSparkle({ className }: { className: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       fill="currentColor"
       className={className}
       aria-hidden="true"
     >
-      <ellipse cx="12" cy="12" rx="7" ry="10" transform="rotate(30 12 12)" />
-      <path
-        d="M12 3 C10 8, 14 16, 12 21"
-        stroke="#fff"
-        strokeWidth="1.5"
-        fill="none"
-        strokeLinecap="round"
-      />
+      <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
     </svg>
   );
 }
@@ -63,10 +56,10 @@ export function CardapioPrintDisplay() {
       <div key={tableId} className="cardapio-acrylic-card">
         <div className="cardapio-acrylic-card__border" />
 
-        <CoffeeBeanIcon className="cardapio-dec-bean cardapio-dec-bean--1" />
-        <CoffeeBeanIcon className="cardapio-dec-bean cardapio-dec-bean--2" />
-        <CoffeeBeanIcon className="cardapio-dec-bean cardapio-dec-bean--3" />
-        <CoffeeBeanIcon className="cardapio-dec-bean cardapio-dec-bean--4" />
+        <CornerSparkle className="cardapio-dec-bean cardapio-dec-bean--1" />
+        <CornerSparkle className="cardapio-dec-bean cardapio-dec-bean--2" />
+        <CornerSparkle className="cardapio-dec-bean cardapio-dec-bean--3" />
+        <CornerSparkle className="cardapio-dec-bean cardapio-dec-bean--4" />
 
         <header className="cardapio-acrylic__header">
           {config.logoUrl ? (
@@ -76,7 +69,7 @@ export function CardapioPrintDisplay() {
               className="cardapio-acrylic__logo-img"
             />
           ) : (
-            <div className="cardapio-acrylic__logo-fallback">☕</div>
+            <div className="cardapio-acrylic__logo-fallback">🍽️</div>
           )}
           <h1 className="cardapio-acrylic__name">{config.restaurantName}</h1>
           <span className="cardapio-acrylic__slogan">{config.slogan}</span>
@@ -87,9 +80,12 @@ export function CardapioPrintDisplay() {
 
         <section className="cardapio-acrylic__cta">
           <div className="cardapio-acrylic__kicker">Aponte a câmera e</div>
-          <h2 className="cardapio-acrylic__title">Acesse nosso cardápio</h2>
+          <h2 className="cardapio-acrylic__title">
+            {config.displayPrintTitle || 'Acesse nosso cardápio'}
+          </h2>
           <p className="cardapio-acrylic__sub">
-            Confira pratos, cafés, sobremesas, combos e <strong>promoções</strong>.
+            {config.displayPrintSubtitle ||
+              'Confira pratos, bebidas, sobremesas, combos e promoções.'}
           </p>
         </section>
 

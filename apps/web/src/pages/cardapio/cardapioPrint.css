@@ -1,4 +1,4 @@
-/* Estilos para o Display de Mesa em Acrílico (Estilo Café Escondido) */
+/* Estilos para o Display de Mesa em Acrílico Personalizado */
 
 .cardapio-display-wrap {
   min-height: 100vh;
@@ -102,7 +102,7 @@
   box-sizing: border-box;
 }
 
-/* Grafismos decorativos de fundo imitando o Café Escondido da foto */
+/* Grafismos decorativos de fundo para display de mesa */
 .cardapio-acrylic-card::before {
   content: '';
   position: absolute;

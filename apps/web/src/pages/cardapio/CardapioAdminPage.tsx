@@ -17,9 +17,36 @@ import {
 } from '../../data/cardapioStore';
 import { getAdminState } from '../../data/adminStore';
 import { listRestaurantTables } from '../../data/kitchenOrderStore';
-import { QrCodeView } from '../../components/QrCodeView';
+import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
 import { CardapioPublicPage } from './CardapioPublicPage';
 import './cardapioAdmin.css';
+
+const BANNER_PRESETS = [
+  {
+    label: 'Restaurante & Bistrô',
+    url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    label: 'Carnes & Grelhados',
+    url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    label: 'Pizzaria & Forno',
+    url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    label: 'Hamburgueria',
+    url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    label: 'Cafeteria & Padaria',
+    url: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80',
+  },
+  {
+    label: 'Sushi & Japonês',
+    url: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=1200&auto=format&fit=crop&q=80',
+  },
+];
 
 export function CardapioAdminPage() {
   const [config, setConfig] = useState<CardapioConfig>(() => getCardapioConfig());
@@ -28,7 +55,9 @@ export function CardapioAdminPage() {
   const [reservations, setReservations] = useState(() => listReservations());
   const tables = listRestaurantTables();
 
-  const [activeTab, setActiveTab] = useState<'dishes' | 'branding' | 'qrcodes' | 'reservations'>('dishes');
+  const [activeTab, setActiveTab] = useState<
+    'dishes' | 'branding' | 'shares' | 'qrcodes' | 'reservations'
+  >('dishes');
 
   // Modal para criar/editar prato
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -62,6 +91,17 @@ export function CardapioAdminPage() {
     const updated = saveCardapioConfig(patch);
     setConfig(updated);
     showToast('Configurações salvas!');
+  }
+
+  function handleFileUpload(file: File, callback: (dataUrl: string) => void) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (typeof e.target?.result === 'string') {
+        callback(e.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   function handleMoveDish(id: string, delta: number) {
@@ -123,6 +163,19 @@ export function CardapioAdminPage() {
   }
 
   const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/cardapio` : '';
+
+  async function handleDownloadGeneralQr() {
+    try {
+      const dataUrl = await generateQrDataUrl(baseUrl, 600);
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `qrcode-${config.restaurantName.toLowerCase().replace(/\s+/g, '-')}.png`;
+      link.click();
+      showToast('Download do QR Code iniciado!');
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   return (
     <div className="cardapio-admin-wrap">
@@ -213,6 +266,13 @@ export function CardapioAdminPage() {
           onClick={() => setActiveTab('branding')}
         >
           🎨 Personalização & Marca
+        </button>
+        <button
+          type="button"
+          className={`cardapio-admin-tab-btn ${activeTab === 'shares' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('shares')}
+        >
+          🌐 Divulgação & Redes Sociais
         </button>
         <button
           type="button"
@@ -417,13 +477,17 @@ export function CardapioAdminPage() {
           {activeTab === 'branding' ? (
             <div className="cardapio-editor-card">
               <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Identidade Visual & Estabelecimento</h2>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+                Personalize 100% da marca para o seu restaurante, bar, cafeteria ou lanchonete.
+              </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div className="cardapio-form-group">
-                  <label>Nome do Restaurante</label>
+                  <label>Nome do Estabelecimento / Loja *</label>
                   <input
                     type="text"
                     value={config.restaurantName}
+                    placeholder="Ex: A Sua Loja, Pizzaria Bella, etc."
                     onChange={(e) => handleSaveConfig({ restaurantName: e.target.value })}
                   />
                 </div>
@@ -432,35 +496,154 @@ export function CardapioAdminPage() {
                   <input
                     type="text"
                     value={config.slogan}
+                    placeholder="Ex: Restaurante, Bar & Gastronomia"
                     onChange={(e) => handleSaveConfig({ slogan: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div className="cardapio-form-group">
-                  <label>URL da Imagem da Logo</label>
-                  <input
-                    type="text"
-                    value={config.logoUrl || ''}
-                    placeholder="https://..."
-                    onChange={(e) => handleSaveConfig({ logoUrl: e.target.value })}
-                  />
+              {/* Upload de Logo */}
+              <div className="cardapio-form-group">
+                <label>Logo do Estabelecimento</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {config.logoUrl ? (
+                    <img
+                      src={config.logoUrl}
+                      alt="Logo"
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #d1d5db',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: '50%',
+                        background: '#e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: '#6b7280',
+                      }}
+                    >
+                      Loja
+                    </div>
+                  )}
+
+                  <label className="cardapio-btn cardapio-btn--secondary" style={{ cursor: 'pointer' }}>
+                    📁 Carregar Arquivo de Logo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file, (dataUrl) => handleSaveConfig({ logoUrl: dataUrl }));
+                      }}
+                    />
+                  </label>
+
+                  {config.logoUrl ? (
+                    <button
+                      type="button"
+                      className="cardapio-btn cardapio-btn--secondary"
+                      onClick={() => handleSaveConfig({ logoUrl: null })}
+                    >
+                      Remover
+                    </button>
+                  ) : null}
                 </div>
-                <div className="cardapio-form-group">
-                  <label>URL do Banner de Capa</label>
-                  <input
-                    type="text"
-                    value={config.bannerUrl || ''}
-                    placeholder="https://..."
-                    onChange={(e) => handleSaveConfig({ bannerUrl: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  placeholder="Ou cole uma URL da imagem da logo..."
+                  value={config.logoUrl || ''}
+                  onChange={(e) => handleSaveConfig({ logoUrl: e.target.value })}
+                  style={{ marginTop: 6 }}
+                />
+              </div>
+
+              {/* Upload de Banner de Capa */}
+              <div className="cardapio-form-group">
+                <label>Foto de Fundo / Banner de Capa</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {config.bannerUrl ? (
+                    <img
+                      src={config.bannerUrl}
+                      alt="Capa"
+                      style={{
+                        width: 100,
+                        height: 48,
+                        borderRadius: 8,
+                        objectFit: 'cover',
+                        border: '1px solid #d1d5db',
+                      }}
+                    />
+                  ) : null}
+
+                  <label className="cardapio-btn cardapio-btn--secondary" style={{ cursor: 'pointer' }}>
+                    📁 Carregar Imagem de Fundo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file, (dataUrl) => handleSaveConfig({ bannerUrl: dataUrl }));
+                      }}
+                    />
+                  </label>
+
+                  {config.bannerUrl ? (
+                    <button
+                      type="button"
+                      className="cardapio-btn cardapio-btn--secondary"
+                      onClick={() => handleSaveConfig({ bannerUrl: null })}
+                    >
+                      Remover
+                    </button>
+                  ) : null}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Ou cole a URL da imagem de fundo..."
+                  value={config.bannerUrl || ''}
+                  onChange={(e) => handleSaveConfig({ bannerUrl: e.target.value })}
+                  style={{ marginTop: 6 }}
+                />
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#6b7280', alignSelf: 'center' }}>
+                    Temas sugeridos:
+                  </span>
+                  {BANNER_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => handleSaveConfig({ bannerUrl: p.url })}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* Cores */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div className="cardapio-form-group">
-                  <label>Cor Primária</label>
+                  <label>Cor Primária (Fundo / Textos)</label>
                   <input
                     type="color"
                     value={config.primaryColor}
@@ -469,7 +652,7 @@ export function CardapioAdminPage() {
                   />
                 </div>
                 <div className="cardapio-form-group">
-                  <label>Cor de Destaque / Botões</label>
+                  <label>Cor de Destaque (Botões / Badges)</label>
                   <input
                     type="color"
                     value={config.accentColor}
@@ -479,18 +662,19 @@ export function CardapioAdminPage() {
                 </div>
               </div>
 
+              {/* Redes e Contato */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div className="cardapio-form-group">
-                  <label>Instagram Oficial</label>
+                  <label>Instagram Oficial (@ da loja)</label>
                   <input
                     type="text"
                     value={config.instagram}
-                    placeholder="@seurestaurante"
+                    placeholder="@asualoja"
                     onChange={(e) => handleSaveConfig({ instagram: e.target.value })}
                   />
                 </div>
                 <div className="cardapio-form-group">
-                  <label>WhatsApp para Pedidos</label>
+                  <label>WhatsApp para Pedidos & Contato</label>
                   <input
                     type="tel"
                     value={config.whatsapp}
@@ -501,7 +685,7 @@ export function CardapioAdminPage() {
               </div>
 
               <div className="cardapio-form-group">
-                <label>Endereço</label>
+                <label>Endereço Completo</label>
                 <input
                   type="text"
                   value={config.address}
@@ -509,9 +693,10 @@ export function CardapioAdminPage() {
                 />
               </div>
 
+              {/* Modalidades */}
               <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-                <h3 style={{ fontSize: '1rem', margin: '0 0 10px' }}>Modalidades de Consumo Ativas</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <h3 style={{ fontSize: '1rem', margin: '0 0 10px' }}>Modalidades de Atendimento</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <input
                       type="checkbox"
@@ -544,6 +729,185 @@ export function CardapioAdminPage() {
                     />
                     <span>Reservas de mesa</span>
                   </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Aba de Divulgação & Redes Sociais */}
+          {activeTab === 'shares' ? (
+            <div className="cardapio-editor-card">
+              <div>
+                <h2 style={{ fontSize: '1.25rem', margin: '0 0 4px' }}>
+                  🌐 Disponibilize o Site do Seu Cardápio para Seus Clientes
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#6b7280' }}>
+                  O cardápio digital funciona 100% no navegador do celular do cliente sem necessidade
+                  de instalar nenhum app. Divulgue o link nas suas páginas e redes sociais.
+                </p>
+              </div>
+
+              {/* Card 1: Link direto */}
+              <div
+                style={{
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '1rem' }}>🔗 Link Oficial do Seu Cardápio</strong>
+                  <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 700 }}>
+                    Pronto para compartilhar
+                  </span>
+                </div>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.92rem',
+                    fontFamily: 'monospace',
+                    color: '#1f2937',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {baseUrl}
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="cardapio-btn cardapio-btn--primary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(baseUrl);
+                      showToast('Link do cardápio copiado!');
+                    }}
+                  >
+                    📋 Copiar Link do Cardápio
+                  </button>
+                  <a
+                    href={baseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cardapio-btn cardapio-btn--secondary"
+                  >
+                    ↗ Abrir Cardápio
+                  </a>
+                </div>
+              </div>
+
+              {/* Card 2: Compartilhar no WhatsApp */}
+              <div
+                style={{
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: '1rem' }}>💬 Compartilhamento no WhatsApp</strong>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+                  Envie mensagens prontas para seus clientes ou listas de transmissão convidando-os a
+                  conferir as novidades e promoções de hoje:
+                </p>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.86rem',
+                    color: '#374151',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  &ldquo;Olá! Confira nosso cardápio online de hoje no {config.restaurantName} e faça seu
+                  pedido ou reserve sua mesa direto pelo celular: {baseUrl}&rdquo;
+                </div>
+                <div>
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `Olá! Confira nosso cardápio online de hoje no ${config.restaurantName} e faça seu pedido ou reserve sua mesa direto pelo celular: ${baseUrl}`,
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cardapio-btn cardapio-btn--secondary"
+                    style={{ background: '#25d366', color: '#fff', border: 'none' }}
+                  >
+                    💬 Compartilhar via WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              {/* Card 3: Instagram e Facebook */}
+              <div
+                style={{
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: '1rem' }}>📷 Instagram & Redes Sociais</strong>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+                  Coloque o link direto no campo <strong>&ldquo;Link na Bio&rdquo;</strong> do seu
+                  Instagram ({config.instagram || '@asualoja'}) e nos botões de ação do Facebook para
+                  que seus seguidores acessem com 1 toque.
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    className="cardapio-btn cardapio-btn--secondary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(baseUrl);
+                      showToast('Link pronto para colar na Bio do Instagram!');
+                    }}
+                  >
+                    📋 Copiar Link para a Bio do Instagram
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 4: QR Code para Embalagens e Panfletos */}
+              <div
+                style={{
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 20,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <QrCodeView value={baseUrl} size={120} colorDark="#1f2937" />
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <strong style={{ fontSize: '1rem' }}>
+                    📱 QR Code para Embalagens, Panfletos e Adesivos
+                  </strong>
+                  <p style={{ margin: '4px 0 10px', fontSize: '0.86rem', color: '#6b7280' }}>
+                    Baixe o QR Code em alta definição para estampar em embalagens de delivery,
+                    materiais impressos e fachadas.
+                  </p>
+                  <button
+                    type="button"
+                    className="cardapio-btn cardapio-btn--primary"
+                    onClick={handleDownloadGeneralQr}
+                  >
+                    📥 Baixar QR Code (PNG em Alta Resolução)
+                  </button>
                 </div>
               </div>
             </div>
@@ -778,13 +1142,36 @@ export function CardapioAdminPage() {
               </div>
             </div>
 
+            {/* Foto do prato com upload ou URL */}
             <div className="cardapio-form-group">
-              <label>URL da Foto do Prato</label>
+              <label>Foto do Prato</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {editingItem.imageUrl ? (
+                  <img
+                    src={editingItem.imageUrl}
+                    alt="Prato"
+                    style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }}
+                  />
+                ) : null}
+                <label className="cardapio-btn cardapio-btn--secondary" style={{ cursor: 'pointer' }}>
+                  📁 Carregar Foto do Prato
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, (dataUrl) => setEditingItem({ ...editingItem, imageUrl: dataUrl }));
+                    }}
+                  />
+                </label>
+              </div>
               <input
                 type="text"
-                placeholder="https://images.unsplash.com/..."
+                placeholder="Ou cole a URL da foto do prato..."
                 value={editingItem.imageUrl || ''}
                 onChange={(e) => setEditingItem({ ...editingItem, imageUrl: e.target.value })}
+                style={{ marginTop: 6 }}
               />
             </div>
 

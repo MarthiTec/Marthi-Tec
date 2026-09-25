@@ -115,17 +115,17 @@ export const DEFAULT_CATEGORIES = [
 ];
 
 export const DEFAULT_CONFIG: CardapioConfig = {
-  restaurantName: 'Café Escondido',
-  slogan: 'Cafeteria & Gastronomia',
+  restaurantName: 'A Sua Loja',
+  slogan: 'Restaurante, Bar & Gastronomia',
   logoUrl:
-    'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop&q=80',
   bannerUrl:
-    'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80',
-  primaryColor: '#3c2415',
-  accentColor: '#c48a39',
-  instagram: '@novocafeescondido',
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80',
+  primaryColor: '#1f2937',
+  accentColor: '#d97706',
+  instagram: '@asualoja',
   whatsapp: '5511999999999',
-  address: 'Rua das Flores, 120 - Centro Histórico',
+  address: 'Sua Cidade, Seu Bairro - Nº 100',
   paymentMethods: [
     'Pix com Chave / QR Code',
     'Cartão de Débito',
@@ -134,7 +134,7 @@ export const DEFAULT_CONFIG: CardapioConfig = {
     'Vale Refeição (VR, Sodexo, Ticket)',
   ],
   displayPrintTitle: 'APONTE A CÂMERA E ACESSE NOSSO CARDÁPIO',
-  displayPrintSubtitle: 'Confira pratos, cafés, sobremesas, combos e promoções.',
+  displayPrintSubtitle: 'Confira pratos, bebidas, sobremesas, combos e promoções.',
   enableDineIn: true,
   enableDelivery: true,
   enableTakeout: true,
@@ -148,9 +148,9 @@ export const DEFAULT_CONFIG: CardapioConfig = {
 export const SEED_ITEMS: CardapioItem[] = [
   {
     id: 'ITEM-FEIJOADA',
-    name: 'Feijoada Especial',
+    name: 'Feijoada Especial da Casa',
     description:
-      'Feijoada clássica preparada com tempero da casa, servida com arroz soltinho, couve fininha, farofa na manteiga e ovo frito.',
+      'Feijoada clássica completa com arroz soltinho, couve fininha, farofa na manteiga e ovo frito.',
     price: 32.0,
     imageUrl:
       'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80',
@@ -162,9 +162,9 @@ export const SEED_ITEMS: CardapioItem[] = [
   },
   {
     id: 'ITEM-CAMARAO',
-    name: 'Camarão Escondido',
+    name: 'Camarão Gratinado Especial',
     description:
-      'Camarões ao molho cremoso com catupiry artesanal e camada generosa de purê de aipim gratinado. Acompanha arroz e fritas.',
+      'Camarões ao molho cremoso com queijo gratinado e purê especial. Acompanha arroz branco e batata frita.',
     price: 42.0,
     imageUrl:
       'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&auto=format&fit=crop&q=80',
@@ -237,10 +237,24 @@ export const SEED_ITEMS: CardapioItem[] = [
 function loadState(): CardapioState {
   try {
     const rawCfg = localStorage.getItem(CONFIG_KEY);
-    const config: CardapioConfig = rawCfg ? { ...DEFAULT_CONFIG, ...JSON.parse(rawCfg) } : DEFAULT_CONFIG;
+    let config: CardapioConfig = rawCfg ? { ...DEFAULT_CONFIG, ...JSON.parse(rawCfg) } : DEFAULT_CONFIG;
+
+    // Migração automática caso o navegador tenha gravado dados do protótipo
+    if (config.restaurantName === 'Café Escondido' || config.instagram === '@novocafeescondido') {
+      config = { ...DEFAULT_CONFIG };
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    }
 
     const rawItems = localStorage.getItem(ITEMS_KEY);
-    const items: CardapioItem[] = rawItems ? JSON.parse(rawItems) : SEED_ITEMS;
+    let items: CardapioItem[] = rawItems ? JSON.parse(rawItems) : SEED_ITEMS;
+    if (items.some((i) => i.name.includes('Camarão Escondido'))) {
+      items = items.map((i) =>
+        i.name.includes('Camarão Escondido')
+          ? { ...i, name: 'Camarão Gratinado Especial' }
+          : i,
+      );
+      localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+    }
 
     const rawRes = localStorage.getItem(RESERVATIONS_KEY);
     const reservations: TableReservation[] = rawRes ? JSON.parse(rawRes) : [];
