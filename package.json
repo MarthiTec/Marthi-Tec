@@ -7,12 +7,12 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc -p apps/api/tsconfig.json && npm --prefix apps/web run build",
+    "build": "tsc -p apps/api/tsconfig.json && npm run build --workspace=@marthi/web",
     "start": "node dist/index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
     "dev:web": "npm run dev --workspace=@marthi/web",
     "build:api": "tsc -p apps/api/tsconfig.json",
-    "build:web": "npm --prefix apps/web run build",
+    "build:web": "npm run build --workspace=@marthi/web",
     "lint": "npm run lint --workspaces --if-present"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
@@ -30,6 +31,7 @@
     "google-auth-library": "^9.15.1",
     "jose": "^6.0.10",
     "pg": "^8.13.3",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.4.0",
