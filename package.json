@@ -7,12 +7,12 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc -p apps/api/tsconfig.json && npm run build --workspace=@marthi/web",
+    "build": "tsc -p apps/api/tsconfig.json && npm --prefix apps/web run build && node -e \"require('fs').accessSync('apps/web/dist/index.html')\"",
     "start": "node index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
     "dev:web": "npm run dev --workspace=@marthi/web",
     "build:api": "tsc -p apps/api/tsconfig.json",
-    "build:web": "npm run build --workspace=@marthi/web",
+    "build:web": "npm --prefix apps/web run build",
     "lint": "npm run lint --workspaces --if-present"
   },
   "dependencies": {
