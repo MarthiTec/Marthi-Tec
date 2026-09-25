@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
 const rootEnvDir = resolve(__dirname, '../..');
+/** Mesma árvore do MAIN na Discloud: /home/node/dist/public */
+const outDir = resolve(__dirname, '../../dist/public');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootEnvDir, '');
@@ -12,14 +14,17 @@ export default defineConfig(({ mode }) => {
   );
 
   return {
-    // Lê .env da raiz do monorepo e de apps/web
     envDir: rootEnvDir,
     plugins: [react()],
+    build: {
+      outDir,
+      emptyOutDir: true,
+      assetsDir: 'assets',
+    },
     server: {
       host: '0.0.0.0',
       port: 5173,
       strictPort: true,
-      // Dev: mesma origem → sem CORS. Produção build usa VITE_API_URL direto.
       proxy: {
         '/health': { target: nestTarget, changeOrigin: true, secure: true },
         '/api': { target: nestTarget, changeOrigin: true, secure: true },

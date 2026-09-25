@@ -15,15 +15,19 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 
 const app = express();
 
-/** Raiz do monorepo (…/dist → …/). Não depende de process.cwd() na Discloud. */
+/** /home/node/dist → /home/node */
 const apiDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(apiDir, '..');
 
 function resolveWebDist() {
   const candidates = [
+    // Preferido na Discloud (sai junto do build da API)
+    path.join(apiDir, 'public'),
+    path.join(projectRoot, 'dist/public'),
+    // Fallback local / legado
     path.join(projectRoot, 'apps/web/dist'),
+    path.join(process.cwd(), 'dist/public'),
     path.join(process.cwd(), 'apps/web/dist'),
-    path.join(apiDir, '../apps/web/dist'),
   ];
   for (const dir of candidates) {
     if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
@@ -67,9 +71,14 @@ if (serveWeb && webDist) {
         service: env.APP_NAME,
         message: 'Marthi API (web build ausente)',
         docs: '/health',
-        lookedIn: [path.join(projectRoot, 'apps/web/dist'), path.join(process.cwd(), 'apps/web/dist')],
+        lookedIn: [
+          path.join(apiDir, 'public'),
+          path.join(projectRoot, 'dist/public'),
+          path.join(projectRoot, 'apps/web/dist'),
+        ],
         cwd: process.cwd(),
         projectRoot,
+        apiDir,
       },
     });
   });

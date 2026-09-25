@@ -7,7 +7,7 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "tsc -p apps/api/tsconfig.json && npm --prefix apps/web run build && node -e \"require('fs').accessSync('apps/web/dist/index.html')\"",
+    "build": "tsc -p apps/api/tsconfig.json && npm --prefix apps/web run build && node -e \"require('fs').accessSync('dist/public/index.html')\"",
     "start": "node index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
     "dev:web": "npm run dev --workspace=@marthi/web",
