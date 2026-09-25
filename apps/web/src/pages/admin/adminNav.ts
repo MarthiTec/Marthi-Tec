@@ -66,11 +66,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
   {
     id: 'erp',
-    label: 'ERP',
+    label: 'Retaguarda',
     icon: 'ops',
     module: 'erp',
     children: [
-      { to: '/erp', label: 'Abrir ERP', openApp: true, accent: '#0e7490' },
+      { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
     ],
   },

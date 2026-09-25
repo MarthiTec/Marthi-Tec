@@ -769,7 +769,7 @@ export function TotemSettingsPage() {
       <article className="admin-card">
         <h2>Catálogo e atributos</h2>
         <p>
-          Cadastre produtos, preços e atributos aqui na aba Totem — o mesmo estoque que o ERP usa
+          Cadastre produtos, preços e atributos aqui na aba Totem — o mesmo estoque que a Retaguarda usa
           quando o módulo estiver contratado. Marque “Exibir no totem” e use atributos com filtro
           ativo para a vitrine.
         </p>

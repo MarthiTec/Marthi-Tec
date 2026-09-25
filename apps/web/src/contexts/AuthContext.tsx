@@ -65,7 +65,7 @@ async function applySession(
   }
   const ok = await bootstrapErpFromApi();
   setErpReady(ok);
-  setErpError(ok ? null : 'Não foi possível sincronizar o ERP. Tentaremos de novo.');
+  setErpError(ok ? null : 'Não foi possível sincronizar a Retaguarda. Tentaremos de novo.');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const ok = await bootstrapErpFromApi();
           if (active) {
             setErpReady(ok);
-            setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+            setErpError(ok ? null : 'Não foi possível sincronizar a Retaguarda.');
           }
         }
       } catch {
@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshErp = useCallback(async () => {
     const ok = await bootstrapErpFromApi();
     setErpReady(ok);
-    setErpError(ok ? null : 'Não foi possível sincronizar o ERP.');
+    setErpError(ok ? null : 'Não foi possível sincronizar a Retaguarda.');
   }, []);
 
   const value = useMemo(

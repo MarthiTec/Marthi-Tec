@@ -258,7 +258,7 @@ export function AdminHomePage() {
 
         <article className="admin-card">
           <h2>Atalhos da loja</h2>
-          <p>PDV, ERP, OS, fiscal e demais canais ficam em Operações.</p>
+          <p>PDV, Retaguarda, OS, fiscal e demais canais ficam em Operações.</p>
           <div className="admin-toolbar admin-toolbar--stack">
             <Link to="/painel/operacoes" className="btn btn--primary">
               <AdminIcon name="ops" />

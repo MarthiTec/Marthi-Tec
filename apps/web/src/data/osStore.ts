@@ -18,13 +18,39 @@ const STORAGE_KEY = 'marthi.os.v2';
 export const OS_STATE_EVENT = 'marthi-os-state';
 
 export type WorkOrderStatus =
+  | 'backlog'
   | 'open'
   | 'diagnosis'
   | 'waiting'
   | 'progress'
+  | 'reproved'
   | 'ready'
   | 'delivered'
   | 'cancelled';
+
+export type WorkOrderPaymentStatus = 'pending' | 'partially_paid' | 'paid' | 'cancelled';
+
+export const PAYMENT_STATUS_LABEL: Record<WorkOrderPaymentStatus, string> = {
+  pending: 'Pendente',
+  partially_paid: 'Parcialmente pago',
+  paid: 'Pago',
+  cancelled: 'Cancelado',
+};
+
+export type WorkOrderPaymentEntry = {
+  id: string;
+  method: string;
+  amount: number;
+  receivedAmount?: number;
+  change?: number;
+  discount?: number;
+  discountMode?: 'money' | 'percent';
+  surcharge?: number;
+  surchargeMode?: 'money' | 'percent';
+  note?: string;
+  paidAt: string;
+  cashierOperator?: string;
+};
 
 export type WorkOrderPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -54,6 +80,32 @@ export type WorkOrderComment = {
   authorRole?: string;
   content: string;
   kind: 'internal' | 'customer' | 'system';
+  createdAt: string;
+};
+
+/** Registro de histórico / auditoria estilo Jira. */
+export type WorkOrderHistoryEntry = {
+  id: string;
+  authorName: string;
+  authorPhoto?: string;
+  authorRole?: string;
+  field: string;
+  action: 'alterou' | 'adicionou' | 'atualizou' | 'removeu';
+  fromValue?: string;
+  toValue: string;
+  createdAt: string;
+};
+
+/** Registro de tempo / worklog estilo Jira. */
+export type WorkOrderWorklog = {
+  id: string;
+  technicianName: string;
+  technicianPhoto?: string;
+  technicianRole?: string;
+  minutesSpent: number;
+  timeSpentFormatted: string;
+  description: string;
+  startedAt?: string;
   createdAt: string;
 };
 
@@ -149,6 +201,8 @@ export type WorkOrder = {
   photos: WorkOrderPhoto[];
   comments?: WorkOrderComment[];
   attachments?: WorkOrderAttachment[];
+  history?: WorkOrderHistoryEntry[];
+  worklogs?: WorkOrderWorklog[];
   /** Minutos gastos em bancada / cronômetro */
   spentMinutes?: number;
   isTimerRunning?: boolean;
@@ -175,6 +229,20 @@ export type WorkOrder = {
   progressStartedAt?: string;
   /** Horário de saída / entrega ao cliente. */
   deliveredAt?: string;
+  /** Status do pagamento (recebimento). */
+  paymentStatus?: WorkOrderPaymentStatus;
+  /** Valor total já pago/recebido. */
+  paidAmount?: number;
+  /** Desconto concedido no fechamento (valor ou percentual). */
+  discount?: number;
+  discountMode?: 'money' | 'percent';
+  /** Acréscimo no fechamento (valor ou percentual). */
+  surcharge?: number;
+  surchargeMode?: 'money' | 'percent';
+  /** Valor final líquido a pagar. */
+  finalAmount?: number;
+  /** Histórico detalhado de pagamentos recebidos nesta OS. */
+  payments?: WorkOrderPaymentEntry[];
   createdAt: string;
   updatedAt: string;
 };
@@ -182,10 +250,12 @@ export type WorkOrder = {
 let memoryOrders: WorkOrder[] | null = null;
 
 export const STATUS_LABEL: Record<WorkOrderStatus, string> = {
+  backlog: 'Backlog',
   open: 'Aberta',
   diagnosis: 'Diagnóstico',
   waiting: 'Aguardando',
   progress: 'Em serviço',
+  reproved: 'Reprovada',
   ready: 'Pronta',
   delivered: 'Entregue',
   cancelled: 'Cancelada',
@@ -196,8 +266,11 @@ export const BOARD_COLUMNS: WorkOrderStatus[] = [
   'diagnosis',
   'waiting',
   'progress',
+  'reproved',
   'ready',
 ];
+
+export const BACKLOG_STATUS: WorkOrderStatus = 'backlog';
 
 export const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
   low: 'Baixa',
@@ -520,6 +593,8 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
     operationId: raw.operationId ?? 'op-2026-09',
     comments: Array.isArray(raw.comments) ? raw.comments : [],
     attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+    history: Array.isArray(raw.history) ? raw.history : [],
+    worklogs: Array.isArray(raw.worklogs) ? raw.worklogs : [],
     spentMinutes: Number(raw.spentMinutes) || 0,
     isTimerRunning: Boolean(raw.isTimerRunning),
     timerStartedAt: raw.timerStartedAt,
@@ -913,6 +988,175 @@ function seed(): WorkOrder[] {
       createdAt: daysAgo(1),
       updatedAt: daysAgo(0),
     }),
+    normalizeWorkOrder({
+      id: 'OS-7109',
+      operationId: 'op-2026-09',
+      customerName: 'Gabriel Nogueira',
+      customerPhone: '(11) 98765-4321',
+      customerDocument: '334.556.778-99',
+      customerEmail: 'gabriel.nogueira@gmail.com',
+      itemName: 'Xiaomi Redmi Note 12',
+      itemBrand: 'Xiaomi',
+      itemModel: 'Redmi Note 12 128GB',
+      itemColor: 'Azul',
+      itemRef: 'IMEI 8675 4321 0987 654',
+      devicePassword: '7890',
+      accessories: 'Capa de silicone',
+      conditionOnEntry: 'Tela frontal quebrada',
+      defect: 'Trocar tela e ajustar botões de volume',
+      diagnosis: 'Tela frontal substituída com sucesso. Durante teste de entrega ao cliente, os botões de volume não estavam funcionando. Reprovada para que o técnico revise e finalize o reparo.',
+      notes: 'Reprovada na entrega ao cliente: tela trocada com sucesso, porém cliente testou e botões de volume continuam sem clique/travados. Retornado para o técnico dar continuidade e ajustar o flat dos botões.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 1)),
+      technician: 'Carlos Lima',
+      priority: 'high',
+      status: 'reproved',
+      labor: 160,
+      parts: 220,
+      spentMinutes: 65,
+      comments: [
+        {
+          id: 'cmt-11',
+          authorName: 'Carlos Lima',
+          authorRole: 'Técnico Especialista',
+          content: 'Troca da tela concluída. Módulo testado com imagem e touch 100%.',
+          kind: 'internal',
+          createdAt: daysAgo(1),
+        },
+        {
+          id: 'cmt-12',
+          authorName: 'Triagem Marthi',
+          authorRole: 'Controle de Entrega',
+          content: 'REPROVADA na entrega ao cliente: Foi solicitado a troca de tela e ajuste dos botões de volume. O técnico trocou a tela mas esqueceu de ajustar os botões de volume (estão duros sem clique). Retornado para o técnico Carlos Lima dar continuidade e finalizar.',
+          kind: 'system',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'cmt-13',
+          authorName: 'Ramon de Freitas',
+          authorRole: 'Analista de Suporte',
+          content: 'Erro no vendas:\n1 - COMBATE DIST. DE BEBIDAS E ALIMENTOS\n\nData/Hora..: 25/09/2026 09:15:22\nAplicação..: C:\\SIG2000\\EXECUTAVEIS\\Vendas-ERP2-2081.exe\nBuild......:\nData App...: 25/09/2026 08:35:38\nVersão B.D.: 27.01.00\nFormulário.: TcxCustomInnerTextEdit\nUsuário....: SIG2000',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [
+        {
+          id: 'att-rf-1',
+          name: 'image-20260925-121611.png',
+          size: 245000,
+          type: 'image/png',
+          dataUrl: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=300&auto=format&fit=crop&q=80',
+          createdAt: daysAgo(0),
+          uploaderName: 'Ramon de Freitas',
+        },
+      ],
+      history: [
+        {
+          id: 'hist-1',
+          authorName: 'Ramon de Freitas',
+          field: 'Status',
+          action: 'alterou',
+          fromValue: 'Em teste',
+          toValue: 'tarefas reprovada',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'hist-2',
+          authorName: 'Ramon de Freitas',
+          field: 'Anexo',
+          action: 'adicionou',
+          fromValue: 'Nenhuma',
+          toValue: 'image-20260925-121611.png',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'hist-3',
+          authorName: 'Ramon de Freitas',
+          field: 'Status',
+          action: 'alterou',
+          fromValue: 'Aguardando Teste',
+          toValue: 'Em teste',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'hist-4',
+          authorName: 'Matheus Henrique Marçal Marques',
+          authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          field: 'Classificação',
+          action: 'atualizou',
+          fromValue: 'Nenhuma',
+          toValue: 'Ranked higher',
+          createdAt: daysAgo(1),
+        },
+        {
+          id: 'hist-5',
+          authorName: 'Matheus Henrique Marçal Marques',
+          authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          field: 'Status',
+          action: 'alterou',
+          fromValue: 'Aberta',
+          toValue: 'Em serviço',
+          createdAt: daysAgo(1),
+        },
+      ],
+      worklogs: [
+        {
+          id: 'wlog-1',
+          technicianName: 'Carlos Lima',
+          technicianRole: 'Técnico Especialista',
+          minutesSpent: 65,
+          timeSpentFormatted: '1h 05m',
+          description: 'Troca da tela frontal, limpeza da carcaça e testes iniciais.',
+          startedAt: daysAgo(1),
+          createdAt: daysAgo(1),
+        },
+      ],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(0),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7110',
+      operationId: 'op-2026-09',
+      customerName: 'Camila Duarte',
+      customerPhone: '(21) 98877-6655',
+      customerDocument: '556.667.778-88',
+      customerEmail: 'camila.duarte@empresa.com.br',
+      itemName: 'Notebook Dell Inspiron 15',
+      itemBrand: 'Dell',
+      itemModel: 'Inspiron 15 3520',
+      itemColor: 'Preto',
+      itemRef: 'S/N 8XYZ123',
+      devicePassword: 'dell2026',
+      accessories: 'Fonte de alimentação original 65W',
+      conditionOnEntry: 'Bom estado geral, carcaça sem trincas',
+      defect: 'Upgrade para SSD NVMe 512GB e instalação do sistema operacional',
+      diagnosis: 'Aparelho aguardando triagem técnica inicial e entrada na fila de bancada.',
+      notes: 'OS cadastrada no totem / balcão de entrada. Ainda não inicializada nas operações ativas.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 3)),
+      technician: '',
+      priority: 'normal',
+      status: 'backlog',
+      labor: 150,
+      parts: 260,
+      spentMinutes: 0,
+      comments: [
+        {
+          id: 'cmt-13',
+          authorName: 'Totem de Entrada',
+          authorRole: 'Sistema de Atendimento',
+          content: 'Chamado criado pelo cliente no totem. Tarefa não inicializada (Backlog da oficina).',
+          kind: 'system',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(0),
+      updatedAt: daysAgo(0),
+    }),
   ];
 }
 
@@ -933,7 +1177,32 @@ function load(): WorkOrder[] {
       save(items);
       return items;
     }
-    return parsed.map((item) => normalizeWorkOrder(item as Partial<WorkOrder> & Pick<WorkOrder, 'id'>));
+    const normalized = parsed.map((item) =>
+      normalizeWorkOrder(item as Partial<WorkOrder> & Pick<WorkOrder, 'id'>),
+    );
+    // Assegura que novos status como backlog e reproved existam no estado local para demonstração imediata
+    const seeds = seed();
+    const hasReproved = normalized.some((o) => o.status === 'reproved');
+    const hasBacklog = normalized.some((o) => o.status === 'backlog');
+    let updated = false;
+    if (!hasReproved) {
+      const reprovedSeed = seeds.find((s) => s.status === 'reproved');
+      if (reprovedSeed && !normalized.some((o) => o.id === reprovedSeed.id)) {
+        normalized.unshift(reprovedSeed);
+        updated = true;
+      }
+    }
+    if (!hasBacklog) {
+      const backlogSeed = seeds.find((s) => s.status === 'backlog');
+      if (backlogSeed && !normalized.some((o) => o.id === backlogSeed.id)) {
+        normalized.unshift(backlogSeed);
+        updated = true;
+      }
+    }
+    if (updated) {
+      save(normalized);
+    }
+    return normalized;
   } catch {
     const items = seed();
     save(items);
@@ -1122,6 +1391,45 @@ export async function updateWorkOrder(
         merged.deliveredAt = undefined;
       }
     }
+    if (!patch.history) {
+      const historyEntries: WorkOrderHistoryEntry[] = [];
+      if (patch.status !== undefined && patch.status !== item.status) {
+        historyEntries.push({
+          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+          authorName: 'Ramon de Freitas',
+          field: 'Status',
+          action: 'alterou',
+          fromValue: STATUS_LABEL[item.status] ?? item.status,
+          toValue: STATUS_LABEL[patch.status] ?? patch.status,
+          createdAt: stamp,
+        });
+      }
+      if (patch.priority !== undefined && patch.priority !== item.priority) {
+        historyEntries.push({
+          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+          authorName: 'Ramon de Freitas',
+          field: 'Prioridade',
+          action: 'alterou',
+          fromValue: PRIORITY_LABEL[item.priority] ?? item.priority,
+          toValue: PRIORITY_LABEL[patch.priority] ?? patch.priority,
+          createdAt: stamp,
+        });
+      }
+      if (patch.technician !== undefined && patch.technician !== item.technician) {
+        historyEntries.push({
+          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+          authorName: 'Ramon de Freitas',
+          field: 'Técnico Responsável',
+          action: 'alterou',
+          fromValue: item.technician || 'Nenhum',
+          toValue: patch.technician || 'Não atribuído',
+          createdAt: stamp,
+        });
+      }
+      if (historyEntries.length > 0) {
+        merged.history = [...(item.history ?? []), ...historyEntries];
+      }
+    }
     return { ...merged, updatedAt: stamp };
   });
   save(next);
@@ -1134,6 +1442,151 @@ export function workOrderTotal(order: Pick<WorkOrder, 'labor' | 'parts' | 'lines
       ? partsTotalFromLines(order.lines)
       : order.parts;
   return order.labor + parts;
+}
+
+export function workOrderFinancialSummary(order: WorkOrder) {
+  const baseTotal = workOrderTotal(order);
+  const discount = order.discount || 0;
+  const discountMode = order.discountMode || 'money';
+  const surcharge = order.surcharge || 0;
+  const surchargeMode = order.surchargeMode || 'money';
+
+  const discValue =
+    discountMode === 'percent'
+      ? Math.round(((baseTotal * discount) / 100) * 100) / 100
+      : discount;
+  const surValue =
+    surchargeMode === 'percent'
+      ? Math.round(((baseTotal * surcharge) / 100) * 100) / 100
+      : surcharge;
+  const finalTotal = Math.max(
+    0,
+    order.finalAmount !== undefined && order.finalAmount > 0
+      ? order.finalAmount
+      : Math.round((baseTotal - discValue + surValue) * 100) / 100,
+  );
+
+  const payments = order.payments ?? [];
+  const paid =
+    payments.reduce((sum, p) => sum + p.amount, 0) || (order.paidAmount ?? 0);
+  const remaining = Math.max(0, Math.round((finalTotal - paid) * 100) / 100);
+
+  let status: WorkOrderPaymentStatus = order.paymentStatus ?? 'pending';
+  if (order.status === 'cancelled') {
+    status = 'cancelled';
+  } else if (paid >= finalTotal && finalTotal > 0) {
+    status = 'paid';
+  } else if (paid > 0) {
+    status = 'partially_paid';
+  } else {
+    status = 'pending';
+  }
+
+  return {
+    baseTotal,
+    discount,
+    discountMode,
+    discValue,
+    surcharge,
+    surchargeMode,
+    surValue,
+    finalTotal,
+    paid,
+    remaining,
+    status,
+    payments,
+  };
+}
+
+export async function registerWorkOrderPayment(
+  osId: string,
+  payment: {
+    method: string;
+    amount: number;
+    receivedAmount?: number;
+    change?: number;
+    discount?: number;
+    discountMode?: 'money' | 'percent';
+    surcharge?: number;
+    surchargeMode?: 'money' | 'percent';
+    note?: string;
+    operatorName?: string;
+  },
+): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+
+  const discount = payment.discount !== undefined ? payment.discount : (order.discount || 0);
+  const discountMode = payment.discountMode ?? order.discountMode ?? 'money';
+  const surcharge = payment.surcharge !== undefined ? payment.surcharge : (order.surcharge || 0);
+  const surchargeMode = payment.surchargeMode ?? order.surchargeMode ?? 'money';
+
+  const baseTotal = workOrderTotal(order);
+  const discValue =
+    discountMode === 'percent'
+      ? Math.round(((baseTotal * discount) / 100) * 100) / 100
+      : discount;
+  const surValue =
+    surchargeMode === 'percent'
+      ? Math.round(((baseTotal * surcharge) / 100) * 100) / 100
+      : surcharge;
+  const finalTotal = Math.max(0, Math.round((baseTotal - discValue + surValue) * 100) / 100);
+
+  const prevPayments = order.payments ?? [];
+  const prevPaid = prevPayments.reduce((sum, p) => sum + p.amount, 0) || (order.paidAmount ?? 0);
+  const newTotalPaid = Math.round((prevPaid + payment.amount) * 100) / 100;
+
+  const entry: WorkOrderPaymentEntry = {
+    id: `PAY-${Date.now().toString(36).toUpperCase()}`,
+    method: payment.method,
+    amount: payment.amount,
+    receivedAmount: payment.receivedAmount,
+    change: payment.change,
+    discount,
+    discountMode,
+    surcharge,
+    surchargeMode,
+    note: payment.note,
+    paidAt: new Date().toISOString(),
+    cashierOperator: payment.operatorName,
+  };
+
+  const nextPayments = [...prevPayments, entry];
+  const isPaid = newTotalPaid >= finalTotal && finalTotal > 0;
+  const paymentStatus: WorkOrderPaymentStatus = isPaid
+    ? 'paid'
+    : newTotalPaid > 0
+    ? 'partially_paid'
+    : 'pending';
+
+  const historyEntry: WorkOrderHistoryEntry = {
+    id: `HIST-${Date.now().toString(36).toUpperCase()}`,
+    authorName: payment.operatorName || 'Caixa',
+    authorRole: 'Operador Financeiro',
+    field: 'Pagamento',
+    action: 'adicionou',
+    toValue: `Recebimento de ${payment.amount.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })} via ${payment.method} (${paymentStatus === 'paid' ? 'OS Quitada' : 'Parcial'})`,
+    createdAt: new Date().toISOString(),
+  };
+
+  const patch: Partial<WorkOrder> = {
+    paymentStatus,
+    paidAmount: newTotalPaid,
+    discount,
+    discountMode,
+    surcharge,
+    surchargeMode,
+    finalAmount: finalTotal,
+    payments: nextPayments,
+    status: isPaid ? 'delivered' : order.status,
+    deliveredAt: isPaid && !order.deliveredAt ? new Date().toISOString() : order.deliveredAt,
+    history: [...(order.history ?? []), historyEntry],
+  };
+
+  return updateWorkOrder(osId, patch);
 }
 
 export function newWorkOrderLineId() {
@@ -1552,6 +2005,7 @@ const AGENDA_ACTIVE: WorkOrderStatus[] = [
   'diagnosis',
   'waiting',
   'progress',
+  'reproved',
   'ready',
 ];
 
@@ -1701,13 +2155,24 @@ export async function addWorkOrderComment(
     kind: input.kind || 'internal',
     createdAt: now(),
   };
+  const historyEntry: WorkOrderHistoryEntry = {
+    id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    authorName: input.authorName || 'Operador',
+    authorPhoto: input.authorPhoto,
+    authorRole: input.authorRole,
+    field: 'Comentário',
+    action: 'adicionou',
+    toValue: input.content.trim(),
+    createdAt: now(),
+  };
   const nextComments = [...(order.comments ?? []), newComment];
-  return updateWorkOrder(osId, { comments: nextComments } as Partial<WorkOrder>);
+  const nextHistory = [...(order.history ?? []), historyEntry];
+  return updateWorkOrder(osId, { comments: nextComments, history: nextHistory } as Partial<WorkOrder>);
 }
 
 export async function addWorkOrderAttachment(
   osId: string,
-  attachment: { name: string; size: number; type: string; dataUrl: string; uploaderName: string },
+  attachment: { name: string; size: number; type: string; dataUrl: string; uploaderName: string; uploaderPhoto?: string },
 ): Promise<WorkOrder | null> {
   const order = getWorkOrder(osId);
   if (!order) return null;
@@ -1720,8 +2185,71 @@ export async function addWorkOrderAttachment(
     createdAt: now(),
     uploaderName: attachment.uploaderName || 'Operador',
   };
+  const historyEntry: WorkOrderHistoryEntry = {
+    id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    authorName: attachment.uploaderName || 'Operador',
+    authorPhoto: attachment.uploaderPhoto,
+    field: 'Anexo',
+    action: 'adicionou',
+    fromValue: 'Nenhuma',
+    toValue: attachment.name,
+    createdAt: now(),
+  };
   const nextAttachments = [...(order.attachments ?? []), newAttachment];
-  return updateWorkOrder(osId, { attachments: nextAttachments } as Partial<WorkOrder>);
+  const nextHistory = [...(order.history ?? []), historyEntry];
+  return updateWorkOrder(osId, { attachments: nextAttachments, history: nextHistory } as Partial<WorkOrder>);
+}
+
+export async function addWorkOrderWorklog(
+  osId: string,
+  input: {
+    technicianName: string;
+    technicianRole?: string;
+    technicianPhoto?: string;
+    minutesSpent: number;
+    description: string;
+    startedAt?: string;
+  },
+): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const mins = Math.max(1, input.minutesSpent);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const formatted = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+
+  const newLog: WorkOrderWorklog = {
+    id: `wlog-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    technicianName: input.technicianName || 'Técnico',
+    technicianRole: input.technicianRole || 'Bancada Técnica',
+    technicianPhoto: input.technicianPhoto,
+    minutesSpent: mins,
+    timeSpentFormatted: formatted,
+    description: input.description.trim(),
+    startedAt: input.startedAt || now(),
+    createdAt: now(),
+  };
+
+  const historyEntry: WorkOrderHistoryEntry = {
+    id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    authorName: input.technicianName || 'Técnico',
+    authorPhoto: input.technicianPhoto,
+    authorRole: input.technicianRole,
+    field: 'Registro de atividades',
+    action: 'adicionou',
+    toValue: `${formatted} — ${input.description.trim()}`,
+    createdAt: now(),
+  };
+
+  const nextWorklogs = [...(order.worklogs ?? []), newLog];
+  const nextHistory = [...(order.history ?? []), historyEntry];
+  const nextSpent = (Number(order.spentMinutes) || 0) + mins;
+
+  return updateWorkOrder(osId, {
+    worklogs: nextWorklogs,
+    history: nextHistory,
+    spentMinutes: nextSpent,
+  } as Partial<WorkOrder>);
 }
 
 export async function removeWorkOrderAttachment(osId: string, attachmentId: string): Promise<WorkOrder | null> {
@@ -1753,4 +2281,26 @@ export async function toggleWorkOrderTimer(osId: string): Promise<WorkOrder | nu
     } as Partial<WorkOrder>);
   }
 }
+
+export async function logWorkOrderActivity(
+  osId: string,
+  field: string,
+  action: 'alterou' | 'adicionou' | 'atualizou' | 'removeu',
+  toValue: string,
+  authorName: string = 'Operador',
+): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const historyEntry: WorkOrderHistoryEntry = {
+    id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    authorName,
+    field,
+    action,
+    toValue,
+    createdAt: now(),
+  };
+  const nextHistory = [...(order.history ?? []), historyEntry];
+  return updateWorkOrder(osId, { history: nextHistory } as Partial<WorkOrder>);
+}
+
 

@@ -77,7 +77,7 @@ function sumEntries(entries: FinanceEntry[], type: 'in' | 'out', from: Date, to:
     .reduce((sum, item) => sum + item.amount, 0);
 }
 
-const OPEN_OS: WorkOrderStatus[] = ['open', 'diagnosis', 'waiting', 'progress', 'ready'];
+const OPEN_OS: WorkOrderStatus[] = ['backlog', 'open', 'diagnosis', 'waiting', 'progress', 'reproved', 'ready'];
 
 function techName(order: WorkOrder) {
   return order.technician.trim() || 'Sem técnico';

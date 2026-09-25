@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BrandLogo } from '../components/BrandLogo';
+import { PublicHeader } from '../components/public/PublicHeader';
+import { PublicFooter } from '../components/public/PublicFooter';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -10,32 +11,17 @@ import {
   type MarthiProductId,
 } from '../data/marthiProducts';
 import { isStoreContracted } from '../data/demoLeadStore';
-import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
+import { marthiWhatsAppHref } from '../data/companyContact';
 import { ingestContactLeadToCrm } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import './home.css';
 import './products.css';
 
-const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
-const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
-
 function IconWhatsApp() {
   return (
-    <svg viewBox="0 0 24 24" className="brand-ico" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
-      />
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
     </svg>
-  );
-}
-
-function IconLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return (
-    <span className="icon-label">
-      {icon}
-      {children}
-    </span>
   );
 }
 
@@ -50,18 +36,29 @@ function productUnlocked(product: MarthiProduct, contracted: boolean) {
   return false;
 }
 
+type ProductCategory = 'all' | 'loja' | 'oficina' | 'gestao' | 'fiscal-ecom';
+
+const CATEGORY_FILTERS: Array<{ id: ProductCategory; label: string }> = [
+  { id: 'all', label: 'Todos os Módulos' },
+  { id: 'loja', label: 'Frente de Loja & Balcão' },
+  { id: 'oficina', label: 'Oficina & Serviços' },
+  { id: 'gestao', label: 'Retaguarda & Gestão' },
+  { id: 'fiscal-ecom', label: 'Fiscal & Canais Online' },
+];
+
 export function ProductsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [contracted, setContracted] = useState(() => isStoreContracted());
-  const [activeId, setActiveId] = useState(MARTHI_PRODUCTS[0]?.id ?? 'totem');
+  const [activeId, setActiveId] = useState<MarthiProductId>(MARTHI_PRODUCTS[0]?.id ?? 'totem');
+  const [category, setCategory] = useState<ProductCategory>('all');
   const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
     null,
   );
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactFeedback, setContactFeedback] = useState('');
-  const [navOpen, setNavOpen] = useState(false);
+
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
   const navBtnRefs = useRef<Partial<Record<MarthiProductId, HTMLButtonElement | null>>>({});
@@ -141,10 +138,11 @@ export function ProductsPage() {
 
   async function submitInterest(event: FormEvent) {
     event.preventDefault();
+    setContactFeedback('');
     const result = await ingestContactLeadToCrm({
       name: contactName,
       whatsapp: contactPhone,
-      message: `Interesse em produtos Marthi · foco: ${active.name}`,
+      message: `Interesse enviado na página de produtos: ${active.name}`,
     });
     if (!result.ok) {
       setContactFeedback(result.error);
@@ -163,64 +161,33 @@ export function ProductsPage() {
     setContactPhone('');
   }
 
+  // Filter products for the quick grid
+  const filteredProducts = MARTHI_PRODUCTS.filter((product) => {
+    if (category === 'all') return true;
+    if (category === 'loja') return product.id === 'totem' || product.id === 'pdv';
+    if (category === 'oficina') return product.id === 'os';
+    if (category === 'gestao') return product.id === 'erp' || product.id === 'painel';
+    if (category === 'fiscal-ecom')
+      return product.id === 'fiscal' || product.id === 'ecommerce' || product.id === 'crm';
+    return true;
+  });
+
   return (
     <div className="site products-page">
       <div className="site__glow" aria-hidden="true" />
 
-      <header className="site__nav">
-        <Link to="/" className="site__nav-brand site__nav-brand--lockup" aria-label="Marthi Tecnologia">
-          <BrandLogo variant="lockup" className="site__nav-lockup" />
-        </Link>
-        <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
-          <Link to="/produtos" aria-current="page" onClick={() => setNavOpen(false)}>
-            Produtos
-          </Link>
-          <Link to="/#planos" onClick={() => setNavOpen(false)}>
-            Planos
-          </Link>
-          <Link to="/#sobre" onClick={() => setNavOpen(false)}>
-            Sobre nós
-          </Link>
-          <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" onClick={() => setNavOpen(false)}>
-            Contato
-          </a>
-          <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
-            Solicitar demo
-          </Link>
-          <Link
-            to="/login"
-            className="site__nav-login site__nav-login--mobile"
-            onClick={() => setNavOpen(false)}
-          >
-            Entrar
-          </Link>
-        </nav>
-        <div className="site__nav-end">
-          <Link to="/login" className="site__nav-login site__nav-login--desk" onClick={() => setNavOpen(false)}>
-            Entrar
-          </Link>
-          <button
-            type="button"
-            className="site__nav-burger"
-            aria-expanded={navOpen}
-            aria-label="Abrir menu"
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            <i />
-            <i />
-            <i />
-          </button>
-        </div>
-      </header>
+      {/* Unified Public Header */}
+      <PublicHeader />
 
       <main>
+        {/* Hero Section with fixed overflow-clip and non-blocking background */}
         <section className="products-hero">
           <div className="products-hero__copy">
-            <p className="eyebrow">Nossos produtos</p>
-            <h1>Tudo que a Marthi atende — da vitrine ao fiscal.</h1>
+            <p className="eyebrow">Catálogo Marthi</p>
+            <h1>Tudo que a sua loja precisa — da vitrine ao fiscal.</h1>
             <p>
-              Totem, caixa, OS, ERP, emissor fiscal, e-commerce e CRM. Escolha os módulos do seu
-              plano e opere a loja em um só ecossistema.
+              Totem touch de autoatendimento, PDV veloz, ordem de serviço para oficina, Retaguarda
+              completa, emissor fiscal e sincronização com marketplaces. Um único ecossistema integrado.
             </p>
             <div className="products-hero__actions">
               <a href="#catalogo" className="btn btn--primary btn--with-icon">
@@ -230,29 +197,30 @@ export function ProductsPage() {
                     d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"
                   />
                 </svg>
-                Explorar catálogo
+                Explorar Catálogo
               </a>
-              <Link to="/parceiro" className="btn btn--ghost btn--with-icon">
+              <Link to="/planos" className="btn btn--ghost btn--with-icon">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     fill="currentColor"
                     d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 2v2H5V6h14zM5 18v-8h14v8H5zm2-2h4v-1.5H7V16zm6 0h4v-1.5h-4V16zM7 12.5h10V11H7v1.5z"
                   />
                 </svg>
-                Montar meu plano
+                Ver Planos & Preços
               </Link>
             </div>
           </div>
           <div className="products-hero__visual" aria-hidden="true">
-            <img src="/home/equipe.jpg" alt="" />
+            <img src="/home/equipe.jpg" alt="" loading="eager" />
             <div className="products-hero__veil" />
           </div>
         </section>
 
+        {/* Segmentos Atendidos */}
         <section className="section products-segments" aria-labelledby="segments-title">
           <div className="section__head">
-            <p className="eyebrow">Para quem</p>
-            <h2 id="segments-title">Segmentos que atendemos</h2>
+            <p className="eyebrow">Soluções por Ramo</p>
+            <h2 id="segments-title">Projetado para o seu modelo de negócio</h2>
           </div>
           <div className="products-segments__grid">
             {MARTHI_SEGMENTS.map((segment) => (
@@ -264,10 +232,15 @@ export function ProductsPage() {
           </div>
         </section>
 
+        {/* Seletor & Detalhe dos Produtos */}
         <section id="catalogo" className="section products-catalog">
           <div className="section__head">
-            <p className="eyebrow">Catálogo</p>
-            <h2>Oito soluções. Uma plataforma.</h2>
+            <p className="eyebrow">Ecossistema Integrado</p>
+            <h2>Oito módulos. Uma experiência completa.</h2>
+            <p style={{ margin: '8px auto 0', maxWidth: '48ch', color: '#64748b' }}>
+              Clique em cada solução para conferir as funcionalidades detalhadas, abrir a demonstração ou
+              adicionar ao seu plano.
+            </p>
           </div>
 
           <div
@@ -314,7 +287,7 @@ export function ProductsPage() {
               <h3>{active.name}</h3>
               <p className="products-catalog__summary">{active.summary}</p>
               <p className="products-catalog__audience">
-                <strong>Para quem:</strong> {active.audience}
+                <strong>Para quem é ideal:</strong> {active.audience}
               </p>
               <ul>
                 {active.features.map((feature) => (
@@ -335,27 +308,50 @@ export function ProductsPage() {
                   </svg>
                   {active.cta ?? 'Abrir módulo'}
                 </button>
-                <Link to="/parceiro" className="btn btn--ghost btn--with-icon">
+                <Link to="/planos" className="btn btn--ghost btn--with-icon">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
-                    />
+                    <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                   </svg>
-                  Incluir no plano
+                  Ver nos Planos
                 </Link>
+                <a
+                  href={marthiWhatsAppHref(`Olá! Gostaria de tirar dúvidas sobre o produto: ${active.name}.`)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn--ghost btn--with-icon"
+                >
+                  <IconWhatsApp />
+                  Dúvidas no WhatsApp
+                </a>
               </div>
             </article>
           </div>
         </section>
 
+        {/* Visão Rápida com Filtro de Categorias */}
         <section className="section products-grid-section">
           <div className="section__head">
-            <p className="eyebrow">Visão rápida</p>
-            <h2>Todos os produtos</h2>
+            <p className="eyebrow">Exploração Rápida</p>
+            <h2>Filtre por Área de Atuação</h2>
           </div>
+
+          <div className="products-filter-bar" role="tablist">
+            {CATEGORY_FILTERS.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                className={`products-filter-pill ${category === cat.id ? 'is-active' : ''}`}
+                onClick={() => setCategory(cat.id)}
+                role="tab"
+                aria-selected={category === cat.id}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
           <div className="products-grid">
-            {MARTHI_PRODUCTS.map((product) => (
+            {filteredProducts.map((product) => (
               <button
                 key={product.id}
                 type="button"
@@ -365,44 +361,56 @@ export function ProductsPage() {
                   document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
+                <span
+                  className="products-grid__badge"
+                  style={{
+                    background: `${product.accent}18`,
+                    color: product.accent,
+                  }}
+                >
+                  {product.tagline}
+                </span>
                 <span className="products-grid__dot" style={{ background: product.accent }} />
                 <strong>{product.name}</strong>
-                <span>{product.tagline}</span>
                 <p>{product.summary}</p>
               </button>
             ))}
           </div>
         </section>
 
+        {/* Próximo Passo & Formulário */}
         <section className="section products-interest">
           <div className="products-interest__card">
             <div>
-              <p className="eyebrow">Próximo passo</p>
-              <h2>Quer ver na prática?</h2>
+              <p className="eyebrow">Demonstração Assistida</p>
+              <h2>Quer ver funcionando na prática?</h2>
               <p>
-                Deixe seu WhatsApp ou fale direto conosco. Um consultor Marthi monta a demo com os
-                módulos certos para a sua loja.
+                Deixe seu contato ou chame no WhatsApp. Um especialista Marthi monta uma demonstração
+                completa personalizada com a realidade do seu ramo.
               </p>
             </div>
             <form onSubmit={submitInterest}>
               <label>
-                Nome
+                Seu Nome
                 <input
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Seu nome"
                   required
                 />
               </label>
               <label>
-                WhatsApp
+                WhatsApp com DDD
                 <input
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="(24) 98124-4253"
                   required
                 />
               </label>
               <button type="submit" className="btn btn--whatsapp">
-                <IconLabel icon={<IconWhatsApp />}>Falar no WhatsApp</IconLabel>
+                <IconWhatsApp />
+                <span>Solicitar Contato no WhatsApp</span>
               </button>
               {contactFeedback ? <p className="products-interest__ok">{contactFeedback}</p> : null}
             </form>
@@ -410,24 +418,8 @@ export function ProductsPage() {
         </section>
       </main>
 
-      <footer className="site__footer">
-        <div className="site__footer-brand">
-          <BrandLogo variant="lockup" className="site__footer-lockup" />
-          <div>
-            <strong>{MARTHI_COMPANY.legalName}</strong>
-            <span>{MARTHI_COMPANY.addressLine}</span>
-            <a href={MARTHI_COMPANY.emailHref}>{MARTHI_COMPANY.email}</a>
-          </div>
-        </div>
-        <nav className="site__footer-links" aria-label="Links rápidos">
-          <Link to="/">Home</Link>
-          <Link to="/produtos">Produtos</Link>
-          <Link to="/parceiro">Solicitar demo</Link>
-          <a href={INSTAGRAM_HREF} target="_blank" rel="noreferrer">
-            Instagram
-          </a>
-        </nav>
-      </footer>
+      {/* Unified Public Footer */}
+      <PublicFooter />
 
       {demoGate ? (
         <DemoLeadGate

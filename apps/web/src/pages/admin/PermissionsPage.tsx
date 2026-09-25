@@ -353,7 +353,7 @@ export function PermissionsPage() {
           <article className="admin-card">
             <h2>Permissões de acesso</h2>
             <p>
-              Atrele áreas e senha de acesso ERP a uma pessoa já cadastrada em{' '}
+              Atrele áreas e senha de acesso à Retaguarda a uma pessoa já cadastrada em{' '}
               <Link to="/erp/funcionarios">Funcionários</Link>. Use <strong>Novo vínculo</strong> para
               liberar login a quem ainda não é usuário do sistema.
             </p>
@@ -386,7 +386,7 @@ export function PermissionsPage() {
                   <th>Login</th>
                   <th>Cargo</th>
                   <th>Áreas</th>
-                  <th>Senha ERP</th>
+                  <th>Senha da Retaguarda</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -441,7 +441,7 @@ export function PermissionsPage() {
           </h2>
           <p>
             Escolha a pessoa, o e-mail de login, as áreas liberadas e (opcional) a senha local de
-            retaguarda do ERP.
+            acesso à Retaguarda.
           </p>
 
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
@@ -512,7 +512,7 @@ export function PermissionsPage() {
             />
 
             <label className="span-2">
-              Senha de acesso ERP (local)
+              Senha de acesso à Retaguarda (local)
               <input
                 type="password"
                 value={form.accessPassword}
@@ -556,7 +556,7 @@ export function PermissionsPage() {
           )}
 
           <p className="empty" style={{ marginTop: 12 }}>
-            Status da senha local: {passwordHint}. Também disponível em Painel ERP → Senhas de
+            Status da senha local: {passwordHint}. Também disponível em Painel Retaguarda → Senhas de
             usuário.
           </p>
 

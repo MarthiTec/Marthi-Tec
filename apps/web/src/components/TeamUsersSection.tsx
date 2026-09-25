@@ -307,13 +307,13 @@ export function TeamUsersSection({ variant, id }: Props) {
             <h2>{variant === 'operations' ? 'Usuários da loja' : 'Funcionários'}</h2>
             {variant === 'operations' ? (
               <p>
-                Cadastre quem pode entrar no sistema sem depender do ERP: e-mail de login, função e
+                Cadastre quem pode entrar no sistema sem depender da Retaguarda: e-mail de login, função e
                 áreas liberadas conforme o plano.
               </p>
             ) : (
               <p>
                 Cadastre o time, marque quem é usuário do sistema e defina as áreas liberadas. A{' '}
-                <strong>senha de acesso local</strong> do ERP também fica neste cadastro (ou em
+                <strong>senha de acesso local</strong> da Retaguarda também fica neste cadastro (ou em
                 Permissões).
               </p>
             )}
@@ -321,7 +321,7 @@ export function TeamUsersSection({ variant, id }: Props) {
               A conta (Google/senha do backend) precisa existir; vincule o mesmo e-mail aqui.{' '}
               {variant === 'operations' && hasModule('erp') ? (
                 <>
-                  RH completo em <Link to="/erp/funcionarios">ERP → Funcionários</Link>. Áreas em{' '}
+                  RH completo em <Link to="/erp/funcionarios">Retaguarda → Funcionários</Link>. Áreas em{' '}
                   <Link to="/erp/permissoes">Permissões</Link>.
                 </>
               ) : hasModule('erp') ? (
@@ -508,7 +508,7 @@ export function TeamUsersSection({ variant, id }: Props) {
             ) : null}
             {form.isSystemUser ? (
               <label className="span-2">
-                Senha de acesso ERP (local)
+                Senha de acesso à Retaguarda (local)
                 <input
                   type="password"
                   value={form.accessPassword}
@@ -557,7 +557,7 @@ export function TeamUsersSection({ variant, id }: Props) {
 
           {form.isSystemUser ? (
             <p className="empty" style={{ marginTop: 12 }}>
-              Status da senha local: {passwordHint}. Também gerenciável em Painel ERP → Senhas de
+              Status da senha local: {passwordHint}. Também gerenciável em Painel Retaguarda → Senhas de
               usuário.
             </p>
           ) : null}

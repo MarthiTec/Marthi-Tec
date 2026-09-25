@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
@@ -9,6 +9,7 @@ import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
+import { registerWorkOrderPayment, logWorkOrderActivity } from '../../data/osStore';
 import {
   applyPriceTable,
   attachOrderCashSession,
@@ -237,6 +238,58 @@ export function CaixaPage() {
   const [lineTableKey, setLineTableKey] = useState<string | null>(null);
   const [cashSettings, setCashSettings] = useState(() => getCashSettings());
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [linkedOsId, setLinkedOsId] = useState<string | null>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    const osState = location.state as {
+      osId?: string;
+      customerName?: string;
+      customerPhone?: string;
+      customerDocument?: string;
+      lines?: Array<{
+        stockId?: string;
+        name: string;
+        qty: number;
+        price: number;
+      }>;
+    } | null;
+
+    if (osState?.osId && osState.lines?.length) {
+      setLinkedOsId(osState.osId);
+      const cartLines: CartLine[] = osState.lines.map((l, idx) => ({
+        key: `os-${osState.osId}-${idx}-${Date.now()}`,
+        stockId: l.stockId || '',
+        name: l.name,
+        sku: '',
+        qty: l.qty || 1,
+        basePrice: l.price || 0,
+        unitPrice: l.price || 0,
+        priceTableId: '',
+        unit: 'UN',
+        lineDiscount: 0,
+        lineDiscountMode: 'money',
+        lineSurcharge: 0,
+        lineSurchargeMode: 'money',
+        imei: '',
+      }));
+      setLines(cartLines);
+      if (osState.customerName) {
+        setCustomerName(osState.customerName);
+        setWalkIn(false);
+      }
+      if (osState.customerPhone) {
+        setCustomerPhone(osState.customerPhone);
+      }
+      if (osState.customerDocument) {
+        setCustomerCpf(osState.customerDocument);
+        setAskCpf(true);
+      }
+      setMessage(`Ordem de Serviço #${osState.osId} carregada no PDV para recebimento.`);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   const fiscalOn = hasModule('fiscal');
   const isAdmin = userIsStoreAdmin(user?.email);
   const customization = useStoreCustomization();
@@ -611,7 +664,7 @@ export function CaixaPage() {
       return;
     }
     if (!primaryPayment || !tables.length) {
-      setError('Cadastre tabela de preço e forma de pagamento no ERP antes de vender.');
+      setError('Cadastre tabela de preço e forma de pagamento na Retaguarda antes de vender.');
       return;
     }
     if (!paySummary.settled) {
@@ -633,7 +686,7 @@ export function CaixaPage() {
       tables.find((item) => item.id === pricedLines[0]?.priceTableId) ??
       tables[0];
     if (!saleTable) {
-      setError('Cadastre tabela de preço no ERP antes de vender.');
+      setError('Cadastre tabela de preço na Retaguarda antes de vender.');
       return;
     }
     const cpfDigits = onlyDigits(customerCpf);
@@ -672,6 +725,24 @@ export function CaixaPage() {
         })),
       });
       const order = state.orders[0];
+      if (linkedOsId) {
+        void registerWorkOrderPayment(linkedOsId, {
+          method: paymentLabel,
+          amount: saleTotal,
+          receivedAmount: saleCash,
+          change: saleChange,
+          operatorName: user?.name || 'Operador PDV',
+          note: `Recebimento via PDV/Caixa (Venda ${order?.id || ''})`,
+        });
+        void logWorkOrderActivity(
+          linkedOsId,
+          'Recebimento PDV',
+          'adicionou',
+          `Venda ${order?.id || ''} concluída no PDV - Valor ${saleTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} via ${paymentLabel}`,
+          user?.name,
+        );
+        setLinkedOsId(null);
+      }
       setLastOrderId(order?.id ?? null);
       setLastOrderAmount(saleTotal);
       setLastChange(saleChange);

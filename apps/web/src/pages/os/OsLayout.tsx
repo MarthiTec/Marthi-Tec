@@ -27,6 +27,12 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
 };
 
 function resolveTitle(pathname: string, search: string) {
+  if (pathname === '/os' && search.includes('view=dashboard')) {
+    return { kicker: 'Oficina', title: 'Resumo e Indicadores' };
+  }
+  if (pathname === '/os' && search.includes('view=backlog')) {
+    return { kicker: 'Oficina', title: 'Backlog e Triagem' };
+  }
   if (pathname === '/os' && search.includes('quote=sent')) {
     return { kicker: 'Oficina', title: 'Orçamentos aguardando' };
   }
@@ -275,6 +281,14 @@ export function OsLayout() {
             <button type="button" className="os-app__ops-central" onClick={() => go('/os')}>
               <AdminIcon name="home" />
               <span>Central</span>
+            </button>
+            <button type="button" onClick={() => go('/os?view=dashboard')}>
+              <AdminIcon name="ops" />
+              <span>Resumo & Métricas</span>
+            </button>
+            <button type="button" onClick={() => go('/os?view=backlog')}>
+              <kbd>F4</kbd>
+              <span>Backlog da Oficina</span>
             </button>
             <button
               type="button"

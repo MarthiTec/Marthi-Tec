@@ -128,7 +128,7 @@ export function PlanPage() {
         <h2>Módulos contratados</h2>
         <p>
           {lockedAll
-            ? 'Golden libera Totem, OS, ERP/PDV, Emissor Fiscal e E-commerce juntos.'
+            ? 'Golden libera Totem, OS, Retaguarda/PDV, Emissor Fiscal e E-commerce juntos.'
             : `${selected.length} de ${limit} módulo(s) no plano ${plan.name}.`}
         </p>
         <div className="module-picker">

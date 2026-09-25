@@ -11,6 +11,7 @@ import {
   type WorkOrderPriority,
 } from '../../data/osStore';
 import { useStoreCustomization } from '../../data/storeSegment';
+import { OsCreatedShareModal } from './OsCreatedShareModal';
 
 type Props = {
   open: boolean;
@@ -56,6 +57,28 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  if (shareOpen && createdOrder) {
+    return (
+      <OsCreatedShareModal
+        open={shareOpen}
+        order={createdOrder}
+        authorName={technician}
+        onClose={() => {
+          setShareOpen(false);
+          onCreated(createdOrder);
+          onClose();
+        }}
+        onContinueToOrder={(order) => {
+          setShareOpen(false);
+          onCreated(order);
+          onClose();
+        }}
+      />
+    );
+  }
 
   if (!open) return null;
 
@@ -113,8 +136,8 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
         parts: Number(parts) || 0,
       });
 
-      onCreated(created);
-      onClose();
+      setCreatedOrder(created);
+      setShareOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao abrir ordem de serviço.');
     } finally {

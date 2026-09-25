@@ -4,6 +4,9 @@ import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductsPage } from './pages/ProductsPage';
+import { PlansPublicPage } from './pages/PlansPublicPage';
+import { AboutPage } from './pages/AboutPage';
+import { ContactPage } from './pages/ContactPage';
 import { PartnerSignupPage } from './pages/PartnerSignupPage';
 import { TotemPage } from './pages/totem/TotemPage';
 import { CaixaPage } from './pages/caixa/CaixaPage';
@@ -90,6 +93,12 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
+        <Route path="/planos" element={<PlansPublicPage />} />
+        <Route path="/precos" element={<Navigate to="/planos" replace />} />
+        <Route path="/sobre" element={<AboutPage />} />
+        <Route path="/sobre-nos" element={<Navigate to="/sobre" replace />} />
+        <Route path="/contato" element={<ContactPage />} />
+        <Route path="/fale-conosco" element={<Navigate to="/contato" replace />} />
         <Route path="/parceiro" element={<PartnerSignupPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />

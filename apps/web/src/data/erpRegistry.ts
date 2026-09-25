@@ -692,6 +692,7 @@ export function canAccessPath(pathname: string, userEmail: string | null | undef
 export function moduleAreas(module: PartnerModuleId): AccessArea[] {
   if (module === 'totem') return ['totem'];
   if (module === 'os') return ['os'];
+  if (module === 'pdv') return ['pdv'];
   if (module === 'fiscal') return ['erp_invoices', 'erp_fiscal'];
   if (module === 'ecommerce') return ['ecommerce'];
   if (module === 'erp') {

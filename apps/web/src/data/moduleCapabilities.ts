@@ -44,12 +44,12 @@ export function hasCapability(id: ModuleCapability): boolean {
       return hasModule('totem');
     case 'catalog.lite':
       return (
-        hasModule('totem') || hasModule('erp') || hasModule('os') || hasModule('ecommerce')
+        hasModule('totem') || hasModule('erp') || hasModule('os') || hasModule('ecommerce') || hasModule('pdv')
       );
     case 'catalog.full':
       return hasModule('erp');
     case 'customers.lite':
-      return hasModule('erp') || hasModule('os');
+      return hasModule('erp') || hasModule('os') || hasModule('pdv');
     case 'customers.full':
       return hasModule('erp');
     case 'finance.full':
@@ -63,7 +63,7 @@ export function hasCapability(id: ModuleCapability): boolean {
     case 'os.ops':
       return hasModule('os');
     case 'pdv.ops':
-      return hasModule('erp');
+      return hasModule('pdv') || hasModule('erp');
     default:
       return false;
   }

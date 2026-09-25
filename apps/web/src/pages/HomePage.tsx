@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BrandLogo } from '../components/BrandLogo';
+import { PublicHeader } from '../components/public/PublicHeader';
+import { PublicFooter } from '../components/public/PublicFooter';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import { PLANS } from '../data/catalog';
@@ -79,7 +80,6 @@ export function HomePage() {
   const [jobCity, setJobCity] = useState('');
   const [jobExp, setJobExp] = useState('');
   const [jobFeedback, setJobFeedback] = useState('');
-  const [navOpen, setNavOpen] = useState(false);
 
   const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os'>('erp');
 
@@ -96,7 +96,7 @@ export function HomePage() {
     showcase === 'pdv'
       ? 'PDV · Caixa na loja'
       : showcase === 'erp'
-        ? 'Marthi ERP · Retaguarda da loja'
+        ? 'Marthi · Retaguarda da loja'
         : showcase === 'painel'
           ? 'Painel da operação · KPIs e gráficos'
           : 'Marthi OS · Quadro da oficina';
@@ -164,61 +164,7 @@ export function HomePage() {
     <div className={`site ${helpOpen ? 'is-frosted' : ''}`}>
       <div className="site__glow" aria-hidden="true" />
 
-      <header className="site__nav">
-        <a href="#topo" className="site__nav-brand site__nav-brand--lockup" aria-label="Marthi Tecnologia">
-          <BrandLogo variant="lockup" className="site__nav-lockup" />
-        </a>
-        <nav className={`site__nav-links ${navOpen ? 'is-open' : ''}`}>
-          <Link to="/produtos" onClick={() => setNavOpen(false)}>
-            Produtos
-          </Link>
-          <a href="#planos" onClick={() => setNavOpen(false)}>
-            Planos
-          </a>
-          <a href="#telas" onClick={() => setNavOpen(false)}>
-            Telas
-          </a>
-          <a href="#sobre" onClick={() => setNavOpen(false)}>
-            Sobre nós
-          </a>
-          <button
-            type="button"
-            className="site__nav-link"
-            onClick={() => {
-              setHelpOpen(true);
-              setNavOpen(false);
-            }}
-          >
-            Contato
-          </button>
-          <Link to="/parceiro" className="site__nav-cta" onClick={() => setNavOpen(false)}>
-            Solicitar demo
-          </Link>
-          <Link
-            to="/login"
-            className="site__nav-login site__nav-login--mobile"
-            onClick={() => setNavOpen(false)}
-          >
-            Entrar
-          </Link>
-        </nav>
-        <div className="site__nav-end">
-          <Link to="/login" className="site__nav-login site__nav-login--desk" onClick={() => setNavOpen(false)}>
-            Entrar
-          </Link>
-          <button
-            type="button"
-            className="site__nav-burger"
-            aria-expanded={navOpen}
-            aria-label="Abrir menu"
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            <i />
-            <i />
-            <i />
-          </button>
-        </div>
-      </header>
+      <PublicHeader />
 
       {helpOpen ? (
         <div className="site-help" role="dialog" aria-labelledby="site-help-title">
@@ -378,9 +324,9 @@ export function HomePage() {
           <div className="showcase__inner">
             <div className="showcase__copy">
               <p className="eyebrow">Por dentro do sistema</p>
-              <h2 id="showcase-title">ERP, painel e oficina — as telas reais da loja.</h2>
+              <h2 id="showcase-title">Retaguarda, painel e oficina — as telas reais da loja.</h2>
               <p>
-                Retaguarda dark da Marthi ERP, painel de operação e quadro da oficina. Troque as
+                Retaguarda dark da Marthi, painel de operação e quadro da oficina. Troque as
                 abas e veja o visual que a equipe usa no dia a dia.
               </p>
               <div className="showcase__tabs" role="tablist" aria-label="Telas do sistema">
@@ -391,7 +337,7 @@ export function HomePage() {
                   className={showcase === 'erp' ? 'is-active' : ''}
                   onClick={() => setShowcase('erp')}
                 >
-                  ERP Retaguarda
+                  Retaguarda
                 </button>
                 <button
                   type="button"
@@ -454,7 +400,7 @@ export function HomePage() {
               <div className="showcase__actions">
                 {showcase === 'erp' ? (
                   <Link to={user ? '/erp' : '/login?next=/erp'} className="btn btn--primary">
-                    Abrir ERP
+                    Abrir Retaguarda
                   </Link>
                 ) : null}
                 {showcase === 'painel' ? (
@@ -600,7 +546,7 @@ export function HomePage() {
             <p className="eyebrow">Planos</p>
             <h2>Escolha o ritmo da sua operação</h2>
             <p className="section__sub">
-              O painel da loja entra em todo plano. Os módulos (Totem, OS, ERP/PDV, Fiscal, E-commerce)
+              O painel da loja entra em todo plano. Os módulos (Totem, OS, Retaguarda/PDV, Fiscal, E-commerce)
               você combina conforme o Bronze, Silver ou Golden.
             </p>
           </div>
@@ -862,27 +808,7 @@ export function HomePage() {
         </section>
       </main>
 
-      <footer className="site__footer">
-        <div className="site__footer-brand">
-          <BrandLogo variant="lockup" className="site__footer-lockup" />
-          <div>
-            <strong>{MARTHI_COMPANY.legalName}</strong>
-            <span>{MARTHI_COMPANY.addressLine}</span>
-            <a href={MARTHI_COMPANY.emailHref}>{MARTHI_COMPANY.email}</a>
-          </div>
-        </div>
-        <nav className="site__footer-links" aria-label="Links rápidos">
-          <Link to="/produtos">Produtos</Link>
-          <a href="#planos">Planos</a>
-          <a href="#sobre">Sobre nós</a>
-          <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer">
-            <IconLabel icon={<IconWhatsApp />}>WhatsApp</IconLabel>
-          </a>
-          <a href={INSTAGRAM_HREF} target="_blank" rel="noreferrer">
-            <IconLabel icon={<IconInstagram />}>Instagram</IconLabel>
-          </a>
-        </nav>
-      </footer>
+      <PublicFooter />
 
       {demoGate ? (
         <DemoLeadGate

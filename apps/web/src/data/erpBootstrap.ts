@@ -138,7 +138,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
     setBootstrap({ loading: false, ready: true, error: null });
     return true;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha ao sincronizar ERP.';
+    const message = error instanceof Error ? error.message : 'Falha ao sincronizar a Retaguarda.';
     setBootstrap({ loading: false, ready: false, error: message });
     console.error('[erp] bootstrap failed', error);
     return false;

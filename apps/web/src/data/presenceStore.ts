@@ -44,7 +44,7 @@ export const PRESENCE_MODULE_LABEL: Record<PresenceModule, string> = {
   painel: 'Painel',
   caixa: 'PDV / Caixa',
   os: 'Oficina',
-  erp: 'ERP',
+  erp: 'Retaguarda',
   fiscal: 'Emissor fiscal',
   ecommerce: 'E-commerce',
   crm: 'CRM Marthi',

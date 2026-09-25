@@ -221,7 +221,7 @@ export function PartnerSignupPage() {
     if (current === 1 && !form.planId) return 'Selecione um plano.';
     if (current === 2) {
       if (form.modules.length === 0) {
-        return 'Escolha ao menos um módulo (Totem, OS, ERP/PDV, Fiscal ou E-commerce).';
+        return 'Escolha ao menos um módulo (Totem, OS, Retaguarda/PDV, Fiscal ou E-commerce).';
       }
       if (lockedAllModules && form.modules.length < PARTNER_MODULES.length) {
         return 'No plano Golden todos os módulos ficam liberados.';

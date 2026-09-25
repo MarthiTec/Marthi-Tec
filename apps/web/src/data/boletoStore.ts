@@ -59,7 +59,7 @@ function seed(): Boleto[] {
       status: 'open',
       customerName: 'Loja Exemplo Ltda',
       customerDocument: '12.345.678/0001-90',
-      description: 'Mensalidade Marthi ERP',
+      description: 'Mensalidade Marthi Retaguarda',
       amount: 289,
       dueDate: dueIso,
       pixCopyPaste: '00020126580014BR.GOV.BCB.PIX0136marthi-demo-pix520400005303986540528.905802BR5913Marthi Demo6009TRES RIOS62070503***6304ABCD',

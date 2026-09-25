@@ -25,7 +25,7 @@ const ECOSYSTEM_APPS: EcosystemApp[] = [
   },
   {
     id: 'erp',
-    name: 'ERP & Estoque',
+    name: 'Retaguarda & Estoque',
     desc: 'Catálogo de peças, almoxarifado, compras e balanço',
     path: '/erp',
     icon: 'box',

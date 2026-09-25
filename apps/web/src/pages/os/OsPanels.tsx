@@ -243,7 +243,7 @@ export function OsHotkeysBar({
         onClick={() => window.dispatchEvent(new CustomEvent('os:focus-search'))}
       >
         <kbd>F7</kbd>
-        <span>buscar OP</span>
+        <span>buscar OS</span>
       </button>
       <button type="button" className="os-hotkeys__hit" onClick={() => navigate('/os/agenda')}>
         <kbd>F6</kbd>

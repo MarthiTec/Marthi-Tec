@@ -24,7 +24,7 @@ import './admin.css';
 const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
-  '/painel': { kicker: 'ERP', title: 'Painel da operação' },
+  '/painel': { kicker: 'Retaguarda', title: 'Painel da operação' },
   '/painel/operacoes': { kicker: 'Operações', title: 'Operações & Ramo da Loja' },
   '/painel/operacoes/usuarios': { kicker: 'Operações', title: 'Usuários da loja' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
@@ -41,7 +41,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
   '/painel/ecommerce': { kicker: 'E-commerce', title: 'Visão da loja online' },
   '/painel/fiscal': { kicker: 'Emissor Fiscal', title: 'Visão fiscal' },
-  '/painel/erp': { kicker: 'ERP', title: 'Visão e ajustes do ERP' },
+  '/painel/erp': { kicker: 'Retaguarda', title: 'Visão e ajustes da Retaguarda' },
   '/painel/notas': { kicker: 'Emissor Fiscal', title: 'Notas de entrada e saída' },
   '/painel/fiscal/config': { kicker: 'Emissor Fiscal', title: 'Configuração fiscal' },
   '/painel/fiscal/cst': { kicker: 'Emissor Fiscal', title: 'CST e cClassTrib' },
@@ -53,8 +53,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/cfop': { kicker: 'Produtos', title: 'CFOP e FECP' },
   '/painel/tabelas': { kicker: 'Produtos', title: 'Tabelas de preço' },
   '/painel/pagamentos': { kicker: 'Vendas', title: 'Formas de pagamento' },
-  '/painel/financeiro': { kicker: 'ERP', title: 'Financeiro' },
-  '/painel/auditoria': { kicker: 'ERP', title: 'Auditoria e acessos' },
+  '/painel/financeiro': { kicker: 'Retaguarda', title: 'Financeiro' },
+  '/painel/auditoria': { kicker: 'Retaguarda', title: 'Auditoria e acessos' },
   '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
   '/painel/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
   '/painel/os/relatorio': { kicker: 'Oficina', title: 'Relatório da OS' },
@@ -87,7 +87,7 @@ function resolveTitle(pathname: string, search: string) {
     TITLES[pathname] ??
     (pathname.startsWith('/painel/os/')
       ? { kicker: 'Oficina', title: 'Ordem de serviço' }
-      : { kicker: 'ERP', title: 'Operação' })
+      : { kicker: 'Retaguarda', title: 'Operação' })
   );
 }
 
@@ -230,7 +230,7 @@ export function AdminLayout() {
 
         <UserChip variant="sidebar" to="/painel/perfil" />
 
-        <nav className="admin__nav" aria-label="Módulos do ERP">
+        <nav className="admin__nav" aria-label="Módulos da Retaguarda">
           {ADMIN_NAV.map((group) => {
             const unlocked = !group.module || hasModule(group.module);
             const opened = openGroups.includes(group.id);

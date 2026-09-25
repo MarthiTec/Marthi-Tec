@@ -24,6 +24,11 @@
   scrollbar-color: transparent transparent;
 }
 
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
+}
+
 html,
 body,
 #root {
@@ -33,6 +38,7 @@ body,
 body {
   margin: 0;
   background: #f5f5f7;
+  overflow-x: clip;
 }
 
 /* Scroll overlay estilo PDV — fino, transparente até hover */

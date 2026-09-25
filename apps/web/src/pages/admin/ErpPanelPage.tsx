@@ -96,12 +96,11 @@ export function ErpPanelPage() {
     <section className="admin-page">
       <div className="admin-toolbar admin-toolbar--lead" style={{ marginBottom: 12 }}>
         <p className="empty" style={{ margin: 0, flex: '1 1 240px', minWidth: 0 }}>
-          Ajustes rápidos para dono/gerente. Cadastros completos, boletos e retaguarda ficam no app
-          ERP.
+          Ajustes rápidos para dono/gerente. Cadastros completos e boletos ficam na Retaguarda.
         </p>
         <Link to="/erp" className="btn btn--primary">
           <AdminIcon name="ops" />
-          Abrir ERP
+          Abrir Retaguarda
         </Link>
       </div>
 
@@ -196,7 +195,7 @@ export function ErpPanelPage() {
                 Atualizar tabela
               </button>
               <Link to="/erp/tabelas" className="btn btn--ghost">
-                Abrir tabelas no ERP
+                Abrir tabelas na Retaguarda
               </Link>
             </div>
           </form>
@@ -248,7 +247,7 @@ export function ErpPanelPage() {
                 Remover
               </button>
               <Link to="/erp/permissoes" className="btn btn--ghost">
-                Permissões no ERP
+                Permissões na Retaguarda
               </Link>
             </div>
           </form>

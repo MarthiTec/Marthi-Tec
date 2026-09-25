@@ -17,9 +17,9 @@ import '../admin/admin.css';
 import './erp.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
-  '/erp': { kicker: 'ERP', title: 'Retaguarda da loja' },
-  '/erp/perfil': { kicker: 'ERP', title: 'Meu perfil' },
-  '/erp/conta': { kicker: 'ERP', title: 'Meu perfil' },
+  '/erp': { kicker: 'Retaguarda', title: 'Retaguarda da loja' },
+  '/erp/perfil': { kicker: 'Retaguarda', title: 'Meu perfil' },
+  '/erp/conta': { kicker: 'Retaguarda', title: 'Meu perfil' },
   '/erp/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
   '/erp/balanco': { kicker: 'Estoque', title: 'Balanço de estoque' },
   '/erp/movimentos': { kicker: 'Estoque', title: 'Movimentação de estoque' },
@@ -86,7 +86,7 @@ export function ErpLayout() {
   const [exitOpen, setExitOpen] = useState(false);
 
   const title = TITLES[location.pathname] ?? {
-    kicker: 'ERP',
+    kicker: 'Retaguarda',
     title: location.pathname.startsWith('/erp/financeiro')
       ? 'Financeiro da loja'
       : 'Retaguarda',
@@ -141,7 +141,7 @@ export function ErpLayout() {
         <OsEcosystemMenu />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
-          <strong>Marthi ERP</strong>
+          <strong>Marthi Retaguarda</strong>
         </div>
         <button type="button" className="erp-app__exit" onClick={() => setExitOpen(true)}>
           Sair
@@ -158,14 +158,14 @@ export function ErpLayout() {
       ) : null}
 
       <div className="erp-app__shell">
-        <aside className="erp-app__side" aria-label="Menu do ERP" aria-hidden={!navOpen}>
+        <aside className="erp-app__side" aria-label="Menu da Retaguarda" aria-hidden={!navOpen}>
           <div className="erp-app__side-head">
             <strong>Navegação</strong>
             <button
               type="button"
               className="erp-app__side-close"
-              title="Central do ERP"
-              aria-label="Ir para a central do ERP"
+              title="Central da Retaguarda"
+              aria-label="Ir para a central da Retaguarda"
               onClick={() => {
                 setNavOpen(false);
                 navigate('/erp');
@@ -224,8 +224,8 @@ export function ErpLayout() {
       <ExitOrLogoutDialog
         open={exitOpen}
         onClose={() => setExitOpen(false)}
-        appName="ERP"
-        exitActionLabel="Sair do ERP"
+        appName="Retaguarda"
+        exitActionLabel="Sair da Retaguarda"
       />
     </div>
   );

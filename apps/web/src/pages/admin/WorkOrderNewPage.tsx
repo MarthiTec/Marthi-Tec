@@ -4,9 +4,10 @@ import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
 import { listSellers } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
-import { createWorkOrder, PRIORITY_LABEL, type WorkOrderPriority } from '../../data/osStore';
+import { createWorkOrder, PRIORITY_LABEL, type WorkOrder, type WorkOrderPriority } from '../../data/osStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { osHref, useOsBase } from '../os/osPaths';
+import { OsCreatedShareModal } from '../os/OsCreatedShareModal';
 
 const EMPTY = {
   customerName: '',
@@ -41,6 +42,8 @@ export function WorkOrderNewPage() {
   const sellers = listSellers(true);
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
   const [error, setError] = useState('');
+  const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   function pickCustomer(id: string) {
     const customer = customers.find((item) => item.id === id);
@@ -60,7 +63,8 @@ export function WorkOrderNewPage() {
     setError('');
     try {
       const created = await createWorkOrder(form);
-      navigate(osHref(osBase, `/${created.id}/relatorio`), { replace: true });
+      setCreatedOrder(created);
+      setShareOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao abrir OS.');
     }
@@ -259,7 +263,7 @@ export function WorkOrderNewPage() {
           </label>
           <div className="span-2 admin-toolbar">
             <button type="submit" className="btn btn--primary">
-              Abrir OS e gerar relatório
+              Abrir OS e compartilhar
             </button>
             <Link to={osBase} className="btn btn--ghost">
               Voltar ao quadro
@@ -267,6 +271,22 @@ export function WorkOrderNewPage() {
           </div>
         </form>
       </article>
+
+      <OsCreatedShareModal
+        open={shareOpen}
+        order={createdOrder}
+        authorName={profile.displayName}
+        onClose={() => {
+          setShareOpen(false);
+          if (createdOrder) {
+            navigate(osHref(osBase, `/${createdOrder.id}/relatorio`), { replace: true });
+          }
+        }}
+        onContinueToOrder={(order) => {
+          setShareOpen(false);
+          navigate(osHref(osBase, `/${order.id}/relatorio`), { replace: true });
+        }}
+      />
     </section>
   );
 }

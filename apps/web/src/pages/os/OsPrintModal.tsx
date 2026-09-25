@@ -39,6 +39,8 @@ function formatDate(iso: string) {
 }
 
 export function OsPrintModal({ order, open, onClose }: Props) {
+  const customization = useStoreCustomization();
+
   useEffect(() => {
     if (open) {
       document.body.classList.add('is-printing-os');
@@ -61,9 +63,8 @@ export function OsPrintModal({ order, open, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  if (!open || !order) return null;
+  if (!open || !order || typeof document === 'undefined') return null;
 
-  const customization = useStoreCustomization();
   const total = workOrderTotal(order);
 
   return createPortal(

@@ -106,8 +106,8 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
   return (
     <section className="op-profile">
       <p className="op-profile__lead">
-        Seu perfil em todo o {workspaceLabel}. Foto, nome e contato valem no painel, ERP, CRM, PDV,
-        OS, fiscal e e-commerce. Cargo só muda com senha de gerente ou pelo ERP.
+        Seu perfil em todo o {workspaceLabel}. Foto, nome e contato valem no painel, Retaguarda, CRM, PDV,
+        OS, fiscal e e-commerce. Cargo só muda com senha de gerente ou pela Retaguarda.
       </p>
 
       {saved ? <p className="op-profile__ok">Perfil atualizado em todos os apps.</p> : null}
@@ -183,7 +183,7 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
           {!roleUnlocked ? (
             <div className="op-profile__role-lock">
               <p>
-                Cargo é definido pelo ERP ou painel administrativo. Para alterar aqui, use a senha de
+                Cargo é definido pela Retaguarda ou painel administrativo. Para alterar aqui, use a senha de
                 gerente.
               </p>
               <div className="op-profile__role-unlock">

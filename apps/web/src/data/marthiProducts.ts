@@ -82,19 +82,19 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   },
   {
     id: 'erp',
-    name: 'ERP da loja',
+    name: 'Retaguarda da loja',
     tagline: 'Estoque, pessoas e financeiro',
     summary:
       'Produtos, PDV, estoque com balanço e movimentos, pessoas, boletos e financeiro — o núcleo da operação.',
     audience: 'Lojas que cresceram além da planilha e precisam de um único painel.',
     features: [
       'Estoque com balanço, movimentos, mín/máx e custo',
-      'PDV/caixa no mesmo contrato do ERP',
+      'PDV/caixa no mesmo contrato da Retaguarda',
       'Clientes, fornecedores, funcionários e permissões',
       'Tabelas de preço, boletos e financeiro',
     ],
     href: '/erp',
-    cta: 'Abrir ERP',
+    cta: 'Abrir Retaguarda',
     accent: '#0e7490',
   },
   {
@@ -153,7 +153,7 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     name: 'Painel da loja',
     tagline: 'O centro de comando',
     summary:
-      'Atalhos para PDV, totem, OS, ERP, plano e ajuda. É de onde a gestão acompanha a operação.',
+      'Atalhos para PDV, totem, OS, Retaguarda, plano e ajuda. É de onde a gestão acompanha a operação.',
     audience: 'Gestores e equipe operacional da loja.',
     features: [
       'Dashboard e atalhos por módulo',

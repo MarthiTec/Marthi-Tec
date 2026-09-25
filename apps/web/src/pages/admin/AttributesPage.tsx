@@ -304,8 +304,8 @@ export function AttributesPage() {
           </p>
           {totemSurface && catalogFull ? (
             <p className="empty">
-              Mesmo cadastro do ERP ·{' '}
-              <Link to="/erp/atributos">Abrir atributos no ERP</Link>
+              Mesmo cadastro da Retaguarda ·{' '}
+              <Link to="/erp/atributos">Abrir atributos na Retaguarda</Link>
             </p>
           ) : null}
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>

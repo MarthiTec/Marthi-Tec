@@ -20,7 +20,7 @@ export const DEMO_PRODUCT_LABEL: Record<DemoProduct, string> = {
   totem: 'Totem',
   caixa: 'PDV / Caixa',
   os: 'Ordem de serviço',
-  erp: 'ERP',
+  erp: 'Retaguarda',
 };
 
 function uid() {

@@ -671,7 +671,7 @@ export function StockPage() {
               {totemSurface && catalogFull ? (
                 <>
                   {' '}
-                  Cadastro completo em <Link to="/erp/produtos">ERP · produtos</Link>.
+                  Cadastro completo em <Link to="/erp/produtos">Retaguarda · produtos</Link>.
                 </>
               ) : null}
             </p>

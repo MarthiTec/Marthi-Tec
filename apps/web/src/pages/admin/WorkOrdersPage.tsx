@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   BOARD_COLUMNS,
   getActiveOperation,
@@ -21,6 +22,8 @@ import { OsNewModal } from '../os/OsNewModal';
 import { OsPrintModal } from '../os/OsPrintModal';
 import { OsSprintModal } from '../os/OsSprintModal';
 import { OsTechnicianRoadmap } from '../os/OsTechnicianRoadmap';
+import { OsBacklogView } from '../os/OsBacklogView';
+import { OsDashboardView } from '../os/OsDashboardView';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -35,7 +38,7 @@ const REFRESH_EVENTS = [
   'marthi-stock',
 ] as const;
 
-type ViewMode = 'board' | 'roadmap' | 'list';
+type ViewMode = 'dashboard' | 'board' | 'backlog' | 'roadmap' | 'list';
 
 function priorityMeta(p: WorkOrderPriority) {
   switch (p) {
@@ -67,7 +70,22 @@ export function WorkOrdersPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<WorkOrderPriority | 'all'>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('board');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const v = params.get('view');
+    if (v === 'dashboard' || v === 'board' || v === 'backlog' || v === 'roadmap' || v === 'list') {
+      return v;
+    }
+    return 'board';
+  });
+
+  function changeView(next: ViewMode) {
+    setViewMode(next);
+    const np = new URLSearchParams(params);
+    if (next === 'board') np.delete('view');
+    else np.set('view', next);
+    setParams(np);
+  }
+
   const [compactMode, setCompactMode] = useState(false);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
 
@@ -241,7 +259,8 @@ export function WorkOrdersPage() {
   }, [orders, query, statusFilter, quoteFilter, opFilter, selectedTech, selectedPriority]);
 
   // Métricas
-  const openCount = orders.filter((item) => !['delivered', 'cancelled'].includes(item.status)).length;
+  const backlogCount = orders.filter((item) => item.status === 'backlog').length;
+  const openCount = orders.filter((item) => !['delivered', 'cancelled', 'backlog'].includes(item.status)).length;
   const progressCount = orders.filter((item) => item.status === 'progress').length;
   const readyCount = orders.filter((item) => item.status === 'ready').length;
   const quoteWaiting = orders.filter((item) => item.quoteStatus === 'sent').length;
@@ -365,7 +384,8 @@ export function WorkOrdersPage() {
                   searchInputRef.current?.blur();
                 }
               }}
-              placeholder="Buscar OP (número, cliente, IMEI, técnico...)"
+              placeholder="Buscar OS..."
+              aria-label="Buscar OS por número, cliente, serial ou defeito"
             />
             {query ? (
               <button
@@ -493,6 +513,36 @@ export function WorkOrdersPage() {
           ) : null}
         </div>
 
+        {/* Combobox Padrão de Prioridades com Ícones (AdminPicker) */}
+        <div className="os-jira-priority-picker-wrap">
+          <AdminPicker
+            compact
+            aria-label="Filtrar por prioridade"
+            value={selectedPriority}
+            options={[
+              { value: 'all', label: `Todas as prioridades (${orders.length})` },
+              {
+                value: 'urgent',
+                label: `⇈ Urgente (${orders.filter((o) => o.priority === 'urgent').length})`,
+              },
+              {
+                value: 'high',
+                label: `↑ Alta (${orders.filter((o) => o.priority === 'high').length})`,
+              },
+              {
+                value: 'normal',
+                label: `= Normal (${orders.filter((o) => o.priority === 'normal').length})`,
+              },
+              {
+                value: 'low',
+                label: `↓ Baixa (${orders.filter((o) => o.priority === 'low').length})`,
+              },
+            ]}
+            onChange={(val) => setSelectedPriority(val as typeof selectedPriority)}
+            className="os-jira-priority-combobox"
+          />
+        </div>
+
         {/* Fila de Avatares / Fotos dos Técnicos (Imagem 2) */}
         <div className="os-jira-avatars-row">
           <button
@@ -551,29 +601,48 @@ export function WorkOrdersPage() {
           </button>
         ) : null}
 
-        {/* Alternador de Visão: Quadro / Roadmap / Lista */}
+        {/* Alternador de Visão: Resumo / Quadro / Backlog / Roadmap / Lista */}
         <div className="os-view-switch">
           <button
             type="button"
+            className={`os-view-btn ${viewMode === 'dashboard' ? 'is-active' : ''}`}
+            onClick={() => changeView('dashboard')}
+            title="Painel Geral / Resumo da Oficina (Gráficos e Indicadores)"
+          >
+            📊 Resumo
+          </button>
+          <button
+            type="button"
             className={`os-view-btn ${viewMode === 'board' ? 'is-active' : ''}`}
-            onClick={() => setViewMode('board')}
-            title="Quadro Kanban"
+            onClick={() => changeView('board')}
+            title="Quadro Kanban da Oficina"
           >
             📋 Quadro
           </button>
           <button
             type="button"
+            className={`os-view-btn ${viewMode === 'backlog' ? 'is-active' : ''}`}
+            onClick={() => changeView('backlog')}
+            title="Tela exclusiva de Backlog e Triagem de Tarefas Não Inicializadas"
+          >
+            ⏳ Backlog
+            {backlogCount > 0 ? (
+              <span className="os-jira-badge-count">{backlogCount}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
             className={`os-view-btn ${viewMode === 'roadmap' ? 'is-active' : ''}`}
-            onClick={() => setViewMode('roadmap')}
+            onClick={() => changeView('roadmap')}
             title="Roadmap do Técnico"
           >
-            📊 Roadmap do Técnico
+            🗺️ Roadmap
           </button>
           <button
             type="button"
             className={`os-view-btn ${viewMode === 'list' ? 'is-active' : ''}`}
-            onClick={() => setViewMode('list')}
-            title="Lista geral"
+            onClick={() => changeView('list')}
+            title="Lista geral de ordens de serviço"
           >
             📑 Lista
           </button>
@@ -609,58 +678,6 @@ export function WorkOrdersPage() {
           <AdminIcon name="plus" />
           <span>Nova OS</span>
           <kbd>F2</kbd>
-        </button>
-      </div>
-
-      {/* Botões de Prioridade Rápida */}
-      <div className="os-priority-filter-bar">
-        <span className="os-priority-filter-bar__title">Prioridade:</span>
-        <button
-          type="button"
-          className={`os-p-filter-pill ${selectedPriority === 'all' ? 'is-active' : ''}`}
-          onClick={() => setSelectedPriority('all')}
-        >
-          Todas ({orders.length})
-        </button>
-        <button
-          type="button"
-          className={`os-p-filter-pill os-p-filter-pill--urgent ${
-            selectedPriority === 'urgent' ? 'is-active' : ''
-          }`}
-          onClick={() => setSelectedPriority(selectedPriority === 'urgent' ? 'all' : 'urgent')}
-        >
-          <span className="os-p-filter-sym">⇈</span>
-          Urgente ({orders.filter((o) => o.priority === 'urgent').length})
-        </button>
-        <button
-          type="button"
-          className={`os-p-filter-pill os-p-filter-pill--high ${
-            selectedPriority === 'high' ? 'is-active' : ''
-          }`}
-          onClick={() => setSelectedPriority(selectedPriority === 'high' ? 'all' : 'high')}
-        >
-          <span className="os-p-filter-sym">↑</span>
-          Alta ({orders.filter((o) => o.priority === 'high').length})
-        </button>
-        <button
-          type="button"
-          className={`os-p-filter-pill os-p-filter-pill--normal ${
-            selectedPriority === 'normal' ? 'is-active' : ''
-          }`}
-          onClick={() => setSelectedPriority(selectedPriority === 'normal' ? 'all' : 'normal')}
-        >
-          <span className="os-p-filter-sym">=</span>
-          Normal ({orders.filter((o) => o.priority === 'normal').length})
-        </button>
-        <button
-          type="button"
-          className={`os-p-filter-pill os-p-filter-pill--low ${
-            selectedPriority === 'low' ? 'is-active' : ''
-          }`}
-          onClick={() => setSelectedPriority(selectedPriority === 'low' ? 'all' : 'low')}
-        >
-          <span className="os-p-filter-sym">↓</span>
-          Baixa ({orders.filter((o) => o.priority === 'low').length})
         </button>
       </div>
 
@@ -737,8 +754,8 @@ export function WorkOrdersPage() {
 
       {error ? <p className="qty-low">{error}</p> : null}
 
-      {/* Cards de Métricas (inibe se optimizeSpace estiver ativo) */}
-      {!optimizeSpace ? (
+      {/* Cards de Métricas (inibe se optimizeSpace estiver ativo ou se estiver no Dashboard/Backlog) */}
+      {!optimizeSpace && viewMode !== 'dashboard' && viewMode !== 'backlog' ? (
         <div className="admin-grid os-metrics-grid">
           <article className="admin-card">
             <h2>Em oficina</h2>
@@ -767,84 +784,158 @@ export function WorkOrdersPage() {
       ) : null}
 
       {/* Conteúdo Principal conforme ViewMode */}
-      {viewMode === 'roadmap' ? (
+      {viewMode === 'dashboard' ? (
+        <OsDashboardView
+          orders={orders}
+          onOpenOrder={(order) => setSelectedDetailOrder(order)}
+          onGoToBoard={(targetStatus) => {
+            if (targetStatus) {
+              const np = new URLSearchParams(params);
+              np.set('status', targetStatus);
+              np.delete('view');
+              setParams(np);
+            }
+            changeView('board');
+          }}
+          onGoToBacklog={() => changeView('backlog')}
+          onNewOrder={() => setNewModalOpen(true)}
+        />
+      ) : viewMode === 'backlog' ? (
+        <OsBacklogView
+          orders={orders}
+          onOpenOrder={(order) => setSelectedDetailOrder(order)}
+          onMoveOrder={move}
+          onUpdatePriority={updatePriority}
+          onNewOrder={() => setNewModalOpen(true)}
+          onGoToBoard={() => changeView('board')}
+        />
+      ) : viewMode === 'roadmap' ? (
         <OsTechnicianRoadmap
           orders={filtered}
           onOpenOrder={(order) => setSelectedDetailOrder(order)}
         />
       ) : viewMode === 'list' ? (
         <article className="admin-card os-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Equipamento</th>
-                <th>Defeito</th>
-                <th>Prioridade</th>
-                <th>Status</th>
-                <th>Técnico</th>
-                <th>Prazo</th>
-                <th>Total</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item) => {
-                const p = priorityMeta(item.priority);
-                const techObj = TECHNICIANS_LIST.find(
-                  (t) => t.name.toLowerCase() === item.technician?.toLowerCase(),
-                );
-                return (
-                  <tr key={item.id}>
-                    <td>
-                      <button
-                        type="button"
-                        className="os-ticket__code"
-                        onClick={() => setSelectedDetailOrder(item)}
-                      >
-                        {item.id}
-                      </button>
-                    </td>
-                    <td>
-                      <strong>{item.customerName}</strong>
-                      <br />
-                      <small>{item.customerPhone}</small>
-                    </td>
-                    <td>{item.itemName}</td>
-                    <td>{item.defect}</td>
-                    <td>
-                      <span className={`os-priority-badge os-priority-badge--${item.priority}`}>
-                        {p.symbol} {p.label}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="os-status-chip">{STATUS_LABEL[item.status]}</span>
-                    </td>
-                    <td>
-                      <div className="os-table-tech">
-                        {techObj ? (
-                          <img src={techObj.avatarUrl} alt={techObj.name} />
+          <div className="os-table-scroll-container">
+            <table className="admin-table os-admin-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Cliente</th>
+                  <th>Equipamento</th>
+                  <th>Defeito</th>
+                  <th>Prioridade</th>
+                  <th>Status</th>
+                  <th>Técnico</th>
+                  <th>Prazo</th>
+                  <th>Total</th>
+                  <th style={{ minWidth: 150 }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => {
+                  const p = priorityMeta(item.priority);
+                  const techObj = TECHNICIANS_LIST.find(
+                    (t) => t.name.toLowerCase() === item.technician?.toLowerCase(),
+                  );
+                  return (
+                    <tr
+                      key={item.id}
+                      className={
+                        item.status === 'reproved'
+                          ? 'os-table-row--reproved'
+                          : item.status === 'backlog'
+                          ? 'os-table-row--backlog'
+                          : ''
+                      }
+                    >
+                      <td>
+                        <button
+                          type="button"
+                          className="os-ticket__code"
+                          onClick={() => setSelectedDetailOrder(item)}
+                          title="Abrir OS"
+                        >
+                          {item.id}
+                        </button>
+                      </td>
+                      <td>
+                        <strong>{item.customerName}</strong>
+                        {item.customerPhone ? (
+                          <>
+                            <br />
+                            <small className="muted">{item.customerPhone}</small>
+                          </>
                         ) : null}
-                        <span>{item.technician || '—'}</span>
-                      </div>
-                    </td>
-                    <td>{item.estimatedReadyAt || '—'}</td>
-                    <td>{money(workOrderTotal(item))}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => setSelectedDetailOrder(item)}
-                      >
-                        Abrir
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <strong>{item.itemName}</strong>
+                        {[item.itemBrand, item.itemModel].filter(Boolean).length > 0 ? (
+                          <div className="os-table-sub">
+                            {[item.itemBrand, item.itemModel].filter(Boolean).join(' ')}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <div className="os-table-defect" title={item.defect}>
+                          {item.defect}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`os-priority-badge os-priority-badge--${item.priority}`}
+                          style={{ color: p.color }}
+                        >
+                          {p.symbol} {p.label}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`os-status-chip os-status-chip--${item.status}`}>
+                          {item.status === 'reproved' ? '⚠️ ' : item.status === 'backlog' ? '⏳ ' : ''}
+                          {STATUS_LABEL[item.status]}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="os-table-tech">
+                          {techObj ? (
+                            <img src={techObj.avatarUrl} alt={techObj.name} />
+                          ) : (
+                            <span className="os-table-tech__placeholder">👤</span>
+                          )}
+                          <span>{item.technician || '—'}</span>
+                        </div>
+                      </td>
+                      <td>{item.estimatedReadyAt || '—'}</td>
+                      <td>
+                        <strong>{money(workOrderTotal(item))}</strong>
+                      </td>
+                      <td>
+                        <div className="os-table-actions">
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setSelectedDetailOrder(item)}
+                            title="Abrir detalhes e fluxo da OS"
+                          >
+                            Abrir
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--sm os-table-btn-print"
+                            onClick={() => setPrintOrder(item)}
+                            title="Pré-visualizar e Imprimir as 2 vias"
+                          >
+                            <AdminIcon name="print" />
+                            <span>Imprimir</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </article>
       ) : quoteFilter === 'sent' ? (
         <article className="admin-card">
@@ -868,28 +959,54 @@ export function WorkOrdersPage() {
           </div>
         </article>
       ) : (
-        <div className="os-board" onWheel={handleBoardWheel}>
-          {columns.map((status) => {
-            const column = filtered.filter((item) => item.status === status);
-            return (
-              <JiraBoardColumn
-                key={status}
-                status={status}
-                orders={column}
-                compact={compactMode}
-                isOver={overStatus === status}
-                draggingId={draggingId}
-                onOpenOrder={(order) => setSelectedDetailOrder(order)}
-                onDragOver={() => setOverStatus(status)}
-                onDragLeave={() => setOverStatus((cur) => (cur === status ? null : cur))}
-                onDrop={() => onDrop(status)}
-                onMove={move}
-                onUpdatePriority={updatePriority}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-              />
-            );
-          })}
+        <div className="os-board-wrapper">
+          {backlogCount > 0 && !statusFilter ? (
+            <div className="os-board-backlog-callout" onClick={() => changeView('backlog')}>
+              <div className="os-board-backlog-callout__text">
+                <span className="os-board-backlog-callout__icon">⏳</span>
+                <div>
+                  <strong>
+                    {backlogCount} {backlogCount === 1 ? 'chamado aguardando' : 'chamados aguardando'} no Backlog
+                  </strong>
+                  <p>Tarefas recém-criadas que ainda não entraram em operação nas bancadas.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  changeView('backlog');
+                }}
+              >
+                <span>Acessar Backlog →</span>
+              </button>
+            </div>
+          ) : null}
+
+          <div className="os-board" onWheel={handleBoardWheel}>
+            {columns.map((status) => {
+              const column = filtered.filter((item) => item.status === status);
+              return (
+                <JiraBoardColumn
+                  key={status}
+                  status={status}
+                  orders={column}
+                  compact={compactMode}
+                  isOver={overStatus === status}
+                  draggingId={draggingId}
+                  onOpenOrder={(order) => setSelectedDetailOrder(order)}
+                  onDragOver={() => setOverStatus(status)}
+                  onDragLeave={() => setOverStatus((cur) => (cur === status ? null : cur))}
+                  onDrop={() => onDrop(status)}
+                  onMove={move}
+                  onUpdatePriority={updatePriority}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -989,7 +1106,10 @@ function JiraBoardColumn({
       onDrop={handleDrop}
     >
       <header className="os-col__head">
-        <h2>{STATUS_LABEL[status]}</h2>
+        <h2>
+          {status === 'backlog' ? '⏳ ' : status === 'reproved' ? '⚠️ ' : ''}
+          {STATUS_LABEL[status]}
+        </h2>
         <span>{orders.length}</span>
       </header>
       {orders.length === 0 ? <p className="empty">Solte aqui</p> : null}
@@ -1056,6 +1176,8 @@ function JiraWorkOrderCard({
     <article
       className={`os-ticket os-jira-card ${dragging ? 'is-dragging' : ''} ${
         compact ? 'is-compact' : ''
+      } ${order.status === 'reproved' ? 'is-reproved' : ''} ${
+        order.status === 'backlog' ? 'is-backlog' : ''
       }`}
       draggable
       onDragStart={handleDragStart}
@@ -1067,33 +1189,65 @@ function JiraWorkOrderCard({
       {/* Faixa vertical colorida de prioridade no lado esquerdo (Imagem 1) */}
       <div
         className="os-jira-card__stripe"
-        style={{ backgroundColor: pMeta.color }}
+        style={{ backgroundColor: order.status === 'reproved' ? '#ef4444' : pMeta.color }}
       />
 
       <div className="os-jira-card__inner">
-        {/* Topo do Card */}
-        <div className="os-jira-card__top">
-          <strong className="os-jira-card__title">
-            {order.itemName}
-            {order.defect ? ` — ${order.defect}` : ''}
-          </strong>
-          <span className="os-jira-card__edit-icon" title="Editar OS">✎</span>
-        </div>
-
-        {/* Badges de Status e Cliente (Imagem 1) */}
-        {!compact ? (
-          <div className="os-jira-card__tags">
-            <span className="os-jira-card__status-pill">
-              {STATUS_LABEL[order.status]}
-            </span>
-            <span className="os-jira-card__client-pill" title="Cliente solicitante">
-              {order.customerName}
-            </span>
-            {order.itemRef ? (
-              <span className="os-jira-card__ref-pill">{order.itemRef}</span>
-            ) : null}
+        {/* Corpo com Scroll Interno Seguro (Mouse & Trackpad) */}
+        <div
+          className="os-jira-card__body"
+          onWheel={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollHeight > el.clientHeight) {
+              e.stopPropagation();
+            }
+          }}
+        >
+          {/* Topo do Card */}
+          <div className="os-jira-card__top">
+            <strong className="os-jira-card__title">
+              {order.itemName}
+              {order.defect ? ` — ${order.defect}` : ''}
+            </strong>
+            <span className="os-jira-card__edit-icon" title="Editar OS">✎</span>
           </div>
-        ) : null}
+
+          {/* Badges de Status e Cliente (Imagem 1) */}
+          {!compact ? (
+            <div className="os-jira-card__tags">
+              <span
+                className={`os-jira-card__status-pill ${
+                  order.status === 'reproved'
+                    ? 'os-jira-card__status-pill--reproved'
+                    : order.status === 'backlog'
+                    ? 'os-jira-card__status-pill--backlog'
+                    : ''
+                }`}
+              >
+                {order.status === 'reproved' ? '⚠️ ' : order.status === 'backlog' ? '⏳ ' : ''}
+                {STATUS_LABEL[order.status]}
+              </span>
+              <span className="os-jira-card__client-pill" title="Cliente solicitante">
+                {order.customerName}
+              </span>
+              {order.itemRef ? (
+                <span className="os-jira-card__ref-pill">{order.itemRef}</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {order.notes ? (
+            <div className="os-jira-card__notes-snippet" title={order.notes}>
+              <span>📝 {order.notes}</span>
+            </div>
+          ) : null}
+
+          {order.status === 'reproved' ? (
+            <div className="os-jira-card__rework-notice" title="Aparelho reprovado na entrega. Necessita retrabalho do técnico.">
+              <span>⚠️ Retrabalho: dar continuidade</span>
+            </div>
+          ) : null}
+        </div>
 
         {/* Rodapé do Card (Imagem 1: Código, Prioridade Dropdown, Foto do Técnico) */}
         <div className="os-jira-card__foot" onClick={(e) => e.stopPropagation()}>

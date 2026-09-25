@@ -1,4 +1,4 @@
-﻿.site {
+.site {
   --ink: #12151a;
   --mist: #f3f5f7;
   --fog: #e6eaef;
@@ -14,7 +14,7 @@
     radial-gradient(1200px 520px at 100% -10%, rgba(15, 118, 110, 0.1), transparent 55%),
     radial-gradient(900px 420px at -5% 30%, rgba(18, 21, 26, 0.04), transparent 50%),
     linear-gradient(180deg, #fbfcfd 0%, #f3f5f7 42%, #eef1f4 100%);
-  overflow-x: hidden;
+  overflow-x: clip;
   font-family: var(--font-sans);
 }
 
@@ -199,7 +199,9 @@
   margin: 0;
   padding: 0;
   max-width: none;
-  overflow: hidden;
+  overflow: clip;
+  overflow-x: clip;
+  overflow-y: visible;
   isolation: isolate;
 }
 
@@ -208,6 +210,9 @@
   inset: 0;
   z-index: 0;
   margin: 0;
+  pointer-events: none !important;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .hero__media img {
@@ -217,6 +222,9 @@
   object-position: center 28%;
   transform: scale(1.04);
   animation: hero-ken 18s ease-in-out infinite alternate;
+  pointer-events: none !important;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 @keyframes hero-ken {
@@ -234,6 +242,7 @@
   background:
     linear-gradient(90deg, rgba(10, 14, 18, 0.78) 0%, rgba(10, 14, 18, 0.42) 48%, rgba(10, 14, 18, 0.18) 100%),
     linear-gradient(0deg, rgba(10, 14, 18, 0.55) 0%, transparent 42%);
+  pointer-events: none !important;
 }
 
 .hero__copy {
@@ -1482,6 +1491,7 @@ button.site__nav-cta {
   background:
     linear-gradient(105deg, rgba(6, 10, 14, 0.9) 0%, rgba(6, 10, 14, 0.58) 40%, rgba(6, 10, 14, 0.2) 70%, rgba(6, 10, 14, 0.4) 100%),
     linear-gradient(0deg, rgba(6, 10, 14, 0.7) 0%, transparent 48%);
+  pointer-events: none !important;
 }
 
 .hero__grain {

@@ -50,7 +50,7 @@ function seed(): Store {
         ],
         giftStockId: '',
         giftMinQty: 10,
-        note: 'Exemplo: 1 é 4 · 3 é 10. Vincule produtos no ERP.',
+        note: 'Exemplo: 1 é 4 · 3 é 10. Vincule produtos na Retaguarda.',
         createdAt: new Date().toISOString(),
       },
     ],

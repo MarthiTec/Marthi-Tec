@@ -219,7 +219,7 @@ export function PriceTablesPage() {
           <h2>{crudFormTitle(mode, 'tabela de preço')}</h2>
           {error ? <p className="qty-low">{error}</p> : null}
           <p>
-            Percentual sobre o preço de estoque. Formas de pagamento do ERP vinculam uma tabela ao
+            Percentual sobre o preço de estoque. Formas de pagamento da Retaguarda vinculam uma tabela ao
             PDV.
           </p>
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
