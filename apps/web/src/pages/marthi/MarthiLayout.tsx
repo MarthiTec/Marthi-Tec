@@ -81,6 +81,22 @@ export function MarthiLayout() {
             <AdminIcon name="people" />
             <span className="admin__link-label">Clientes ativos</span>
           </NavLink>
+          <NavLink
+            to="/admin/planos"
+            title="Planos comerciais"
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="receipt" />
+            <span className="admin__link-label">Planos comerciais</span>
+          </NavLink>
+          <NavLink
+            to="/admin/recebimentos"
+            title="Recebimentos & Pix"
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="payments" />
+            <span className="admin__link-label">Recebimentos & Pix</span>
+          </NavLink>
         </nav>
 
         <div className="admin__sidebar-foot">

@@ -124,8 +124,12 @@ export function isPlanId(value: string | null): value is PlanId {
   return normalizePlanId(value) !== null;
 }
 
+import { getCommercialPlanById } from './plansStore';
+
 export function getPlanById(planId: PlanId) {
   const id = normalizePlanId(planId) ?? 'bronze';
+  const dynamic = getCommercialPlanById(id);
+  if (dynamic) return dynamic;
   return PLANS.find((plan) => plan.id === id) ?? PLANS[0];
 }
 

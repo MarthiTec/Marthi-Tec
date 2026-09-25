@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { getAdminState } from '../../data/adminStore';
 import { listSellers } from '../../data/erpRegistry';
@@ -59,6 +59,19 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
   const [busy, setBusy] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        const form = document.querySelector('.os-modal__form') as HTMLFormElement | null;
+        form?.requestSubmit();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
 
   if (shareOpen && createdOrder) {
     return (
@@ -469,8 +482,10 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
               type="submit"
               className="btn btn--primary os-modal__submit-btn"
               disabled={busy}
+              title="Salvar Ordem de Serviço [Ctrl+S]"
             >
-              {busy ? 'Abrindo OS…' : 'Abrir Ordem de Serviço'}
+              <span>{busy ? 'Abrindo OS…' : 'Abrir Ordem de Serviço'}</span>
+              <kbd className="os-key-badge">Ctrl+S</kbd>
             </button>
           </footer>
         </form>

@@ -80,6 +80,8 @@ import { OperatorAccountPage } from './pages/shared/OperatorAccountPage';
 import { MarthiLayout } from './pages/marthi/MarthiLayout';
 import { MarthiDashboardPage } from './pages/marthi/MarthiDashboardPage';
 import { MarthiClientsPage } from './pages/marthi/MarthiClientsPage';
+import { MarthiPlansPage } from './pages/marthi/MarthiPlansPage';
+import { MarthiPayoutSettingsPage } from './pages/marthi/MarthiPayoutSettingsPage';
 import { CardapioPublicPage } from './pages/cardapio/CardapioPublicPage';
 import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
 import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
@@ -114,6 +116,8 @@ export function App() {
         <Route path="/admin" element={<MarthiLayout />}>
           <Route index element={<MarthiDashboardPage />} />
           <Route path="clientes" element={<MarthiClientsPage />} />
+          <Route path="planos" element={<MarthiPlansPage />} />
+          <Route path="recebimentos" element={<MarthiPayoutSettingsPage />} />
         </Route>
         <Route path="/marthi/*" element={<LegacyMarthiRedirect />} />
         <Route path="/painel-marthi" element={<Navigate to="/admin" replace />} />

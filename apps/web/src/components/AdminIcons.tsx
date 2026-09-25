@@ -20,7 +20,12 @@ export type AdminIconName =
   | 'mail'
   | 'settings'
   | 'print'
-  | 'trash';
+  | 'trash'
+  | 'payments'
+  | 'receipt'
+  | 'edit'
+  | 'restore'
+  | 'dollar';
 
 type AdminIconProps = {
   name: AdminIconName;
@@ -190,6 +195,40 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
       return (
         <svg {...common}>
           <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l1-12M10 11v6M14 11v6" />
+        </svg>
+      );
+    case 'payments':
+      return (
+        <svg {...common}>
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <path d="M2 10h20M7 15h3" />
+        </svg>
+      );
+    case 'receipt':
+      return (
+        <svg {...common}>
+          <path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2L4 2z" />
+          <path d="M8 8h8M8 12h8M8 16h4" />
+        </svg>
+      );
+    case 'edit':
+      return (
+        <svg {...common}>
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        </svg>
+      );
+    case 'restore':
+      return (
+        <svg {...common}>
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+      );
+    case 'dollar':
+      return (
+        <svg {...common}>
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       );
     default:

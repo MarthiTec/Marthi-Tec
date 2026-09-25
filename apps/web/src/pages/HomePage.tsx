@@ -4,7 +4,8 @@ import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
-import { PLANS } from '../data/catalog';
+import { PLANS, type PlanId } from '../data/catalog';
+import { getCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
 import { MARTHI_PRODUCTS } from '../data/marthiProducts';
 import {
   enableLivePresentation,
@@ -60,7 +61,8 @@ function IconLabel({ icon, children }: { icon: ReactNode; children: ReactNode })
 export function HomePage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activePlan, setActivePlan] = useState<(typeof PLANS)[number]['id']>('silver');
+  const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>(() => getCommercialPlans());
+  const [activePlan, setActivePlan] = useState<PlanId>('silver');
   const [helpOpen, setHelpOpen] = useState(false);
   const [contracted, setContracted] = useState(() => isStoreContracted());
   const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
@@ -121,11 +123,18 @@ export function HomePage() {
     function refresh() {
       setContracted(isStoreContracted());
     }
+    function refreshPlans() {
+      setCommercialPlans(getCommercialPlans());
+    }
     window.addEventListener('marthi-plan-updated', refresh);
+    window.addEventListener(PLANS_UPDATED_EVENT, refreshPlans);
     window.addEventListener('storage', refresh);
+    window.addEventListener('storage', refreshPlans);
     return () => {
       window.removeEventListener('marthi-plan-updated', refresh);
+      window.removeEventListener(PLANS_UPDATED_EVENT, refreshPlans);
       window.removeEventListener('storage', refresh);
+      window.removeEventListener('storage', refreshPlans);
     };
   }, []);
 
@@ -154,7 +163,7 @@ export function HomePage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [helpOpen]);
 
-  const selected = PLANS.find((plan) => plan.id === activePlan) ?? PLANS[1];
+  const selected = commercialPlans.find((plan) => plan.id === activePlan) ?? commercialPlans[0] ?? PLANS[1];
 
   function openDemo(product: 'totem' | 'caixa' | 'os', to: string) {
     setDemoGate({ product, to });
@@ -551,19 +560,28 @@ export function HomePage() {
             </p>
           </div>
           <div className="plans">
-            {PLANS.map((plan) => (
+            {commercialPlans.map((plan) => (
               <button
                 key={plan.id}
                 type="button"
-                className={`plan-card plan-card--${plan.id} ${activePlan === plan.id ? 'is-active' : ''} ${'featured' in plan && plan.featured ? 'is-featured' : ''}`}
+                className={`plan-card plan-card--${plan.id} ${activePlan === plan.id ? 'is-active' : ''} ${plan.featured ? 'is-featured' : ''}`}
                 onClick={() => setActivePlan(plan.id)}
               >
-                {'featured' in plan && plan.featured ? (
-                  <span className="plan-card__badge">Mais escolhido</span>
+                {plan.featured ? (
+                  <span className="plan-card__badge">{plan.commercialCallout || 'Mais escolhido'}</span>
                 ) : null}
                 <h3>{plan.name}</h3>
                 <p className="plan-card__price">
-                  {plan.price}
+                  {plan.promotionalPrice ? (
+                    <>
+                      <span style={{ textDecoration: 'line-through', opacity: 0.6, fontSize: '0.85em', marginRight: '6px' }}>
+                        {plan.price}
+                      </span>
+                      <span>{plan.promotionalPrice}</span>
+                    </>
+                  ) : (
+                    plan.price
+                  )}
                   <small>{plan.period}</small>
                 </p>
                 <p className="plan-card__blurb">{plan.blurb}</p>

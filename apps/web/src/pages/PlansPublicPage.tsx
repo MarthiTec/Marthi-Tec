@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
-import { PLANS, PARTNER_MODULES, type PartnerModuleId } from '../data/catalog';
+import { PARTNER_MODULES, type PartnerModuleId } from '../data/catalog';
+import { getCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
 import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
 import './publicPages.css';
 
@@ -42,7 +43,20 @@ const FAQ_ITEMS = [
 ];
 
 export function PlansPublicPage() {
+  const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>(() => getCommercialPlans());
   const [selectedModules, setSelectedModules] = useState<PartnerModuleId[]>(['erp', 'os']);
+
+  useEffect(() => {
+    function refresh() {
+      setCommercialPlans(getCommercialPlans());
+    }
+    window.addEventListener(PLANS_UPDATED_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(PLANS_UPDATED_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   function toggleModule(id: PartnerModuleId) {
     setSelectedModules((prev) =>
@@ -52,18 +66,22 @@ export function PlansPublicPage() {
 
   // Calculate recommended plan based on selected modules
   const moduleCount = selectedModules.length;
+  const bronze = commercialPlans.find((p) => p.id === 'bronze');
+  const silver = commercialPlans.find((p) => p.id === 'silver');
+  const golden = commercialPlans.find((p) => p.id === 'golden');
+
   let recommendedPlan = 'silver';
-  let recommendedText = 'Plano Silver (Até 2 módulos)';
-  let recommendedPrice = 'R$ 497/mês';
+  let recommendedText = `Plano ${silver?.name || 'Silver'} (Até ${silver?.maxModules || 2} módulos)`;
+  let recommendedPrice = `${silver?.promotionalPrice || silver?.price || 'R$ 497'}${silver?.period || '/mês'}`;
 
   if (moduleCount <= 1) {
     recommendedPlan = 'bronze';
-    recommendedText = 'Plano Bronze (1 módulo)';
-    recommendedPrice = 'R$ 197/mês';
+    recommendedText = `Plano ${bronze?.name || 'Bronze'} (${bronze?.maxModules || 1} módulo)`;
+    recommendedPrice = `${bronze?.promotionalPrice || bronze?.price || 'R$ 197'}${bronze?.period || '/mês'}`;
   } else if (moduleCount >= 3) {
     recommendedPlan = 'golden';
-    recommendedText = 'Plano Golden (Todos os módulos liberados)';
-    recommendedPrice = 'R$ 597/mês';
+    recommendedText = `Plano ${golden?.name || 'Golden'} (Todos os módulos liberados)`;
+    recommendedPrice = `${golden?.promotionalPrice || golden?.price || 'R$ 597'}${golden?.period || '/mês'}`;
   }
 
   return (
@@ -83,21 +101,32 @@ export function PlansPublicPage() {
 
         {/* Pricing Cards */}
         <section className="plans-grid">
-          {PLANS.map((plan) => {
-            const isFeatured = plan.id === 'silver';
+          {commercialPlans.map((plan) => {
+            const isFeatured = plan.featured;
             return (
               <article
                 key={plan.id}
                 className={`plan-card ${isFeatured ? 'plan-card--featured' : ''}`}
               >
-                {isFeatured ? <div className="plan-card__badge">Mais escolhido</div> : null}
+                {isFeatured ? (
+                  <div className="plan-card__badge">{plan.commercialCallout || 'Mais escolhido'}</div>
+                ) : null}
 
                 <div>
                   <div className="plan-card__header">
                     <h2 className="plan-card__name">{plan.name}</h2>
                     <p className="plan-card__blurb">{plan.blurb}</p>
                     <div className="plan-card__price-row">
-                      <span className="plan-card__price">{plan.price}</span>
+                      {plan.promotionalPrice ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', opacity: 0.6, fontSize: '0.85em', marginRight: '6px' }}>
+                            {plan.price}
+                          </span>
+                          <span className="plan-card__price">{plan.promotionalPrice}</span>
+                        </>
+                      ) : (
+                        <span className="plan-card__price">{plan.price}</span>
+                      )}
                       <span className="plan-card__period">{plan.period}</span>
                     </div>
                   </div>

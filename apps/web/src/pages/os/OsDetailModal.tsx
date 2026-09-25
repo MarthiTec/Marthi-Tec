@@ -222,6 +222,14 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
         else if (sMenuOpen) setSMenuOpen(false);
         else onClose();
       }
+      if (e.key === 'F2') {
+        e.preventDefault();
+        handleFinalizeOrReceive();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setPrintOpen(true);
+      }
       if (e.key === 'm' || e.key === 'M') {
         const target = e.target as HTMLElement;
         if (!['INPUT', 'TEXTAREA'].includes(target.tagName)) {
@@ -565,6 +573,16 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
       text = `Olá, ${order.customerName}! Seu equipamento ${order.itemName} (OS #${order.id}) está pronto para retirada!`;
     }
     return `https://wa.me/55${phone}?text=${encodeURIComponent(text)}`;
+  }
+
+  function getEmailUrl() {
+    if (!order) return '';
+    const email = (order.customerEmail || '').trim();
+    const subject = encodeURIComponent(`Ordem de Serviço #${order.id} - ${order.itemName} | Marthi Oficina`);
+    const body = encodeURIComponent(
+      `Olá, ${order.customerName}!\n\nAtualização sobre sua Ordem de Serviço #${order.id}:\nItem: ${order.itemName}\nStatus atual: ${STATUS_LABEL[order.status]}\nValor Total: ${money(total)}\n\nEstamos à disposição para qualquer esclarecimento!\nEquipe Marthi Oficina`
+    );
+    return `mailto:${email}?subject=${subject}&body=${body}`;
   }
 
   return (
@@ -1692,16 +1710,16 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                     </button>
                   </div>
 
-                  {/* WhatsApp */}
+                  {/* WhatsApp e E-mail */}
                   <div className="os-jira-wa-group">
-                    <span className="os-jira-sub-label">Notificar Cliente (WhatsApp):</span>
+                    <span className="os-jira-sub-label">Notificar Cliente (WhatsApp & E-mail):</span>
                     <div className="os-jira-wa-buttons">
                       <a
                         href={getWhatsAppUrl('created')}
                         target="_blank"
                         rel="noreferrer"
                         className="os-jira-wa-btn"
-                        title="Enviar mensagem de recebimento do aparelho"
+                        title="Enviar WhatsApp de recebimento do aparelho"
                       >
                         💬 Entrada
                       </a>
@@ -1710,7 +1728,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                         target="_blank"
                         rel="noreferrer"
                         className="os-jira-wa-btn"
-                        title="Enviar mensagem com valor do orçamento"
+                        title="Enviar WhatsApp com valor do orçamento"
                       >
                         💬 Orçamento
                       </a>
@@ -1719,10 +1737,19 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                         target="_blank"
                         rel="noreferrer"
                         className="os-jira-wa-btn"
-                        title="Enviar aviso de aparelho pronto para retirada"
+                        title="Enviar WhatsApp de aparelho pronto para retirada"
                       >
                         💬 Pronta
                       </a>
+                      {order.customerEmail ? (
+                        <a
+                          href={getEmailUrl()}
+                          className="os-jira-wa-btn os-jira-wa-btn--email"
+                          title="Enviar dados da OS por E-mail ao cliente"
+                        >
+                          ✉️ E-mail
+                        </a>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1740,11 +1767,12 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                         onClick={handleFinalizeOrReceive}
                         title={
                           checkoutMode === 'os_standalone'
-                            ? 'Registrar pagamento desta OS'
-                            : 'Enviar esta OS para o PDV/Caixa'
+                            ? 'Registrar pagamento desta OS [F2]'
+                            : 'Enviar esta OS para o PDV/Caixa [F2]'
                         }
                       >
-                        {checkoutMode === 'os_standalone' ? '💰 Receber Pagamento' : '🖥️ Enviar para o PDV'}
+                        <span>{checkoutMode === 'os_standalone' ? '💰 Receber Pagamento' : '🖥️ Enviar para o PDV'}</span>
+                        <kbd className="os-key-badge">F2</kbd>
                       </button>
                     ) : null}
 
@@ -1764,9 +1792,10 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                       type="button"
                       className="btn btn--sm os-jira-side-link os-jira-side-link--print"
                       onClick={() => setPrintOpen(true)}
-                      title="Pré-visualizar e Imprimir as 2 Vias (Bancada e Cliente)"
+                      title="Pré-visualizar e Imprimir as 2 Vias (Bancada e Cliente) [Ctrl+P]"
                     >
-                      🖨️ Pré-visualizar Impressão (2 Vias)
+                      <span>🖨️ Imprimir OS (2 Vias)</span>
+                      <kbd className="os-key-badge">Ctrl+P</kbd>
                     </button>
                     <Link
                       to={`/os/${order.id}/relatorio`}

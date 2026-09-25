@@ -266,14 +266,11 @@ export function OsLayout() {
             <button
               type="button"
               className="os-app__ops-close"
-              title="Quadro da oficina"
-              aria-label="Ir para o quadro da oficina"
-              onClick={() => {
-                setOpsMenuOpen(false);
-                navigate('/os');
-              }}
+              title="Fechar operações"
+              aria-label="Fechar operações"
+              onClick={() => setOpsMenuOpen(false)}
             >
-              <AdminIcon name="home" />
+              <AdminIcon name="collapse" />
             </button>
           </div>
           <UserChip to="/os/perfil" />

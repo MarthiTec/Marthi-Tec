@@ -185,3 +185,664 @@
   border-color: rgba(148, 163, 184, 0.28);
   color: #e5e7eb;
 }
+
+/* ==========================================================================
+   Marthi Commercial Plans Grid & Cards
+   ========================================================================== */
+.marthi-feedback-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 12px;
+  color: #166534;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.marthi-feedback-banner button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-weight: bold;
+}
+
+.marthi-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.marthi-plan-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.marthi-plan-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.marthi-plan-card.is-featured {
+  border: 2px solid #0f766e;
+}
+
+.marthi-plan-card.is-inactive {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.marthi-plan-card__header {
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.marthi-plan-card__badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.marthi-plan-card__id {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.marthi-plan-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.marthi-plan-badge--featured {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.marthi-plan-badge--inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.marthi-plan-card__title {
+  margin: 0 0 4px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.marthi-plan-card__callout {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.marthi-plan-card__pricing {
+  margin-bottom: 16px;
+}
+
+.marthi-plan-card__price-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.marthi-plan-card__amount {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.marthi-plan-card__period {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.marthi-plan-card__promo {
+  font-size: 0.82rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.marthi-plan-card__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.marthi-plan-card__blurb {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.marthi-plan-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #64748b;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.marthi-plan-card__features-preview {
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+
+.marthi-plan-card__features-preview strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #334155;
+}
+
+.marthi-plan-card__features-preview ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  display: grid;
+  gap: 4px;
+}
+
+.marthi-plan-card__features-more {
+  list-style: none;
+  margin-left: -18px;
+  font-weight: 600;
+  color: #0f766e;
+  margin-top: 4px;
+}
+
+.marthi-plan-card__foot {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ==========================================================================
+   Histórico de Auditoria & Badges
+   ========================================================================== */
+.marthi-audit-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 32px;
+}
+
+.marthi-audit-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.marthi-audit-section__head h3 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.marthi-audit-section__head p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.marthi-audit-badge {
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.marthi-action-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Modal e Drawer de Edição Marthi
+   ========================================================================== */
+.marthi-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.marthi-modal-card {
+  width: 100%;
+  max-width: 580px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.marthi-modal-card--lg {
+  max-width: 720px;
+}
+
+.marthi-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.marthi-modal-kicker {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0f766e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+}
+
+.marthi-modal-head h2 {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+}
+
+.marthi-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.marthi-modal-form {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.marthi-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.marthi-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.marthi-form-field span,
+.marthi-form-field label {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #334155;
+}
+
+.marthi-form-field input,
+.marthi-form-field textarea {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  background: #ffffff;
+}
+
+.marthi-form-field input:focus,
+.marthi-form-field textarea:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.marthi-form-field small {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.marthi-form-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.marthi-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+}
+
+.marthi-features-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.marthi-features-editor h4 {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+.marthi-features-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.marthi-features-add input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+
+.marthi-features-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.marthi-features-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.marthi-features-del {
+  border: none;
+  background: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.marthi-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ==========================================================================
+   Recebimentos e Pix (Cardápio e Assinaturas)
+   ========================================================================== */
+.marthi-payout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.marthi-payout-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.marthi-payout-card__head {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.marthi-payout-card__icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.marthi-payout-card__icon-wrap--pix {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.marthi-payout-card__icon-wrap--bank {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.marthi-payout-card__head h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+}
+
+.marthi-payout-card__head p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.marthi-payout-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.marthi-input-action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.marthi-input-action-row input {
+  flex: 1;
+}
+
+.marthi-pix-result {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid;
+}
+
+.marthi-pix-result.is-valid {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.marthi-pix-result.is-invalid {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.marthi-pix-result__badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 10px;
+}
+
+.marthi-pix-result__info {
+  display: grid;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.marthi-pix-meta-label {
+  color: #4b5563;
+  font-weight: 600;
+  display: inline-block;
+  width: 100px;
+}
+
+.marthi-pix-meta-val {
+  color: #111827;
+}
+
+.marthi-form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.marthi-payout-card__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.marthi-status-indicator.is-active {
+  color: #166534;
+}
+
+.marthi-security-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.marthi-security-notice__icon {
+  font-size: 1.5rem;
+}
+
+.marthi-security-notice__text strong {
+  color: #1e293b;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.marthi-security-notice__text p {
+  margin: 0;
+}
+
+/* Dark theme overrides para o painel Marthi */
+.admin.admin--dark .marthi-plan-card,
+.is-theme-dark .marthi-plan-card,
+.admin.admin--dark .marthi-payout-card,
+.is-theme-dark .marthi-payout-card,
+.admin.admin--dark .marthi-audit-section,
+.is-theme-dark .marthi-audit-section,
+.admin.admin--dark .marthi-modal-card,
+.is-theme-dark .marthi-modal-card {
+  background: #161c24;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .marthi-plan-card__amount,
+.is-theme-dark .marthi-plan-card__amount {
+  color: #f8fafc;
+}
+
+.admin.admin--dark .marthi-modal-head,
+.is-theme-dark .marthi-modal-head {
+  background: #11151b;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .marthi-form-field input,
+.is-theme-dark .marthi-form-field input,
+.admin.admin--dark .marthi-form-field textarea,
+.is-theme-dark .marthi-form-field textarea {
+  background: #1a222d;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+.admin.admin--dark .marthi-features-editor,
+.is-theme-dark .marthi-features-editor {
+  background: #11151b;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .marthi-features-list li,
+.is-theme-dark .marthi-features-list li {
+  background: #1a222d;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .marthi-security-notice,
+.is-theme-dark .marthi-security-notice {
+  background: #11151b;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
