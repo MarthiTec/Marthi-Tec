@@ -758,12 +758,16 @@
   padding: 8px 24px 32px;
   display: grid;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .admin-grid--2 {
@@ -788,6 +792,9 @@
   border-radius: 18px;
   padding: 16px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-card h2,
@@ -5080,14 +5087,99 @@ select.caixa-mov-input {
     background: rgba(0, 0, 0, 0.35);
   }
 
+  .admin__top {
+    padding: 0 14px !important;
+    gap: 10px !important;
+  }
+
+  .admin__title h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .admin__workspace {
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin__main {
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin-page {
+    padding: 12px 14px 28px !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin-card {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+  }
+
   .admin-grid,
   .admin-grid--2,
   .admin-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
 
   .admin-form .span-2 {
-    grid-column: span 1;
+    grid-column: span 1 !important;
+  }
+
+  .admin-ops {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .dash-hero {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .dash-hero__title {
+    font-size: 1.25rem !important;
+  }
+
+  .dash-hero__launch {
+    width: 100% !important;
+  }
+
+  .dash-hero__launch a {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+
+  .dash-charts {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    max-width: 100% !important;
+  }
+
+  .dash-chart {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  /* Isolamento horizontal seguro para todas as tabelas no painel */
+  .admin-table-container,
+  .admin-card > .admin-table,
+  .admin-card:has(.admin-table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
   }
 }
 

@@ -2361,6 +2361,14 @@
 /* ==========================================================================
    Kanban Board & Colunas (Layout & Temas)
    ========================================================================== */
+.os-board-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
 .os-board {
   display: grid;
   grid-auto-flow: column;
@@ -2384,6 +2392,13 @@
   overflow-y: auto;
   box-sizing: border-box;
   transition: all 140ms ease;
+}
+
+.os-col--full-mobile {
+  min-width: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  flex: 1 1 100% !important;
 }
 
 .os-col.is-drop-target {
@@ -5409,23 +5424,130 @@
     left: 0;
   }
 
+  /* Banner do Ciclo de Tarefas no mobile */
+  .os-sprint-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+  }
+
+  .os-sprint-banner__actions {
+    width: 100% !important;
+  }
+
+  .os-sprint-banner__actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Cards de Métricas compactos no mobile */
+  .os-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .os-metrics-grid .admin-card {
+    padding: 10px 12px !important;
+  }
+
+  .os-metrics-grid .admin-card h2 {
+    font-size: 0.76rem !important;
+    margin-bottom: 2px !important;
+  }
+
+  .os-metrics-grid .admin-card strong {
+    font-size: 1.25rem !important;
+  }
+
+  .os-metrics-grid .admin-card p {
+    display: none !important;
+  }
+
+  /* Barra de Navegação Rápida entre Colunas do Kanban (Pills no mobile) */
+  .os-mobile-col-pills {
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 2px 2px 10px !important;
+    margin-bottom: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .os-mobile-col-pills::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .os-mobile-col-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    color: #475569 !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .os-mobile-col-pill.is-active {
+    background: #0284c7 !important;
+    border-color: #0284c7 !important;
+    color: #ffffff !important;
+  }
+
+  .os-mobile-col-pill__count {
+    padding: 1px 6px !important;
+    border-radius: 999px !important;
+    font-size: 0.72rem !important;
+    background: rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .os-mobile-col-pill.is-active .os-mobile-col-pill__count {
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: #fff !important;
+  }
+
   /* Kanban Board touch-friendly swipeable on mobile */
+  .os-board-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
   .os-board {
     display: flex !important;
+    flex-direction: row !important;
     overflow-x: auto !important;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    gap: 12px;
-    padding: 0 4px 16px;
-    min-height: auto;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 12px !important;
+    padding: 2px 4px 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: auto !important;
   }
 
   .os-col {
-    min-width: 82vw !important;
-    max-width: 85vw !important;
-    flex: 0 0 82vw !important;
-    scroll-snap-align: center;
-    max-height: calc(100vh - 180px);
+    min-width: 86vw !important;
+    max-width: 88vw !important;
+    width: 86vw !important;
+    flex: 0 0 86vw !important;
+    scroll-snap-align: center !important;
+    box-sizing: border-box !important;
+    max-height: calc(100vh - 160px) !important;
   }
 }
 

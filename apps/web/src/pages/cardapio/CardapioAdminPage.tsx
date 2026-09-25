@@ -225,7 +225,7 @@ export function CardapioAdminPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="cardapio-admin-header-actions">
           <button
             type="button"
             className="cardapio-btn cardapio-btn--secondary"
@@ -315,7 +315,7 @@ export function CardapioAdminPage() {
                   </small>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="cardapio-btn cardapio-btn--secondary"
@@ -482,7 +482,7 @@ export function CardapioAdminPage() {
                 Personalize 100% da marca para o seu restaurante, bar, cafeteria ou lanchonete.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="cardapio-form-grid-2">
                 <div className="cardapio-form-group">
                   <label>Nome do Estabelecimento / Loja *</label>
                   <input
@@ -642,7 +642,7 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Cores */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="cardapio-form-grid-2">
                 <div className="cardapio-form-group">
                   <label>Cor Primária (Fundo / Textos)</label>
                   <input
@@ -664,7 +664,7 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Redes e Contato */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="cardapio-form-grid-2">
                 <div className="cardapio-form-group">
                   <label>Instagram Oficial (@ da loja)</label>
                   <input
@@ -1115,7 +1115,7 @@ export function CardapioAdminPage() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="cardapio-form-grid-2">
               <div className="cardapio-form-group">
                 <label>Preço de Venda (R$) *</label>
                 <input

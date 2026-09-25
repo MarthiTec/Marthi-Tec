@@ -88,6 +88,18 @@ export function WorkOrdersPage() {
 
   const [compactMode, setCompactMode] = useState(false);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
+  const [mobileColFilter, setMobileColFilter] = useState<WorkOrderStatus | 'all'>('all');
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false,
+  );
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Modais e Drawers
   const [newModalOpen, setNewModalOpen] = useState(false);
@@ -271,7 +283,11 @@ export function WorkOrdersPage() {
     ? Math.round((currentOpDelivered / currentOpOrders.length) * 100)
     : 100;
 
-  const columns = statusFilter && BOARD_COLUMNS.includes(statusFilter) ? [statusFilter] : BOARD_COLUMNS;
+  const columns = useMemo(() => {
+    if (statusFilter && BOARD_COLUMNS.includes(statusFilter)) return [statusFilter];
+    if (isMobile && mobileColFilter !== 'all') return [mobileColFilter];
+    return BOARD_COLUMNS;
+  }, [statusFilter, isMobile, mobileColFilter]);
 
   async function move(id: string, status: WorkOrderStatus) {
     const current = orders.find((item) => item.id === id);
@@ -948,6 +964,7 @@ export function WorkOrdersPage() {
                 key={order.id}
                 order={order}
                 compact={compactMode}
+                isMobile={isMobile}
                 onOpen={() => setSelectedDetailOrder(order)}
                 onMove={move}
                 onUpdatePriority={updatePriority}
@@ -984,6 +1001,33 @@ export function WorkOrdersPage() {
             </div>
           ) : null}
 
+          {isMobile ? (
+            <div className="os-mobile-col-pills" role="tablist" aria-label="Navegar por colunas">
+              <button
+                type="button"
+                className={`os-mobile-col-pill ${mobileColFilter === 'all' ? 'is-active' : ''}`}
+                onClick={() => setMobileColFilter('all')}
+              >
+                Todas as Colunas
+                <span className="os-mobile-col-pill__count">{filtered.length}</span>
+              </button>
+              {BOARD_COLUMNS.map((col) => {
+                const count = filtered.filter((o) => o.status === col).length;
+                return (
+                  <button
+                    key={col}
+                    type="button"
+                    className={`os-mobile-col-pill ${mobileColFilter === col ? 'is-active' : ''}`}
+                    onClick={() => setMobileColFilter(col)}
+                  >
+                    {STATUS_LABEL[col]}
+                    <span className="os-mobile-col-pill__count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
           <div className="os-board" onWheel={handleBoardWheel}>
             {columns.map((status) => {
               const column = filtered.filter((item) => item.status === status);
@@ -995,6 +1039,8 @@ export function WorkOrdersPage() {
                   compact={compactMode}
                   isOver={overStatus === status}
                   draggingId={draggingId}
+                  isMobile={isMobile}
+                  singleColumn={columns.length === 1 && isMobile}
                   onOpenOrder={(order) => setSelectedDetailOrder(order)}
                   onDragOver={() => setOverStatus(status)}
                   onDragLeave={() => setOverStatus((cur) => (cur === status ? null : cur))}
@@ -1063,6 +1109,8 @@ function JiraBoardColumn({
   compact,
   isOver,
   draggingId,
+  isMobile,
+  singleColumn,
   onOpenOrder,
   onDragOver,
   onDragLeave,
@@ -1077,6 +1125,8 @@ function JiraBoardColumn({
   compact: boolean;
   isOver: boolean;
   draggingId: string | null;
+  isMobile?: boolean;
+  singleColumn?: boolean;
   onOpenOrder: (order: WorkOrder) => void;
   onDragOver: () => void;
   onDragLeave: () => void;
@@ -1100,7 +1150,9 @@ function JiraBoardColumn({
 
   return (
     <section
-      className={`os-col ${isOver ? 'is-drop-target' : ''} ${draggingId ? 'is-dragging-board' : ''}`}
+      className={`os-col ${singleColumn ? 'os-col--full-mobile' : ''} ${
+        isOver ? 'is-drop-target' : ''
+      } ${draggingId ? 'is-dragging-board' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={onDragLeave}
       onDrop={handleDrop}
@@ -1118,6 +1170,7 @@ function JiraBoardColumn({
           key={order.id}
           order={order}
           compact={compact}
+          isMobile={isMobile}
           onOpen={() => onOpenOrder(order)}
           onMove={onMove}
           onUpdatePriority={onUpdatePriority}
@@ -1134,6 +1187,7 @@ function JiraBoardColumn({
 function JiraWorkOrderCard({
   order,
   compact,
+  isMobile,
   onOpen,
   onMove: _onMove,
   onUpdatePriority,
@@ -1143,6 +1197,7 @@ function JiraWorkOrderCard({
 }: {
   order: WorkOrder;
   compact: boolean;
+  isMobile?: boolean;
   onOpen: () => void;
   onMove?: (id: string, status: WorkOrderStatus) => void;
   onUpdatePriority: (id: string, priority: WorkOrderPriority) => void;
@@ -1179,7 +1234,7 @@ function JiraWorkOrderCard({
       } ${order.status === 'reproved' ? 'is-reproved' : ''} ${
         order.status === 'backlog' ? 'is-backlog' : ''
       }`}
-      draggable
+      draggable={!isMobile}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={() => {

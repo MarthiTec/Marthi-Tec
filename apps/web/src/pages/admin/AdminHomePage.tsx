@@ -181,34 +181,36 @@ export function AdminHomePage() {
             {dash.technicians.length === 0 ? (
               <p className="empty">Nenhum técnico com OS ainda.</p>
             ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Técnico</th>
-                    <th>Fechadas</th>
-                    <th>Receita</th>
-                    <th>Ticket</th>
-                    <th>Em aberto</th>
-                    <th>Retornos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...dash.technicians]
-                    .sort((a, b) => b.revenue - a.revenue || b.closedCount - a.closedCount)
-                    .map((row, index) => (
-                      <tr key={row.name}>
-                        <td>{index + 1}</td>
-                        <td>{row.name}</td>
-                        <td>{row.closedCount}</td>
-                        <td className="price-red">{money(row.revenue)}</td>
-                        <td>{money(row.avgTicket)}</td>
-                        <td>{row.inProgress}</td>
-                        <td className={row.returns > 0 ? 'qty-low' : ''}>{row.returns}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="admin-table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Técnico</th>
+                      <th>Fechadas</th>
+                      <th>Receita</th>
+                      <th>Ticket</th>
+                      <th>Em aberto</th>
+                      <th>Retornos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...dash.technicians]
+                      .sort((a, b) => b.revenue - a.revenue || b.closedCount - a.closedCount)
+                      .map((row, index) => (
+                        <tr key={row.name}>
+                          <td>{index + 1}</td>
+                          <td>{row.name}</td>
+                          <td>{row.closedCount}</td>
+                          <td className="price-red">{money(row.revenue)}</td>
+                          <td>{money(row.avgTicket)}</td>
+                          <td>{row.inProgress}</td>
+                          <td className={row.returns > 0 ? 'qty-low' : ''}>{row.returns}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </article>
         </>
@@ -222,37 +224,39 @@ export function AdminHomePage() {
               Nenhum interesse no totem agora. Quando o cliente confirmar, cai aqui.
             </p>
           ) : (
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Produto</th>
-                  <th>Valor</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {openTickets.slice(0, 5).map((ticket) => (
-                  <tr key={ticket.id}>
-                    <td>{ticket.customerName}</td>
-                    <td>
-                      {ticket.productName} · {ticketVariation(ticket)}
-                    </td>
-                    <td className="price-red">{ticket.priceLabel}</td>
-                    <td className="admin-table__action">
-                      <Link
-                        to="/painel/pdv"
-                        className="btn btn--primary btn--icon"
-                        aria-label="Abrir PDV"
-                        title="Abrir PDV"
-                      >
-                        <AdminIcon name="cart" />
-                      </Link>
-                    </td>
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Produto</th>
+                    <th>Valor</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {openTickets.slice(0, 5).map((ticket) => (
+                    <tr key={ticket.id}>
+                      <td>{ticket.customerName}</td>
+                      <td>
+                        {ticket.productName} · {ticketVariation(ticket)}
+                      </td>
+                      <td className="price-red">{ticket.priceLabel}</td>
+                      <td className="admin-table__action">
+                        <Link
+                          to="/painel/pdv"
+                          className="btn btn--primary btn--icon"
+                          aria-label="Abrir PDV"
+                          title="Abrir PDV"
+                        >
+                          <AdminIcon name="cart" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </article>
 
