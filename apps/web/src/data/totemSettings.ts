@@ -119,7 +119,7 @@ export const TOTEM_VERTICALS: {
       audioAssist: false,
       keyboardPlacement: 'bottom',
       attractGradientColor: '#0f766e',
-      shareStockWithErp: false,
+      shareStockWithErp: true,
     },
     copy: {
       kioskSubtitle: 'Quiosque de venda',
@@ -334,7 +334,7 @@ export function defaultTotemSettings(): TotemSettings {
   return {
     mode: general.preset.mode,
     exitPassword: DEFAULT_EXIT,
-    shareStockWithErp: false,
+    shareStockWithErp: true,
     vertical: 'general',
     columns: general.preset.columns,
     showAttractScreen: true,
@@ -458,12 +458,8 @@ function read(): TotemSettings {
 }
 
 /** Campos que o Nest já aceita em PUT /store/totem-settings. */
-function toApiTotemSettings(settings: TotemSettings): Partial<TotemSettings> {
-  return {
-    mode: settings.mode,
-    exitPassword: settings.exitPassword,
-    shareStockWithErp: settings.shareStockWithErp,
-  };
+function toApiTotemSettings(settings: TotemSettings): TotemSettings {
+  return { ...settings };
 }
 
 function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<TotemSettings>): TotemSettings {
@@ -515,26 +511,7 @@ export async function saveTotemSettings(input: Partial<TotemSettings>) {
   if (isNestAuthed()) {
     const { apiPutTotemSettings } = await import('../services/erpApi');
     const saved = await apiPutTotemSettings(toApiTotemSettings(next));
-    return replaceTotemSettings({
-      ...next,
-      ...saved,
-      vertical: saved.vertical ?? next.vertical,
-      columns: saved.columns ?? next.columns,
-      showAttractScreen: saved.showAttractScreen ?? next.showAttractScreen,
-      storeName: saved.storeName ?? next.storeName,
-      storeLogo: saved.storeLogo ?? next.storeLogo,
-      attractBackground: saved.attractBackground ?? next.attractBackground,
-      attractGradientColor: saved.attractGradientColor ?? next.attractGradientColor,
-      attractLayout: saved.attractLayout ?? next.attractLayout,
-      keyboardPlacement: saved.keyboardPlacement ?? next.keyboardPlacement,
-      askCustomerName: saved.askCustomerName ?? next.askCustomerName,
-      offerFulfillment: saved.offerFulfillment ?? next.offerFulfillment,
-      printTicket: saved.printTicket ?? next.printTicket,
-      audioAssist: saved.audioAssist ?? next.audioAssist,
-      storeWhatsApp: saved.storeWhatsApp ?? next.storeWhatsApp,
-      notifyCustomerOnLead: saved.notifyCustomerOnLead ?? next.notifyCustomerOnLead,
-      locationLabel: saved.locationLabel ?? next.locationLabel,
-    });
+    return replaceTotemSettings(saved);
   }
   return replaceTotemSettings(next);
 }

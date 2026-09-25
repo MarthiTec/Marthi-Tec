@@ -1,9 +1,20 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminState } from '../../data/adminStore';
 import { boletoSnapshot } from '../../data/boletoStore';
+import {
+  ERP_BOOTSTRAP_EVENT,
+  getErpBootstrapState,
+} from '../../data/erpBootstrap';
 import { listEmployees } from '../../data/erpRegistry';
+import {
+  getDashboardSnapshot,
+  hydrateDashboardFromApi,
+  type DashboardSnapshot,
+} from '../../data/dashboardStats';
 import { money, payablesOpenTotal, receivablesOpenTotal } from '../../data/financeBook';
 import { stockBalanceSnapshot } from '../../data/stockLedger';
+import { isNestAuthed } from '../../services/nestClient';
 
 const CARDS = [
   {
@@ -63,10 +74,39 @@ const CARDS = [
 ] as const;
 
 export function ErpHomePage() {
+  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot(7));
+  const [ready, setReady] = useState(() => getErpBootstrapState().ready || !isNestAuthed());
   const stock = getAdminState().stock;
   const snap = stockBalanceSnapshot(stock);
   const users = listEmployees(true).filter((item) => item.isSystemUser).length;
   const boletos = boletoSnapshot();
+
+  useEffect(() => {
+    const sync = () => setReady(getErpBootstrapState().ready || !isNestAuthed());
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, sync);
+    return () => window.removeEventListener(ERP_BOOTSTRAP_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const next = await hydrateDashboardFromApi(7);
+        if (alive) setDash(next);
+      } catch {
+        if (alive) setDash(getDashboardSnapshot(7));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [ready]);
+
+  const skuCount = dash.skuCount ?? snap.skus;
+  const stockUnits = dash.stockUnits ?? snap.units;
+  const lowStock = dash.lowStock ?? snap.low;
+  const receivables = dash.receivablesOpen ?? receivablesOpenTotal();
+  const payables = dash.payablesOpen ?? payablesOpenTotal();
 
   return (
     <div className="erp-home">
@@ -78,19 +118,19 @@ export function ErpHomePage() {
       <div className="admin-grid">
         <article className="admin-card">
           <h2>SKUs</h2>
-          <strong>{snap.skus}</strong>
-          <p>{snap.units} unidades em saldo.</p>
+          <strong>{skuCount}</strong>
+          <p>{stockUnits} unidades em saldo.</p>
         </article>
         <article className="admin-card">
           <h2>Estoque baixo</h2>
-          <strong className={snap.low ? 'qty-low' : ''}>{snap.low}</strong>
+          <strong className={lowStock ? 'qty-low' : ''}>{lowStock}</strong>
           <p>
             {snap.over} acima do máx · valor a custo {money(snap.inventory)}
           </p>
         </article>
         <article className="admin-card">
           <h2>A receber</h2>
-          <strong>{money(receivablesOpenTotal())}</strong>
+          <strong>{money(receivables)}</strong>
           <p>Títulos em aberto.</p>
         </article>
         <article className="admin-card">
@@ -113,7 +153,7 @@ export function ErpHomePage() {
       </div>
 
       <p className="empty" style={{ margin: 0 }}>
-        A pagar em aberto: {money(payablesOpenTotal())}. Ajustes rápidos de preço e senha ficam no{' '}
+        A pagar em aberto: {money(payables)}. Ajustes rápidos de preço e senha ficam no{' '}
         <Link to="/painel/erp">painel administrativo</Link>.
       </p>
     </div>

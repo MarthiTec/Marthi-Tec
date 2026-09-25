@@ -50,7 +50,20 @@ export type DashboardSnapshot = {
   topReturns: TechnicianRank | null;
   deliveredCount: number;
   returnRate: number;
+  openPosTickets?: number;
+  skuCount?: number;
+  stockUnits?: number;
 };
+
+let nestSnapshot: DashboardSnapshot | null = null;
+
+export function getCachedDashboardSnapshot() {
+  return nestSnapshot;
+}
+
+export function replaceDashboardSnapshot(snapshot: DashboardSnapshot | null) {
+  nestSnapshot = snapshot;
+}
 
 function dayKey(iso: string) {
   return iso.slice(0, 10);
@@ -77,7 +90,15 @@ function sumEntries(entries: FinanceEntry[], type: 'in' | 'out', from: Date, to:
     .reduce((sum, item) => sum + item.amount, 0);
 }
 
-const OPEN_OS: WorkOrderStatus[] = ['backlog', 'open', 'diagnosis', 'waiting', 'progress', 'reproved', 'ready'];
+const OPEN_OS: WorkOrderStatus[] = [
+  'backlog',
+  'open',
+  'diagnosis',
+  'waiting',
+  'progress',
+  'reproved',
+  'ready',
+];
 
 function techName(order: WorkOrder) {
   return order.technician.trim() || 'Sem técnico';
@@ -137,7 +158,7 @@ function buildTechnicianRanks(orders: WorkOrder[]): TechnicianRank[] {
     .sort((a, b) => b.closedCount - a.closedCount || b.revenue - a.revenue);
 }
 
-export function getDashboardSnapshot(days = 7): DashboardSnapshot {
+function buildLocalDashboardSnapshot(days = 7): DashboardSnapshot {
   const admin = getAdminState();
   const orders = listWorkOrders();
   const from = startOfDay(-(days - 1));
@@ -241,5 +262,48 @@ export function getDashboardSnapshot(days = 7): DashboardSnapshot {
     topReturns,
     deliveredCount,
     returnRate: deliveredCount > 0 ? returnCount / deliveredCount : 0,
+    skuCount: admin.stock.length,
+    stockUnits: admin.stock.reduce((sum, item) => sum + item.qty, 0),
   };
+}
+
+/** Preferência: cache Nest → agregação local (após bootstrap). */
+export function getDashboardSnapshot(days = 7): DashboardSnapshot {
+  if (nestSnapshot) return nestSnapshot;
+  return buildLocalDashboardSnapshot(days);
+}
+
+export async function hydrateDashboardFromApi(days = 7) {
+  const { isNestAuthed } = await import('../services/nestClient');
+  if (!isNestAuthed()) {
+    nestSnapshot = null;
+    return getDashboardSnapshot(days);
+  }
+  const { apiGetDashboardSummary } = await import('../services/erpApi');
+  const remote = await apiGetDashboardSummary(days);
+  nestSnapshot = {
+    cashBalance: remote.cashBalance,
+    treasury: remote.treasury,
+    payablesOpen: remote.payablesOpen,
+    receivablesOpen: remote.receivablesOpen,
+    advancesOpen: remote.advancesOpen,
+    soldCount: remote.soldCount,
+    revenuePeriod: remote.revenuePeriod,
+    expensePeriod: remote.expensePeriod,
+    resultPeriod: remote.resultPeriod,
+    openOs: remote.openOs,
+    lowStock: remote.lowStock,
+    series: remote.series ?? [],
+    mix: remote.mix ?? [],
+    technicians: remote.technicians ?? [],
+    topCloser: remote.topCloser ?? null,
+    topEarner: remote.topEarner ?? null,
+    topReturns: remote.topReturns ?? null,
+    deliveredCount: remote.deliveredCount ?? 0,
+    returnRate: remote.returnRate ?? 0,
+    openPosTickets: remote.openPosTickets,
+    skuCount: remote.skuCount,
+    stockUnits: remote.stockUnits,
+  };
+  return nestSnapshot;
 }

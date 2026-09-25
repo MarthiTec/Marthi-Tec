@@ -26,6 +26,7 @@ import { hydrateCrmFromApi } from './crmStore';
 import { hydrateEcommerceFromApi } from './ecommerceStore';
 import { hydrateAuditFromApi } from './auditLog';
 import { hydrateTotemAnalyticsFromApi } from './totemAnalyticsStore';
+import { hydrateDashboardFromApi } from './dashboardStats';
 import {
   apiGetOperatorProfile,
   apiGetStorePlan,
@@ -118,6 +119,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       hydrateEcommerceFromApi(),
       hydrateAuditFromApi(),
       hydrateTotemAnalyticsFromApi(),
+      hydrateDashboardFromApi(7),
     ]);
 
     replaceAdminState({

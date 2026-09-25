@@ -67,6 +67,16 @@ export function setPanelTheme(theme: PanelTheme) {
   if (id) localStorage.setItem(keyedStorage(id), theme);
   persistProfileTheme(theme);
   window.dispatchEvent(new Event(PANEL_THEME_EVENT));
+  void (async () => {
+    try {
+      const { isNestAuthed } = await import('../services/nestClient');
+      if (!isNestAuthed()) return;
+      const { apiPutOperatorProfile } = await import('../services/erpApi');
+      await apiPutOperatorProfile({ theme });
+    } catch {
+      /* ignore — tema já ficou no cache local */
+    }
+  })();
 }
 
 export function syncThemeForProfile(email: string, theme?: PanelTheme | null) {

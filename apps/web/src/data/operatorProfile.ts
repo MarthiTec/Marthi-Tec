@@ -97,20 +97,17 @@ export async function saveOperatorProfile(
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
     const { apiPutOperatorProfile } = await import('../services/erpApi');
-    // Nest UpdateOperatorProfileDto: só displayName | role | photo (forbidNonWhitelisted).
     const saved = await apiPutOperatorProfile({
       displayName: next.displayName,
       role: next.role,
       photo: next.photo,
+      email: next.email,
+      phone: next.phone,
+      address: next.address,
+      theme: next.theme,
     });
     const merged = normalizeProfile(
-      {
-        ...next,
-        displayName: saved.displayName ?? next.displayName,
-        role: saved.role ?? next.role,
-        photo: saved.photo !== undefined ? saved.photo : next.photo,
-        theme: next.theme,
-      },
+      { ...next, ...saved, theme: saved.theme ?? next.theme },
       next.displayName,
       next.email,
     );
@@ -142,16 +139,8 @@ export function resolveProfilePhoto(profile: OperatorProfile, authPicture?: stri
 }
 
 export async function fileToProfilePhoto(file: File): Promise<string> {
-  return fileToSquareImage(file, 256);
-}
-
-/** Foto de produto (quadrada, maior) para vitrine / cadastro. */
-export async function fileToProductImage(file: File): Promise<string> {
-  return fileToSquareImage(file, 512);
-}
-
-async function fileToSquareImage(file: File, size: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -165,6 +154,26 @@ async function fileToSquareImage(file: File, size: number): Promise<string> {
   const width = bitmap.width * scale;
   const height = bitmap.height * scale;
   ctx.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', 0.84);
+}
+
+/** Foto de produto/estoque (vitrine totem / ERP). */
+export async function fileToProductImage(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const max = 960;
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    throw new Error('Não foi possível ler a imagem.');
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   return canvas.toDataURL('image/jpeg', 0.86);
 }

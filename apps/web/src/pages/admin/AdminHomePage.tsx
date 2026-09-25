@@ -1,15 +1,24 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { DonutChart, DualBarChart, LineAreaChart } from '../../components/MiniCharts';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDashboardSnapshot } from '../../data/dashboardStats';
+import {
+  ERP_BOOTSTRAP_EVENT,
+  getErpBootstrapState,
+} from '../../data/erpBootstrap';
+import {
+  getDashboardSnapshot,
+  hydrateDashboardFromApi,
+  type DashboardSnapshot,
+} from '../../data/dashboardStats';
 import { money } from '../../data/financeBook';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
 import { ticketVariation } from '../../data/posQueueStore';
 import { hasModule } from '../../data/storePlan';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
+import { isNestAuthed } from '../../services/nestClient';
 import { usePosTickets } from './usePosTickets';
 
 export function AdminHomePage() {
@@ -18,7 +27,29 @@ export function AdminHomePage() {
   const isAdmin = userIsStoreAdmin(user?.email);
   const { tickets } = usePosTickets();
   const openTickets = tickets.filter((item) => item.status === 'open');
-  const dash = useMemo(() => getDashboardSnapshot(7), [tickets, openTickets.length]);
+  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot(7));
+  const [ready, setReady] = useState(() => getErpBootstrapState().ready || !isNestAuthed());
+
+  useEffect(() => {
+    const sync = () => setReady(getErpBootstrapState().ready || !isNestAuthed());
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, sync);
+    return () => window.removeEventListener(ERP_BOOTSTRAP_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const next = await hydrateDashboardFromApi(7);
+        if (alive) setDash(next);
+      } catch {
+        if (alive) setDash(getDashboardSnapshot(7));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [ready, tickets.length]);
 
   const greeting = useMemo(
     () =>
@@ -64,7 +95,7 @@ export function AdminHomePage() {
         <article className="admin-card">
           <h2>Caixa</h2>
           <strong>{money(dash.cashBalance)}</strong>
-          <p>Saldo do extrato local.</p>
+          <p>Saldo do extrato da loja.</p>
         </article>
       </div>
 

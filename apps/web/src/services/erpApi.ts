@@ -337,8 +337,20 @@ export function apiPutOperatorProfile(body: {
   displayName?: string;
   role?: string;
   photo?: string | null;
+  email?: string;
+  phone?: string;
+  address?: string;
+  theme?: 'light' | 'dark';
 }) {
-  return nestPut<Pick<OperatorProfile, 'displayName' | 'role' | 'photo'>>('/me/profile', body);
+  return nestPut<OperatorProfile>('/me/profile', body);
+}
+
+export function apiGetDashboardSummary(days = 7) {
+  return nestGet<import('../data/dashboardStats').DashboardSnapshot & {
+    openPosTickets?: number;
+    skuCount?: number;
+    stockUnits?: number;
+  }>(`/dashboard/summary?days=${days}`);
 }
 
 /* ── Fase 3 P0: Registry ───────────────────────────────── */

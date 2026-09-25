@@ -1164,6 +1164,22 @@ function load(): WorkOrder[] {
   if (memoryOrders) {
     return memoryOrders.map((item) => normalizeWorkOrder(item));
   }
+
+  // Com JWT Nest: cache local apenas — nunca reinjeta seed demo.
+  if (isNestAuthed()) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as Partial<WorkOrder>[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((item) =>
+        normalizeWorkOrder(item as Partial<WorkOrder> & Pick<WorkOrder, 'id'>),
+      );
+    } catch {
+      return [];
+    }
+  }
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -1180,7 +1196,7 @@ function load(): WorkOrder[] {
     const normalized = parsed.map((item) =>
       normalizeWorkOrder(item as Partial<WorkOrder> & Pick<WorkOrder, 'id'>),
     );
-    // Assegura que novos status como backlog e reproved existam no estado local para demonstração imediata
+    // Offline/demo: garante status backlog/reproved no estado local.
     const seeds = seed();
     const hasReproved = normalized.some((o) => o.status === 'reproved');
     const hasBacklog = normalized.some((o) => o.status === 'backlog');
