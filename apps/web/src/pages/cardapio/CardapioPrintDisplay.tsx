@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCardapioConfig } from '../../data/cardapioStore';
 import { listRestaurantTables } from '../../data/kitchenOrderStore';
 import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
+import { AdminPicker } from '../../components/AdminPicker';
 import './cardapioPrint.css';
 
 function CornerSparkle({ className }: { className: string }) {
@@ -131,28 +132,25 @@ export function CardapioPrintDisplay() {
         </div>
 
         <div className="cardapio-display-controls__row">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-            <span>Mesa:</span>
-            <select
+          <div style={{ minWidth: 260 }}>
+            <AdminPicker
+              label="Mesa"
               value={printAll ? 'all' : selectedTable}
-              onChange={(e) => {
-                if (e.target.value === 'all') {
+              disabled={printAll}
+              options={[
+                { value: 'geral', label: 'QR Code Geral (Sem mesa)' },
+                ...tables.map((t) => ({ value: t.id, label: `${t.label} (Mesa ${t.number})` })),
+              ]}
+              onChange={(val) => {
+                if (val === 'all') {
                   setPrintAll(true);
                 } else {
                   setPrintAll(false);
-                  setSelectedTable(e.target.value);
+                  setSelectedTable(val);
                 }
               }}
-              disabled={printAll}
-            >
-              <option value="geral">QR Code Geral (Sem mesa)</option>
-              {tables.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label} (Mesa {t.number})
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem' }}>
             <input

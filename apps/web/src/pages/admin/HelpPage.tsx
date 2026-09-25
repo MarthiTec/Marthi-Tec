@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
+import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { MARTHI_COMPANY, marthiWhatsAppHref } from '../../data/companyContact';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
@@ -121,16 +122,20 @@ export function HelpPage() {
           <h2>Solicitar ajuste</h2>
           <p>Registre o pedido aqui. Em seguida fale conosco pelo WhatsApp se for urgente.</p>
           <form className="admin-form help-form" onSubmit={submit}>
-            <label>
-              Assunto
-              <select value={topic} onChange={(event) => setTopic(event.target.value)}>
-                <option value="ajuste">Ajuste no sistema</option>
-                <option value="plano">Plano / contrato</option>
-                <option value="acesso">Acesso / permissões</option>
-                <option value="totem">Totem</option>
-                <option value="outro">Outro</option>
-              </select>
-            </label>
+            <div>
+              <AdminPicker
+                label="Assunto"
+                value={topic}
+                options={[
+                  { value: 'ajuste', label: 'Ajuste no sistema' },
+                  { value: 'plano', label: 'Plano / contrato' },
+                  { value: 'acesso', label: 'Acesso / permissões' },
+                  { value: 'totem', label: 'Totem' },
+                  { value: 'outro', label: 'Outro' },
+                ]}
+                onChange={(val) => setTopic(val)}
+              />
+            </div>
             <label className="admin-form__full">
               Mensagem
               <textarea

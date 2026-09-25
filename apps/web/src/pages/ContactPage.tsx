@@ -1,9 +1,20 @@
 import { useState, type FormEvent } from 'react';
+import { AdminPicker } from '../components/AdminPicker';
 import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
 import { ingestContactLeadToCrm } from '../data/crmStore';
 import './publicPages.css';
+
+const CONTACT_SUBJECTS = [
+  { value: 'Demonstração', label: 'Agendar Demonstração Guiada' },
+  { value: 'Dúvida sobre Planos', label: 'Dúvidas sobre Módulos e Preços' },
+  { value: 'Totem Touch', label: 'Informações sobre Totem de Autoatendimento' },
+  { value: 'Oficina / OS', label: 'Dúvidas sobre Ordem de Serviço & Oficina' },
+  { value: 'PDV / Caixa', label: 'Dúvidas sobre Frente de Caixa & Emissão Fiscal' },
+  { value: 'Parceria Comercial', label: 'Parceria Comercial / Representação' },
+  { value: 'Outros', label: 'Outro Assunto' },
+] as const;
 
 function IconWhatsApp() {
   return (
@@ -134,18 +145,14 @@ export function ContactPage() {
                 />
               </label>
 
-              <label className="span-full">
-                Assunto de Interesse
-                <select value={subject} onChange={(e) => setSubject(e.target.value)}>
-                  <option value="Demonstração">Agendar Demonstração Guiada</option>
-                  <option value="Dúvida sobre Planos">Dúvidas sobre Módulos e Preços</option>
-                  <option value="Totem Touch">Informações sobre Totem de Autoatendimento</option>
-                  <option value="Oficina / OS">Dúvidas sobre Ordem de Serviço & Oficina</option>
-                  <option value="PDV / Caixa">Dúvidas sobre Frente de Caixa & Emissão Fiscal</option>
-                  <option value="Parceria Comercial">Parceria Comercial / Representação</option>
-                  <option value="Outros">Outro Assunto</option>
-                </select>
-              </label>
+              <div className="span-full">
+                <AdminPicker
+                  label="Assunto de Interesse"
+                  value={subject}
+                  options={CONTACT_SUBJECTS}
+                  onChange={(val) => setSubject(val)}
+                />
+              </div>
 
               <label className="span-full">
                 Como podemos te ajudar? *

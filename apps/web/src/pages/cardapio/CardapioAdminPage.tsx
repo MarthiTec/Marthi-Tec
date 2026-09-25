@@ -18,6 +18,7 @@ import {
 import { getAdminState } from '../../data/adminStore';
 import { listRestaurantTables } from '../../data/kitchenOrderStore';
 import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
+import { AdminPicker } from '../../components/AdminPicker';
 import { CardapioPublicPage } from './CardapioPublicPage';
 import './cardapioAdmin.css';
 
@@ -1128,17 +1129,12 @@ export function CardapioAdminPage() {
               </div>
 
               <div className="cardapio-form-group">
-                <label>Categoria</label>
-                <select
+                <AdminPicker
+                  label="Categoria"
                   value={editingItem.category || categories[0]}
-                  onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                >
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  options={categories.map((c) => ({ value: c, label: c }))}
+                  onChange={(val) => setEditingItem({ ...editingItem, category: val })}
+                />
               </div>
             </div>
 
