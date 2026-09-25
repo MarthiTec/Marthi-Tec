@@ -7,6 +7,7 @@ import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
+import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
@@ -98,6 +99,7 @@ export function EcommerceLayout() {
     <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="ecommerce-app__top">
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <OsEcosystemMenu />
         <BrandLogo variant="mark" className="ecommerce-app__mark" />
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>

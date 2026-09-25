@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   formatDuration,
   searchWorkOrders,
@@ -220,36 +220,35 @@ function OsConsultPanel({
 
 /** Atalhos exibidos na tela principal do quadro. */
 export function OsHotkeysBar({
-  onConsult,
-  onReprint,
+  onNewOrder,
 }: {
-  onConsult: () => void;
-  onReprint: () => void;
+  onConsult?: () => void;
+  onReprint?: () => void;
+  onNewOrder?: () => void;
 }) {
   const navigate = useNavigate();
+  const handleNew = onNewOrder || (() => window.dispatchEvent(new CustomEvent('os:open-new-modal')));
+
   return (
     <div className="pdv__hotkeys os-hotkeys" aria-label="Atalhos da oficina">
       <kbd>Alt+M</kbd>
       <span>menu</span>
-      <button type="button" className="os-hotkeys__hit" onClick={() => navigate('/os/nova')}>
+      <button type="button" className="os-hotkeys__hit" onClick={handleNew}>
         <kbd>F2</kbd>
         <span>nova OS</span>
       </button>
-      <button type="button" className="os-hotkeys__hit" onClick={onConsult}>
+      <button
+        type="button"
+        className="os-hotkeys__hit"
+        onClick={() => window.dispatchEvent(new CustomEvent('os:focus-search'))}
+      >
         <kbd>F7</kbd>
-        <span>consultar</span>
-      </button>
-      <button type="button" className="os-hotkeys__hit" onClick={onReprint}>
-        <kbd>F8</kbd>
-        <span>reimprimir</span>
+        <span>buscar OP</span>
       </button>
       <button type="button" className="os-hotkeys__hit" onClick={() => navigate('/os/agenda')}>
         <kbd>F6</kbd>
         <span>agenda</span>
       </button>
-      <Link to="/os/nova" className="btn btn--primary os-hotkeys__cta">
-        Nova OS
-      </Link>
     </div>
   );
 }

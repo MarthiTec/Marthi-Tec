@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
@@ -11,7 +11,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
+import { AdminPicker } from '../../components/AdminPicker';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
+import { OsEcosystemMenu } from './OsEcosystemMenu';
+import { getActiveOperation, listOperations } from '../../data/osStore';
 import '../admin/admin.css';
 import './os.css';
 
@@ -46,6 +49,7 @@ function resolveTitle(pathname: string, search: string) {
 export function OsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   usePresenceSession('os');
   const { isDark } = usePanelTheme();
@@ -53,6 +57,10 @@ export function OsLayout() {
   const [opsMenuOpen, setOpsMenuOpen] = useState(false);
   const [panel, setPanel] = useState<OsPanel>(null);
   const openPanelRef = useRef<(next: Exclude<OsPanel, null>) => void>(() => undefined);
+
+  const operations = listOperations();
+  const activeOp = getActiveOperation();
+  const currentOpId = params.get('op') || activeOp.id;
 
   const title = resolveTitle(location.pathname, location.search);
   const isBoard = location.pathname === '/os';
@@ -80,6 +88,16 @@ export function OsLayout() {
     setOpsMenuOpen(false);
     setPanel(null);
     navigate(path);
+  }
+
+  function handlePeriodChange(newOpId: string) {
+    const next = new URLSearchParams(params);
+    if (newOpId === 'all') {
+      next.set('op', 'all');
+    } else {
+      next.set('op', newOpId);
+    }
+    setParams(next);
   }
 
   useEffect(() => {
@@ -113,7 +131,11 @@ export function OsLayout() {
 
       if (event.key === 'F2') {
         event.preventDefault();
-        go('/os/nova');
+        if (location.pathname === '/os') {
+          window.dispatchEvent(new CustomEvent('os:open-new-modal'));
+        } else {
+          navigate('/os?new=1');
+        }
         return;
       }
       if (event.key === 'F6') {
@@ -121,14 +143,9 @@ export function OsLayout() {
         go('/os/agenda');
         return;
       }
-      if (event.key === 'F7') {
+      if (event.key === 'F7' || event.key === 'F8') {
         event.preventDefault();
-        openPanelRef.current('consult');
-        return;
-      }
-      if (event.key === 'F8') {
-        event.preventDefault();
-        openPanelRef.current('reprint');
+        window.dispatchEvent(new CustomEvent('os:focus-search'));
         return;
       }
       if (event.key === 'F9') {
@@ -153,24 +170,23 @@ export function OsLayout() {
           setOpsMenuOpen((open) => !open);
           return;
         }
-        if (key === 'c') {
+        if (key === 'c' || key === 'r') {
           event.preventDefault();
-          openPanelRef.current('consult');
+          window.dispatchEvent(new CustomEvent('os:focus-search'));
           return;
         }
         if (key === 'n') {
           event.preventDefault();
-          go('/os/nova');
+          if (location.pathname === '/os') {
+            window.dispatchEvent(new CustomEvent('os:open-new-modal'));
+          } else {
+            navigate('/os?new=1');
+          }
           return;
         }
         if (key === 'q') {
           event.preventDefault();
           go('/os?quote=sent');
-          return;
-        }
-        if (key === 'r') {
-          event.preventDefault();
-          openPanelRef.current('reprint');
           return;
         }
       }
@@ -193,10 +209,33 @@ export function OsLayout() {
     >
       <header className="os-app__top">
         <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
+        {/* Botão de ícone para acesso ao Ecossistema Marthi imediatamente ao lado do Menu */}
+        <OsEcosystemMenu />
+
         <BrandLogo variant="mark" className="os-app__mark" />
         <div className="os-app__brand">
           <strong>Marthi OS</strong>
         </div>
+
+        {/* Filtro centralizado ao topo usando o combobox padrão do sistema AdminPicker */}
+        <div className="os-app__period-picker-wrap">
+          <span className="os-app__period-icon" aria-hidden="true">📅</span>
+          <AdminPicker
+            compact
+            aria-label="Filtrar por período / operação da oficina"
+            value={currentOpId}
+            options={[
+              ...operations.map((op) => ({
+                value: op.id,
+                label: `${op.title} ${op.status === 'active' ? '(Tarefas Ativas)' : '(Concluída)'}`,
+              })),
+              { value: 'all', label: 'Todas as Operações (Histórico Total)' },
+            ]}
+            onChange={(val) => handlePeriodChange(val)}
+            className="os-app__period-picker"
+          />
+        </div>
+
         <button type="button" className="os-app__exit" onClick={requestExit}>
           Sair
         </button>
@@ -237,17 +276,19 @@ export function OsLayout() {
               <AdminIcon name="home" />
               <span>Central</span>
             </button>
-            <button type="button" onClick={() => go('/os/nova')}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpsMenuOpen(false);
+                if (location.pathname === '/os') {
+                  window.dispatchEvent(new CustomEvent('os:open-new-modal'));
+                } else {
+                  navigate('/os?new=1');
+                }
+              }}
+            >
               <kbd>F2</kbd>
               <span>Nova OS</span>
-            </button>
-            <button type="button" onClick={() => openPanel('consult')}>
-              <kbd>F7</kbd>
-              <span>Consultar OS</span>
-            </button>
-            <button type="button" onClick={() => openPanel('reprint')}>
-              <kbd>F8</kbd>
-              <span>Reimprimir OS</span>
             </button>
             <button type="button" onClick={() => go('/os/agenda')}>
               <kbd>F6</kbd>
@@ -282,8 +323,7 @@ export function OsLayout() {
             </div>
             {isBoard ? (
               <OsHotkeysBar
-                onConsult={() => openPanel('consult')}
-                onReprint={() => openPanel('reprint')}
+                onNewOrder={() => window.dispatchEvent(new CustomEvent('os:open-new-modal'))}
               />
             ) : null}
           </header>

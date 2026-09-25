@@ -14,7 +14,7 @@ import {
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
 
-const STORAGE_KEY = 'marthi.os.v1';
+const STORAGE_KEY = 'marthi.os.v2';
 export const OS_STATE_EVENT = 'marthi-os-state';
 
 export type WorkOrderStatus =
@@ -26,7 +26,7 @@ export type WorkOrderStatus =
   | 'delivered'
   | 'cancelled';
 
-export type WorkOrderPriority = 'low' | 'normal' | 'high';
+export type WorkOrderPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export type WorkOrderLineKind = 'part' | 'labor';
 
@@ -44,6 +44,51 @@ export type WorkOrderPhoto = {
   dataUrl: string;
   caption: string;
   createdAt: string;
+};
+
+/** Comentário no chamado estilo Jira. */
+export type WorkOrderComment = {
+  id: string;
+  authorName: string;
+  authorPhoto?: string;
+  authorRole?: string;
+  content: string;
+  kind: 'internal' | 'customer' | 'system';
+  createdAt: string;
+};
+
+/** Arquivo / documento anexado à OS. */
+export type WorkOrderAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  dataUrl: string;
+  createdAt: string;
+  uploaderName: string;
+};
+
+/** Operação / Sprint mensal da oficina. */
+export type WorkOrderOperation = {
+  id: string;
+  code: string;
+  title: string;
+  status: 'active' | 'completed' | 'planned';
+  startDate: string;
+  endDate: string;
+  completedAt?: string;
+  masterOperatorName?: string;
+  targetOrdersCount: number;
+};
+
+/** Cadastro de técnico com foto e especialidade. */
+export type TechnicianInfo = {
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl: string;
+  specialty: string;
+  active: boolean;
 };
 
 /** Resultado de cada item do checklist de entrada. */
@@ -69,6 +114,7 @@ export type WorkOrderLine = {
 
 export type WorkOrder = {
   id: string;
+  operationId?: string;
   customerName: string;
   customerPhone: string;
   customerDocument: string;
@@ -87,6 +133,8 @@ export type WorkOrder = {
   defect: string;
   diagnosis: string;
   notes: string;
+  /** Observações do técnico / bancada técnica. */
+  techNotes?: string;
   /** Previsão de pronto (ISO date ou texto curto). */
   estimatedReadyAt: string;
   technician: string;
@@ -99,6 +147,12 @@ export type WorkOrder = {
   parts: number;
   lines: WorkOrderLine[];
   photos: WorkOrderPhoto[];
+  comments?: WorkOrderComment[];
+  attachments?: WorkOrderAttachment[];
+  /** Minutos gastos em bancada / cronômetro */
+  spentMinutes?: number;
+  isTimerRunning?: boolean;
+  timerStartedAt?: string;
   /** Checklist padronizado (entrada / inspeção). */
   checklist: WorkOrderChecklistItem[];
   /** Assinatura digital do cliente (data URL PNG). */
@@ -149,7 +203,162 @@ export const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
   low: 'Baixa',
   normal: 'Normal',
   high: 'Alta',
+  urgent: 'Urgente',
 };
+
+export const TECHNICIANS_LIST: TechnicianInfo[] = [
+  {
+    id: 'tech-1',
+    name: 'Ana Costa',
+    role: 'Especialista Apple & Microeletrônica',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    specialty: 'Placas e iPhones',
+    active: true,
+  },
+  {
+    id: 'tech-2',
+    name: 'Carlos Lima',
+    role: 'Técnico Sênior de Hardware & Notebooks',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    specialty: 'Notebooks e PCs',
+    active: true,
+  },
+  {
+    id: 'tech-3',
+    name: 'Lucas Silva',
+    role: 'Técnico de Bancada & Telas',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    specialty: 'Troca de Telas e Baterias',
+    active: true,
+  },
+  {
+    id: 'tech-4',
+    name: 'Marthi Teste',
+    role: 'Operador Master & Triagem',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    specialty: 'Revisão Técnica e Triagem',
+    active: true,
+  },
+];
+
+export function getTechnicianByName(name?: string | null): TechnicianInfo | undefined {
+  if (!name) return undefined;
+  return TECHNICIANS_LIST.find((t) => t.name.toLowerCase() === name.toLowerCase());
+}
+
+const OPERATIONS_STORAGE_KEY = 'marthi.os.operations.v1';
+
+export const DEFAULT_OPERATIONS: WorkOrderOperation[] = [
+  {
+    id: 'op-2026-09',
+    code: 'OP-2026-09',
+    title: 'Operação Setembro 2026',
+    status: 'active',
+    startDate: '2026-09-01',
+    endDate: '2026-09-30',
+    masterOperatorName: 'Marthi Master',
+    targetOrdersCount: 20,
+  },
+  {
+    id: 'op-2026-08',
+    code: 'OP-2026-08',
+    title: 'Operação Agosto 2026',
+    status: 'completed',
+    startDate: '2026-08-01',
+    endDate: '2026-08-31',
+    completedAt: '2026-08-31T23:59:59.000Z',
+    masterOperatorName: 'Marthi Master',
+    targetOrdersCount: 25,
+  },
+  {
+    id: 'op-2026-07',
+    code: 'OP-2026-07',
+    title: 'Operação Julho 2026',
+    status: 'completed',
+    startDate: '2026-07-01',
+    endDate: '2026-07-31',
+    completedAt: '2026-07-31T23:59:59.000Z',
+    masterOperatorName: 'Marthi Master',
+    targetOrdersCount: 22,
+  },
+];
+
+export function listOperations(): WorkOrderOperation[] {
+  try {
+    const raw = localStorage.getItem(OPERATIONS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_OPERATIONS;
+}
+
+export function saveOperations(ops: WorkOrderOperation[]) {
+  try {
+    localStorage.setItem(OPERATIONS_STORAGE_KEY, JSON.stringify(ops));
+    window.dispatchEvent(new Event(OS_STATE_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getActiveOperation(): WorkOrderOperation {
+  const ops = listOperations();
+  return ops.find((op) => op.status === 'active') || ops[0];
+}
+
+export function finishActiveOperation(
+  currentOpId: string,
+  nextTitle: string,
+  masterOperatorName = 'Operador Master',
+): { oldOp: WorkOrderOperation; newOp: WorkOrderOperation } {
+  const ops = listOperations();
+  const stamp = new Date().toISOString();
+  const nextId = `op-${Date.now().toString(36)}`;
+  const nextCode = `OP-${stamp.slice(0, 7)}`;
+
+  const updated = ops.map((op) => {
+    if (op.id === currentOpId) {
+      return {
+        ...op,
+        status: 'completed' as const,
+        completedAt: stamp,
+        masterOperatorName,
+      };
+    }
+    return op;
+  });
+
+  const newOp: WorkOrderOperation = {
+    id: nextId,
+    code: nextCode,
+    title: nextTitle || `Operação ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+    status: 'active',
+    startDate: stamp.split('T')[0],
+    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    masterOperatorName,
+    targetOrdersCount: 25,
+  };
+
+  const allOps = [newOp, ...updated];
+  saveOperations(allOps);
+
+  // Mover OSs pendentes da operação anterior para a nova sprint
+  const currentOrders = listWorkOrders();
+  const migrated = currentOrders.map((order) => {
+    if (order.operationId === currentOpId && !['delivered', 'cancelled'].includes(order.status)) {
+      return { ...order, operationId: newOp.id, updatedAt: stamp };
+    }
+    return order;
+  });
+  save(migrated);
+
+  const oldOp = updated.find((op) => op.id === currentOpId) ?? ops[0];
+  return { oldOp, newOp };
+}
 
 export const DISPOSITION_LABEL: Record<AssetDisposition, string> = {
   customer: 'Permanece do cliente',
@@ -279,6 +488,7 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
     defect: raw.defect ?? '',
     diagnosis: raw.diagnosis ?? '',
     notes: raw.notes ?? '',
+    techNotes: raw.techNotes ?? '',
     estimatedReadyAt: raw.estimatedReadyAt ?? '',
     technician: raw.technician ?? '',
     sellerId: raw.sellerId ?? '',
@@ -307,7 +517,12 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
     purchaseAt: raw.purchaseAt,
     purchaseStockId: raw.purchaseStockId,
     purchaseFinanceId: raw.purchaseFinanceId,
-    revenueFinanceId: raw.revenueFinanceId,
+    operationId: raw.operationId ?? 'op-2026-09',
+    comments: Array.isArray(raw.comments) ? raw.comments : [],
+    attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+    spentMinutes: Number(raw.spentMinutes) || 0,
+    isTimerRunning: Boolean(raw.isTimerRunning),
+    timerStartedAt: raw.timerStartedAt,
     progressStartedAt: raw.progressStartedAt,
     deliveredAt: raw.deliveredAt,
     createdAt: raw.createdAt ?? now(),
@@ -316,91 +531,387 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
 }
 
 function seed(): WorkOrder[] {
-  const created = daysAgo(1);
   return [
     normalizeWorkOrder({
-      id: uid(),
-      customerName: 'Ana Souza',
-      customerPhone: '(24) 99811-2200',
-      customerDocument: '123.456.789-00',
-      customerEmail: 'ana@email.com',
-      itemName: 'iPhone 15',
+      id: 'OS-7101',
+      operationId: 'op-2026-09',
+      customerName: 'Juliana Silveira',
+      customerPhone: '(11) 98765-4321',
+      customerDocument: '321.654.987-00',
+      customerEmail: 'juliana.silveira@email.com',
+      itemName: 'iPhone 13 Pro 128GB',
       itemBrand: 'Apple',
-      itemModel: 'iPhone 15',
-      itemColor: 'Preto',
-      itemRef: 'IMEI 3598 4412',
-      devicePassword: '1234',
-      accessories: 'Capa + cabo',
-      conditionOnEntry: 'Tela trincada; laterais ok',
-      defect: 'Tela trincada e toque falhando no canto.',
-      diagnosis: '',
-      notes: 'Pediu orçamento antes de autorizar.',
-      estimatedReadyAt: toDateKey(addDays(new Date(), 2)),
-      technician: 'Ana Costa',
-      priority: 'high',
-      status: 'diagnosis',
-      labor: 80,
-      parts: 620,
+      itemModel: 'iPhone 13 Pro',
+      itemColor: 'Grafite',
+      itemRef: 'IMEI 3548 9210 4928 112',
+      devicePassword: '2580',
+      accessories: 'Capa anti-impacto preta e película trincada',
+      conditionOnEntry: 'Vidro frontal trincado no canto superior, saúde da bateria 74%',
+      defect: 'Aparelho desliga sozinho com 20% e vidro quebrou após queda na calçada.',
+      diagnosis: 'Avaliação visual realizada. Troca de display OLED original + Troca de bateria original recomendada.',
+      notes: 'Cliente autorizou orçamento verbal até R$ 800. Prioridade máxima pois utiliza para trabalho de vendas.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 1)),
+      technician: 'Carlos Lima',
+      priority: 'urgent',
+      status: 'open',
+      labor: 120,
+      parts: 590,
+      spentMinutes: 10,
+      comments: [
+        {
+          id: 'cmt-1',
+          authorName: 'Triagem Marthi',
+          authorRole: 'Atendimento',
+          content: 'Cliente deu entrada no balcão com muita urgência. Equipamento de uso corporativo.',
+          kind: 'system',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'cmt-2',
+          authorName: 'Carlos Lima',
+          authorRole: 'Técnico Especialista',
+          content: 'Recebido na bancada 1. Bateria com risco de estufamento. Desconectada para segurança.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [
+        {
+          id: 'att-1',
+          name: 'foto-entrada-frontal.jpg',
+          size: 184000,
+          type: 'image/jpeg',
+          dataUrl: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=300&auto=format&fit=crop&q=80',
+          createdAt: daysAgo(0),
+          uploaderName: 'Carlos Lima',
+        },
+      ],
       lines: [],
       assetDisposition: 'customer',
-      createdAt: created,
-      updatedAt: created,
+      createdAt: daysAgo(0),
+      updatedAt: daysAgo(0),
     }),
     normalizeWorkOrder({
-      id: uid(),
-      customerName: 'Carlos Lima',
-      customerPhone: '(24) 99200-1188',
-      customerDocument: '',
-      customerEmail: '',
-      itemName: 'Notebook Dell',
-      itemBrand: 'Dell',
-      itemModel: 'Inspiron',
-      itemColor: '',
-      itemRef: 'S/N 7XK22',
-      devicePassword: '',
-      accessories: 'Fonte',
-      conditionOnEntry: 'Sem marcas aparentes',
-      defect: 'Não liga. Só o LED da fonte acende.',
-      diagnosis: '',
-      notes: '',
-      estimatedReadyAt: toDateKey(addDays(new Date(), 0)),
-      technician: 'Marthi Teste',
+      id: 'OS-7102',
+      operationId: 'op-2026-09',
+      customerName: 'Marcos Vinicius',
+      customerPhone: '(21) 97123-4567',
+      customerDocument: '445.667.889-11',
+      customerEmail: 'marcos.v@empresa.com.br',
+      itemName: 'Samsung Galaxy S22 Ultra',
+      itemBrand: 'Samsung',
+      itemModel: 'Galaxy S22 Ultra 256GB',
+      itemColor: 'Verde Botânico',
+      itemRef: 'IMEI 3587 6109 2837 415',
+      devicePassword: 'Padrão em L',
+      accessories: 'S-Pen original inclusa (sem carregador)',
+      conditionOnEntry: 'Tampa traseira sem riscos, marcas no conector de carga',
+      defect: 'Não carrega na tomada, esquenta muito próximo à entrada Type-C.',
+      diagnosis: 'Subplaca de carga oxidada com resíduos de umidade. Linha VBUS em fuga para GND.',
+      notes: 'Testar se carregamento por indução continua operacional antes de mexer na placa principal.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 2)),
+      technician: 'Roberto Costa',
+      priority: 'high',
+      status: 'open',
+      labor: 140,
+      parts: 180,
+      spentMinutes: 15,
+      comments: [
+        {
+          id: 'cmt-3',
+          authorName: 'Roberto Costa',
+          authorRole: 'Técnico Bancada',
+          content: 'Subplaca desoxidação concluída. Testando carregamento rápido Super Fast Charging 45W.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(0),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7103',
+      operationId: 'op-2026-09',
+      customerName: 'Patrícia Mendes',
+      customerPhone: '(24) 99345-6789',
+      customerDocument: '112.233.445-55',
+      customerEmail: 'patricia.mendes@advocacia.com',
+      itemName: 'MacBook Air M1 13" (A2337)',
+      itemBrand: 'Apple',
+      itemModel: 'MacBook Air M1 256GB',
+      itemColor: 'Cinza Espacial',
+      itemRef: 'S/N C02G90PMQ05D',
+      devicePassword: 'marthi2026',
+      accessories: 'Carregador Apple 30W original e cabo USB-C MagSafe',
+      conditionOnEntry: 'Excelente estado, sem marcas',
+      defect: 'Não liga após queda de raio na residência durante a chuva de ontem.',
+      diagnosis: 'Placa lógica em análise. Fonte indica 5V 0.02A travado. Controlador USB-C CD3217 avariado. Necessária microsolda.',
+      notes: 'Equipamento contém documentos jurídicos sigilosos. Preservar o chip SSD NAND onboard a todo custo.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 3)),
+      technician: 'Lucas Silveira',
+      priority: 'urgent',
+      status: 'diagnosis',
+      labor: 350,
+      parts: 220,
+      spentMinutes: 48,
+      isTimerRunning: true,
+      timerStartedAt: daysAgo(0),
+      comments: [
+        {
+          id: 'cmt-4',
+          authorName: 'Lucas Silveira',
+          authorRole: 'Especialista em Microsolda',
+          content: 'Injetado 5V na linha PPBUS_G3H. Aquecimento identificado no componente U3100. Chip novo separado no estoque.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [
+        {
+          id: 'att-2',
+          name: 'laudo-tensao-placa.pdf',
+          size: 450000,
+          type: 'application/pdf',
+          dataUrl: 'data:text/plain;base64,TGF1ZG8=',
+          createdAt: daysAgo(0),
+          uploaderName: 'Lucas Silveira',
+        },
+      ],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(0),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7104',
+      operationId: 'op-2026-09',
+      customerName: 'Fernando Albuquerque',
+      customerPhone: '(11) 98112-3344',
+      customerDocument: '556.778.990-22',
+      customerEmail: 'fernando.alb@gmail.com',
+      itemName: 'Motorola Edge 40 Neo',
+      itemBrand: 'Motorola',
+      itemModel: 'Edge 40 Neo 5G',
+      itemColor: 'Caneel Bay (Azul)',
+      itemRef: 'IMEI 3567 8219 0345 678',
+      devicePassword: '0000',
+      accessories: 'Nenhum acessório deixado',
+      conditionOnEntry: 'Vidro frontal estilhaçado com manchas pretas (vazamento de OLED)',
+      defect: 'Display apagou completamente após impacto de moto.',
+      diagnosis: 'Orçamento aprovado pelo cliente. Display curvo pOLED solicitado ao distribuidor oficial. Previsão de chegada em 2 dias úteis.',
+      notes: 'Peça sob encomenda com código de rastreio #BR91823746. Aguardando entrega dos Correios.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 3)),
+      technician: 'Ana Costa',
       priority: 'normal',
+      status: 'waiting',
+      quoteStatus: 'approved',
+      labor: 110,
+      parts: 530,
+      spentMinutes: 20,
+      comments: [
+        {
+          id: 'cmt-5',
+          authorName: 'Ana Costa',
+          authorRole: 'Técnica Responsável',
+          content: 'Peça despachada pelo fornecedor parceiro. Notificado cliente sobre o prazo estimado.',
+          kind: 'internal',
+          createdAt: daysAgo(1),
+        },
+      ],
+      attachments: [],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(1),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7105',
+      operationId: 'op-2026-09',
+      customerName: 'Rodrigo Peixoto',
+      customerPhone: '(21) 99887-1122',
+      customerDocument: '889.990.112-33',
+      customerEmail: 'rodrigo.games@hotmail.com',
+      itemName: 'PlayStation 5 Disc Edition',
+      itemBrand: 'Sony',
+      itemModel: 'PS5 CFI-1114A',
+      itemColor: 'Branco',
+      itemRef: 'S/N 03-27451908-51',
+      devicePassword: 'Sem senha',
+      accessories: '1 Controle DualSense branco e cabo HDMI 2.1',
+      conditionOnEntry: 'Poeira interna moderada, conector HDMI com folga visível',
+      defect: 'Desliga sozinho após 15 minutos em jogos pesados acusando temperatura alta; tela pisca em 4K.',
+      diagnosis: 'Oxidação e deslocamento do metal líquido sobre a APU. Pinos 3 e 7 do HDMI rompidos da trilha. Limpeza profunda, metal líquido com barreira e HDMI novo.',
+      notes: 'Fazer teste de 2 horas no jogo Spider-Man 2 em modo Desempenho antes de liberar.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 1)),
+      technician: 'Roberto Costa',
+      priority: 'high',
       status: 'progress',
+      labor: 220,
+      parts: 130,
+      spentMinutes: 75,
+      isTimerRunning: true,
+      timerStartedAt: daysAgo(0),
+      comments: [
+        {
+          id: 'cmt-6',
+          authorName: 'Roberto Costa',
+          authorRole: 'Técnico Console & Hardware',
+          content: 'Conector HDMI 2.1 novo soldado com sucesso. Limpeza de fluxo e alinhamento de pinos OK.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+        {
+          id: 'cmt-7',
+          authorName: 'Roberto Costa',
+          authorRole: 'Técnico Console & Hardware',
+          content: 'Metal líquido original removido da APU. Aplicado Thermal Grizzly com vedação protetora.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [
+        {
+          id: 'att-3',
+          name: 'conector-hdmi-microscopio.jpg',
+          size: 312000,
+          type: 'image/jpeg',
+          dataUrl: 'https://images.unsplash.com/photo-1597733336794-12d05021d510?w=300&auto=format&fit=crop&q=80',
+          createdAt: daysAgo(0),
+          uploaderName: 'Roberto Costa',
+        },
+      ],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(0),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7106',
+      operationId: 'op-2026-09',
+      customerName: 'Mariana Goulart',
+      customerPhone: '(24) 98122-8899',
+      customerDocument: '667.889.001-44',
+      customerEmail: 'mariana.goulart@gmail.com',
+      itemName: 'Notebook Dell Inspiron 15 3520',
+      itemBrand: 'Dell',
+      itemModel: 'Inspiron 15 3520 Core i5',
+      itemColor: 'Cinza Grafite',
+      itemRef: 'Service Tag BRG8712X',
+      devicePassword: '123456',
+      accessories: 'Carregador Dell 65W original',
+      conditionOnEntry: 'Aparelho muito conservado',
+      defect: 'Lentidão excessiva para abrir programas e boot demorando mais de 5 minutos.',
+      diagnosis: 'HD mecânico antigo de 1TB com setores defeituosos. Realizado upgrade para SSD NVMe 1TB, clonagem de dados e limpeza interna.',
+      notes: 'Serviço concluído com êxito. Sistema inicializando em 8 segundos. Mensagem de pronto enviada no WhatsApp da cliente.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 0)),
+      technician: 'Carlos Lima',
+      priority: 'normal',
+      status: 'ready',
       labor: 150,
-      parts: 0,
+      parts: 380,
+      spentMinutes: 85,
+      comments: [
+        {
+          id: 'cmt-8',
+          authorName: 'Carlos Lima',
+          authorRole: 'Técnico Responsável',
+          content: 'Benchmark CrystalDiskMark: 3500 MB/s leitura e 2800 MB/s escrita. Aparelho pronto na estante de retiradas.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [],
       lines: [],
       assetDisposition: 'customer',
       createdAt: daysAgo(3),
-      updatedAt: now(),
+      updatedAt: daysAgo(0),
     }),
     normalizeWorkOrder({
-      id: uid(),
-      customerName: 'Fernanda Dias',
-      customerPhone: '(24) 98810-4411',
-      customerDocument: '',
-      customerEmail: '',
-      itemName: 'Óculos de grau',
-      itemBrand: '',
-      itemModel: '',
-      itemColor: '',
-      itemRef: 'OS armação 882',
-      devicePassword: '',
-      accessories: '',
-      conditionOnEntry: '',
-      defect: 'Troca de lentes e ajuste da haste.',
-      diagnosis: '',
-      notes: 'Retirada combinada para sexta.',
-      estimatedReadyAt: toDateKey(addDays(new Date(), 4)),
-      technician: 'Ana Costa',
-      priority: 'low',
-      status: 'ready',
-      labor: 40,
-      parts: 280,
+      id: 'OS-7107',
+      operationId: 'op-2026-09',
+      customerName: 'Tiago Barbosa',
+      customerPhone: '(11) 97654-3210',
+      customerDocument: '223.334.445-66',
+      customerEmail: 'tiago.barbosa@outlook.com',
+      itemName: 'Xiaomi Redmi Note 12 4G',
+      itemBrand: 'Xiaomi',
+      itemModel: 'Redmi Note 12 128GB',
+      itemColor: 'Azul Céu',
+      itemRef: 'IMEI 8675 4321 0987 654',
+      devicePassword: '7890',
+      accessories: 'Capa de silicone transparente',
+      conditionOnEntry: 'Tampa traseira descolando levemente pela pressão da bateria',
+      defect: 'Bateria inchou e aparelho descarrega muito rápido.',
+      diagnosis: 'Substituição da bateria por modelo original BN5D de 5000mAh e nova fita de fixação. Higienização das saídas de áudio.',
+      notes: 'Equipamento entregue ao cliente com termo de garantia de 90 dias assinado.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), -1)),
+      technician: 'Lucas Silveira',
+      priority: 'normal',
+      status: 'delivered',
+      labor: 90,
+      parts: 160,
+      spentMinutes: 40,
+      deliveredAt: daysAgo(1),
+      customerSignedName: 'Tiago Barbosa',
+      comments: [
+        {
+          id: 'cmt-9',
+          authorName: 'Lucas Silveira',
+          authorRole: 'Técnico Responsável',
+          content: 'Entregue no balcão pelo operador. Cliente conferiu 100% das funções.',
+          kind: 'system',
+          createdAt: daysAgo(1),
+        },
+      ],
+      attachments: [],
       lines: [],
       assetDisposition: 'customer',
-      createdAt: daysAgo(5),
-      updatedAt: now(),
+      createdAt: daysAgo(4),
+      updatedAt: daysAgo(1),
+    }),
+    normalizeWorkOrder({
+      id: 'OS-7108',
+      operationId: 'op-2026-09',
+      customerName: 'Beatriz Faria',
+      customerPhone: '(24) 99988-7766',
+      customerDocument: '778.889.990-55',
+      customerEmail: 'beatriz.faria@gmail.com',
+      itemName: 'Apple Watch Series 7 45mm',
+      itemBrand: 'Apple',
+      itemModel: 'Watch Series 7 GPS',
+      itemColor: 'Meia-noite',
+      itemRef: 'S/N FGG770K1N7',
+      devicePassword: '1988',
+      accessories: 'Pulseira esportiva preta original',
+      conditionOnEntry: 'Vidro superior com trincado superficial no canto direito',
+      defect: 'Vidro trincou ao bater na mesa de escritório; imagem e toque continuam perfeitos.',
+      diagnosis: 'Recondicionamento do vidro com laminação OCA a vácuo, mantendo o display Retina OLED original.',
+      notes: 'Avisar cliente que após recondicionamento a vedação para natação profunda não é recomendada.',
+      estimatedReadyAt: toDateKey(addDays(new Date(), 2)),
+      technician: 'Ana Costa',
+      priority: 'normal',
+      status: 'open',
+      labor: 180,
+      parts: 140,
+      spentMinutes: 15,
+      comments: [
+        {
+          id: 'cmt-10',
+          authorName: 'Ana Costa',
+          authorRole: 'Técnica Responsável',
+          content: 'Touch testado em 100% da área útil com aplicativo de desenho. Display intacto.',
+          kind: 'internal',
+          createdAt: daysAgo(0),
+        },
+      ],
+      attachments: [],
+      lines: [],
+      assetDisposition: 'customer',
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(0),
     }),
   ];
 }
@@ -417,7 +928,7 @@ function load(): WorkOrder[] {
       return items;
     }
     const parsed = JSON.parse(raw) as Partial<WorkOrder>[];
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    if (!Array.isArray(parsed) || parsed.length < 6) {
       const items = seed();
       save(items);
       return items;
@@ -1074,7 +1585,8 @@ export function getAgendaWeek(anchorDate: Date, technician = 'all'): AgendaDay[]
   }
   for (const day of days) {
     day.orders.sort((a, b) => {
-      const pri = { high: 0, normal: 1, low: 2 }[a.priority] - { high: 0, normal: 1, low: 2 }[b.priority];
+      const priMap: Record<WorkOrderPriority, number> = { urgent: -1, high: 0, normal: 1, low: 2 };
+      const pri = (priMap[a.priority] ?? 1) - (priMap[b.priority] ?? 1);
       if (pri !== 0) return pri;
       return a.customerName.localeCompare(b.customerName, 'pt-BR');
     });
@@ -1172,5 +1684,73 @@ export function workOrderExitAt(order: Pick<WorkOrder, 'deliveredAt' | 'status' 
   if (order.deliveredAt) return order.deliveredAt;
   if (order.status === 'delivered') return order.updatedAt;
   return null;
+}
+
+export async function addWorkOrderComment(
+  osId: string,
+  input: { authorName: string; authorRole?: string; authorPhoto?: string; content: string; kind?: 'internal' | 'customer' | 'system' },
+): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const newComment: WorkOrderComment = {
+    id: `cmt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    authorName: input.authorName || 'Operador',
+    authorRole: input.authorRole || 'Técnico',
+    authorPhoto: input.authorPhoto,
+    content: input.content.trim(),
+    kind: input.kind || 'internal',
+    createdAt: now(),
+  };
+  const nextComments = [...(order.comments ?? []), newComment];
+  return updateWorkOrder(osId, { comments: nextComments } as Partial<WorkOrder>);
+}
+
+export async function addWorkOrderAttachment(
+  osId: string,
+  attachment: { name: string; size: number; type: string; dataUrl: string; uploaderName: string },
+): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const newAttachment: WorkOrderAttachment = {
+    id: `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    name: attachment.name,
+    size: attachment.size,
+    type: attachment.type,
+    dataUrl: attachment.dataUrl,
+    createdAt: now(),
+    uploaderName: attachment.uploaderName || 'Operador',
+  };
+  const nextAttachments = [...(order.attachments ?? []), newAttachment];
+  return updateWorkOrder(osId, { attachments: nextAttachments } as Partial<WorkOrder>);
+}
+
+export async function removeWorkOrderAttachment(osId: string, attachmentId: string): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const nextAttachments = (order.attachments ?? []).filter((a) => a.id !== attachmentId);
+  return updateWorkOrder(osId, { attachments: nextAttachments } as Partial<WorkOrder>);
+}
+
+export async function toggleWorkOrderTimer(osId: string): Promise<WorkOrder | null> {
+  const order = getWorkOrder(osId);
+  if (!order) return null;
+  const isRunning = Boolean(order.isTimerRunning);
+  const currentSpent = Number(order.spentMinutes) || 0;
+  if (isRunning) {
+    let added = 0;
+    if (order.timerStartedAt) {
+      added = Math.max(1, Math.round((Date.now() - new Date(order.timerStartedAt).getTime()) / 60000));
+    }
+    return updateWorkOrder(osId, {
+      isTimerRunning: false,
+      timerStartedAt: undefined,
+      spentMinutes: currentSpent + added,
+    } as Partial<WorkOrder>);
+  } else {
+    return updateWorkOrder(osId, {
+      isTimerRunning: true,
+      timerStartedAt: now(),
+    } as Partial<WorkOrder>);
+  }
 }
 

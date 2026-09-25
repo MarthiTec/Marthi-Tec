@@ -6,6 +6,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
+import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -58,6 +59,7 @@ import {
   syncSingleSplit,
   type SplitPayment,
 } from './paymentSplit';
+import { useStoreCustomization } from '../../data/storeSegment';
 import '../admin/admin.css';
 import './caixa.css';
 
@@ -237,6 +239,7 @@ export function CaixaPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const fiscalOn = hasModule('fiscal');
   const isAdmin = userIsStoreAdmin(user?.email);
+  const customization = useStoreCustomization();
   const sellers = useMemo(() => listSellers(true), []);
   const codeRef = useRef<HTMLInputElement>(null);
   const linesRef = useRef(lines);
@@ -1009,6 +1012,7 @@ export function CaixaPage() {
     >
       <header className="caixa-app__top">
         <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
+        <OsEcosystemMenu />
         <BrandLogo variant="mark" className="caixa-app__mark" />
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
@@ -1275,14 +1279,18 @@ export function CaixaPage() {
               <AdminIcon name="home" />
               <span>Central</span>
             </button>
-            <Link to="/mesa" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
-              <AdminIcon name="ops" />
-              <span>Mesas / garçom</span>
-            </Link>
-            <Link to="/cozinha" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
-              <AdminIcon name="ops" />
-              <span>Tela da cozinha</span>
-            </Link>
+            {customization.showTablesAndKitchen ? (
+              <>
+                <Link to="/mesa" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
+                  <AdminIcon name="ops" />
+                  <span>Mesas / garçom</span>
+                </Link>
+                <Link to="/cozinha" className="caixa-app__ops-central" onClick={() => setOpsMenuOpen(false)}>
+                  <AdminIcon name="ops" />
+                  <span>Tela da cozinha</span>
+                </Link>
+              </>
+            ) : null}
           <button type="button" onClick={() => openPanel('sales')}>
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
@@ -1392,7 +1400,7 @@ export function CaixaPage() {
           <article className="admin-card pdv__scan">
             <form className="pdv__code" onSubmit={scan}>
               <label className="pdv__code-field">
-                Código / SKU / IMEI
+                {customization.showImei ? 'Código / SKU / IMEI' : 'Código / SKU / Barras'}
                 <input
                   ref={codeRef}
                   autoFocus

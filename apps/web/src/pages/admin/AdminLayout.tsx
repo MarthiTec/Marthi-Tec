@@ -62,6 +62,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/perfil': { kicker: 'Conta', title: 'Meu perfil' },
   '/painel/crm': { kicker: 'CRM', title: 'Visão do CRM' },
   '/painel/plano': { kicker: 'Contrato', title: 'Plano da loja' },
+  '/painel/ramo': { kicker: 'Configurações', title: 'Ramo da Loja & Personalização' },
+  '/painel/personalizacao': { kicker: 'Configurações', title: 'Ramo da Loja & Personalização' },
   '/painel/ajuda': { kicker: 'Suporte', title: 'Central de ajuda' },
 };
 

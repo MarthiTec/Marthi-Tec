@@ -16,6 +16,7 @@ import {
 } from '../data/companyContact';
 import { ingestSellerApplicantToCrm, listLeadMessages, postHomepageCrmChat } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
+import { useStoreCustomization } from '../data/storeSegment';
 import './home.css';
 import './products.css';
 
@@ -104,6 +105,7 @@ export function HomePage() {
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
   const showFiscal = contracted && hasModule('fiscal');
+  const storeCustom = useStoreCustomization();
   /** Em apresentação ao vivo, abre módulos direto (sem pedir login). */
   const liveOpen =
     liveReady || hasDemoAccess('totem') || hasDemoAccess('caixa') || hasDemoAccess('os');
@@ -520,13 +522,13 @@ export function HomePage() {
                   <span>{user || liveOpen ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
                 </Link>
               ) : null}
-              {showCaixa || showTotem ? (
+              {(showCaixa || showTotem) && storeCustom.showTablesAndKitchen ? (
                 <Link to="/mesa" className="launch-card">
                   <strong>Mesas</strong>
                   <span>Garçom lança pedido no tablet</span>
                 </Link>
               ) : null}
-              {showCaixa || showTotem ? (
+              {(showCaixa || showTotem) && storeCustom.showTablesAndKitchen ? (
                 <Link to="/cozinha" className="launch-card">
                   <strong>Cozinha</strong>
                   <span>Fila ao vivo na TV da cozinha</span>

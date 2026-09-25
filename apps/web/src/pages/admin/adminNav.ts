@@ -108,9 +108,18 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/crm', label: 'Visão no painel', end: true },
     ],
   },
+  {
+    id: 'ramo',
+    label: 'Ramo da Loja',
+    icon: 'settings',
+    to: '/painel/ramo',
+    end: true,
+    module: null,
+  },
 ];
 
 export function navGroupForPath(pathname: string, search = '') {
+  if (pathname.startsWith('/painel/ramo') || pathname.startsWith('/painel/personalizacao')) return 'ramo';
   if (pathname.startsWith('/painel/operacoes')) return 'operacoes';
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (

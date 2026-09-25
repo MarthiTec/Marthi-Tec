@@ -174,16 +174,16 @@ export function FinanceBoletosPanel({
     setDetailId(boleto.id);
   }
 
-  function onPay(item: Boleto) {
+  async function onPay(item: Boleto) {
     const paid = markBoletoPaid(item.id);
     if (!paid) {
       onError('Não foi possível baixar o boleto.');
       return;
     }
     if (item.receivableId) {
-      settleReceivable(item.receivableId, item.amount);
+      await settleReceivable(item.receivableId, item.amount);
     } else {
-      const created = upsertReceivable({
+      const created = await upsertReceivable({
         description: `Boleto ${item.id} · ${item.description}`,
         customerName: item.customerName,
         category: 'Recebimentos',
@@ -192,7 +192,7 @@ export function FinanceBoletosPanel({
         accountId: item.bankAccountId || config.defaultBankAccountId || accounts[0]?.id || '',
         notes: `Baixa automática do boleto ${item.id}`,
       });
-      if (created.ok) settleReceivable(created.data.id, item.amount);
+      if (created.ok) await settleReceivable(created.data.id, item.amount);
     }
     void addFinance({
       type: 'in',
@@ -378,7 +378,7 @@ export function FinanceBoletosPanel({
                     <td className="admin-table__actions">
                       {item.status === 'open' ? (
                         <div className="admin-toolbar">
-                          <button type="button" className="btn btn--ghost" onClick={() => onPay(item)}>
+                          <button type="button" className="btn btn--ghost" onClick={() => void onPay(item)}>
                             Baixar
                           </button>
                           <button
@@ -761,7 +761,7 @@ export function FinanceRemessaRetornoPanel({
     );
   }
 
-  function processRetorno(id: string) {
+  async function processRetorno(id: string) {
     const batch = listRetornos().find((item) => item.id === id);
     if (!batch) return;
     let paid = 0;
@@ -770,7 +770,7 @@ export function FinanceRemessaRetornoPanel({
       const boleto = listBoletos().find((row) => row.id === item.boletoId);
       if (!boleto || boleto.status !== 'open') continue;
       markBoletoPaid(boleto.id);
-      if (boleto.receivableId) settleReceivable(boleto.receivableId, boleto.amount);
+      if (boleto.receivableId) await settleReceivable(boleto.receivableId, boleto.amount);
       void addFinance({
         type: 'in',
         amount: boleto.amount,
@@ -1004,7 +1004,7 @@ export function FinanceRemessaRetornoPanel({
                         <button
                           type="button"
                           className="btn btn--primary"
-                          onClick={() => processRetorno(item.id)}
+                          onClick={() => void processRetorno(item.id)}
                         >
                           Processar baixas
                         </button>

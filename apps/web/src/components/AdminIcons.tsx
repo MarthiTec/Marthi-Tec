@@ -19,6 +19,7 @@ export type AdminIconName =
   | 'whatsapp'
   | 'mail'
   | 'settings'
+  | 'print'
   | 'trash';
 
 type AdminIconProps = {
@@ -175,6 +176,14 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
         <svg {...common}>
           <circle cx="12" cy="12" r="3" />
           <path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </svg>
+      );
+    case 'print':
+      return (
+        <svg {...common}>
+          <path d="M6 9V2h12v7" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <rect x="6" y="14" width="12" height="8" rx="1" />
         </svg>
       );
     case 'trash':

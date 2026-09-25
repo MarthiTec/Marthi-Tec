@@ -58,6 +58,7 @@ import { WorkOrderDetailPage } from './pages/admin/WorkOrderDetailPage';
 import { WorkOrderReportPage } from './pages/admin/WorkOrderReportPage';
 import { AgendaPage } from './pages/admin/AgendaPage';
 import { PlanPage } from './pages/admin/PlanPage';
+import { StoreSegmentPage } from './pages/admin/StoreSegmentPage';
 import { SellersPage } from './pages/admin/SellersPage';
 import { SuppliersPage } from './pages/admin/SuppliersPage';
 import { EmployeesPage } from './pages/admin/EmployeesPage';
@@ -131,6 +132,8 @@ export function App() {
           <Route path="conexoes" element={<EcommerceConnectionsPage />} />
           <Route path=":channelId" element={<EcommerceChannelPage />} />
         </Route>
+        <Route path="/ecomerce/*" element={<Navigate to="/ecommerce" replace />} />
+        <Route path="/ecomerce" element={<Navigate to="/ecommerce" replace />} />
         <Route path="/crm" element={<CrmLayout />}>
           <Route index element={<CrmBoardPage />} />
           <Route path="conversas" element={<CrmInboxPage />} />
@@ -139,6 +142,8 @@ export function App() {
           <Route path="perfil" element={<CrmProfilePage />} />
           <Route path="rede" element={<CrmNetworkPage />} />
         </Route>
+        <Route path="/CRM/*" element={<Navigate to="/crm" replace />} />
+        <Route path="/CRM" element={<Navigate to="/crm" replace />} />
         <Route path="/erp" element={<ErpLayout />}>
           <Route index element={<ErpHomePage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />
@@ -207,6 +212,8 @@ export function App() {
           <Route path="perfil" element={<ProfilePage />} />
           <Route path="conta" element={<Navigate to="/painel/perfil" replace />} />
           <Route path="plano" element={<PlanPage />} />
+          <Route path="ramo" element={<StoreSegmentPage />} />
+          <Route path="personalizacao" element={<StoreSegmentPage />} />
           <Route path="ajuda" element={<HelpPage />} />
         </Route>
       </Routes>

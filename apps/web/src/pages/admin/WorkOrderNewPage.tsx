@@ -215,6 +215,7 @@ export function WorkOrderNewPage() {
               { value: 'low', label: PRIORITY_LABEL.low },
               { value: 'normal', label: PRIORITY_LABEL.normal },
               { value: 'high', label: PRIORITY_LABEL.high },
+              { value: 'urgent', label: PRIORITY_LABEL.urgent },
             ]}
             onChange={(value) =>
               setForm({ ...form, priority: value as WorkOrderPriority })

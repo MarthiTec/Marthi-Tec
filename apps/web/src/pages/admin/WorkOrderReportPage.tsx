@@ -213,7 +213,7 @@ export function WorkOrderReportPage() {
 
         <footer className="os-report__sign">
           <div>
-            <p>Recebi o equipamento nas condições descritas.</p>
+            <p>Declaro que as informações acima e o estado estético do aparelho estão de acordo.</p>
             {order.customerSignature ? (
               <img
                 className="os-report__signature"
@@ -221,20 +221,107 @@ export function WorkOrderReportPage() {
                 alt={`Assinatura ${order.customerSignedName || order.customerName}`}
               />
             ) : (
-              <span>Assinatura do cliente</span>
+              <div className="os-print-signature-line" style={{ marginTop: 24, borderTop: '1px solid #333' }} />
             )}
-            {order.customerSignedName || order.customerName ? (
-              <small>
-                {order.customerSignedName || order.customerName}
-                {order.customerSignedAt
-                  ? ` · ${new Date(order.customerSignedAt).toLocaleString('pt-BR')}`
-                  : ''}
-              </small>
-            ) : null}
+            <strong>Assinatura do Cliente</strong>
+            <small>{order.customerName}</small>
           </div>
           <div>
-            <p>Responsável pela oficina</p>
+            <p>Recebido e conferido pela bancada técnica da oficina.</p>
+            <div className="os-print-signature-line" style={{ marginTop: 24, borderTop: '1px solid #333' }} />
+            <strong>Assinatura do Técnico Responsável</strong>
+            <small>{order.technician || 'Técnico Marthi'}</small>
+          </div>
+        </footer>
+      </article>
+
+      {/* =================================================================
+          LINHA DE SERRILHA / CORTE ENTRE AS DUAS VIAS
+         ================================================================= */}
+      <div className="os-print-cut-divider" aria-hidden="true">
+        <span className="os-print-cut-icon">✂</span>
+        <span className="os-print-cut-label">
+          CORTE AQUI · DESTAQUE A 2ª VIA PARA ENTREGAR AO CLIENTE
+        </span>
+        <span className="os-print-cut-icon">✂</span>
+      </div>
+
+      {/* =================================================================
+          2ª VIA — VIA DO CLIENTE (Comprovante de Entrada / Retirada)
+         ================================================================= */}
+      <article className="admin-card os-report os-report--customer">
+        <header className="os-report__head">
+          <div>
+            <p className="os-report__kicker">2ª VIA · COMPROVANTE DO CLIENTE</p>
+            <h1>ORDEM DE SERVIÇO #{order.id}</h1>
+            <p>Apresente este documento ao retornar para retirar seu aparelho</p>
+          </div>
+          <div className="os-report__total">
+            <span>Total estimado</span>
+            <strong>{money(workOrderTotal(order))}</strong>
+          </div>
+        </header>
+
+        <div className="os-print-customer-ticket-card">
+          <div className="os-print-customer-ticket-card__header">
+            <span>COMPROVANTE DE ENTREGA DE EQUIPAMENTO</span>
+            <small>Guarde este número com cuidado</small>
+          </div>
+          <div className="os-print-customer-ticket-card__number-row">
+            <span className="os-print-ticket-label">NÚMERO DA OS:</span>
+            <strong className="os-print-ticket-big-num">#{order.id}</strong>
+          </div>
+          <div className="os-print-customer-ticket-card__alert">
+            ⚠️ APRESENTE ESTE NÚMERO / PAPEL NA RETIRADA DO CELULAR
+          </div>
+        </div>
+
+        <div className="os-report__grid" style={{ marginTop: 16 }}>
+          <section>
+            <h2>Cliente</h2>
+            <Row label="Nome" value={order.customerName} />
+            <Row label="Telefone" value={order.customerPhone} />
+          </section>
+          <section>
+            <h2>Aparelho</h2>
+            <Row label="Descrição" value={order.itemName} />
+            <Row label="Marca/Modelo" value={[order.itemBrand, order.itemModel].filter(Boolean).join(' · ')} />
+            <Row label="IMEI / Série" value={order.itemRef} />
+            <Row label="Acessórios" value={order.accessories} />
+          </section>
+          <section className="os-report__span">
+            <h2>Prazos e Defeito</h2>
+            <Row label="Defeito relatado" value={order.defect} />
+            <Row label="Data de Entrada" value={when(order.createdAt)} />
+            <Row label="Previsão de Pronto" value={when(order.estimatedReadyAt)} />
+          </section>
+        </div>
+
+        <div className="os-print-rules-box" style={{ margin: '16px 0' }}>
+          <strong>TERMOS DE GARANTIA E RETIRADA:</strong>
+          <ol>
+            <li>
+              A retirada do aparelho será permitida exclusivamente mediante apresentação deste comprovante original ou documento com foto do titular.
+            </li>
+            <li>
+              Garantia legal de 90 dias sobre serviços executados e peças trocadas (Artigo 26 do CDC). A garantia não cobre quebra de vidro, contato com líquidos ou violação de lacres.
+            </li>
+            <li>
+              Aparelhos prontos não retirados em até 90 dias após aviso poderão ser destinados para arcar com os custos de armazenagem e peças.
+            </li>
+          </ol>
+        </div>
+
+        <footer className="os-report__sign">
+          <div>
+            <p>Recebido por (Loja Marthi)</p>
+            <div className="os-print-signature-line" style={{ marginTop: 24, borderTop: '1px solid #333' }} />
             <span>Assinatura / carimbo</span>
+          </div>
+          <div>
+            <p>Assinatura do Cliente</p>
+            <div className="os-print-signature-line" style={{ marginTop: 24, borderTop: '1px solid #333' }} />
+            <span>{order.customerName}</span>
           </div>
         </footer>
       </article>
