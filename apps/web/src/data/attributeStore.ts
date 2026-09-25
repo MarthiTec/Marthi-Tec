@@ -2,7 +2,7 @@ export const ATTR_COR = 'ATTR-COR';
 export const ATTR_CAP = 'ATTR-CAP';
 export const ATTR_RET = 'ATTR-RET';
 export const ATTR_TAM = 'ATTR-TAM';
-export const MAX_ATTRIBUTES = 8;
+export const MAX_ATTRIBUTES = 5;
 
 /** Presets prontos para atributo Tamanho (roupa / calçado). */
 export const SIZE_VALUE_PRESETS: { id: string; label: string; values: string[] }[] = [
@@ -105,21 +105,26 @@ function sortAttrs(items: ProductAttribute[]) {
 }
 
 function load(): ProductAttribute[] {
-  if (memoryAttrs) return sortAttrs(memoryAttrs.map((item) => ({ ...item, values: [...item.values], priceDeltas: { ...item.priceDeltas } })));
+  if (memoryAttrs) {
+    return sortAttrs(
+      memoryAttrs.map((item) => ({
+        ...item,
+        values: [...item.values],
+        priceDeltas: { ...item.priceDeltas },
+      })),
+    );
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const fresh = seedAttributes();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      return fresh;
+      // Sem seed automático — totem/ERP hidratam via Nest.
+      return [];
     }
     const parsed = JSON.parse(raw) as ProductAttribute[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      const fresh = seedAttributes();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      return fresh;
+      return [];
     }
-    const next = sortAttrs(
+    return sortAttrs(
       parsed.map((item, index) => {
         const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
         const priceDeltas = { ...(item.priceDeltas ?? {}) };
@@ -139,31 +144,8 @@ function load(): ProductAttribute[] {
         };
       }),
     );
-    let merged = next;
-    if (!merged.some((item) => item.id === ATTR_TAM) && merged.length < MAX_ATTRIBUTES) {
-      merged = sortAttrs([
-        ...merged,
-        {
-          id: ATTR_TAM,
-          name: 'Tamanho',
-          values: [...SIZE_VALUE_PRESETS[0].values],
-          priceDeltas: {},
-          useOnTotem: true,
-          filterOnTotem: true,
-          useOnStock: true,
-          sort: 4,
-          active: true,
-        },
-      ]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    }
-    const rawRet = parsed.find((item) => item.id === ATTR_RET);
-    if (rawRet && rawRet.priceDeltas?.['Por encomenda'] === undefined) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    }
-    return merged;
   } catch {
-    return seedAttributes();
+    return [];
   }
 }
 
@@ -181,6 +163,16 @@ function persist(items: ProductAttribute[]) {
 
 export function replaceAttributes(items: ProductAttribute[]) {
   return persist(items.slice(0, MAX_ATTRIBUTES));
+}
+
+/** Hidrata atributos do Nest (público no totem ou autenticado no painel). */
+export async function hydrateAttributesFromApi() {
+  const { isNestAuthed } = await import('../services/nestClient');
+  const { apiGetTotemPublicAttributes, apiListAttributes } = await import('../services/erpApi');
+  const remote = isNestAuthed()
+    ? await apiListAttributes().catch(() => apiGetTotemPublicAttributes())
+    : await apiGetTotemPublicAttributes();
+  return replaceAttributes(remote);
 }
 
 export function getAttributes() {

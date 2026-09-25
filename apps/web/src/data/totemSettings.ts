@@ -493,6 +493,16 @@ export function getTotemExitPassword() {
   return read().exitPassword;
 }
 
+/** Carrega settings do Nest (público ou autenticado). Sem seed mock. */
+export async function hydrateTotemSettingsFromApi() {
+  const { isNestAuthed } = await import('../services/nestClient');
+  const { apiGetTotemPublicSettings, apiGetTotemSettings } = await import('../services/erpApi');
+  const remote = isNestAuthed()
+    ? await apiGetTotemSettings().catch(() => apiGetTotemPublicSettings())
+    : await apiGetTotemPublicSettings();
+  return replaceTotemSettings(remote);
+}
+
 export function replaceTotemSettings(input: Partial<TotemSettings>) {
   const next = mergeTotemSettings(readStored(), input);
   memorySettings = next;

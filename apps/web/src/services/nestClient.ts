@@ -13,7 +13,13 @@ export function getAuthToken(): string | null {
 }
 
 export function isNestAuthed(): boolean {
-  return Boolean(getAuthToken());
+  const token = getAuthToken();
+  if (!token) return false;
+  // Staff local / demo não são JWT Nest
+  if (token.startsWith('marthi-staff-local:') || token === 'marthi-demo-token') {
+    return false;
+  }
+  return true;
 }
 
 type ApiErrorBody = {

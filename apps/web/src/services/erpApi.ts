@@ -505,6 +505,21 @@ export function apiGetMeAccess() {
 
 /* ── Fase 3 P0: Totem leads + POS tickets ──────────────── */
 
+/** Catálogo público do totem (sem JWT) — estoque showOnTotem. */
+export function apiGetTotemCatalog() {
+  return nestGet<StockItem[]>('/totem/catalog');
+}
+
+/** Settings públicos do totem (sem JWT). */
+export function apiGetTotemPublicSettings() {
+  return nestGet<TotemSettings>('/totem/settings');
+}
+
+/** Atributos públicos do totem (sem JWT). */
+export function apiGetTotemPublicAttributes() {
+  return nestGet<ProductAttribute[]>('/totem/attributes');
+}
+
 export function apiSubmitTotemLead(body: {
   customerName: string;
   customerPhone: string;

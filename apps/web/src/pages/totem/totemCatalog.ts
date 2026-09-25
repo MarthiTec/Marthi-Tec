@@ -1,13 +1,19 @@
-import { getAdminState, stockItemImages, type StockItem } from '../../data/adminStore';
+import {
+  stockItemImages,
+  type StockItem,
+} from '../../data/adminStore';
 import { ATTR_CAP, ATTR_COR, ATTR_RET, totemAttributes } from '../../data/attributeStore';
 import { formatInstallment } from '../../data/variantQuote';
-import { apiListStock } from '../../services/erpApi';
+import { apiGetTotemCatalog, apiListStock } from '../../services/erpApi';
 import { isNestAuthed } from '../../services/nestClient';
 import {
   FULFILLMENT_OPTIONS,
   type TotemBrand,
   type TotemProduct,
 } from './totemData';
+
+/** Cache em memória do último catálogo Nest (nunca seed localStorage). */
+let catalogStockCache: StockItem[] = [];
 
 function stableId(name: string) {
   let hash = 0;
@@ -31,7 +37,6 @@ function pushUnique(map: Record<string, string[]>, key: string, value: string) {
   map[key] = list;
 }
 
-/** Agrega attrs do estoque ERP para o card do totem (incluindo atributos customizados). */
 function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
   const attrs: Record<string, string[]> = {};
 
@@ -96,34 +101,46 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
   });
 }
 
-/** Só estoque do ERP (itens com “Exibir no totem”). Sem catálogo mock. */
+function rememberStock(items: StockItem[]) {
+  catalogStockCache = items.map((item) => ({
+    ...item,
+    attrs: { ...(item.attrs ?? {}) },
+    images: [...(item.images ?? [])],
+  }));
+}
+
+/** Sync: só cache Nest em memória — nunca adminStore/seed. */
 export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
-  return groupStockForTotem(getAdminState().stock);
+  return groupStockForTotem(catalogStockCache);
 }
 
 /**
- * Carrega estoque do Nest quando autenticado; senão usa cache local do ERP.
- * Não usa TOTEM_PRODUCTS nem GET /products (seed/demo).
+ * Catálogo do totem = Nest.
+ * Público: GET /totem/catalog. Autenticado: preferência estoque da loja via /stock.
+ * Sem fallback para mock/localStorage.
  */
 export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: number })[]> {
-  if (isNestAuthed()) {
-    try {
-      const stock = await apiListStock();
-      return groupStockForTotem(stock);
-    } catch {
-      return groupStockForTotem(getAdminState().stock);
-    }
+  try {
+    const stock = isNestAuthed()
+      ? await apiListStock().catch(() => apiGetTotemCatalog())
+      : await apiGetTotemCatalog();
+    const forTotem = stock.filter((item) => item.showOnTotem !== false);
+    rememberStock(forTotem);
+    return groupStockForTotem(forTotem);
+  } catch (error) {
+    console.error('[totem] falha ao carregar catálogo Nest', error);
+    catalogStockCache = [];
+    return [];
   }
-  return groupStockForTotem(getAdminState().stock);
 }
 
 export function findStockImageById(stockId: string) {
-  const item = getAdminState().stock.find((entry) => entry.id === stockId);
+  const item = catalogStockCache.find((entry) => entry.id === stockId);
   return stockItemImages(item);
 }
 
 export function findStockImageByName(name: string) {
-  const item = getAdminState().stock.find(
+  const item = catalogStockCache.find(
     (entry) => entry.name.toLowerCase() === name.trim().toLowerCase(),
   );
   return stockItemImages(item);

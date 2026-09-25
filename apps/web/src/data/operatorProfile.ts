@@ -1,4 +1,4 @@
-import { syncThemeForProfile, type PanelTheme } from './panelThemeStore';
+import { getPanelTheme, syncThemeForProfile, type PanelTheme } from './panelThemeStore';
 
 const STORAGE_KEY = 'marthi.operator.profile';
 export const PROFILE_EVENT = 'marthi-profile-updated';
@@ -79,6 +79,27 @@ export function replaceOperatorProfileCache(profile: OperatorProfile) {
   syncThemeForProfile(memoryProfile.email || memoryProfile.displayName, memoryProfile.theme);
 }
 
+/** Mantém memoryProfile.theme alinhado ao toggle (evita PUT revertendo tema). */
+export function patchOperatorProfileTheme(theme: PanelTheme) {
+  if (!memoryProfile) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        memoryProfile = normalizeProfile(JSON.parse(raw) as Partial<OperatorProfile>, 'Operador');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!memoryProfile) return;
+  memoryProfile = { ...memoryProfile, theme };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function saveOperatorProfile(
   profile: Omit<OperatorProfile, 'theme'> & { theme?: PanelTheme },
   options?: { allowRole?: boolean },
@@ -88,7 +109,7 @@ export async function saveOperatorProfile(
     {
       ...profile,
       role: options?.allowRole ? profile.role : current.role,
-      theme: profile.theme || current.theme,
+      theme: profile.theme ?? getPanelTheme() ?? current.theme,
     },
     profile.displayName,
     profile.email,

@@ -1,10 +1,13 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { ERP_BOOTSTRAP_EVENT } from '../data/erpBootstrap';
+import { getPanelTheme } from '../data/panelThemeStore';
 import { getTotemExitPassword } from '../data/totemSettings';
 import {
   fileToProfilePhoto,
   getOperatorProfile,
   notifyProfileUpdated,
+  PROFILE_EVENT,
   profileInitials,
   saveOperatorProfile,
 } from '../data/operatorProfile';
@@ -40,7 +43,7 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
   const [managerPassword, setManagerPassword] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function hydrateForm() {
     const next = getOperatorProfile(fallback, fallbackEmail);
     setDisplayName(next.displayName);
     setRole(next.role);
@@ -51,6 +54,20 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
     setRoleUnlocked(false);
     setManagerPassword('');
     setRoleError(null);
+  }
+
+  useEffect(() => {
+    hydrateForm();
+  }, [fallback, fallbackEmail]);
+
+  useEffect(() => {
+    const onSync = () => hydrateForm();
+    window.addEventListener(PROFILE_EVENT, onSync);
+    window.addEventListener(ERP_BOOTSTRAP_EVENT, onSync);
+    return () => {
+      window.removeEventListener(PROFILE_EVENT, onSync);
+      window.removeEventListener(ERP_BOOTSTRAP_EVENT, onSync);
+    };
   }, [fallback, fallbackEmail]);
 
   const preview = photo || user?.picture || null;
@@ -86,13 +103,23 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setPhotoError(null);
     try {
       await saveOperatorProfile(
-        { displayName, role, photo, email, phone, address },
+        {
+          displayName,
+          role,
+          photo,
+          email,
+          phone,
+          address,
+          theme: getPanelTheme(),
+        },
         { allowRole: roleUnlocked },
       );
       setSaved(true);
       notifyProfileUpdated();
+      hydrateForm();
     } catch (error) {
       const message =
         error instanceof Error && error.message

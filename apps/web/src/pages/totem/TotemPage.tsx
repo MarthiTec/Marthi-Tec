@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../../components/BrandLogo';
 import {
   formatPicked,
+  hydrateAttributesFromApi,
   productAttrValues,
   resolveTotemAttrOptions,
   toLegacyFields,
@@ -16,6 +17,7 @@ import { speakTotem, stopTotemSpeech } from '../../data/totemSpeech';
 import {
   getTotemExitPassword,
   getTotemSettings,
+  hydrateTotemSettingsFromApi,
   storeGreeting,
   totemCopy,
   TOTEM_DINE_ID,
@@ -179,8 +181,9 @@ export function TotemPage() {
   const [sessionMode, setSessionMode] = useState<TotemMode | null>(null);
   const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
-  const [catalog, setCatalog] = useState(() => listTotemCatalog());
+  const [catalog, setCatalog] = useState<(TotemProduct & { totalQty?: number })[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [ticketId, setTicketId] = useState<string | null>(null);
   const effectiveMode = sessionMode ?? mode;
   const catalogOnly = effectiveMode === 'catalog';
@@ -428,10 +431,52 @@ export function TotemPage() {
     let active = true;
     async function hydrateCatalog() {
       setCatalogLoading(true);
-      const next = await loadTotemCatalog();
-      if (active) {
-        setCatalog(next);
-        setCatalogLoading(false);
+      setCatalogError(null);
+      try {
+        await Promise.all([
+          hydrateTotemSettingsFromApi().catch((error) => {
+            console.error('[totem] settings Nest', error);
+          }),
+          hydrateAttributesFromApi().catch((error) => {
+            console.error('[totem] attributes Nest', error);
+          }),
+        ]);
+        if (active) {
+          const settings = getTotemSettings();
+          setMode(settings.mode);
+          setVertical(settings.vertical);
+          setColumns(settings.columns);
+          setAskCustomerName(settings.askCustomerName);
+          setOfferFulfillment(settings.offerFulfillment);
+          setPrintTicket(settings.printTicket);
+          setAudioAssist(settings.audioAssist);
+          setShowAttractScreen(settings.showAttractScreen);
+          setStoreName(settings.storeName);
+          setStoreLogo(settings.storeLogo);
+          setAttractBackground(settings.attractBackground);
+          setAttractGradientColor(settings.attractGradientColor);
+          setAttractLayout(settings.attractLayout);
+          setKeyboardPlacement(settings.keyboardPlacement);
+          setRequiredExitPassword(settings.exitPassword);
+          setCardAttrs(totemCardAttributes());
+          setFilterAttrs(totemFilterAttributes());
+        }
+        const next = await loadTotemCatalog();
+        if (active) {
+          setCatalog(next);
+          if (next.length === 0) {
+            setCatalogError(
+              'Nenhum item com “Exibir no totem” no estoque. Marque no ERP e atualize.',
+            );
+          }
+        }
+      } catch {
+        if (active) {
+          setCatalog([]);
+          setCatalogError('Não foi possível carregar o estoque do servidor.');
+        }
+      } finally {
+        if (active) setCatalogLoading(false);
       }
     }
     void hydrateCatalog();
@@ -447,7 +492,7 @@ export function TotemPage() {
       );
     }
 
-    function refreshLive() {
+    function applySettingsFromCache() {
       const settings = getTotemSettings();
       setMode(settings.mode);
       setVertical(settings.vertical);
@@ -466,11 +511,23 @@ export function TotemPage() {
       setRequiredExitPassword(settings.exitPassword);
       setCardAttrs(totemCardAttributes());
       setFilterAttrs(totemFilterAttributes());
+    }
+
+    async function refreshLive() {
+      try {
+        await Promise.all([
+          hydrateTotemSettingsFromApi(),
+          hydrateAttributesFromApi(),
+        ]);
+      } catch {
+        /* cache local já aplicado */
+      }
+      applySettingsFromCache();
       applyCatalog(listTotemCatalog());
       void loadTotemCatalog().then(applyCatalog);
     }
 
-    refreshLive();
+    void refreshLive();
     return subscribeTotemLive(refreshLive);
   }, []);
 
@@ -1073,7 +1130,12 @@ export function TotemPage() {
                 <p className="totem__empty">Carregando catálogo…</p>
               )}
               {!catalogLoading && products.length === 0 && (
-                <p className="totem__empty">Nenhum produto encontrado com esses filtros.</p>
+                <p className="totem__empty">
+                  {catalogError ||
+                    (search || brand !== 'all'
+                      ? 'Nenhum produto encontrado com esses filtros.'
+                      : 'Nenhum produto no totem. Marque “Exibir no totem” no estoque do ERP.')}
+                </p>
               )}
             </div>
             {keyboardOpen && keyboardPlacement === 'bottom' ? (

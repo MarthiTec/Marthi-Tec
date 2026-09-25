@@ -69,6 +69,8 @@ export function setPanelTheme(theme: PanelTheme) {
   window.dispatchEvent(new Event(PANEL_THEME_EVENT));
   void (async () => {
     try {
+      const { patchOperatorProfileTheme } = await import('./operatorProfile');
+      patchOperatorProfileTheme(theme);
       const { isNestAuthed } = await import('../services/nestClient');
       if (!isNestAuthed()) return;
       const { apiPutOperatorProfile } = await import('../services/erpApi');
