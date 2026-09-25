@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { TeamUsersSection } from '../../components/TeamUsersSection';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
+import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
 import {
   deleteOperationShortcut,
   listOperationShortcuts,
@@ -36,9 +37,20 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-/** Atalhos configuráveis + presença da equipe. */
+type OpsTab = 'ramo' | 'atalhos' | 'usuarios';
+
+/** Ramo da loja, atalhos configuráveis e equipe da operação. */
 export function OperationsPage() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as OpsTab | null;
+
+  const [tab, setTab] = useState<OpsTab>(() => {
+    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'usuarios') return tabParam;
+    if (location.pathname.endsWith('/usuarios')) return 'usuarios';
+    return 'ramo';
+  });
+
   const [items, setItems] = useState(() => listOperationShortcuts());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -57,10 +69,17 @@ export function OperationsPage() {
   }, []);
 
   useEffect(() => {
-    if (!location.pathname.endsWith('/usuarios')) return;
-    const el = document.getElementById('usuarios-loja');
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (location.pathname.endsWith('/usuarios')) {
+      setTab('usuarios');
+      const el = document.getElementById('usuarios-loja');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [location.pathname]);
+
+  function switchTab(nextTab: OpsTab) {
+    setTab(nextTab);
+    setSearchParams({ tab: nextTab });
+  }
 
   function openCreate() {
     setEditing(true);
@@ -103,19 +122,19 @@ export function OperationsPage() {
       active: draft.active,
       icon: draft.icon,
     });
-    setMessage(draft.id ? 'Operação atualizada.' : 'Operação criada.');
-    setDraft(null);
-    setEditing(false);
     setItems(listOperationShortcuts());
+    setMessage('Operação salva.');
+    cancelEdit();
   }
 
   function toggleActive(item: OperationShortcut) {
     setOperationActive(item.id, !item.active);
     setItems(listOperationShortcuts());
+    setMessage(item.active ? 'Operação desativada.' : 'Operação ativada.');
   }
 
   function remove(item: OperationShortcut) {
-    if (!window.confirm(`Remover “${item.label}”?`)) return;
+    if (!window.confirm(`Remover "${item.label}"?`)) return;
     deleteOperationShortcut(item.id);
     setItems(listOperationShortcuts());
     setMessage('Operação removida.');
@@ -134,206 +153,272 @@ export function OperationsPage() {
       <div className="dash-hero">
         <div>
           <p className="empty" style={{ margin: 0 }}>
-            Monte seus atalhos, escolha a cor e acompanhe a equipe em cada módulo.
+            Configure o ramo do negócio, campos ativos, atalhos rápidos e a equipe de operação.
           </p>
-          <h1 className="dash-hero__title">Operações</h1>
+          <h1 className="dash-hero__title">Operações & Configurações da Loja</h1>
         </div>
-        <div className="dash-hero__launch">
-          <div className="dash-hero__presence">
-            <PresenceStatusControl />
+
+        {tab === 'atalhos' ? (
+          <div className="dash-hero__launch">
+            <div className="dash-hero__presence">
+              <PresenceStatusControl />
+            </div>
+            <button type="button" className="btn btn--primary" onClick={openCreate}>
+              <AdminIcon name="plus" />
+              Nova operação
+            </button>
+            <button
+              type="button"
+              className={`btn btn--ghost ${editing ? 'is-active' : ''}`}
+              onClick={() => setEditing((value) => !value)}
+            >
+              <AdminIcon name="settings" />
+              {editing ? 'Concluir edição' : 'Editar atalhos'}
+            </button>
           </div>
-          <Link to="/painel/operacoes/usuarios" className="btn btn--ghost">
-            <AdminIcon name="people" />
-            Usuários
-          </Link>
-          <button type="button" className="btn btn--primary" onClick={openCreate}>
-            <AdminIcon name="plus" />
-            Nova operação
-          </button>
-          <button
-            type="button"
-            className={`btn btn--ghost ${editing ? 'is-active' : ''}`}
-            onClick={() => setEditing((value) => !value)}
-          >
-            <AdminIcon name="settings" />
-            {editing ? 'Concluir edição' : 'Editar'}
-          </button>
-        </div>
+        ) : tab === 'usuarios' ? (
+          <div className="dash-hero__launch">
+            <div className="dash-hero__presence">
+              <PresenceStatusControl />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Barra de Abas das Operações */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          borderBottom: '1px solid var(--line)',
+          paddingBottom: 14,
+          marginBottom: 8,
+        }}
+      >
+        <button
+          type="button"
+          className={`btn ${tab === 'ramo' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('ramo')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="settings" />
+          <span>Ramo da Loja & Personalização</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn ${tab === 'atalhos' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('atalhos')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="ops" />
+          <span>Atalhos Operacionais</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn ${tab === 'usuarios' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('usuarios')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="people" />
+          <span>Equipe & Usuários da Loja</span>
+        </button>
       </div>
 
       {message ? <p className="ops-page__flash">{message}</p> : null}
 
-      {draft ? (
-        <form className="admin-card ops-form" onSubmit={submit}>
-          <header className="ops-form__head">
-            <div>
-              <h2>{draft.id ? 'Editar operação' : 'Nova operação'}</h2>
-              <p>Verde = ativo · vermelho = inativo. A cor do botão é a sua escolha.</p>
-            </div>
-            <div className="ops-form__actions">
-              <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
-                Cancelar
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Salvar
-              </button>
-            </div>
-          </header>
-
-          <div className="ops-form__grid">
-            <label>
-              Nome
-              <input
-                value={draft.label}
-                onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                placeholder="Ex.: Abrir PDV"
-                required
-              />
-            </label>
-            <label>
-              Link / rota
-              <input
-                value={draft.href}
-                onChange={(e) => setDraft({ ...draft, href: e.target.value })}
-                placeholder="/caixa ou https://…"
-                required
-              />
-            </label>
-            <label>
-              Ícone
-              <select
-                value={draft.icon}
-                onChange={(e) => setDraft({ ...draft, icon: e.target.value as AdminIconName })}
-              >
-                {OPERATION_ICON_OPTIONS.map((icon) => (
-                  <option key={icon} value={icon}>
-                    {icon}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="ops-form__status">
-              Disponibilidade
-              <button
-                type="button"
-                className={`ops-status-toggle ${draft.active ? 'is-on' : 'is-off'}`}
-                onClick={() => setDraft({ ...draft, active: !draft.active })}
-              >
-                <i style={{ background: operationStatusColor(draft.active) }} />
-                {draft.active ? 'Ativo' : 'Inativo'}
-              </button>
-            </label>
-          </div>
-
-          <fieldset className="ops-form__colors">
-            <legend>Cor do atalho</legend>
-            <div className="ops-form__swatches">
-              {OPERATION_COLOR_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  className={`ops-swatch ${draft.color.toLowerCase() === hex ? 'is-selected' : ''}`}
-                  style={{ background: hex }}
-                  aria-label={`Cor ${hex}`}
-                  onClick={() => setDraft({ ...draft, color: hex })}
-                />
-              ))}
-              <label className="ops-swatch ops-swatch--custom" title="Cor personalizada">
-                <input
-                  type="color"
-                  value={draft.color}
-                  onChange={(e) => setDraft({ ...draft, color: e.target.value })}
-                />
-              </label>
-            </div>
-          </fieldset>
-        </form>
+      {/* ABA 1: Ramo da Loja & Personalização */}
+      {tab === 'ramo' ? (
+        <article className="admin-card">
+          <StoreSegmentSettings
+            title="Personalizações por Ramo de Atividade"
+            lead="Clique no ramo da sua loja para aplicar as configurações recomendadas ou personalize campos como IMEI, senhas, mesas/cozinha e grade de moda."
+            showSaveButton={true}
+          />
+        </article>
       ) : null}
 
-      <article className="admin-card ops-board">
-        <header className="ops-board__head">
-          <div>
-            <h2>Acesso rápido</h2>
-            <p>
-              Ativo em verde · inativo em vermelho. Toque para abrir; em modo edição, altere ou remova.
-            </p>
-          </div>
-          <button type="button" className="btn btn--ghost" onClick={resetDefaults}>
-            Restaurar padrão
-          </button>
-        </header>
+      {/* ABA 2: Atalhos Operacionais */}
+      {tab === 'atalhos' ? (
+        <>
+          {draft ? (
+            <form className="admin-card ops-form" onSubmit={submit}>
+              <header className="ops-form__head">
+                <div>
+                  <h2>{draft.id ? 'Editar operação' : 'Nova operação'}</h2>
+                  <p>Verde = ativo · vermelho = inativo. A cor do botão é a sua escolha.</p>
+                </div>
+                <div className="ops-form__actions">
+                  <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn--primary">
+                    Salvar
+                  </button>
+                </div>
+              </header>
 
-        {items.length === 0 ? (
-          <p className="empty">Nenhuma operação ainda. Crie a primeira acima.</p>
-        ) : (
-          <ul className="ops-grid">
-            {items.map((item) => {
-              const status = operationStatusColor(item.active);
-              const card = (
-                <>
-                  <span className="ops-tile__icon" style={{ background: `${item.color}22`, color: item.color }}>
-                    <AdminIcon name={item.icon} />
-                  </span>
-                  <span className="ops-tile__body">
-                    <strong>{item.label}</strong>
-                    <small>{item.href}</small>
-                  </span>
-                  <span className="ops-tile__status" style={{ background: status }} title={item.active ? 'Ativo' : 'Inativo'} />
-                </>
-              );
+              <div className="ops-form__grid">
+                <label>
+                  Nome da operação
+                  <input
+                    value={draft.label}
+                    onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                    placeholder="Ex.: Totem balcão, TV cozinha"
+                    required
+                  />
+                </label>
+                <label>
+                  Link interno ou URL externa
+                  <input
+                    value={draft.href}
+                    onChange={(e) => setDraft({ ...draft, href: e.target.value })}
+                    placeholder="/totem, /cozinha ou https://…"
+                    required
+                  />
+                </label>
+                <label>
+                  Ícone
+                  <select
+                    value={draft.icon}
+                    onChange={(e) => setDraft({ ...draft, icon: e.target.value as AdminIconName })}
+                  >
+                    {OPERATION_ICON_OPTIONS.map((iconName) => (
+                      <option key={iconName} value={iconName}>
+                        {iconName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ops-form__status">
+                  Status
+                  <select
+                    value={draft.active ? '1' : '0'}
+                    onChange={(e) => setDraft({ ...draft, active: e.target.value === '1' })}
+                  >
+                    <option value="1">Ativo na central</option>
+                    <option value="0">Inativo</option>
+                  </select>
+                </label>
+              </div>
 
-              return (
-                <li key={item.id} className={`ops-tile ${item.active ? 'is-active' : 'is-inactive'}`}>
-                  {editing ? (
-                    <div className="ops-tile__panel" style={{ borderColor: `${item.color}55` }}>
-                      {card}
-                      <div className="ops-tile__edit crud-actions">
-                        <CrudIconButton action="edit" onClick={() => openEdit(item)} />
-                        <button type="button" className="btn btn--ghost" onClick={() => toggleActive(item)}>
-                          {item.active ? 'Desativar' : 'Ativar'}
-                        </button>
-                        <CrudIconButton action="delete" onClick={() => remove(item)} />
-                      </div>
-                    </div>
-                  ) : item.active ? (
-                    item.href.startsWith('http://') || item.href.startsWith('https://') ? (
-                      <a
-                        href={item.href}
-                        className="ops-tile__link"
-                        style={{ borderColor: `${item.color}66`, ['--ops-accent' as string]: item.color }}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {card}
-                      </a>
-                    ) : (
-                      <Link
-                        to={item.href}
-                        className="ops-tile__link"
-                        style={{ borderColor: `${item.color}66`, ['--ops-accent' as string]: item.color }}
-                      >
-                        {card}
-                      </Link>
-                    )
-                  ) : (
-                    <div
-                      className="ops-tile__link is-disabled"
-                      style={{ borderColor: `${status}44` }}
-                      title="Operação inativa"
-                    >
-                      {card}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </article>
+              <fieldset className="ops-colors">
+                <legend>Cor do destaque</legend>
+                <div className="ops-colors__row">
+                  {OPERATION_COLOR_PRESETS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`ops-swatch ${draft.color.toLowerCase() === color.toLowerCase() ? 'is-active' : ''}`}
+                      style={{ background: color }}
+                      onClick={() => setDraft({ ...draft, color })}
+                      title={color}
+                    />
+                  ))}
+                  <label className="ops-swatch ops-swatch--custom" title="Cor personalizada">
+                    <input
+                      type="color"
+                      value={draft.color}
+                      onChange={(e) => setDraft({ ...draft, color: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            </form>
+          ) : null}
 
-      <TeamPresenceBoard />
+          <article className="admin-card ops-board">
+            <header className="ops-board__head">
+              <div>
+                <h2>Acesso rápido</h2>
+                <p>
+                  Ativo em verde · inativo em vermelho. Toque para abrir; em modo edição, altere ou remova.
+                </p>
+              </div>
+              <button type="button" className="btn btn--ghost" onClick={resetDefaults}>
+                Restaurar padrão
+              </button>
+            </header>
 
-      <TeamUsersSection variant="operations" id="usuarios-loja" />
+            {items.length === 0 ? (
+              <p className="empty">Nenhuma operação ainda. Crie a primeira acima.</p>
+            ) : (
+              <ul className="ops-grid">
+                {items.map((item) => {
+                  const status = operationStatusColor(item.active);
+                  const card = (
+                    <>
+                      <span className="ops-tile__icon" style={{ background: `${item.color}22`, color: item.color }}>
+                        <AdminIcon name={item.icon} />
+                      </span>
+                      <span className="ops-tile__body">
+                        <strong>{item.label}</strong>
+                        <small>{item.href}</small>
+                      </span>
+                      <span className="ops-tile__status" style={{ background: status }} title={item.active ? 'Ativo' : 'Inativo'} />
+                    </>
+                  );
+
+                  return (
+                    <li key={item.id} className={`ops-tile ${item.active ? 'is-active' : 'is-inactive'}`}>
+                      {editing ? (
+                        <div className="ops-tile__panel" style={{ borderColor: `${item.color}55` }}>
+                          {card}
+                          <div className="ops-tile__edit crud-actions">
+                            <CrudIconButton action="edit" onClick={() => openEdit(item)} />
+                            <button type="button" className="btn btn--ghost" onClick={() => toggleActive(item)}>
+                              {item.active ? 'Desativar' : 'Ativar'}
+                            </button>
+                            <CrudIconButton action="delete" onClick={() => remove(item)} />
+                          </div>
+                        </div>
+                      ) : item.active ? (
+                        item.href.startsWith('http://') || item.href.startsWith('https://') ? (
+                          <a
+                            href={item.href}
+                            className="ops-tile__link"
+                            style={{ borderColor: `${item.color}66`, ['--ops-accent' as string]: item.color }}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {card}
+                          </a>
+                        ) : (
+                          <Link
+                            to={item.href}
+                            className="ops-tile__link"
+                            style={{ borderColor: `${item.color}66`, ['--ops-accent' as string]: item.color }}
+                          >
+                            {card}
+                          </Link>
+                        )
+                      ) : (
+                        <div
+                          className="ops-tile__link is-disabled"
+                          style={{ borderColor: `${status}44` }}
+                          title="Operação inativa"
+                        >
+                          {card}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </article>
+        </>
+      ) : null}
+
+      {/* ABA 3: Equipe & Usuários da Loja */}
+      {tab === 'usuarios' ? (
+        <>
+          <TeamPresenceBoard />
+          <TeamUsersSection variant="operations" id="usuarios-loja" />
+        </>
+      ) : null}
     </section>
   );
 }

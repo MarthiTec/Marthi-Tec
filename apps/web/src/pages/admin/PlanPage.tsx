@@ -16,6 +16,7 @@ import {
   getStoreEntitlement,
   saveStoreEntitlement,
 } from '../../data/storePlan';
+import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
 
 export function PlanPage() {
   const { user } = useAuth();
@@ -167,6 +168,14 @@ export function PlanPage() {
             <span className="empty">Plano atualizado. O menu lateral já respeita a liberação.</span>
           ) : null}
         </div>
+      </article>
+
+      <article className="admin-card">
+        <StoreSegmentSettings
+          title="Ramo de Atividade da Loja"
+          lead="Defina o segmento do seu negócio para adequar automaticamente os campos da oficina, do caixa e do ecossistema."
+          showSaveButton={false}
+        />
       </article>
     </section>
   );

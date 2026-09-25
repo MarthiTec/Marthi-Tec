@@ -25,7 +25,7 @@ const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'ERP', title: 'Painel da operação' },
-  '/painel/operacoes': { kicker: 'Operações', title: 'Equipe na loja' },
+  '/painel/operacoes': { kicker: 'Operações', title: 'Operações & Ramo da Loja' },
   '/painel/operacoes/usuarios': { kicker: 'Operações', title: 'Usuários da loja' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/totem': { kicker: 'Totem', title: 'Dados do totem' },

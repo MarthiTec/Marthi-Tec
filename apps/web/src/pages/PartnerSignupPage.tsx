@@ -15,6 +15,12 @@ import {
 import { submitPartnerSignup } from '../services/partners';
 import { markStoreContracted } from '../data/demoLeadStore';
 import { saveStoreEntitlement } from '../data/storePlan';
+import {
+  SEGMENT_PRESETS,
+  applySegmentPreset,
+  type SegmentPreset,
+  type StoreSegmentId,
+} from '../data/storeSegment';
 import './partner-signup.css';
 
 type Step = 1 | 2 | 3 | 4;
@@ -129,10 +135,22 @@ export function PartnerSignupPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [cepStatus, setCepStatus] = useState<string | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<StoreSegmentId>('assistencia_tecnica');
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
   const lockedAllModules = planIncludesAllModules(form.planId);
+
+  function handleSelectSegment(preset: SegmentPreset) {
+    setSelectedSegment(preset.id);
+    setForm((current) => ({
+      ...current,
+      segment: preset.name,
+      ...(!planIncludesAllModules(current.planId) && preset.recommendedModules.length > 0
+        ? { modules: preset.recommendedModules.slice(0, getPlanModuleLimit(current.planId)) }
+        : {}),
+    }));
+  }
 
   async function lookupCep(raw: string) {
     const digits = onlyDigits(raw);
@@ -297,6 +315,7 @@ export function PartnerSignupPage() {
         notes: form.notes.trim(),
       });
       await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
+      applySegmentPreset(selectedSegment);
       markStoreContracted();
       setProtocol(result.id);
       void import('../data/crmStore').then(({ ingestPartnerLeadToCrm }) => {
@@ -430,6 +449,67 @@ export function PartnerSignupPage() {
                   </small>
                 </button>
               ))}
+            </div>
+
+            {/* Ramo de Atividade da Loja (Definido na aquisição do plano) */}
+            <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--line)' }}>
+              <div style={{ marginBottom: 14 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px', color: 'var(--ink)' }}>
+                  Qual é o Ramo de Atividade da sua loja?
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--mute)' }}>
+                  Defina o segmento para a loja já iniciar pronta e configurada para você (ex.: Moda ativa grade de cores/tamanhos e oculta IMEI; Oficina e eletrônicos já marca IMEI e senhas de aparelhos).
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {SEGMENT_PRESETS.map((preset) => {
+                  const isSelected = selectedSegment === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectSegment(preset)}
+                      className={`partner-plan ${isSelected ? 'is-active' : ''}`}
+                      style={{
+                        padding: '16px 18px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '1.4rem' }}>{preset.icon}</span>
+                          <strong style={{ fontSize: '0.92rem' }}>{preset.name}</strong>
+                        </div>
+                        <span
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: '50%',
+                            border: isSelected ? '5px solid #0f766e' : '2px solid #cbd5e1',
+                            background: '#fff',
+                            boxSizing: 'border-box',
+                            flexShrink: 0,
+                          }}
+                        />
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--mute)', lineHeight: 1.35 }}>
+                        {preset.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
         )}

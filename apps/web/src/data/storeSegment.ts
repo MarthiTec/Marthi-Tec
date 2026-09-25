@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import type { PartnerModuleId } from './catalog';
 
 export type StoreSegmentId =
   | 'assistencia_tecnica'
-  | 'restaurante_gastronomia'
   | 'vestuario_moda'
+  | 'restaurante_gastronomia'
   | 'varejo_geral'
   | 'prestador_servicos'
   | 'personalizado';
@@ -23,16 +24,21 @@ export type SegmentPreset = {
   id: StoreSegmentId;
   name: string;
   icon: string;
+  badge: string;
   description: string;
+  recommendedModules: PartnerModuleId[];
   config: Omit<StoreCustomization, 'segmentId' | 'segmentName' | 'updatedAt'>;
 };
 
 export const SEGMENT_PRESETS: SegmentPreset[] = [
   {
     id: 'assistencia_tecnica',
-    name: 'Assistência Técnica & Eletrônicos',
+    name: 'Oficina, Assistência Técnica & Acessórios',
     icon: '🔧',
-    description: 'Smartphones, computadores e eletrônicos. Exibe IMEI/série, senhas e bancada técnica de testes.',
+    badge: 'Eletrônicos & Reparos',
+    description:
+      'Smartphones, computadores e eletrônicos. Ativa IMEI/Série obrigatório, senhas de desbloqueio para teste e bancada técnica.',
+    recommendedModules: ['os', 'erp'],
     config: {
       showImei: true,
       showDevicePassword: true,
@@ -42,23 +48,13 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     },
   },
   {
-    id: 'restaurante_gastronomia',
-    name: 'Restaurante, Bar & Gastronomia',
-    icon: '🍔',
-    description: 'Alimentação e bebidas. Ativa sistema de mesas e cozinha; oculta IMEI e senhas de aparelhos.',
-    config: {
-      showImei: false,
-      showDevicePassword: false,
-      showTablesAndKitchen: true,
-      showTechnicalBench: false,
-      showSizeColorGrid: false,
-    },
-  },
-  {
     id: 'vestuario_moda',
-    name: 'Loja de Roupas, Calçados & Moda',
+    name: 'Moda, Vestuário & Calçados',
     icon: '👗',
-    description: 'Varejo de vestuário e calçados. Oculta mesas/cozinha e IMEI; ativa grade de tamanhos e cores.',
+    badge: 'Moda & Roupas',
+    description:
+      'Lojas de roupas, calçados e acessórios. Ativa grade de tamanhos e cores no catálogo e PDV. Oculta IMEI, senhas e mesas/cozinha.',
+    recommendedModules: ['erp', 'ecommerce'],
     config: {
       showImei: false,
       showDevicePassword: false,
@@ -68,10 +64,29 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     },
   },
   {
+    id: 'restaurante_gastronomia',
+    name: 'Restaurante, Bar & Gastronomia',
+    icon: '🍔',
+    badge: 'Alimentação & Bebidas',
+    description:
+      'Bares, lanchonetes, restaurantes e cafeterias. Ativa mesas, pedidos por comanda e tela de cozinha. Oculta IMEI e senhas de aparelhos.',
+    recommendedModules: ['totem', 'erp'],
+    config: {
+      showImei: false,
+      showDevicePassword: false,
+      showTablesAndKitchen: true,
+      showTechnicalBench: false,
+      showSizeColorGrid: false,
+    },
+  },
+  {
     id: 'varejo_geral',
     name: 'Varejo Geral, Mercado & Utilidades',
     icon: '🛒',
-    description: 'Comércio geral, produtos de prateleira e distribuição. Oculta mesas e IMEI.',
+    badge: 'Comércio de Balcão',
+    description:
+      'Comércio de prateleira, mercados, papelarias e utilidades. Foco em frente de caixa ágil. Oculta mesas e IMEI.',
+    recommendedModules: ['erp', 'fiscal'],
     config: {
       showImei: false,
       showDevicePassword: false,
@@ -84,7 +99,10 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     id: 'prestador_servicos',
     name: 'Prestação de Serviços Gerais',
     icon: '📋',
-    description: 'Empresas de serviços em geral, reparos e orçamentos comerciais. Oculta mesas e IMEI.',
+    badge: 'Serviços & Reparos Gerais',
+    description:
+      'Empresas de serviços, montagens, marcenarias e orçamentos comerciais. Oculta mesas/cozinha e IMEI de eletrônicos.',
+    recommendedModules: ['os', 'erp'],
     config: {
       showImei: false,
       showDevicePassword: false,
@@ -97,7 +115,10 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     id: 'personalizado',
     name: 'Personalizado',
     icon: '⚙️',
-    description: 'Controle manual dos campos e módulos conforme a necessidade específica da sua empresa.',
+    badge: 'Ajuste Fino',
+    description:
+      'Defina você mesmo quais campos e módulos ficam visíveis na sua loja conforme a sua necessidade específica.',
+    recommendedModules: ['totem', 'erp', 'os'],
     config: {
       showImei: true,
       showDevicePassword: true,
@@ -145,6 +166,15 @@ export function saveStoreCustomization(next: Partial<StoreCustomization>): Store
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   window.dispatchEvent(new CustomEvent(SEGMENT_UPDATED_EVENT, { detail: updated }));
   return updated;
+}
+
+export function applySegmentPreset(segmentId: StoreSegmentId): StoreCustomization {
+  const preset = SEGMENT_PRESETS.find((p) => p.id === segmentId) || SEGMENT_PRESETS[0];
+  return saveStoreCustomization({
+    segmentId: preset.id,
+    segmentName: preset.name,
+    ...preset.config,
+  });
 }
 
 export function useStoreCustomization() {
