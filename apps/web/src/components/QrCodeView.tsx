@@ -33,7 +33,7 @@ export function QrCodeView({
         },
         errorCorrectionLevel: 'M',
       },
-      (err) => {
+      (err: Error | null | undefined) => {
         if (err) {
           setError(err.message);
         } else {

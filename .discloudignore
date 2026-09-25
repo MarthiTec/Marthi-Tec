@@ -5,6 +5,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
+discloud.totem.vars.env
+discloud.backend.vars.env
 *.log
 .tmp-evolution-qr.png
 apps/*/node_modules/
