@@ -644,12 +644,13 @@
   z-index: 120;
   width: 480px;
   max-width: 90vw;
-  background: #181d24;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #ffffff;
+  border: 1px solid #d8dde3;
   border-radius: 14px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
   padding: 16px;
-  color: #f1f5f9;
+  color: #0f172a;
+  transition: all 0.2s ease;
 }
 
 .os-ecosystem-popover__head {
@@ -657,19 +658,20 @@
   justify-content: space-between;
   align-items: flex-start;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #e2e8f0;
   margin-bottom: 12px;
 }
 
 .os-ecosystem-popover__head strong {
   display: block;
   font-size: 0.95rem;
+  color: inherit;
 }
 
 .os-ecosystem-popover__head p {
   margin: 2px 0 0;
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .os-ecosystem-popover__status {
@@ -693,8 +695,8 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   cursor: pointer;
   text-align: left;
@@ -703,14 +705,14 @@
 }
 
 .os-ecosystem-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
   transform: translateY(-1px);
 }
 
 .os-ecosystem-card.is-current {
   border-color: #d97706;
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(217, 119, 6, 0.08);
 }
 
 .os-ecosystem-card__icon {
@@ -733,10 +735,43 @@
   line-height: 1.2;
 }
 
+.os-ecosystem-card__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
+
+.os-ecosystem-card__badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.os-ecosystem-card__badge--active {
+  background: rgba(217, 119, 6, 0.15);
+  color: #d97706;
+}
+
+.is-theme-dark .os-ecosystem-card__badge {
+  background: rgba(45, 212, 191, 0.15);
+  color: #2dd4bf;
+}
+
+.is-theme-dark .os-ecosystem-card__badge--active {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
 .os-ecosystem-card__body p {
   margin: 3px 0 0;
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: #64748b;
   line-height: 1.25;
 }
 
@@ -746,21 +781,81 @@
   align-items: center;
   padding-top: 12px;
   margin-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #e2e8f0;
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .os-ecosystem-popover__close {
   background: transparent;
   border: 0;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
   font-weight: 600;
 }
 
 .os-ecosystem-popover__close:hover {
-  color: #fff;
+  color: #0f172a;
+}
+
+/* Modo escuro para o menu ecossistema */
+.is-theme-dark .os-ecosystem-popover {
+  background: #181d24;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-ecosystem-popover__head {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .os-ecosystem-popover__head p {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-ecosystem-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-ecosystem-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.is-theme-dark .os-ecosystem-card.is-current {
+  border-color: #d97706;
+  background: rgba(217, 119, 6, 0.15);
+}
+
+.is-theme-dark .os-ecosystem-card__body p {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-ecosystem-popover__footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-ecosystem-popover__close {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-ecosystem-popover__close:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 540px) {
+  .os-ecosystem-popover {
+    width: min(480px, calc(100vw - 24px));
+    left: 0;
+    padding: 12px;
+  }
+  .os-ecosystem-popover__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==========================================================================
@@ -1581,6 +1676,20 @@
 
 .is-theme-dark .os-jira-bar__search-icon {
   color: #94a3b8;
+}
+
+.is-theme-dark .os-jira-search-kbd {
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-jira-search-clear {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-jira-search-clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .is-theme-dark .os-jira-reprint-btn {
@@ -3987,9 +4096,44 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .os-form-grid--4 {
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* Modal Jira em telas médias e tablets: empilha corpo e barra lateral com rolagem fluida */
+  .os-jira-modal {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .os-jira-body {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto !important;
+    height: 100%;
+  }
+
+  .os-jira-main {
+    height: auto;
+    min-height: auto;
+    overflow-y: visible !important;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 16px;
+  }
+
+  .is-theme-dark .os-jira-main {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .os-jira-sidebar {
+    height: auto;
+    min-height: auto;
+    overflow-y: visible !important;
+    padding: 16px 16px 48px;
   }
 }
 
@@ -3997,12 +4141,109 @@
   .os-form-grid--5 {
     grid-template-columns: 1fr 1fr;
   }
+
+  .os-jira-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .os-jira-search-filter {
+    max-width: 100%;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .os-jira-search-popover {
+    width: calc(100vw - 24px);
+    max-width: 100%;
+    left: 0;
+  }
 }
 
-@media (max-width: 580px) {
+@media (max-width: 640px) {
+  .os-form-grid--2,
+  .os-form-grid--3,
   .os-form-grid--4,
-  .os-form-grid--5 {
-    grid-template-columns: 1fr;
+  .os-form-grid--5,
+  .os-form-split {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modal de Nova OS e Sprint no mobile */
+  .os-modal {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .os-modal__head {
+    padding: 12px 14px;
+  }
+
+  .os-modal__form {
+    padding: 14px;
+  }
+
+  .os-modal__foot {
+    padding: 12px 14px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .os-modal__foot .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Modal de Impressão no mobile */
+  .os-print-modal-backdrop {
+    padding: 0;
+  }
+
+  .os-print-modal-dialog {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .os-print-modal__bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .os-print-modal__bar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .os-print-modal__btn-print,
+  .os-print-modal__btn-close {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .os-print-sheet-scroll-wrap {
+    padding: 8px 4px;
+  }
+
+  .os-print-sheet {
+    padding: 14px;
+    border-radius: 0;
+  }
+
+  .os-print-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .os-print-head__meta {
+    align-items: flex-start;
+    text-align: left;
   }
 }
 
@@ -4828,4 +5069,38 @@
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
+
+/* Modo escuro para histórico e seleção de técnico */
+.is-theme-dark .os-history__entry {
+  background: #1e2631;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-history__entry:hover {
+  background: #252e3b;
+}
+
+.is-theme-dark .os-history__entry-icon {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .os-history__entry-title {
+  color: #ffffff;
+}
+
+.is-theme-dark .os-history__entry-time {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-history__entry-detail {
+  color: #cbd5e1;
+}
+
+.is-theme-dark .os-jira-tech-select {
+  background-color: #1a222d;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f1f5f9;
+}
+
 

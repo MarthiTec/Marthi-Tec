@@ -9,6 +9,7 @@ import {
   type StoreSegmentId,
 } from '../data/storeSegment';
 import { AdminIcon } from './AdminIcons';
+import { usePanelTheme } from '../hooks/usePanelTheme';
 
 type Props = {
   title?: string;
@@ -23,6 +24,7 @@ export function StoreSegmentSettings({
   showSaveButton = true,
   onSegmentChange,
 }: Props) {
+  const { isDark } = usePanelTheme();
   const [config, setConfig] = useState<StoreCustomization>(getStoreCustomization);
   const [toast, setToast] = useState('');
 
@@ -59,7 +61,7 @@ export function StoreSegmentSettings({
             top: 24,
             right: 24,
             zIndex: 9999,
-            background: '#0f766e',
+            background: isDark ? '#14b8a6' : '#0f766e',
             color: '#fff',
             padding: '12px 20px',
             borderRadius: 10,
@@ -87,8 +89,8 @@ export function StoreSegmentSettings({
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: 'rgba(15, 118, 110, 0.1)',
-                color: '#0f766e',
+                background: isDark ? 'rgba(45, 212, 191, 0.15)' : 'rgba(15, 118, 110, 0.1)',
+                color: isDark ? '#2dd4bf' : '#0f766e',
               }}
             >
               <AdminIcon name="settings" />
@@ -105,8 +107,8 @@ export function StoreSegmentSettings({
               fontWeight: 700,
               padding: '6px 14px',
               borderRadius: 20,
-              background: 'rgba(15, 118, 110, 0.12)',
-              color: '#0f766e',
+              background: isDark ? 'rgba(45, 212, 191, 0.18)' : 'rgba(15, 118, 110, 0.12)',
+              color: isDark ? '#2dd4bf' : '#0f766e',
             }}
           >
             Perfil Ativo: {config.segmentName}
@@ -128,7 +130,7 @@ export function StoreSegmentSettings({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
             gap: 14,
           }}
         >
@@ -139,13 +141,29 @@ export function StoreSegmentSettings({
                 key={preset.id}
                 onClick={() => handleSelectPreset(preset)}
                 style={{
-                  border: isSelected ? '2px solid #0f766e' : '1px solid var(--line)',
+                  border: isSelected
+                    ? isDark
+                      ? '2px solid #2dd4bf'
+                      : '2px solid #0f766e'
+                    : isDark
+                    ? '1px solid rgba(255, 255, 255, 0.1)'
+                    : '1px solid var(--line)',
                   borderRadius: 12,
                   padding: '16px 18px',
-                  background: isSelected ? '#f0fdfa' : '#fff',
+                  background: isSelected
+                    ? isDark
+                      ? 'rgba(15, 118, 110, 0.24)'
+                      : '#f0fdfa'
+                    : isDark
+                    ? '#1a222d'
+                    : '#fff',
                   cursor: 'pointer',
                   transition: 'all 0.18s ease',
-                  boxShadow: isSelected ? '0 4px 14px rgba(15, 118, 110, 0.12)' : 'none',
+                  boxShadow: isSelected
+                    ? isDark
+                      ? '0 4px 16px rgba(45, 212, 191, 0.18)'
+                      : '0 4px 14px rgba(15, 118, 110, 0.12)'
+                    : 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 8,
@@ -154,7 +172,12 @@ export function StoreSegmentSettings({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1.4rem' }}>{preset.icon}</span>
-                    <strong style={{ fontSize: '0.92rem', color: isSelected ? '#0f766e' : 'var(--ink)' }}>
+                    <strong
+                      style={{
+                        fontSize: '0.92rem',
+                        color: isSelected ? (isDark ? '#2dd4bf' : '#0f766e') : 'var(--ink)',
+                      }}
+                    >
                       {preset.name}
                     </strong>
                   </div>
@@ -163,9 +186,16 @@ export function StoreSegmentSettings({
                       width: 18,
                       height: 18,
                       borderRadius: '50%',
-                      border: isSelected ? '5px solid #0f766e' : '2px solid #cbd5e1',
-                      background: '#fff',
+                      border: isSelected
+                        ? isDark
+                          ? '5px solid #2dd4bf'
+                          : '5px solid #0f766e'
+                        : isDark
+                        ? '2px solid #475569'
+                        : '2px solid #cbd5e1',
+                      background: isDark ? '#0f141a' : '#fff',
                       boxSizing: 'border-box',
+                      flexShrink: 0,
                     }}
                   />
                 </div>
@@ -180,8 +210,20 @@ export function StoreSegmentSettings({
                       fontSize: '0.72rem',
                       padding: '2px 8px',
                       borderRadius: 10,
-                      background: preset.config.showImei ? '#e0f2fe' : '#f1f5f9',
-                      color: preset.config.showImei ? '#0369a1' : '#64748b',
+                      background: preset.config.showImei
+                        ? isDark
+                          ? 'rgba(56, 189, 248, 0.2)'
+                          : '#e0f2fe'
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : '#f1f5f9',
+                      color: preset.config.showImei
+                        ? isDark
+                          ? '#38bdf8'
+                          : '#0369a1'
+                        : isDark
+                        ? '#94a3b8'
+                        : '#64748b',
                       fontWeight: 600,
                     }}
                   >
@@ -192,8 +234,20 @@ export function StoreSegmentSettings({
                       fontSize: '0.72rem',
                       padding: '2px 8px',
                       borderRadius: 10,
-                      background: preset.config.showTablesAndKitchen ? '#fce7f3' : '#f1f5f9',
-                      color: preset.config.showTablesAndKitchen ? '#be185d' : '#64748b',
+                      background: preset.config.showTablesAndKitchen
+                        ? isDark
+                          ? 'rgba(244, 114, 182, 0.2)'
+                          : '#fce7f3'
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : '#f1f5f9',
+                      color: preset.config.showTablesAndKitchen
+                        ? isDark
+                          ? '#f472b6'
+                          : '#be185d'
+                        : isDark
+                        ? '#94a3b8'
+                        : '#64748b',
                       fontWeight: 600,
                     }}
                   >
@@ -204,8 +258,20 @@ export function StoreSegmentSettings({
                       fontSize: '0.72rem',
                       padding: '2px 8px',
                       borderRadius: 10,
-                      background: preset.config.showSizeColorGrid ? '#fef3c7' : '#f1f5f9',
-                      color: preset.config.showSizeColorGrid ? '#b45309' : '#64748b',
+                      background: preset.config.showSizeColorGrid
+                        ? isDark
+                          ? 'rgba(251, 191, 36, 0.2)'
+                          : '#fef3c7'
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : '#f1f5f9',
+                      color: preset.config.showSizeColorGrid
+                        ? isDark
+                          ? '#fbbf24'
+                          : '#b45309'
+                        : isDark
+                        ? '#94a3b8'
+                        : '#64748b',
                       fontWeight: 600,
                     }}
                   >
@@ -221,9 +287,9 @@ export function StoreSegmentSettings({
       {/* Ajuste fino dos campos (Toggles manuais) */}
       <section
         style={{
-          background: '#fff',
+          background: isDark ? '#171e27' : '#fff',
           borderRadius: 12,
-          border: '1px solid var(--line)',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--line)',
           padding: '20px 24px',
         }}
       >
@@ -243,23 +309,48 @@ export function StoreSegmentSettings({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: config.showImei ? 'rgba(15, 118, 110, 0.04)' : '#f8fafc',
-              border: '1px solid var(--line)',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showImei
+                ? isDark
+                  ? 'rgba(15, 118, 110, 0.16)'
+                  : 'rgba(15, 118, 110, 0.04)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showImei
+                ? isDark
+                  ? '1px solid rgba(45, 212, 191, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
               gap: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
                   Campos de IMEI e Nº de Série nas OS e Impressões
                 </strong>
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    background: config.showImei ? '#dcfce7' : '#f1f5f9',
-                    color: config.showImei ? '#15803d' : '#64748b',
+                    background: config.showImei
+                      ? isDark
+                        ? 'rgba(34, 197, 94, 0.2)'
+                        : '#dcfce7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showImei
+                      ? isDark
+                        ? '#4ade80'
+                        : '#15803d'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
                     padding: '2px 8px',
                     borderRadius: 8,
                     fontWeight: 600,
@@ -272,7 +363,7 @@ export function StoreSegmentSettings({
                 Relevante para assistências técnicas e eletrônicos. Quando desativado, remove o campo de IMEI da abertura rápida, detalhes da OS e comprovantes de 1ª e 2ª via.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
               <input
                 type="checkbox"
                 checked={config.showImei}
@@ -283,7 +374,7 @@ export function StoreSegmentSettings({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: config.showImei ? '#0f766e' : '#cbd5e1',
+                  backgroundColor: config.showImei ? (isDark ? '#14b8a6' : '#0f766e') : (isDark ? '#334155' : '#cbd5e1'),
                   transition: '0.2s',
                   borderRadius: 24,
                 }}
@@ -310,23 +401,48 @@ export function StoreSegmentSettings({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: config.showDevicePassword ? 'rgba(15, 118, 110, 0.04)' : '#f8fafc',
-              border: '1px solid var(--line)',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showDevicePassword
+                ? isDark
+                  ? 'rgba(15, 118, 110, 0.16)'
+                  : 'rgba(15, 118, 110, 0.04)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showDevicePassword
+                ? isDark
+                  ? '1px solid rgba(45, 212, 191, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
               gap: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
                   Senha / PIN de Desbloqueio do Aparelho
                 </strong>
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    background: config.showDevicePassword ? '#dcfce7' : '#f1f5f9',
-                    color: config.showDevicePassword ? '#15803d' : '#64748b',
+                    background: config.showDevicePassword
+                      ? isDark
+                        ? 'rgba(34, 197, 94, 0.2)'
+                        : '#dcfce7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showDevicePassword
+                      ? isDark
+                        ? '#4ade80'
+                        : '#15803d'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
                     padding: '2px 8px',
                     borderRadius: 8,
                     fontWeight: 600,
@@ -339,7 +455,7 @@ export function StoreSegmentSettings({
                 Permite registrar senhas de teste do cliente na recepção da oficina. Inútil para restaurantes e vestuário.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
               <input
                 type="checkbox"
                 checked={config.showDevicePassword}
@@ -350,7 +466,7 @@ export function StoreSegmentSettings({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: config.showDevicePassword ? '#0f766e' : '#cbd5e1',
+                  backgroundColor: config.showDevicePassword ? (isDark ? '#14b8a6' : '#0f766e') : (isDark ? '#334155' : '#cbd5e1'),
                   transition: '0.2s',
                   borderRadius: 24,
                 }}
@@ -377,23 +493,48 @@ export function StoreSegmentSettings({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: config.showTablesAndKitchen ? 'rgba(15, 118, 110, 0.04)' : '#f8fafc',
-              border: '1px solid var(--line)',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showTablesAndKitchen
+                ? isDark
+                  ? 'rgba(15, 118, 110, 0.16)'
+                  : 'rgba(15, 118, 110, 0.04)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showTablesAndKitchen
+                ? isDark
+                  ? '1px solid rgba(45, 212, 191, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
               gap: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
                   Módulo de Mesas, Comandas & Cozinha
                 </strong>
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    background: config.showTablesAndKitchen ? '#dcfce7' : '#f1f5f9',
-                    color: config.showTablesAndKitchen ? '#15803d' : '#64748b',
+                    background: config.showTablesAndKitchen
+                      ? isDark
+                        ? 'rgba(34, 197, 94, 0.2)'
+                        : '#dcfce7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showTablesAndKitchen
+                      ? isDark
+                        ? '#4ade80'
+                        : '#15803d'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
                     padding: '2px 8px',
                     borderRadius: 8,
                     fontWeight: 600,
@@ -406,7 +547,7 @@ export function StoreSegmentSettings({
                 Ativa o sistema de mesas e TV da cozinha. Em lojas de roupa, óticas ou oficinas, mantenha desligado para não poluir os menus.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
               <input
                 type="checkbox"
                 checked={config.showTablesAndKitchen}
@@ -417,7 +558,7 @@ export function StoreSegmentSettings({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: config.showTablesAndKitchen ? '#0f766e' : '#cbd5e1',
+                  backgroundColor: config.showTablesAndKitchen ? (isDark ? '#14b8a6' : '#0f766e') : (isDark ? '#334155' : '#cbd5e1'),
                   transition: '0.2s',
                   borderRadius: 24,
                 }}
@@ -444,23 +585,48 @@ export function StoreSegmentSettings({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: config.showTechnicalBench ? 'rgba(15, 118, 110, 0.04)' : '#f8fafc',
-              border: '1px solid var(--line)',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showTechnicalBench
+                ? isDark
+                  ? 'rgba(15, 118, 110, 0.16)'
+                  : 'rgba(15, 118, 110, 0.04)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showTechnicalBench
+                ? isDark
+                  ? '1px solid rgba(45, 212, 191, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
               gap: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
                   Bancada Técnica e Diagnóstico Preliminar
                 </strong>
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    background: config.showTechnicalBench ? '#dcfce7' : '#f1f5f9',
-                    color: config.showTechnicalBench ? '#15803d' : '#64748b',
+                    background: config.showTechnicalBench
+                      ? isDark
+                        ? 'rgba(34, 197, 94, 0.2)'
+                        : '#dcfce7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showTechnicalBench
+                      ? isDark
+                        ? '#4ade80'
+                        : '#15803d'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
                     padding: '2px 8px',
                     borderRadius: 8,
                     fontWeight: 600,
@@ -473,7 +639,7 @@ export function StoreSegmentSettings({
                 Habilita notas de diagnóstico técnico, tempos de serviço e checklist de testes pré/pós reparo nas ordens de serviço.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
               <input
                 type="checkbox"
                 checked={config.showTechnicalBench}
@@ -484,7 +650,7 @@ export function StoreSegmentSettings({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: config.showTechnicalBench ? '#0f766e' : '#cbd5e1',
+                  backgroundColor: config.showTechnicalBench ? (isDark ? '#14b8a6' : '#0f766e') : (isDark ? '#334155' : '#cbd5e1'),
                   transition: '0.2s',
                   borderRadius: 24,
                 }}
@@ -511,23 +677,48 @@ export function StoreSegmentSettings({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: config.showSizeColorGrid ? 'rgba(15, 118, 110, 0.04)' : '#f8fafc',
-              border: '1px solid var(--line)',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showSizeColorGrid
+                ? isDark
+                  ? 'rgba(15, 118, 110, 0.16)'
+                  : 'rgba(15, 118, 110, 0.04)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showSizeColorGrid
+                ? isDark
+                  ? '1px solid rgba(45, 212, 191, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
               gap: 16,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
                   Grade de Tamanho e Cor (Vestuário, Calçados & Moda)
                 </strong>
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    background: config.showSizeColorGrid ? '#dcfce7' : '#f1f5f9',
-                    color: config.showSizeColorGrid ? '#15803d' : '#64748b',
+                    background: config.showSizeColorGrid
+                      ? isDark
+                        ? 'rgba(34, 197, 94, 0.2)'
+                        : '#dcfce7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showSizeColorGrid
+                      ? isDark
+                        ? '#4ade80'
+                        : '#15803d'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
                     padding: '2px 8px',
                     borderRadius: 8,
                     fontWeight: 600,
@@ -540,7 +731,7 @@ export function StoreSegmentSettings({
                 Ativa suporte no catálogo de produtos e PDV para matriz de variação de tamanho (P, M, G, GG, 36 a 44) e cores para o segmento de vestuário.
               </p>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
               <input
                 type="checkbox"
                 checked={config.showSizeColorGrid}
@@ -551,7 +742,7 @@ export function StoreSegmentSettings({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: config.showSizeColorGrid ? '#0f766e' : '#cbd5e1',
+                  backgroundColor: config.showSizeColorGrid ? (isDark ? '#14b8a6' : '#0f766e') : (isDark ? '#334155' : '#cbd5e1'),
                   transition: '0.2s',
                   borderRadius: 24,
                 }}
@@ -577,8 +768,8 @@ export function StoreSegmentSettings({
       {showSaveButton ? (
         <footer
           style={{
-            background: '#f8fafc',
-            border: '1px solid var(--line)',
+            background: isDark ? '#131922' : '#f8fafc',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--line)',
             borderRadius: 10,
             padding: '16px 20px',
             display: 'flex',
