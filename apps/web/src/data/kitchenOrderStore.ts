@@ -3,9 +3,9 @@
  * Persistência local até o backend Nest ter o mesmo contrato.
  */
 
-export type KitchenChannel = 'mesa' | 'totem' | 'balcao';
+export type KitchenChannel = 'mesa' | 'totem' | 'balcao' | 'cardapio' | 'delivery' | 'retirada';
 export type KitchenStatus = 'queued' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
-export type TableFloorStatus = 'free' | 'occupied' | 'closing';
+export type TableFloorStatus = 'free' | 'occupied' | 'reserved' | 'closing';
 
 export type KitchenLine = {
   id: string;
@@ -24,6 +24,9 @@ export type KitchenOrder = {
   tableId: string | null;
   tableLabel: string | null;
   customerName: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  totalAmount?: number;
   lines: KitchenLine[];
   note: string;
   createdAt: string;
@@ -41,6 +44,9 @@ export type RestaurantTable = {
   status: TableFloorStatus;
   openOrderId: string | null;
   guestName: string;
+  reservationTime?: string;
+  reservationParty?: number;
+  reservationPhone?: string;
 };
 
 type KitchenState = {
@@ -56,6 +62,9 @@ export const CHANNEL_LABEL: Record<KitchenChannel, string> = {
   mesa: 'Mesa',
   totem: 'Totem',
   balcao: 'Balcão',
+  cardapio: 'Cardápio Digital',
+  delivery: 'Entrega (Delivery)',
+  retirada: 'Retirada no Local',
 };
 
 export const STATUS_LABEL: Record<KitchenStatus, string> = {
@@ -154,6 +163,9 @@ export function getTable(id: string) {
 export type EnqueueKitchenInput = {
   channel: KitchenChannel;
   customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  totalAmount?: number;
   tableId?: string | null;
   note?: string;
   lines: Array<{ name: string; qty?: number; note?: string; detail?: string }>;
@@ -190,6 +202,9 @@ export function enqueueKitchenOrder(input: EnqueueKitchenInput) {
     tableId: table?.id ?? null,
     tableLabel: table?.label ?? null,
     customerName: (input.customerName ?? table?.guestName ?? '').trim() || 'Cliente',
+    customerPhone: input.customerPhone,
+    deliveryAddress: input.deliveryAddress,
+    totalAmount: input.totalAmount,
     lines,
     note: (input.note ?? '').trim(),
     createdAt: now,
@@ -263,6 +278,45 @@ export function seatTable(tableId: string, guestName = '') {
   return tables.find((item) => item.id === tableId) ?? null;
 }
 
+export function reserveTable(
+  tableId: string,
+  input: { guestName: string; time: string; guests: number; phone?: string },
+) {
+  const state = load();
+  const tables = state.tables.map((item) =>
+    item.id === tableId
+      ? {
+          ...item,
+          status: 'reserved' as const,
+          guestName: input.guestName.trim() || item.guestName,
+          reservationTime: input.time,
+          reservationParty: input.guests,
+          reservationPhone: input.phone,
+        }
+      : item,
+  );
+  save({ ...state, tables });
+  return tables.find((item) => item.id === tableId) ?? null;
+}
+
+export function unreserveTable(tableId: string) {
+  const state = load();
+  const tables = state.tables.map((item) =>
+    item.id === tableId && item.status === 'reserved'
+      ? {
+          ...item,
+          status: 'free' as const,
+          guestName: '',
+          reservationTime: undefined,
+          reservationParty: undefined,
+          reservationPhone: undefined,
+        }
+      : item,
+  );
+  save({ ...state, tables });
+  return tables.find((item) => item.id === tableId) ?? null;
+}
+
 export function clearTable(tableId: string) {
   const state = load();
   const table = state.tables.find((item) => item.id === tableId);
@@ -278,7 +332,15 @@ export function clearTable(tableId: string) {
   });
   const tables = state.tables.map((item) =>
     item.id === tableId
-      ? { ...item, status: 'free' as const, openOrderId: null, guestName: '' }
+      ? {
+          ...item,
+          status: 'free' as const,
+          openOrderId: null,
+          guestName: '',
+          reservationTime: undefined,
+          reservationParty: undefined,
+          reservationPhone: undefined,
+        }
       : item,
   );
   save({ ...state, tables, orders });

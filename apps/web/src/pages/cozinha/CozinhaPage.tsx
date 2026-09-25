@@ -133,6 +133,9 @@ export function CozinhaPage() {
             Pronto <strong>{byColumn.ready.length}</strong>
           </span>
         </div>
+        <Link to="/cardapio" target="_blank" rel="noreferrer" className="kds-app__link">
+          Cardápio Digital
+        </Link>
         <Link to="/mesa" className="kds-app__link">
           Mesas
         </Link>

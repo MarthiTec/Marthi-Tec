@@ -80,6 +80,9 @@ import { OperatorAccountPage } from './pages/shared/OperatorAccountPage';
 import { MarthiLayout } from './pages/marthi/MarthiLayout';
 import { MarthiDashboardPage } from './pages/marthi/MarthiDashboardPage';
 import { MarthiClientsPage } from './pages/marthi/MarthiClientsPage';
+import { CardapioPublicPage } from './pages/cardapio/CardapioPublicPage';
+import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
+import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
 
 function LegacyMarthiRedirect() {
   const location = useLocation();
@@ -106,6 +109,8 @@ export function App() {
         <Route path="/caixa" element={<CaixaPage />} />
         <Route path="/mesa" element={<MesaPage />} />
         <Route path="/cozinha" element={<CozinhaPage />} />
+        <Route path="/cardapio" element={<CardapioPublicPage />} />
+        <Route path="/cardapio/:slug" element={<CardapioPublicPage />} />
         <Route path="/admin" element={<MarthiLayout />}>
           <Route index element={<MarthiDashboardPage />} />
           <Route path="clientes" element={<MarthiClientsPage />} />
@@ -175,6 +180,8 @@ export function App() {
           <Route path="boletos" element={<ErpBoletosPage />} />
           <Route path="relatorios" element={<ErpReportsPage />} />
           <Route path="auditoria" element={<AuditPage />} />
+          <Route path="cardapio" element={<CardapioAdminPage />} />
+          <Route path="cardapio/imprimir" element={<CardapioPrintDisplay />} />
         </Route>
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
@@ -223,6 +230,8 @@ export function App() {
           <Route path="plano" element={<PlanPage />} />
           <Route path="ramo" element={<StoreSegmentPage />} />
           <Route path="personalizacao" element={<StoreSegmentPage />} />
+          <Route path="cardapio" element={<CardapioAdminPage />} />
+          <Route path="cardapio/imprimir" element={<CardapioPrintDisplay />} />
           <Route path="ajuda" element={<HelpPage />} />
         </Route>
       </Routes>

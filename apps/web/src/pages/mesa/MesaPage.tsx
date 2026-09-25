@@ -177,6 +177,9 @@ export function MesaPage() {
           <strong>Marthi Mesas</strong>
           <span>Garçom · tablet / celular</span>
         </div>
+        <Link to="/cardapio" target="_blank" rel="noreferrer" className="mesa-app__link">
+          Cardápio Digital
+        </Link>
         <Link to="/cozinha" className="mesa-app__link">
           Cozinha
         </Link>
@@ -195,23 +198,36 @@ export function MesaPage() {
             <p className="mesa-floor__legend">
               <i className="is-free" /> Livre
               <i className="is-busy" /> Ocupada
+              <i className="is-reserved" style={{ background: '#f59e0b' }} /> Reservada
               <i className="is-pick" /> Selecionada
             </p>
           </header>
           <div className="mesa-floor__grid">
             {tables.map((table) => {
-              const busy = table.status !== 'free';
+              const isReserved = table.status === 'reserved';
+              const busy = table.status === 'occupied' || table.status === 'closing';
               const active = table.id === selectedId;
               return (
                 <button
                   key={table.id}
                   type="button"
-                  className={`mesa-tile ${busy ? 'is-busy' : 'is-free'} ${active ? 'is-active' : ''}`}
+                  className={`mesa-tile ${
+                    isReserved ? 'is-reserved' : busy ? 'is-busy' : 'is-free'
+                  } ${active ? 'is-active' : ''}`}
                   onClick={() => pickTable(table)}
+                  style={isReserved ? { borderColor: '#f59e0b', background: '#fffbeb' } : undefined}
                 >
                   <strong>{table.number}</strong>
                   <span>{table.seats} lugares</span>
-                  {busy ? <em>{table.guestName || 'Ocupada'}</em> : <em>Livre</em>}
+                  {isReserved ? (
+                    <em style={{ color: '#b45309', fontWeight: 700 }}>
+                      Reservada {table.reservationTime ? `(${table.reservationTime})` : ''}
+                    </em>
+                  ) : busy ? (
+                    <em>{table.guestName || 'Ocupada'}</em>
+                  ) : (
+                    <em>Livre</em>
+                  )}
                 </button>
               );
             })}

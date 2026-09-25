@@ -38,9 +38,17 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/boletos': { kicker: 'Financeiro', title: 'Boletos' },
   '/erp/relatorios': { kicker: 'Retaguarda', title: 'Relatórios' },
   '/erp/auditoria': { kicker: 'Retaguarda', title: 'Auditoria' },
+  '/erp/cardapio': { kicker: 'Restaurante', title: 'Cardápio Digital do Dia' },
+  '/erp/cardapio/imprimir': { kicker: 'Restaurante', title: 'Display de Mesa' },
 };
 
 type NavItem = { to: string; label: string; icon: AdminIconName; end?: boolean };
+
+const NAV_FOOD: NavItem[] = [
+  { to: '/erp/cardapio', label: 'Cardápio Digital', icon: 'store' },
+  { to: '/mesa', label: 'Mesas / Salão', icon: 'ops' },
+  { to: '/cozinha', label: 'Cozinha', icon: 'totem' },
+];
 
 const NAV_PRODUCTS: NavItem[] = [
   { to: '/erp/produtos', label: 'Cadastro', icon: 'box', end: true },
@@ -186,6 +194,9 @@ export function ErpLayout() {
             <AdminIcon name="home" />
             Central
           </NavLink>
+
+          <p className="erp-app__side-label">Atendimento & Salão</p>
+          {renderNav(NAV_FOOD)}
 
           <p className="erp-app__side-label">Produtos</p>
           {renderNav(NAV_PRODUCTS)}

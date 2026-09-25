@@ -1,0 +1,638 @@
+/* Cardápio Digital Mobile-First (Baseado na interface Café Escondido / Imagem 2) */
+
+:root {
+  --cardapio-bg: #f9fafb;
+  --cardapio-card-bg: #ffffff;
+  --cardapio-text: #1f2937;
+  --cardapio-text-muted: #6b7280;
+  --cardapio-primary: #3c2415;
+  --cardapio-accent: #c48a39;
+  --cardapio-border: #f3f4f6;
+}
+
+.cardapio-page {
+  min-height: 100vh;
+  background-color: var(--cardapio-bg);
+  color: var(--cardapio-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  padding-bottom: 90px;
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+}
+
+/* 1. Barra de Busca Superior */
+.cardapio-search-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #ffffff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f3f4f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.cardapio-search-box {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background: #f3f4f6;
+  border-radius: 20px;
+  padding: 8px 14px;
+  gap: 8px;
+}
+
+.cardapio-search-box input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-size: 0.94rem;
+  color: #1f2937;
+  outline: none;
+}
+
+.cardapio-search-box input::placeholder {
+  color: #9ca3af;
+}
+
+/* 2. Banner de Capa e Avatar da Logo */
+.cardapio-hero {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  background-size: cover;
+  background-position: center;
+  background-color: #2c1d11;
+}
+
+.cardapio-hero__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55));
+}
+
+.cardapio-avatar-wrap {
+  position: absolute;
+  bottom: -32px;
+  left: 20px;
+  z-index: 10;
+}
+
+.cardapio-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  background: #ffffff;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+/* 3. Cabeçalho de Informações do Restaurante */
+.cardapio-brand-info {
+  padding: 42px 18px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.cardapio-brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cardapio-brand-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.cardapio-table-pill {
+  background: #e0f2fe;
+  color: #0284c7;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cardapio-table-pill--clickable {
+  cursor: pointer;
+}
+
+.cardapio-payment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cardapio-payment-link:hover {
+  color: #111827;
+}
+
+/* 4. Categorias deslizáveis horizontais (Fiel à imagem 2) */
+.cardapio-cats-strip {
+  position: sticky;
+  top: 53px;
+  z-index: 25;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cardapio-cats-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.cardapio-cat-chip {
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cardapio-cat-chip.is-active {
+  background: #1f2937;
+  color: #ffffff;
+  border-color: #1f2937;
+}
+
+/* 5. Lista de Produtos e Pratos */
+.cardapio-content {
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cardapio-section-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #374151;
+  margin: 0 0 12px;
+  padding-left: 4px;
+}
+
+.cardapio-items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardapio-item-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  display: flex;
+  gap: 14px;
+  border: 1px solid #f3f4f6;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.cardapio-item-card:active {
+  transform: scale(0.99);
+}
+
+.cardapio-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardapio-item-badge {
+  align-self: flex-start;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cardapio-item-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  line-height: 1.25;
+}
+
+.cardapio-item-desc {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0 0 10px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardapio-item-bottom {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardapio-item-price {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.cardapio-add-btn {
+  background: #f3f4f6;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.cardapio-add-btn:hover {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.cardapio-item-img-wrap {
+  width: 96px;
+  height: 82px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f3f4f6;
+}
+
+.cardapio-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Stepper de quantidade no card */
+.cardapio-stepper {
+  display: inline-flex;
+  align-items: center;
+  background: #111827;
+  color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cardapio-stepper button {
+  background: transparent;
+  color: #fff;
+  border: none;
+  width: 28px;
+  height: 28px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardapio-stepper span {
+  padding: 0 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* 6. Barra Flutuante de Carrinho */
+.cardapio-float-bar {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 28px);
+  max-width: 560px;
+  background: #111827;
+  color: #ffffff;
+  padding: 12px 18px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+  z-index: 40;
+  cursor: pointer;
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.cardapio-float-bar__left {
+  display: flex;
+  flex-direction: column;
+}
+
+.cardapio-float-bar__qty {
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+.cardapio-float-bar__total {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.cardapio-float-bar__action {
+  background: var(--cardapio-accent, #c48a39);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+/* 7. Drawer / Modal do Carrinho & Checkout */
+.cardapio-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.cardapio-modal-sheet {
+  background: #ffffff;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  border-radius: 20px 20px 0 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.cardapio-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 12px;
+}
+
+.cardapio-modal-head h2 {
+  font-size: 1.25rem;
+  margin: 0;
+  font-weight: 800;
+}
+
+.cardapio-modal-close {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Escolha de modalidade */
+.cardapio-modality-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.cardapio-modality-card {
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.cardapio-modality-card.is-active {
+  border-color: #111827;
+  background: #f9fafb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.cardapio-modality-card strong {
+  font-size: 0.92rem;
+  color: #111827;
+}
+
+.cardapio-modality-card span {
+  font-size: 0.76rem;
+  color: #6b7280;
+}
+
+/* Formulário de checkout */
+.cardapio-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardapio-form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cardapio-form-group input,
+.cardapio-form-group textarea,
+.cardapio-form-group select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.94rem;
+  color: #1f2937;
+  outline: none;
+}
+
+.cardapio-form-group input:focus,
+.cardapio-form-group textarea:focus,
+.cardapio-form-group select:focus {
+  border-color: #111827;
+}
+
+/* Grade de mesas interativa para reserva e comer no local */
+.cardapio-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cardapio-table-btn {
+  padding: 10px 6px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  gap: 2px;
+}
+
+.cardapio-table-btn.is-free {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.cardapio-table-btn.is-busy {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.cardapio-table-btn.is-reserved {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.cardapio-table-btn.is-selected {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.cardapio-table-btn strong {
+  font-size: 0.86rem;
+}
+
+.cardapio-table-btn small {
+  font-size: 0.7rem;
+}
+
+/* Tela de Sucesso */
+.cardapio-success-box {
+  text-align: center;
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardapio-success-icon {
+  width: 64px;
+  height: 64px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+.cardapio-status-tracker {
+  width: 100%;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.cardapio-status-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #9ca3af;
+}
+
+.cardapio-status-step.is-done {
+  color: #16a34a;
+}
+
+.cardapio-status-step.is-current {
+  color: #0284c7;
+}

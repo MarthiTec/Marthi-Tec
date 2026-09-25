@@ -1,0 +1,221 @@
+/* Estilos do Editor Administrativo do Cardápio Digital (Retaguarda + Painel) */
+
+.cardapio-admin-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.cardapio-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: var(--admin-card-bg, #ffffff);
+  padding: 20px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.cardapio-admin-header__titles h1 {
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+  color: var(--admin-text, #111827);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardapio-admin-header__titles p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--admin-text-muted, #6b7280);
+}
+
+.cardapio-admin-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--admin-border, #e5e7eb);
+  padding-bottom: 2px;
+  overflow-x: auto;
+}
+
+.cardapio-admin-tab-btn {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--admin-text-muted, #6b7280);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -4px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.cardapio-admin-tab-btn:hover {
+  color: var(--admin-text, #111827);
+}
+
+.cardapio-admin-tab-btn.is-active {
+  color: #c48a39;
+  border-bottom-color: #c48a39;
+}
+
+/* Split view: Editor à esquerda, Mockup do celular à direita */
+.cardapio-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .cardapio-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cardapio-editor-card {
+  background: var(--admin-card-bg, #ffffff);
+  border-radius: 14px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+/* Lista de pratos no editor */
+.cardapio-dish-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  transition: background 0.15s;
+}
+
+.cardapio-dish-row:hover {
+  background: #f3f4f6;
+}
+
+.cardapio-dish-thumb {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e5e7eb;
+}
+
+.cardapio-dish-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardapio-dish-title {
+  font-weight: 700;
+  font-size: 0.96rem;
+  color: #111827;
+  margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardapio-dish-desc {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardapio-dish-meta {
+  font-size: 0.8rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardapio-dish-price {
+  font-weight: 800;
+  color: #166534;
+}
+
+.cardapio-dish-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Mockup de celular à direita (Phone preview) */
+.cardapio-phone-frame {
+  background: #111827;
+  border-radius: 36px;
+  padding: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25), 0 0 0 2px #374151;
+  position: sticky;
+  top: 24px;
+}
+
+.cardapio-phone-screen {
+  background: #f9fafb;
+  border-radius: 26px;
+  height: 680px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.cardapio-phone-notch {
+  width: 120px;
+  height: 18px;
+  background: #111827;
+  border-radius: 0 0 12px 12px;
+  margin: 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Modal de Importação do Estoque */
+.cardapio-modal-stock-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.cardapio-stock-item-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cardapio-stock-item-pick.is-selected {
+  border-color: #c48a39;
+  background: #fffdfa;
+}

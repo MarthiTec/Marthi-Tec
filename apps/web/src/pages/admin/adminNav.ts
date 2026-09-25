@@ -72,6 +72,20 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
+      { to: '/painel/cardapio', label: 'Cardápio Digital' },
+    ],
+  },
+  {
+    id: 'cardapio',
+    label: 'Cardápio Digital',
+    icon: 'store',
+    module: null,
+    children: [
+      { to: '/cardapio', label: 'Abrir cardápio', openApp: true, accent: '#c48a39' },
+      { to: '/painel/cardapio', label: 'Gestão e Pratos do Dia', end: true },
+      { to: '/painel/cardapio/imprimir', label: 'Display de Mesa (QR Code)' },
+      { to: '/mesa', label: 'Mesas / Salão' },
+      { to: '/cozinha', label: 'Fila da Cozinha' },
     ],
   },
   {
@@ -126,6 +140,7 @@ export function navGroupForPath(pathname: string, search = '') {
   ) {
     return 'presales';
   }
+  if (pathname.startsWith('/painel/cardapio') || pathname.startsWith('/cardapio')) return 'cardapio';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (
     pathname.startsWith('/painel/erp') ||

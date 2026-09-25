@@ -1,0 +1,339 @@
+/* Estilos para o Display de Mesa em Acrílico (Estilo Café Escondido) */
+
+.cardapio-display-wrap {
+  min-height: 100vh;
+  background: #f1f1f4;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2c2523;
+}
+
+.cardapio-display-controls {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 20px;
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardapio-display-controls__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cardapio-display-controls h2 {
+  font-size: 1.1rem;
+  margin: 0;
+  color: #1e1b18;
+}
+
+.cardapio-display-controls select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #374151;
+  outline: none;
+}
+
+.cardapio-display-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cardapio-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.cardapio-btn--primary {
+  background: #c48a39;
+  color: #ffffff;
+}
+
+.cardapio-btn--primary:hover {
+  background: #aa7329;
+}
+
+.cardapio-btn--secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.cardapio-btn--secondary:hover {
+  background: #e5e7eb;
+}
+
+/* CARTÃO DO DISPLAY DE MESA (ACRÍLICO) */
+.cardapio-acrylic-card {
+  width: 340px;
+  min-height: 580px;
+  background: #fffcf8;
+  border-radius: 16px;
+  padding: 28px 22px;
+  box-shadow: 0 16px 36px rgba(60, 36, 21, 0.15), 0 0 0 1px rgba(196, 138, 57, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Grafismos decorativos de fundo imitando o Café Escondido da foto */
+.cardapio-acrylic-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 12% 15%, rgba(196, 138, 57, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 88% 85%, rgba(60, 36, 21, 0.06) 0%, transparent 45%);
+  pointer-events: none;
+}
+
+/* Moldura interna fina e elegante */
+.cardapio-acrylic-card__border {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid rgba(196, 138, 57, 0.25);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Ícones de grãos de café decorativos */
+.cardapio-dec-bean {
+  position: absolute;
+  color: rgba(196, 138, 57, 0.35);
+  pointer-events: none;
+}
+
+.cardapio-dec-bean--1 { top: 24px; left: 18px; transform: rotate(-25deg); }
+.cardapio-dec-bean--2 { top: 22px; right: 20px; transform: rotate(35deg); }
+.cardapio-dec-bean--3 { top: 240px; left: 14px; transform: rotate(15deg); }
+.cardapio-dec-bean--4 { top: 260px; right: 14px; transform: rotate(-40deg); }
+
+/* Logo & Marca */
+.cardapio-acrylic__header {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cardapio-acrylic__logo-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
+  border: 2px solid #c48a39;
+}
+
+.cardapio-acrylic__logo-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #3c2415;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 10px rgba(60, 36, 21, 0.2);
+}
+
+.cardapio-acrylic__name {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  font-style: italic;
+  color: #2d1e18;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.cardapio-acrylic__slogan {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #78645b;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* Call to action */
+.cardapio-acrylic__cta {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 16px;
+}
+
+.cardapio-acrylic__kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #c48a39;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.cardapio-acrylic__kicker::before,
+.cardapio-acrylic__kicker::after {
+  content: '✦';
+  font-size: 0.6rem;
+  opacity: 0.75;
+}
+
+.cardapio-acrylic__title {
+  font-family: 'Impact', 'Arial Black', -apple-system, sans-serif;
+  font-size: 1.6rem;
+  line-height: 1.05;
+  color: #1e1b18;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0;
+}
+
+.cardapio-acrylic__sub {
+  font-size: 0.82rem;
+  color: #63534b;
+  margin: 8px 0 0;
+  line-height: 1.35;
+  max-width: 250px;
+}
+
+.cardapio-acrylic__sub strong {
+  color: #c48a39;
+}
+
+/* Badge de Mesa */
+.cardapio-acrylic__mesa-badge {
+  display: inline-block;
+  background: #3c2415;
+  color: #ffffff;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 10px 0 2px;
+  box-shadow: 0 3px 8px rgba(60, 36, 21, 0.2);
+}
+
+/* QR Code Box */
+.cardapio-acrylic__qr-box {
+  position: relative;
+  z-index: 2;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 16px;
+  border: 2px solid #e2a853;
+  box-shadow: 0 8px 24px rgba(196, 138, 57, 0.18);
+  margin-bottom: 14px;
+}
+
+.cardapio-acrylic__scan-hint {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'Caveat', 'Brush Script MT', cursive, sans-serif;
+  font-size: 1.15rem;
+  color: #7b5b3f;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+.cardapio-acrylic__scan-hint::before,
+.cardapio-acrylic__scan-hint::after {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: #c48a39;
+  opacity: 0.5;
+}
+
+/* Footer / Instagram */
+.cardapio-acrylic__footer {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #3c2415;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ESTILOS PARA IMPRESSÃO EM FOLHA A4 / ACRÍLICO */
+@media print {
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .cardapio-display-controls,
+  .erp-app__top,
+  .erp-app__side,
+  .admin-top,
+  .admin-side,
+  nav,
+  header {
+    display: none !important;
+  }
+
+  .cardapio-display-wrap {
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  .cardapio-acrylic-card {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    margin: 20px auto !important;
+    page-break-inside: avoid !important;
+  }
+}
