@@ -209,36 +209,38 @@ export function FiscalClassPage() {
 
       <article className="admin-card">
         <h2>Classificações</h2>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>NCM</th>
-              <th>CST</th>
-              <th>ICMS</th>
-              <th>IBS/CBS</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.name}</td>
-                <td>{item.ncm}</td>
-                <td>{item.cstIcms}</td>
-                <td>{item.icmsRate}%</td>
-                <td>
-                  {item.ibsRate}% / {item.cbsRate}%
-                </td>
-                <td className="admin-table__actions">
-                  <div className="crud-actions">
-                    <CrudIconButton action="edit" onClick={() => edit(item.id)} />
-                  </div>
-                </td>
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>NCM</th>
+                <th>CST</th>
+                <th>ICMS</th>
+                <th>IBS/CBS</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.ncm}</td>
+                  <td>{item.cstIcms}</td>
+                  <td>{item.icmsRate}%</td>
+                  <td>
+                    {item.ibsRate}% / {item.cbsRate}%
+                  </td>
+                  <td className="admin-table__actions">
+                    <div className="crud-actions">
+                      <CrudIconButton action="edit" onClick={() => edit(item.id)} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

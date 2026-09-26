@@ -723,36 +723,31 @@ export function WorkOrdersPage() {
               />
             </label>
 
-            <label>
-              <span>Técnico Responsável:</span>
-              <select
-                className="os-select"
-                value={selectedTech ?? ''}
-                onChange={(e) => setSelectedTech(e.target.value ? e.target.value : null)}
-              >
-                <option value="">Todos os técnicos</option>
-                {TECHNICIANS_LIST.map((t) => (
-                  <option key={t.id} value={t.name}>
-                    {t.name} ({t.specialty})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AdminPicker
+              label="Técnico Responsável"
+              value={selectedTech ?? ''}
+              options={[
+                { value: '', label: 'Todos os técnicos' },
+                ...TECHNICIANS_LIST.map((t) => ({
+                  value: t.name,
+                  label: `${t.name} (${t.specialty})`,
+                })),
+              ]}
+              onChange={(val) => setSelectedTech(val ? val : null)}
+            />
 
-            <label>
-              <span>Nível de Prioridade:</span>
-              <select
-                className="os-select"
-                value={selectedPriority}
-                onChange={(e) => setSelectedPriority(e.target.value as any)}
-              >
-                <option value="all">Todas as prioridades</option>
-                <option value="urgent">⇈ Urgente</option>
-                <option value="high">↑ Alta</option>
-                <option value="normal">= Normal</option>
-                <option value="low">↓ Baixa</option>
-              </select>
-            </label>
+            <AdminPicker
+              label="Nível de Prioridade"
+              value={selectedPriority}
+              options={[
+                { value: 'all', label: 'Todas as prioridades' },
+                { value: 'urgent', label: '⇈ Urgente' },
+                { value: 'high', label: '↑ Alta' },
+                { value: 'normal', label: '= Normal' },
+                { value: 'low', label: '↓ Baixa' },
+              ]}
+              onChange={(val) => setSelectedPriority(val as any)}
+            />
 
             <div className="os-filter-drawer__actions">
               <button type="button" className="btn btn--ghost" onClick={clearAllFilters}>

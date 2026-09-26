@@ -78,24 +78,26 @@ export function CfopPage() {
             Cadastrar CFOP
           </button>
         </div>
-        <table className="admin-table" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Descrição</th>
-              <th>Operação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cfops.map((item) => (
-              <tr key={item.id}>
-                <td>{item.code}</td>
-                <td>{item.description}</td>
-                <td>{CFOP_OPERATION_LABEL[item.operation]}</td>
+        <div className="admin-table-container" style={{ marginTop: 16 }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descrição</th>
+                <th>Operação</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {cfops.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.code}</td>
+                  <td>{item.description}</td>
+                  <td>{CFOP_OPERATION_LABEL[item.operation]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </article>
 
       <article className="admin-card">
@@ -120,26 +122,28 @@ export function CfopPage() {
             Cadastrar FECP
           </button>
         </div>
-        <table className="admin-table" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>UF</th>
-              <th>Descrição</th>
-              <th>Alíquota</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fecps.map((item) => (
-              <tr key={item.id}>
-                <td>{item.uf}</td>
-                <td>{item.description}</td>
-                <td>{item.rate}%</td>
-                <td>{item.active ? 'Ativo' : 'Inativo'}</td>
+        <div className="admin-table-container" style={{ marginTop: 16 }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>UF</th>
+                <th>Descrição</th>
+                <th>Alíquota</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {fecps.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.uf}</td>
+                  <td>{item.description}</td>
+                  <td>{item.rate}%</td>
+                  <td>{item.active ? 'Ativo' : 'Inativo'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

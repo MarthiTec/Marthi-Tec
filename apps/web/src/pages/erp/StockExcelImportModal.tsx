@@ -254,7 +254,7 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
           ) : null}
 
           {error ? (
-            <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', borderRadius: 8, fontSize: '0.88rem' }}>
+            <div className="stock-inv-alert stock-inv-alert--danger">
               ⚠️ {error}
             </div>
           ) : null}
@@ -262,37 +262,37 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
           {report ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                <div className="stock-inv-metric-card">
+                <div className="stock-inv-stat-badge">
                   <span style={{ fontSize: '0.75rem', color: 'var(--mute)', display: 'block' }}>Total de Linhas</span>
                   <strong style={{ fontSize: '1.2rem', color: 'var(--ink)' }}>{report.totalRows}</strong>
                 </div>
 
-                <div style={{ padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: '#166534', display: 'block' }}>Produtos Encontrados</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#15803d' }}>
+                <div className="stock-inv-stat-badge stock-inv-stat-badge--success">
+                  <span style={{ fontSize: '0.75rem', display: 'block' }}>Produtos Encontrados</span>
+                  <strong style={{ fontSize: '1.2rem' }}>
                     {report.matchedRows.length} ({report.uniqueMatchedItemsCount} únicos)
                   </strong>
                 </div>
 
-                <div style={{ padding: '8px 12px', background: report.unmatchedRows.length ? '#fef2f2' : '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: report.unmatchedRows.length ? '#b91c1c' : '#64748b', display: 'block' }}>Não Encontrados</span>
-                  <strong style={{ fontSize: '1.2rem', color: report.unmatchedRows.length ? '#dc2626' : '#64748b' }}>
+                <div className={`stock-inv-stat-badge ${report.unmatchedRows.length ? 'stock-inv-stat-badge--danger' : ''}`}>
+                  <span style={{ fontSize: '0.75rem', display: 'block' }}>Não Encontrados</span>
+                  <strong style={{ fontSize: '1.2rem' }}>
                     {report.unmatchedRows.length}
                   </strong>
                 </div>
 
-                <div style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: '#1e40af', display: 'block' }}>Total de Peças</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#1d4ed8' }}>{report.totalUnitsToImport} UN</strong>
+                <div className="stock-inv-stat-badge stock-inv-stat-badge--info">
+                  <span style={{ fontSize: '0.75rem', display: 'block' }}>Total de Peças</span>
+                  <strong style={{ fontSize: '1.2rem' }}>{report.totalUnitsToImport} UN</strong>
                 </div>
               </div>
 
               {report.unmatchedRows.length > 0 ? (
-                <div style={{ border: '1px solid #fecaca', background: '#fff5f5', borderRadius: 8, padding: 12 }}>
-                  <strong style={{ color: '#991b1b', fontSize: '0.88rem', display: 'block', marginBottom: 6 }}>
+                <div className="stock-inv-alert stock-inv-alert--danger">
+                  <strong style={{ fontSize: '0.88rem', display: 'block', marginBottom: 6 }}>
                     ⚠️ {report.unmatchedRows.length} produtos não encontrados no catálogo:
                   </strong>
-                  <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '0.82rem', color: '#7f1d1d' }}>
+                  <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '0.82rem' }}>
                     {report.unmatchedRows.slice(0, 50).map((u, i) => (
                       <div key={i} style={{ padding: '2px 0' }}>
                         Linha {u.line}: Código <strong>"{u.code}"</strong> ({u.reason})
@@ -303,19 +303,19 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
               ) : null}
 
               {report.duplicateSummary.length > 0 ? (
-                <div style={{ border: '1px solid #fed7aa', background: '#fffbeb', borderRadius: 8, padding: 10, fontSize: '0.84rem', color: '#9a3412' }}>
+                <div className="stock-inv-alert stock-inv-alert--warning">
                   ℹ️ <strong>{report.duplicateSummary.length} produtos repetidos</strong> na planilha. As quantidades serão {duplicateRule === 'sum' ? 'somadas' : 'atualizadas pelo último valor'}.
                 </div>
               ) : null}
 
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: '200px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+              <div className="stock-inv-modal-table-box">
+                <table className="stock-inv-modal-table">
                   <thead>
-                    <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
-                      <th style={{ padding: '6px 10px' }}>Linha</th>
-                      <th style={{ padding: '6px 10px' }}>Código</th>
-                      <th style={{ padding: '6px 10px' }}>Produto Identificado</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Qtd Contada</th>
+                    <tr>
+                      <th>Linha</th>
+                      <th>Código</th>
+                      <th>Produto Identificado</th>
+                      <th style={{ textAlign: 'right' }}>Qtd Contada</th>
                     </tr>
                   </thead>
                   <tbody>

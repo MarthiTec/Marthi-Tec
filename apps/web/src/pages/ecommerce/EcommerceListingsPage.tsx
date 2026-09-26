@@ -136,90 +136,92 @@ export function EcommerceListingsPage() {
 
       <article className="admin-card">
         <h2>Anúncios ({listings.length})</h2>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Foto</th>
-              <th>Canal</th>
-              <th>Produto</th>
-              <th>SKU</th>
-              <th>Qtd</th>
-              <th>Preço</th>
-              <th>Status</th>
-              <th>Sync</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {listings.length === 0 ? (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={9} className="empty">
-                  Nenhum anúncio publicado.
-                </td>
+                <th>Foto</th>
+                <th>Canal</th>
+                <th>Produto</th>
+                <th>SKU</th>
+                <th>Qtd</th>
+                <th>Preço</th>
+                <th>Status</th>
+                <th>Sync</th>
+                <th />
               </tr>
-            ) : (
-              listings.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    {item.images[0] ? (
-                      <img
-                        src={item.images[0]}
-                        alt=""
-                        width={44}
-                        height={44}
-                        style={{ objectFit: 'cover', borderRadius: 8 }}
-                      />
-                    ) : (
-                      <span className="qty-low">sem foto</span>
-                    )}
-                  </td>
-                  <td>
-                    <Link to={`/ecommerce/${item.channelId}`}>
-                      {CHANNEL_LABEL[item.channelId]}
-                    </Link>
-                  </td>
-                  <td>
-                    <strong>{item.title}</strong>
-                    <div className="empty" style={{ margin: 0 }}>
-                      {item.message}
-                    </div>
-                  </td>
-                  <td>{item.sku}</td>
-                  <td>{item.qty}</td>
-                  <td>
-                    {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </td>
-                  <td>{item.status}</td>
-                  <td>
-                    {item.syncedAt
-                      ? new Date(item.syncedAt).toLocaleString('pt-BR')
-                      : '—'}
-                  </td>
-                  <td className="admin-table__action">
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => {
-                        void pauseListing(item.id).then(() => setTick((value) => value + 1));
-                      }}
-                    >
-                      Pausar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => {
-                        void removeListing(item.id).then(() => setTick((value) => value + 1));
-                      }}
-                    >
-                      Remover
-                    </button>
+            </thead>
+            <tbody>
+              {listings.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="empty">
+                    Nenhum anúncio publicado.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                listings.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.images[0] ? (
+                        <img
+                          src={item.images[0]}
+                          alt=""
+                          width={44}
+                          height={44}
+                          style={{ objectFit: 'cover', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <span className="qty-low">sem foto</span>
+                      )}
+                    </td>
+                    <td>
+                      <Link to={`/ecommerce/${item.channelId}`}>
+                        {CHANNEL_LABEL[item.channelId]}
+                      </Link>
+                    </td>
+                    <td>
+                      <strong>{item.title}</strong>
+                      <div className="empty" style={{ margin: 0 }}>
+                        {item.message}
+                      </div>
+                    </td>
+                    <td>{item.sku}</td>
+                    <td>{item.qty}</td>
+                    <td>
+                      {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td>{item.status}</td>
+                    <td>
+                      {item.syncedAt
+                        ? new Date(item.syncedAt).toLocaleString('pt-BR')
+                        : '—'}
+                    </td>
+                    <td className="admin-table__action">
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => {
+                          void pauseListing(item.id).then(() => setTick((value) => value + 1));
+                        }}
+                      >
+                        Pausar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => {
+                          void removeListing(item.id).then(() => setTick((value) => value + 1));
+                        }}
+                      >
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

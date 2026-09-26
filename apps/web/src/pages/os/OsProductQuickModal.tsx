@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { AdminPicker } from '../../components/AdminPicker';
 import { upsertStockItem, type StockItem, type StockUnit } from '../../data/adminStore';
 
 type Props = {
@@ -142,23 +143,15 @@ export function OsProductQuickModal({ open, onClose, onCreated }: Props) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                Unidade
-              </label>
-              <select
+              <AdminPicker
+                label="Unidade"
                 value={unit}
-                onChange={(e) => setUnit(e.target.value as StockUnit)}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.9rem',
-                }}
-              >
-                <option value="UN">Unidade (UN)</option>
-                <option value="KG">Quilograma (KG)</option>
-              </select>
+                options={[
+                  { value: 'UN', label: 'Unidade (UN)' },
+                  { value: 'KG', label: 'Quilograma (KG)' },
+                ]}
+                onChange={(val) => setUnit(val as StockUnit)}
+              />
             </div>
           </div>
 

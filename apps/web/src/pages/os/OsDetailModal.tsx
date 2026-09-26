@@ -1344,18 +1344,18 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                           />
                         </div>
                         <div className="os-jira-worklog-form__field">
-                          <label>Técnico Responsável</label>
-                          <select
+                          <AdminPicker
+                            label="Técnico Responsável"
                             value={worklogTech || order.technician || ''}
-                            onChange={(e) => setWorklogTech(e.target.value)}
-                          >
-                            <option value="">Selecione o técnico</option>
-                            {TECHNICIANS_LIST.map((t) => (
-                              <option key={t.id} value={t.name}>
-                                {t.name} ({t.role})
-                              </option>
-                            ))}
-                          </select>
+                            options={[
+                              { value: '', label: 'Selecione o técnico' },
+                              ...TECHNICIANS_LIST.map((t) => ({
+                                value: t.name,
+                                label: `${t.name} (${t.role})`,
+                              })),
+                            ]}
+                            onChange={setWorklogTech}
+                          />
                         </div>
                         <div className="os-jira-worklog-form__field">
                           <label>Data da execução</label>

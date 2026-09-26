@@ -167,88 +167,90 @@ export function OrdersPage() {
         {rows.length === 0 ? (
           <p className="empty">Nenhuma venda neste filtro.</p>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Quando</th>
-                <th>Cliente</th>
-                <th>Produto</th>
-                <th>Pagamento</th>
-                <th>Valor</th>
-                <th>Status</th>
-                <th>Fiscal</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const doc = row.kind === 'sale' ? getFiscalDocumentForRef('sale', row.id) : null;
-                const sold = row.status === 'sold' && row.order;
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Quando</th>
+                  <th>Cliente</th>
+                  <th>Produto</th>
+                  <th>Pagamento</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Fiscal</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const doc = row.kind === 'sale' ? getFiscalDocumentForRef('sale', row.id) : null;
+                  const sold = row.status === 'sold' && row.order;
 
-                return (
-                  <tr key={`${row.kind}-${row.id}`}>
-                    <td>{row.id}</td>
-                    <td>{new Date(row.when).toLocaleString('pt-BR')}</td>
-                    <td>{row.customer}</td>
-                    <td>{row.product}</td>
-                    <td>{row.payment}</td>
-                    <td className="price-red">{row.amountLabel}</td>
-                    <td>
-                      <span className={`badge ${row.status === 'open' ? 'badge--open' : 'badge--sold'}`}>
-                        {row.status === 'open' ? 'Aberto no totem' : 'Vendido'}
-                      </span>
-                    </td>
-                    <td>
-                      {doc ? (
-                        <span className="badge badge--sold">
-                          {FISCAL_KIND_LABEL[doc.kind]} {doc.number}
+                  return (
+                    <tr key={`${row.kind}-${row.id}`}>
+                      <td>{row.id}</td>
+                      <td>{new Date(row.when).toLocaleString('pt-BR')}</td>
+                      <td>{row.customer}</td>
+                      <td>{row.product}</td>
+                      <td>{row.payment}</td>
+                      <td className="price-red">{row.amountLabel}</td>
+                      <td>
+                        <span className={`badge ${row.status === 'open' ? 'badge--open' : 'badge--sold'}`}>
+                          {row.status === 'open' ? 'Aberto no totem' : 'Vendido'}
                         </span>
-                      ) : (
-                        <span className="empty">—</span>
-                      )}
-                    </td>
-                    <td className="admin-table__action">
-                      {sold && fiscalOn && !doc ? (
-                        <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>
-                          <button
-                            type="button"
+                      </td>
+                      <td>
+                        {doc ? (
+                          <span className="badge badge--sold">
+                            {FISCAL_KIND_LABEL[doc.kind]} {doc.number}
+                          </span>
+                        ) : (
+                          <span className="empty">—</span>
+                        )}
+                      </td>
+                      <td className="admin-table__action">
+                        {sold && fiscalOn && !doc ? (
+                          <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--icon"
+                              title="Emitir NFC-e"
+                              aria-label="Emitir NFC-e"
+                              onClick={() => emit(row.order!, true)}
+                            >
+                              <AdminIcon name="fiscal" />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              title="Emitir NF-e"
+                              onClick={() => emit(row.order!, false)}
+                            >
+                              NF-e
+                            </button>
+                          </div>
+                        ) : sold && !fiscalOn ? (
+                          <Link to="/painel/plano" className="btn btn--ghost" title="Requer Emissor Fiscal">
+                            Plano
+                          </Link>
+                        ) : row.status === 'open' ? (
+                          <Link
+                            to="/painel/pdv"
                             className="btn btn--primary btn--icon"
-                            title="Emitir NFC-e"
-                            aria-label="Emitir NFC-e"
-                            onClick={() => emit(row.order!, true)}
+                            title="Abrir PDV"
+                            aria-label="Abrir PDV"
                           >
-                            <AdminIcon name="fiscal" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            title="Emitir NF-e"
-                            onClick={() => emit(row.order!, false)}
-                          >
-                            NF-e
-                          </button>
-                        </div>
-                      ) : sold && !fiscalOn ? (
-                        <Link to="/painel/plano" className="btn btn--ghost" title="Requer Emissor Fiscal">
-                          Plano
-                        </Link>
-                      ) : row.status === 'open' ? (
-                        <Link
-                          to="/painel/pdv"
-                          className="btn btn--primary btn--icon"
-                          title="Abrir PDV"
-                          aria-label="Abrir PDV"
-                        >
-                          <AdminIcon name="cart" />
-                        </Link>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                            <AdminIcon name="cart" />
+                          </Link>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {fiscalOn && docs.filter((d) => d.refType === 'sale').length > 0 ? (

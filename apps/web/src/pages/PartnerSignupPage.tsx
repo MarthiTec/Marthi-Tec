@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
+import { AdminPicker } from '../components/AdminPicker';
 import {
   BRAZIL_UFS,
   PARTNER_MODULES,
@@ -694,16 +695,12 @@ export function PartnerSignupPage() {
                   required
                 />
               </label>
-              <label>
-                UF
-                <select value={form.state} onChange={(e) => patch('state', e.target.value)} required>
-                  {BRAZIL_UFS.map((uf) => (
-                    <option key={uf} value={uf}>
-                      {uf}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <AdminPicker
+                label="UF"
+                value={form.state}
+                options={BRAZIL_UFS.map((uf) => ({ value: uf, label: uf }))}
+                onChange={(val) => patch('state', val)}
+              />
               <label>
                 Responsável
                 <input
@@ -881,16 +878,12 @@ export function PartnerSignupPage() {
                   Cidade
                   <input value={form.city} onChange={(e) => patch('city', e.target.value)} required />
                 </label>
-                <label>
-                  UF
-                  <select value={form.state} onChange={(e) => patch('state', e.target.value)} required>
-                    {BRAZIL_UFS.map((uf) => (
-                      <option key={uf} value={uf}>
-                        {uf}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <AdminPicker
+                  label="UF"
+                  value={form.state}
+                  options={BRAZIL_UFS.map((uf) => ({ value: uf, label: uf }))}
+                  onChange={(val) => patch('state', val)}
+                />
               </div>
             ) : (
               <div className="partner__review" style={{ marginTop: 16 }}>

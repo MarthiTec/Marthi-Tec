@@ -390,19 +390,16 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
             </div>
 
             <div className="os-form-grid os-form-grid--5" style={{ marginTop: 12 }}>
-              <label>
-                <span>Técnico responsável</span>
-                <select
+              <div>
+                <AdminPicker
+                  label="Técnico responsável"
                   value={technician}
-                  onChange={(e) => setTechnician(e.target.value)}
-                  className="os-select"
-                >
-                  {TECHNICIANS_LIST.map((tech) => (
-                    <option key={tech.id} value={tech.name}>
-                      {tech.name} ({tech.specialty})
-                    </option>
-                  ))}
-                </select>
+                  options={TECHNICIANS_LIST.map((tech) => ({
+                    value: tech.name,
+                    label: `${tech.name} (${tech.specialty})`,
+                  }))}
+                  onChange={setTechnician}
+                />
                 {selectedTechInfo ? (
                   <div className="os-tech-badge" style={{ marginTop: 6 }}>
                     <img
@@ -416,23 +413,22 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
                     </div>
                   </div>
                 ) : null}
-              </label>
+              </div>
 
-              <label>
-                <span>Vendedor / Atendente</span>
-                <select
+              <div>
+                <AdminPicker
+                  label="Vendedor / Atendente"
                   value={sellerId}
-                  onChange={(e) => setSellerId(e.target.value)}
-                  className="os-select"
-                >
-                  <option value="">Sem vendedor vinculado</option>
-                  {sellers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  options={[
+                    { value: '', label: 'Sem vendedor vinculado' },
+                    ...sellers.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    })),
+                  ]}
+                  onChange={setSellerId}
+                />
+              </div>
 
               <label>
                 <span style={{ whiteSpace: 'nowrap' }}>Previsão de conclusão</span>

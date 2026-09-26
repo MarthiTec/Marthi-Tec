@@ -94,14 +94,8 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
         <div className="stock-modal__body">
           {feedback ? (
             <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: 8,
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                background: feedback.type === 'ok' ? '#dcfce7' : '#fee2e2',
-                color: feedback.type === 'ok' ? '#166534' : '#991b1b',
-              }}
+              className={`stock-inv-alert ${feedback.type === 'ok' ? 'stock-inv-alert--success' : 'stock-inv-alert--danger'}`}
+              style={{ fontWeight: 600 }}
             >
               {feedback.msg}
             </div>
@@ -110,7 +104,7 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
           {!selectedItem ? (
             <>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--ink)' }}>
                   Digite o Nome, SKU, Código de Barras, IMEI ou Código Interno:
                 </span>
                 <input
@@ -121,22 +115,20 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
                   placeholder="Ex: iPhone 13, tela, 7890000000000..."
                   style={{
                     padding: '10px 12px',
-                    borderRadius: 8,
-                    border: '1px solid #cbd5e1',
                     fontSize: '1rem',
                   }}
                 />
               </label>
 
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: '340px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+              <div className="stock-inv-modal-table-box" style={{ maxHeight: '340px' }}>
+                <table className="stock-inv-modal-table">
                   <thead>
-                    <tr style={{ background: '#f8fafc', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '8px 12px' }}>Produto</th>
-                      <th style={{ padding: '8px 12px' }}>Códigos</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>Sistema</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>Contado</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Ação</th>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Códigos</th>
+                      <th style={{ textAlign: 'center' }}>Sistema</th>
+                      <th style={{ textAlign: 'center' }}>Contado</th>
+                      <th style={{ textAlign: 'right' }}>Ação</th>
                     </tr>
                   </thead>
                   <tbody>

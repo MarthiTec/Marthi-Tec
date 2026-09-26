@@ -1,10 +1,11 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   useOsPrintSettings,
   getDefaultCompanyData,
   DEFAULT_WARRANTY_TERMS,
   type OsPrintSettings,
 } from '../../data/osPrintSettings';
+import { AdminPicker } from '../../components/AdminPicker';
 import { fileToStoreLogo } from '../../data/totemSettings';
 
 type Props = {
@@ -380,16 +381,16 @@ export function OsPrintSettingsDrawer({ open, onClose }: Props) {
               </div>
 
               <div className="os-settings-group">
-                <label className="os-settings-label">Vias a Imprimir por Padrão</label>
-                <select
+                <AdminPicker
+                  label="Vias a Imprimir por Padrão"
                   value={form.copies}
-                  onChange={(e) => setForm({ ...form, copies: e.target.value as any })}
-                  className="os-settings-select"
-                >
-                  <option value="both">Duas vias na mesma folha (1ª Via Loja + 2ª Via Cliente)</option>
-                  <option value="customer">Apenas 2ª Via (Comprovante do Cliente)</option>
-                  <option value="shop">Apenas 1ª Via (Bancada da Loja)</option>
-                </select>
+                  options={[
+                    { value: 'both', label: 'Duas vias na mesma folha (1ª Via Loja + 2ª Via Cliente)' },
+                    { value: 'customer', label: 'Apenas 2ª Via (Comprovante do Cliente)' },
+                    { value: 'shop', label: 'Apenas 1ª Via (Bancada da Loja)' },
+                  ]}
+                  onChange={(val) => setForm({ ...form, copies: val as any })}
+                />
               </div>
             </div>
           )}

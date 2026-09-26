@@ -429,25 +429,22 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
             }}
           />
         </label>
-        <label>
-          Caixa
-          <select
-            value={sessionFilter}
-            onChange={(e) => {
-              setSessionFilter(e.target.value);
-              setSelected(null);
-              setEditing(false);
-            }}
-          >
-            <option value="">Todos os caixas</option>
-            {sessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {session.id} · {session.status === 'open' ? 'Aberto' : 'Fechado'} ·{' '}
-                {formatDisplay(session.openedAt)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <AdminPicker
+          label="Caixa"
+          value={sessionFilter}
+          options={[
+            { value: '', label: 'Todos os caixas' },
+            ...sessions.map((session) => ({
+              value: session.id,
+              label: `${session.id} · ${session.status === 'open' ? 'Aberto' : 'Fechado'} · ${formatDisplay(session.openedAt)}`,
+            })),
+          ]}
+          onChange={(val) => {
+            setSessionFilter(val);
+            setSelected(null);
+            setEditing(false);
+          }}
+        />
       </div>
 
       <div className="caixa-sales-list" role="list">
@@ -2379,20 +2376,19 @@ function SessionsPanel({ operatorName, cashSession, onClose, onDone, onError, on
             }}
           />
         </label>
-        <label>
-          Status
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as 'all' | 'open' | 'closed');
-              setSelected(null);
-            }}
-          >
-            <option value="all">Todos</option>
-            <option value="open">Abertos</option>
-            <option value="closed">Fechados</option>
-          </select>
-        </label>
+        <AdminPicker
+          label="Status"
+          value={statusFilter}
+          options={[
+            { value: 'all', label: 'Todos' },
+            { value: 'open', label: 'Abertos' },
+            { value: 'closed', label: 'Fechados' },
+          ]}
+          onChange={(val) => {
+            setStatusFilter(val as 'all' | 'open' | 'closed');
+            setSelected(null);
+          }}
+        />
       </div>
 
       <div className="caixa-sales-list" role="list">

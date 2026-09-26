@@ -54,29 +54,29 @@ export function StockFinalizeModal({ balance, isOpen, onClose, onFinalized }: Pr
 
           {/* Indicadores de conferência */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
-              <span style={{ fontSize: '0.78rem', color: '#166534', display: 'block' }}>Produtos Contados</span>
-              <strong style={{ fontSize: '1.25rem', color: '#15803d' }}>
+            <div className="stock-inv-stat-badge stock-inv-stat-badge--success">
+              <span style={{ fontSize: '0.78rem', display: 'block' }}>Produtos Contados</span>
+              <strong style={{ fontSize: '1.25rem' }}>
                 {balance.countedItems} de {balance.totalItems}
               </strong>
             </div>
 
-            <div style={{ padding: '10px 14px', background: hasPending ? '#fef2f2' : '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              <span style={{ fontSize: '0.78rem', color: hasPending ? '#b91c1c' : '#64748b', display: 'block' }}>Produtos Pendentes</span>
-              <strong style={{ fontSize: '1.25rem', color: hasPending ? '#dc2626' : '#64748b' }}>
+            <div className={`stock-inv-stat-badge ${hasPending ? 'stock-inv-stat-badge--danger' : ''}`}>
+              <span style={{ fontSize: '0.78rem', display: 'block' }}>Produtos Pendentes</span>
+              <strong style={{ fontSize: '1.25rem' }}>
                 {balance.pendingItems}
               </strong>
             </div>
           </div>
 
           {hasPending ? (
-            <div style={{ padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, color: '#92400e', fontSize: '0.86rem' }}>
+            <div className="stock-inv-alert stock-inv-alert--warning">
               ⚠️ <strong>Atenção:</strong> Existem <strong>{balance.pendingItems} produtos</strong> no catálogo que não receberam nenhuma contagem física. Eles permanecerão com o saldo do sistema inalterado.
             </div>
           ) : null}
 
           {hasDivergences ? (
-            <div style={{ padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, color: '#1e40af', fontSize: '0.86rem' }}>
+            <div className="stock-inv-alert stock-inv-alert--info">
               📊 <strong>Resumo das Divergências:</strong>
               <div style={{ marginTop: 4 }}>
                 • <strong>{balance.divergentItems} produtos</strong> apresentaram divergência entre a contagem e o sistema.
@@ -87,18 +87,18 @@ export function StockFinalizeModal({ balance, isOpen, onClose, onFinalized }: Pr
               <div>
                 • Faltas detectadas: <strong>-{balance.divergentNegativeUnits} UN</strong>
               </div>
-              <div style={{ marginTop: 6, fontSize: '0.8rem', color: '#3b82f6' }}>
+              <div style={{ marginTop: 6, fontSize: '0.8rem', opacity: 0.85 }}>
                 * A finalização congela o resultado para auditoria. Você poderá gerar os ajustes de estoque posteriormente na consulta do balanço.
               </div>
             </div>
           ) : (
-            <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, color: '#166534', fontSize: '0.86rem' }}>
+            <div className="stock-inv-alert stock-inv-alert--success">
               ✅ <strong>Estoque 100% conciliado!</strong> Nenhuma divergência detectada entre o sistema e a contagem física.
             </div>
           )}
 
           <label>
-            <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+            <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
               Observações Finais do Balanço (opcional)
             </span>
             <textarea
@@ -106,7 +106,7 @@ export function StockFinalizeModal({ balance, isOpen, onClose, onFinalized }: Pr
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ex: Auditoria semestral completa, recontado setor A e vitrine..."
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.88rem' }}
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.88rem' }}
             />
           </label>
         </div>

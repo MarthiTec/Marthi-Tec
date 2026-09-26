@@ -239,49 +239,51 @@ export function StockMovementsPage() {
             />
           </label>
         </div>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Quando</th>
-              <th>Produto</th>
-              <th>Tipo</th>
-              <th>Qtd</th>
-              <th>Custo un.</th>
-              <th>Saldo</th>
-              <th>Obs.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 ? (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={7} className="empty">
-                  Nenhum movimento registrado ainda. Lance uma compra ou ajuste acima.
-                </td>
+                <th>Quando</th>
+                <th>Produto</th>
+                <th>Tipo</th>
+                <th>Qtd</th>
+                <th>Custo un.</th>
+                <th>Saldo</th>
+                <th>Obs.</th>
               </tr>
-            ) : (
-              visible.map((item) => (
-                <tr key={item.id}>
-                  <td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td>
-                  <td>
-                    {item.stockName}
-                    <div className="empty">{item.sku}</div>
-                  </td>
-                  <td>{STOCK_MOVE_LABEL[item.type]}</td>
-                  <td className={item.direction < 0 ? 'qty-low' : ''}>
-                    {item.direction > 0 ? '+' : '−'}
-                    {item.qty}
-                  </td>
-                  <td>{money(item.unitCost)}</td>
-                  <td>{item.balanceAfter}</td>
-                  <td>
-                    {item.note || '—'}
-                    {item.refId ? <div className="empty">{item.refId}</div> : null}
+            </thead>
+            <tbody>
+              {visible.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="empty">
+                    Nenhum movimento registrado ainda. Lance uma compra ou ajuste acima.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                visible.map((item) => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td>
+                    <td>
+                      {item.stockName}
+                      <div className="empty">{item.sku}</div>
+                    </td>
+                    <td>{STOCK_MOVE_LABEL[item.type]}</td>
+                    <td className={item.direction < 0 ? 'qty-low' : ''}>
+                      {item.direction > 0 ? '+' : '−'}
+                      {item.qty}
+                    </td>
+                    <td>{money(item.unitCost)}</td>
+                    <td>{item.balanceAfter}</td>
+                    <td>
+                      {item.note || '—'}
+                      {item.refId ? <div className="empty">{item.refId}</div> : null}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

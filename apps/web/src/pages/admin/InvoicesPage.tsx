@@ -344,48 +344,50 @@ export function InvoicesPage() {
       <div className="erp-invoices">
         <article className="admin-card">
           <h2>Notas</h2>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Tipo</th>
-                <th>Status</th>
-                <th>Fiscal</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
                 <tr>
-                  <td colSpan={5} className="empty">
-                    Nenhuma nota ainda.
-                  </td>
+                  <th>Código</th>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                  <th>Fiscal</th>
+                  <th>Total</th>
                 </tr>
-              ) : (
-                filtered.map((item) => {
-                  const doc = getFiscalDocumentForRef('invoice', item.id);
-                  return (
-                    <tr
-                      key={item.id}
-                      className={selectedId === item.id ? 'is-selected' : ''}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setSelectedId(item.id)}
-                    >
-                      <td>{item.id}</td>
-                      <td>{INVOICE_KIND_LABEL[item.kind]}</td>
-                      <td>{INVOICE_STATUS_LABEL[item.status]}</td>
-                      <td>
-                        {doc
-                          ? `${FISCAL_KIND_LABEL[doc.kind]} · ${FISCAL_STATUS_LABEL[doc.status]}`
-                          : '—'}
-                      </td>
-                      <td>{money(invoiceTotal(item))}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="empty">
+                      Nenhuma nota ainda.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => {
+                    const doc = getFiscalDocumentForRef('invoice', item.id);
+                    return (
+                      <tr
+                        key={item.id}
+                        className={selectedId === item.id ? 'is-selected' : ''}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setSelectedId(item.id)}
+                      >
+                        <td>{item.id}</td>
+                        <td>{INVOICE_KIND_LABEL[item.kind]}</td>
+                        <td>{INVOICE_STATUS_LABEL[item.status]}</td>
+                        <td>
+                          {doc
+                            ? `${FISCAL_KIND_LABEL[doc.kind]} · ${FISCAL_STATUS_LABEL[doc.status]}`
+                            : '—'}
+                        </td>
+                        <td>{money(invoiceTotal(item))}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="admin-card">
@@ -504,55 +506,57 @@ export function InvoicesPage() {
                 </div>
               ) : null}
 
-              <table className="admin-table" style={{ marginTop: 12 }}>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qtd</th>
-                    <th>{selected.kind === 'entry' ? 'Custo' : 'Preço'}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.lines.length === 0 ? (
+              <div className="admin-table-container" style={{ marginTop: 12 }}>
+                <table className="admin-table">
+                  <thead>
                     <tr>
-                      <td colSpan={4} className="empty">
-                        Sem itens.
-                      </td>
+                      <th>Item</th>
+                      <th>Qtd</th>
+                      <th>{selected.kind === 'entry' ? 'Custo' : 'Preço'}</th>
+                      <th></th>
                     </tr>
-                  ) : (
-                    selected.lines.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.name}</td>
-                        <td>{line.qty}</td>
-                        <td>
-                          {money(
-                            (selected.kind === 'entry' ? line.unitCost : line.unitPrice) *
-                              line.qty,
-                          )}
-                        </td>
-                        <td>
-                          {selected.status === 'draft' ? (
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              onClick={() => {
-                                void (async () => {
-                                  const result = await removeInvoiceLine(selected.id, line.id);
-                                  if (!result.ok) fail(result.error);
-                                  else refresh(selected.id);
-                                })();
-                              }}
-                            >
-                              Remover
-                            </button>
-                          ) : null}
+                  </thead>
+                  <tbody>
+                    {selected.lines.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="empty">
+                          Sem itens.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      selected.lines.map((line) => (
+                        <tr key={line.id}>
+                          <td>{line.name}</td>
+                          <td>{line.qty}</td>
+                          <td>
+                            {money(
+                              (selected.kind === 'entry' ? line.unitCost : line.unitPrice) *
+                                line.qty,
+                            )}
+                          </td>
+                          <td>
+                            {selected.status === 'draft' ? (
+                              <button
+                                type="button"
+                                className="btn btn--ghost"
+                                onClick={() => {
+                                  void (async () => {
+                                    const result = await removeInvoiceLine(selected.id, line.id);
+                                    if (!result.ok) fail(result.error);
+                                    else refresh(selected.id);
+                                  })();
+                                }}
+                              >
+                                Remover
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="admin-toolbar" style={{ marginTop: 12 }}>
                 {selected.status === 'draft' ? (

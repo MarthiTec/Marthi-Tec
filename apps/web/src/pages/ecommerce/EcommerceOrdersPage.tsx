@@ -39,44 +39,46 @@ export function EcommerceOrdersPage() {
       </div>
 
       <article className="admin-card">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Canal</th>
-              <th>Externo</th>
-              <th>Cliente</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Quando</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={7} className="empty">
-                  Nenhum pedido.
-                </td>
+                <th>ID</th>
+                <th>Canal</th>
+                <th>Externo</th>
+                <th>Cliente</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Quando</th>
               </tr>
-            ) : (
-              orders.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>
-                    <Link to={`/ecommerce/${item.channelId}`}>{CHANNEL_LABEL[item.channelId]}</Link>
+            </thead>
+            <tbody>
+              {orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="empty">
+                    Nenhum pedido.
                   </td>
-                  <td>{item.externalId}</td>
-                  <td>{item.customerName}</td>
-                  <td>
-                    {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </td>
-                  <td>{ORDER_STATUS_LABEL[item.status]}</td>
-                  <td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                orders.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.id}</td>
+                    <td>
+                      <Link to={`/ecommerce/${item.channelId}`}>{CHANNEL_LABEL[item.channelId]}</Link>
+                    </td>
+                    <td>{item.externalId}</td>
+                    <td>{item.customerName}</td>
+                    <td>
+                      {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td>{ORDER_STATUS_LABEL[item.status]}</td>
+                    <td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

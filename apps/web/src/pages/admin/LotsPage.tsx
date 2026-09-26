@@ -124,36 +124,38 @@ export function LotsPage() {
 
       <article className="admin-card">
         <h2>Lotes cadastrados</h2>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Lote</th>
-              <th>Produto</th>
-              <th>Qtd</th>
-              <th>Validade</th>
-              <th>Fornecedor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lots.length === 0 ? (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="empty">
-                  Nenhum lote ainda.
-                </td>
+                <th>Lote</th>
+                <th>Produto</th>
+                <th>Qtd</th>
+                <th>Validade</th>
+                <th>Fornecedor</th>
               </tr>
-            ) : (
-              lots.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.lotNumber}</td>
-                  <td>{item.stockName}</td>
-                  <td>{item.qty}</td>
-                  <td>{item.expiryDate || '—'}</td>
-                  <td>{item.supplierName || '—'}</td>
+            </thead>
+            <tbody>
+              {lots.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty">
+                    Nenhum lote ainda.
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                lots.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.lotNumber}</td>
+                    <td>{item.stockName}</td>
+                    <td>{item.qty}</td>
+                    <td>{item.expiryDate || '—'}</td>
+                    <td>{item.supplierName || '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

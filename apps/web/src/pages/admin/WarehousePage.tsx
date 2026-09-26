@@ -102,24 +102,26 @@ export function WarehousePage() {
             Cadastrar local
           </button>
         </div>
-        <table className="admin-table" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Nome</th>
-              <th>Local</th>
-            </tr>
-          </thead>
-          <tbody>
-            {warehouses.map((item) => (
-              <tr key={item.id}>
-                <td>{item.code}</td>
-                <td>{item.name}</td>
-                <td>{item.address || '—'}</td>
+        <div className="admin-table-container" style={{ marginTop: 16 }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nome</th>
+                <th>Local</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {warehouses.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.code}</td>
+                  <td>{item.name}</td>
+                  <td>{item.address || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </article>
 
       <article className="admin-card">
@@ -170,36 +172,38 @@ export function WarehousePage() {
             Registrar movimento
           </button>
         </div>
-        <table className="admin-table" style={{ marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th>Quando</th>
-              <th>Tipo</th>
-              <th>Produto</th>
-              <th>Qtd</th>
-              <th>Descrição</th>
-            </tr>
-          </thead>
-          <tbody>
-            {moves.length === 0 ? (
+        <div className="admin-table-container" style={{ marginTop: 16 }}>
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="empty">
-                  Sem movimentos.
-                </td>
+                <th>Quando</th>
+                <th>Tipo</th>
+                <th>Produto</th>
+                <th>Qtd</th>
+                <th>Descrição</th>
               </tr>
-            ) : (
-              moves.map((item) => (
-                <tr key={item.id}>
-                  <td>{new Date(item.at).toLocaleString('pt-BR')}</td>
-                  <td>{WAREHOUSE_MOVE_LABEL[item.kind]}</td>
-                  <td>{item.stockName}</td>
-                  <td>{item.qty}</td>
-                  <td>{item.description}</td>
+            </thead>
+            <tbody>
+              {moves.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty">
+                    Sem movimentos.
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                moves.map((item) => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.at).toLocaleString('pt-BR')}</td>
+                    <td>{WAREHOUSE_MOVE_LABEL[item.kind]}</td>
+                    <td>{item.stockName}</td>
+                    <td>{item.qty}</td>
+                    <td>{item.description}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

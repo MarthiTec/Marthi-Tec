@@ -826,7 +826,11 @@
 }
 
 .admin-table-container,
-.admin-card > .admin-table {
+.admin-table-wrap,
+.table-wrap,
+.table-container,
+.admin-card > .admin-table,
+.admin-card:has(.admin-table) {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
@@ -5203,6 +5207,9 @@ select.caixa-mov-input {
 
   /* Isolamento horizontal seguro para todas as tabelas no painel */
   .admin-table-container,
+  .admin-table-wrap,
+  .table-wrap,
+  .table-container,
   .admin-card > .admin-table,
   .admin-card:has(.admin-table) {
     width: 100% !important;

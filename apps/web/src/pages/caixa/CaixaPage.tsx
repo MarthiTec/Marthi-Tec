@@ -1606,25 +1606,21 @@ export function CaixaPage() {
                                   : ''}
                               </small>
                               {lineTableKey === line.key && tables.length > 0 ? (
-                                <label className="pdv__line-table">
-                                  Tabela de preço
-                                  <select
+                                <div className="pdv__line-table" style={{ marginTop: 6 }}>
+                                  <AdminPicker
+                                    label="Tabela de preço"
                                     value={line.priceTableId || defaultTableId}
-                                    onChange={(e) => {
-                                      patchLine(line.key, { priceTableId: e.target.value });
+                                    options={tables.map((item) => ({
+                                      value: item.id,
+                                      label: `${item.name} (${item.percent > 0 ? '+' : ''}${item.percent}%)`,
+                                    }))}
+                                    onChange={(val) => {
+                                      patchLine(line.key, { priceTableId: val });
                                       setLineTableKey(null);
                                       focusCode();
                                     }}
-                                    autoFocus
-                                  >
-                                    {tables.map((item) => (
-                                      <option key={item.id} value={item.id}>
-                                        {item.name} ({item.percent > 0 ? '+' : ''}
-                                        {item.percent}%)
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
+                                  />
+                                </div>
                               ) : null}
                               {lineAdjKey === line.key ? (
                                 <div className="pdv__line-adj">

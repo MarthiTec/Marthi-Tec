@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { TeamUsersSection } from '../../components/TeamUsersSection';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
+import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
@@ -279,29 +280,24 @@ export function OperationsPage() {
                     required
                   />
                 </label>
-                <label>
-                  Ícone
-                  <select
-                    value={draft.icon}
-                    onChange={(e) => setDraft({ ...draft, icon: e.target.value as AdminIconName })}
-                  >
-                    {OPERATION_ICON_OPTIONS.map((iconName) => (
-                      <option key={iconName} value={iconName}>
-                        {iconName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="ops-form__status">
-                  Status
-                  <select
-                    value={draft.active ? '1' : '0'}
-                    onChange={(e) => setDraft({ ...draft, active: e.target.value === '1' })}
-                  >
-                    <option value="1">Ativo na central</option>
-                    <option value="0">Inativo</option>
-                  </select>
-                </label>
+                <AdminPicker
+                  label="Ícone"
+                  value={draft.icon}
+                  options={OPERATION_ICON_OPTIONS.map((iconName) => ({
+                    value: iconName,
+                    label: iconName,
+                  }))}
+                  onChange={(val) => setDraft({ ...draft, icon: val as AdminIconName })}
+                />
+                <AdminPicker
+                  label="Status"
+                  value={draft.active ? '1' : '0'}
+                  options={[
+                    { value: '1', label: 'Ativo na central' },
+                    { value: '0', label: 'Inativo' },
+                  ]}
+                  onChange={(val) => setDraft({ ...draft, active: val === '1' })}
+                />
               </div>
 
               <fieldset className="ops-colors">

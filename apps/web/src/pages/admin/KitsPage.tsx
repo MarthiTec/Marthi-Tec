@@ -121,36 +121,38 @@ export function KitsPage() {
 
       <article className="admin-card">
         <h2>Kits</h2>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>SKU</th>
-              <th>Itens</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {kits.length === 0 ? (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={4} className="empty">
-                  Nenhum kit cadastrado.
-                </td>
+                <th>Nome</th>
+                <th>SKU</th>
+                <th>Itens</th>
+                <th>Status</th>
               </tr>
-            ) : (
-              kits.map((kit) => (
-                <tr key={kit.id}>
-                  <td>{kit.name}</td>
-                  <td>{kit.sku || '—'}</td>
-                  <td>
-                    {kit.items.map((item) => `${item.qty}× ${item.stockName}`).join(', ')}
+            </thead>
+            <tbody>
+              {kits.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="empty">
+                    Nenhum kit cadastrado.
                   </td>
-                  <td>{kit.active ? 'Ativo' : 'Inativo'}</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                kits.map((kit) => (
+                  <tr key={kit.id}>
+                    <td>{kit.name}</td>
+                    <td>{kit.sku || '—'}</td>
+                    <td>
+                      {kit.items.map((item) => `${item.qty}× ${item.stockName}`).join(', ')}
+                    </td>
+                    <td>{kit.active ? 'Ativo' : 'Inativo'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   );

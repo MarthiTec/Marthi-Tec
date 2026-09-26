@@ -358,15 +358,38 @@
   color: #fca5a5;
 }
 
-/* CRM social profile */
+/* CRM dark theme overrides */
 .is-theme-dark .crm-profile__card,
 .is-theme-dark .crm-profile__form,
 .is-theme-dark .crm-board,
 .is-theme-dark .crm-deal,
-.is-theme-dark .crm-inbox {
-  background: var(--card, #171e27);
-  border-color: rgba(255, 255, 255, 0.06);
-  color: var(--ink, #e8eef4);
+.is-theme-dark .crm-inbox,
+.is-theme-dark .crm-board-hero,
+.is-theme-dark .crm-board-stats article,
+.is-theme-dark .crm-chip-toggle,
+.is-theme-dark .crm-create,
+.is-theme-dark .crm-dock,
+.is-theme-dark .crm-deal-hero,
+.is-theme-dark .crm-deal-tabs,
+.is-theme-dark .crm-deal-grid article,
+.is-theme-dark .crm-timeline__composer,
+.is-theme-dark .crm-timeline-item,
+.is-theme-dark .crm-deal-field,
+.is-theme-dark .crm-inbox__list,
+.is-theme-dark .crm-inbox__chat,
+.is-theme-dark .crm-inbox-item,
+.is-theme-dark .crm-network-card,
+.is-theme-dark .crm-seller-row,
+.is-theme-dark .crm-deal-modal,
+.is-theme-dark .crm-deal-sidebar,
+.is-theme-dark .crm-deal-summary-card,
+.is-theme-dark .crm-activity-item,
+.is-theme-dark .crm-deal-form,
+.is-theme-dark .crm-inbox__context span,
+.is-theme-dark .crm-inbox__composer {
+  background: var(--card, #171e27) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--ink, #e8eef4) !important;
 }
 
 .is-theme-dark .crm-profile__form-head {
@@ -378,6 +401,41 @@
 .is-theme-dark .crm-deal-card {
   background: var(--card-2, #1c2430);
   border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .crm-inbox__messages {
+  background: #0f141c !important;
+}
+
+.is-theme-dark .crm-inbox__bubble {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .crm-inbox__bubble.is-me {
+  background: rgba(15, 118, 110, 0.25);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: #e2e8f0;
+}
+
+.is-theme-dark .crm-inbox__bubble.is-me strong {
+  color: #2dd4bf;
+}
+
+.is-theme-dark .crm-inbox__lock {
+  background: rgba(154, 52, 18, 0.2);
+  border-color: rgba(251, 146, 60, 0.3);
+  color: #fed7aa;
+}
+
+.is-theme-dark .crm-deal-field input,
+.is-theme-dark .crm-deal-field textarea,
+.is-theme-dark .crm-inbox__composer input {
+  background-color: #1a222d !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
 }
 
 /* OS / Caixa panels */

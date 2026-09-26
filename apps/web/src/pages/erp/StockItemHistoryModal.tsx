@@ -125,18 +125,18 @@ export function StockItemHistoryModal({ balance, item, isOpen, onClose, onUpdate
             </div>
           ) : null}
 
-          <h4 style={{ margin: '8px 0 0', fontSize: '0.9rem', color: '#475569' }}>
+          <h4 style={{ margin: '8px 0 0', fontSize: '0.9rem', color: 'var(--ink)' }}>
             Registros de Bipagem / Lançamentos ({item.entries.length}):
           </h4>
 
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: '240px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+          <div className="stock-inv-modal-table-box">
+            <table className="stock-inv-modal-table">
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 10px' }}>Data / Hora</th>
-                  <th style={{ padding: '6px 10px' }}>Canal</th>
-                  <th style={{ padding: '6px 10px', textAlign: 'right' }}>Qtd Lançada</th>
-                  <th style={{ padding: '6px 10px' }}>Usuário / Detalhes</th>
+                <tr>
+                  <th>Data / Hora</th>
+                  <th>Canal</th>
+                  <th style={{ textAlign: 'right' }}>Qtd Lançada</th>
+                  <th>Usuário / Detalhes</th>
                 </tr>
               </thead>
               <tbody>
