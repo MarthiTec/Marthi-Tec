@@ -1,4 +1,8 @@
-﻿/* Estilos do Balanço Físico de Estoque */
+/* ==========================================================================
+   ESTILOS DO BALANÇO FÍSICO DE ESTOQUE (MARTHI ERP)
+   Padrão responsivo com suporte total aos temas Claro e Escuro (.is-theme-dark / .admin--dark)
+   ========================================================================== */
+
 .stock-inv {
   display: flex;
   flex-direction: column;
@@ -6,14 +10,18 @@
   width: 100%;
 }
 
-/* Abas superiores: Contagem Física vs Relatório de Posição */
+/* --------------------------------------------------------------------------
+   Abas Superiores de Navegação
+   -------------------------------------------------------------------------- */
 .stock-inv__tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 4px;
-  margin-bottom: 12px;
+  border-bottom: 2px solid var(--line, #e2e8f0);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .stock-inv__tab-btn {
@@ -25,7 +33,7 @@
   background: transparent;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mute, #64748b);
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.15s ease;
@@ -33,8 +41,8 @@
 }
 
 .stock-inv__tab-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--card-2, #f1f5f9);
+  color: var(--ink, #0f172a);
 }
 
 .stock-inv__tab-btn.is-active {
@@ -42,15 +50,147 @@
   color: #ffffff;
 }
 
-/* Cabeçalho do Balanço Ativo */
+/* --------------------------------------------------------------------------
+   Cards e Estrutura Geral (Tema Claro & Escuro Adaptável)
+   -------------------------------------------------------------------------- */
 .stock-inv-card {
-  background: #ffffff;
+  background: var(--card, #ffffff);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 18px;
+  color: var(--ink, #0f172a);
 }
 
+.is-theme-dark .stock-inv-card,
+.admin--dark .stock-inv-card {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: var(--ink, #e8eef4);
+}
+
+/* Card de Configuração / Abertura de Novo Balanço */
+.stock-inv-card--setup {
+  max-width: 800px;
+  margin: 10px auto;
+  width: 100%;
+}
+
+.stock-inv-setup__head {
+  text-align: center;
+  padding: 12px 0 20px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.is-theme-dark .stock-inv-setup__head,
+.admin--dark .stock-inv-setup__head {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.stock-inv-setup__icon {
+  font-size: 2.6rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.stock-inv-setup__title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .stock-inv-setup__title,
+.admin--dark .stock-inv-setup__title {
+  color: var(--ink, #e8eef4);
+}
+
+.stock-inv-setup__desc {
+  margin: 6px 0 0;
+  color: var(--mute, #64748b);
+  font-size: 0.92rem;
+}
+
+.stock-inv-setup__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.stock-inv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stock-inv-setup__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.stock-inv-setup__col {
+  flex: 1 1 240px;
+  min-width: 220px;
+}
+
+.stock-inv-security-notice {
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.is-theme-dark .stock-inv-security-notice,
+.admin--dark .stock-inv-security-notice {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+.stock-inv-security-notice__title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .stock-inv-security-notice__title,
+.admin--dark .stock-inv-security-notice__title {
+  color: var(--ink, #e8eef4);
+}
+
+.stock-inv-security-notice ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.stock-inv-security-notice li {
+  margin-bottom: 4px;
+}
+
+.stock-inv-setup__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stock-inv-setup__btn-start {
+  background: #0f766e;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Cabeçalho do Balanço Ativo
+   -------------------------------------------------------------------------- */
 .stock-inv-head {
   display: flex;
   flex-wrap: wrap;
@@ -68,12 +208,20 @@
 
 .stock-inv-badge-code {
   background: #0f172a;
-  color: #ffffff;
+  color: #2dd4bf;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.05em;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+}
+
+.is-theme-dark .stock-inv-badge-code,
+.admin--dark .stock-inv-badge-code {
+  background: #0b0f14;
+  color: #2dd4bf;
+  border-color: rgba(45, 212, 191, 0.4);
 }
 
 .stock-inv-status {
@@ -90,6 +238,13 @@
   background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
+}
+
+.is-theme-dark .stock-inv-status--progress,
+.admin--dark .stock-inv-status--progress {
+  background: rgba(4, 120, 87, 0.2);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.4);
 }
 
 .stock-inv-status--progress::before {
@@ -114,10 +269,24 @@
   border: 1px solid #cbd5e1;
 }
 
+.is-theme-dark .stock-inv-status--completed,
+.admin--dark .stock-inv-status--completed {
+  background: #1e2632;
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
 .stock-inv-status--cancelled {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
+}
+
+.is-theme-dark .stock-inv-status--cancelled,
+.admin--dark .stock-inv-status--cancelled {
+  background: rgba(185, 28, 28, 0.2);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.4);
 }
 
 .stock-inv-head__meta {
@@ -125,12 +294,17 @@
   align-items: center;
   gap: 16px;
   font-size: 0.86rem;
-  color: #64748b;
+  color: var(--mute, #64748b);
   flex-wrap: wrap;
 }
 
 .stock-inv-head__meta strong {
-  color: #1e293b;
+  color: var(--ink, #1e293b);
+}
+
+.is-theme-dark .stock-inv-head__meta strong,
+.admin--dark .stock-inv-head__meta strong {
+  color: var(--ink, #e8eef4);
 }
 
 .stock-inv-sync {
@@ -148,12 +322,26 @@
   color: #15803d;
 }
 
+.is-theme-dark .stock-inv-sync--synced,
+.admin--dark .stock-inv-sync--synced {
+  background: rgba(21, 128, 61, 0.25);
+  color: #86efac;
+}
+
 .stock-inv-sync--offline {
   background: #fffbeb;
   color: #b45309;
 }
 
-/* Grid de Indicadores / Cards */
+.is-theme-dark .stock-inv-sync--offline,
+.admin--dark .stock-inv-sync--offline {
+  background: rgba(180, 83, 9, 0.25);
+  color: #fde68a;
+}
+
+/* --------------------------------------------------------------------------
+   Grid de Indicadores / Métricas
+   -------------------------------------------------------------------------- */
 .stock-inv-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -163,7 +351,7 @@
 
 .stock-inv-metric-card {
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
@@ -171,11 +359,17 @@
   justify-content: space-between;
 }
 
+.is-theme-dark .stock-inv-metric-card,
+.admin--dark .stock-inv-metric-card {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
 .stock-inv-metric-card__title {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--mute, #64748b);
   font-weight: 600;
   margin: 0 0 6px 0;
 }
@@ -183,13 +377,18 @@
 .stock-inv-metric-card__val {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
   line-height: 1.1;
+}
+
+.is-theme-dark .stock-inv-metric-card__val,
+.admin--dark .stock-inv-metric-card__val {
+  color: var(--ink, #e8eef4);
 }
 
 .stock-inv-metric-card__hint {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--mute, #64748b);
   margin-top: 4px;
 }
 
@@ -197,10 +396,15 @@
 .stock-inv-progress {
   width: 100%;
   height: 6px;
-  background: #e2e8f0;
+  background: var(--line, #e2e8f0);
   border-radius: 3px;
   overflow: hidden;
   margin-top: 8px;
+}
+
+.is-theme-dark .stock-inv-progress,
+.admin--dark .stock-inv-progress {
+  background: #1e2632;
 }
 
 .stock-inv-progress__bar {
@@ -210,7 +414,9 @@
   transition: width 0.3s ease;
 }
 
-/* Barra do Coletor / Scanner Rápido */
+/* --------------------------------------------------------------------------
+   Barra do Coletor / Scanner Rápido (Bip)
+   -------------------------------------------------------------------------- */
 .stock-inv-scanner {
   background: #f1f5f9;
   border: 2px solid #cbd5e1;
@@ -223,10 +429,23 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.is-theme-dark .stock-inv-scanner,
+.admin--dark .stock-inv-scanner {
+  background: #141b24;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
 .stock-inv-scanner:focus-within {
   border-color: #0f766e;
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
   background: #ffffff;
+}
+
+.is-theme-dark .stock-inv-scanner:focus-within,
+.admin--dark .stock-inv-scanner:focus-within {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2);
+  background: #171e27;
 }
 
 .stock-inv-scanner__input-wrap {
@@ -240,14 +459,26 @@
   padding: 4px 10px;
 }
 
+.is-theme-dark .stock-inv-scanner__input-wrap,
+.admin--dark .stock-inv-scanner__input-wrap {
+  background: #0f141a;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
 .stock-inv-scanner__input-wrap input {
   flex: 1;
-  border: none;
-  outline: none;
+  border: none !important;
+  outline: none !important;
   font-size: 0.95rem;
   padding: 6px 0;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
+  background: transparent !important;
+}
+
+.is-theme-dark .stock-inv-scanner__input-wrap input,
+.admin--dark .stock-inv-scanner__input-wrap input {
+  color: var(--ink, #e8eef4);
 }
 
 .stock-inv-scanner__stepper {
@@ -259,7 +490,7 @@
 .stock-inv-scanner__stepper-label {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mute, #64748b);
   margin-right: 4px;
 }
 
@@ -275,11 +506,25 @@
   transition: all 0.15s ease;
 }
 
+.is-theme-dark .stock-inv-scanner__step-btn,
+.admin--dark .stock-inv-scanner__step-btn {
+  background: #1a222d;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
 .stock-inv-scanner__step-btn:hover,
 .stock-inv-scanner__step-btn.is-active {
   background: #0f766e;
   color: #ffffff;
   border-color: #0f766e;
+}
+
+.is-theme-dark .stock-inv-scanner__step-btn.is-active,
+.admin--dark .stock-inv-scanner__step-btn.is-active {
+  background: #2dd4bf;
+  color: #0f172a;
+  border-color: #2dd4bf;
 }
 
 /* Flash de confirmação do bip */
@@ -306,13 +551,29 @@
   border: 1px solid #86efac;
 }
 
+.is-theme-dark .stock-inv-flash--ok,
+.admin--dark .stock-inv-flash--ok {
+  background: rgba(22, 101, 52, 0.3);
+  color: #86efac;
+  border-color: rgba(134, 239, 172, 0.4);
+}
+
 .stock-inv-flash--err {
   background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fca5a5;
 }
 
-/* Barra de Ações Operacionais */
+.is-theme-dark .stock-inv-flash--err,
+.admin--dark .stock-inv-flash--err {
+  background: rgba(153, 27, 27, 0.3);
+  color: #fca5a5;
+  border-color: rgba(252, 165, 165, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Barra de Ações Operacionais (Importar, Pesquisa, Finalizar)
+   -------------------------------------------------------------------------- */
 .stock-inv-actions {
   display: flex;
   flex-wrap: wrap;
@@ -321,7 +582,12 @@
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--line, #e2e8f0);
+}
+
+.is-theme-dark .stock-inv-actions,
+.admin--dark .stock-inv-actions {
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
 .stock-inv-actions__left {
@@ -359,8 +625,20 @@
   transition: all 0.15s ease;
 }
 
+.is-theme-dark .stock-inv-filter-btn,
+.admin--dark .stock-inv-filter-btn {
+  background: #171e27;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #cbd5e1;
+}
+
 .stock-inv-filter-btn:hover {
   background: #f1f5f9;
+}
+
+.is-theme-dark .stock-inv-filter-btn:hover,
+.admin--dark .stock-inv-filter-btn:hover {
+  background: #1e2632;
 }
 
 .stock-inv-filter-btn.is-active {
@@ -369,7 +647,17 @@
   border-color: #0f172a;
 }
 
-/* Tabela e Badges */
+.is-theme-dark .stock-inv-filter-btn.is-active,
+.admin--dark .stock-inv-filter-btn.is-active {
+  background: #2dd4bf;
+  color: #0f172a;
+  border-color: #2dd4bf;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Badges de Diferença de Estoque
+   -------------------------------------------------------------------------- */
 .stock-badge-diff {
   display: inline-flex;
   align-items: center;
@@ -386,14 +674,35 @@
   color: #166534;
 }
 
+.is-theme-dark .stock-badge-diff--ok,
+.admin--dark .stock-badge-diff--ok {
+  background: rgba(22, 101, 52, 0.35);
+  color: #86efac;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+}
+
 .stock-badge-diff--over {
   background: #e0f2fe;
   color: #0369a1;
 }
 
+.is-theme-dark .stock-badge-diff--over,
+.admin--dark .stock-badge-diff--over {
+  background: rgba(3, 105, 161, 0.35);
+  color: #7dd3fc;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+}
+
 .stock-badge-diff--loss {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.is-theme-dark .stock-badge-diff--loss,
+.admin--dark .stock-badge-diff--loss {
+  background: rgba(153, 27, 27, 0.35);
+  color: #fca5a5;
+  border: 1px solid rgba(252, 165, 165, 0.35);
 }
 
 .stock-badge-diff--pending {
@@ -402,7 +711,15 @@
   font-weight: 500;
 }
 
-/* Modal Overlay & Card */
+.is-theme-dark .stock-badge-diff--pending,
+.admin--dark .stock-badge-diff--pending {
+  background: #1c2430;
+  color: #94a3b8;
+}
+
+/* --------------------------------------------------------------------------
+   Modais Operacionais (TXT, Excel, Busca Manual, Finalização, Histórico)
+   -------------------------------------------------------------------------- */
 .stock-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -426,6 +743,15 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .stock-modal,
+.admin--dark .stock-modal {
+  background: #171e27;
+  color: #e8eef4;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 38px rgba(0, 0, 0, 0.45);
 }
 
 .stock-modal--large {
@@ -439,17 +765,27 @@
 
 .stock-modal__head {
   padding: 16px 20px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--line, #e2e8f0);
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.is-theme-dark .stock-modal__head,
+.admin--dark .stock-modal__head {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .stock-modal__title {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .stock-modal__title,
+.admin--dark .stock-modal__title {
+  color: var(--ink, #e8eef4);
 }
 
 .stock-modal__body {
@@ -462,7 +798,7 @@
 
 .stock-modal__foot {
   padding: 14px 20px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--line, #e2e8f0);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -470,19 +806,153 @@
   background: #f8fafc;
 }
 
-/* Responsividade Global para Telas Pequenas */
+.is-theme-dark .stock-modal__foot,
+.admin--dark .stock-modal__foot {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  background: #121820;
+}
+
+.stock-inv-excel-map {
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.is-theme-dark .stock-inv-excel-map,
+.admin--dark .stock-inv-excel-map {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   Responsividade Mobile Completa (Celulares & Tablets)
+   -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
   .stock-inv-head {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
   }
+
+  .stock-inv-head__left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stock-inv-head__meta {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .stock-inv-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stock-inv-scanner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .stock-inv-scanner__input-wrap {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .stock-inv-scanner__stepper {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .stock-inv-scanner button[type="submit"] {
+    width: 100%;
+  }
+
   .stock-inv-actions {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
+
   .stock-inv-actions__left,
   .stock-inv-actions__right {
     width: 100%;
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stock-inv-actions__left .btn,
+  .stock-inv-actions__right .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .stock-inv-setup__row {
+    flex-direction: column;
+  }
+
+  .stock-inv-setup__col {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .stock-inv-setup__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stock-inv-setup__actions .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .stock-modal {
+    max-width: 96vw;
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+
+  .stock-modal__body {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .stock-modal__foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .stock-modal__foot .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .stock-inv-card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .stock-inv-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-inv-metric-card__val {
+    font-size: 1.2rem;
+  }
+
+  .stock-inv-tabs {
+    gap: 4px;
+  }
+
+  .stock-inv__tab-btn {
+    padding: 6px 12px;
+    font-size: 0.88rem;
   }
 }

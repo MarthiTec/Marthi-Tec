@@ -1,4 +1,5 @@
-﻿import { useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   parseTxtContent,
   recordBatchCounts,
@@ -126,35 +127,31 @@ export function StockTxtImportModal({ balance, isOpen, onClose, onImportComplete
               />
             </label>
 
-            <label style={{ flex: '0 1 180px' }}>
-              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                Delimitador
-              </span>
-              <select
+            <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+              <AdminPicker
+                label="Delimitador"
                 value={delimiter}
-                onChange={(e) => handleDelimiterChange(e.target.value)}
-                style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 8 }}
-              >
-                <option value=";">Ponto e vírgula ( ; )</option>
-                <option value="|">Pipe ( | )</option>
-                <option value=",">Vírgula ( , )</option>
-                <option value="\t">Tabulação ( Tab )</option>
-              </select>
-            </label>
+                options={[
+                  { value: ';', label: 'Ponto e vírgula ( ; )' },
+                  { value: '|', label: 'Pipe ( | )' },
+                  { value: ',', label: 'Vírgula ( , )' },
+                  { value: '\t', label: 'Tabulação ( Tab )' },
+                ]}
+                onChange={(val) => handleDelimiterChange(val)}
+              />
+            </div>
 
-            <label style={{ flex: '1 1 240px' }}>
-              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                Regra para códigos repetidos
-              </span>
-              <select
+            <div style={{ flex: '1 1 240px', minWidth: '200px' }}>
+              <AdminPicker
+                label="Regra para códigos repetidos"
                 value={duplicateRule}
-                onChange={(e) => setDuplicateRule(e.target.value as DuplicateRule)}
-                style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 8 }}
-              >
-                <option value="sum">Somar quantidades (Ex: 5 + 3 = 8) [Recomendado]</option>
-                <option value="overwrite">Sobrescrever com último valor</option>
-              </select>
-            </label>
+                options={[
+                  { value: 'sum', label: 'Somar quantidades (Ex: 5 + 3 = 8) [Padrão]' },
+                  { value: 'overwrite', label: 'Sobrescrever com último valor' },
+                ]}
+                onChange={(val) => setDuplicateRule(val as DuplicateRule)}
+              />
+            </div>
           </div>
 
           <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>

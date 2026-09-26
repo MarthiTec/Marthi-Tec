@@ -1,4 +1,5 @@
-﻿import { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
 import { recordCount, type StockBalanceAudit, type StockBalanceItem } from '../../data/stockInventoryStore';
 
 type Props = {
@@ -201,19 +202,17 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                <label style={{ flex: '1 1 200px' }}>
-                  <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                    Modo de Lançamento
-                  </span>
-                  <select
+                <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+                  <AdminPicker
+                    label="Modo de Lançamento"
                     value={mode}
-                    onChange={(e) => setMode(e.target.value as 'add' | 'set')}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 8 }}
-                  >
-                    <option value="add">Somar à contagem atual ( + )</option>
-                    <option value="set">Definir quantidade exata total ( = )</option>
-                  </select>
-                </label>
+                    options={[
+                      { value: 'add', label: 'Somar à contagem atual ( + )' },
+                      { value: 'set', label: 'Definir quantidade exata total ( = )' },
+                    ]}
+                    onChange={(val) => setMode(val as 'add' | 'set')}
+                  />
+                </div>
 
                 <label style={{ flex: '1 1 160px' }}>
                   <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>

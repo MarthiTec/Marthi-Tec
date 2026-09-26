@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import { getAdminState, adjustStockQty, type StockItem } from './adminStore';
 import { logStockMovements } from './stockLedger';
 
@@ -715,6 +715,45 @@ export function deleteStockBalance(balanceId: string) {
   saveHistory(hist);
   void deleteFromIdb(balanceId);
 }
+
+export function duplicateStockBalance(
+  balanceId: string,
+  operator = 'Operador',
+): StockBalanceAudit | null {
+  const source = getStockBalance(balanceId);
+  if (!source) return null;
+
+  return createStockBalance({
+    responsibleUser: operator,
+    warehouseId: source.warehouseId,
+    warehouseName: source.warehouseName,
+    title: `Cópia de ${source.title}`,
+    duplicateRule: source.duplicateRule,
+  });
+}
+
+export function updateStockBalanceMetadata(
+  balanceId: string,
+  data: { title?: string; notes?: string },
+): StockBalanceAudit | null {
+  const active = getActiveStockBalance();
+  if (active && active.id === balanceId) {
+    if (data.title !== undefined) active.title = data.title;
+    if (data.notes !== undefined) active.notes = data.notes;
+    active.updatedAt = new Date().toISOString();
+    saveActiveBalance(active);
+    return active;
+  }
+  const history = listStockBalances();
+  const target = history.find((b) => b.id === balanceId);
+  if (!target) return null;
+  if (data.title !== undefined) target.title = data.title;
+  if (data.notes !== undefined) target.notes = data.notes;
+  target.updatedAt = new Date().toISOString();
+  saveHistory(history.map((b) => (b.id === balanceId ? target : b)));
+  return target;
+}
+
 
 export function parseTxtContent(content: string, delimiter: string) {
   const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { matchesQuery } from '../../components/CrudKit';
@@ -156,73 +156,67 @@ export function StockBalancePage() {
           />
         ) : (
           /* Formulário de Abertura de Novo Balanço */
-          <div className="stock-inv-card" style={{ maxWidth: '800px', margin: '10px auto' }}>
-            <div style={{ textAlign: 'center', padding: '16px 0 24px', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>📦</span>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a' }}>Novo Balanço de Estoque</h2>
-              <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+          <div className="stock-inv-card stock-inv-card--setup">
+            <div className="stock-inv-setup__head">
+              <span className="stock-inv-setup__icon">📦</span>
+              <h2 className="stock-inv-setup__title">Novo Balanço de Estoque</h2>
+              <p className="stock-inv-setup__desc">
                 Inicie uma contagem física comparando o estoque do sistema com a quantidade real nas prateleiras.
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 20 }}>
-              <label>
-                <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
-                  Título / Identificação do Balanço (opcional)
-                </span>
+            <div className="stock-inv-setup__body">
+              <label className="admin-field stock-inv-field">
+                Título / Identificação do Balanço (opcional)
                 <input
                   type="text"
                   value={balanceTitle}
                   onChange={(e) => setBalanceTitle(e.target.value)}
                   placeholder="Ex: Contagem Geral Loja, Inventário Semestral, Balanço de Acessórios..."
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.95rem' }}
                 />
               </label>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                <label style={{ flex: '1 1 240px' }}>
-                  <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
-                    Local / Estoque a ser contado
-                  </span>
-                  <select
+              <div className="stock-inv-setup__row">
+                <div className="stock-inv-setup__col">
+                  <AdminPicker
+                    label="Local / Estoque a ser contado"
                     value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.95rem' }}
-                  >
-                    <option value="">Loja / Estoque Principal</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} {w.code ? `(${w.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={[
+                      { value: '', label: 'Loja / Estoque Principal' },
+                      ...warehouses.map((w) => ({
+                        value: w.id,
+                        label: `${w.name}${w.code ? ` (${w.code})` : ''}`,
+                      })),
+                    ]}
+                    onChange={(val) => setWarehouseId(val)}
+                  />
+                </div>
 
-                <label style={{ flex: '1 1 240px' }}>
-                  <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
-                    Regra para produtos repetidos
-                  </span>
-                  <select
+                <div className="stock-inv-setup__col">
+                  <AdminPicker
+                    label="Regra para produtos repetidos"
                     value={duplicateRule}
-                    onChange={(e) => setDuplicateRule(e.target.value as 'sum' | 'overwrite')}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.95rem' }}
-                  >
-                    <option value="sum">Somar quantidades (Ex: 5 + 3 = 8) [Padrão]</option>
-                    <option value="overwrite">Sobrescrever com último valor</option>
-                  </select>
-                </label>
+                    options={[
+                      { value: 'sum', label: 'Somar quantidades (Ex: 5 + 3 = 8) [Padrão]' },
+                      { value: 'overwrite', label: 'Sobrescrever com último valor' },
+                    ]}
+                    onChange={(val) => setDuplicateRule(val as 'sum' | 'overwrite')}
+                  />
+                </div>
               </div>
 
-              <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.86rem', color: '#475569' }}>
-                🛡️ <strong>Segurança e Persistência Garantida:</strong>
-                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              <div className="stock-inv-security-notice">
+                <div className="stock-inv-security-notice__title">
+                  🛡️ <strong>Segurança e Persistência Garantida:</strong>
+                </div>
+                <ul>
                   <li>Você poderá fechar a tela, atualizar o navegador ou perder a conexão sem perder nenhum lançamento.</li>
                   <li>Lançamentos suportam leitura de código de barras USB/HID, pesquisa manual, importação TXT e Excel.</li>
                   <li>O ajuste final de estoque é opcional e nunca altera o saldo do sistema sem sua confirmação explícita.</li>
                 </ul>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, flexWrap: 'wrap', gap: 10 }}>
+              <div className="stock-inv-setup__actions">
                 <button
                   type="button"
                   className="btn btn--ghost"
@@ -233,8 +227,7 @@ export function StockBalancePage() {
 
                 <button
                   type="button"
-                  className="btn btn--primary"
-                  style={{ background: '#0f766e', padding: '12px 24px', fontSize: '1rem', fontWeight: 700 }}
+                  className="btn btn--primary stock-inv-setup__btn-start"
                   onClick={handleStartNewBalance}
                 >
                   🚀 Iniciar Novo Balanço de Estoque

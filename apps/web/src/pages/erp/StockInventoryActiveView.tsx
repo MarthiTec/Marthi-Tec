@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CrudNameButton, CrudRowActions } from '../../components/CrudKit';
 import {
   cancelStockBalance,
   formatDuration,
@@ -101,6 +102,32 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
     const next = Math.max(0, current + delta);
     setDirectCount(balance.id, item.stockId, next, `Ajuste rápido (+${delta})`);
     if (soundEnabled) playInventoryBeep('ok');
+    onBalanceUpdated();
+  }
+
+  function handleEditItemCount(item: StockBalanceItem) {
+    const current = item.countedQty === null ? '' : String(item.countedQty);
+    const next = window.prompt(
+      `Editar contagem de "${item.name}":\n\nEstoque do sistema: ${item.systemQty} ${item.unit}\nInforme a quantidade física exata contada:`,
+      current,
+    );
+    if (next !== null && next.trim() !== '') {
+      const val = parseFloat(next.replace(',', '.'));
+      if (!Number.isFinite(val) || val < 0) {
+        alert('Informe uma quantidade válida.');
+        return;
+      }
+      setDirectCount(balance.id, item.stockId, val, 'Ajuste manual pela tabela');
+      if (soundEnabled) playInventoryBeep('ok');
+      onBalanceUpdated();
+    }
+  }
+
+  function handleResetItemCount(item: StockBalanceItem) {
+    if (item.countedQty === null) return;
+    if (!window.confirm(`Deseja zerar a contagem de "${item.name}" e marcar como pendente?`)) return;
+    setDirectCount(balance.id, item.stockId, null, 'Contagem reiniciada');
+    if (soundEnabled) playInventoryBeep('warning');
     onBalanceUpdated();
   }
 
@@ -399,7 +426,7 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
                 <th style={{ textAlign: 'center', width: '100px' }}>Diferença</th>
                 <th style={{ width: '110px' }}>Status</th>
                 <th style={{ width: '140px' }}>Último Lançamento</th>
-                <th className="col-actions">Ações</th>
+                <th className="admin-table__actions" style={{ textAlign: 'center', width: '130px' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -413,7 +440,9 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
                 filteredItems.map((item) => (
                   <tr key={item.stockId}>
                     <td className="col-product">
-                      <strong>{item.name}</strong>
+                      <CrudNameButton onClick={() => setHistoryItem(item)}>
+                        <strong>{item.name}</strong>
+                      </CrudNameButton>
                       {(item.color || item.capacity) && (
                         <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                           {[item.color, item.capacity].filter(Boolean).join(' · ')}
@@ -496,16 +525,13 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
                         '—'
                       )}
                     </td>
-                    <td className="col-actions">
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        style={{ padding: '4px 8px', fontSize: '0.8rem' }}
-                        onClick={() => setHistoryItem(item)}
-                        title="Ver histórico e editar contagem"
-                      >
-                        📋 Histórico
-                      </button>
+                    <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
+                      <CrudRowActions
+                        onView={() => setHistoryItem(item)}
+                        onEdit={() => handleEditItemCount(item)}
+                        onDuplicate={() => handleQuickIncrement(item, 1)}
+                        onDelete={() => handleResetItemCount(item)}
+                      />
                     </td>
                   </tr>
                 ))

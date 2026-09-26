@@ -1,9 +1,13 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
 import {
   applyStockAdjustment,
+  deleteStockBalance,
+  duplicateStockBalance,
   formatDuration,
   listStockBalances,
   reopenStockBalance,
+  updateStockBalanceMetadata,
   type StockBalanceAudit,
   type StockBalanceItem,
 } from '../../data/stockInventoryStore';
@@ -34,6 +38,46 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
     } else {
       alert('Não é possível reabrir este balanço no momento (verifique se já existe outro balanço em andamento).');
     }
+  }
+
+  function handleEdit(b: StockBalanceAudit) {
+    if (b.status === 'in_progress') {
+      onReopenSuccess(b);
+      return;
+    }
+    const choice = window.prompt(
+      `Editar Balanço ${b.code}:\n\nDigite o novo título ou deixe em branco para manter "${b.title}":`,
+      b.title,
+    );
+    if (choice !== null && choice.trim() && choice.trim() !== b.title) {
+      updateStockBalanceMetadata(b.id, { title: choice.trim() });
+      refresh();
+      setMsg({ type: 'ok', text: `Título do balanço ${b.code} atualizado!` });
+    }
+  }
+
+  function handleDuplicate(b: StockBalanceAudit) {
+    if (
+      !window.confirm(
+        `Deseja duplicar o balanço "${b.title}" (${b.code}) para iniciar uma nova contagem física com as mesmas configurações de estoque?`,
+      )
+    ) {
+      return;
+    }
+    const newAudit = duplicateStockBalance(b.id);
+    if (newAudit) {
+      onReopenSuccess(newAudit);
+    } else {
+      setMsg({ type: 'err', text: 'Não foi possível duplicar o balanço.' });
+    }
+  }
+
+  function handleDelete(b: StockBalanceAudit) {
+    if (!confirmDelete(`o balanço ${b.code} ("${b.title}")`)) return;
+    deleteStockBalance(b.id);
+    refresh();
+    if (selectedAudit?.id === b.id) setSelectedAudit(null);
+    setMsg({ type: 'ok', text: `Balanço ${b.code} excluído com sucesso.` });
   }
 
   function handleApplyAdjustment(balance: StockBalanceAudit) {
@@ -144,7 +188,7 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
                   <th>Contados / Total</th>
                   <th>Divergências</th>
                   <th>Ajuste Aplicado</th>
-                  <th style={{ textAlign: 'right' }}>Ações</th>
+                  <th className="admin-table__actions" style={{ textAlign: 'center', width: '130px' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,12 +200,16 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
                   </tr>
                 ) : (
                   filteredHistory.map((b) => (
-                    <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedAudit(b)}>
+                    <tr key={b.id}>
                       <td>
-                        <strong className="stock-inv-badge-code">{b.code}</strong>
+                        <CrudNameButton onClick={() => setSelectedAudit(b)}>
+                          <strong className="stock-inv-badge-code">{b.code}</strong>
+                        </CrudNameButton>
                       </td>
                       <td>
-                        <strong>{b.title}</strong>
+                        <CrudNameButton onClick={() => setSelectedAudit(b)}>
+                          <strong>{b.title}</strong>
+                        </CrudNameButton>
                         <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{b.warehouseName}</div>
                       </td>
                       <td>{b.responsibleUser}</td>
@@ -201,15 +249,13 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
                           <span style={{ color: '#64748b', fontSize: '0.82rem' }}>Não aplicado</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="btn btn--ghost"
-                          style={{ padding: '4px 10px', fontSize: '0.82rem' }}
-                          onClick={() => setSelectedAudit(b)}
-                        >
-                          👁️ Ver Detalhes
-                        </button>
+                      <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
+                        <CrudRowActions
+                          onView={() => setSelectedAudit(b)}
+                          onEdit={() => handleEdit(b)}
+                          onDuplicate={() => handleDuplicate(b)}
+                          onDelete={() => handleDelete(b)}
+                        />
                       </td>
                     </tr>
                   ))
@@ -263,6 +309,24 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
                     🔄 Reabrir Balanço
                   </button>
                 ) : null}
+
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => handleDuplicate(selectedAudit)}
+                  title="Duplicar balanço para nova contagem"
+                >
+                  📄 Duplicar
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn--ghost crud-actions__danger"
+                  onClick={() => handleDelete(selectedAudit)}
+                  title="Excluir este balanço do histórico"
+                >
+                  🗑️ Excluir
+                </button>
               </div>
             </div>
 

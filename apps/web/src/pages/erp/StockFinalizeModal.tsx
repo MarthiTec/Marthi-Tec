@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   finalizeStockBalance,
   formatDuration,
@@ -42,12 +42,12 @@ export function StockFinalizeModal({ balance, isOpen, onClose, onFinalized }: Pr
         </div>
 
         <div className="stock-modal__body">
-          <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
+          <div className="stock-inv-security-notice">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong>{balance.title}</strong>
               <span className="stock-inv-badge-code">{balance.code}</span>
             </div>
-            <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: 4 }}>
+            <div style={{ fontSize: '0.84rem', marginTop: 4 }}>
               Responsável: {balance.responsibleUser} · Início: {new Date(balance.startedAt).toLocaleString('pt-BR')} · Duração estimada: {formatDuration(balance.durationSeconds)}
             </div>
           </div>

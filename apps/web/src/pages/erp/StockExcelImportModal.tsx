@@ -1,4 +1,5 @@
-﻿import { useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   parseExcelBuffer,
   recordBatchCounts,
@@ -180,41 +181,31 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
             </label>
 
             {sheetNames.length > 1 ? (
-              <label style={{ flex: '0 1 180px' }}>
-                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                  Aba da Planilha
-                </span>
-                <select
+              <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                <AdminPicker
+                  label="Aba da Planilha"
                   value={selectedSheet}
-                  onChange={(e) => handleSheetChange(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 8 }}
-                >
-                  {sheetNames.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  options={sheetNames.map((s) => ({ value: s, label: s }))}
+                  onChange={(val) => handleSheetChange(val)}
+                />
+              </div>
             ) : null}
 
-            <label style={{ flex: '1 1 220px' }}>
-              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>
-                Regra para códigos repetidos
-              </span>
-              <select
+            <div style={{ flex: '1 1 220px', minWidth: '190px' }}>
+              <AdminPicker
+                label="Regra para códigos repetidos"
                 value={duplicateRule}
-                onChange={(e) => setDuplicateRule(e.target.value as DuplicateRule)}
-                style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 8 }}
-              >
-                <option value="sum">Somar quantidades (Ex: 5 + 3 = 8) [Recomendado]</option>
-                <option value="overwrite">Sobrescrever com último valor</option>
-              </select>
-            </label>
+                options={[
+                  { value: 'sum', label: 'Somar quantidades (Ex: 5 + 3 = 8) [Padrão]' },
+                  { value: 'overwrite', label: 'Sobrescrever com último valor' },
+                ]}
+                onChange={(val) => setDuplicateRule(val as DuplicateRule)}
+              />
+            </div>
           </div>
 
           {currentRows.length > 0 ? (
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+            <div className="stock-inv-excel-map">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 600 }}>
                   <input
@@ -225,43 +216,39 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
                   A primeira linha contém cabeçalhos
                 </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
-                  Coluna do Código (SKU/Barras):
-                  <select
-                    value={codeColIdx}
-                    onChange={(e) => handleCodeColChange(Number(e.target.value))}
-                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                  >
-                    {Array.from({ length: maxCols }).map((_, idx) => {
-                      const letter = String.fromCharCode(65 + idx);
-                      const sample = sampleHeaders[idx] ? ` (${String(sampleHeaders[idx]).slice(0, 15)})` : '';
-                      return (
-                        <option key={idx} value={idx}>
-                          Coluna {letter}{sample}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
+                  <span>Código (SKU/Barras):</span>
+                  <div style={{ minWidth: '180px' }}>
+                    <AdminPicker
+                      compact
+                      label="Coluna do Código"
+                      value={String(codeColIdx)}
+                      options={Array.from({ length: maxCols }).map((_, idx) => {
+                        const letter = String.fromCharCode(65 + idx);
+                        const sample = sampleHeaders[idx] ? ` (${String(sampleHeaders[idx]).slice(0, 15)})` : '';
+                        return { value: String(idx), label: `Coluna ${letter}${sample}` };
+                      })}
+                      onChange={(val) => handleCodeColChange(Number(val))}
+                    />
+                  </div>
+                </div>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
-                  Coluna da Quantidade Contada:
-                  <select
-                    value={qtyColIdx}
-                    onChange={(e) => handleQtyColChange(Number(e.target.value))}
-                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                  >
-                    {Array.from({ length: maxCols }).map((_, idx) => {
-                      const letter = String.fromCharCode(65 + idx);
-                      const sample = sampleHeaders[idx] ? ` (${String(sampleHeaders[idx]).slice(0, 15)})` : '';
-                      return (
-                        <option key={idx} value={idx}>
-                          Coluna {letter}{sample}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
+                  <span>Qtd. Contada:</span>
+                  <div style={{ minWidth: '180px' }}>
+                    <AdminPicker
+                      compact
+                      label="Coluna da Quantidade"
+                      value={String(qtyColIdx)}
+                      options={Array.from({ length: maxCols }).map((_, idx) => {
+                        const letter = String.fromCharCode(65 + idx);
+                        const sample = sampleHeaders[idx] ? ` (${String(sampleHeaders[idx]).slice(0, 15)})` : '';
+                        return { value: String(idx), label: `Coluna ${letter}${sample}` };
+                      })}
+                      onChange={(val) => handleQtyColChange(Number(val))}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}

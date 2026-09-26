@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   setDirectCount,
   type StockBalanceAudit,
@@ -58,9 +58,9 @@ export function StockItemHistoryModal({ balance, item, isOpen, onClose, onUpdate
         </div>
 
         <div className="stock-modal__body">
-          <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
-            <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>{item.name}</strong>
-            <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: 4 }}>
+          <div className="stock-inv-security-notice">
+            <strong style={{ fontSize: '1.05rem' }}>{item.name}</strong>
+            <div style={{ fontSize: '0.84rem', marginTop: 4 }}>
               SKU: {item.sku || '—'} · Barras: {item.barcode || '—'} · Sistema: {item.systemQty} {item.unit}
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 8, alignItems: 'center' }}>
