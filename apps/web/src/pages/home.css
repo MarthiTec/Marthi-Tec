@@ -1689,9 +1689,12 @@ button.site__nav-cta {
   position: absolute;
   margin: 0;
   width: min(42%, 190px);
+  aspect-ratio: 9 / 19;
   border-radius: 28px;
   overflow: hidden;
-  background: #0a0f14;
+  background:
+    linear-gradient(180deg, rgba(45, 212, 191, 0.18), transparent 42%),
+    #0a0f14;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 28px 50px rgba(0, 0, 0, 0.55);
 }

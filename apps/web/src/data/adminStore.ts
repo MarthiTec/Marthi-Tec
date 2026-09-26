@@ -226,251 +226,28 @@ function seedPayments(): PaymentMethod[] {
   ];
 }
 
-function variantSku(
-  item: Omit<
-    StockItem,
-    | 'attrs'
-    | 'kind'
-    | 'condition'
-    | 'unit'
-    | 'sourceWorkOrderId'
-    | 'showOnTotem'
-    | 'images'
-    | 'maxQty'
-    | 'avgCost'
-    | 'lastPurchaseAt'
-    | 'lastPurchaseCost'
-  > &
-    Partial<
-      Pick<
-        StockItem,
-        | 'kind'
-        | 'condition'
-        | 'unit'
-        | 'sourceWorkOrderId'
-        | 'showOnTotem'
-        | 'images'
-        | 'maxQty'
-        | 'avgCost'
-        | 'lastPurchaseAt'
-        | 'lastPurchaseCost'
-      >
-    >,
-): StockItem {
-  return normalizeStock({ ...item, attrs: {} } as StockItem);
-}
+const DEMO_TOTEM_STOCK_IDS = new Set([
+  'STK-16PM',
+  'STK-16PM-512',
+  'STK-16P',
+  'STK-16P-256',
+  'STK-15',
+  'STK-15-256',
+  'STK-14-128',
+  'STK-14-256',
+  'STK-13-128',
+  'STK-13-256',
+  'STK-12-64',
+  'STK-12-128',
+  'STK-11-64',
+  'STK-11-128',
+  'STK-RN13',
+  'STK-RN13-512',
+  'STK-DEMO-APARELHO',
+]);
 
-function seedStock(): StockItem[] {
-  return [
-    variantSku({
-      id: 'STK-16PM',
-      name: 'iPhone 16 Pro Max',
-      sku: 'APL-16PM-256',
-      barcode: '7891000160256',
-      imei: '353456789012345',
-      color: 'Desert',
-      capacity: '256 GB',
-      qty: 4,
-      minQty: 2,
-      cost: 6200,
-      price: 6990,
-    }),
-    variantSku({
-      id: 'STK-16PM-512',
-      name: 'iPhone 16 Pro Max',
-      sku: 'APL-16PM-512',
-      barcode: '7891000160512',
-      imei: '',
-      color: 'Desert',
-      capacity: '512 GB',
-      qty: 2,
-      minQty: 1,
-      cost: 7300,
-      price: 8290,
-    }),
-    variantSku({
-      id: 'STK-16P',
-      name: 'iPhone 16 Pro',
-      sku: 'APL-16P-128',
-      barcode: '7891000160128',
-      imei: '353456789012346',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 6,
-      minQty: 2,
-      cost: 5400,
-      price: 6290,
-    }),
-    variantSku({
-      id: 'STK-16P-256',
-      name: 'iPhone 16 Pro',
-      sku: 'APL-16P-256',
-      barcode: '7891000160257',
-      imei: '',
-      color: 'Preto',
-      capacity: '256 GB',
-      qty: 3,
-      minQty: 1,
-      cost: 6100,
-      price: 7190,
-    }),
-    variantSku({
-      id: 'STK-15',
-      name: 'iPhone 15',
-      sku: 'APL-15-128',
-      barcode: '7891000150128',
-      imei: '359844120000001',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 8,
-      minQty: 3,
-      cost: 3800,
-      price: 4499,
-    }),
-    variantSku({
-      id: 'STK-15-256',
-      name: 'iPhone 15',
-      sku: 'APL-15-256',
-      barcode: '7891000150256',
-      imei: '',
-      color: 'Preto',
-      capacity: '256 GB',
-      qty: 4,
-      minQty: 2,
-      cost: 4400,
-      price: 5199,
-    }),
-    variantSku({
-      id: 'STK-14-128',
-      name: 'iPhone 14',
-      sku: 'APL-14-128',
-      barcode: '7891000140128',
-      imei: '',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 5,
-      minQty: 2,
-      cost: 3200,
-      price: 3899,
-    }),
-    variantSku({
-      id: 'STK-14-256',
-      name: 'iPhone 14',
-      sku: 'APL-14-256',
-      barcode: '7891000140256',
-      imei: '',
-      color: 'Preto',
-      capacity: '256 GB',
-      qty: 3,
-      minQty: 1,
-      cost: 3700,
-      price: 4499,
-    }),
-    variantSku({
-      id: 'STK-13-128',
-      name: 'iPhone 13',
-      sku: 'APL-13-128',
-      barcode: '7891000130128',
-      imei: '',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 4,
-      minQty: 2,
-      cost: 2800,
-      price: 3400,
-    }),
-    variantSku({
-      id: 'STK-13-256',
-      name: 'iPhone 13',
-      sku: 'APL-13-256',
-      barcode: '7891000130256',
-      imei: '',
-      color: 'Preto',
-      capacity: '256 GB',
-      qty: 2,
-      minQty: 1,
-      cost: 3200,
-      price: 3899,
-    }),
-    variantSku({
-      id: 'STK-12-64',
-      name: 'iPhone 12',
-      sku: 'APL-12-64',
-      barcode: '7891000120064',
-      imei: '',
-      color: 'Preto',
-      capacity: '64 GB',
-      qty: 3,
-      minQty: 1,
-      cost: 2100,
-      price: 2799,
-    }),
-    variantSku({
-      id: 'STK-12-128',
-      name: 'iPhone 12',
-      sku: 'APL-12-128',
-      barcode: '7891000120128',
-      imei: '',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 3,
-      minQty: 1,
-      cost: 2400,
-      price: 3199,
-    }),
-    variantSku({
-      id: 'STK-11-64',
-      name: 'iPhone 11',
-      sku: 'APL-11-64',
-      barcode: '7891000110064',
-      imei: '',
-      color: 'Preto',
-      capacity: '64 GB',
-      qty: 4,
-      minQty: 1,
-      cost: 1700,
-      price: 2299,
-    }),
-    variantSku({
-      id: 'STK-11-128',
-      name: 'iPhone 11',
-      sku: 'APL-11-128',
-      barcode: '7891000110128',
-      imei: '',
-      color: 'Preto',
-      capacity: '128 GB',
-      qty: 3,
-      minQty: 1,
-      cost: 2000,
-      price: 2699,
-    }),
-    variantSku({
-      id: 'STK-RN13',
-      name: 'Redmi Note 13 Pro',
-      sku: 'XIA-RN13-256',
-      barcode: '7892000130256',
-      imei: '',
-      color: 'Preto',
-      capacity: '256 GB',
-      qty: 12,
-      minQty: 4,
-      cost: 1650,
-      price: 2199,
-    }),
-    variantSku({
-      id: 'STK-RN13-512',
-      name: 'Redmi Note 13 Pro',
-      sku: 'XIA-RN13-512',
-      barcode: '7892000130512',
-      imei: '',
-      color: 'Preto',
-      capacity: '512 GB',
-      qty: 5,
-      minQty: 2,
-      cost: 1950,
-      price: 2599,
-    }),
-  ];
+function withoutDemoTotemStock<T extends { id: string }>(items: T[]) {
+  return items.filter((item) => !DEMO_TOTEM_STOCK_IDS.has(item.id));
 }
 
 function seed(): AdminState {
@@ -509,7 +286,7 @@ function seed(): AdminState {
         createdAt: new Date().toISOString(),
       },
     ],
-    stock: seedStock(),
+    stock: [],
     orders: [],
     finance: [
       {
@@ -532,7 +309,9 @@ function normalizeStock(item: StockItem): StockItem {
   if (!attrs[ATTR_CAP] && item.capacity) attrs[ATTR_CAP] = item.capacity;
   const looksLikeDevice = Boolean(item.imei || item.capacity || /iphone|redmi|galaxy|notebook/i.test(item.name));
   const images = Array.isArray(item.images)
-    ? item.images.map((url) => String(url).trim()).filter(Boolean)
+    ? item.images
+        .map((url) => String(url).trim())
+        .filter((url) => Boolean(url) && !url.startsWith('/totem/'))
     : [];
   const cost = Number(item.cost) || 0;
   const qty = Math.max(0, Number(item.qty) || 0);
@@ -564,7 +343,7 @@ function normalizeStock(item: StockItem): StockItem {
     unit: item.unit === 'KG' ? 'KG' : 'UN',
     sourceWorkOrderId: item.sourceWorkOrderId,
     showOnTotem: item.showOnTotem ?? looksLikeDevice,
-    images: images.length ? images : defaultImagesForName(item.name),
+    images,
     supplierId: item.supplierId ?? '',
     fiscalClassificationId: item.fiscalClassificationId ?? '',
     warehouseId: item.warehouseId ?? '',
@@ -573,27 +352,9 @@ function normalizeStock(item: StockItem): StockItem {
   };
 }
 
-function defaultImagesForName(name: string): string[] {
-  const slug = name.toLowerCase();
-  const map: { test: RegExp; folder: string; count: number }[] = [
-    { test: /16 pro max/, folder: 'iphone-16-pro-max', count: 5 },
-    { test: /16 pro/, folder: 'iphone-16-pro', count: 4 },
-    { test: /iphone 15/, folder: 'iphone-15', count: 4 },
-    { test: /iphone 14/, folder: 'iphone-14', count: 4 },
-    { test: /iphone 13/, folder: 'iphone-13', count: 4 },
-    { test: /iphone 12/, folder: 'iphone-12', count: 3 },
-    { test: /iphone 11/, folder: 'iphone-11', count: 3 },
-    { test: /redmi|note 13/, folder: 'redmi-note-13', count: 4 },
-  ];
-  const hit = map.find((item) => item.test.test(slug));
-  if (!hit) return [];
-  return Array.from({ length: hit.count }, (_, index) => `/totem/${hit.folder}/${index + 1}.svg`);
-}
-
 export function stockItemImages(item: Pick<StockItem, 'name' | 'images'> | null | undefined) {
-  if (!item) return [] as string[];
-  if (item.images?.length) return item.images;
-  return defaultImagesForName(item.name);
+  if (!item?.images?.length) return [] as string[];
+  return item.images;
 }
 
 function normalizeFinance(entry: FinanceEntry): FinanceEntry {
@@ -627,7 +388,7 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
   const base = seed();
   return {
     customers: (parsed.customers ?? base.customers).map(normalizeCustomer),
-    stock: (parsed.stock ?? base.stock).map(normalizeStock),
+    stock: withoutDemoTotemStock(parsed.stock ?? []).map(normalizeStock),
     orders: (parsed.orders ?? []).map((order) => ({
       ...order,
       sellerId: order.sellerId ?? '',
@@ -664,11 +425,11 @@ function load(): AdminState {
       return fresh;
     }
     const next = hydrate(parsed);
-    // Não injeta mais aparelhos demo (seedStock) no localStorage.
+    const hadDemoStock = (parsed.stock ?? []).some((item) => DEMO_TOTEM_STOCK_IDS.has(item.id));
     const stockNeedsCodes = (parsed.stock ?? []).some(
       (item) => item.barcode === undefined || item.imei === undefined,
     );
-    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes) {
+    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes || hadDemoStock) {
       save(next);
     }
     return next;

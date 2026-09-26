@@ -1,4 +1,4 @@
-import { getAdminState, type StockItem } from './adminStore';
+import type { StockItem } from './adminStore';
 import {
   getAttributes,
   stockAttributes,
@@ -36,7 +36,7 @@ function varyingStockAttrs(rows: StockItem[], attrs: ProductAttribute[]) {
 export function findStockVariant(
   productName: string,
   config: Record<string, string>,
-  stock = getAdminState().stock,
+  stock: StockItem[] = [],
   attrs = stockAttributes(),
 ): StockItem | null {
   const rows = stock.filter((item) => namesMatch(item.name, productName));
@@ -73,8 +73,8 @@ export function quoteTotemVariant(
   productName: string,
   fallbackPrice: number,
   config: Record<string, string>,
+  stock: StockItem[] = [],
 ): VariantQuote {
-  const stock = getAdminState().stock;
   const stockAttrs = stockAttributes();
   const attrs = getAttributes().filter((item) => item.active);
   const matched = findStockVariant(productName, config, stock, stockAttrs);
@@ -100,7 +100,8 @@ export function quoteFromPicked(
   productName: string,
   fallbackPrice: number,
   picked: { id: string; value: string }[],
+  stock: StockItem[] = [],
 ) {
   const config = Object.fromEntries(picked.map((item) => [item.id, item.value]));
-  return quoteTotemVariant(productName, fallbackPrice, config);
+  return quoteTotemVariant(productName, fallbackPrice, config, stock);
 }

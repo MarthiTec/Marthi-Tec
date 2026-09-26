@@ -45,7 +45,7 @@ import {
   type TotemBrand,
   type TotemProduct,
 } from './totemData';
-import { listTotemCatalog, loadTotemCatalog } from './totemCatalog';
+import { listTotemCatalog, listTotemStock, loadTotemCatalog } from './totemCatalog';
 import './totem.css';
 
 const FILTER_IDLE_MS = 2 * 60 * 1000;
@@ -583,7 +583,7 @@ export function TotemPage() {
         value: config[TOTEM_DINE_ID] || TOTEM_DINE_OPTIONS[0],
       });
     }
-    const quote = quoteFromPicked(product.name, product.cashPrice, picked);
+    const quote = quoteFromPicked(product.name, product.cashPrice, picked, listTotemStock());
     setSelection({
       product,
       picked,
@@ -1040,7 +1040,7 @@ export function TotemPage() {
                 const pickers = cardAttrs
                   .filter((attr) => resolveTotemAttrOptions(product, attr).length > 0)
                   .slice(0, 5);
-                const quote = quoteTotemVariant(product.name, product.cashPrice, config);
+                const quote = quoteTotemVariant(product.name, product.cashPrice, config, listTotemStock());
                 return (
                   <article
                     key={product.id}

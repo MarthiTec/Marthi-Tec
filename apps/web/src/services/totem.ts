@@ -28,30 +28,21 @@ function shouldSendToKitchen() {
 }
 
 export async function submitTotemLead(payload: TotemLeadRequest) {
-  let customerNotified = false;
-  let ticketId: string;
-
-  try {
-    const result = await apiSubmitTotemLead({
-      customerName: payload.customerName,
-      customerPhone: payload.customerPhone,
-      productName: payload.productName,
-      attributes: payload.attributes,
-      color: payload.color,
-      storage: payload.storage,
-      fulfillment: payload.fulfillment,
-      payment: payload.payment,
-      installment: payload.installment,
-      priceLabel: payload.priceLabel,
-    });
-    ticketId = result.id;
-    customerNotified = Boolean(result.customerNotified);
-    enqueueTotemLead({ ...payload, source: 'totem', id: ticketId });
-  } catch {
-    const ticket = enqueueTotemLead(payload);
-    ticketId = ticket.id;
-    customerNotified = false;
-  }
+  const result = await apiSubmitTotemLead({
+    customerName: payload.customerName,
+    customerPhone: payload.customerPhone,
+    productName: payload.productName,
+    attributes: payload.attributes,
+    color: payload.color,
+    storage: payload.storage,
+    fulfillment: payload.fulfillment,
+    payment: payload.payment,
+    installment: payload.installment,
+    priceLabel: payload.priceLabel,
+  });
+  const ticketId = result.id;
+  const customerNotified = Boolean(result.customerNotified);
+  enqueueTotemLead({ ...payload, source: 'totem', id: ticketId });
 
   if (shouldSendToKitchen()) {
     try {

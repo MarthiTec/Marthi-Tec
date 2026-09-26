@@ -8,10 +8,7 @@ const outDir = resolve(__dirname, '../../dist/public');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootEnvDir, '');
-  const nestTarget = (env.VITE_API_URL || 'https://marthi-backend.discloud.app').replace(
-    /\/$/,
-    '',
-  );
+  const nestTarget = (env.VITE_API_URL || 'http://127.0.0.1:8080').replace(/\/$/, '');
 
   return {
     envDir: rootEnvDir,

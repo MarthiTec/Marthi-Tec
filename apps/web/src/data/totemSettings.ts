@@ -18,7 +18,7 @@ export type TotemSettings = {
   exitPassword: string;
   /**
    * true = totem usa o estoque do ERP (itens com “exibir no totem”).
-   * false = catálogo demo isolado do ERP.
+   * false = o totem não reaproveita o estoque do ERP.
    */
   shareStockWithErp: boolean;
   /** Ramo da loja: define o preset recomendado do totem. */
@@ -258,10 +258,10 @@ export const TOTEM_VERTICALS: {
       showInstallments: true,
       showBrandFilters: true,
       previewItems: [
-        { name: 'iPhone 16', price: 'R$ 6.290' },
-        { name: 'iPhone 15', price: 'R$ 4.499' },
-        { name: 'iPhone 14', price: 'R$ 3.899' },
-        { name: 'Redmi Note', price: 'R$ 1.899' },
+        { name: 'Produto 1', price: 'R$ 0,00' },
+        { name: 'Produto 2', price: 'R$ 0,00' },
+        { name: 'Produto 3', price: 'R$ 0,00' },
+        { name: 'Produto 4', price: 'R$ 0,00' },
       ],
     },
   },

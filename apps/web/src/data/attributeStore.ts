@@ -259,7 +259,7 @@ export function productAttrValues(
     return product.storages;
   }
   if (name.includes('retir') || attr.id === ATTR_RET) {
-    return product.attrs?.[attr.id] ?? ['Pronta entrega', 'Por encomenda'];
+    return product.attrs?.[attr.id] ?? [];
   }
   return [];
 }

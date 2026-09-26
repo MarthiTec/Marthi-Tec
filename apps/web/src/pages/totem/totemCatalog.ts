@@ -2,15 +2,11 @@ import {
   stockItemImages,
   type StockItem,
 } from '../../data/adminStore';
-import { ATTR_CAP, ATTR_COR, ATTR_RET, totemAttributes } from '../../data/attributeStore';
+import { ATTR_CAP, ATTR_COR } from '../../data/attributeStore';
 import { formatInstallment } from '../../data/variantQuote';
 import { apiGetTotemCatalog, apiListStock } from '../../services/erpApi';
 import { isNestAuthed } from '../../services/nestClient';
-import {
-  FULFILLMENT_OPTIONS,
-  type TotemBrand,
-  type TotemProduct,
-} from './totemData';
+import { type TotemBrand, type TotemProduct } from './totemData';
 
 /** Cache em memória do último catálogo Nest (nunca seed localStorage). */
 let catalogStockCache: StockItem[] = [];
@@ -26,7 +22,8 @@ function stableId(name: string) {
 function guessBrand(name: string): TotemBrand {
   const slug = name.toLowerCase();
   if (slug.includes('xiaomi') || slug.includes('redmi')) return 'xiaomi';
-  return 'apple';
+  if (slug.includes('iphone') || slug.includes('apple')) return 'apple';
+  return 'other';
 }
 
 function pushUnique(map: Record<string, string[]>, key: string, value: string) {
@@ -48,18 +45,6 @@ function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
     pushUnique(attrs, ATTR_CAP, row.capacity || row.attrs?.[ATTR_CAP] || '');
   }
 
-  for (const attr of totemAttributes()) {
-    if (attr.id === ATTR_RET) {
-      attrs[ATTR_RET] = [...FULFILLMENT_OPTIONS];
-    }
-  }
-  if (!attrs[ATTR_RET]?.length) {
-    attrs[ATTR_RET] = [...FULFILLMENT_OPTIONS];
-  }
-
-  if (!attrs[ATTR_COR]?.length) attrs[ATTR_COR] = ['—'];
-  if (!attrs[ATTR_CAP]?.length) attrs[ATTR_CAP] = ['—'];
-
   return attrs;
 }
 
@@ -78,8 +63,8 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
 
   return [...groups.entries()].map(([name, rows]) => {
     const attrs = buildTotemAttrs(rows);
-    const colors = attrs[ATTR_COR] ?? ['—'];
-    const storages = attrs[ATTR_CAP] ?? ['—'];
+    const colors = attrs[ATTR_COR] ?? [];
+    const storages = attrs[ATTR_CAP] ?? [];
     const priced = [...rows].sort((a, b) => a.price - b.price);
     const primary = priced[0];
     const images = rows
@@ -107,6 +92,11 @@ function rememberStock(items: StockItem[]) {
     attrs: { ...(item.attrs ?? {}) },
     images: [...(item.images ?? [])],
   }));
+}
+
+/** Estoque cru do último GET Nest — a cotação do card usa isto, não o seed local. */
+export function listTotemStock(): StockItem[] {
+  return catalogStockCache;
 }
 
 /** Sync: só cache Nest em memória — nunca adminStore/seed. */

@@ -291,15 +291,9 @@ export function HomePage() {
             </div>
             <div className="spotlight__stage" aria-hidden="true">
               <div className="spotlight__glow" />
-              <figure className="spotlight__device spotlight__device--back">
-                <img src="/totem/iphone-15/2.svg" alt="" />
-              </figure>
-              <figure className="spotlight__device spotlight__device--mid">
-                <img src="/totem/iphone-16-pro/1.svg" alt="" />
-              </figure>
-              <figure className="spotlight__device spotlight__device--front">
-                <img src="/totem/iphone-16-pro-max/3.svg" alt="" />
-              </figure>
+              <figure className="spotlight__device spotlight__device--back" />
+              <figure className="spotlight__device spotlight__device--mid" />
+              <figure className="spotlight__device spotlight__device--front" />
               <p className="spotlight__caption">Catálogo touch · lead na hora · painel da loja</p>
             </div>
           </div>
