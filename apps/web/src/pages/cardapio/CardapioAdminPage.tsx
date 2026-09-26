@@ -900,7 +900,7 @@ export function CardapioAdminPage() {
         </div>
 
         {/* Mockup do Celular à Direita (Live Preview) */}
-        <aside>
+        <aside className="cardapio-preview-aside">
           <div className="cardapio-phone-frame">
             <div className="cardapio-phone-notch" />
             <div className="cardapio-phone-screen">

@@ -9,11 +9,11 @@
 .cardapio-admin-wrap {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 20px;
-  max-width: 1400px;
+  gap: 18px;
+  padding: 10px 14px 28px;
+  max-width: 1260px;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   box-sizing: border-box;
 }
 
@@ -275,22 +275,37 @@
    -------------------------------------------------------------------------- */
 .cardapio-split-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 18px;
   align-items: start;
-  max-width: 100%;
+  max-width: 1220px;
   width: 100%;
   box-sizing: border-box;
 }
 
-@media (max-width: 1180px) {
+.cardapio-preview-aside {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 330px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-right: 6px;
+}
+
+@media (max-width: 1120px) {
   .cardapio-split-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+  .cardapio-preview-aside,
   .cardapio-split-layout > aside {
     display: flex;
     justify-content: center;
+    width: 100%;
+    max-width: 100%;
     margin-top: 16px;
+    padding-right: 0;
   }
 }
 
@@ -819,14 +834,15 @@
    -------------------------------------------------------------------------- */
 .cardapio-phone-frame {
   background: #111827;
-  border-radius: 36px;
-  padding: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25), 0 0 0 2px #374151;
+  border-radius: 32px;
+  padding: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25), 0 0 0 2px #374151;
   position: sticky;
-  top: 24px;
-  width: 100%;
-  max-width: 390px;
+  top: 20px;
+  width: 320px;
+  max-width: 100%;
   box-sizing: border-box;
+  margin: 0 auto 0 0;
 }
 
 .is-theme-dark .cardapio-phone-frame,
@@ -836,23 +852,64 @@
 
 .cardapio-phone-screen {
   background: #f9fafb;
-  border-radius: 26px;
-  height: 680px;
+  border-radius: 22px;
+  height: 640px;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
   scrollbar-width: thin;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cardapio-phone-notch {
-  width: 120px;
-  height: 18px;
+  width: 100px;
+  height: 15px;
   background: #111827;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 10px 10px;
   margin: 0 auto;
   position: sticky;
   top: 0;
   z-index: 50;
+}
+
+/* Otimização interna do preview do cardápio para caber perfeitamente no frame sem cortes */
+.cardapio-phone-screen .cardapio-page {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  box-shadow: none !important;
+  padding-bottom: 70px !important;
+}
+
+.cardapio-phone-screen .cardapio-item-card {
+  padding: 10px !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+}
+
+.cardapio-phone-screen .cardapio-item-img-wrap {
+  width: 76px !important;
+  height: 70px !important;
+  flex-shrink: 0 !important;
+}
+
+.cardapio-phone-screen .cardapio-item-name {
+  font-size: 0.92rem !important;
+}
+
+.cardapio-phone-screen .cardapio-item-desc {
+  font-size: 0.78rem !important;
+}
+
+.cardapio-phone-screen .cardapio-item-price {
+  font-size: 0.95rem !important;
+}
+
+.cardapio-phone-screen .cardapio-add-btn {
+  padding: 4px 8px !important;
+  font-size: 0.78rem !important;
 }
 
 /* --------------------------------------------------------------------------
