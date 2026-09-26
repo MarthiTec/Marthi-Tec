@@ -8439,3 +8439,1196 @@
   }
 }
 
+
+
+
+/* ==========================================================================
+   OS CONTROLES PRÉ-IMPRESSÃO & CONFIGURAÇÕES (NOVO MODELO COMERCIAL)
+   ========================================================================== */
+.os-print-controls-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.os-print-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.os-print-toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-right: 4px;
+}
+
+.os-print-toggle-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.os-print-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.os-print-toggle-btn.is-active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.os-print-pwd-quick-input {
+  width: 90px;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid #38bdf8;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 600;
+  outline: none;
+}
+
+.os-print-modal__btn-config {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.os-print-modal__btn-config:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ==========================================================================
+   MODELO COMERCIAL / NOTA FISCAL (Fiel ao modelo físico com 2 vias em 1 folha)
+   ========================================================================== */
+.os-commercial-sheet {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.2;
+}
+
+.os-comm-copy {
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #0f172a;
+  box-sizing: border-box;
+}
+
+.os-comm-copy--shop {
+  padding: 6px 10px;
+}
+
+.os-comm-copy--customer {
+  padding: 7px 10px;
+}
+
+/* 1. Cabeçalho */
+.os-comm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1.5px solid #0f172a;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+}
+
+.os-comm-header--compact {
+  padding-bottom: 3px;
+  margin-bottom: 4px;
+}
+
+.os-comm-header__brand {
+  flex: 0 0 160px;
+  display: flex;
+  align-items: center;
+}
+
+.os-comm-header__logo-img {
+  max-height: 44px;
+  max-width: 155px;
+  object-fit: contain;
+}
+
+.os-comm-header__logo-img--compact {
+  max-height: 34px;
+  max-width: 130px;
+}
+
+.os-comm-header__logo-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.os-comm-header__logo-badge--compact {
+  padding: 3px 8px;
+}
+
+.os-comm-header__logo-badge-top {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #22c55e;
+}
+
+.os-comm-header__logo-badge-mid {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #a3e635;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.os-comm-header__logo-badge-bot {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+
+.os-comm-header__info {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.os-comm-header__legal-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  margin: 0 0 1px 0;
+  letter-spacing: -0.2px;
+  color: #0f172a;
+}
+
+.os-comm-header__address {
+  font-size: 8.5px;
+  color: #334155;
+  margin: 0 0 1px 0;
+  line-height: 1.2;
+}
+
+.os-comm-header__contact-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 8.5px;
+  color: #1e293b;
+}
+
+.os-comm-header__email {
+  font-size: 8px;
+  color: #475569;
+  margin: 1px 0 0 0;
+}
+
+.os-comm-header__badge-wrap {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.os-comm-copy-tag {
+  display: inline-block;
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+.os-comm-copy-tag--shop {
+  background: #334155;
+}
+
+.os-comm-copy-tag--customer {
+  background: #0284c7;
+}
+
+.os-comm-copy-tag--warranty {
+  background: #065f46;
+  color: #ecfdf5;
+}
+
+/* 2. Grade de campos estilo documento fiscal */
+.os-comm-grid {
+  display: flex;
+  width: 100%;
+  border-left: 1px solid #0f172a;
+  border-top: 1px solid #0f172a;
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+
+.os-comm-cell {
+  display: flex;
+  flex-direction: column;
+  padding: 2.5px 5px;
+  border-right: 1px solid #0f172a;
+  border-bottom: 1px solid #0f172a;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.os-comm-cell--w15 { flex: 0 0 15%; max-width: 15%; }
+.os-comm-cell--w20 { flex: 0 0 20%; max-width: 20%; }
+.os-comm-cell--w25 { flex: 0 0 25%; max-width: 25%; }
+.os-comm-cell--w30 { flex: 0 0 30%; max-width: 30%; }
+.os-comm-cell--w35 { flex: 0 0 35%; max-width: 35%; }
+.os-comm-cell--w50 { flex: 0 0 50%; max-width: 50%; }
+.os-comm-cell--w55 { flex: 0 0 55%; max-width: 55%; }
+.os-comm-cell--flex1 { flex: 1 1 0; }
+
+.os-comm-cell--os-num {
+  text-align: center;
+  background: #f8fafc;
+  justify-content: center;
+}
+
+.os-comm-cell--pattern {
+  flex: 0 0 110px;
+  max-width: 110px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #fafafa;
+}
+
+.os-comm-cell--pattern-compact {
+  flex: 0 0 95px;
+  max-width: 95px;
+  padding: 2px;
+}
+
+.os-comm-label {
+  font-size: 7px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5px;
+}
+
+.os-comm-val {
+  font-size: 9.5px;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.os-comm-val--customer {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.os-comm-val--big-os {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: 1px;
+}
+
+.os-comm-val--total {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.os-comm-desc-text {
+  font-size: 9px;
+  line-height: 1.25;
+  margin: 1px 0 0 0;
+  color: #334155;
+}
+
+.os-comm-pwd-typed {
+  font-size: 9px;
+  margin-top: 2px;
+  color: #0f172a;
+}
+
+.os-comm-pwd-badge {
+  background: #e2e8f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+/* 3. Tabela Comercial de Serviços e Peças */
+.os-comm-table-wrap {
+  width: 100%;
+  border-left: 1px solid #0f172a;
+  border-top: 1px solid #0f172a;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.os-comm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+}
+
+.os-comm-table th {
+  background: #f1f5f9;
+  padding: 2.5px 5px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-right: 1px solid #0f172a;
+  border-bottom: 1px solid #0f172a;
+  color: #1e293b;
+}
+
+.os-comm-table td {
+  padding: 2.5px 5px;
+  border-right: 1px solid #0f172a;
+  border-bottom: 1px solid #0f172a;
+  vertical-align: middle;
+}
+
+.os-comm-table--compact td,
+.os-comm-table--compact th {
+  padding: 1.5px 4px;
+}
+
+.os-comm-totals-notes {
+  font-size: 8.5px;
+  color: #475569;
+}
+
+.os-comm-total-label {
+  font-size: 8.5px;
+  text-align: right;
+  background: #f8fafc;
+}
+
+.os-comm-total-val {
+  font-size: 9.5px;
+  text-align: right;
+  background: #f8fafc;
+}
+
+.os-comm-total-val--highlight {
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+/* 4. Barra de Pagamento */
+.os-comm-payment-strip {
+  display: flex;
+  border: 1px solid #0f172a;
+  border-top: none;
+  background: #ffffff;
+  padding: 2.5px 6px;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.os-comm-payment-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.os-comm-payment-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.os-comm-paid-badge {
+  font-size: 8.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 800;
+}
+
+.os-comm-paid-badge--yes {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.os-comm-paid-badge--no {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* 5. Termos & QR Code (Exclusivos da Via do Cliente) */
+.os-comm-terms-wrap {
+  display: flex;
+  gap: 8px;
+  border: 1px solid #0f172a;
+  border-top: none;
+  padding: 4px 6px;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.os-comm-terms-text {
+  flex: 1 1 auto;
+  font-size: 7.5px;
+  line-height: 1.25;
+  color: #334155;
+}
+
+.os-comm-terms-text p {
+  margin: 1px 0;
+  white-space: pre-line;
+}
+
+.os-comm-warranty-until {
+  font-size: 8.5px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: #0f172a;
+}
+
+.os-comm-declaration {
+  font-size: 7px;
+  font-style: italic;
+  color: #64748b;
+  display: block;
+  margin-top: 1px;
+}
+
+.os-comm-qr-box {
+  flex: 0 0 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3px;
+  border: 1px dashed #94a3b8;
+  border-radius: 4px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.os-comm-qr-label {
+  font-size: 6.5px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+
+/* 6. Assinaturas e Conferência de Retirada */
+.os-comm-signatures {
+  display: flex;
+  gap: 12px;
+  border: 1px solid #0f172a;
+  border-top: none;
+  padding: 6px 10px 3px 10px;
+  box-sizing: border-box;
+}
+
+.os-comm-signatures--shop {
+  align-items: stretch;
+  padding: 5px 8px 3px 8px;
+}
+
+.os-comm-sig-block {
+  flex: 1 1 0;
+  text-align: center;
+}
+
+.os-comm-sig-block--delivery {
+  flex: 1.4 1 0;
+}
+
+.os-comm-delivery-check-box {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.os-comm-delivery-fields {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 7.5px;
+  color: #334155;
+  margin: 3px 0;
+}
+
+.os-comm-sig-line {
+  border-top: 1px solid #0f172a;
+  margin-bottom: 2px;
+}
+
+.os-comm-sig-title {
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  display: block;
+}
+
+.os-comm-sig-sub {
+  font-size: 7px;
+  color: #64748b;
+  display: block;
+}
+
+/* 7. Rodapé */
+.os-comm-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 7px;
+  color: #64748b;
+  padding: 2px 2px 0 2px;
+}
+
+/* ==========================================================================
+   CONFIGURAÇÕES DRAWER (OsPrintSettingsDrawer)
+   ========================================================================== */
+.os-settings-drawer-backdrop {
+  z-index: 100002;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.os-settings-drawer-dialog {
+  background: #ffffff;
+  width: 100%;
+  max-width: 680px;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+  color: #0f172a;
+}
+
+.os-settings-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.os-settings-drawer__title-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.os-settings-drawer__title-box h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.os-settings-drawer__title-box p {
+  margin: 2px 0 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.os-settings-drawer__btn-close {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.os-settings-drawer__btn-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.os-settings-drawer__tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.os-settings-tab {
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.os-settings-tab:hover {
+  color: #0f172a;
+}
+
+.os-settings-tab.is-active {
+  color: #0284c7;
+  border-bottom-color: #0284c7;
+  background: #ffffff;
+}
+
+.os-settings-drawer__body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.os-settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.os-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.os-settings-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.os-settings-radio-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.os-radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: #ffffff;
+}
+
+.os-radio-card:hover {
+  border-color: #94a3b8;
+}
+
+.os-radio-card.is-selected {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.os-radio-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.os-radio-card__badge {
+  align-self: flex-start;
+  font-size: 9px;
+  font-weight: 800;
+  background: #0284c7;
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.os-radio-card__content strong {
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.os-radio-card__content p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.os-settings-select,
+.os-settings-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  box-sizing: border-box;
+}
+
+.os-settings-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.os-settings-toolbar-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.os-settings-hint {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.os-settings-logo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.os-settings-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.os-settings-logo-preview {
+  position: relative;
+  width: 100px;
+  height: 70px;
+  border: 2px dashed #94a3b8;
+  border-radius: 8px;
+  padding: 4px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.os-settings-logo-preview:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.os-settings-logo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.btn-remove-logo {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.os-settings-logo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: center;
+  padding: 2px;
+}
+
+.os-settings-logo-actions {
+  flex: 1 1 auto;
+}
+
+.os-settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.os-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.os-settings-field span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.os-settings-field input {
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  box-sizing: border-box;
+}
+
+.os-settings-span-2 {
+  grid-column: span 2;
+}
+
+.os-settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.os-settings-drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+/* ==========================================================================
+   TERMO DE GARANTIA MODAL (OsWarrantyModal)
+   ========================================================================== */
+.os-warranty-dialog {
+  max-width: 900px !important;
+}
+
+.os-warranty-config-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border-bottom: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.os-warranty-config-field label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.os-warranty-config-field input {
+  padding: 4px 8px;
+  border: 1px solid #86efac;
+  border-radius: 4px;
+  font-size: 0.84rem;
+}
+
+.os-warranty-config-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.os-warranty-config-items > span {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.os-warranty-config-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.os-warranty-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid #86efac;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.os-warranty-item-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.os-warranty-tag-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.os-warranty-days-input {
+  width: 44px;
+  padding: 1px 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.os-warranty-unit {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.btn-quick-day {
+  background: #e2e8f0;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  cursor: pointer;
+  color: #334155;
+}
+
+.btn-quick-day:hover {
+  background: #cbd5e1;
+}
+
+.os-warranty-sheet {
+  padding: 12px 16px;
+  border: 1.5px solid #0f172a;
+  background: #ffffff;
+}
+
+.os-warranty-table-section {
+  margin: 8px 0;
+}
+
+.os-warranty-section-title {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0 0 3px 0;
+  color: #0f172a;
+  letter-spacing: 0.04em;
+}
+
+.os-warranty-table th {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.os-comm-tag-kind {
+  font-size: 8px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.os-warranty-highlight-days {
+  color: #0369a1;
+  font-size: 10px;
+}
+
+.os-warranty-highlight-end {
+  color: #0f172a;
+  font-size: 10px;
+}
+
+.os-warranty-rules-wrap {
+  border-top: 1px solid #1e293b;
+  margin-top: 8px;
+}
+
+.os-warranty-legal-list {
+  margin: 3px 0 4px 14px;
+  padding: 0;
+  font-size: 7.5px;
+  line-height: 1.3;
+}
+
+.os-warranty-legal-list li {
+  margin-bottom: 2px;
+}
+
+.os-warranty-legal-list ul {
+  margin: 1px 0 1px 12px;
+  padding: 0;
+}
+
+.os-warranty-acceptance {
+  font-size: 8px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 4px;
+  padding: 3px 5px;
+  background: #f8fafc;
+  border-left: 3px solid #0f172a;
+}
+
+.os-warranty-qr-box {
+  flex: 0 0 88px;
+}
+
+/* ==========================================================================
+   CSS PRINT MEDIA (@media print) OVERRIDES — DUAS VIAS EM 1 PÁGINA A4
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 3mm 5mm !important;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .os-commercial-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+
+  .os-comm-section {
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  .os-comm-copy {
+    border: 1px solid #000000 !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  .os-comm-header {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    border-bottom: 1.5px solid #000000 !important;
+  }
+
+  .os-comm-grid,
+  .os-comm-cell,
+  .os-comm-table-wrap,
+  .os-comm-table th,
+  .os-comm-table td,
+  .os-comm-payment-strip,
+  .os-comm-terms-wrap,
+  .os-comm-signatures {
+    border-color: #000000 !important;
+  }
+
+  .os-comm-table th {
+    background: #e2e8f0 !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .os-comm-copy-tag {
+    background: #000000 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .os-print-cut-divider {
+    border-top: 1.5px dashed #000000 !important;
+    border-bottom: 1.5px dashed #000000 !important;
+    margin: 4px 0 !important;
+    padding: 2px 0 !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .os-warranty-sheet {
+    border: 1.5px solid #000000 !important;
+    page-break-inside: avoid !important;
+  }
+}

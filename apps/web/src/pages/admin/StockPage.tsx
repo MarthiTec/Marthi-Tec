@@ -541,7 +541,8 @@ export function StockPage() {
               onDeleteSelected={() => void removeSelected()}
               entityLabel="produtos"
             />
-            <table className="admin-table">
+            <div className="admin-table-container">
+              <table className="admin-table">
           <thead>
             <tr>
               <th className="admin-table__check">
@@ -555,8 +556,8 @@ export function StockPage() {
                 />
               </th>
               <th></th>
-              <th>Produto</th>
-              <th>SKU / barras / IMEI</th>
+              <th className="col-product">Produto</th>
+              <th className="col-sku">SKU / barras / IMEI</th>
               <th>Tipo</th>
               <th>Totem</th>
               <th>Variação</th>
@@ -565,7 +566,7 @@ export function StockPage() {
               <th>Custo méd.</th>
               <th>Preço</th>
               <th>Margem</th>
-              <th></th>
+              <th className="col-actions"></th>
             </tr>
           </thead>
           <tbody>
@@ -604,7 +605,7 @@ export function StockPage() {
                         '—'
                       )}
                     </td>
-                    <td>
+                    <td className="col-product">
                       <CrudNameButton onClick={() => openForm(item, 'view')}>{item.name}</CrudNameButton>
                       {item.condition === 'refurbished' ? (
                         <div className="empty">
@@ -618,10 +619,10 @@ export function StockPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td>
-                      {item.sku}
-                      {item.barcode ? ` · ${item.barcode}` : ''}
-                      {item.imei ? ` · IMEI ${item.imei}` : ''}
+                    <td className="col-sku">
+                      <div>{item.sku || '—'}</div>
+                      {item.barcode ? <div className="empty">{item.barcode}</div> : null}
+                      {item.imei ? <div className="empty">IMEI: {item.imei}</div> : null}
                     </td>
                     <td>
                       {STOCK_KIND_LABEL[item.kind]} · {STOCK_CONDITION_LABEL[item.condition]} ·{' '}
@@ -661,7 +662,8 @@ export function StockPage() {
             )}
           </tbody>
         </table>
-      </article>
+      </div>
+    </article>
         </>
       ) : null}
 

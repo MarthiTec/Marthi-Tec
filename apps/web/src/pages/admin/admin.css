@@ -825,9 +825,38 @@
   line-height: 1.45;
 }
 
+.admin-table-container,
+.admin-card > .admin-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  display: block;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 720px;
+}
+
+.admin-table th.col-sku,
+.admin-table td.col-sku {
+  min-width: 150px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.admin-table th.col-product,
+.admin-table td.col-product {
+  min-width: 180px;
+}
+
+.admin-table th.col-actions,
+.admin-table td.col-actions {
+  min-width: 110px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .admin-table th,
@@ -1313,10 +1342,11 @@
 }
 
 .admin-toolbar .admin-picker--compact {
-  align-self: stretch;
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 auto;
+  align-self: flex-end;
+  width: auto;
+  min-width: 130px;
+  max-width: 220px;
+  flex: 0 1 auto;
 }
 
 .stock-list-head {

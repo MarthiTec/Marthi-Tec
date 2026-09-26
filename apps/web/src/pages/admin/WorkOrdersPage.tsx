@@ -20,6 +20,7 @@ import { osHref, useOsBase } from '../os/osPaths';
 import { OsDetailModal } from '../os/OsDetailModal';
 import { OsNewModal } from '../os/OsNewModal';
 import { OsPrintModal } from '../os/OsPrintModal';
+import { OsWarrantyModal } from '../os/OsWarrantyModal';
 import { OsSprintModal } from '../os/OsSprintModal';
 import { OsTechnicianRoadmap } from '../os/OsTechnicianRoadmap';
 import { OsBacklogView } from '../os/OsBacklogView';
@@ -106,6 +107,7 @@ export function WorkOrdersPage() {
   const [sprintModalOpen, setSprintModalOpen] = useState(false);
   const [selectedDetailOrder, setSelectedDetailOrder] = useState<WorkOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<WorkOrder | null>(null);
+  const [warrantyOrder, setWarrantyOrder] = useState<WorkOrder | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Drag & drop
@@ -944,6 +946,16 @@ export function WorkOrdersPage() {
                             <AdminIcon name="print" />
                             <span>Imprimir</span>
                           </button>
+                          {(item.status === 'delivered' || item.status === 'ready') ? (
+                            <button
+                              type="button"
+                              className="btn btn--secondary btn--sm os-table-btn-warranty"
+                              onClick={() => setWarrantyOrder(item)}
+                              title="Imprimir Certificado de Garantia pós-entrega"
+                            >
+                              <span>📜 Garantia</span>
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -1086,6 +1098,12 @@ export function WorkOrdersPage() {
         order={printOrder}
         open={Boolean(printOrder)}
         onClose={() => setPrintOrder(null)}
+      />
+
+      <OsWarrantyModal
+        order={warrantyOrder}
+        open={Boolean(warrantyOrder)}
+        onClose={() => setWarrantyOrder(null)}
       />
 
       {/* Modal de Finalizar Sprint / Operação */}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { OsPrintModal } from './OsPrintModal';
+import { OsWarrantyModal } from './OsWarrantyModal';
 import { OsSimplifiedCheckoutModal } from './OsSimplifiedCheckoutModal';
 import { OsProductQuickModal } from './OsProductQuickModal';
 import { useAuth } from '../../contexts/AuthContext';
@@ -168,6 +169,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
   const [sMenuOpen, setSMenuOpen] = useState(false);
   // Modal de impressão de 2 vias
   const [printOpen, setPrintOpen] = useState(false);
+  const [warrantyOpen, setWarrantyOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -626,6 +628,16 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
             >
               <AdminIcon name="print" />
             </button>
+            {(order.status === 'delivered' || order.status === 'ready') ? (
+              <button
+                type="button"
+                className="os-jira-btn-icon"
+                title="Imprimir Termo de Garantia"
+                onClick={() => setWarrantyOpen(true)}
+              >
+                <span>📜</span>
+              </button>
+            ) : null}
             <button
               type="button"
               className="os-jira-btn-icon"
@@ -1797,6 +1809,22 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                       <span>🖨️ Imprimir OS (2 Vias)</span>
                       <kbd className="os-key-badge">Ctrl+P</kbd>
                     </button>
+                    {(order.status === 'delivered' || order.status === 'ready') ? (
+                      <button
+                        type="button"
+                        className="btn btn--sm os-jira-side-link os-jira-side-link--warranty"
+                        onClick={() => setWarrantyOpen(true)}
+                        title="Imprimir Certificado e Termo de Garantia por Peça/Serviço"
+                        style={{
+                          background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                          color: '#065f46',
+                          borderColor: '#a7f3d0',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>📜 Imprimir Garantia (Peças)</span>
+                      </button>
+                    ) : null}
                     <Link
                       to={`/os/${order.id}/relatorio`}
                       className="btn btn--sm btn--ghost os-jira-side-link"
@@ -1879,6 +1907,12 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
         order={order}
         open={printOpen}
         onClose={() => setPrintOpen(false)}
+      />
+
+      <OsWarrantyModal
+        order={order}
+        open={warrantyOpen}
+        onClose={() => setWarrantyOpen(false)}
       />
 
       <OsSimplifiedCheckoutModal

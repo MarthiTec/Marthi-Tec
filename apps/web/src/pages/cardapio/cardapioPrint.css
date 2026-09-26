@@ -319,8 +319,8 @@
   .erp-app__side,
   .admin-top,
   .admin-side,
-  nav,
-  header {
+  .cardapio-display-wrap nav,
+  .cardapio-display-wrap header {
     display: none !important;
   }
 
