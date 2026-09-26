@@ -37,8 +37,10 @@ import {
   listWarehouses,
 } from '../../data/fiscalCatalog';
 import { onStockChanged } from '../../data/ecommerceStore';
+import { refreshAdminSlices } from '../../data/erpBootstrap';
 import { hasCapability, isTotemCatalogPath } from '../../data/moduleCapabilities';
 import { fileToProductImage } from '../../data/operatorProfile';
+import { isNestAuthed } from '../../services/nestClient';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 type Mode = 'new' | 'edit' | 'view';
@@ -92,6 +94,11 @@ export function StockPage() {
     }
     window.addEventListener(ATTRIBUTES_EVENT, refreshAttrs);
     for (const event of REFRESH_EVENTS) window.addEventListener(event, refreshStock);
+
+    if (isNestAuthed()) {
+      void refreshAdminSlices(['stock']).catch(() => {});
+    }
+
     return () => {
       window.removeEventListener(ATTRIBUTES_EVENT, refreshAttrs);
       for (const event of REFRESH_EVENTS) window.removeEventListener(event, refreshStock);

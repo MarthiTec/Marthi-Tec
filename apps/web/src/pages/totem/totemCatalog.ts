@@ -114,7 +114,9 @@ export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: n
     const stock = isNestAuthed()
       ? await apiListStock().catch(() => apiGetTotemCatalog())
       : await apiGetTotemCatalog();
-    const forTotem = stock.filter((item) => item.showOnTotem !== false);
+    const forTotem = stock.filter(
+      (item) => item.showOnTotem === true,
+    );
     rememberStock(forTotem);
     return groupStockForTotem(forTotem);
   } catch (error) {

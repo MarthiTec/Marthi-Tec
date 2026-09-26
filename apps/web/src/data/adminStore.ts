@@ -19,7 +19,7 @@ import { isNestAuthed, NestApiError } from '../services/nestClient';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
-const STORAGE_KEY = 'marthi.admin.v1';
+const STORAGE_KEY = 'marthi.admin.v2';
 
 export type Customer = {
   id: string;
@@ -226,78 +226,12 @@ function seedPayments(): PaymentMethod[] {
   ];
 }
 
-const DEMO_TOTEM_STOCK_IDS = new Set([
-  'STK-16PM',
-  'STK-16PM-512',
-  'STK-16P',
-  'STK-16P-256',
-  'STK-15',
-  'STK-15-256',
-  'STK-14-128',
-  'STK-14-256',
-  'STK-13-128',
-  'STK-13-256',
-  'STK-12-64',
-  'STK-12-128',
-  'STK-11-64',
-  'STK-11-128',
-  'STK-RN13',
-  'STK-RN13-512',
-  'STK-DEMO-APARELHO',
-]);
-
-function withoutDemoTotemStock<T extends { id: string }>(items: T[]) {
-  return items.filter((item) => !DEMO_TOTEM_STOCK_IDS.has(item.id));
-}
-
 function seed(): AdminState {
   return {
-    customers: [
-      {
-        id: uid('CLI'),
-        name: 'Ana Souza',
-        phone: '(24) 99811-2200',
-        document: '123.456.789-00',
-        email: 'ana@email.com',
-        city: 'Três Rios',
-        zipCode: '',
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        state: 'RJ',
-        active: true,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: uid('CLI'),
-        name: 'Carlos Lima',
-        phone: '(24) 99200-1188',
-        document: '987.654.321-00',
-        email: 'carlos@email.com',
-        city: 'Três Rios',
-        zipCode: '',
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        state: 'RJ',
-        active: true,
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    customers: [],
     stock: [],
     orders: [],
-    finance: [
-      {
-        id: uid('FIN'),
-        type: 'in',
-        label: 'Saldo inicial de caixa',
-        amount: 2500,
-        createdAt: new Date().toISOString(),
-        source: 'manual',
-      },
-    ],
+    finance: [],
     priceTables: seedPriceTables(),
     payments: seedPayments(),
   };
@@ -388,7 +322,7 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
   const base = seed();
   return {
     customers: (parsed.customers ?? base.customers).map(normalizeCustomer),
-    stock: withoutDemoTotemStock(parsed.stock ?? []).map(normalizeStock),
+    stock: (parsed.stock ?? []).map(normalizeStock),
     orders: (parsed.orders ?? []).map((order) => ({
       ...order,
       sellerId: order.sellerId ?? '',
@@ -412,6 +346,7 @@ function load(): AdminState {
     };
   }
   try {
+    localStorage.removeItem('marthi.admin.v1');
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       const fresh = seed();
@@ -425,11 +360,10 @@ function load(): AdminState {
       return fresh;
     }
     const next = hydrate(parsed);
-    const hadDemoStock = (parsed.stock ?? []).some((item) => DEMO_TOTEM_STOCK_IDS.has(item.id));
     const stockNeedsCodes = (parsed.stock ?? []).some(
       (item) => item.barcode === undefined || item.imei === undefined,
     );
-    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes || hadDemoStock) {
+    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes) {
       save(next);
     }
     return next;
