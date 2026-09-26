@@ -167,7 +167,7 @@ export function StockBalancePage() {
 
             <div className="stock-inv-setup__body">
               <label className="admin-field stock-inv-field">
-                Título / Identificação do Balanço (opcional)
+                <span className="stock-inv-field__label">Título / Identificação do Balanço (opcional)</span>
                 <input
                   type="text"
                   value={balanceTitle}

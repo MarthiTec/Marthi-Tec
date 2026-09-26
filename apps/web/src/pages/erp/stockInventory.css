@@ -122,7 +122,120 @@
 .stock-inv-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--mute, #64748b);
+}
+
+.stock-inv-field__label {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--mute, #64748b);
+  margin-bottom: 4px;
+}
+
+.is-theme-dark .stock-inv-field__label,
+.admin--dark .stock-inv-field__label {
+  color: var(--mute, #94a3b8) !important;
+}
+
+.is-theme-dark .stock-inv-field,
+.admin--dark .stock-inv-field,
+.is-theme-dark .stock-inv-card label,
+.admin--dark .stock-inv-card label,
+.is-theme-dark .admin-field,
+.admin--dark .admin-field {
+  color: var(--mute, #94a3b8) !important;
+}
+
+.stock-inv-field input,
+.stock-inv-card input[type="text"],
+.stock-inv-card input[type="search"],
+.stock-inv input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: var(--card, #ffffff);
+  color: var(--ink, #0f172a);
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.is-theme-dark .stock-inv-field input,
+.admin--dark .stock-inv-field input,
+.is-theme-dark .stock-inv-card input,
+.admin--dark .stock-inv-card input,
+.is-theme-dark .stock-inv input[type="text"],
+.admin--dark .stock-inv input[type="text"],
+.is-theme-dark .admin-field input,
+.admin--dark .admin-field input {
+  background: #121820 !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+  color: #e8eef4 !important;
+}
+
+.is-theme-dark .stock-inv-field input:focus,
+.admin--dark .stock-inv-field input:focus,
+.is-theme-dark .stock-inv-card input:focus,
+.admin--dark .stock-inv-card input:focus,
+.is-theme-dark .admin-field input:focus,
+.admin--dark .admin-field input:focus {
+  border-color: #2dd4bf !important;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2) !important;
+}
+
+/* Títulos Universais do Balanço no Tema Escuro */
+.stock-inv h1,
+.stock-inv h2,
+.stock-inv h3,
+.stock-inv h4,
+.stock-inv-card h1,
+.stock-inv-card h2,
+.stock-inv-card h3,
+.stock-inv-card h4,
+.stock-inv-title {
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .stock-inv h1,
+.admin--dark .stock-inv h1,
+.is-theme-dark .stock-inv h2,
+.admin--dark .stock-inv h2,
+.is-theme-dark .stock-inv h3,
+.admin--dark .stock-inv h3,
+.is-theme-dark .stock-inv h4,
+.admin--dark .stock-inv h4,
+.is-theme-dark .stock-inv-card h1,
+.admin--dark .stock-inv-card h1,
+.is-theme-dark .stock-inv-card h2,
+.admin--dark .stock-inv-card h2,
+.is-theme-dark .stock-inv-card h3,
+.admin--dark .stock-inv-card h3,
+.is-theme-dark .stock-inv-card h4,
+.admin--dark .stock-inv-card h4,
+.is-theme-dark .stock-inv-title,
+.admin--dark .stock-inv-title {
+  color: var(--ink, #e8eef4) !important;
+}
+
+.stock-inv p,
+.stock-inv-card p,
+.stock-inv-subtitle {
+  color: var(--mute, #64748b);
+}
+
+.is-theme-dark .stock-inv p,
+.admin--dark .stock-inv p,
+.is-theme-dark .stock-inv-card p,
+.admin--dark .stock-inv-card p,
+.is-theme-dark .stock-inv-subtitle,
+.admin--dark .stock-inv-subtitle {
+  color: var(--mute, #94a3b8) !important;
 }
 
 .stock-inv-setup__row {

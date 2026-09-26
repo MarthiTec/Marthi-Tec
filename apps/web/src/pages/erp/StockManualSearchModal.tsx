@@ -191,11 +191,11 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
             </>
           ) : (
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                <strong style={{ fontSize: '1.05rem', color: '#0f172a', display: 'block' }}>
+              <div className="stock-inv-security-notice">
+                <strong style={{ fontSize: '1.05rem', color: 'var(--ink)', display: 'block' }}>
                   {selectedItem.name}
                 </strong>
-                <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: 4 }}>
+                <div style={{ fontSize: '0.84rem', color: 'var(--mute)', marginTop: 4 }}>
                   SKU: {selectedItem.sku || '—'} · Barras: {selectedItem.barcode || '—'} · Sistema: {selectedItem.systemQty} {selectedItem.unit}
                   {selectedItem.countedQty !== null ? ` · Já contado: ${selectedItem.countedQty} ${selectedItem.unit}` : ' · Ainda não contado'}
                 </div>

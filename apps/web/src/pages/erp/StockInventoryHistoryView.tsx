@@ -160,8 +160,8 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
         <div className="stock-inv-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>📜 Histórico de Balanços Realizados</h3>
-              <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+              <h3 className="stock-inv-title" style={{ margin: 0, fontSize: '1.1rem', color: 'var(--ink)' }}>📜 Histórico de Balanços Realizados</h3>
+              <p className="stock-inv-subtitle" style={{ margin: '4px 0 0', fontSize: '0.84rem', color: 'var(--mute)' }}>
                 {historyList.length} balanço(s) arquivado(s). Clique em um registro para visualizar a auditoria completa.
               </p>
             </div>
@@ -171,7 +171,7 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
               placeholder="Filtrar por código, título ou operador..."
-              style={{ width: '280px', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.88rem' }}
+              style={{ width: '280px', padding: '8px 12px', borderRadius: 8, fontSize: '0.88rem' }}
             />
           </div>
 
@@ -274,7 +274,7 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
                   ← Voltar ao Histórico
                 </button>
                 <span className="stock-inv-badge-code">{selectedAudit.code}</span>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>{selectedAudit.title}</h3>
+                <h3 className="stock-inv-title" style={{ margin: 0, fontSize: '1.2rem', color: 'var(--ink)' }}>{selectedAudit.title}</h3>
                 <span className={`stock-inv-status stock-inv-status--${selectedAudit.status}`}>
                   {selectedAudit.status === 'completed' ? 'Finalizado' : 'Cancelado'}
                 </span>
@@ -395,7 +395,7 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
 
           {/* Tabela de Itens Auditados */}
           <div className="stock-inv-card">
-            <h4 style={{ margin: '0 0 12px', fontSize: '1rem', color: '#0f172a' }}>
+            <h4 className="stock-inv-title" style={{ margin: '0 0 12px', fontSize: '1rem', color: 'var(--ink)' }}>
               Produtos Auditados nesta Contagem:
             </h4>
 

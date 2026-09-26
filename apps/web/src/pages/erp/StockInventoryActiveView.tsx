@@ -173,7 +173,7 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
         <div className="stock-inv-head">
           <div className="stock-inv-head__left">
             <span className="stock-inv-badge-code">{balance.code}</span>
-            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>{balance.title}</h3>
+            <h3 className="stock-inv-title" style={{ margin: 0, fontSize: '1.25rem', color: 'var(--ink)' }}>{balance.title}</h3>
             <span className="stock-inv-status stock-inv-status--progress">Em andamento</span>
             <span className={`stock-inv-sync stock-inv-sync--${balance.syncState}`}>
               {balance.syncState === 'synced' ? '🟢 Sincronizado' : '🟡 Salvo localmente (Offline)'}
@@ -477,7 +477,7 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
                             minWidth: '50px',
                             fontWeight: 700,
                             fontSize: '0.95rem',
-                            color: item.countedQty === null ? '#94a3b8' : '#0f172a',
+                            color: item.countedQty === null ? 'var(--mute)' : 'var(--ink)',
                           }}
                         >
                           {item.countedQty === null ? '—' : `${item.countedQty} ${item.unit}`}

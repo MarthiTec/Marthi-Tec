@@ -91,15 +91,28 @@
 
 .is-theme-dark input,
 .is-theme-dark select,
-.is-theme-dark textarea {
-  background: #121820;
-  border-color: rgba(148, 163, 184, 0.28);
-  color: #e8eef4;
+.is-theme-dark textarea,
+.admin--dark input,
+.admin--dark select,
+.admin--dark textarea,
+.is-theme-dark .admin-field input,
+.admin--dark .admin-field input,
+.is-theme-dark .admin-field select,
+.admin--dark .admin-field select,
+.is-theme-dark .admin-field textarea,
+.admin--dark .admin-field textarea,
+.is-theme-dark .stock-inv-field input,
+.admin--dark .stock-inv-field input {
+  background: #121820 !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+  color: #e8eef4 !important;
 }
 
 .is-theme-dark input::placeholder,
-.is-theme-dark textarea::placeholder {
-  color: #64748b;
+.is-theme-dark textarea::placeholder,
+.admin--dark input::placeholder,
+.admin--dark textarea::placeholder {
+  color: #64748b !important;
 }
 
 .is-theme-dark .admin-picker__caption {

@@ -171,9 +171,9 @@ export function StockTxtImportModal({ balance, isOpen, onClose, onImportComplete
           {report ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Total de Linhas</span>
-                  <strong style={{ fontSize: '1.2rem', color: '#0f172a' }}>{report.totalRows}</strong>
+                <div className="stock-inv-metric-card">
+                  <span style={{ fontSize: '0.75rem', color: 'var(--mute)', display: 'block' }}>Total de Linhas</span>
+                  <strong style={{ fontSize: '1.2rem', color: 'var(--ink)' }}>{report.totalRows}</strong>
                 </div>
 
                 <div style={{ padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8 }}>
