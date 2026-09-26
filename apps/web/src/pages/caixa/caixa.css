@@ -1642,3 +1642,276 @@
   background: #f8fafc;
   color: #0f172a;
 }
+
+/* ==========================================================================
+   PAINEL DE ORÇAMENTOS E PROPOSTAS COMERCIAIS (PDV)
+   ========================================================================== */
+.pdv-quotes-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  width: 100%;
+}
+
+.pdv-quotes-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--line, rgba(148, 163, 184, 0.2));
+  padding-bottom: 12px;
+}
+
+.pdv-quotes-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink, #e8eef4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdv-quotes-head .empty {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--mute, #94a3b8);
+}
+
+.pdv-quotes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.pdv-quotes-search {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--mute, #94a3b8);
+}
+
+.pdv-quotes-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #cbd5e1);
+  background: var(--card, #ffffff);
+  color: var(--ink, #0f172a);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.pdv-quotes-search input:focus {
+  border-color: var(--accent, #0284c7);
+}
+
+.is-theme-dark .pdv-quotes-search input,
+.admin--dark .pdv-quotes-search input {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--ink, #e8eef4);
+}
+
+.pdv-quotes-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.pdv-quotes-tab-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--line, #cbd5e1);
+  background: var(--card, #ffffff);
+  color: var(--mute, #64748b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.pdv-quotes-tab-btn:hover {
+  border-color: var(--accent, #0284c7);
+  color: var(--ink, #0f172a);
+}
+
+.pdv-quotes-tab-btn.is-active {
+  background: var(--accent, #0284c7) !important;
+  border-color: var(--accent, #0284c7) !important;
+  color: #ffffff !important;
+}
+
+.is-theme-dark .pdv-quotes-tab-btn,
+.admin--dark .pdv-quotes-tab-btn {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .pdv-quotes-tab-btn:hover,
+.admin--dark .pdv-quotes-tab-btn:hover {
+  border-color: var(--accent, #2dd4bf);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .pdv-quotes-tab-btn.is-active,
+.admin--dark .pdv-quotes-tab-btn.is-active {
+  background: var(--accent, #0284c7) !important;
+  border-color: var(--accent, #0284c7) !important;
+  color: #ffffff !important;
+}
+
+/* Badge de status compacta e refinada */
+.quote-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.quote-status-badge--draft {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.quote-status-badge--open {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.quote-status-badge--sent {
+  background: rgba(20, 184, 166, 0.15);
+  color: #14b8a6;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+}
+
+.quote-status-badge--approved {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.quote-status-badge--rejected,
+.quote-status-badge--expired {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.quote-status-badge--converted {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.quote-status-badge--cancelled {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Light mode overrides for badge */
+.caixa-app:not(.is-theme-dark) .quote-status-badge--open {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.caixa-app:not(.is-theme-dark) .quote-status-badge--sent {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
+.caixa-app:not(.is-theme-dark) .quote-status-badge--approved {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.caixa-app:not(.is-theme-dark) .quote-status-badge--expired,
+.caixa-app:not(.is-theme-dark) .quote-status-badge--rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.caixa-app:not(.is-theme-dark) .quote-status-badge--converted {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.caixa-app:not(.is-theme-dark) .quote-status-badge--cancelled {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+/* Valor total destacado e legível em qualquer tema */
+.quote-table-total {
+  color: var(--ink, #e8eef4) !important;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: block;
+}
+
+/* Ações na linha */
+.quote-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.quote-action-btn-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.2));
+  background: var(--card, rgba(255, 255, 255, 0.05));
+  color: var(--ink, #e8eef4);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quote-action-btn-icon:hover {
+  background: var(--card-2, rgba(255, 255, 255, 0.12));
+  border-color: var(--accent, #0284c7);
+  transform: translateY(-1px);
+}
+
+.is-theme-dark .quote-action-btn-icon,
+.admin--dark .quote-action-btn-icon {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .quote-action-btn-icon:hover,
+.admin--dark .quote-action-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent, #2dd4bf);
+}
+

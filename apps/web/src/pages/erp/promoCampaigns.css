@@ -1,0 +1,241 @@
+/* ==========================================================================
+   CAMPANHAS COMERCIAIS E DE DESCONTO (ERP)
+   Estilização completa para tema claro e tema escuro (.is-theme-dark / .admin--dark)
+   ========================================================================== */
+
+/* Badges de Tipo de Promoção */
+.promo-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  transition: all 0.15s ease;
+}
+
+/* Tipos Específicos */
+.promo-kind-badge--percent {
+  background: rgba(2, 132, 199, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.35);
+}
+
+.promo-kind-badge--fixed {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+}
+
+.promo-kind-badge--promo_price {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.promo-kind-badge--tier {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.promo-kind-badge--buy_x_pay_y {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.35);
+}
+
+.promo-kind-badge--gift {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
+/* Light Theme Overrides para Badges de Tipo */
+:root:not(.is-theme-dark) .promo-kind-badge--percent {
+  background: #f0f9ff;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+:root:not(.is-theme-dark) .promo-kind-badge--fixed {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border-color: #ddd6fe;
+}
+
+:root:not(.is-theme-dark) .promo-kind-badge--promo_price {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+:root:not(.is-theme-dark) .promo-kind-badge--tier {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: #fde68a;
+}
+
+:root:not(.is-theme-dark) .promo-kind-badge--buy_x_pay_y {
+  background: #fdf2f8;
+  color: #db2777;
+  border-color: #fbcfe8;
+}
+
+:root:not(.is-theme-dark) .promo-kind-badge--gift {
+  background: #ecfeff;
+  color: #0891b2;
+  border-color: #a5f3fc;
+}
+
+/* Badges de Status da Campanha */
+.promo-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.promo-status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.promo-status-badge--active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.promo-status-badge--active::before {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.promo-status-badge--inactive {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.promo-status-badge--inactive::before {
+  background: #64748b;
+}
+
+:root:not(.is-theme-dark) .promo-status-badge--active {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+:root:not(.is-theme-dark) .promo-status-badge--inactive {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* Alvo e Condição */
+.promo-target-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.promo-target-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink, #e8eef4);
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.2));
+}
+
+:root:not(.is-theme-dark) .promo-target-tag {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+/* Vigência e Prioridade */
+.promo-validity-wrap {
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.promo-validity-dates {
+  color: var(--ink, #e8eef4);
+  font-weight: 500;
+}
+
+.promo-validity-priority {
+  font-size: 0.74rem;
+  color: var(--mute, #94a3b8);
+}
+
+/* Benefício / Regra */
+.promo-benefit-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent, #10b981) !important;
+  display: block;
+}
+
+/* Formulário de Campanha - Seções e Divisores */
+.promo-form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink, #e8eef4);
+}
+
+.promo-form-section-desc {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: var(--mute, #94a3b8);
+}
+
+.promo-stock-item-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: var(--card-2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.2));
+  color: var(--ink, #e8eef4);
+}
+
+.promo-stock-item-remove {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.promo-stock-item-remove:hover {
+  transform: scale(1.2);
+}

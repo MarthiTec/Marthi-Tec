@@ -38,10 +38,16 @@ import {
 } from '../../data/cashSettings';
 import { listSellers, userIsStoreAdmin } from '../../data/erpRegistry';
 import {
-  applyTierTotal,
+  evaluateCampaignForLine,
   findCampaignsForStock,
   PROMO_EVENT,
 } from '../../data/promoCampaignStore';
+import {
+  markQuoteConverted,
+  POS_QUOTES_EVENT,
+  type PosQuote,
+} from '../../data/posQuotesStore';
+import { QuoteCommercialPrintModal } from '../../components/QuoteCommercialPrintModal';
 import { emitNfeFromSale, emitSaleCheckoutDocument, FISCAL_KIND_LABEL } from '../../data/fiscalDocuments';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
@@ -112,8 +118,12 @@ type CartLine = {
   lineDiscountMode: MoneyMode;
   lineSurcharge: number;
   lineSurchargeMode: MoneyMode;
-  /** Campanha aplicada (faixa / brinde). */
+  /** Se o preço unitário foi fixado (ex: carregado de Orçamento Comercial) */
+  isFrozenPrice?: boolean;
+  /** Campanha aplicada (faixa / brinde / regra). */
   promoLabel?: string;
+  promoExplanation?: string;
+  campaignId?: string;
 };
 
 function money(value: number) {
@@ -239,11 +249,66 @@ export function CaixaPage() {
   const [cashSettings, setCashSettings] = useState(() => getCashSettings());
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [linkedOsId, setLinkedOsId] = useState<string | null>(null);
+  const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null);
+  const [printQuote, setPrintQuote] = useState<PosQuote | null>(null);
   const location = useLocation();
 
+  function handleConvertQuoteToCart(quote: PosQuote, updatePrices: boolean) {
+    setLinkedQuoteId(quote.id);
+    const cartLines: CartLine[] = quote.lines.map((l, idx) => {
+      const stk = stock.find((s) => s.id === l.stockId);
+      const basePrice = updatePrices && stk ? stk.price : l.basePrice || l.unitPrice;
+      const unitPrice = updatePrices && stk ? stk.price : l.unitPrice;
+      return {
+        key: `quote-${quote.id}-${idx}-${Date.now()}`,
+        stockId: l.stockId || '',
+        name: l.name,
+        sku: l.sku || stk?.sku || '',
+        qty: l.qty || 1,
+        unit: (l.unit as StockUnit) || (stk?.unit as StockUnit) || 'UN',
+        basePrice,
+        unitPrice,
+        priceTableId: quote.priceTableId || '',
+        lineDiscount: updatePrices ? 0 : l.lineDiscount || 0,
+        lineDiscountMode: l.lineDiscountMode || 'money',
+        lineSurcharge: updatePrices ? 0 : l.lineSurcharge || 0,
+        lineSurchargeMode: l.lineSurchargeMode || 'money',
+        isFrozenPrice: !updatePrices,
+        promoLabel: updatePrices ? undefined : l.promoLabel,
+        imei: '',
+      };
+    });
+
+    setLines(cartLines);
+    if (quote.customerId) setCustomerId(quote.customerId);
+    if (quote.customerName) {
+      setCustomerName(quote.customerName);
+      setWalkIn(false);
+    }
+    if (quote.customerPhone) setCustomerPhone(quote.customerPhone);
+    if (quote.customerDocument) {
+      setCustomerCpf(formatCpf(quote.customerDocument));
+      setAskCpf(true);
+    }
+    if (quote.sellerId) setSellerId(quote.sellerId);
+    if (!updatePrices) {
+      setDiscount(quote.discount || 0);
+      setDiscountMode(quote.discountMode || 'money');
+      setSurcharge(quote.surcharge || 0);
+      setSurchargeMode(quote.surchargeMode || 'money');
+    } else {
+      setDiscount(0);
+      setSurcharge(0);
+    }
+
+    setMessage(`Orçamento #${quote.quoteNumber} carregado no PDV. Conclua a venda normalmente.`);
+  }
+
   useEffect(() => {
-    const osState = location.state as {
+    const navState = location.state as {
       osId?: string;
+      quote?: PosQuote;
+      updatePrices?: boolean;
       customerName?: string;
       customerPhone?: string;
       customerDocument?: string;
@@ -255,10 +320,16 @@ export function CaixaPage() {
       }>;
     } | null;
 
-    if (osState?.osId && osState.lines?.length) {
-      setLinkedOsId(osState.osId);
-      const cartLines: CartLine[] = osState.lines.map((l, idx) => ({
-        key: `os-${osState.osId}-${idx}-${Date.now()}`,
+    if (navState?.quote) {
+      handleConvertQuoteToCart(navState.quote, Boolean(navState.updatePrices));
+      window.history.replaceState({}, document.title);
+      return;
+    }
+
+    if (navState?.osId && navState.lines?.length) {
+      setLinkedOsId(navState.osId);
+      const cartLines: CartLine[] = navState.lines.map((l, idx) => ({
+        key: `os-${navState.osId}-${idx}-${Date.now()}`,
         stockId: l.stockId || '',
         name: l.name,
         sku: '',
@@ -274,18 +345,18 @@ export function CaixaPage() {
         imei: '',
       }));
       setLines(cartLines);
-      if (osState.customerName) {
-        setCustomerName(osState.customerName);
+      if (navState.customerName) {
+        setCustomerName(navState.customerName);
         setWalkIn(false);
       }
-      if (osState.customerPhone) {
-        setCustomerPhone(osState.customerPhone);
+      if (navState.customerPhone) {
+        setCustomerPhone(navState.customerPhone);
       }
-      if (osState.customerDocument) {
-        setCustomerCpf(osState.customerDocument);
+      if (navState.customerDocument) {
+        setCustomerCpf(navState.customerDocument);
         setAskCpf(true);
       }
-      setMessage(`Ordem de Serviço #${osState.osId} carregada no PDV para recebimento.`);
+      setMessage(`Ordem de Serviço #${navState.osId} carregada no PDV para recebimento.`);
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -325,10 +396,12 @@ export function CaixaPage() {
     window.addEventListener(CASH_SETTINGS_EVENT, sync);
     window.addEventListener('storage', sync);
     window.addEventListener(PROMO_EVENT, sync);
+    window.addEventListener(POS_QUOTES_EVENT, sync);
     return () => {
       window.removeEventListener(CASH_SETTINGS_EVENT, sync);
       window.removeEventListener('storage', sync);
       window.removeEventListener(PROMO_EVENT, sync);
+      window.removeEventListener(POS_QUOTES_EVENT, sync);
     };
   }, []);
 
@@ -346,22 +419,38 @@ export function CaixaPage() {
           tables.find((item) => item.id === line.priceTableId) ??
           tables.find((item) => item.id === defaultTableId) ??
           tables[0];
-        let unitPrice = applyPriceTable(line.basePrice, lineTable);
+
+        let unitPrice =
+          line.isFrozenPrice && line.unitPrice > 0
+            ? line.unitPrice
+            : applyPriceTable(line.basePrice, lineTable);
+
         let lineBase = Math.round(unitPrice * line.qty * 100) / 100;
-        let promoLabel = '';
-        const campaigns = findCampaignsForStock(line.stockId);
-        const tier = campaigns.find((item) => item.kind === 'tier' && item.tiers.length > 0);
-        if (tier) {
-          lineBase = applyTierTotal(line.qty, unitPrice, tier.tiers);
-          unitPrice = line.qty > 0 ? Math.round((lineBase / line.qty) * 100) / 100 : unitPrice;
-          promoLabel = tier.name;
+        let promoLabel = line.promoLabel || '';
+        let promoExplanation = line.promoExplanation || '';
+
+        if (!line.isFrozenPrice) {
+          const stk = stock.find((s) => s.id === line.stockId);
+          const evalResult = evaluateCampaignForLine(
+            {
+              id: line.stockId,
+              name: line.name,
+              sku: line.sku,
+              supplierId: stk?.supplierId,
+              attrs: stk?.attrs,
+            },
+            line.qty,
+            unitPrice,
+          );
+
+          if (evalResult.appliedCampaign) {
+            unitPrice = evalResult.unitPrice;
+            lineBase = evalResult.lineBaseTotal;
+            promoLabel = evalResult.promoLabel;
+            promoExplanation = evalResult.explanation || '';
+          }
         }
-        const gift = campaigns.find((item) => item.kind === 'gift');
-        if (gift && line.qty >= gift.giftMinQty) {
-          promoLabel = promoLabel
-            ? `${promoLabel} · ${gift.name}`
-            : `${gift.name} (brinde ≥${gift.giftMinQty})`;
-        }
+
         const disc = moneyAdj(lineBase, line.lineDiscount, line.lineDiscountMode);
         const sur = moneyAdj(lineBase, line.lineSurcharge, line.lineSurchargeMode);
         const lineTotal = Math.max(0, lineBase - disc + sur);
@@ -373,11 +462,71 @@ export function CaixaPage() {
           lineSurMoney: sur,
           lineTotal,
           promoLabel,
+          promoExplanation,
           tableName: lineTable?.name ?? '',
         };
       }),
-    [lines, tables, defaultTableId],
+    [lines, tables, defaultTableId, stock],
   );
+
+  const activeQuoteDraft = useMemo(() => {
+    const saleTable =
+      tables.find((item) => item.id === defaultTableId) ?? tables[0];
+    return {
+      lines: pricedLines.map((l) => ({
+        stockId: l.stockId,
+        sku: l.sku,
+        name: l.name,
+        unit: l.unit,
+        qty: l.qty,
+        basePrice: l.basePrice,
+        unitPrice: l.unitPrice,
+        lineDiscount: l.lineDiscount,
+        lineDiscountMode: l.lineDiscountMode,
+        lineSurcharge: l.lineSurcharge,
+        lineSurchargeMode: l.lineSurchargeMode,
+        total: l.lineTotal,
+        promoLabel: l.promoLabel,
+        campaignId: l.campaignId,
+      })),
+      customerId,
+      customerName: walkIn || !customerName.trim() ? '' : customerName.trim(),
+      customerPhone: walkIn ? '' : customerPhone.trim(),
+      customerCpf: askCpf ? onlyDigits(customerCpf) : '',
+      sellerId: seller?.id,
+      sellerName: seller?.name,
+      priceTableName: saleTable?.name || 'Padrão',
+      priceTableId: saleTable?.id || '',
+      discount,
+      discountMode,
+      surcharge,
+      surchargeMode,
+      subtotal: pricedLines.reduce((sum, line) => sum + line.lineBase, 0),
+      total: Math.max(
+        0,
+        pricedLines.reduce((sum, line) => sum + line.lineBase, 0) -
+          (moneyAdj(pricedLines.reduce((sum, line) => sum + line.lineBase, 0), discount, discountMode) +
+            pricedLines.reduce((sum, line) => sum + line.lineDiscMoney, 0)) +
+          (moneyAdj(pricedLines.reduce((sum, line) => sum + line.lineBase, 0), surcharge, surchargeMode) +
+            pricedLines.reduce((sum, line) => sum + line.lineSurMoney, 0)),
+      ),
+    };
+  }, [
+    pricedLines,
+    customerId,
+    walkIn,
+    customerName,
+    customerPhone,
+    askCpf,
+    customerCpf,
+    seller,
+    defaultTableId,
+    tables,
+    discount,
+    discountMode,
+    surcharge,
+    surchargeMode,
+  ]);
 
   const subtotal = pricedLines.reduce((sum, line) => sum + line.lineBase, 0);
   const itemsDiscount = pricedLines.reduce((sum, line) => sum + line.lineDiscMoney, 0);
@@ -743,6 +892,10 @@ export function CaixaPage() {
         );
         setLinkedOsId(null);
       }
+      if (linkedQuoteId) {
+        void markQuoteConverted(linkedQuoteId, order?.id || '', user?.name || operatorName);
+        setLinkedQuoteId(null);
+      }
       setLastOrderId(order?.id ?? null);
       setLastOrderAmount(saleTotal);
       setLastChange(saleChange);
@@ -895,6 +1048,11 @@ export function CaixaPage() {
       if (event.key === 'F2') {
         event.preventDefault();
         finishRef.current();
+        return;
+      }
+      if (event.altKey && (key === 'o' || key === 'O')) {
+        event.preventDefault();
+        openPanelRef.current('quotes');
         return;
       }
       if (event.key === 'F3') {
@@ -1366,6 +1524,10 @@ export function CaixaPage() {
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
           </button>
+          <button type="button" onClick={() => openPanel('quotes')} title="Consultar orçamentos comerciais (Alt+O)">
+            <kbd>Alt+O</kbd>
+            <span>Orçamentos</span>
+          </button>
           <button type="button" onClick={() => openPanel('canceled')}>
             <kbd>Alt+E</kbd>
             <span>Estorno (24h)</span>
@@ -1600,7 +1762,23 @@ export function CaixaPage() {
                                 {line.imei ? ` · IMEI ${line.imei}` : ''}
                                 {` · ${line.unit}`}
                                 {line.tableName ? ` · ${line.tableName}` : ''}
-                                {line.promoLabel ? ` · ${line.promoLabel}` : ''}
+                                {line.promoLabel ? (
+                                  <span
+                                    style={{
+                                      marginLeft: '0.4rem',
+                                      background: '#ecfdf5',
+                                      color: '#047857',
+                                      padding: '0.1rem 0.4rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      border: '1px solid #a7f3d0',
+                                    }}
+                                    title={line.promoExplanation || line.promoLabel}
+                                  >
+                                    ✨ {line.promoLabel}
+                                  </span>
+                                ) : null}
                                 {line.lineDiscMoney > 0 || line.lineSurMoney > 0
                                   ? ` · adj. ${money(line.lineSurMoney - line.lineDiscMoney)}`
                                   : ''}
@@ -1709,7 +1887,20 @@ export function CaixaPage() {
                               title="Preço base (antes da tabela)"
                             />
                           ) : (
-                            money(line.unitPrice)
+                            <div>
+                              {line.promoLabel && line.unitPrice < line.basePrice ? (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ textDecoration: 'line-through', fontSize: '0.74rem', color: '#94a3b8' }}>
+                                    {money(line.basePrice)}
+                                  </span>
+                                  <span style={{ color: '#059669', fontWeight: 700 }}>
+                                    {money(line.unitPrice)}
+                                  </span>
+                                </div>
+                              ) : (
+                                money(line.unitPrice)
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="price-red">{money(line.lineTotal)}</td>
@@ -2033,6 +2224,16 @@ export function CaixaPage() {
                 ? `Falta ${money(paySummary.remaining)}`
                 : 'F2 · Confirmar venda'}
             </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ background: '#0284c7', borderColor: '#0369a1', color: '#fff', fontWeight: 600 }}
+              onClick={() => openPanel('save_quote')}
+              disabled={!pricedLines.length}
+              title="Salvar itens do carrinho como proposta/orçamento comercial"
+            >
+              📝 Salvar Orçamento
+            </button>
             {fiscalOn && lastOrderId ? (
               <button type="button" className="btn btn--ghost" onClick={() => emitFiscal(true)}>
                 <AdminIcon name="fiscal" />
@@ -2049,6 +2250,13 @@ export function CaixaPage() {
           operatorName={operatorName}
           cashSession={cashSession}
           exchangeOrderId={exchangeOrderId}
+          activeQuoteDraft={activeQuoteDraft}
+          onConvertQuoteToCart={handleConvertQuoteToCart}
+          onOpenPrintQuote={(q) => setPrintQuote(q)}
+          onQuoteSaved={(q) => {
+            setLines([]);
+            setPrintQuote(q);
+          }}
           onClose={() => {
             setPanel(null);
             setExchangeOrderId(null);
@@ -2071,6 +2279,14 @@ export function CaixaPage() {
           }}
         />
       ) : null}
+
+      <QuoteCommercialPrintModal
+        quote={printQuote}
+        open={Boolean(printQuote)}
+        onClose={() => setPrintQuote(null)}
+        operatorName={operatorName}
+        onConvertToSale={(q) => handleConvertQuoteToCart(q, false)}
+      />
 
       {deletePrompt ? (
         <div className="pdv__modal" role="dialog" aria-modal="true">

@@ -4,6 +4,19 @@ import { CrudIconButton } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
+  listPosQuotes,
+  createPosQuote,
+  duplicatePosQuote,
+  changeQuoteStatus,
+  deletePosQuote,
+  isQuoteExpired,
+  getQuoteSettings,
+  QUOTE_STATUS_LABEL,
+  POS_QUOTES_EVENT,
+  type PosQuote,
+  type PosQuoteStatus,
+} from '../../data/posQuotesStore';
+import {
   adjustStockQty,
   cancelPosSaleOrder,
   findStockByCode,
@@ -60,7 +73,7 @@ import {
   updateCashSettings,
   type CashSettings,
 } from '../../data/cashSettings';
-import { listEmployees, userIsStoreAdmin } from '../../data/erpRegistry';
+import { listEmployees, listSellers, userIsStoreAdmin } from '../../data/erpRegistry';
 import { lookupCep, maskCep } from '../../services/cep';
 import {
   cancelFiscalDocumentForSale,
@@ -175,7 +188,42 @@ export type CaixaPanel =
   | 'price'
   | 'customer'
   | 'settings'
+  | 'quotes'
+  | 'save_quote'
   | null;
+
+export type ActiveQuoteDraft = {
+  lines: Array<{
+    stockId: string;
+    sku: string;
+    name: string;
+    unit: string;
+    qty: number;
+    basePrice: number;
+    unitPrice: number;
+    lineDiscount: number;
+    lineDiscountMode: 'money' | 'percent';
+    lineSurcharge: number;
+    lineSurchargeMode: 'money' | 'percent';
+    total: number;
+    promoLabel?: string;
+    campaignId?: string;
+  }>;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerCpf?: string;
+  sellerId?: string;
+  sellerName?: string;
+  priceTableName?: string;
+  priceTableId?: string;
+  discount?: number;
+  discountMode?: 'money' | 'percent';
+  surcharge?: number;
+  surchargeMode?: 'money' | 'percent';
+  subtotal: number;
+  total: number;
+};
 
 type PanelProps = {
   panel: Exclude<CaixaPanel, null>;
@@ -188,6 +236,10 @@ type PanelProps = {
   onRefresh: () => void;
   onOpenExchange?: (orderId: string) => void;
   onCustomerCreated?: (customer: Customer) => void;
+  activeQuoteDraft?: ActiveQuoteDraft;
+  onConvertQuoteToCart?: (quote: PosQuote, updatePrices: boolean) => void;
+  onOpenPrintQuote?: (quote: PosQuote) => void;
+  onQuoteSaved?: (quote: PosQuote) => void;
 };
 
 export function CaixaPanelHost(props: PanelProps) {
@@ -208,6 +260,8 @@ export function CaixaPanelHost(props: PanelProps) {
         {panel === 'price' ? <PricePanel {...props} /> : null}
         {panel === 'customer' ? <CustomerQuickPanel {...props} /> : null}
         {panel === 'settings' ? <CashSettingsPanel {...props} /> : null}
+        {panel === 'quotes' ? <QuotesListPanel {...props} /> : null}
+        {panel === 'save_quote' ? <SaveQuotePanel {...props} /> : null}
       </div>
     </div>
   );
@@ -2803,3 +2857,561 @@ function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated }: Pan
     </form>
   );
 }
+
+/* =============================================================================
+   PAINEL: CONSULTA E GERENCIAMENTO DE ORÇAMENTOS NO PDV
+   ============================================================================= */
+function QuotesListPanel(props: PanelProps) {
+  const { onClose, onDone, onError, operatorName, onConvertQuoteToCart, onOpenPrintQuote } = props;
+  const [quotes, setQuotes] = useState<PosQuote[]>(() => listPosQuotes());
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'approved' | 'expired' | 'converted' | 'cancelled'>('all');
+  const [expiredPrompt, setExpiredPrompt] = useState<PosQuote | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setQuotes(listPosQuotes());
+    window.addEventListener(POS_QUOTES_EVENT, refresh);
+    return () => window.removeEventListener(POS_QUOTES_EVENT, refresh);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const now = Date.now();
+
+    return quotes.filter((q) => {
+      // Filtro de status
+      if (statusFilter === 'open' && q.status !== 'open' && q.status !== 'sent' && q.status !== 'pending_approval') return false;
+      if (statusFilter === 'approved' && q.status !== 'approved') return false;
+      if (statusFilter === 'expired' && q.status !== 'expired' && !isQuoteExpired(q, now)) return false;
+      if (statusFilter === 'converted' && q.status !== 'converted') return false;
+      if (statusFilter === 'cancelled' && q.status !== 'cancelled' && q.status !== 'rejected') return false;
+
+      // Busca textual
+      if (!needle) return true;
+      const haystack = `${q.quoteNumber} ${q.customerName} ${q.customerDocument} ${q.customerPhone} ${q.sellerName} ${q.notes} ${q.lines.map((l) => l.name).join(' ')}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [quotes, query, statusFilter]);
+
+  function handleConvert(q: PosQuote) {
+    if (isQuoteExpired(q)) {
+      setExpiredPrompt(q);
+      return;
+    }
+    if (onConvertQuoteToCart) {
+      onConvertQuoteToCart(q, false);
+      onClose();
+    }
+  }
+
+  function handleConfirmConvertExpired(updatePrices: boolean) {
+    if (!expiredPrompt || !onConvertQuoteToCart) return;
+    const target = expiredPrompt;
+    setExpiredPrompt(null);
+    onConvertQuoteToCart(target, updatePrices);
+    onClose();
+  }
+
+  function handleDuplicate(q: PosQuote) {
+    const res = duplicatePosQuote(q.id, operatorName);
+    if (res.ok) {
+      setQuotes(listPosQuotes());
+      onDone(`Orçamento duplicado com sucesso! Nova proposta nº ${res.quote.quoteNumber}`);
+    } else {
+      onError(res.error);
+    }
+  }
+
+  function handleStatusChange(q: PosQuote, nextStatus: PosQuoteStatus) {
+    const res = changeQuoteStatus(q.id, nextStatus, operatorName);
+    if (res.ok) {
+      setQuotes(listPosQuotes());
+      onDone(`Orçamento nº ${q.quoteNumber} alterado para "${QUOTE_STATUS_LABEL[nextStatus]}".`);
+    } else {
+      onError(res.error);
+    }
+  }
+
+  function handleDelete(q: PosQuote) {
+    if (!window.confirm(`Tem certeza que deseja excluir o orçamento nº ${q.quoteNumber}?`)) return;
+    const res = deletePosQuote(q.id);
+    if (res.ok) {
+      setQuotes(listPosQuotes());
+      onDone(`Orçamento nº ${q.quoteNumber} excluído.`);
+    } else {
+      onError(res.error);
+    }
+  }
+
+  return (
+    <div className="pdv-quotes-modal">
+      <header className="pdv-quotes-head">
+        <div>
+          <h2>📑 Orçamentos do PDV</h2>
+          <p className="empty">
+            Consulte propostas comerciais salvas, valide expiração, reimprima ou converta em venda no caixa.
+          </p>
+        </div>
+        <button type="button" className="btn btn--ghost" onClick={onClose} style={{ flexShrink: 0 }}>
+          ✕ Fechar
+        </button>
+      </header>
+
+      {/* FILTROS E BUSCA */}
+      <div className="pdv-quotes-filters">
+        <label className="pdv-quotes-search">
+          <span>Buscar orçamento</span>
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Nº da proposta, cliente, CPF, vendedor ou produto…"
+          />
+        </label>
+        <div className="pdv-quotes-tabs">
+          {(
+            [
+              ['all', 'Todos'],
+              ['open', 'Abertos'],
+              ['approved', 'Aprovados'],
+              ['expired', 'Expirados'],
+              ['converted', 'Convertidos'],
+              ['cancelled', 'Cancelados'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`pdv-quotes-tab-btn ${statusFilter === key ? 'is-active' : ''}`}
+              onClick={() => setStatusFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* TABELA DE ORÇAMENTOS */}
+      <div className="admin-table-container" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th style={{ width: '90px' }}>Nº Proposta</th>
+              <th style={{ width: '130px' }}>Emissão / Validade</th>
+              <th>Cliente</th>
+              <th style={{ width: '120px' }}>Vendedor</th>
+              <th style={{ width: '80px' }} className="text-right">Itens</th>
+              <th style={{ width: '120px' }} className="text-right">Valor Total</th>
+              <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
+              <th style={{ width: '220px' }} className="text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="empty" style={{ textAlign: 'center', padding: '2rem' }}>
+                  Nenhum orçamento encontrado para os critérios informados.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((q) => {
+                const expired = isQuoteExpired(q);
+                return (
+                  <tr key={q.id}>
+                    <td>
+                      <strong style={{ color: 'var(--accent, #0284c7)', fontFamily: 'monospace', fontSize: '0.92rem' }}>
+                        #{q.quoteNumber}
+                      </strong>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.82rem' }}>
+                        {new Date(q.createdAt).toLocaleDateString('pt-BR')}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.74rem',
+                          color: expired ? '#ef4444' : '#10b981',
+                          fontWeight: expired ? 700 : 500,
+                        }}
+                      >
+                        Até {new Date(q.expiresAt).toLocaleDateString('pt-BR')}
+                        {expired && ' (expirado)'}
+                      </div>
+                    </td>
+                    <td>
+                      <strong>{q.customerName || 'Consumidor Final'}</strong>
+                      {q.customerPhone ? (
+                        <div className="empty" style={{ fontSize: '0.75rem' }}>
+                          {q.customerPhone}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>{q.sellerName || '—'}</td>
+                    <td className="text-right" style={{ fontSize: '0.82rem' }}>
+                      {q.lines.length} {q.lines.length === 1 ? 'item' : 'itens'}
+                    </td>
+                    <td className="text-right">
+                      <strong className="quote-table-total">{money(q.total)}</strong>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className={`quote-status-badge quote-status-badge--${q.status}`}>
+                        {QUOTE_STATUS_LABEL[q.status]}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <div className="quote-row-actions">
+                        {q.status !== 'converted' && onConvertQuoteToCart ? (
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--sm"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => handleConvert(q)}
+                            title="Carregar itens e cliente no PDV para faturar"
+                          >
+                            🛒 Converter
+                          </button>
+                        ) : null}
+                        {onOpenPrintQuote ? (
+                          <button
+                            type="button"
+                            className="btn btn--secondary btn--sm"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => onOpenPrintQuote(q)}
+                            title="Visualizar e Imprimir proposta timbrada / WhatsApp"
+                          >
+                            📄 Proposta
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="quote-action-btn-icon"
+                          onClick={() => handleDuplicate(q)}
+                          title="Duplicar proposta comercial"
+                        >
+                          📋
+                        </button>
+                        {q.status === 'open' || q.status === 'sent' ? (
+                          <button
+                            type="button"
+                            className="quote-action-btn-icon"
+                            style={{ color: '#10b981' }}
+                            onClick={() => handleStatusChange(q, 'approved')}
+                            title="Marcar como Aprovado pelo cliente"
+                          >
+                            ✓
+                          </button>
+                        ) : null}
+                        {q.status !== 'converted' ? (
+                          <button
+                            type="button"
+                            className="quote-action-btn-icon"
+                            style={{ color: '#ef4444' }}
+                            onClick={() => handleDelete(q)}
+                            title="Excluir proposta"
+                          >
+                            🗑️
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* MODAL DE CONFIRMAÇÃO PARA ORÇAMENTO EXPIRADO */}
+      {expiredPrompt ? (
+        <div className="pdv__modal" style={{ zIndex: 10005 }} role="dialog" aria-modal="true">
+          <div className="pdv__modal-card" style={{ maxWidth: '480px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#be123c', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              ⚠️ Orçamento Expirado
+            </h3>
+            <p style={{ margin: '0.75rem 0', fontSize: '0.9rem', lineHeight: 1.5 }}>
+              O orçamento <strong>#{expiredPrompt.quoteNumber}</strong> expirou em{' '}
+              <strong>{new Date(expiredPrompt.expiresAt).toLocaleDateString('pt-BR')}</strong>. Os
+              preços unitários ou campanhas promocionais podem ter sofrido alterações no cadastro da loja.
+            </p>
+            <p style={{ margin: '0.5rem 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
+              Como deseja prosseguir para carregar a venda no PDV?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => handleConfirmConvertExpired(true)}
+              >
+                🔄 Atualizar com Preços e Promoções Atuais
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => handleConfirmConvertExpired(false)}
+              >
+                🔒 Manter Preços Originais da Proposta (Autorizado)
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                style={{ marginTop: '0.25rem' }}
+                onClick={() => setExpiredPrompt(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* =============================================================================
+   PAINEL: SALVAR ITENS DO CARRINHO COMO ORÇAMENTO NO PDV
+   ============================================================================= */
+function SaveQuotePanel(props: PanelProps) {
+  const { onClose, onDone, onError, operatorName, activeQuoteDraft, onQuoteSaved } = props;
+  const settings = useMemo(() => getQuoteSettings(), []);
+  const sellers = useMemo(() => listSellers(true), []);
+
+  const [customerName, setCustomerName] = useState(() => activeQuoteDraft?.customerName || '');
+  const [customerPhone, setCustomerPhone] = useState(() => activeQuoteDraft?.customerPhone || '');
+  const [customerDocument, setCustomerDocument] = useState(() => activeQuoteDraft?.customerCpf || '');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [sellerId, setSellerId] = useState(() => activeQuoteDraft?.sellerId || '');
+  const [validityDays, setValidityDays] = useState(settings.defaultValidityDays || 7);
+  const [deliveryTerm, setDeliveryTerm] = useState(settings.defaultDeliveryTerm || '');
+  const [paymentConditions, setPaymentConditions] = useState(settings.defaultPaymentConditions || '');
+  const [notes, setNotes] = useState(settings.defaultNotes || '');
+  const [saving, setSaving] = useState(false);
+
+  const lines = activeQuoteDraft?.lines || [];
+
+  if (!lines.length) {
+    return (
+      <div className="pdv__modal-form">
+        <header className="pdv__modal-head">
+          <h2>Salvar como Orçamento</h2>
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            ✕ Fechar
+          </button>
+        </header>
+        <p className="pdv__alert" style={{ margin: '2rem 0' }}>
+          O carrinho do PDV está vazio. Adicione pelo menos um produto antes de gerar um orçamento.
+        </p>
+        <div className="pdv__modal-actions">
+          <button type="button" className="btn btn--primary" onClick={onClose}>
+            Voltar ao PDV
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedSeller = sellers.find((s) => s.id === sellerId);
+  const sellerName = selectedSeller ? selectedSeller.name : operatorName;
+
+  const calculatedExpiresDate = new Date();
+  calculatedExpiresDate.setDate(calculatedExpiresDate.getDate() + Number(validityDays || 7));
+
+  function handleSave(e: FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+
+    try {
+      const created = createPosQuote({
+        customerId: activeQuoteDraft?.customerId,
+        customerName: customerName.trim() || 'Consumidor Final',
+        customerDocument: customerDocument.trim(),
+        customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail.trim(),
+        customerAddress: customerAddress.trim(),
+        sellerId,
+        sellerName,
+        validityDays: Number(validityDays) || 7,
+        priceTableName: activeQuoteDraft?.priceTableName || 'Padrão',
+        priceTableId: activeQuoteDraft?.priceTableId || '',
+        deliveryTerm: deliveryTerm.trim(),
+        paymentConditions: paymentConditions.trim(),
+        notes: notes.trim(),
+        discount: activeQuoteDraft?.discount || 0,
+        discountMode: activeQuoteDraft?.discountMode || 'money',
+        surcharge: activeQuoteDraft?.surcharge || 0,
+        surchargeMode: activeQuoteDraft?.surchargeMode || 'money',
+        lines: lines.map((l) => ({
+          stockId: l.stockId,
+          sku: l.sku,
+          name: l.name,
+          unit: l.unit,
+          qty: l.qty,
+          basePrice: l.basePrice,
+          unitPrice: l.unitPrice,
+          lineDiscount: l.lineDiscount,
+          lineDiscountMode: l.lineDiscountMode,
+          lineSurcharge: l.lineSurcharge,
+          lineSurchargeMode: l.lineSurchargeMode,
+          total: l.total,
+          promoLabel: l.promoLabel,
+          campaignId: l.campaignId,
+        })),
+        actorName: operatorName,
+      });
+
+      if (onQuoteSaved) {
+        onQuoteSaved(created);
+      }
+
+      onDone(`Orçamento nº ${created.quoteNumber} gerado com sucesso!`);
+      onClose();
+    } catch (err: any) {
+      onError(err?.message || 'Falha ao salvar orçamento comercial.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="pdv-quotes-modal" onSubmit={handleSave}>
+      <header className="pdv-quotes-head">
+        <div>
+          <h2>📝 Salvar Operação como Orçamento</h2>
+          <p className="empty">
+            Gera proposta comercial com numeração exclusiva e validade. Os preços negociados ficam congelados e o estoque não é baixado até a conversão.
+          </p>
+        </div>
+        <button type="button" className="btn btn--ghost" onClick={onClose} style={{ flexShrink: 0 }}>
+          ✕ Fechar
+        </button>
+      </header>
+
+      {/* DADOS COMERCIAIS */}
+      <div className="pdv__customer-form-grid" style={{ marginBottom: '1rem' }}>
+        <label>
+          Cliente / Razão Social
+          <input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Nome do cliente ou empresa"
+          />
+        </label>
+        <label>
+          CPF / CNPJ
+          <input
+            value={customerDocument}
+            onChange={(e) => setCustomerDocument(e.target.value)}
+            placeholder="000.000.000-00"
+          />
+        </label>
+        <label>
+          Telefone / WhatsApp
+          <input
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="(00) 00000-0000"
+          />
+        </label>
+        <label>
+          E-mail de Contato
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            placeholder="contato@cliente.com"
+          />
+        </label>
+        <label style={{ gridColumn: 'span 2' }}>
+          Endereço / Local de Entrega da Obra
+          <input
+            value={customerAddress}
+            onChange={(e) => setCustomerAddress(e.target.value)}
+            placeholder="Rua, número, bairro e cidade"
+          />
+        </label>
+      </div>
+
+      <div className="pdv__customer-form-grid" style={{ marginBottom: '1rem' }}>
+        <label>
+          Vendedor Responsável
+          <AdminPicker
+            value={sellerId}
+            onChange={(val) => setSellerId(val)}
+            options={[
+              { value: '', label: `Atendente atual (${operatorName})` },
+              ...sellers.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+        </label>
+        <label>
+          Validade da Proposta (Dias)
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={validityDays}
+            onChange={(e) => setValidityDays(Number(e.target.value) || 1)}
+          />
+          <span className="empty" style={{ fontSize: '0.74rem' }}>
+            Válido até: {calculatedExpiresDate.toLocaleDateString('pt-BR')}
+          </span>
+        </label>
+        <label>
+          Prazo de Entrega
+          <input
+            value={deliveryTerm}
+            onChange={(e) => setDeliveryTerm(e.target.value)}
+            placeholder="Ex: Imediato / 3 dias úteis"
+          />
+        </label>
+        <label>
+          Condições de Pagamento
+          <input
+            value={paymentConditions}
+            onChange={(e) => setPaymentConditions(e.target.value)}
+            placeholder="Ex: À vista Pix com 5% ou 12x cartão"
+          />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Observações / Escopo da Proposta
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Detalhes adicionais, garantias ou observações para o cliente..."
+          />
+        </label>
+      </div>
+
+      {/* RESUMO DOS ITENS */}
+      <div style={{ background: 'var(--card-2, rgba(255, 255, 255, 0.04))', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--line, rgba(148, 163, 184, 0.2))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontWeight: 600, color: 'var(--ink, #e8eef4)' }}>
+          <span>Itens ({lines.length} produtos / materiais):</span>
+          <span style={{ color: 'var(--accent, #10b981)' }}>Total: {money(activeQuoteDraft?.total || 0)}</span>
+        </div>
+        <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '0.82rem' }}>
+          {lines.map((l, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', borderBottom: '1px dashed var(--line, rgba(148, 163, 184, 0.15))', color: 'var(--ink, #e8eef4)' }}>
+              <span>
+                {l.qty} {l.unit} × {l.name}
+                {l.promoLabel ? <span style={{ color: 'var(--accent, #10b981)', marginLeft: '0.4rem', fontWeight: 600 }}>({l.promoLabel})</span> : null}
+              </span>
+              <strong>{money(l.total)}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pdv__modal-actions" style={{ marginTop: '1rem' }}>
+        <button type="button" className="btn btn--ghost" onClick={onClose} disabled={saving}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn--primary" disabled={saving}>
+          {saving ? 'Gravando proposta…' : '✓ Confirmar e Salvar Orçamento'}
+        </button>
+      </div>
+    </form>
+  );
+}
+

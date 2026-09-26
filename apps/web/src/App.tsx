@@ -31,6 +31,7 @@ import { ErpReportsPage } from './pages/erp/ErpReportsPage';
 import { StockBalancePage } from './pages/erp/StockBalancePage';
 import { StockMovementsPage } from './pages/erp/StockMovementsPage';
 import { PromoCampaignsPage } from './pages/erp/PromoCampaignsPage';
+import { QuotesManagementPage } from './pages/admin/QuotesManagementPage';
 import { CrmLayout } from './pages/crm/CrmLayout';
 import { CrmBoardPage } from './pages/crm/CrmBoardPage';
 import { CrmDealPage } from './pages/crm/CrmDealPage';
@@ -175,6 +176,7 @@ export function App() {
           <Route path="almoxarifado" element={<WarehousePage />} />
           <Route path="tabelas" element={<PriceTablesPage />} />
           <Route path="campanhas" element={<PromoCampaignsPage />} />
+          <Route path="orcamentos" element={<QuotesManagementPage />} />
           <Route path="clientes" element={<CustomersPage />} />
           <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="permissoes" element={<PermissionsPage />} />
@@ -212,6 +214,8 @@ export function App() {
           <Route path="lotes" element={<Navigate to="/erp/lotes" replace />} />
           <Route path="almoxarifado" element={<Navigate to="/erp/almoxarifado" replace />} />
           <Route path="tabelas" element={<Navigate to="/erp/tabelas" replace />} />
+          <Route path="campanhas" element={<Navigate to="/erp/campanhas" replace />} />
+          <Route path="orcamentos" element={<Navigate to="/erp/orcamentos" replace />} />
           <Route path="pagamentos" element={<PaymentsPage />} />
           <Route path="financeiro" element={<Navigate to="/erp/financeiro" replace />} />
           <Route path="vendedores" element={<Navigate to="/erp/vendedores" replace />} />

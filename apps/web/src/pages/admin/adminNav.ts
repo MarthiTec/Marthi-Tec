@@ -49,6 +49,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/caixa', label: 'Abrir caixa', openApp: true, accent: '#1d4ed8' },
       { to: '/painel/pdv', label: 'Fila do totem', end: true },
+      { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
     ],
