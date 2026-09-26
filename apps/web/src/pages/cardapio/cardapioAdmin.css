@@ -1,115 +1,395 @@
-/* Estilos do Editor Administrativo do Cardápio Digital (Retaguarda + Painel) */
+/* ==========================================================================
+   Editor Administrativo do Cardápio Digital (Retaguarda + Painel)
+   Tema Claro e Escuro (.is-theme-dark / .admin--dark) + Responsividade Mobile
+   ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   1. Layout Base e Container Principal
+   -------------------------------------------------------------------------- */
 .cardapio-admin-wrap {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 20px;
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
+/* Toast Notificação */
+.cardapio-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  background: #111827;
+  color: #ffffff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.is-theme-dark .cardapio-toast,
+.admin--dark .cardapio-toast {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   2. Cabeçalho da Página (Header Card)
+   -------------------------------------------------------------------------- */
 .cardapio-admin-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  background: var(--admin-card-bg, #ffffff);
+  background: var(--card, #ffffff);
   padding: 20px 24px;
   border-radius: 14px;
-  border: 1px solid var(--admin-border, #e5e7eb);
+  border: 1px solid var(--line, #e2e8f0);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+}
+
+.is-theme-dark .cardapio-admin-header,
+.admin--dark .cardapio-admin-header {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .cardapio-admin-header__titles h1 {
   font-size: 1.4rem;
-  margin: 0 0 4px;
-  color: var(--admin-text, #111827);
+  margin: 0 0 6px;
+  color: var(--ink, #0f172a);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.is-theme-dark .cardapio-admin-header__titles h1,
+.admin--dark .cardapio-admin-header__titles h1 {
+  color: var(--ink, #e8eef4);
 }
 
 .cardapio-admin-header__titles p {
   margin: 0;
   font-size: 0.88rem;
-  color: var(--admin-text-muted, #6b7280);
+  color: var(--mute, #64748b);
+  line-height: 1.45;
 }
 
+.is-theme-dark .cardapio-admin-header__titles p,
+.admin--dark .cardapio-admin-header__titles p {
+  color: var(--mute, #94a3b8);
+}
+
+/* Badge de status no ar / rascunho */
+.cardapio-status-badge {
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cardapio-status-badge.is-published {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.is-theme-dark .cardapio-status-badge.is-published,
+.admin--dark .cardapio-status-badge.is-published {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cardapio-status-badge.is-draft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.is-theme-dark .cardapio-status-badge.is-draft,
+.admin--dark .cardapio-status-badge.is-draft {
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.cardapio-admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   3. Botões do Sistema do Cardápio
+   -------------------------------------------------------------------------- */
+.cardapio-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.cardapio-btn:active {
+  transform: scale(0.98);
+}
+
+.cardapio-btn--primary {
+  background: #c48a39;
+  color: #ffffff;
+  border-color: #b3792c;
+}
+
+.cardapio-btn--primary:hover {
+  background: #aa7329;
+  border-color: #996420;
+}
+
+.cardapio-btn--secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.cardapio-btn--secondary:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.is-theme-dark .cardapio-btn--secondary,
+.admin--dark .cardapio-btn--secondary {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.is-theme-dark .cardapio-btn--secondary:hover,
+.admin--dark .cardapio-btn--secondary:hover {
+  background: #283548;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.cardapio-btn--danger {
+  color: #dc2626 !important;
+}
+
+.is-theme-dark .cardapio-btn--danger,
+.admin--dark .cardapio-btn--danger {
+  color: #f87171 !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Abas de Navegação (Tabs)
+   -------------------------------------------------------------------------- */
 .cardapio-admin-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 2px solid var(--admin-border, #e5e7eb);
-  padding-bottom: 2px;
+  border-bottom: 2px solid var(--line, #e2e8f0);
+  padding-bottom: 4px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.is-theme-dark .cardapio-admin-tabs,
+.admin--dark .cardapio-admin-tabs {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.cardapio-admin-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.cardapio-admin-tabs::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
 }
 
 .cardapio-admin-tab-btn {
-  padding: 10px 18px;
+  padding: 10px 16px;
   border: none;
   background: transparent;
   font-size: 0.94rem;
   font-weight: 700;
-  color: var(--admin-text-muted, #6b7280);
+  color: var(--mute, #64748b);
   cursor: pointer;
   border-bottom: 3px solid transparent;
-  margin-bottom: -4px;
+  margin-bottom: -6px;
   transition: all 0.15s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cardapio-admin-tab-btn:hover {
-  color: var(--admin-text, #111827);
+  color: var(--ink, #0f172a);
+}
+
+.is-theme-dark .cardapio-admin-tab-btn,
+.admin--dark .cardapio-admin-tab-btn {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .cardapio-admin-tab-btn:hover,
+.admin--dark .cardapio-admin-tab-btn:hover {
+  color: var(--ink, #f8fafc);
 }
 
 .cardapio-admin-tab-btn.is-active {
-  color: #c48a39;
-  border-bottom-color: #c48a39;
+  color: #c48a39 !important;
+  border-bottom-color: #c48a39 !important;
 }
 
-/* Split view: Editor à esquerda, Mockup do celular à direita */
+/* --------------------------------------------------------------------------
+   5. Layout Dividido (Split Layout: Editor + Preview)
+   -------------------------------------------------------------------------- */
 .cardapio-split-layout {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: minmax(0, 1fr) 390px;
   gap: 24px;
   align-items: start;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .cardapio-split-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cardapio-split-layout > aside {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
   }
 }
 
+/* Card Principal do Editor */
 .cardapio-editor-card {
-  background: var(--admin-card-bg, #ffffff);
+  background: var(--card, #ffffff);
   border-radius: 14px;
-  border: 1px solid var(--admin-border, #e5e7eb);
+  border: 1px solid var(--line, #e2e8f0);
   padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 20px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  color: var(--ink, #0f172a);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
-/* Lista de pratos no editor */
+.is-theme-dark .cardapio-editor-card,
+.admin--dark .cardapio-editor-card {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.cardapio-editor-title {
+  color: var(--ink, #0f172a);
+  margin: 0 0 2px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.is-theme-dark .cardapio-editor-title,
+.admin--dark .cardapio-editor-title {
+  color: var(--ink, #e8eef4);
+}
+
+.cardapio-editor-subtitle {
+  color: var(--mute, #64748b);
+  font-size: 0.86rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.is-theme-dark .cardapio-editor-subtitle,
+.admin--dark .cardapio-editor-subtitle {
+  color: var(--mute, #94a3b8);
+}
+
+/* Toolbar de Pratos (Cardápio de Hoje + Botões) */
+.cardapio-dishes-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.cardapio-dishes-toolbar__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   6. Lista de Pratos no Editor
+   -------------------------------------------------------------------------- */
 .cardapio-dish-row {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 14px;
-  background: #f9fafb;
+  background: #f8fafc;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  transition: background 0.15s;
+  border: 1px solid #e2e8f0;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .cardapio-dish-row:hover {
-  background: #f3f4f6;
+  background: #f1f5f9;
+}
+
+.is-theme-dark .cardapio-dish-row,
+.admin--dark .cardapio-dish-row {
+  background: #141b22;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .cardapio-dish-row:hover,
+.admin--dark .cardapio-dish-row:hover {
+  background: #19232d;
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .cardapio-dish-thumb {
@@ -118,7 +398,12 @@
   border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
-  background: #e5e7eb;
+  background: #e2e8f0;
+}
+
+.is-theme-dark .cardapio-dish-thumb,
+.admin--dark .cardapio-dish-thumb {
+  background: #243040;
 }
 
 .cardapio-dish-main {
@@ -129,28 +414,45 @@
 .cardapio-dish-title {
   font-weight: 700;
   font-size: 0.96rem;
-  color: #111827;
+  color: var(--ink, #0f172a);
   margin: 0 0 2px;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.is-theme-dark .cardapio-dish-title,
+.admin--dark .cardapio-dish-title {
+  color: var(--ink, #f1f5f9);
 }
 
 .cardapio-dish-desc {
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--mute, #64748b);
   margin: 0 0 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.is-theme-dark .cardapio-dish-desc,
+.admin--dark .cardapio-dish-desc {
+  color: var(--mute, #94a3b8);
+}
+
 .cardapio-dish-meta {
   font-size: 0.8rem;
-  color: #4b5563;
+  color: #475569;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.is-theme-dark .cardapio-dish-meta,
+.admin--dark .cardapio-dish-meta {
+  color: #cbd5e1;
 }
 
 .cardapio-dish-price {
@@ -158,13 +460,363 @@
   color: #166534;
 }
 
+.is-theme-dark .cardapio-dish-price,
+.admin--dark .cardapio-dish-price {
+  color: #4ade80;
+}
+
+.cardapio-dish-dot {
+  color: #9ca3af;
+}
+
+.is-theme-dark .cardapio-dish-dot,
+.admin--dark .cardapio-dish-dot {
+  color: #64748b;
+}
+
+.cardapio-dish-category {
+  font-weight: 500;
+}
+
+.cardapio-dish-available {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+/* Badges de Prato */
+.cardapio-badge-promo {
+  font-size: 0.7rem;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.is-theme-dark .cardapio-badge-promo,
+.admin--dark .cardapio-badge-promo {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cardapio-badge-retaguarda {
+  font-size: 0.7rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.is-theme-dark .cardapio-badge-retaguarda,
+.admin--dark .cardapio-badge-retaguarda {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.cardapio-badge-confirmed {
+  background: #dcfce7;
+  color: #166534;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.is-theme-dark .cardapio-badge-confirmed,
+.admin--dark .cardapio-badge-confirmed {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
 .cardapio-dish-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-/* Mockup de celular à direita (Phone preview) */
+/* --------------------------------------------------------------------------
+   7. Formulários e Grupos de Entrada
+   -------------------------------------------------------------------------- */
+.cardapio-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.cardapio-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardapio-form-group label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.is-theme-dark .cardapio-form-group label,
+.admin--dark .cardapio-form-group label {
+  color: #cbd5e1;
+}
+
+.cardapio-form-group input[type="text"],
+.cardapio-form-group input[type="number"],
+.cardapio-form-group input[type="tel"],
+.cardapio-form-group textarea,
+.cardapio-stock-search {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.is-theme-dark .cardapio-form-group input[type="text"],
+.is-theme-dark .cardapio-form-group input[type="number"],
+.is-theme-dark .cardapio-form-group input[type="tel"],
+.is-theme-dark .cardapio-form-group textarea,
+.is-theme-dark .cardapio-stock-search,
+.admin--dark .cardapio-form-group input[type="text"],
+.admin--dark .cardapio-form-group input[type="number"],
+.admin--dark .cardapio-form-group input[type="tel"],
+.admin--dark .cardapio-form-group textarea,
+.admin--dark .cardapio-stock-search {
+  background: #0f141a;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eef4;
+}
+
+.cardapio-form-group input:focus,
+.cardapio-form-group textarea:focus,
+.cardapio-stock-search:focus {
+  border-color: #c48a39;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(196, 138, 57, 0.2);
+}
+
+/* Imagens de Marca (Logo e Banner) */
+.cardapio-logo-preview {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #d1d5db;
+}
+
+.is-theme-dark .cardapio-logo-preview,
+.admin--dark .cardapio-logo-preview {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.cardapio-logo-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.is-theme-dark .cardapio-logo-placeholder,
+.admin--dark .cardapio-logo-placeholder {
+  background: #243040;
+  color: #94a3b8;
+}
+
+.cardapio-banner-preview {
+  width: 100px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #d1d5db;
+}
+
+.is-theme-dark .cardapio-banner-preview,
+.admin--dark .cardapio-banner-preview {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.cardapio-preset-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  align-self: center;
+}
+
+.is-theme-dark .cardapio-preset-label,
+.admin--dark .cardapio-preset-label {
+  color: #94a3b8;
+}
+
+.cardapio-preset-btn {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cardapio-preset-btn:hover {
+  border-color: #c48a39;
+  color: #c48a39;
+}
+
+.is-theme-dark .cardapio-preset-btn,
+.admin--dark .cardapio-preset-btn {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
+.is-theme-dark .cardapio-preset-btn:hover,
+.admin--dark .cardapio-preset-btn:hover {
+  background: #283548;
+  border-color: #c48a39;
+  color: #e09f3e;
+}
+
+.cardapio-section-divider {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 18px;
+}
+
+.is-theme-dark .cardapio-section-divider,
+.admin--dark .cardapio-section-divider {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   8. Subcards Informativos (Divulgação, Mesas e Reservas)
+   -------------------------------------------------------------------------- */
+.cardapio-subcard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.is-theme-dark .cardapio-subcard,
+.admin--dark .cardapio-subcard {
+  background: #141b22;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8eef4;
+}
+
+.cardapio-subcard--qr {
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cardapio-qr-container {
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cardapio-code-box {
+  background: #ffffff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.92rem;
+  font-family: monospace;
+  color: #1e293b;
+  word-break: break-all;
+}
+
+.is-theme-dark .cardapio-code-box,
+.admin--dark .cardapio-code-box {
+  background: #0b0f14;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #38bdf8;
+}
+
+.cardapio-quote-box {
+  background: #ffffff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.86rem;
+  color: #374151;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.is-theme-dark .cardapio-quote-box,
+.admin--dark .cardapio-quote-box {
+  background: #0b0f14;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
+.cardapio-table-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  transition: border-color 0.15s;
+}
+
+.is-theme-dark .cardapio-table-card,
+.admin--dark .cardapio-table-card {
+  background: #141b22;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8eef4;
+}
+
+.cardapio-reservation-card {
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.is-theme-dark .cardapio-reservation-card,
+.admin--dark .cardapio-reservation-card {
+  background: #141b22;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8eef4;
+}
+
+/* --------------------------------------------------------------------------
+   9. Mockup do Celular à Direita (Live Phone Preview)
+   -------------------------------------------------------------------------- */
 .cardapio-phone-frame {
   background: #111827;
   border-radius: 36px;
@@ -172,6 +824,14 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25), 0 0 0 2px #374151;
   position: sticky;
   top: 24px;
+  width: 100%;
+  max-width: 390px;
+  box-sizing: border-box;
+}
+
+.is-theme-dark .cardapio-phone-frame,
+.admin--dark .cardapio-phone-frame {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .cardapio-phone-screen {
@@ -195,14 +855,106 @@
   z-index: 50;
 }
 
-/* Modal de Importação do Estoque */
+/* --------------------------------------------------------------------------
+   10. Modais do Cardápio (Prato & Importação de Estoque)
+   -------------------------------------------------------------------------- */
+.cardapio-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.cardapio-modal-sheet {
+  background: #ffffff;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  border-radius: 16px;
+  overflow-y: auto;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  color: #0f172a;
+}
+
+.is-theme-dark .cardapio-modal-sheet,
+.admin--dark .cardapio-modal-sheet {
+  background: #171e27;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e8eef4;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+.cardapio-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+.is-theme-dark .cardapio-modal-head,
+.admin--dark .cardapio-modal-head {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.cardapio-modal-head h2 {
+  font-size: 1.25rem;
+  margin: 0;
+  font-weight: 800;
+  color: inherit;
+}
+
+.cardapio-modal-close {
+  background: #f1f5f9;
+  color: #334155;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cardapio-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.is-theme-dark .cardapio-modal-close,
+.admin--dark .cardapio-modal-close {
+  background: #243040;
+  color: #cbd5e1;
+}
+
+.is-theme-dark .cardapio-modal-close:hover,
+.admin--dark .cardapio-modal-close:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+/* Lista de importação de estoque */
 .cardapio-modal-stock-list {
-  max-height: 400px;
+  max-height: 380px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 
 .cardapio-stock-item-pick {
@@ -210,9 +962,22 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
+  background: #ffffff;
+  transition: all 0.15s;
+}
+
+.is-theme-dark .cardapio-stock-item-pick,
+.admin--dark .cardapio-stock-item-pick {
+  background: #141b22;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e8eef4;
+}
+
+.cardapio-stock-item-pick:hover {
+  border-color: #c48a39;
 }
 
 .cardapio-stock-item-pick.is-selected {
@@ -220,25 +985,26 @@
   background: #fffdfa;
 }
 
-/* Grids responsivos de formulário */
-.cardapio-form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+.is-theme-dark .cardapio-stock-item-pick.is-selected,
+.admin--dark .cardapio-stock-item-pick.is-selected {
+  background: rgba(196, 138, 57, 0.15);
+  border-color: #c48a39;
 }
 
 /* ==========================================================================
-   Ajustes Responsivos Mobile (Telas < 768px)
+   11. Responsividade Mobile (< 768px e < 480px)
    ========================================================================== */
 @media (max-width: 768px) {
   .cardapio-admin-wrap {
-    padding: 12px 14px 28px !important;
+    padding: 12px 10px 28px !important;
     max-width: 100vw !important;
     width: 100% !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
+    gap: 14px !important;
   }
 
+  /* Cabeçalho mobile */
   .cardapio-admin-header {
     padding: 14px 16px !important;
     flex-direction: column !important;
@@ -248,49 +1014,69 @@
   }
 
   .cardapio-admin-header__titles h1 {
-    font-size: 1.25rem !important;
-    flex-wrap: wrap !important;
+    font-size: 1.2rem !important;
+    gap: 8px !important;
   }
 
   .cardapio-admin-header-actions {
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-direction: column !important;
     gap: 8px !important;
     width: 100% !important;
   }
 
   .cardapio-admin-header-actions .cardapio-btn {
-    flex: 1 1 calc(50% - 6px) !important;
+    width: 100% !important;
     min-height: 42px !important;
-    padding: 8px 12px !important;
-    font-size: 0.82rem !important;
+    padding: 10px 14px !important;
+    font-size: 0.88rem !important;
     justify-content: center !important;
     text-align: center !important;
   }
 
+  /* Abas mobile com scroll horizontal suave e seguro */
   .cardapio-admin-tabs {
-    gap: 4px !important;
-    padding-bottom: 2px !important;
+    gap: 6px !important;
+    padding-bottom: 6px !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-  }
-
-  .cardapio-admin-tabs::-webkit-scrollbar {
-    display: none;
+    scrollbar-width: thin !important;
   }
 
   .cardapio-admin-tab-btn {
-    padding: 8px 12px !important;
+    padding: 8px 14px !important;
     font-size: 0.88rem !important;
+    flex-shrink: 0 !important;
   }
 
+  /* Card do Editor mobile */
   .cardapio-editor-card {
     padding: 14px !important;
     border-radius: 12px !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    gap: 16px !important;
+  }
+
+  .cardapio-dishes-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .cardapio-dishes-toolbar__actions {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .cardapio-dishes-toolbar__actions .cardapio-btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    justify-content: center !important;
+    text-align: center !important;
   }
 
   .cardapio-form-grid-2 {
@@ -298,10 +1084,10 @@
     gap: 12px !important;
   }
 
-  /* Pratos em 2 linhas limpas: linha 1 (foto + dados), linha 2 (ações completas) */
+  /* Pratos em 2 linhas limpas no celular */
   .cardapio-dish-row {
     display: grid !important;
-    grid-template-columns: 50px 1fr !important;
+    grid-template-columns: 48px 1fr !important;
     gap: 10px 12px !important;
     padding: 12px !important;
     align-items: start !important;
@@ -312,8 +1098,8 @@
   .cardapio-dish-thumb {
     grid-column: 1 !important;
     grid-row: 1 !important;
-    width: 50px !important;
-    height: 50px !important;
+    width: 48px !important;
+    height: 48px !important;
     border-radius: 8px !important;
   }
 
@@ -331,6 +1117,7 @@
 
   .cardapio-dish-desc {
     white-space: normal !important;
+    word-break: break-word !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
@@ -338,8 +1125,10 @@
   }
 
   .cardapio-dish-meta {
+    display: flex !important;
     flex-wrap: wrap !important;
-    gap: 6px 10px !important;
+    align-items: center !important;
+    gap: 6px 8px !important;
   }
 
   .cardapio-dish-actions {
@@ -347,20 +1136,92 @@
     grid-row: 2 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-end !important;
+    justify-content: space-between !important;
     gap: 6px !important;
     width: 100% !important;
     padding-top: 10px !important;
-    border-top: 1px solid #e5e7eb !important;
+    border-top: 1px solid var(--line, #e2e8f0) !important;
     margin-top: 2px !important;
+  }
+
+  .is-theme-dark .cardapio-dish-actions,
+  .admin--dark .cardapio-dish-actions {
+    border-top-color: rgba(255, 255, 255, 0.08) !important;
   }
 
   .cardapio-dish-actions .cardapio-btn {
     flex: 1 1 auto !important;
     min-height: 38px !important;
-    padding: 6px 10px !important;
+    padding: 6px 8px !important;
     font-size: 0.82rem !important;
     justify-content: center !important;
     text-align: center !important;
+  }
+
+  /* Subcards em mobile */
+  .cardapio-subcard--qr {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .cardapio-reservation-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Modais em mobile (estilo bottom-sheet nativo) */
+  .cardapio-modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .cardapio-modal-sheet {
+    max-width: 100vw !important;
+    width: 100% !important;
+    border-radius: 18px 18px 0 0 !important;
+    max-height: 92vh !important;
+    padding: 16px 18px 24px !important;
+  }
+
+  /* Mockup no mobile */
+  .cardapio-phone-frame {
+    position: static !important;
+    max-width: 100% !important;
+    border-radius: 24px !important;
+    padding: 10px !important;
+    margin: 12px auto 0 !important;
+  }
+
+  .cardapio-phone-screen {
+    height: 540px !important;
+    border-radius: 18px !important;
+  }
+}
+
+/* Telas ultra-estreitas (iPhone SE / celulares antigos <= 380px) */
+@media (max-width: 380px) {
+  .cardapio-admin-wrap {
+    padding: 8px 6px 20px !important;
+  }
+
+  .cardapio-admin-header {
+    padding: 12px !important;
+  }
+
+  .cardapio-editor-card {
+    padding: 12px 10px !important;
+  }
+
+  .cardapio-dish-row {
+    grid-template-columns: 42px 1fr !important;
+    gap: 8px !important;
+    padding: 10px 8px !important;
+  }
+
+  .cardapio-dish-thumb {
+    width: 42px !important;
+    height: 42px !important;
   }
 }

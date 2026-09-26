@@ -182,21 +182,7 @@ export function CardapioAdminPage() {
     <div className="cardapio-admin-wrap">
       {/* Toast */}
       {toast ? (
-        <div
-          style={{
-            position: 'fixed',
-            top: 24,
-            right: 24,
-            zIndex: 100,
-            background: '#111827',
-            color: '#fff',
-            padding: '12px 20px',
-            borderRadius: 8,
-            boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
-            fontWeight: 700,
-            fontSize: '0.92rem',
-          }}
-        >
+        <div className="cardapio-toast">
           ✓ {toast}
         </div>
       ) : null}
@@ -207,14 +193,7 @@ export function CardapioAdminPage() {
           <h1>
             🍽️ Cardápio Digital do Dia{' '}
             <span
-              style={{
-                fontSize: '0.78rem',
-                padding: '2px 8px',
-                borderRadius: 12,
-                background: config.published ? '#dcfce7' : '#f3f4f6',
-                color: config.published ? '#166534' : '#6b7280',
-                fontWeight: 700,
-              }}
+              className={`cardapio-status-badge ${config.published ? 'is-published' : 'is-draft'}`}
             >
               {config.published ? '● No ar' : '○ Rascunho'}
             </span>
@@ -297,25 +276,17 @@ export function CardapioAdminPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {activeTab === 'dishes' ? (
             <div className="cardapio-editor-card">
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 12,
-                }}
-              >
+              <div className="cardapio-dishes-toolbar">
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', margin: '0 0 2px' }}>
+                  <h2 className="cardapio-editor-title">
                     Cardápio de Hoje · {new Date().toLocaleDateString('pt-BR')}
                   </h2>
-                  <small style={{ color: '#6b7280' }}>
+                  <p className="cardapio-editor-subtitle">
                     Os pratos marcados como disponíveis aparecem para o cliente no celular.
-                  </small>
+                  </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="cardapio-dishes-toolbar__actions">
                   <button
                     type="button"
                     className="cardapio-btn cardapio-btn--secondary"
@@ -361,28 +332,12 @@ export function CardapioAdminPage() {
                       <div className="cardapio-dish-title">
                         <span>{dish.name}</span>
                         {dish.isPromotion ? (
-                          <span
-                            style={{
-                              fontSize: '0.7rem',
-                              background: '#fef3c7',
-                              color: '#92400e',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
+                          <span className="cardapio-badge-promo">
                             Promoção
                           </span>
                         ) : null}
                         {dish.stockId ? (
-                          <span
-                            style={{
-                              fontSize: '0.7rem',
-                              background: '#e0f2fe',
-                              color: '#0369a1',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
+                          <span className="cardapio-badge-retaguarda">
                             Retaguarda
                           </span>
                         ) : null}
@@ -397,17 +352,10 @@ export function CardapioAdminPage() {
                             currency: 'BRL',
                           })}
                         </span>
-                        <span style={{ color: '#9ca3af' }}>·</span>
-                        <span>{dish.category}</span>
-                        <span style={{ color: '#9ca3af' }}>·</span>
-                        <label
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            cursor: 'pointer',
-                          }}
-                        >
+                        <span className="cardapio-dish-dot">·</span>
+                        <span className="cardapio-dish-category">{dish.category}</span>
+                        <span className="cardapio-dish-dot">·</span>
+                        <label className="cardapio-dish-available">
                           <input
                             type="checkbox"
                             checked={dish.available}
@@ -415,7 +363,7 @@ export function CardapioAdminPage() {
                               updateCardapioItem(dish.id, { available: e.target.checked })
                             }
                           />
-                          <span style={{ fontSize: '0.8rem' }}>
+                          <span>
                             {dish.available ? 'Disponível' : 'Esgotado'}
                           </span>
                         </label>
@@ -461,8 +409,8 @@ export function CardapioAdminPage() {
                             removeCardapioItem(dish.id);
                           }
                         }}
-                        className="cardapio-btn cardapio-btn--secondary"
-                        style={{ padding: '6px 8px', color: '#dc2626' }}
+                        className="cardapio-btn cardapio-btn--secondary cardapio-btn--danger"
+                        style={{ padding: '6px 8px' }}
                         title="Remover"
                       >
                         ✕
@@ -477,8 +425,8 @@ export function CardapioAdminPage() {
           {/* Aba de Marca e Personalização */}
           {activeTab === 'branding' ? (
             <div className="cardapio-editor-card">
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Identidade Visual & Estabelecimento</h2>
-              <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+              <h2 className="cardapio-editor-title">Identidade Visual & Estabelecimento</h2>
+              <p className="cardapio-editor-subtitle">
                 Personalize 100% da marca para o seu restaurante, bar, cafeteria ou lanchonete.
               </p>
 
@@ -511,28 +459,10 @@ export function CardapioAdminPage() {
                     <img
                       src={config.logoUrl}
                       alt="Logo"
-                      style={{
-                        width: 54,
-                        height: 54,
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '2px solid #d1d5db',
-                      }}
+                      className="cardapio-logo-preview"
                     />
                   ) : (
-                    <div
-                      style={{
-                        width: 54,
-                        height: 54,
-                        borderRadius: '50%',
-                        background: '#e5e7eb',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        color: '#6b7280',
-                      }}
-                    >
+                    <div className="cardapio-logo-placeholder">
                       Loja
                     </div>
                   )}
@@ -577,13 +507,7 @@ export function CardapioAdminPage() {
                     <img
                       src={config.bannerUrl}
                       alt="Capa"
-                      style={{
-                        width: 100,
-                        height: 48,
-                        borderRadius: 8,
-                        objectFit: 'cover',
-                        border: '1px solid #d1d5db',
-                      }}
+                      className="cardapio-banner-preview"
                     />
                   ) : null}
 
@@ -617,22 +541,15 @@ export function CardapioAdminPage() {
                   onChange={(e) => handleSaveConfig({ bannerUrl: e.target.value })}
                   style={{ marginTop: 6 }}
                 />
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                  <span style={{ fontSize: '0.78rem', color: '#6b7280', alignSelf: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  <span className="cardapio-preset-label">
                     Temas sugeridos:
                   </span>
                   {BANNER_PRESETS.map((p) => (
                     <button
                       key={p.label}
                       type="button"
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '3px 8px',
-                        borderRadius: 4,
-                        border: '1px solid #d1d5db',
-                        background: '#fff',
-                        cursor: 'pointer',
-                      }}
+                      className="cardapio-preset-btn"
                       onClick={() => handleSaveConfig({ bannerUrl: p.url })}
                     >
                       {p.label}
@@ -695,10 +612,12 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Modalidades */}
-              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-                <h3 style={{ fontSize: '1rem', margin: '0 0 10px' }}>Modalidades de Atendimento</h3>
+              <div className="cardapio-section-divider">
+                <h3 className="cardapio-editor-title" style={{ fontSize: '1rem', margin: '0 0 10px' }}>
+                  Modalidades de Atendimento
+                </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.enableDineIn}
@@ -706,7 +625,7 @@ export function CardapioAdminPage() {
                     />
                     <span>Comer no local</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.enableDelivery}
@@ -714,7 +633,7 @@ export function CardapioAdminPage() {
                     />
                     <span>Entrega (Delivery)</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.enableTakeout}
@@ -722,7 +641,7 @@ export function CardapioAdminPage() {
                     />
                     <span>Retirada no local</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.enableReservation}
@@ -739,45 +658,24 @@ export function CardapioAdminPage() {
           {activeTab === 'shares' ? (
             <div className="cardapio-editor-card">
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: '0 0 4px' }}>
+                <h2 className="cardapio-editor-title">
                   🌐 Disponibilize o Site do Seu Cardápio para Seus Clientes
                 </h2>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#6b7280' }}>
+                <p className="cardapio-editor-subtitle">
                   O cardápio digital funciona 100% no navegador do celular do cliente sem necessidade
                   de instalar nenhum app. Divulgue o link nas suas páginas e redes sociais.
                 </p>
               </div>
 
               {/* Card 1: Link direto */}
-              <div
-                style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 18,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="cardapio-subcard">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <strong style={{ fontSize: '1rem' }}>🔗 Link Oficial do Seu Cardápio</strong>
                   <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 700 }}>
-                    Pronto para compartilhar
+                    ● Pronto para compartilhar
                   </span>
                 </div>
-                <div
-                  style={{
-                    background: '#ffffff',
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.92rem',
-                    fontFamily: 'monospace',
-                    color: '#1f2937',
-                    wordBreak: 'break-all',
-                  }}
-                >
+                <div className="cardapio-code-box">
                   {baseUrl}
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -803,33 +701,13 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Card 2: Compartilhar no WhatsApp */}
-              <div
-                style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 18,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
+              <div className="cardapio-subcard">
                 <strong style={{ fontSize: '1rem' }}>💬 Compartilhamento no WhatsApp</strong>
-                <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+                <p className="cardapio-editor-subtitle">
                   Envie mensagens prontas para seus clientes ou listas de transmissão convidando-os a
                   conferir as novidades e promoções de hoje:
                 </p>
-                <div
-                  style={{
-                    background: '#ffffff',
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.86rem',
-                    color: '#374151',
-                    fontStyle: 'italic',
-                  }}
-                >
+                <div className="cardapio-quote-box">
                   &ldquo;Olá! Confira nosso cardápio online de hoje no {config.restaurantName} e faça seu
                   pedido ou reserve sua mesa direto pelo celular: {baseUrl}&rdquo;
                 </div>
@@ -840,7 +718,7 @@ export function CardapioAdminPage() {
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="cardapio-btn cardapio-btn--secondary"
+                    className="cardapio-btn"
                     style={{ background: '#25d366', color: '#fff', border: 'none' }}
                   >
                     💬 Compartilhar via WhatsApp
@@ -849,19 +727,9 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Card 3: Instagram e Facebook */}
-              <div
-                style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 18,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
+              <div className="cardapio-subcard">
                 <strong style={{ fontSize: '1rem' }}>📷 Instagram & Redes Sociais</strong>
-                <p style={{ margin: 0, fontSize: '0.86rem', color: '#6b7280' }}>
+                <p className="cardapio-editor-subtitle">
                   Coloque o link direto no campo <strong>&ldquo;Link na Bio&rdquo;</strong> do seu
                   Instagram ({config.instagram || '@asualoja'}) e nos botões de ação do Facebook para
                   que seus seguidores acessem com 1 toque.
@@ -881,24 +749,15 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Card 4: QR Code para Embalagens e Panfletos */}
-              <div
-                style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 18,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 20,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <QrCodeView value={baseUrl} size={120} colorDark="#1f2937" />
-                <div style={{ flex: 1, minWidth: 240 }}>
+              <div className="cardapio-subcard cardapio-subcard--qr">
+                <div className="cardapio-qr-container">
+                  <QrCodeView value={baseUrl} size={120} colorDark="#1f2937" />
+                </div>
+                <div style={{ flex: 1, minWidth: 220 }}>
                   <strong style={{ fontSize: '1rem' }}>
                     📱 QR Code para Embalagens, Panfletos e Adesivos
                   </strong>
-                  <p style={{ margin: '4px 0 10px', fontSize: '0.86rem', color: '#6b7280' }}>
+                  <p className="cardapio-editor-subtitle" style={{ margin: '4px 0 12px' }}>
                     Baixe o QR Code em alta definição para estampar em embalagens de delivery,
                     materiais impressos e fachadas.
                   </p>
@@ -917,13 +776,13 @@ export function CardapioAdminPage() {
           {/* Aba de Mesas & QR Codes */}
           {activeTab === 'qrcodes' ? (
             <div className="cardapio-editor-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', margin: 0 }}>QR Codes & Display de Mesas</h2>
-                  <small style={{ color: '#6b7280' }}>
+                  <h2 className="cardapio-editor-title">QR Codes & Display de Mesas</h2>
+                  <p className="cardapio-editor-subtitle">
                     Cada mesa tem seu próprio QR Code. Ao escanear, o cliente já entra com a mesa
                     identificada.
-                  </small>
+                  </p>
                 </div>
                 <Link to="/painel/cardapio/imprimir" className="cardapio-btn cardapio-btn--primary">
                   🖨️ Abrir Modo Impressão Display Acrílico
@@ -931,23 +790,15 @@ export function CardapioAdminPage() {
               </div>
 
               {/* QR Code Geral */}
-              <div
-                style={{
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 20,
-                }}
-              >
-                <QrCodeView value={baseUrl} size={110} colorDark="#2c1d11" />
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem' }}>
+              <div className="cardapio-subcard cardapio-subcard--qr">
+                <div className="cardapio-qr-container">
+                  <QrCodeView value={baseUrl} size={110} colorDark="#2c1d11" />
+                </div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <h3 className="cardapio-editor-title" style={{ margin: '0 0 4px', fontSize: '1.05rem' }}>
                     QR Code Geral (Cardápio / Delivery)
                   </h3>
-                  <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#6b7280' }}>
+                  <p className="cardapio-editor-subtitle" style={{ margin: '0 0 8px' }}>
                     Link público do restaurante: <code>{baseUrl}</code>
                   </p>
                   <button
@@ -964,7 +815,9 @@ export function CardapioAdminPage() {
               </div>
 
               {/* Tabela de QR Codes por Mesa */}
-              <h3 style={{ fontSize: '1rem', margin: '14px 0 6px' }}>QR Codes Individuais por Mesa</h3>
+              <h3 className="cardapio-editor-title" style={{ fontSize: '1rem', margin: '14px 0 6px' }}>
+                QR Codes Individuais por Mesa
+              </h3>
               <div
                 style={{
                   display: 'grid',
@@ -978,20 +831,14 @@ export function CardapioAdminPage() {
                   return (
                     <div
                       key={table.id}
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 10,
-                        padding: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        background: '#ffffff',
-                      }}
+                      className="cardapio-table-card"
                     >
-                      <QrCodeView value={tableUrl} size={70} colorDark="#2c1d11" />
+                      <div className="cardapio-qr-container">
+                        <QrCodeView value={tableUrl} size={70} colorDark="#2c1d11" />
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <strong style={{ fontSize: '0.94rem' }}>{table.label}</strong>
-                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                        <div className="cardapio-editor-subtitle" style={{ fontSize: '0.78rem' }}>
                           {table.seats} lugares · Status: {table.status}
                         </div>
                         <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
@@ -1018,13 +865,13 @@ export function CardapioAdminPage() {
           {/* Aba de Reservas */}
           {activeTab === 'reservations' ? (
             <div className="cardapio-editor-card">
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Reservas de Mesas Realizadas</h2>
-              <small style={{ color: '#6b7280' }}>
+              <h2 className="cardapio-editor-title">Reservas de Mesas Realizadas</h2>
+              <p className="cardapio-editor-subtitle">
                 Clientes que solicitaram reserva de mesa pelo Cardápio Digital.
-              </small>
+              </p>
 
               {reservations.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>
+                <div style={{ padding: 24, textAlign: 'center' }} className="cardapio-editor-subtitle">
                   Nenhuma reserva registrada no momento.
                 </div>
               ) : (
@@ -1032,33 +879,16 @@ export function CardapioAdminPage() {
                   {reservations.map((r) => (
                     <div
                       key={r.id}
-                      style={{
-                        padding: 14,
-                        borderRadius: 8,
-                        border: '1px solid #e5e7eb',
-                        background: '#f9fafb',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
+                      className="cardapio-reservation-card"
                     >
                       <div>
                         <strong>{r.guestName}</strong> · 🍽️ {r.tableLabel} ({r.guests} pessoas)
-                        <div style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: 2 }}>
+                        <div className="cardapio-editor-subtitle" style={{ fontSize: '0.82rem', marginTop: 2 }}>
                           Data: <strong>{r.date}</strong> às <strong>{r.time}</strong> · Tel:{' '}
                           {r.guestPhone || 'Não informado'}
                         </div>
                       </div>
-                      <span
-                        style={{
-                          background: '#dcfce7',
-                          color: '#166534',
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                          fontWeight: 700,
-                          fontSize: '0.82rem',
-                        }}
-                      >
+                      <span className="cardapio-badge-confirmed">
                         Confirmada
                       </span>
                     </div>
@@ -1221,22 +1051,17 @@ export function CardapioAdminPage() {
                 ✕
               </button>
             </div>
-            <p style={{ margin: 0, fontSize: '0.88rem', color: '#6b7280' }}>
+            <p className="cardapio-editor-subtitle" style={{ margin: 0 }}>
               Selecione os produtos já cadastrados no estoque para adicioná-los diretamente ao
               cardápio de hoje.
             </p>
 
             <input
               type="text"
+              className="cardapio-stock-search"
               placeholder="Buscar no estoque da Retaguarda..."
               value={stockSearch}
               onChange={(e) => setStockSearch(e.target.value)}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                fontSize: '0.92rem',
-              }}
             />
 
             <div className="cardapio-modal-stock-list">
@@ -1257,12 +1082,12 @@ export function CardapioAdminPage() {
                   >
                     <div>
                       <strong>{stock.name}</strong>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                      <div className="cardapio-editor-subtitle" style={{ fontSize: '0.8rem' }}>
                         SKU: {stock.sku || '-'} · Saldo: {stock.qty} {stock.unit}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <strong style={{ color: '#166534' }}>
+                      <strong className="cardapio-dish-price">
                         {stock.price.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
@@ -1282,7 +1107,7 @@ export function CardapioAdminPage() {
               })}
 
               {filteredStock.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>
+                <div className="cardapio-editor-subtitle" style={{ padding: 20, textAlign: 'center' }}>
                   Nenhum produto encontrado.
                 </div>
               ) : null}
