@@ -8,8 +8,22 @@ import { apiGetTotemCatalog, apiListStock } from '../../services/erpApi';
 import { isNestAuthed } from '../../services/nestClient';
 import { type TotemBrand, type TotemProduct } from './totemData';
 
-/** Cache em memória do último catálogo Nest (nunca seed localStorage). */
-let catalogStockCache: StockItem[] = [];
+const TOTEM_CATALOG_CACHE_KEY = 'marthi.totem.catalog.cache.v2';
+
+function readPersistedStockCache(): StockItem[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(TOTEM_CATALOG_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Cache em memória do último catálogo Nest (inicializado com cache persistido se houver). */
+let catalogStockCache: StockItem[] = readPersistedStockCache();
 
 function stableId(name: string) {
   let hash = 0;
@@ -92,6 +106,11 @@ function rememberStock(items: StockItem[]) {
     attrs: { ...(item.attrs ?? {}) },
     images: [...(item.images ?? [])],
   }));
+  try {
+    localStorage.setItem(TOTEM_CATALOG_CACHE_KEY, JSON.stringify(catalogStockCache));
+  } catch {
+    /* quota / private mode */
+  }
 }
 
 /** Estoque cru do último GET Nest — a cotação do card usa isto, não o seed local. */
@@ -107,7 +126,7 @@ export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
 /**
  * Catálogo do totem = Nest.
  * Público: GET /totem/catalog. Autenticado: preferência estoque da loja via /stock.
- * Sem fallback para mock/localStorage.
+ * Sem fallback para mock, com retenção resiliente em caso de falha de rede/rate-limit.
  */
 export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: number })[]> {
   try {
@@ -120,8 +139,16 @@ export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: n
     rememberStock(forTotem);
     return groupStockForTotem(forTotem);
   } catch (error) {
-    console.error('[totem] falha ao carregar catálogo Nest', error);
-    catalogStockCache = [];
+    console.warn('[totem] falha ao carregar catálogo Nest, mantendo cache existente:', error);
+    // Blindagem: NUNCA zera o catálogo em caso de erro momentâneo (ex: rate-limit ou queda de rede)
+    if (catalogStockCache.length > 0) {
+      return groupStockForTotem(catalogStockCache);
+    }
+    const persisted = readPersistedStockCache();
+    if (persisted.length > 0) {
+      catalogStockCache = persisted;
+      return groupStockForTotem(persisted);
+    }
     return [];
   }
 }

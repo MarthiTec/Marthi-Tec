@@ -31,6 +31,7 @@ export function subscribeTotemLive(onChange: () => void) {
   function onStorage(event: StorageEvent) {
     if (
       event.key &&
+      event.key !== 'marthi.admin.v2' &&
       event.key !== 'marthi.admin.v1' &&
       event.key !== 'marthi.totem.settings.v1' &&
       event.key !== 'marthi.attributes.v1'
@@ -55,7 +56,23 @@ export function subscribeTotemLive(onChange: () => void) {
     channel = null;
   }
 
-  const poll = window.setInterval(refresh, 2500);
+  let isPolling = false;
+  function safeBackgroundPoll() {
+    // Não executa polling se a aba estiver em segundo plano ou se outra chamada estiver pendente
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (isPolling) return;
+    isPolling = true;
+    try {
+      refresh();
+    } finally {
+      setTimeout(() => {
+        isPolling = false;
+      }, 1500);
+    }
+  }
+
+  // Intervalo seguro de 45s (evita estourar o rate limiter/throttler do servidor)
+  const poll = window.setInterval(safeBackgroundPoll, 45_000);
 
   return () => {
     window.removeEventListener(STOCK_EVENT, refresh);

@@ -489,9 +489,12 @@ export function TotemPage() {
 
   useEffect(() => {
     function applyCatalog(next: ReturnType<typeof listTotemCatalog>) {
-      setCatalog((current) =>
-        catalogFingerprint(current) === catalogFingerprint(next) ? current : next,
-      );
+      setCatalog((current) => {
+        if (next.length === 0 && current.length > 0) {
+          return current;
+        }
+        return catalogFingerprint(current) === catalogFingerprint(next) ? current : next;
+      });
     }
 
     function applySettingsFromCache() {
@@ -525,7 +528,6 @@ export function TotemPage() {
         /* cache local já aplicado */
       }
       applySettingsFromCache();
-      applyCatalog(listTotemCatalog());
       void loadTotemCatalog().then(applyCatalog);
     }
 
