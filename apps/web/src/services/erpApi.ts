@@ -177,6 +177,8 @@ export function apiGetOrder(id: string) {
 
 export function apiClosePosSale(body: {
   ticketId: string | null;
+  localId?: string;
+  idempotencyKey?: string;
   customerName: string;
   customerPhone: string;
   customerDocument?: string;

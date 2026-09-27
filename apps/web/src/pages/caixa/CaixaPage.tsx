@@ -48,6 +48,15 @@ import {
   type PosQuote,
 } from '../../data/posQuotesStore';
 import { QuoteCommercialPrintModal } from '../../components/QuoteCommercialPrintModal';
+import {
+  clearCompletedDraftSale,
+  deleteDraftSale,
+  generateSaleLocalId,
+  getPosTerminalId,
+  listActiveDraftSales,
+  saveDraftSale,
+  type PosDraftSale,
+} from '../../data/posDraftStore';
 import { emitNfeFromSale, emitSaleCheckoutDocument, FISCAL_KIND_LABEL } from '../../data/fiscalDocuments';
 import { hasDemoAccess } from '../../data/demoLeadStore';
 import { hasModule } from '../../data/storePlan';
@@ -252,7 +261,257 @@ export function CaixaPage() {
   const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null);
   const [printQuote, setPrintQuote] = useState<PosQuote | null>(null);
   const [autoPrintQuote, setAutoPrintQuote] = useState(false);
+  const [currentLocalId, setCurrentLocalId] = useState<string>(() => generateSaleLocalId());
+  const [recoveredDrafts, setRecoveredDrafts] = useState<PosDraftSale[]>([]);
+  const [selectedRecoveryDraft, setSelectedRecoveryDraft] = useState<PosDraftSale | null>(null);
+  const [recoveryPromptOpen, setRecoveryPromptOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  );
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const location = useLocation();
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function checkForDraft() {
+      if (location.state) return;
+      try {
+        const terminalId = getPosTerminalId();
+        const drafts = await listActiveDraftSales(terminalId);
+        if (isMounted && drafts.length > 0) {
+          setRecoveredDrafts(drafts);
+          setSelectedRecoveryDraft(drafts[0]);
+          setRecoveryPromptOpen(true);
+        }
+      } catch (err) {
+        console.error('[CaixaPage] Erro ao buscar vendas em andamento no IndexedDB:', err);
+      }
+    }
+    void checkForDraft();
+    return () => {
+      isMounted = false;
+    };
+  }, [location.state]);
+
+  function handleConfirmRecovery(draft: PosDraftSale) {
+    setCurrentLocalId(draft.localId);
+    setLines(draft.lines as CartLine[]);
+    if (draft.customer) {
+      setCustomerId(draft.customer.id || '');
+      setCustomerName(draft.customer.name || CONSUMIDOR_FINAL);
+      setCustomerPhone(draft.customer.phone || '');
+      setCustomerCpf(draft.customer.document || '');
+      setAskCpf(Boolean(draft.customer.askCpf));
+      setWalkIn(Boolean(draft.customer.walkIn));
+    }
+    if (draft.sellerId) setSellerId(draft.sellerId);
+    if (draft.defaultTableId) setDefaultTableId(draft.defaultTableId);
+    setDiscount(draft.discount || 0);
+    setDiscountMode(draft.discountMode || 'money');
+    setSurcharge(draft.surcharge || 0);
+    setSurchargeMode(draft.surchargeMode || 'money');
+    if (draft.splits && draft.splits.length) {
+      setSplits(
+        draft.splits.map((s) => ({
+          key: s.key || `split-${Math.random().toString(36).slice(2, 7)}`,
+          methodId: s.methodId,
+          amount: Number(s.amount) || 0,
+          installments: Math.max(1, Number(s.installments) || 1),
+          tendered: Number(s.tendered) || 0,
+        })),
+      );
+      setSplitTouched(Boolean(draft.splitTouched));
+    }
+    if (draft.linkedOsId) setLinkedOsId(draft.linkedOsId);
+    if (draft.linkedQuoteId) setLinkedQuoteId(draft.linkedQuoteId);
+
+    setRecoveryPromptOpen(false);
+    setSelectedRecoveryDraft(null);
+    setRecoveredDrafts([]);
+    setMessage(
+      `Venda em andamento recuperada com ${draft.lines.length} ${
+        draft.lines.length === 1 ? 'item' : 'itens'
+      }.`,
+    );
+    focusCode();
+  }
+
+  async function handleDiscardRecovery(draft: PosDraftSale) {
+    await deleteDraftSale(draft.localId);
+    const remaining = recoveredDrafts.filter((d) => d.localId !== draft.localId);
+    if (remaining.length > 0) {
+      setRecoveredDrafts(remaining);
+      setSelectedRecoveryDraft(remaining[0]);
+    } else {
+      setRecoveredDrafts([]);
+      setSelectedRecoveryDraft(null);
+      setRecoveryPromptOpen(false);
+      setCurrentLocalId(generateSaleLocalId());
+      setMessage('Venda anterior descartada. PDV pronto para nova venda.');
+      focusCode();
+    }
+  }
+
+  async function handleCancelCurrentSale() {
+    if (!pricedLines.length) return;
+    if (
+      !window.confirm(
+        `Tem certeza que deseja cancelar e descartar a venda atual com ${pricedLines.length} itens? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+    const oldId = currentLocalId;
+    await deleteDraftSale(oldId);
+    setLines([]);
+    resetSplits();
+    setDiscount(0);
+    setSurcharge(0);
+    setSellerId('');
+    setCustomerId('');
+    setCustomerName(CONSUMIDOR_FINAL);
+    setCustomerPhone('');
+    setCustomerCpf('');
+    setAskCpf(false);
+    setWalkIn(true);
+    setLinkedOsId(null);
+    setLinkedQuoteId(null);
+    setCurrentLocalId(generateSaleLocalId());
+    setMessage('Venda cancelada e descartada.');
+    focusCode();
+  }
+
+  const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current);
+    }
+
+    if (lines.length === 0) {
+      setSaveStatus('saved');
+      void deleteDraftSale(currentLocalId);
+      return;
+    }
+
+    setSaveStatus('saving');
+
+    persistTimeoutRef.current = setTimeout(async () => {
+      try {
+        const draft: PosDraftSale = {
+          localId: currentLocalId,
+          status: 'in_progress',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          operatorName,
+          operatorEmail: user?.email,
+          terminalId: getPosTerminalId(),
+          cashSessionId: cashSession?.id ?? null,
+          customer: {
+            id: customerId,
+            name: customerName,
+            phone: customerPhone,
+            document: customerCpf,
+            askCpf,
+            walkIn,
+          },
+          sellerId,
+          defaultTableId,
+          discount,
+          discountMode,
+          surcharge,
+          surchargeMode,
+          splits: splits.map((s) => ({
+            key: s.key,
+            methodId: s.methodId,
+            amount: s.amount,
+            installments: s.installments,
+            tendered: s.tendered,
+          })),
+          splitTouched,
+          lines: lines.map((l) => ({
+            key: l.key,
+            stockId: l.stockId,
+            name: l.name,
+            sku: l.sku,
+            qty: l.qty,
+            unit: l.unit,
+            basePrice: l.basePrice,
+            unitPrice: l.unitPrice,
+            priceTableId: l.priceTableId,
+            lineDiscount: l.lineDiscount,
+            lineDiscountMode: l.lineDiscountMode,
+            lineSurcharge: l.lineSurcharge,
+            lineSurchargeMode: l.lineSurchargeMode,
+            isFrozenPrice: l.isFrozenPrice,
+            promoLabel: l.promoLabel,
+            promoExplanation: l.promoExplanation,
+            campaignId: l.campaignId,
+            imei: l.imei,
+          })),
+          linkedOsId,
+          linkedQuoteId,
+        };
+
+        await saveDraftSale(draft);
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('[CaixaPage] Erro ao persistir venda no IndexedDB:', err);
+        setSaveStatus('saved');
+      }
+    }, 40);
+
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+      }
+    };
+  }, [
+    currentLocalId,
+    lines,
+    customerId,
+    customerName,
+    customerPhone,
+    customerCpf,
+    askCpf,
+    walkIn,
+    sellerId,
+    defaultTableId,
+    discount,
+    discountMode,
+    surcharge,
+    surchargeMode,
+    splits,
+    splitTouched,
+    linkedOsId,
+    linkedQuoteId,
+    operatorName,
+    user?.email,
+    cashSession?.id,
+  ]);
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (lines.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [lines.length]);
 
   function handleConvertQuoteToCart(quote: PosQuote, updatePrices: boolean) {
     setLinkedQuoteId(quote.id);
@@ -855,6 +1114,7 @@ export function CaixaPage() {
     try {
       const state = await closePosSale({
         ticketId: null,
+        localId: currentLocalId,
         customerName: saleCustomer,
         customerPhone: walkIn ? '' : customerPhone.trim(),
         customerDocument: saleCpf,
@@ -904,6 +1164,8 @@ export function CaixaPage() {
       setStock(state.stock);
       setCustomers(state.customers);
       setLines([]);
+      void clearCompletedDraftSale(currentLocalId);
+      setCurrentLocalId(generateSaleLocalId());
       setDiscount(0);
       setDiscountMode('money');
       setSurcharge(0);
@@ -1246,6 +1508,29 @@ export function CaixaPage() {
         <BrandLogo variant="mark" className="caixa-app__mark" />
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
+        </div>
+        <div
+          className={`caixa-persistence-pill ${isOnline ? 'is-online' : 'is-offline'}`}
+          title={
+            isOnline
+              ? 'Conexão ativa · Venda em andamento sendo salva continuamente no IndexedDB local.'
+              : 'Modo Offline · Sem conexão com a internet. Todos os bipes e alterações estão sendo salvos com segurança no IndexedDB deste computador.'
+          }
+        >
+          <span className="caixa-persistence-pill__dot" />
+          <span className="caixa-persistence-pill__label">
+            {saveStatus === 'saving' ? (
+              'Salvando…'
+            ) : isOnline ? (
+              <>
+                <span className="pdv__desk-only">Online · </span>Salvo local
+              </>
+            ) : (
+              <>
+                <span className="pdv__desk-only">Offline · </span>Salvo no disco
+              </>
+            )}
+          </span>
         </div>
         <div className="caixa-app__top-actions">
           <div className={`caixa-app__shortcuts ${shortcutsOpen ? 'is-open' : ''}`}>
@@ -1728,7 +2013,20 @@ export function CaixaPage() {
           </article>
 
           <article className="admin-card pdv__cart pdv__cart--caixa">
-            <h2>Itens</h2>
+            <div className="pdv__cart-header-row">
+              <h2 style={{ margin: 0 }}>Itens</h2>
+              {pricedLines.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  style={{ color: '#ef4444', fontSize: '0.76rem', padding: '2px 8px' }}
+                  onClick={handleCancelCurrentSale}
+                  title="Cancelar e descartar a venda atual em andamento"
+                >
+                  🗑️ Cancelar venda
+                </button>
+              ) : null}
+            </div>
             <div className="pdv__cart-scroll">
               {pricedLines.length === 0 ? (
                 <p className="empty">Nenhum item. Escaneie ou use o estoque rápido.</p>
@@ -2337,6 +2635,159 @@ export function CaixaPage() {
               </button>
             </div>
           </form>
+        </div>
+      ) : null}
+
+      {recoveryPromptOpen && selectedRecoveryDraft ? (
+        <div className="pdv__modal" style={{ zIndex: 10010 }} role="dialog" aria-modal="true">
+          <div className="admin-card pdv__modal-card" style={{ maxWidth: '540px', padding: '20px 22px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '1.75rem' }}>💾</span>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--ink, #0f172a)' }}>
+                  Venda em Andamento Recuperada
+                </h2>
+                <span style={{ fontSize: '0.8rem', color: 'var(--mute, #64748b)' }}>
+                  Terminal: {selectedRecoveryDraft.terminalId} · ID: {selectedRecoveryDraft.localId}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ margin: '8px 0 12px', fontSize: '0.9rem', lineHeight: 1.5, color: 'var(--ink, #0f172a)' }}>
+              Identificamos uma venda iniciada anteriormente que não foi concluída neste terminal.
+              <br />
+              <span style={{ fontSize: '0.84rem', color: 'var(--mute, #64748b)' }}>
+                Última alteração:{' '}
+                <strong>
+                  {new Date(selectedRecoveryDraft.updatedAt).toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })}
+                </strong>
+                {selectedRecoveryDraft.customer?.name &&
+                selectedRecoveryDraft.customer.name !== CONSUMIDOR_FINAL
+                  ? ` · Cliente: ${selectedRecoveryDraft.customer.name}`
+                  : ''}
+              </span>
+            </p>
+
+            {recoveredDrafts.length > 1 ? (
+              <div style={{ marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink, #0f172a)' }}>
+                  Selecione a venda a retomar ({recoveredDrafts.length} encontradas):
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+                  {recoveredDrafts.map((d) => (
+                    <button
+                      key={d.localId}
+                      type="button"
+                      className={`btn btn--ghost ${
+                        d.localId === selectedRecoveryDraft.localId ? 'is-active' : ''
+                      }`}
+                      style={{
+                        justifyContent: 'space-between',
+                        textAlign: 'left',
+                        padding: '8px 12px',
+                        border: '1px solid var(--line)',
+                        background:
+                          d.localId === selectedRecoveryDraft.localId ? 'var(--card-2)' : 'transparent',
+                      }}
+                      onClick={() => setSelectedRecoveryDraft(d)}
+                    >
+                      <span>
+                        <strong>#{d.localId}</strong> ({d.lines.length} itens)
+                      </span>
+                      <span>
+                        {new Date(d.updatedAt).toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                maxHeight: '160px',
+                overflowY: 'auto',
+                background: 'var(--card-2, rgba(0, 0, 0, 0.04))',
+                border: '1px solid var(--line, rgba(148, 163, 184, 0.2))',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                marginBottom: '16px',
+                fontSize: '0.82rem',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontWeight: 700,
+                  marginBottom: '6px',
+                  paddingBottom: '4px',
+                  borderBottom: '1px solid var(--line, rgba(148, 163, 184, 0.15))',
+                }}
+              >
+                <span>Itens ({selectedRecoveryDraft.lines.length}):</span>
+                <span style={{ color: 'var(--accent, #10b981)' }}>
+                  Total:{' '}
+                  {money(
+                    selectedRecoveryDraft.lines.reduce(
+                      (acc, cur) => acc + cur.unitPrice * cur.qty,
+                      0,
+                    ),
+                  )}
+                </span>
+              </div>
+              {selectedRecoveryDraft.lines.map((l, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '3px 0',
+                    borderBottom: '1px dashed var(--line, rgba(148, 163, 184, 0.12))',
+                  }}
+                >
+                  <span>
+                    {l.qty} {l.unit} × {l.name}
+                  </span>
+                  <strong>{money(l.unitPrice * l.qty)}</strong>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                style={{ color: '#ef4444' }}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Deseja realmente DESCARTAR estes itens e iniciar uma nova venda em branco?',
+                    )
+                  ) {
+                    void handleDiscardRecovery(selectedRecoveryDraft);
+                  }
+                }}
+              >
+                🗑️ Descartar Venda
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => handleConfirmRecovery(selectedRecoveryDraft)}
+                autoFocus
+              >
+                ✓ Continuar Venda ({selectedRecoveryDraft.lines.length} itens)
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

@@ -930,6 +930,7 @@ export async function closeSale(input: {
 
 export async function closePosSale(input: {
   ticketId: string | null;
+  localId?: string;
   customerName: string;
   customerPhone: string;
   customerDocument?: string;
@@ -947,6 +948,8 @@ export async function closePosSale(input: {
     try {
       const order = await apiClosePosSale({
         ticketId: input.ticketId,
+        localId: input.localId,
+        idempotencyKey: input.localId,
         customerName: input.customerName,
         customerPhone: input.customerPhone,
         customerDocument: input.customerDocument,
@@ -1012,11 +1015,14 @@ export async function closePosSale(input: {
   }
 
   const state = load();
+  if (input.localId && state.orders.some((o) => o.id === input.localId || o.ticketId === input.localId)) {
+    return state;
+  }
   const subtotal = input.lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
   const amount = Math.max(0, subtotal - input.discount + input.surcharge);
   const summary = input.lines.map((line) => `${line.qty}x ${line.name}`).join(', ');
   const order: SalesOrder = {
-    id: uid('PED'),
+    id: input.localId || uid('PED'),
     ticketId: input.ticketId,
     customerName: input.customerName || 'Consumidor Final',
     customerDocument: (input.customerDocument ?? '').replace(/\D/g, ''),

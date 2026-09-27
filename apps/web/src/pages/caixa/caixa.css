@@ -2327,4 +2327,59 @@
   }
 }
 
+/* ==========================================================================
+   INDICADOR DE PERSISTÊNCIA E STATUS DA VENDA (IndexedDB / Offline)
+   ========================================================================== */
+.caixa-persistence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.25));
+  background: var(--card, #ffffff);
+  color: var(--ink, #0f172a);
+  user-select: none;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.is-theme-dark .caixa-persistence-pill,
+.admin--dark .caixa-persistence-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink, #e8eef4);
+}
+
+.caixa-persistence-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.caixa-persistence-pill.is-online .caixa-persistence-pill__dot {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.caixa-persistence-pill.is-offline .caixa-persistence-pill__dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.caixa-persistence-pill.is-offline {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.pdv__cart-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
 
