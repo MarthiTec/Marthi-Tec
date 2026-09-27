@@ -258,6 +258,14 @@ function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
       Boolean(camp.criteria?.brand) ||
       Boolean(camp.criteria?.supplierId);
 
+    if (camp.id === 'PROMO-DEMO-TIER' && camp.active) {
+      return {
+        ...camp,
+        active: false,
+        note: 'Campanha de demonstração (desativada por padrão).',
+      };
+    }
+
     // Proteção de segurança: se a campanha for de preço fixo, faixas de volume ou leve X pague Y sem NENHUM target:
     // Desativa para evitar que altere preços indevidamente de produtos não participantes.
     if ((camp.kind === 'tier' || camp.kind === 'promo_price' || camp.kind === 'buy_x_pay_y') && !hasTarget) {
@@ -505,7 +513,6 @@ export function evaluateCampaignForLine(
       const catNeedle = criteria.category.toLowerCase().trim();
       const matchCat =
         (item.category && item.category.toLowerCase().includes(catNeedle)) ||
-        (item.name && item.name.toLowerCase().includes(catNeedle)) ||
         Object.values(item.attrs || {}).some((val) =>
           String(val).toLowerCase().includes(catNeedle),
         );
