@@ -247,7 +247,11 @@ export function CaixaPanelHost(props: PanelProps) {
   return (
     <div className="pdv__modal" role="dialog" aria-modal="true">
       <button type="button" className="pdv__modal-backdrop" aria-label="Fechar" onClick={onClose} />
-      <div className="admin-card pdv__modal-card pdv__modal-card--wide">
+      <div
+        className={`admin-card pdv__modal-card pdv__modal-card--wide ${
+          panel === 'save_quote' ? 'pdv__modal-card--save-quote' : ''
+        } ${panel === 'quotes' ? 'pdv__modal-card--quotes' : ''}`}
+      >
         {panel === 'sales' ? <SalesPanel {...props} /> : null}
         {panel === 'canceled' ? <CanceledSalesPanel {...props} /> : null}
         {panel === 'open' ? <OpenPanel {...props} /> : null}
@@ -3276,7 +3280,7 @@ function SaveQuotePanel(props: PanelProps) {
 
   return (
     <form className="pdv-save-quote-form" onSubmit={handleSave}>
-      <header className="pdv-quotes-head">
+      <header className="pdv-quotes-head pdv-save-quote-head">
         <div>
           <h2>📝 Salvar Operação como Orçamento</h2>
           <p className="empty">
@@ -3288,140 +3292,142 @@ function SaveQuotePanel(props: PanelProps) {
         </button>
       </header>
 
-      {/* 1. DADOS DO CLIENTE */}
-      <div className="pdv-save-quote-section-title">
-        👤 1. Destinatário / Dados do Cliente
-      </div>
-      <div className="pdv-save-quote-grid">
-        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
-          <span>Cliente / Razão Social</span>
-          <input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Nome do cliente ou empresa"
-          />
-        </label>
-        <label className="pdv-save-quote-field">
-          <span>CPF / CNPJ</span>
-          <input
-            value={customerDocument}
-            onChange={(e) => setCustomerDocument(e.target.value)}
-            placeholder="000.000.000-00"
-          />
-        </label>
-        <label className="pdv-save-quote-field">
-          <span>Telefone / WhatsApp</span>
-          <input
-            value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
-            placeholder="(00) 00000-0000"
-          />
-        </label>
-        <label className="pdv-save-quote-field">
-          <span>E-mail de Contato</span>
-          <input
-            type="email"
-            value={customerEmail}
-            onChange={(e) => setCustomerEmail(e.target.value)}
-            placeholder="contato@cliente.com"
-          />
-        </label>
-        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
-          <span>Endereço / Local de Entrega da Obra</span>
-          <input
-            value={customerAddress}
-            onChange={(e) => setCustomerAddress(e.target.value)}
-            placeholder="Rua, número, bairro e cidade"
-          />
-        </label>
-      </div>
-
-      {/* 2. CONDIÇÕES COMERCIAIS */}
-      <div className="pdv-save-quote-section-title">
-        📋 2. Condições Comerciais & Validade
-      </div>
-      <div className="pdv-save-quote-grid">
-        <div className="pdv-save-quote-field">
-          <span>Vendedor Responsável</span>
-          <AdminPicker
-            value={sellerId}
-            onChange={(val) => setSellerId(val)}
-            options={[
-              { value: '', label: `Atendente atual (${operatorName})` },
-              ...sellers.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-          />
+      <div className="pdv-save-quote-body">
+        {/* 1. DADOS DO CLIENTE */}
+        <div className="pdv-save-quote-section-title">
+          👤 1. Destinatário / Dados do Cliente
         </div>
-        <label className="pdv-save-quote-field">
-          <span>Validade da Proposta (Dias)</span>
+        <div className="pdv-save-quote-grid">
+          <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+            <span>Cliente / Razão Social</span>
+            <input
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Nome do cliente ou empresa"
+            />
+          </label>
+          <label className="pdv-save-quote-field">
+            <span>CPF / CNPJ</span>
+            <input
+              value={customerDocument}
+              onChange={(e) => setCustomerDocument(e.target.value)}
+              placeholder="000.000.000-00"
+            />
+          </label>
+          <label className="pdv-save-quote-field">
+            <span>Telefone / WhatsApp</span>
+            <input
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="(00) 00000-0000"
+            />
+          </label>
+          <label className="pdv-save-quote-field">
+            <span>E-mail de Contato</span>
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="contato@cliente.com"
+            />
+          </label>
+          <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+            <span>Endereço / Local de Entrega da Obra</span>
+            <input
+              value={customerAddress}
+              onChange={(e) => setCustomerAddress(e.target.value)}
+              placeholder="Rua, número, bairro e cidade"
+            />
+          </label>
+        </div>
+
+        {/* 2. CONDIÇÕES COMERCIAIS */}
+        <div className="pdv-save-quote-section-title">
+          📋 2. Condições Comerciais & Validade
+        </div>
+        <div className="pdv-save-quote-grid">
+          <div className="pdv-save-quote-field">
+            <span>Vendedor Responsável</span>
+            <AdminPicker
+              value={sellerId}
+              onChange={(val) => setSellerId(val)}
+              options={[
+                { value: '', label: `Atendente atual (${operatorName})` },
+                ...sellers.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
+          <label className="pdv-save-quote-field">
+            <span>Validade da Proposta (Dias)</span>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={validityDays}
+              onChange={(e) => setValidityDays(Number(e.target.value) || 1)}
+            />
+            <span className="pdv-save-quote-hint">
+              Válido até: <strong>{calculatedExpiresDate.toLocaleDateString('pt-BR')}</strong>
+            </span>
+          </label>
+          <label className="pdv-save-quote-field">
+            <span>Prazo de Entrega</span>
+            <input
+              value={deliveryTerm}
+              onChange={(e) => setDeliveryTerm(e.target.value)}
+              placeholder="Ex: Imediato / 3 dias úteis"
+            />
+          </label>
+          <label className="pdv-save-quote-field">
+            <span>Condições de Pagamento</span>
+            <input
+              value={paymentConditions}
+              onChange={(e) => setPaymentConditions(e.target.value)}
+              placeholder="Ex: À vista Pix com 5% ou 12x cartão"
+            />
+          </label>
+          <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+            <span>Observações / Escopo da Proposta</span>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Detalhes adicionais, garantias ou observações para o cliente..."
+            />
+          </label>
+        </div>
+
+        {/* RESUMO DOS ITENS */}
+        <div className="pdv-save-quote-items-box">
+          <div className="pdv-save-quote-items-head">
+            <span>Itens ({lines.length} produtos / materiais):</span>
+            <span className="pdv-save-quote-items-total">Total: {money(activeQuoteDraft?.total || 0)}</span>
+          </div>
+          <div className="pdv-save-quote-items-list">
+            {lines.map((l, i) => (
+              <div key={i} className="pdv-save-quote-item-row">
+                <span>
+                  {l.qty} {l.unit} × {l.name}
+                  {l.promoLabel ? <span style={{ color: 'var(--accent, #10b981)', marginLeft: '0.4rem', fontWeight: 600 }}>({l.promoLabel})</span> : null}
+                </span>
+                <strong>{money(l.total)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* OPÇÃO DE IMPRESSÃO AUTOMÁTICA */}
+        <label className="pdv-save-quote-autoprint-toggle">
           <input
-            type="number"
-            min={1}
-            max={90}
-            value={validityDays}
-            onChange={(e) => setValidityDays(Number(e.target.value) || 1)}
+            type="checkbox"
+            checked={autoPrint}
+            onChange={(e) => setAutoPrint(e.target.checked)}
           />
-          <span className="pdv-save-quote-hint">
-            Válido até: <strong>{calculatedExpiresDate.toLocaleDateString('pt-BR')}</strong>
-          </span>
-        </label>
-        <label className="pdv-save-quote-field">
-          <span>Prazo de Entrega</span>
-          <input
-            value={deliveryTerm}
-            onChange={(e) => setDeliveryTerm(e.target.value)}
-            placeholder="Ex: Imediato / 3 dias úteis"
-          />
-        </label>
-        <label className="pdv-save-quote-field">
-          <span>Condições de Pagamento</span>
-          <input
-            value={paymentConditions}
-            onChange={(e) => setPaymentConditions(e.target.value)}
-            placeholder="Ex: À vista Pix com 5% ou 12x cartão"
-          />
-        </label>
-        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
-          <span>Observações / Escopo da Proposta</span>
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Detalhes adicionais, garantias ou observações para o cliente..."
-          />
+          <span>🖨️ Abrir proposta e imprimir / PDF automaticamente após salvar</span>
         </label>
       </div>
 
-      {/* RESUMO DOS ITENS */}
-      <div className="pdv-save-quote-items-box">
-        <div className="pdv-save-quote-items-head">
-          <span>Itens ({lines.length} produtos / materiais):</span>
-          <span className="pdv-save-quote-items-total">Total: {money(activeQuoteDraft?.total || 0)}</span>
-        </div>
-        <div className="pdv-save-quote-items-list">
-          {lines.map((l, i) => (
-            <div key={i} className="pdv-save-quote-item-row">
-              <span>
-                {l.qty} {l.unit} × {l.name}
-                {l.promoLabel ? <span style={{ color: 'var(--accent, #10b981)', marginLeft: '0.4rem', fontWeight: 600 }}>({l.promoLabel})</span> : null}
-              </span>
-              <strong>{money(l.total)}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* OPÇÃO DE IMPRESSÃO AUTOMÁTICA */}
-      <label className="pdv-save-quote-autoprint-toggle">
-        <input
-          type="checkbox"
-          checked={autoPrint}
-          onChange={(e) => setAutoPrint(e.target.checked)}
-        />
-        <span>🖨️ Abrir proposta e imprimir / PDF automaticamente após salvar</span>
-      </label>
-
-      <div className="pdv__modal-actions" style={{ marginTop: '0.5rem' }}>
+      <div className="pdv__modal-actions pdv-save-quote-actions">
         <button type="button" className="btn btn--ghost" onClick={onClose} disabled={saving}>
           Cancelar
         </button>

@@ -1916,13 +1916,110 @@
 }
 
 /* ==========================================================================
-   FORMULÁRIO DE SALVAMENTO DE ORÇAMENTO NO PDV
+   MODAIS DE ORÇAMENTO NO PDV (CONSULTA E SALVAMENTO)
+   Suporte a scroll suave, cabeçalho e rodapé fixos, desktop, tablet e celular
    ========================================================================== */
+
+/* Cards dos Modais de Orçamento */
+.pdv--caixa .pdv__modal-card--save-quote,
+.pdv--caixa .pdv__modal-card:has(.pdv-save-quote-form),
+.pdv--caixa .pdv__modal-card--quotes,
+.pdv--caixa .pdv__modal-card:has(.pdv-quotes-modal) {
+  height: min(92vh, 92dvh);
+  max-height: min(92vh, 92dvh);
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 16px 18px 14px;
+}
+
+/* Modal de listagem de orçamentos */
+.pdv-quotes-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pdv-quotes-modal .pdv-quotes-head {
+  flex-shrink: 0;
+}
+
+.pdv-quotes-modal .pdv-quotes-filters {
+  flex-shrink: 0;
+}
+
+.pdv-quotes-modal .admin-table-container {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: none !important;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modal de Salvamento de Orçamento */
 .pdv-save-quote-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
+}
+
+.pdv-save-quote-head {
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+}
+
+.pdv-save-quote-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 6px 8px 2px;
+  margin-right: -4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.pdv-save-quote-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pdv-save-quote-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pdv-save-quote-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+}
+
+.is-theme-dark .pdv-save-quote-body::-webkit-scrollbar-thumb,
+.admin--dark .pdv-save-quote-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pdv-save-quote-actions {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line, rgba(148, 163, 184, 0.2));
 }
 
 .pdv-save-quote-section-title {
@@ -2054,6 +2151,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  scrollbar-width: thin;
 }
 
 .pdv-save-quote-item-row {
@@ -2099,12 +2197,133 @@
   accent-color: var(--accent, #0284c7);
 }
 
-@media (max-width: 640px) {
+/* ==========================================================================
+   RESPONSIVIDADE: TABLET (<= 820px) E MOBILE (<= 600px)
+   ========================================================================== */
+
+@media (max-width: 820px) {
+  .pdv--caixa .pdv__modal-card--wide {
+    width: min(760px, calc(100vw - 20px));
+    padding: 12px 14px 10px;
+  }
+
+  .pdv-quotes-head {
+    gap: 10px;
+  }
+
+  .pdv-quotes-head h2 {
+    font-size: 1.15rem;
+  }
+
+  .pdv-quotes-filters {
+    gap: 8px;
+  }
+
+  .pdv-quotes-search {
+    flex: 1 1 100%;
+  }
+
+  .pdv-quotes-tabs {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
+@media (max-width: 600px) {
+  .pdv--caixa .pdv__modal-card--save-quote,
+  .pdv--caixa .pdv__modal-card:has(.pdv-save-quote-form),
+  .pdv--caixa .pdv__modal-card--quotes,
+  .pdv--caixa .pdv__modal-card:has(.pdv-quotes-modal) {
+    width: calc(100vw - 12px) !important;
+    max-height: min(96vh, 96dvh) !important;
+    height: min(96vh, 96dvh) !important;
+    padding: 10px 10px 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .pdv-quotes-head h2 {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  .pdv-quotes-head .empty {
+    font-size: 0.74rem;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .pdv-quotes-head button {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+  }
+
   .pdv-save-quote-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
+
   .pdv-save-quote-grid--span-2 {
     grid-column: 1;
+  }
+
+  .pdv-save-quote-field input,
+  .pdv-save-quote-field textarea {
+    min-height: 42px;
+    font-size: 0.92rem;
+  }
+
+  .pdv-save-quote-autoprint-toggle {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.78rem;
+    padding: 8px 10px;
+  }
+
+  .pdv-save-quote-actions {
+    display: flex;
+    flex-direction: column-reverse;
+    width: 100%;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .pdv-save-quote-actions .btn {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.92rem;
+    justify-content: center;
+  }
+
+  .pdv-save-quote-items-head {
+    font-size: 0.8rem;
+  }
+
+  .pdv-save-quote-items-total {
+    font-size: 0.88rem;
+  }
+}
+
+/* Fallback para telas extremamente baixas (ex: celular deitado em paisagem) */
+@media (max-height: 500px) {
+  .pdv--caixa .pdv__modal-card--save-quote,
+  .pdv--caixa .pdv__modal-card:has(.pdv-save-quote-form),
+  .pdv--caixa .pdv__modal-card--quotes,
+  .pdv--caixa .pdv__modal-card:has(.pdv-quotes-modal) {
+    overflow-y: auto !important;
+    height: auto !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+  .pdv-save-quote-form {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .pdv-save-quote-body {
+    overflow: visible !important;
+    height: auto !important;
   }
 }
 
