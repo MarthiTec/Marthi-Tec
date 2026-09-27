@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
-import { ADMIN_STATE_EVENT, getAdminState, type SalesOrder } from '../../data/adminStore';
+import { cancelSalesOrder, ADMIN_STATE_EVENT, getAdminState, type SalesOrder } from '../../data/adminStore';
 import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
+import { userCanCancelSale } from '../../data/erpRegistry';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   emitNfeFromSale,
   FISCAL_KIND_LABEL,
@@ -18,9 +20,10 @@ function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-type Filter = 'sold' | 'open' | 'all';
+type Filter = 'sold' | 'open' | 'cancelled' | 'all';
 
 export function OrdersPage() {
+  const { user } = useAuth();
   const fiscalOn = hasModule('fiscal');
   const [orders, setOrders] = useState(() => getAdminState().orders);
   const [docs, setDocs] = useState(() => listFiscalDocuments());
@@ -62,6 +65,22 @@ export function OrdersPage() {
         order,
       }));
 
+    const cancelled = orders
+      .filter((order) => order.status === 'cancelled')
+      .map((order) => ({
+        kind: 'sale' as const,
+        id: order.id,
+        customer: order.customerName || 'Consumidor Final',
+        product: order.productName,
+        payment: order.payment,
+        seller: order.sellerName || '—',
+        amount: order.amount,
+        amountLabel: money(order.amount),
+        status: order.status,
+        when: order.createdAt,
+        order,
+      }));
+
     const open = tickets
       .filter((ticket) => ticket.status === 'open')
       .map((ticket) => ({
@@ -79,7 +98,13 @@ export function OrdersPage() {
       }));
 
     const mixed =
-      filter === 'sold' ? sold : filter === 'open' ? open : [...sold, ...open];
+      filter === 'sold'
+        ? sold
+        : filter === 'open'
+          ? open
+          : filter === 'cancelled'
+            ? cancelled
+            : [...sold, ...open, ...cancelled];
 
     const needle = query.trim().toLowerCase();
     return mixed
@@ -100,6 +125,24 @@ export function OrdersPage() {
   function refresh() {
     setOrders(getAdminState().orders);
     setDocs(listFiscalDocuments());
+  }
+
+  function handleCancelOrder(order: SalesOrder) {
+    if (!userCanCancelSale(user?.email)) {
+      setError('Seu usuário não possui permissão para cancelar vendas.');
+      return;
+    }
+    const confirmMsg = `Deseja realmente cancelar a venda ${order.id} no valor de ${money(order.amount)}?\n\nEsta ação irá estornar o valor no financeiro e devolver os produtos ao estoque.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const res = cancelSalesOrder(order.id, 'Cancelado via painel de vendas', user?.name || 'Administrador');
+    if (!res.ok) {
+      setError(res.error || 'Erro ao cancelar venda.');
+      return;
+    }
+    setMessage(`Venda ${order.id} cancelada com sucesso. Valor estornado no financeiro e estoque atualizado.`);
+    setError('');
+    refresh();
   }
 
   function emit(order: SalesOrder, asNfce: boolean) {
@@ -155,6 +198,7 @@ export function OrdersPage() {
             options={[
               { value: 'sold', label: 'Vendas realizadas' },
               { value: 'open', label: 'Abertos no totem' },
+              { value: 'cancelled', label: 'Vendas canceladas' },
               { value: 'all', label: 'Todos' },
             ]}
             onChange={(value) => setFilter(value as Filter)}
@@ -196,8 +240,25 @@ export function OrdersPage() {
                       <td>{row.payment}</td>
                       <td className="price-red">{row.amountLabel}</td>
                       <td>
-                        <span className={`badge ${row.status === 'open' ? 'badge--open' : 'badge--sold'}`}>
-                          {row.status === 'open' ? 'Aberto no totem' : 'Vendido'}
+                        <span
+                          className={`badge ${
+                            row.status === 'open'
+                              ? 'badge--open'
+                              : row.status === 'cancelled'
+                                ? 'badge--cancelled'
+                                : 'badge--sold'
+                          }`}
+                          style={
+                            row.status === 'cancelled'
+                              ? {
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                }
+                              : undefined
+                          }
+                        >
+                          {row.status === 'open' ? 'Aberto no totem' : row.status === 'cancelled' ? 'Cancelada' : 'Vendido'}
                         </span>
                       </td>
                       <td>
@@ -210,30 +271,43 @@ export function OrdersPage() {
                         )}
                       </td>
                       <td className="admin-table__action">
-                        {sold && fiscalOn && !doc ? (
-                          <div className="admin-toolbar" style={{ justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="btn btn--primary btn--icon"
-                              title="Emitir NFC-e"
-                              aria-label="Emitir NFC-e"
-                              onClick={() => emit(row.order!, true)}
-                            >
-                              <AdminIcon name="fiscal" />
-                            </button>
+                        {sold ? (
+                          <div className="admin-toolbar" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                            {fiscalOn && !doc ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn--primary btn--icon"
+                                  title="Emitir NFC-e"
+                                  aria-label="Emitir NFC-e"
+                                  onClick={() => emit(row.order!, true)}
+                                >
+                                  <AdminIcon name="fiscal" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost"
+                                  title="Emitir NF-e"
+                                  onClick={() => emit(row.order!, false)}
+                                >
+                                  NF-e
+                                </button>
+                              </>
+                            ) : null}
                             <button
                               type="button"
                               className="btn btn--ghost"
-                              title="Emitir NF-e"
-                              onClick={() => emit(row.order!, false)}
+                              title="Cancelar venda e estornar valor"
+                              onClick={() => handleCancelOrder(row.order!)}
+                              style={{ color: '#ef4444' }}
                             >
-                              NF-e
+                              Cancelar
                             </button>
                           </div>
-                        ) : sold && !fiscalOn ? (
-                          <Link to="/painel/plano" className="btn btn--ghost" title="Requer Emissor Fiscal">
-                            Plano
-                          </Link>
+                        ) : row.status === 'cancelled' ? (
+                          <span className="empty" style={{ fontSize: '0.78rem' }}>
+                            {row.order?.cancelReason || 'Estornada'}
+                          </span>
                         ) : row.status === 'open' ? (
                           <Link
                             to="/painel/pdv"

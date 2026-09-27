@@ -44,7 +44,6 @@ import {
 } from '../../data/erpRegistry';
 import {
   evaluateCampaignForLine,
-  findCampaignsForStock,
   PROMO_EVENT,
 } from '../../data/promoCampaignStore';
 import {
@@ -134,6 +133,8 @@ type CartLine = {
   lineSurchargeMode: MoneyMode;
   /** Se o preço unitário foi fixado (ex: carregado de Orçamento Comercial) */
   isFrozenPrice?: boolean;
+  /** Preço resultante da tabela antes de promoções */
+  tablePrice?: number;
   /** Campanha aplicada (faixa / brinde / regra). */
   promoLabel?: string;
   promoExplanation?: string;
@@ -708,14 +709,15 @@ export function CaixaPage() {
           tables.find((item) => item.id === defaultTableId) ??
           tables[0];
 
-        let unitPrice =
+        const tableUnitPrice =
           line.isFrozenPrice && line.unitPrice > 0
             ? line.unitPrice
             : applyPriceTable(line.basePrice, lineTable);
 
+        let unitPrice = tableUnitPrice;
         let lineBase = Math.round(unitPrice * line.qty * 100) / 100;
-        let promoLabel = line.promoLabel || '';
-        let promoExplanation = line.promoExplanation || '';
+        let promoLabel = line.isFrozenPrice ? line.promoLabel || '' : '';
+        let promoExplanation = line.isFrozenPrice ? line.promoExplanation || '' : '';
 
         if (!line.isFrozenPrice) {
           const stk = stock.find((s) => s.id === line.stockId);
@@ -725,10 +727,12 @@ export function CaixaPage() {
               name: line.name,
               sku: line.sku,
               supplierId: stk?.supplierId,
+              category: stk?.attrs?.categoria || stk?.kind,
+              brand: stk?.attrs?.marca,
               attrs: stk?.attrs,
             },
             line.qty,
-            unitPrice,
+            tableUnitPrice,
           );
 
           if (evalResult.appliedCampaign) {
@@ -745,6 +749,7 @@ export function CaixaPage() {
         return {
           ...line,
           unitPrice,
+          tablePrice: tableUnitPrice,
           lineBase,
           lineDiscMoney: disc,
           lineSurMoney: sur,
@@ -944,11 +949,22 @@ export function CaixaPage() {
     setLines(existing ? current.map((line) => (line.key === key ? nextLine : line)) : [...current, nextLine]);
     setCode('');
     setError(null);
-    const camps = findCampaignsForStock(item.id);
-    const promoHit = camps.find((c) => c.kind === 'tier' || (c.kind === 'gift' && nextQty >= c.giftMinQty));
+    const evalPreview = evaluateCampaignForLine(
+      {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        supplierId: item.supplierId,
+        category: item.attrs?.categoria || item.kind,
+        brand: item.attrs?.marca,
+        attrs: item.attrs,
+      },
+      nextQty,
+      unitPrice,
+    );
     setMessage(
-      promoHit
-        ? `${item.name} · ${formatQty(addQty, unit)} ${unit} · campanha ${promoHit.name}`
+      evalPreview.appliedCampaign
+        ? `${item.name} · ${formatQty(addQty, unit)} ${unit} · ✨ ${evalPreview.promoLabel}`
         : `${item.name} · ${formatQty(addQty, unit)} ${unit}`,
     );
     focusCode();
@@ -2220,10 +2236,10 @@ export function CaixaPage() {
                             />
                           ) : (
                             <div>
-                              {line.promoLabel && line.unitPrice < line.basePrice ? (
+                              {line.promoLabel && line.unitPrice < (line.tablePrice ?? line.basePrice) ? (
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                   <span style={{ textDecoration: 'line-through', fontSize: '0.74rem', color: '#94a3b8' }}>
-                                    {money(line.basePrice)}
+                                    {money(line.tablePrice ?? line.basePrice)}
                                   </span>
                                   <span style={{ color: '#059669', fontWeight: 700 }}>
                                     {money(line.unitPrice)}

@@ -172,23 +172,24 @@ function seed(): Store {
       },
       {
         id: 'PROMO-DEMO-TIER',
-        name: 'Leve 3 pague R$ 10 (Faixas)',
-        active: true,
+        name: 'Leve 3 Pague R$ 10 (Volume)',
+        active: false,
         kind: 'tier',
         criteria: {
+          category: 'Bebidas',
           stockIds: [],
-          minQty: 1,
+          minQty: 3,
         },
         stockIds: [],
         tiers: [
-          { qty: 1, totalPrice: 4 },
           { qty: 3, totalPrice: 10 },
+          { qty: 6, totalPrice: 18 },
         ],
         giftStockId: '',
         giftMinQty: 10,
         priority: 1,
         accumulative: false,
-        note: 'Exemplo: 1 é 4 · 3 é 10. Vincule produtos na Retaguarda.',
+        note: 'Exemplo de faixas por volume para categoria Bebidas. Ative após vincular produtos.',
         createdAt: today.toISOString(),
       },
     ],
@@ -249,23 +250,56 @@ function normalize(item: any): PromoCampaign {
   };
 }
 
+function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
+  return campaigns.map((camp) => {
+    const hasTarget =
+      (camp.criteria?.stockIds && camp.criteria.stockIds.length > 0) ||
+      Boolean(camp.criteria?.category) ||
+      Boolean(camp.criteria?.brand) ||
+      Boolean(camp.criteria?.supplierId);
+
+    // Proteção de segurança: se a campanha for de preço fixo, faixas de volume ou leve X pague Y sem NENHUM target:
+    // Desativa para evitar que altere preços indevidamente de produtos não participantes.
+    if ((camp.kind === 'tier' || camp.kind === 'promo_price' || camp.kind === 'buy_x_pay_y') && !hasTarget) {
+      if (camp.active) {
+        return {
+          ...camp,
+          active: false,
+          note: camp.note
+            ? `${camp.note} [Pausada por segurança: requer vincular produto ou categoria]`
+            : 'Pausada por segurança: requer vincular produto ou categoria',
+        };
+      }
+    }
+    return camp;
+  });
+}
+
 function load(): Store {
   if (memory) return memory;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Store>;
-      memory = {
-        campaigns: Array.isArray(parsed.campaigns)
-          ? parsed.campaigns.map(normalize)
-          : seed().campaigns,
-      };
+      const loaded = Array.isArray(parsed.campaigns)
+        ? parsed.campaigns.map(normalize)
+        : seed().campaigns;
+      const sanitized = sanitizeCampaigns(loaded);
+      memory = { campaigns: sanitized };
+      // Se houve alteração de segurança, salva de volta
+      if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+        } catch {
+          /* ignore */
+        }
+      }
       return memory;
     }
   } catch {
     /* ignore */
   }
-  memory = seed();
+  memory = { campaigns: sanitizeCampaigns(seed().campaigns) };
   return memory;
 }
 
@@ -331,25 +365,42 @@ export function findCampaignsForStock(stockId: string): PromoCampaign[] {
 
 /**
  * Calcula total da linha com faixas “N é R$ X”.
- * Empacota pela maior faixa possível; resto pela menor (ou preço base).
+ * Empacota pela maior faixa possível; resto pela menor faixa unitária (ou preço base).
+ * Garante que o valor final NUNCA seja maior que o preço padrão da quantidade.
  */
 export function applyTierTotal(qty: number, baseUnitPrice: number, tiers: PromoTier[]): number {
   if (qty <= 0) return 0;
-  if (!tiers.length) return Math.round(baseUnitPrice * qty * 100) / 100;
-  const sortedDesc = [...tiers].sort((a, b) => b.qty - a.qty);
-  const one = [...tiers].sort((a, b) => a.qty - b.qty).find((tier) => tier.qty === 1);
-  const remainderUnit = one ? one.totalPrice : baseUnitPrice;
+  const standardTotal = Math.round(baseUnitPrice * qty * 100) / 100;
+  if (!tiers || !tiers.length) return standardTotal;
+
+  const validTiers = tiers
+    .filter((t) => t.qty > 0 && t.totalPrice >= 0)
+    .sort((a, b) => b.qty - a.qty);
+
+  if (!validTiers.length) return standardTotal;
+
+  // Se a quantidade solicitada for menor que a menor faixa da campanha, não atinge promoção
+  const minTierQty = validTiers[validTiers.length - 1].qty;
+  if (qty < minTierQty) return standardTotal;
+
+  // Unidade avulsa se tiver faixa de 1 unidade mais barata que o preço base
+  const tierOne = validTiers.find((tier) => tier.qty === 1);
+  const remainderUnit = tierOne && tierOne.totalPrice < baseUnitPrice ? tierOne.totalPrice : baseUnitPrice;
+
   let remaining = qty;
   let total = 0;
-  for (const tier of sortedDesc) {
-    if (tier.qty <= 0) continue;
+  for (const tier of validTiers) {
+    if (tier.qty <= 1) continue;
     const packs = Math.floor(remaining / tier.qty);
     if (packs <= 0) continue;
     total += packs * tier.totalPrice;
     remaining -= packs * tier.qty;
   }
   total += remaining * remainderUnit;
-  return Math.round(total * 100) / 100;
+  const calculatedTotal = Math.round(total * 100) / 100;
+
+  // Regra de ouro comercial: promoção NUNCA encarece o produto
+  return calculatedTotal < standardTotal ? calculatedTotal : standardTotal;
 }
 
 export type EvaluatedLinePromo = {
@@ -369,12 +420,14 @@ export type StockItemEvaluationInput = {
   sku?: string;
   supplierId?: string;
   category?: string;
+  brand?: string;
   attrs?: Record<string, string>;
 };
 
 /**
  * Avalia de forma inteligente todas as campanhas ativas para uma linha do carrinho do PDV / Orçamento.
  * Respeita critérios (produto, fornecedor, categoria, quantidade mínima), vigência e prioridade.
+ * NUNCA aplica campanhas de faixas ou preços fixos em produtos que não atendam estritamente aos critérios.
  */
 export function evaluateCampaignForLine(
   item: StockItemEvaluationInput,
@@ -400,19 +453,30 @@ export function evaluateCampaignForLine(
   const eligibleCampaigns = activeCampaigns.filter((camp) => {
     const { criteria } = camp;
 
-    // 1. Filtro de Grupo de Cliente
-    if (criteria.customerGroup && customerGroup && criteria.customerGroup.toLowerCase() !== customerGroup.toLowerCase()) {
-      return false;
+    // 1. Filtro de Grupo de Cliente (se a campanha exige grupo específico, cliente precisa pertencer)
+    if (criteria.customerGroup) {
+      if (!customerGroup || criteria.customerGroup.toLowerCase() !== customerGroup.toLowerCase()) {
+        return false;
+      }
     }
 
-    // 2. Filtro de Quantidade Mínima
-    if (criteria.minQty && qty < criteria.minQty) {
+    // 2. Proteção Crítica: Campanhas de Preço Fixo, Faixas ou Leve X Pague Y PRECISAM ter alvo específico!
+    // Evita catástrofes como vender um item de R$ 709.000,00 por R$ 4,00 ou R$ 10,00.
+    const hasSpecificTarget =
+      (criteria.stockIds && criteria.stockIds.length > 0) ||
+      Boolean(criteria.category) ||
+      Boolean(criteria.brand) ||
+      Boolean(criteria.supplierId);
+
+    if (
+      (camp.kind === 'tier' || camp.kind === 'promo_price' || camp.kind === 'buy_x_pay_y' || camp.kind === 'gift') &&
+      !hasSpecificTarget
+    ) {
       return false;
     }
 
     // 3. Filtro de Produtos Específicos
-    const hasSpecificProducts = criteria.stockIds && criteria.stockIds.length > 0;
-    if (hasSpecificProducts) {
+    if (criteria.stockIds && criteria.stockIds.length > 0) {
       if (!criteria.stockIds.includes(item.id)) return false;
     }
 
@@ -425,19 +489,59 @@ export function evaluateCampaignForLine(
 
     // 5. Filtro de Categoria
     if (criteria.category) {
+      const catNeedle = criteria.category.toLowerCase().trim();
       const matchCat =
-        (item.category && item.category.toLowerCase().includes(criteria.category.toLowerCase())) ||
-        (item.name && item.name.toLowerCase().includes(criteria.category.toLowerCase())) ||
+        (item.category && item.category.toLowerCase().includes(catNeedle)) ||
+        (item.name && item.name.toLowerCase().includes(catNeedle)) ||
         Object.values(item.attrs || {}).some((val) =>
-          String(val).toLowerCase().includes(criteria.category!.toLowerCase()),
+          String(val).toLowerCase().includes(catNeedle),
         );
       if (!matchCat) return false;
     }
 
-    // Se a campanha não tem produto, nem fornecedor, nem categoria específica,
-    // e não é brinde/tier geral, só aplica se explicitamente genérica
-    if (!hasSpecificProducts && !criteria.supplierId && !criteria.category && camp.kind !== 'gift') {
-      // Permitir se tiver faixa ou for genérica
+    // 6. Filtro de Marca
+    if (criteria.brand) {
+      const brandNeedle = criteria.brand.toLowerCase().trim();
+      const matchBrand =
+        (item.brand && item.brand.toLowerCase().includes(brandNeedle)) ||
+        (item.attrs?.marca && item.attrs.marca.toLowerCase().includes(brandNeedle)) ||
+        (item.attrs?.brand && item.attrs.brand.toLowerCase().includes(brandNeedle)) ||
+        (item.name && item.name.toLowerCase().includes(brandNeedle));
+      if (!matchBrand) return false;
+    }
+
+    // 7. Filtro de Quantidade Mínima geral
+    if (criteria.minQty && qty < criteria.minQty) {
+      return false;
+    }
+
+    // 8. Filtro de Valor Mínimo da Linha
+    if (criteria.minAmount && standardTotal < criteria.minAmount) {
+      return false;
+    }
+
+    // 9. Validações específicas por tipo de benefício
+    if (camp.kind === 'buy_x_pay_y') {
+      const buy = camp.buyQty || 2;
+      const pay = camp.payQty || 1;
+      if (buy <= pay || qty < buy) return false;
+    }
+
+    if (camp.kind === 'tier') {
+      if (!camp.tiers || camp.tiers.length === 0) return false;
+      const minTierQty = Math.min(...camp.tiers.map((t) => t.qty));
+      if (qty < minTierQty) return false;
+    }
+
+    if (camp.kind === 'gift') {
+      if (!camp.giftStockId || qty < (camp.giftMinQty || 1)) return false;
+    }
+
+    if (camp.kind === 'promo_price') {
+      // Preço promocional deve ser menor que o preço unitário para fazer sentido
+      if (typeof camp.promoPrice === 'number' && camp.promoPrice >= originalUnitPrice) {
+        return false;
+      }
     }
 
     return true;
@@ -465,28 +569,30 @@ export function evaluateCampaignForLine(
 
   switch (bestCampaign.kind) {
     case 'percent': {
-      const pct = bestCampaign.discountPercent || 0;
+      const pct = Math.min(100, Math.max(0, bestCampaign.discountPercent || 0));
       calculatedUnitPrice = Math.round(originalUnitPrice * (1 - pct / 100) * 100) / 100;
       calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
       explanation = `${pct}% OFF · ${bestCampaign.name}`;
       break;
     }
     case 'fixed': {
-      const discount = bestCampaign.discountAmount || 0;
+      const discount = Math.max(0, bestCampaign.discountAmount || 0);
       calculatedUnitPrice = Math.max(0, Math.round((originalUnitPrice - discount) * 100) / 100);
       calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
-      explanation = `R$ ${discount.toFixed(2)} OFF por un. · ${bestCampaign.name}`;
+      explanation = `R$ ${discount.toFixed(2).replace('.', ',')} OFF por un. · ${bestCampaign.name}`;
       break;
     }
     case 'promo_price': {
       const price = bestCampaign.promoPrice || originalUnitPrice;
-      calculatedUnitPrice = Math.round(price * 100) / 100;
-      calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
-      explanation = `Preço Promocional R$ ${calculatedUnitPrice.toFixed(2)} · ${bestCampaign.name}`;
+      if (price < originalUnitPrice) {
+        calculatedUnitPrice = Math.round(price * 100) / 100;
+        calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
+        explanation = `Preço Especial R$ ${calculatedUnitPrice.toFixed(2).replace('.', ',')} · ${bestCampaign.name}`;
+      }
       break;
     }
     case 'buy_x_pay_y': {
-      const buy = bestCampaign.buyQty || 1;
+      const buy = bestCampaign.buyQty || 2;
       const pay = bestCampaign.payQty || 1;
       if (buy > pay && qty >= buy) {
         const sets = Math.floor(qty / buy);
@@ -499,14 +605,17 @@ export function evaluateCampaignForLine(
     }
     case 'tier': {
       if (bestCampaign.tiers && bestCampaign.tiers.length > 0) {
-        calculatedLineTotal = applyTierTotal(qty, originalUnitPrice, bestCampaign.tiers);
-        calculatedUnitPrice = qty > 0 ? Math.round((calculatedLineTotal / qty) * 100) / 100 : originalUnitPrice;
-        explanation = `Faixa de Quantidade · ${bestCampaign.name}`;
+        const tierTotal = applyTierTotal(qty, originalUnitPrice, bestCampaign.tiers);
+        if (tierTotal < standardTotal) {
+          calculatedLineTotal = tierTotal;
+          calculatedUnitPrice = qty > 0 ? Math.round((calculatedLineTotal / qty) * 100) / 100 : originalUnitPrice;
+          explanation = `Faixas por Volume · ${bestCampaign.name}`;
+        }
       }
       break;
     }
     case 'gift': {
-      if (bestCampaign.giftStockId && qty >= bestCampaign.giftMinQty) {
+      if (bestCampaign.giftStockId && qty >= (bestCampaign.giftMinQty || 1)) {
         giftDescription = `Brinde incluso por volume (a partir de ${bestCampaign.giftMinQty} un.)`;
         explanation = `Ganhe Brinde · ${bestCampaign.name}`;
       }
@@ -515,6 +624,18 @@ export function evaluateCampaignForLine(
   }
 
   const discountAmount = Math.max(0, Math.round((standardTotal - calculatedLineTotal) * 100) / 100);
+  const hasEffectiveBenefit = discountAmount > 0 || Boolean(giftDescription);
+
+  if (!hasEffectiveBenefit) {
+    return {
+      appliedCampaign: null,
+      unitPrice: originalUnitPrice,
+      lineBaseTotal: standardTotal,
+      originalUnitPrice,
+      discountAmount: 0,
+      promoLabel: '',
+    };
+  }
 
   return {
     appliedCampaign: bestCampaign,

@@ -108,7 +108,7 @@ function emptyForm(): FormState {
     discountPercent: 10,
     discountAmount: 5,
     promoPrice: 0,
-    tiersText: '1=4\n3=10',
+    tiersText: '3=10\n6=18',
     buyQty: 3,
     payQty: 2,
     giftStockId: '',
@@ -251,7 +251,7 @@ export function PromoCampaignsPage() {
     }
     const tiers = form.kind === 'tier' ? parseTiersText(form.tiersText) : [];
     if (form.kind === 'tier' && tiers.length === 0) {
-      setError('Informe ao menos uma faixa no formato 1=4 ou 3=10.');
+      setError('Informe ao menos uma faixa no formato quantidade=preço (ex: 3=10 para levar 3 por R$ 10,00).');
       return;
     }
     if (form.kind === 'gift' && !form.giftStockId) {
@@ -274,8 +274,10 @@ export function PromoCampaignsPage() {
       setError('No Leve X Pague Y, a quantidade de compra (X) deve ser maior que a paga (Y).');
       return;
     }
-    if (form.stockIds.length === 0 && !form.supplierId && !form.category.trim() && !form.brand.trim()) {
-      setError('Vincule ao menos um produto, fornecedor, categoria ou marca à campanha.');
+    const requiresTarget = ['tier', 'promo_price', 'buy_x_pay_y', 'gift'].includes(form.kind);
+    const hasTarget = form.stockIds.length > 0 || Boolean(form.supplierId) || Boolean(form.category.trim()) || Boolean(form.brand.trim());
+    if (requiresTarget && !hasTarget) {
+      setError('Para promoções com Preço Fixo, Faixas de Volume, Leve X Pague Y ou Brinde, é obrigatório vincular ao menos um produto, fornecedor, categoria ou marca para proteger os preços da loja.');
       return;
     }
 
@@ -617,8 +619,11 @@ export function PromoCampaignsPage() {
                   disabled={readOnly}
                   value={form.tiersText}
                   onChange={(e) => setForm({ ...form, tiersText: e.target.value })}
-                  placeholder={'1=4\n3=10\n10=30'}
+                  placeholder={'3=10\n6=18\n12=32'}
                 />
+                <small style={{ color: 'var(--muted, #94a3b8)', marginTop: 4, display: 'block' }}>
+                  Exemplo: <strong>3=10</strong> significa levar 3 unidades pelo valor total de R$ 10,00. É obrigatório vincular os produtos participantes na seção abaixo.
+                </small>
               </label>
             ) : null}
 
@@ -774,8 +779,27 @@ export function PromoCampaignsPage() {
             {/* PRODUTOS ESPECÍFICOS */}
             <div className="span-2" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               <strong style={{ color: 'var(--ink, #e8eef4)' }}>
-                Vincular Produtos Específicos (Opcional se fornecedor/categoria estiver definido)
+                Vincular Produtos Específicos (Opcional se fornecedor/categoria/marca estiver definido)
               </strong>
+              {['tier', 'promo_price', 'buy_x_pay_y', 'gift'].includes(form.kind) &&
+              form.stockIds.length === 0 &&
+              !form.supplierId &&
+              !form.category.trim() &&
+              !form.brand.trim() ? (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#ef4444',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  ⚠️ Obrigatório: Para campanhas de Faixas, Preço Fixo ou Leve X Pague Y, vincule ao menos um produto abaixo ou defina fornecedor/categoria/marca para evitar atingir produtos não participantes.
+                </div>
+              ) : null}
               {!readOnly ? (
                 <AdminPicker
                   label="Adicionar produto específico à campanha"

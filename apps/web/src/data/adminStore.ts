@@ -114,6 +114,14 @@ export type PaymentMethod = {
   active: boolean;
 };
 
+export type SalesOrderLine = {
+  stockId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  imei?: string;
+};
+
 export type SalesOrder = {
   id: string;
   ticketId: string | null;
@@ -128,6 +136,11 @@ export type SalesOrder = {
   createdAt: string;
   /** Sessão de caixa em que a venda foi registrada. */
   cashSessionId?: string;
+  /** Linhas originais da venda */
+  lines?: SalesOrderLine[];
+  /** Informações de cancelamento */
+  cancelledAt?: string;
+  cancelReason?: string;
 };
 
 export type FinanceSource = 'manual' | 'pos' | 'os_part' | 'os_purchase' | 'os_revenue' | 'os_reversal';
@@ -1033,6 +1046,13 @@ export async function closePosSale(input: {
     sellerId: input.sellerId ?? '',
     sellerName: input.sellerName ?? '',
     createdAt: new Date().toISOString(),
+    lines: input.lines.map((l) => ({
+      stockId: l.stockId,
+      name: l.name,
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      imei: l.imei,
+    })),
   };
   state.orders.unshift(order);
   state.finance.unshift({
@@ -1115,6 +1135,81 @@ export async function closePosSale(input: {
     });
   }
   return state;
+}
+
+export function cancelSalesOrder(
+  orderId: string,
+  reason = 'Cancelamento de venda',
+  operatorName = 'Administrador',
+): { ok: boolean; error?: string } {
+  const state = load();
+  const order = state.orders.find((o) => o.id === orderId);
+  if (!order) return { ok: false, error: 'Venda não encontrada.' };
+  if (order.status === 'cancelled') return { ok: false, error: 'Esta venda já está cancelada.' };
+
+  order.status = 'cancelled';
+  order.cancelledAt = new Date().toISOString();
+  order.cancelReason = reason.trim() || 'Cancelamento de venda';
+
+  // Lança o estorno no financeiro para não distorcer o fluxo de caixa
+  state.finance.unshift({
+    id: uid('FIN'),
+    type: 'out',
+    label: `Estorno Venda ${order.id} · ${order.cancelReason}`,
+    amount: order.amount,
+    createdAt: order.cancelledAt,
+    source: 'pos',
+    refId: order.id,
+  });
+
+  // Devolve itens ao estoque se existirem linhas vinculadas
+  if (order.lines && order.lines.length > 0) {
+    const returnMoves: Array<{
+      stockId: string;
+      stockName: string;
+      sku: string;
+      type: 'return';
+      qty: number;
+      direction: 1;
+      unitCost: number;
+      balanceAfter: number;
+      note: string;
+      refId: string;
+      warehouseId?: string;
+    }> = [];
+
+    for (const line of order.lines) {
+      if (!line.stockId) continue;
+      const stock = state.stock.find((s) => s.id === line.stockId);
+      if (stock) {
+        stock.qty = Math.round((stock.qty + line.qty) * 1000) / 1000;
+        returnMoves.push({
+          stockId: stock.id,
+          stockName: stock.name,
+          sku: stock.sku,
+          type: 'return',
+          qty: line.qty,
+          direction: 1,
+          unitCost: stock.avgCost || stock.cost || 0,
+          balanceAfter: stock.qty,
+          note: `Estorno Venda ${order.id} (${operatorName})`,
+          refId: order.id,
+          warehouseId: stock.warehouseId,
+        });
+      }
+    }
+
+    if (returnMoves.length > 0) {
+      void import('./stockLedger').then(({ logStockMovements }) => {
+        logStockMovements(returnMoves);
+      });
+    }
+  }
+
+  save(state);
+  window.dispatchEvent(new Event(ADMIN_STATE_EVENT));
+  window.dispatchEvent(new Event(STOCK_EVENT));
+  return { ok: true };
 }
 
 export async function addFinance(
