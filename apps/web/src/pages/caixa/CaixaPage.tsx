@@ -744,8 +744,9 @@ export function CaixaPage() {
             ? line.unitPrice
             : applyPriceTable(line.basePrice, lineTable);
 
+        const standardLineTotal = Math.round(tableUnitPrice * line.qty * 100) / 100;
         let unitPrice = tableUnitPrice;
-        let lineBase = Math.round(unitPrice * line.qty * 100) / 100;
+        let lineBase = standardLineTotal;
         let promoLabel = line.isFrozenPrice ? line.promoLabel || '' : '';
         let promoExplanation = line.isFrozenPrice ? line.promoExplanation || '' : '';
 
@@ -765,11 +766,21 @@ export function CaixaPage() {
             tableUnitPrice,
           );
 
-          if (evalResult.appliedCampaign) {
-            unitPrice = evalResult.unitPrice;
-            lineBase = evalResult.lineBaseTotal;
+          // Hard guard: A promoção NUNCA pode encarecer o produto nem igualar sem brinde.
+          // Se o valor calculado for maior ou igual ao total padrão sem benefício, descarta a campanha.
+          if (
+            evalResult.appliedCampaign &&
+            (evalResult.lineBaseTotal < standardLineTotal || evalResult.giftDescription)
+          ) {
+            unitPrice = Math.min(tableUnitPrice, evalResult.unitPrice);
+            lineBase = Math.min(standardLineTotal, evalResult.lineBaseTotal);
             promoLabel = evalResult.promoLabel;
             promoExplanation = evalResult.explanation || '';
+          } else {
+            unitPrice = tableUnitPrice;
+            lineBase = standardLineTotal;
+            promoLabel = '';
+            promoExplanation = '';
           }
         }
 
@@ -1019,8 +1030,13 @@ export function CaixaPage() {
       nextQty,
       unitPrice,
     );
+    const standardAddTotal = Math.round(unitPrice * nextQty * 100) / 100;
+    const hasPromoBenefit =
+      evalPreview.appliedCampaign &&
+      (evalPreview.lineBaseTotal < standardAddTotal || Boolean(evalPreview.giftDescription));
+
     setMessage(
-      evalPreview.appliedCampaign
+      hasPromoBenefit
         ? `${item.name} · ${formatQty(addQty, unit)} ${unit} · ✨ ${evalPreview.promoLabel}`
         : `${item.name} · ${formatQty(addQty, unit)} ${unit}`,
     );

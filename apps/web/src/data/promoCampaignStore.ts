@@ -368,28 +368,40 @@ export function findCampaignsForStock(stockId: string): PromoCampaign[] {
  * Empacota pela maior faixa possível; resto pela menor faixa unitária (ou preço base).
  * Garante que o valor final NUNCA seja maior que o preço padrão da quantidade.
  */
+/**
+ * Calcula total da linha com faixas “N é R$ X”.
+ * Empacota pela maior faixa possível; resto pela menor faixa unitária (ou preço base).
+ * Garante com rigor absoluto que NENHUMA faixa seja aplicada se não proporcionar desconto
+ * real frente ao preço unitário padrão do produto (totalPrice < qty * baseUnitPrice).
+ */
 export function applyTierTotal(qty: number, baseUnitPrice: number, tiers: PromoTier[]): number {
-  if (qty <= 0) return 0;
+  if (qty <= 0 || baseUnitPrice <= 0) return 0;
   const standardTotal = Math.round(baseUnitPrice * qty * 100) / 100;
   if (!tiers || !tiers.length) return standardTotal;
 
-  const validTiers = tiers
-    .filter((t) => t.qty > 0 && t.totalPrice >= 0)
+  // Filtro de segurança: somente faixas que oferecem desconto real em relação ao preço unitário base
+  const beneficialTiers = tiers
+    .filter(
+      (t) =>
+        t.qty > 0 &&
+        t.totalPrice > 0 &&
+        t.totalPrice < Math.round(t.qty * baseUnitPrice * 100) / 100,
+    )
     .sort((a, b) => b.qty - a.qty);
 
-  if (!validTiers.length) return standardTotal;
+  if (!beneficialTiers.length) return standardTotal;
 
-  // Se a quantidade solicitada for menor que a menor faixa da campanha, não atinge promoção
-  const minTierQty = validTiers[validTiers.length - 1].qty;
+  // Se a quantidade solicitada for menor que a menor faixa vantajosa, não há promoção aplicável
+  const minTierQty = beneficialTiers[beneficialTiers.length - 1].qty;
   if (qty < minTierQty) return standardTotal;
 
-  // Unidade avulsa se tiver faixa de 1 unidade mais barata que o preço base
-  const tierOne = validTiers.find((tier) => tier.qty === 1);
+  // Unidade avulsa do restante se tiver faixa unitária mais barata que o preço base
+  const tierOne = beneficialTiers.find((tier) => tier.qty === 1);
   const remainderUnit = tierOne && tierOne.totalPrice < baseUnitPrice ? tierOne.totalPrice : baseUnitPrice;
 
   let remaining = qty;
   let total = 0;
-  for (const tier of validTiers) {
+  for (const tier of beneficialTiers) {
     if (tier.qty <= 1) continue;
     const packs = Math.floor(remaining / tier.qty);
     if (packs <= 0) continue;
@@ -399,7 +411,7 @@ export function applyTierTotal(qty: number, baseUnitPrice: number, tiers: PromoT
   total += remaining * remainderUnit;
   const calculatedTotal = Math.round(total * 100) / 100;
 
-  // Regra de ouro comercial: promoção NUNCA encarece o produto
+  // Regra de ouro comercial inegociável: promoção NUNCA encarece o produto
   return calculatedTotal < standardTotal ? calculatedTotal : standardTotal;
 }
 
@@ -428,6 +440,7 @@ export type StockItemEvaluationInput = {
  * Avalia de forma inteligente todas as campanhas ativas para uma linha do carrinho do PDV / Orçamento.
  * Respeita critérios (produto, fornecedor, categoria, quantidade mínima), vigência e prioridade.
  * NUNCA aplica campanhas de faixas ou preços fixos em produtos que não atendam estritamente aos critérios.
+ * Avalia todos os candidatos elegíveis e seleciona aquele que proporciona o maior benefício comercial.
  */
 export function evaluateCampaignForLine(
   item: StockItemEvaluationInput,
@@ -529,8 +542,11 @@ export function evaluateCampaignForLine(
 
     if (camp.kind === 'tier') {
       if (!camp.tiers || camp.tiers.length === 0) return false;
-      const minTierQty = Math.min(...camp.tiers.map((t) => t.qty));
-      if (qty < minTierQty) return false;
+      // Requer que exista ao menos uma faixa que forneça preço menor por unidade
+      const hasAnyBeneficialTier = camp.tiers.some(
+        (t) => t.qty > 0 && t.totalPrice > 0 && t.totalPrice < Math.round(t.qty * originalUnitPrice * 100) / 100,
+      );
+      if (!hasAnyBeneficialTier) return false;
     }
 
     if (camp.kind === 'gift') {
@@ -538,7 +554,7 @@ export function evaluateCampaignForLine(
     }
 
     if (camp.kind === 'promo_price') {
-      // Preço promocional deve ser menor que o preço unitário para fazer sentido
+      // Preço promocional deve ser estritamente menor que o preço unitário para fazer sentido
       if (typeof camp.promoPrice === 'number' && camp.promoPrice >= originalUnitPrice) {
         return false;
       }
@@ -558,75 +574,100 @@ export function evaluateCampaignForLine(
     };
   }
 
-  // Ordena por maior prioridade (descendente)
-  eligibleCampaigns.sort((a, b) => (b.priority || 1) - (a.priority || 1));
-  const bestCampaign = eligibleCampaigns[0];
+  type CandidateEvaluation = {
+    campaign: PromoCampaign;
+    calculatedLineTotal: number;
+    calculatedUnitPrice: number;
+    discountAmount: number;
+    explanation: string;
+    giftDescription: string;
+  };
 
-  let calculatedLineTotal = standardTotal;
-  let calculatedUnitPrice = originalUnitPrice;
-  let explanation = '';
-  let giftDescription = '';
+  const candidates: CandidateEvaluation[] = [];
 
-  switch (bestCampaign.kind) {
-    case 'percent': {
-      const pct = Math.min(100, Math.max(0, bestCampaign.discountPercent || 0));
-      calculatedUnitPrice = Math.round(originalUnitPrice * (1 - pct / 100) * 100) / 100;
-      calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
-      explanation = `${pct}% OFF · ${bestCampaign.name}`;
-      break;
-    }
-    case 'fixed': {
-      const discount = Math.max(0, bestCampaign.discountAmount || 0);
-      calculatedUnitPrice = Math.max(0, Math.round((originalUnitPrice - discount) * 100) / 100);
-      calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
-      explanation = `R$ ${discount.toFixed(2).replace('.', ',')} OFF por un. · ${bestCampaign.name}`;
-      break;
-    }
-    case 'promo_price': {
-      const price = bestCampaign.promoPrice || originalUnitPrice;
-      if (price < originalUnitPrice) {
-        calculatedUnitPrice = Math.round(price * 100) / 100;
-        calculatedLineTotal = Math.round(calculatedUnitPrice * qty * 100) / 100;
-        explanation = `Preço Especial R$ ${calculatedUnitPrice.toFixed(2).replace('.', ',')} · ${bestCampaign.name}`;
-      }
-      break;
-    }
-    case 'buy_x_pay_y': {
-      const buy = bestCampaign.buyQty || 2;
-      const pay = bestCampaign.payQty || 1;
-      if (buy > pay && qty >= buy) {
-        const sets = Math.floor(qty / buy);
-        const remainder = qty % buy;
-        calculatedLineTotal = Math.round((sets * pay * originalUnitPrice + remainder * originalUnitPrice) * 100) / 100;
-        calculatedUnitPrice = Math.round((calculatedLineTotal / qty) * 100) / 100;
-        explanation = `Leve ${buy} Pague ${pay} · ${bestCampaign.name}`;
-      }
-      break;
-    }
-    case 'tier': {
-      if (bestCampaign.tiers && bestCampaign.tiers.length > 0) {
-        const tierTotal = applyTierTotal(qty, originalUnitPrice, bestCampaign.tiers);
-        if (tierTotal < standardTotal) {
-          calculatedLineTotal = tierTotal;
-          calculatedUnitPrice = qty > 0 ? Math.round((calculatedLineTotal / qty) * 100) / 100 : originalUnitPrice;
-          explanation = `Faixas por Volume · ${bestCampaign.name}`;
+  for (const camp of eligibleCampaigns) {
+    let lineTotal = standardTotal;
+    let unitPrice = originalUnitPrice;
+    let explanation = '';
+    let giftDescription = '';
+
+    switch (camp.kind) {
+      case 'percent': {
+        const pct = Math.min(100, Math.max(0, camp.discountPercent || 0));
+        if (pct > 0) {
+          unitPrice = Math.round(originalUnitPrice * (1 - pct / 100) * 100) / 100;
+          lineTotal = Math.round(unitPrice * qty * 100) / 100;
+          explanation = `${pct}% OFF · ${camp.name}`;
         }
+        break;
       }
-      break;
+      case 'fixed': {
+        const discount = Math.max(0, camp.discountAmount || 0);
+        if (discount > 0) {
+          unitPrice = Math.max(0, Math.round((originalUnitPrice - discount) * 100) / 100);
+          lineTotal = Math.round(unitPrice * qty * 100) / 100;
+          explanation = `R$ ${discount.toFixed(2).replace('.', ',')} OFF por un. · ${camp.name}`;
+        }
+        break;
+      }
+      case 'promo_price': {
+        const price = camp.promoPrice;
+        if (typeof price === 'number' && price > 0 && price < originalUnitPrice) {
+          unitPrice = Math.round(price * 100) / 100;
+          lineTotal = Math.round(unitPrice * qty * 100) / 100;
+          explanation = `Preço Especial R$ ${unitPrice.toFixed(2).replace('.', ',')} · ${camp.name}`;
+        }
+        break;
+      }
+      case 'buy_x_pay_y': {
+        const buy = camp.buyQty || 2;
+        const pay = camp.payQty || 1;
+        if (buy > pay && qty >= buy) {
+          const sets = Math.floor(qty / buy);
+          const remainder = qty % buy;
+          lineTotal = Math.round((sets * pay * originalUnitPrice + remainder * originalUnitPrice) * 100) / 100;
+          unitPrice = Math.round((lineTotal / qty) * 100) / 100;
+          explanation = `Leve ${buy} Pague ${pay} · ${camp.name}`;
+        }
+        break;
+      }
+      case 'tier': {
+        if (camp.tiers && camp.tiers.length > 0) {
+          const tierTotal = applyTierTotal(qty, originalUnitPrice, camp.tiers);
+          if (tierTotal < standardTotal) {
+            lineTotal = tierTotal;
+            unitPrice = qty > 0 ? Math.round((lineTotal / qty) * 100) / 100 : originalUnitPrice;
+            explanation = `Faixas por Volume · ${camp.name}`;
+          }
+        }
+        break;
+      }
+      case 'gift': {
+        if (camp.giftStockId && qty >= (camp.giftMinQty || 1)) {
+          giftDescription = `Brinde incluso por volume (a partir de ${camp.giftMinQty} un.)`;
+          explanation = `Ganhe Brinde · ${camp.name}`;
+        }
+        break;
+      }
     }
-    case 'gift': {
-      if (bestCampaign.giftStockId && qty >= (bestCampaign.giftMinQty || 1)) {
-        giftDescription = `Brinde incluso por volume (a partir de ${bestCampaign.giftMinQty} un.)`;
-        explanation = `Ganhe Brinde · ${bestCampaign.name}`;
-      }
-      break;
+
+    const discountAmount = Math.max(0, Math.round((standardTotal - lineTotal) * 100) / 100);
+    const hasEffectiveBenefit = discountAmount > 0 || Boolean(giftDescription);
+
+    // CRÍTICO: Só aceita candidato se ele efetivamente gerar desconto real e NÃO aumentar o preço
+    if (hasEffectiveBenefit && lineTotal <= standardTotal) {
+      candidates.push({
+        campaign: camp,
+        calculatedLineTotal: lineTotal,
+        calculatedUnitPrice: unitPrice,
+        discountAmount,
+        explanation,
+        giftDescription,
+      });
     }
   }
 
-  const discountAmount = Math.max(0, Math.round((standardTotal - calculatedLineTotal) * 100) / 100);
-  const hasEffectiveBenefit = discountAmount > 0 || Boolean(giftDescription);
-
-  if (!hasEffectiveBenefit) {
+  if (candidates.length === 0) {
     return {
       appliedCampaign: null,
       unitPrice: originalUnitPrice,
@@ -637,14 +678,25 @@ export function evaluateCampaignForLine(
     };
   }
 
+  // Ordena candidatos:
+  // 1º: Maior prioridade declarada na campanha
+  // 2º: Maior economia real em R$ (desconto) para o cliente
+  candidates.sort((a, b) => {
+    const prioDiff = (b.campaign.priority || 1) - (a.campaign.priority || 1);
+    if (prioDiff !== 0) return prioDiff;
+    return b.discountAmount - a.discountAmount;
+  });
+
+  const best = candidates[0];
+
   return {
-    appliedCampaign: bestCampaign,
-    unitPrice: calculatedUnitPrice,
-    lineBaseTotal: calculatedLineTotal,
+    appliedCampaign: best.campaign,
+    unitPrice: best.calculatedUnitPrice,
+    lineBaseTotal: best.calculatedLineTotal,
     originalUnitPrice,
-    discountAmount,
-    promoLabel: bestCampaign.name,
-    explanation,
-    giftDescription,
+    discountAmount: best.discountAmount,
+    promoLabel: best.campaign.name,
+    explanation: best.explanation,
+    giftDescription: best.giftDescription,
   };
 }

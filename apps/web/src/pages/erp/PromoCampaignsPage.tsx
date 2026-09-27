@@ -281,6 +281,22 @@ export function PromoCampaignsPage() {
       return;
     }
 
+    if (form.kind === 'tier' && form.stockIds.length > 0) {
+      const selectedProducts = stock.filter((s) => form.stockIds.includes(s.id));
+      const problematicTiers = tiers.filter((t) =>
+        selectedProducts.length > 0 && selectedProducts.every((p) => p.price > 0 && t.totalPrice >= Math.round(t.qty * p.price * 100) / 100),
+      );
+      if (problematicTiers.length > 0) {
+        const example = problematicTiers[0];
+        const prod = selectedProducts[0];
+        const normalTotal = (example.qty * prod.price).toFixed(2);
+        setError(
+          `A faixa ${example.qty} un. por R$ ${example.totalPrice.toFixed(2)} encarece o produto ${prod.name} (preço normal R$ ${prod.price.toFixed(2)} x ${example.qty} = R$ ${normalTotal}). Ajuste o valor da faixa para conceder desconto real.`,
+        );
+        return;
+      }
+    }
+
     upsertPromoCampaign({
       id: mode === 'edit' && selectedId ? selectedId : undefined,
       name: form.name.trim(),
@@ -622,7 +638,7 @@ export function PromoCampaignsPage() {
                   placeholder={'3=10\n6=18\n12=32'}
                 />
                 <small style={{ color: 'var(--muted, #94a3b8)', marginTop: 4, display: 'block' }}>
-                  Exemplo: <strong>3=10</strong> significa levar 3 unidades pelo valor total de R$ 10,00. É obrigatório vincular os produtos participantes na seção abaixo.
+                  Exemplo: <strong>3=10</strong> significa levar 3 unidades pelo valor total de R$ 10,00 (R$ 3,33/un). A promoção no PDV só é ativada se gerar economia real frente ao preço normal do item. Se o item custar menos (ex: R$ 2,00 x 3 = R$ 6,00), a campanha é ignorada automaticamente para proteger o cliente.
                 </small>
               </label>
             ) : null}
