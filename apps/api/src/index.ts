@@ -5,6 +5,8 @@ import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
 import { healthRouter } from './routes/health.js';
+import { authRouter } from './routes/auth.js';
+import { partnersRouter } from './routes/partners.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
@@ -38,7 +40,9 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 app.use(healthRouter);
-// Perfil, totem, estoque, PDV e auth ficam no Nest. Este processo só publica o site.
+app.use(authRouter);
+app.use(partnersRouter);
+// Perfil, totem, estoque, PDV e demais rotas não implementadas localmente são encaminhadas para o Nest.
 app.use(proxyUnmatchedApi);
 
 if (serveWeb && webDist) {

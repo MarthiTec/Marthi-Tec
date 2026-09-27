@@ -86,6 +86,7 @@ import { MarthiPayoutSettingsPage } from './pages/marthi/MarthiPayoutSettingsPag
 import { CardapioPublicPage } from './pages/cardapio/CardapioPublicPage';
 import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
 import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
+import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 
 function LegacyMarthiRedirect() {
   const location = useLocation();
@@ -188,9 +189,11 @@ export function App() {
           <Route path="auditoria" element={<AuditPage />} />
           <Route path="cardapio" element={<CardapioAdminPage />} />
           <Route path="cardapio/imprimir" element={<CardapioPrintDisplay />} />
+          <Route path="lojas" element={<MultiStoreManagementPage />} />
         </Route>
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
+          <Route path="lojas" element={<Navigate to="/erp/lojas" replace />} />
           <Route path="operacoes" element={<OperationsPage />} />
           <Route path="operacoes/usuarios" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />

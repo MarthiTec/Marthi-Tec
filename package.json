@@ -13,6 +13,7 @@
     "dev:web": "npm run dev --workspace=@marthi/web",
     "build:api": "tsc -p apps/api/tsconfig.json",
     "build:web": "npm --prefix apps/web run build",
+    "db:migrate": "npm run db:migrate --workspace=@marthi/api",
     "lint": "npm run lint --workspaces --if-present"
   },
   "dependencies": {

@@ -6,6 +6,7 @@ import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,7 @@ import './erp.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp': { kicker: 'Retaguarda', title: 'Retaguarda da loja' },
+  '/erp/lojas': { kicker: 'Retaguarda', title: 'Lojas & Licenciamento por CNPJ' },
   '/erp/perfil': { kicker: 'Retaguarda', title: 'Meu perfil' },
   '/erp/conta': { kicker: 'Retaguarda', title: 'Meu perfil' },
   '/erp/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
@@ -78,6 +80,7 @@ const NAV_FINANCE: NavItem[] = [
 ];
 
 const NAV_BACK: NavItem[] = [
+  { to: '/erp/lojas', label: 'Lojas & Licenças', icon: 'store' },
   { to: '/erp/relatorios', label: 'Relatórios', icon: 'ops' },
   { to: '/erp/auditoria', label: 'Auditoria', icon: 'ops' },
 ];
@@ -149,6 +152,7 @@ export function ErpLayout() {
       <header className="erp-app__top">
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <StoreSwitcher />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi Retaguarda</strong>
