@@ -28,6 +28,8 @@ export type PosDraftLine = {
   promoExplanation?: string;
   campaignId?: string;
   imei?: string;
+  isAdHoc?: boolean;
+  itemType?: 'product' | 'ad_hoc';
 };
 
 export type PosDraftSplit = {

@@ -104,6 +104,8 @@ export type EmployeePermissions = {
   posCancelItem?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  posAdHocConfigure?: boolean;
+  posAdHocLaunch?: boolean;
 };
 
 export type Employee = {
@@ -785,6 +787,29 @@ export function userCanDelete(userEmail: string | null | undefined): boolean {
   if (!emp) return linkedSystemUsers().length === 0;
   if (emp.role === 'admin' || emp.role === 'manager') return true;
   return Boolean(emp.permissions?.canDelete);
+}
+
+/** Permissão para configurar o recurso de Venda Avulsa nos caixas */
+export function userCanConfigureAdHoc(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return linkedSystemUsers().length === 0;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  return Boolean(emp.permissions?.posAdHocConfigure);
+}
+
+/** Permissão operacional para lançar Venda Avulsa no PDV */
+export function userCanLaunchAdHoc(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return true;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  if (typeof emp.permissions?.posAdHocLaunch === 'boolean') {
+    return emp.permissions.posAdHocLaunch;
+  }
+  return true;
 }
 
 export function navPathToAccessArea(path: string): AccessArea | null {

@@ -66,6 +66,8 @@ export type PosQuoteLine = {
   total: number;
   promoLabel?: string;
   campaignId?: string;
+  isAdHoc?: boolean;
+  itemType?: 'product' | 'ad_hoc';
 };
 
 export type PosQuoteHistoryEntry = {

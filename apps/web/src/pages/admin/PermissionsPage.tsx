@@ -61,6 +61,8 @@ const EMPTY_FORM: FormState = {
     posCancelItem: false,
     canEdit: true,
     canDelete: false,
+    posAdHocConfigure: false,
+    posAdHocLaunch: true,
   },
   accessPassword: '',
   active: true,
@@ -187,10 +189,10 @@ export function PermissionsPage() {
     setError('');
     const defaultPerms =
       item.role === 'admin' || item.role === 'manager'
-        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true, posAdHocConfigure: true, posAdHocLaunch: true }
         : item.role === 'operator'
-          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false }
-          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false };
+          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false, posAdHocConfigure: false, posAdHocLaunch: true }
+          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false, posAdHocConfigure: false, posAdHocLaunch: false };
     setForm({
       employeeId: item.id,
       role: item.role,
@@ -210,10 +212,10 @@ export function PermissionsPage() {
     }
     const defaultPerms =
       person.role === 'admin' || person.role === 'manager'
-        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true, posAdHocConfigure: true, posAdHocLaunch: true }
         : person.role === 'operator'
-          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false }
-          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false };
+          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false, posAdHocConfigure: false, posAdHocLaunch: true }
+          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false, posAdHocConfigure: false, posAdHocLaunch: false };
     setForm((current) => ({
       ...current,
       employeeId,
@@ -266,7 +268,7 @@ export function PermissionsPage() {
 
     const perms =
       form.role === 'admin'
-        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true, posAdHocConfigure: true, posAdHocLaunch: true }
         : form.permissions;
 
     const result = await upsertEmployee({
@@ -646,6 +648,34 @@ export function PermissionsPage() {
                       }
                     />
                     <span>🗑️ Excluir Cadastros (Lixeira Geral)</span>
+                  </label>
+                  <label className="erp-access__item">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={Boolean(form.permissions.posAdHocConfigure)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, posAdHocConfigure: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>⚙️ Configurar Venda Avulsa nos Caixas</span>
+                  </label>
+                  <label className="erp-access__item">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={form.permissions.posAdHocLaunch !== false}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, posAdHocLaunch: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>⚡ Lançar Venda Avulsa no PDV</span>
                   </label>
                 </div>
               </div>

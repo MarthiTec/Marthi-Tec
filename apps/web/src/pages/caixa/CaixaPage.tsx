@@ -33,6 +33,7 @@ import {
 import {
   CASH_SETTINGS_EVENT,
   getCashSettings,
+  isAdHocEnabledForTerminal,
   readScaleKg,
   verifyDeleteItemPassword,
 } from '../../data/cashSettings';
@@ -41,7 +42,9 @@ import {
   userCanCancelItem,
   userCanCancelSale,
   userIsStoreAdmin,
+  userCanLaunchAdHoc,
 } from '../../data/erpRegistry';
+import { logAudit } from '../../data/auditLog';
 import {
   evaluateCampaignForLine,
   PROMO_EVENT,
@@ -139,6 +142,9 @@ type CartLine = {
   promoLabel?: string;
   promoExplanation?: string;
   campaignId?: string;
+  /** Venda Avulsa: produto ou serviço rápido sem cadastro e sem movimentação de estoque */
+  isAdHoc?: boolean;
+  itemType?: 'product' | 'ad_hoc';
 };
 
 function money(value: number) {
@@ -562,9 +568,11 @@ export function CaixaPage() {
         lineDiscountMode: l.lineDiscountMode || 'money',
         lineSurcharge: updatePrices ? 0 : l.lineSurcharge || 0,
         lineSurchargeMode: l.lineSurchargeMode || 'money',
-        isFrozenPrice: !updatePrices,
+        isFrozenPrice: !updatePrices || Boolean(l.isAdHoc),
         promoLabel: updatePrices ? undefined : l.promoLabel,
         imei: '',
+        isAdHoc: l.isAdHoc,
+        itemType: l.itemType,
       };
     });
 
@@ -652,6 +660,8 @@ export function CaixaPage() {
 
   const fiscalOn = hasModule('fiscal');
   const isAdmin = userIsStoreAdmin(user?.email);
+  const terminalId = getPosTerminalId();
+  const canLaunchAdHoc = isAdHocEnabledForTerminal(terminalId) && userCanLaunchAdHoc(user?.email);
   const customization = useStoreCustomization();
   const sellers = useMemo(() => listSellers(true), []);
   const codeRef = useRef<HTMLInputElement>(null);
@@ -704,6 +714,26 @@ export function CaixaPage() {
   const pricedLines = useMemo(
     () =>
       lines.map((line) => {
+        if (line.isAdHoc) {
+          const unitPrice = line.unitPrice;
+          const lineBase = Math.round(unitPrice * line.qty * 100) / 100;
+          const disc = moneyAdj(lineBase, line.lineDiscount, line.lineDiscountMode);
+          const sur = moneyAdj(lineBase, line.lineSurcharge, line.lineSurchargeMode);
+          const lineTotal = Math.max(0, lineBase - disc + sur);
+          return {
+            ...line,
+            unitPrice,
+            tablePrice: unitPrice,
+            lineBase,
+            lineDiscMoney: disc,
+            lineSurMoney: sur,
+            lineTotal,
+            promoLabel: '',
+            promoExplanation: '',
+            tableName: 'Avulso',
+          };
+        }
+
         const lineTable =
           tables.find((item) => item.id === line.priceTableId) ??
           tables.find((item) => item.id === defaultTableId) ??
@@ -781,6 +811,8 @@ export function CaixaPage() {
         total: l.lineTotal,
         promoLabel: l.promoLabel,
         campaignId: l.campaignId,
+        isAdHoc: l.isAdHoc,
+        itemType: l.itemType,
       })),
       customerId,
       customerName: walkIn || !customerName.trim() ? '' : customerName.trim(),
@@ -872,6 +904,31 @@ export function CaixaPage() {
   }
 
   openPanelRef.current = openPanel;
+
+  function handleAddAdHocLine(item: { name: string; unitPrice: number; qty: number }) {
+    const key = `adhoc:${Date.now()}:${Math.random().toString(36).slice(2, 6)}`;
+    const newLine: CartLine = {
+      key,
+      stockId: '',
+      name: item.name,
+      sku: 'AVULSO',
+      imei: '',
+      qty: item.qty,
+      unit: 'UN',
+      basePrice: item.unitPrice,
+      unitPrice: item.unitPrice,
+      priceTableId: '',
+      lineDiscount: 0,
+      lineDiscountMode: 'money',
+      lineSurcharge: 0,
+      lineSurchargeMode: 'money',
+      isFrozenPrice: true,
+      isAdHoc: true,
+      itemType: 'ad_hoc',
+    };
+    setLines((prev) => [...prev, newLine]);
+    focusCode();
+  }
 
   function pickCustomer(customer: Customer | undefined) {
     if (!customer) {
@@ -1177,9 +1234,22 @@ export function CaixaPage() {
           qty: line.qty,
           unitPrice: line.unitPrice,
           imei: line.imei,
+          isAdHoc: line.isAdHoc,
+          itemType: line.isAdHoc ? 'ad_hoc' : (line.itemType || 'product'),
         })),
       });
       const order = state.orders[0];
+      const adHocLines = pricedLines.filter((l) => l.isAdHoc);
+      if (adHocLines.length > 0) {
+        logAudit({
+          kind: 'action',
+          actorName: user?.name || operatorName,
+          actorEmail: user?.email || '',
+          action: 'venda_avulsa_lancada',
+          detail: `Venda ${order?.id || currentLocalId}: ${adHocLines.length} item(ns) avulso(s) lançado(s). Total avulso: R$ ${adHocLines.reduce((acc, l) => acc + l.lineTotal, 0).toFixed(2)}. Terminal: ${terminalId}`,
+          path: '/caixa',
+        });
+      }
       if (linkedOsId) {
         void registerWorkOrderPayment(linkedOsId, {
           method: paymentLabel,
@@ -1456,6 +1526,17 @@ export function CaixaPage() {
           setOpsMenuOpen((open) => !open);
           return;
         }
+        if (key === 'a' || event.code === 'KeyA') {
+          event.preventDefault();
+          if (!cashOpen) {
+            setError('Abra o caixa antes de lançar vendas (F7).');
+          } else if (!canLaunchAdHoc) {
+            setError('Venda Avulsa desativada neste terminal ou usuário sem permissão.');
+          } else {
+            openPanelRef.current('ad_hoc');
+          }
+          return;
+        }
         if (key === 'c') {
           event.preventDefault();
           openPanelRef.current('sales');
@@ -1514,6 +1595,7 @@ export function CaixaPage() {
     opsMenuOpen,
     profileOpen,
     clientPanelOpen,
+    canLaunchAdHoc,
   ]);
 
   useEffect(() => {
@@ -1627,6 +1709,17 @@ export function CaixaPage() {
                 </button>
                 <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Alt+L</kbd> cliente / CPF / vendedor
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!canLaunchAdHoc}
+                  onClick={() => {
+                    setShortcutsOpen(false);
+                    if (canLaunchAdHoc) openPanel('ad_hoc');
+                  }}
+                >
+                  <kbd>Alt+A</kbd> venda avulsa
                 </button>
                 <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Alt+1…9</kbd> estoque
@@ -1857,6 +1950,17 @@ export function CaixaPage() {
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
           </button>
+          {canLaunchAdHoc ? (
+            <button
+              type="button"
+              disabled={!cashOpen}
+              onClick={() => openPanel('ad_hoc')}
+              title="Lançar produto ou serviço avulso sem estoque (Alt+A)"
+            >
+              <kbd>Alt+A</kbd>
+              <span>Venda Avulsa</span>
+            </button>
+          ) : null}
           {cashSettings.enableQuotes !== false ? (
             <button type="button" onClick={() => openPanel('quotes')} title="Consultar orçamentos comerciais (Alt+O)">
               <kbd>Alt+O</kbd>
@@ -2005,6 +2109,34 @@ export function CaixaPage() {
               </button>
               <button
                 type="button"
+                className="btn btn--secondary pdv__adhoc-btn"
+                onClick={() => {
+                  if (!cashOpen) {
+                    setError('Abra o caixa antes de lançar vendas (F7).');
+                  } else if (canLaunchAdHoc) {
+                    openPanel('ad_hoc');
+                  } else {
+                    setError('Venda Avulsa desativada neste caixa ou usuário sem permissão.');
+                  }
+                }}
+                disabled={!cashOpen}
+                title={
+                  canLaunchAdHoc
+                    ? 'Lançar produto ou serviço avulso sem estoque (Alt+A)'
+                    : 'Venda Avulsa não permitida neste caixa ou usuário sem permissão'
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Venda Avulsa
+              </button>
+              <button
+                type="button"
                 className="btn btn--primary pdv__pay-btn"
                 onClick={finish}
                 disabled={!pricedLines.length}
@@ -2104,9 +2236,29 @@ export function CaixaPage() {
                               />
                             ) : null}
                             <div>
-                              <strong className="pdv__item">{line.name}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <strong className="pdv__item">{line.name}</strong>
+                                {line.isAdHoc ? (
+                                  <span
+                                    style={{
+                                      background: '#e0f2fe',
+                                      color: '#0369a1',
+                                      padding: '0.1rem 0.4rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      border: '1px solid #bae6fd',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.04em',
+                                    }}
+                                    title="Item lançado de forma avulsa sem movimentação de estoque"
+                                  >
+                                    Avulso
+                                  </span>
+                                ) : null}
+                              </div>
                               <small>
-                                {line.sku}
+                                {line.isAdHoc ? 'Sem estoque' : line.sku}
                                 {line.imei ? ` · IMEI ${line.imei}` : ''}
                                 {` · ${line.unit}`}
                                 {line.tableName ? ` · ${line.tableName}` : ''}
@@ -2631,6 +2783,7 @@ export function CaixaPage() {
             setCustomers(getAdminState().customers);
             pickCustomer(customer);
           }}
+          onAddAdHocLine={handleAddAdHocLine}
         />
       ) : null}
 

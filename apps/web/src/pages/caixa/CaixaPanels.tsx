@@ -73,7 +73,8 @@ import {
   updateCashSettings,
   type CashSettings,
 } from '../../data/cashSettings';
-import { listEmployees, listSellers, userIsStoreAdmin } from '../../data/erpRegistry';
+import { listEmployees, listSellers, userIsStoreAdmin, userCanConfigureAdHoc } from '../../data/erpRegistry';
+import { getPosTerminalId } from '../../data/posDraftStore';
 import { lookupCep, maskCep } from '../../services/cep';
 import {
   cancelFiscalDocumentForSale,
@@ -190,6 +191,7 @@ export type CaixaPanel =
   | 'settings'
   | 'quotes'
   | 'save_quote'
+  | 'ad_hoc'
   | null;
 
 export type ActiveQuoteDraft = {
@@ -208,6 +210,8 @@ export type ActiveQuoteDraft = {
     total: number;
     promoLabel?: string;
     campaignId?: string;
+    isAdHoc?: boolean;
+    itemType?: 'product' | 'ad_hoc';
   }>;
   customerId?: string;
   customerName?: string;
@@ -240,6 +244,7 @@ type PanelProps = {
   onConvertQuoteToCart?: (quote: PosQuote, updatePrices: boolean) => void;
   onOpenPrintQuote?: (quote: PosQuote) => void;
   onQuoteSaved?: (quote: PosQuote, autoPrint?: boolean) => void;
+  onAddAdHocLine?: (item: { name: string; unitPrice: number; qty: number }) => void;
 };
 
 export function CaixaPanelHost(props: PanelProps) {
@@ -250,7 +255,9 @@ export function CaixaPanelHost(props: PanelProps) {
       <div
         className={`admin-card pdv__modal-card pdv__modal-card--wide ${
           panel === 'save_quote' ? 'pdv__modal-card--save-quote' : ''
-        } ${panel === 'quotes' ? 'pdv__modal-card--quotes' : ''}`}
+        } ${panel === 'quotes' ? 'pdv__modal-card--quotes' : ''} ${
+          panel === 'ad_hoc' ? 'pdv__modal-card--ad-hoc' : ''
+        }`}
       >
         {panel === 'sales' ? <SalesPanel {...props} /> : null}
         {panel === 'canceled' ? <CanceledSalesPanel {...props} /> : null}
@@ -266,6 +273,7 @@ export function CaixaPanelHost(props: PanelProps) {
         {panel === 'settings' ? <CashSettingsPanel {...props} /> : null}
         {panel === 'quotes' ? <QuotesListPanel {...props} /> : null}
         {panel === 'save_quote' ? <SaveQuotePanel {...props} /> : null}
+        {panel === 'ad_hoc' ? <AdHocSalePanel {...props} /> : null}
       </div>
     </div>
   );
@@ -2191,6 +2199,8 @@ function ClosePanel({
 function CashSettingsPanel({ onClose, onDone }: PanelProps) {
   const { user } = useAuth();
   const isAdmin = userIsStoreAdmin(user?.email);
+  const canConfigureAdHoc = isAdmin || userCanConfigureAdHoc(user?.email);
+  const currentTerminalId = getPosTerminalId();
   const [form, setForm] = useState<CashSettings>(() => getCashSettings());
 
   function patch<K extends keyof CashSettings>(key: K, value: CashSettings[K]) {
@@ -2200,7 +2210,7 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
   function save(event: FormEvent) {
     event.preventDefault();
     const next = updateCashSettings(
-      isAdmin
+      isAdmin || canConfigureAdHoc
         ? form
         : {
             drawerEnabled: form.drawerEnabled,
@@ -2278,63 +2288,118 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
           </label>
         </fieldset>
 
-        {isAdmin ? (
+        {isAdmin || canConfigureAdHoc ? (
           <fieldset className="caixa-settings__set">
             <legend>Administrativo</legend>
-            <label className="caixa-panel__check">
-              <input
-                type="checkbox"
-                checked={form.showExpectedOnClose}
-                onChange={(e) => patch('showExpectedOnClose', e.target.checked)}
-              />
-              <span>Exibir saldo esperado no fechamento (Esp.)</span>
-            </label>
-            <p className="empty">
-              Desligado: o operador conta sem ver o valor do sistema — evita “colar” o esperado.
-            </p>
-            <label className="caixa-panel__check">
-              <input
-                type="checkbox"
-                checked={form.requirePasswordToDeleteItem}
-                onChange={(e) => patch('requirePasswordToDeleteItem', e.target.checked)}
-              />
-              <span>Exigir senha para excluir item do carrinho</span>
-            </label>
-            <label>
-              Senha de exclusão
-              <input
-                type="password"
-                value={form.deleteItemPassword}
-                onChange={(e) => patch('deleteItemPassword', e.target.value)}
-                disabled={!form.requirePasswordToDeleteItem}
-                autoComplete="new-password"
-              />
-            </label>
-            <label className="caixa-panel__check">
-              <input
-                type="checkbox"
-                checked={form.allowEditUnitPrice}
-                onChange={(e) => patch('allowEditUnitPrice', e.target.checked)}
-              />
-              <span>Permitir editar preço unitário no PDV</span>
-            </label>
-            <label className="caixa-panel__check">
-              <input
-                type="checkbox"
-                checked={form.enableQuotes ?? true}
-                onChange={(e) => patch('enableQuotes', e.target.checked)}
-              />
-              <span>Habilitar módulo de Orçamentos no PDV</span>
-            </label>
-            <p className="empty">
-              Quando desativado, oculta os botões de emissão e consulta de orçamentos (Alt+O) no caixa.
-            </p>
-            <p className="empty">
+            {isAdmin ? (
+              <>
+                <label className="caixa-panel__check">
+                  <input
+                    type="checkbox"
+                    checked={form.showExpectedOnClose}
+                    onChange={(e) => patch('showExpectedOnClose', e.target.checked)}
+                  />
+                  <span>Exibir saldo esperado no fechamento (Esp.)</span>
+                </label>
+                <p className="empty">
+                  Desligado: o operador conta sem ver o valor do sistema — evita “colar” o esperado.
+                </p>
+                <label className="caixa-panel__check">
+                  <input
+                    type="checkbox"
+                    checked={form.requirePasswordToDeleteItem}
+                    onChange={(e) => patch('requirePasswordToDeleteItem', e.target.checked)}
+                  />
+                  <span>Exigir senha para excluir item do carrinho</span>
+                </label>
+                <label>
+                  Senha de exclusão
+                  <input
+                    type="password"
+                    value={form.deleteItemPassword}
+                    onChange={(e) => patch('deleteItemPassword', e.target.value)}
+                    disabled={!form.requirePasswordToDeleteItem}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="caixa-panel__check">
+                  <input
+                    type="checkbox"
+                    checked={form.allowEditUnitPrice}
+                    onChange={(e) => patch('allowEditUnitPrice', e.target.checked)}
+                  />
+                  <span>Permitir editar preço unitário no PDV</span>
+                </label>
+                <label className="caixa-panel__check">
+                  <input
+                    type="checkbox"
+                    checked={form.enableQuotes ?? true}
+                    onChange={(e) => patch('enableQuotes', e.target.checked)}
+                  />
+                  <span>Habilitar módulo de Orçamentos no PDV</span>
+                </label>
+                <p className="empty">
+                  Quando desativado, oculta os botões de emissão e consulta de orçamentos (Alt+O) no caixa.
+                </p>
+              </>
+            ) : null}
+
+            {canConfigureAdHoc ? (
+              <>
+                <label className="caixa-panel__check" style={{ marginTop: '0.75rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.enableAdHocSales ?? true}
+                    onChange={(e) => patch('enableAdHocSales', e.target.checked)}
+                  />
+                  <span>Habilitar Venda Avulsa no PDV (Geral)</span>
+                </label>
+                <p className="empty">
+                  Permite lançar produtos e serviços sem cadastro e sem movimentação de estoque informando descrição e valor diretamente no caixa.
+                </p>
+
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    backgroundColor: 'var(--bg-subtle, rgba(0,0,0,0.02))',
+                  }}
+                >
+                  <strong style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                    Configuração por Terminal / Caixa
+                  </strong>
+                  <label className="caixa-panel__check">
+                    <input
+                      type="checkbox"
+                      checked={
+                        form.terminalAdHocSales?.[currentTerminalId] ??
+                        (form.enableAdHocSales ?? true)
+                      }
+                      onChange={(e) => {
+                        const nextTerminals = { ...(form.terminalAdHocSales || {}) };
+                        nextTerminals[currentTerminalId] = e.target.checked;
+                        patch('terminalAdHocSales', nextTerminals);
+                      }}
+                    />
+                    <span>
+                      Permitir Venda Avulsa <strong>neste Caixa ({currentTerminalId})</strong>
+                    </span>
+                  </label>
+                  <p className="empty" style={{ margin: '0.2rem 0 0 1.5rem', fontSize: '0.75rem' }}>
+                    Se desativado, o botão e atalho de Venda Avulsa (Alt+A) ficam bloqueados neste terminal.
+                  </p>
+                </div>
+              </>
+            ) : null}
+
+            <p className="empty" style={{ marginTop: '0.5rem' }}>
               Balança ligada: produtos em <strong>KG</strong> entram com o peso lido automaticamente.
             </p>
           </fieldset>
         ) : (
-          <p className="empty">Opções administrativas só aparecem para perfil administrador.</p>
+          <p className="empty">Opções administrativas só aparecem para perfil administrador ou autorizado.</p>
         )}
       </div>
       <div className="pdv__modal-actions">
@@ -2343,6 +2408,142 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
         </button>
         <button type="submit" className="btn btn--primary">
           Salvar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function AdHocSalePanel({ onClose, onDone, onError, onAddAdHocLine }: PanelProps) {
+  const [description, setDescription] = useState('');
+  const [unitPriceStr, setUnitPriceStr] = useState('');
+  const [qtyStr, setQtyStr] = useState('1');
+
+  const unitPrice = Math.max(0, Number(unitPriceStr.replace(',', '.')) || 0);
+  const qty = Math.max(0.001, Number(qtyStr.replace(',', '.')) || 1);
+  const subtotal = Math.round(unitPrice * qty * 100) / 100;
+  const isValid = description.trim().length > 0 && unitPrice > 0 && qty > 0;
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!description.trim()) {
+      onError('Informe a descrição do produto ou serviço.');
+      return;
+    }
+    if (unitPrice <= 0) {
+      onError('Informe um valor unitário maior que zero.');
+      return;
+    }
+    if (qty <= 0) {
+      onError('A quantidade deve ser maior que zero.');
+      return;
+    }
+
+    if (onAddAdHocLine) {
+      onAddAdHocLine({
+        name: description.trim(),
+        unitPrice,
+        qty,
+      });
+      onDone(`"${description.trim()}" adicionado à venda com sucesso.`);
+    }
+    onClose();
+  }
+
+  return (
+    <form className="caixa-panel caixa-panel--fit" onSubmit={handleSubmit}>
+      <div className="caixa-panel__head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <h2>Venda Avulsa (Alt+A)</h2>
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              padding: '0.15rem 0.5rem',
+              borderRadius: '999px',
+              backgroundColor: '#e0f2fe',
+              color: '#0369a1',
+              border: '1px solid #bae6fd',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Sem Estoque
+          </span>
+        </div>
+        <p className="empty">
+          Lançamento rápido direto no caixa sem cadastro de produto. <strong>Não realiza movimentação no estoque.</strong>
+        </p>
+      </div>
+
+      <div className="caixa-panel__body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <label>
+          Descrição do Produto / Serviço *
+          <input
+            autoFocus
+            type="text"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ex: Instalação de Torneira, Peça sob encomenda, Serviço rápido..."
+            maxLength={120}
+          />
+        </label>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <label>
+            Valor Unitário (R$) *
+            <input
+              type="text"
+              inputMode="decimal"
+              required
+              value={unitPriceStr}
+              onChange={(e) => setUnitPriceStr(e.target.value)}
+              placeholder="0,00"
+            />
+          </label>
+
+          <label>
+            Quantidade
+            <input
+              type="text"
+              inputMode="decimal"
+              value={qtyStr}
+              onChange={(e) => setQtyStr(e.target.value)}
+              placeholder="1"
+            />
+          </label>
+        </div>
+
+        <div
+          style={{
+            padding: '0.9rem 1rem',
+            borderRadius: '8px',
+            backgroundColor: 'var(--bg-subtle, rgba(0,0,0,0.03))',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Total Previsto:</span>
+            <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-color, #0f172a)' }}>
+              {subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+          </div>
+          <span style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'right' }}>
+            {qty} x {unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+        </div>
+      </div>
+
+      <div className="pdv__modal-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar (Esc)
+        </button>
+        <button type="submit" className="btn btn--primary" disabled={!isValid}>
+          + Adicionar à Venda (Enter)
         </button>
       </div>
     </form>

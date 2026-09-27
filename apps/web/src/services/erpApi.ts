@@ -196,6 +196,8 @@ export function apiClosePosSale(body: {
     qty: number;
     unitPrice: number;
     imei: string;
+    isAdHoc?: boolean;
+    itemType?: 'product' | 'ad_hoc';
   }>;
 }) {
   return nestPost<SalesOrderDetail>('/pos/sales', body);
@@ -408,6 +410,8 @@ export type ApiEmployeePermissions = {
   posCancelItem?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  posAdHocConfigure?: boolean;
+  posAdHocLaunch?: boolean;
 };
 
 export type ApiEmployee = {

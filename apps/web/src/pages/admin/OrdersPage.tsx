@@ -20,7 +20,7 @@ function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-type Filter = 'sold' | 'open' | 'cancelled' | 'all';
+type Filter = 'sold' | 'open' | 'cancelled' | 'ad_hoc' | 'all';
 
 export function OrdersPage() {
   const { user } = useAuth();
@@ -97,14 +97,36 @@ export function OrdersPage() {
         order: null as SalesOrder | null,
       }));
 
+    const adHoc = orders
+      .filter(
+        (order) =>
+          order.hasAdHocItems ||
+          order.lines?.some((l) => l.isAdHoc || l.itemType === 'ad_hoc'),
+      )
+      .map((order) => ({
+        kind: 'sale' as const,
+        id: order.id,
+        customer: order.customerName || 'Consumidor Final',
+        product: order.productName,
+        payment: order.payment,
+        seller: order.sellerName || '—',
+        amount: order.amount,
+        amountLabel: money(order.amount),
+        status: order.status,
+        when: order.createdAt,
+        order,
+      }));
+
     const mixed =
       filter === 'sold'
         ? sold
-        : filter === 'open'
-          ? open
-          : filter === 'cancelled'
-            ? cancelled
-            : [...sold, ...open, ...cancelled];
+        : filter === 'ad_hoc'
+          ? adHoc
+          : filter === 'open'
+            ? open
+            : filter === 'cancelled'
+              ? cancelled
+              : [...sold, ...open, ...cancelled];
 
     const needle = query.trim().toLowerCase();
     return mixed
@@ -197,6 +219,7 @@ export function OrdersPage() {
             value={filter}
             options={[
               { value: 'sold', label: 'Vendas realizadas' },
+              { value: 'ad_hoc', label: 'Vendas Avulsas (Sem estoque)' },
               { value: 'open', label: 'Abertos no totem' },
               { value: 'cancelled', label: 'Vendas canceladas' },
               { value: 'all', label: 'Todos' },
@@ -230,13 +253,36 @@ export function OrdersPage() {
                 {rows.map((row) => {
                   const doc = row.kind === 'sale' ? getFiscalDocumentForRef('sale', row.id) : null;
                   const sold = row.status === 'sold' && row.order;
+                  const hasAdHoc =
+                    row.order?.hasAdHocItems ||
+                    row.order?.lines?.some((l) => l.isAdHoc || l.itemType === 'ad_hoc');
 
                   return (
                     <tr key={`${row.kind}-${row.id}`}>
                       <td>{row.id}</td>
                       <td>{new Date(row.when).toLocaleString('pt-BR')}</td>
                       <td>{row.customer}</td>
-                      <td>{row.product}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span>{row.product}</span>
+                          {hasAdHoc ? (
+                            <span
+                              className="badge"
+                              style={{
+                                background: '#e0f2fe',
+                                color: '#0369a1',
+                                border: '1px solid #bae6fd',
+                                fontSize: '0.68rem',
+                                padding: '0.1rem 0.4rem',
+                                fontWeight: 700,
+                              }}
+                              title="Possui item lançado como Venda Avulsa (sem estoque)"
+                            >
+                              Avulso
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td>{row.payment}</td>
                       <td className="price-red">{row.amountLabel}</td>
                       <td>

@@ -120,6 +120,8 @@ export type SalesOrderLine = {
   qty: number;
   unitPrice: number;
   imei?: string;
+  isAdHoc?: boolean;
+  itemType?: 'product' | 'ad_hoc';
 };
 
 export type SalesOrder = {
@@ -138,6 +140,8 @@ export type SalesOrder = {
   cashSessionId?: string;
   /** Linhas originais da venda */
   lines?: SalesOrderLine[];
+  /** Indica se a venda possui um ou mais itens avulsos (sem estoque) */
+  hasAdHocItems?: boolean;
   /** Informações de cancelamento */
   cancelledAt?: string;
   cancelReason?: string;
@@ -161,6 +165,8 @@ export type PosLineInput = {
   qty: number;
   unitPrice: number;
   imei: string;
+  isAdHoc?: boolean;
+  itemType?: 'product' | 'ad_hoc';
 };
 
 type AdminState = {
@@ -974,9 +980,10 @@ export async function closePosSale(input: {
         surcharge: input.surcharge,
         sellerId: input.sellerId,
         sellerName: input.sellerName,
-        lines: input.lines.filter((line) => line.stockId),
+        lines: input.lines,
       });
       const state = load();
+      const hasAdHocItems = input.lines.some((l) => l.isAdHoc || l.itemType === 'ad_hoc');
       state.orders = [
         {
           id: order.id,
@@ -990,10 +997,21 @@ export async function closePosSale(input: {
           sellerId: order.sellerId,
           sellerName: order.sellerName,
           createdAt: order.createdAt,
+          hasAdHocItems,
+          lines: input.lines.map((l) => ({
+            stockId: l.stockId,
+            name: l.name,
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+            imei: l.imei,
+            isAdHoc: Boolean(l.isAdHoc || l.itemType === 'ad_hoc'),
+            itemType: (l.isAdHoc || l.itemType === 'ad_hoc') ? 'ad_hoc' : 'product',
+          })),
         },
         ...state.orders.filter((item) => item.id !== order.id),
       ];
       for (const line of input.lines) {
+        if (line.isAdHoc || line.itemType === 'ad_hoc' || !line.stockId) continue;
         const stock = state.stock.find((item) => item.id === line.stockId);
         if (stock) {
           stock.qty = Math.max(0, stock.qty - line.qty);
@@ -1034,6 +1052,7 @@ export async function closePosSale(input: {
   const subtotal = input.lines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
   const amount = Math.max(0, subtotal - input.discount + input.surcharge);
   const summary = input.lines.map((line) => `${line.qty}x ${line.name}`).join(', ');
+  const hasAdHocItems = input.lines.some((l) => l.isAdHoc || l.itemType === 'ad_hoc');
   const order: SalesOrder = {
     id: input.localId || uid('PED'),
     ticketId: input.ticketId,
@@ -1046,12 +1065,15 @@ export async function closePosSale(input: {
     sellerId: input.sellerId ?? '',
     sellerName: input.sellerName ?? '',
     createdAt: new Date().toISOString(),
+    hasAdHocItems,
     lines: input.lines.map((l) => ({
       stockId: l.stockId,
       name: l.name,
       qty: l.qty,
       unitPrice: l.unitPrice,
       imei: l.imei,
+      isAdHoc: Boolean(l.isAdHoc || l.itemType === 'ad_hoc'),
+      itemType: (l.isAdHoc || l.itemType === 'ad_hoc') ? 'ad_hoc' : 'product',
     })),
   };
   state.orders.unshift(order);
@@ -1080,6 +1102,9 @@ export async function closePosSale(input: {
   }> = [];
 
   for (const line of input.lines) {
+    if (line.isAdHoc || line.itemType === 'ad_hoc') {
+      continue;
+    }
     const stock = line.stockId
       ? state.stock.find((item) => item.id === line.stockId)
       : state.stock.find((item) => line.name.toLowerCase().includes(item.name.toLowerCase()));
@@ -1179,7 +1204,7 @@ export function cancelSalesOrder(
     }> = [];
 
     for (const line of order.lines) {
-      if (!line.stockId) continue;
+      if (line.isAdHoc || line.itemType === 'ad_hoc' || !line.stockId) continue;
       const stock = state.stock.find((s) => s.id === line.stockId);
       if (stock) {
         stock.qty = Math.round((stock.qty + line.qty) * 1000) / 1000;

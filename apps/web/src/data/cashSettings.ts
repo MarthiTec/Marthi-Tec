@@ -25,6 +25,10 @@ export type CashSettings = {
   allowEditUnitPrice: boolean;
   /** Habilita módulo e ações de Orçamento na venda / PDV. */
   enableQuotes: boolean;
+  /** Habilita Venda Avulsa no caixa (padrão). */
+  enableAdHocSales?: boolean;
+  /** Configuração específica por terminal/caixa (ex: { 'CAIXA-01': true, 'CAIXA-02': false }). */
+  terminalAdHocSales?: Record<string, boolean>;
 };
 
 const DEFAULTS: CashSettings = {
@@ -39,6 +43,12 @@ const DEFAULTS: CashSettings = {
   deleteItemPassword: '1234',
   allowEditUnitPrice: false,
   enableQuotes: true,
+  enableAdHocSales: true,
+  terminalAdHocSales: {
+    'CAIXA-01': true,
+    'CAIXA-02': false,
+    'CAIXA-03': true,
+  },
 };
 
 let memory: CashSettings | null = null;
@@ -115,3 +125,59 @@ export function readScaleKg(): number | null {
   if (!load().scaleEnabled) return null;
   return getLastScaleKg() ?? setLastScaleKg(0.25);
 }
+
+/** Verifica se a Venda Avulsa está habilitada para o terminal/caixa informado */
+export function isAdHocEnabledForTerminal(terminalId?: string): boolean {
+  const settings = load();
+  const tid = (terminalId || 'CAIXA-01').trim();
+  if (settings.terminalAdHocSales && typeof settings.terminalAdHocSales[tid] === 'boolean') {
+    return settings.terminalAdHocSales[tid];
+  }
+  return settings.enableAdHocSales ?? true;
+}
+
+/** Altera a configuração de Venda Avulsa de um terminal e registra na auditoria */
+export function setAdHocEnabledForTerminal(
+  terminalId: string,
+  enabled: boolean,
+  actor?: { name: string; email: string },
+) {
+  const tid = terminalId.trim() || 'CAIXA-01';
+  const settings = load();
+  const prevMap = settings.terminalAdHocSales || {};
+  const prevStatus = isAdHocEnabledForTerminal(tid);
+  const nextMap = { ...prevMap, [tid]: enabled };
+
+  updateCashSettings({
+    terminalAdHocSales: nextMap,
+  });
+
+  // Registro de Auditoria detalhado
+  import('./auditLog').then(({ logAudit }) => {
+    logAudit({
+      kind: 'action',
+      actorName: actor?.name || 'Administrador',
+      actorEmail: actor?.email || 'admin@marthi.com.br',
+      action: `Configuração Venda Avulsa: ${enabled ? 'Ativada' : 'Desativada'} no ${tid}`,
+      detail: `Terminal ${tid}: Venda Avulsa alterada de "${prevStatus ? 'Ativada' : 'Desativada'}" para "${enabled ? 'Ativada' : 'Desativada'}"`,
+      path: '/caixa/configuracoes',
+    });
+  });
+}
+
+/** Lista todos os terminais conhecidos e seus status de Venda Avulsa */
+export function listTerminalAdHocConfigs(): Array<{ terminalId: string; enabled: boolean }> {
+  const settings = load();
+  const knownTerminals = ['CAIXA-01', 'CAIXA-02', 'CAIXA-03'];
+  const map = settings.terminalAdHocSales || {};
+  for (const tid of Object.keys(map)) {
+    if (!knownTerminals.includes(tid)) {
+      knownTerminals.push(tid);
+    }
+  }
+  return knownTerminals.map((tid) => ({
+    terminalId: tid,
+    enabled: isAdHocEnabledForTerminal(tid),
+  }));
+}
+
