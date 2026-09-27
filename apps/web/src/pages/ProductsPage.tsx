@@ -28,6 +28,7 @@ function IconWhatsApp() {
 function productUnlocked(product: MarthiProduct, contracted: boolean) {
   if (!contracted) return false;
   if (product.id === 'totem') return hasModule('totem');
+  if (product.id === 'cardapio') return true;
   if (product.id === 'pdv' || product.id === 'erp' || product.id === 'painel') return hasModule('erp');
   if (product.id === 'os') return hasModule('os');
   if (product.id === 'fiscal') return hasModule('fiscal');
@@ -36,11 +37,12 @@ function productUnlocked(product: MarthiProduct, contracted: boolean) {
   return false;
 }
 
-type ProductCategory = 'all' | 'loja' | 'oficina' | 'gestao' | 'fiscal-ecom';
+type ProductCategory = 'all' | 'loja' | 'food' | 'oficina' | 'gestao' | 'fiscal-ecom';
 
 const CATEGORY_FILTERS: Array<{ id: ProductCategory; label: string }> = [
   { id: 'all', label: 'Todos os Módulos' },
   { id: 'loja', label: 'Frente de Loja & Balcão' },
+  { id: 'food', label: 'Alimentação & Cardápio' },
   { id: 'oficina', label: 'Oficina & Serviços' },
   { id: 'gestao', label: 'Retaguarda & Gestão' },
   { id: 'fiscal-ecom', label: 'Fiscal & Canais Online' },
@@ -165,6 +167,7 @@ export function ProductsPage() {
   const filteredProducts = MARTHI_PRODUCTS.filter((product) => {
     if (category === 'all') return true;
     if (category === 'loja') return product.id === 'totem' || product.id === 'pdv';
+    if (category === 'food') return product.id === 'cardapio';
     if (category === 'oficina') return product.id === 'os';
     if (category === 'gestao') return product.id === 'erp' || product.id === 'painel';
     if (category === 'fiscal-ecom')
@@ -184,10 +187,11 @@ export function ProductsPage() {
         <section className="products-hero">
           <div className="products-hero__copy">
             <p className="eyebrow">Catálogo Marthi</p>
-            <h1>Tudo que a sua loja precisa — da vitrine ao fiscal.</h1>
+            <h1>Tudo que o seu negócio precisa — da vitrine e cardápio ao fiscal.</h1>
             <p>
-              Totem touch de autoatendimento, PDV veloz, ordem de serviço para oficina, Retaguarda
-              completa, emissor fiscal e sincronização com marketplaces. Um único ecossistema integrado.
+              Totem touch, Cardápio Digital com QR Code e KDS, PDV veloz com persistência blindada,
+              Orçamentos comerciais em PDF por WhatsApp, ordem de serviço técnica, Retaguarda completa,
+              emissor fiscal e integração com marketplaces.
             </p>
             <div className="products-hero__actions">
               <a href="#catalogo" className="btn btn--primary btn--with-icon">

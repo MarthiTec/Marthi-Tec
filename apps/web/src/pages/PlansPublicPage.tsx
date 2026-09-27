@@ -25,8 +25,20 @@ const FAQ_ITEMS = [
     a: 'Não! O sistema Marthi roda diretamente no navegador ou em computadores comuns que sua loja já possui. Para o Totem de autoatendimento, oferecemos modelos prontos com tela touch e leitor integrado, mas você também pode utilizar telas já existentes.',
   },
   {
-    q: 'Como funciona o treinamento e a implantação inicial?',
-    a: 'Nosso time acompanha todo o processo: cadastramos sua loja, importamos seus produtos, configuramos suas tabelas fiscais e treinamos seus operadores de caixa e oficina. Você começa a operar com total segurança.',
+    q: 'E se a internet cair na loja ou houver queda de energia durante o caixa?',
+    a: 'Nosso PDV possui persistência local blindada. Toda venda lançada fica gravada no cache e fila local do navegador. Se a luz cair ou alguém pressionar F5 por acidente, a venda é recuperada automaticamente com 1 clique, sem perder itens nem estragar o financeiro.',
+  },
+  {
+    q: 'Como funcionam os Orçamentos Comerciais e o envio aos clientes?',
+    a: 'Pela Retaguarda, você gera propostas comerciais elegantes em PDF com congelamento de preços, validade e condições de pagamento, enviando com 1 clique para o WhatsApp e E-mail do cliente. Ao aprovar, o PDV importa o orçamento diretamente com 1 clique, eliminando qualquer redigitação.',
+  },
+  {
+    q: 'Como funciona o Motor de Campanhas Promocionais?',
+    a: 'Você define promoções como Leve X Pague Y, Faixas de Preço por Quantidade/Volume, Preço Fixo Promocional ou Brindes com critérios de categoria, marca ou grupo de clientes. O PDV valida e aplica a promoção em tempo real com regras de margem de lucro.',
+  },
+  {
+    q: 'O que o módulo de Cardápio Digital & Food oferece?',
+    a: 'Inclui cardápio interativo acessado por QR Code nas mesas ou salão, gerador de display de mesa para impressão, gestão de mesas/comandas, painel KDS ao vivo na TV da cozinha e fechamento direto no caixa.',
   },
   {
     q: 'Posso trocar de plano ou adicionar novos módulos depois?',
@@ -35,10 +47,6 @@ const FAQ_ITEMS = [
   {
     q: 'Existe contrato de fidelidade ou multa rescisória?',
     a: 'Não exigimos fidelidade. Confiamos na qualidade da nossa solução e na satisfação dos nossos clientes. Você tem total liberdade.',
-  },
-  {
-    q: 'E se a internet cair na loja durante uma venda no caixa?',
-    a: 'Nosso PDV foi projetado com resiliência local. O operador consegue concluir a venda e os dados são sincronizados automaticamente assim que a conexão for restabelecida.',
   },
 ];
 
@@ -227,7 +235,7 @@ export function PlansPublicPage() {
                   <td><strong>Módulos ativos permitidos</strong></td>
                   <td>1 módulo</td>
                   <td>Até 2 módulos</td>
-                  <td><strong>Todos os 5 módulos</strong></td>
+                  <td><strong>Todos os módulos liberados</strong></td>
                 </tr>
                 <tr>
                   <td>Painel da Loja & Perfil Operacional</td>
@@ -242,10 +250,34 @@ export function PlansPublicPage() {
                   <td>✓ Incluso ilimitado</td>
                 </tr>
                 <tr>
-                  <td>Backup em nuvem automático</td>
-                  <td>✓ Diário</td>
-                  <td>✓ Em tempo real</td>
-                  <td>✓ Em tempo real prioritário</td>
+                  <td><strong>Orçamentos Comerciais em PDF (WhatsApp & E-mail)</strong></td>
+                  <td>Básico</td>
+                  <td>✓ Propostas com margem e validade</td>
+                  <td><strong>✓ Propostas + Conversão 1 clique no PDV</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>Motor de Campanhas Promocionais (Leve X Pague Y, Faixas)</strong></td>
+                  <td>—</td>
+                  <td>✓ Incluso com regras comerciais</td>
+                  <td><strong>✓ Avançado com proteção de margem</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>PDV com Persistência Blindada (F5 / Queda de Energia)</strong></td>
+                  <td>✓ Incluso no PDV</td>
+                  <td>✓ Incluso no PDV</td>
+                  <td><strong>✓ Blindado + Conciliação Financeira</strong></td>
+                </tr>
+                <tr>
+                  <td><strong>Cardápio Digital QR Code, Mesas & KDS Cozinha</strong></td>
+                  <td>Se escolhido</td>
+                  <td>Se escolhido</td>
+                  <td><strong>✓ Incluso completo</strong></td>
+                </tr>
+                <tr>
+                  <td>Ordens de Serviço (OS) com Garantia em PDF</td>
+                  <td>Se escolhido</td>
+                  <td>Se escolhido</td>
+                  <td>✓ Completo com agenda e bancada</td>
                 </tr>
                 <tr>
                   <td>Emissor Fiscal (NF-e, NFC-e, NFS-e, CT-e, MDF-e)</td>
@@ -258,6 +290,12 @@ export function PlansPublicPage() {
                   <td>Se escolhido</td>
                   <td>Se escolhido</td>
                   <td>✓ Completo</td>
+                </tr>
+                <tr>
+                  <td>Backup em nuvem automático</td>
+                  <td>✓ Diário</td>
+                  <td>✓ Em tempo real</td>
+                  <td>✓ Em tempo real prioritário</td>
                 </tr>
                 <tr>
                   <td>Personalização com a marca da sua loja</td>

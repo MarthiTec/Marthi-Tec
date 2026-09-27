@@ -4,6 +4,7 @@
 
 export type MarthiProductId =
   | 'totem'
+  | 'cardapio'
   | 'pdv'
   | 'os'
   | 'erp'
@@ -45,17 +46,36 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     accent: '#0f766e',
   },
   {
+    id: 'cardapio',
+    name: 'Cardápio Digital & Food',
+    tagline: 'QR Code nas mesas, KDS e comandas',
+    summary:
+      'Cardápio interativo via QR Code para mesas e comandas, tela KDS na cozinha e pedidos integrados diretamente ao caixa e ao estoque.',
+    audience: 'Restaurantes, lanchonetes, bares, cafeterias, hamburguerias e delivery.',
+    features: [
+      'Cardápio interativo via QR Code para mesas e salão',
+      'Emissão e impressão de displays de mesa com QR Code',
+      'KDS (Fila de pedidos em tempo real na TV da cozinha)',
+      'Lançamento de pedidos para garçons em celulares e tablets',
+      'Integração imediata com fechamento no PDV e conciliação',
+    ],
+    href: '/cardapio',
+    cta: 'Abrir cardápio digital',
+    accent: '#ea580c',
+  },
+  {
     id: 'pdv',
     name: 'PDV / Caixa',
-    tagline: 'Venda rápida no balcão',
+    tagline: 'Caixa veloz com persistência blindada',
     summary:
-      'Caixa completo: venda, troca, vale-compra, sangria, aporte e fechamento. Pensado para o ritmo da loja.',
-    audience: 'Lojas físicas que precisam de caixa estável e integrado ao estoque.',
+      'Caixa rápido com persistência contra queda de energia ou F5, recuperação com 1 clique, motor de campanhas promocionais e conversão direta de orçamentos.',
+    audience: 'Lojas físicas, mercados e comércios que precisam de caixa ultra-estável e integrado.',
     features: [
-      'Venda e troca no mesmo fluxo',
-      'Sangria, aporte e fechamento de caixa',
-      'Vale-compra e formas de pagamento',
-      'NFC-e no PDV quando o fiscal está liberado',
+      'Persistência local blindada: nunca perca itens por F5 ou falta de energia',
+      'Motor de campanhas promocionais: Leve X Pague Y e faixas de volume',
+      'Importação e conversão de orçamentos comerciais com 1 clique',
+      'Cancelamento e estorno seguro com reposição de estoque e conciliação',
+      'NFC-e integrada, controle de sangria/aporte e múltiplos pagamentos',
     ],
     href: '/caixa',
     cta: 'Ver demo do caixa',
@@ -65,15 +85,15 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'os',
     name: 'Ordem de serviço',
-    tagline: 'Oficina e bancada sob controle',
+    tagline: 'Oficina técnica e bancada sob controle',
     summary:
-      'Orçamento, oficina, agenda e entrega — app próprio para o operador da bancada acompanhar cada OS.',
-    audience: 'Assistências, oficinas, serviços técnicos e lojas com pós-venda.',
+      'Abertura de OS, agenda de bancada, envio de proposta e garantia em PDF via WhatsApp e E-mail, integração direta de peças com o estoque e recebimento no PDV.',
+    audience: 'Assistências técnicas, oficinas mecânicas, serviços especializados e lojas com pós-venda.',
     features: [
-      'Abertura de OS e orçamento',
-      'Agenda da bancada',
-      'Status até a entrega',
-      'Relatório por ordem de serviço',
+      'Abertura de OS, checklist técnico e agenda de bancada',
+      'Envio de Termo de Garantia e OS em PDF via WhatsApp e E-mail',
+      'Integração direta de peças com o estoque e fechamento no caixa',
+      'Quadro Kanban de status operacional até a entrega ao cliente',
     ],
     href: '/os',
     cta: 'Ver demo da OS',
@@ -83,15 +103,16 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'erp',
     name: 'Retaguarda da loja',
-    tagline: 'Estoque, pessoas e financeiro',
+    tagline: 'Orçamentos, Campanhas, Estoque e Financeiro',
     summary:
-      'Produtos, PDV, estoque com balanço e movimentos, pessoas, boletos e financeiro — o núcleo da operação.',
-    audience: 'Lojas que cresceram além da planilha e precisam de um único painel.',
+      'Gestão integrada completa com geração de propostas comerciais em PDF via WhatsApp e E-mail, motor de campanhas de desconto, estoque com custo médio e financeiro.',
+    audience: 'Lojas e comércios que cresceram além da planilha e precisam de um centro de comando unificado.',
     features: [
-      'Estoque com balanço, movimentos, mín/máx e custo',
-      'PDV/caixa no mesmo contrato da Retaguarda',
-      'Clientes, fornecedores, funcionários e permissões',
-      'Tabelas de preço, boletos e financeiro',
+      'Orçamentos comerciais em PDF com envio por WhatsApp e E-mail',
+      'Motor de campanhas promocionais com regras e proteção de margem',
+      'Estoque completo com balanço, inventário, custo médio e movimentações',
+      'Financeiro: boletos, conciliação bancária, contas a pagar/receber e DRE',
+      'Gestão de clientes, fornecedores e equipe com controle de permissões',
     ],
     href: '/erp',
     cta: 'Abrir Retaguarda',
@@ -171,12 +192,17 @@ export const MARTHI_SEGMENTS = [
   {
     id: 'varejo',
     name: 'Varejo e loja física',
-    text: 'Totem na vitrine, PDV no balcão, estoque e clientes no mesmo painel.',
+    text: 'Totem na vitrine, PDV no balcão com campanhas e persistência, estoque e clientes no mesmo painel.',
+  },
+  {
+    id: 'food',
+    name: 'Restaurantes e Food Service',
+    text: 'Cardápio digital via QR Code, mesas e comandas, tela KDS na cozinha e caixa ágil.',
   },
   {
     id: 'oficina',
     name: 'Oficina e assistência',
-    text: 'OS com agenda, orçamento e entrega — do atendimento à bancada.',
+    text: 'OS com agenda, propostas e garantia em PDF via WhatsApp/E-mail — do atendimento à bancada.',
   },
   {
     id: 'omni',

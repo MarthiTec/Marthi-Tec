@@ -25,7 +25,7 @@ import './products.css';
 const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
 const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
 
-const HOME_PRODUCT_IDS = ['totem', 'pdv', 'os', 'fiscal', 'ecommerce', 'crm', 'erp', 'painel'] as const;
+const HOME_PRODUCT_IDS = ['totem', 'cardapio', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce', 'crm', 'painel'] as const;
 
 function IconWhatsApp() {
   return (
@@ -83,7 +83,7 @@ export function HomePage() {
   const [jobExp, setJobExp] = useState('');
   const [jobFeedback, setJobFeedback] = useState('');
 
-  const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os'>('erp');
+  const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os' | 'cardapio'>('erp');
 
   const showcaseImage =
     showcase === 'pdv'
@@ -92,16 +92,20 @@ export function HomePage() {
         ? '/home/showcase-erp.jpg'
         : showcase === 'painel'
           ? '/home/showcase-painel.jpg'
-          : '/home/showcase-os.jpg';
+          : showcase === 'cardapio'
+            ? '/home/showcase-painel.jpg'
+            : '/home/showcase-os.jpg';
 
   const showcaseCaption =
     showcase === 'pdv'
-      ? 'PDV · Caixa na loja'
+      ? 'PDV · Caixa blindado com persistência e promoções'
       : showcase === 'erp'
-        ? 'Marthi · Retaguarda da loja'
+        ? 'Marthi · Retaguarda com Orçamentos e Campanhas'
         : showcase === 'painel'
           ? 'Painel da operação · KPIs e gráficos'
-          : 'Marthi OS · Quadro da oficina';
+          : showcase === 'cardapio'
+            ? 'Cardápio Digital & Food · QR Code na mesa e KDS Cozinha'
+            : 'Marthi OS · Quadro da oficina e garantia';
 
   const showCaixa = contracted && hasModule('erp');
   const showTotem = contracted && hasModule('totem');
@@ -239,10 +243,10 @@ export function HomePage() {
             <p className="hero__brand" aria-label="Marthi">
               Marthi
             </p>
-            <h1>Tecnologia que coloca a loja no comando.</h1>
+            <h1>Tecnologia que coloca o seu negócio no comando.</h1>
             <p>
-              Totem, PDV, OS, fiscal e e-commerce no mesmo ritmo — feitos para o varejo brasileiro
-              operar com clareza.
+              Totem, Cardápio Digital, PDV, Orçamentos comerciais, OS, Fiscal e E-commerce no mesmo ritmo —
+              feitos para o varejo e food service operarem com máxima eficiência.
             </p>
             <div className="hero__actions">
               <Link to="/parceiro" className="btn btn--primary btn--hero">
@@ -345,20 +349,20 @@ export function HomePage() {
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={showcase === 'painel'}
-                  className={showcase === 'painel' ? 'is-active' : ''}
-                  onClick={() => setShowcase('painel')}
-                >
-                  Painel
-                </button>
-                <button
-                  type="button"
-                  role="tab"
                   aria-selected={showcase === 'pdv'}
                   className={showcase === 'pdv' ? 'is-active' : ''}
                   onClick={() => setShowcase('pdv')}
                 >
                   PDV / Caixa
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'cardapio'}
+                  className={showcase === 'cardapio' ? 'is-active' : ''}
+                  onClick={() => setShowcase('cardapio')}
+                >
+                  Cardápio & Food
                 </button>
                 <button
                   type="button"
@@ -369,13 +373,43 @@ export function HomePage() {
                 >
                   Oficina / OS
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showcase === 'painel'}
+                  className={showcase === 'painel' ? 'is-active' : ''}
+                  onClick={() => setShowcase('painel')}
+                >
+                  Painel
+                </button>
               </div>
               <ul className="showcase__bullets">
                 {showcase === 'erp' ? (
                   <>
-                    <li>Retaguarda: estoque, clientes, financeiro e boletos</li>
-                    <li>Cards de módulos com atalho direto para cada área</li>
-                    <li>Alertas de estoque baixo e títulos em aberto</li>
+                    <li>Orçamentos comerciais em PDF com envio por WhatsApp e E-mail</li>
+                    <li>Motor de Campanhas Promocionais: Leve X Pague Y e faixas por volume</li>
+                    <li>Estoque com custo médio, balanço, fornecedores e financeiro integrado</li>
+                  </>
+                ) : null}
+                {showcase === 'pdv' ? (
+                  <>
+                    <li>Caixa veloz com persistência blindada contra queda de energia e F5</li>
+                    <li>Conversão direta de Orçamentos em venda no balcão com 1 clique</li>
+                    <li>Aplicação automática de campanhas, desconto e emissão de NFC-e</li>
+                  </>
+                ) : null}
+                {showcase === 'cardapio' ? (
+                  <>
+                    <li>Cardápio interativo via QR Code nas mesas e comanda digital</li>
+                    <li>Fila ao vivo na TV da cozinha (KDS) e pedidos em tablets para garçons</li>
+                    <li>Integração instantânea com estoque e fechamento no caixa</li>
+                  </>
+                ) : null}
+                {showcase === 'os' ? (
+                  <>
+                    <li>Quadro Kanban: aberta, diagnóstico, aguardando, em serviço, pronta</li>
+                    <li>Envio de Ordem de Serviço e Termo de Garantia em PDF por WhatsApp</li>
+                    <li>Integração de peças com o estoque e recebimento direto no PDV</li>
                   </>
                 ) : null}
                 {showcase === 'painel' ? (
@@ -385,30 +419,11 @@ export function HomePage() {
                     <li>Operações rápidas para a equipe no balcão</li>
                   </>
                 ) : null}
-                {showcase === 'pdv' ? (
-                  <>
-                    <li>Caixa livre com busca por SKU e estoque rápido</li>
-                    <li>Pagamento, CPF na nota, desconto e acréscimo</li>
-                    <li>Atalhos de teclado pensados para o balcão</li>
-                  </>
-                ) : null}
-                {showcase === 'os' ? (
-                  <>
-                    <li>Quadro Kanban: aberta, diagnóstico, aguardando, em serviço, pronta</li>
-                    <li>Resumo da oficina e atalhos de nova OS</li>
-                    <li>Integração com estoque e caixa</li>
-                  </>
-                ) : null}
               </ul>
               <div className="showcase__actions">
                 {showcase === 'erp' ? (
                   <Link to={user ? '/erp' : '/login?next=/erp'} className="btn btn--primary">
                     Abrir Retaguarda
-                  </Link>
-                ) : null}
-                {showcase === 'painel' ? (
-                  <Link to={user ? '/painel' : '/login?next=/painel'} className="btn btn--primary">
-                    Abrir painel
                   </Link>
                 ) : null}
                 {showcase === 'pdv' ? (
@@ -426,6 +441,11 @@ export function HomePage() {
                     </button>
                   )
                 ) : null}
+                {showcase === 'cardapio' ? (
+                  <Link to="/cardapio" className="btn btn--primary">
+                    Abrir Cardápio Digital
+                  </Link>
+                ) : null}
                 {showcase === 'os' ? (
                   showOs || liveOpen ? (
                     <Link to={osHref} className="btn btn--primary">
@@ -440,6 +460,11 @@ export function HomePage() {
                       Ver demo da OS
                     </button>
                   )
+                ) : null}
+                {showcase === 'painel' ? (
+                  <Link to={user ? '/painel' : '/login?next=/painel'} className="btn btn--primary">
+                    Abrir painel
+                  </Link>
                 ) : null}
                 <Link to="/parceiro" className="btn btn--ghost">
                   Solicitar demonstração
@@ -465,10 +490,14 @@ export function HomePage() {
                   <span>Abrir autoatendimento</span>
                 </Link>
               ) : null}
+              <Link to="/cardapio" className="launch-card launch-card--accent">
+                <strong>Cardápio Digital</strong>
+                <span>QR Code e pedidos na mesa</span>
+              </Link>
               {showCaixa ? (
                 <Link to={caixaHref} className="launch-card">
                   <strong>Caixa / PDV</strong>
-                  <span>{user || liveOpen ? 'Abrir sistema de caixa' : 'Entrar e abrir o caixa'}</span>
+                  <span>{user || liveOpen ? 'Abrir caixa blindado' : 'Entrar e abrir o caixa'}</span>
                 </Link>
               ) : null}
               {(showCaixa || showTotem) && storeCustom.showTablesAndKitchen ? (
@@ -549,8 +578,8 @@ export function HomePage() {
             <p className="eyebrow">Planos</p>
             <h2>Escolha o ritmo da sua operação</h2>
             <p className="section__sub">
-              O painel da loja entra em todo plano. Os módulos (Totem, OS, Retaguarda/PDV, Fiscal, E-commerce)
-              você combina conforme o Bronze, Silver ou Golden.
+              O painel da loja entra em todo plano. Os módulos (Totem, Cardápio Digital, OS, PDV com campanhas,
+              Retaguarda com orçamentos em PDF, Fiscal ou E-commerce) você combina conforme o Bronze, Silver ou Golden.
             </p>
           </div>
           <div className="plans">
