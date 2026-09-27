@@ -1,4 +1,5 @@
 import { AdminPicker } from '../../components/AdminPicker';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import type { PaymentMethod } from '../../data/adminStore';
 import {
   isCashPayment,
@@ -79,19 +80,14 @@ export function CaixaPaymentSplit({
                 />
                 <label className="pdv-split__amount">
                   Valor
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
+                  <CurrencyInput
+                    value={row.amount}
                     placeholder="0,00"
-                    value={row.amount || ''}
-                    aria-label={`Valor em ${label}`}
-                    onChange={(event) =>
+                    ariaLabel={`Valor em ${label}`}
+                    onChange={(nextAmount) =>
                       onPatch(
                         row.key,
-                        // Mudou o valor da linha, o recebido anterior não vale mais.
-                        { amount: Math.max(0, Number(event.target.value) || 0), tendered: 0 },
+                        { amount: nextAmount, tendered: 0 },
                         { touch: true },
                       )
                     }
@@ -149,17 +145,13 @@ export function CaixaPaymentSplit({
                 <div className="pdv-split__cash">
                   <label className="pdv-split__tender">
                     Recebido em dinheiro
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      inputMode="decimal"
+                    <CurrencyInput
+                      value={row.tendered}
                       placeholder={moneyBRL(row.amount)}
-                      value={row.tendered || ''}
-                      aria-label="Valor recebido em dinheiro"
-                      onChange={(event) =>
+                      ariaLabel="Valor recebido em dinheiro"
+                      onChange={(nextTendered) =>
                         onPatch(row.key, {
-                          tendered: Math.max(0, Number(event.target.value) || 0),
+                          tendered: nextTendered,
                         })
                       }
                     />

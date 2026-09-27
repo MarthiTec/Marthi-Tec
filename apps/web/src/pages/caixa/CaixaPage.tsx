@@ -6,6 +6,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
@@ -2508,14 +2509,12 @@ export function CaixaPage() {
                         </td>
                         <td>
                           {cashSettings.allowEditUnitPrice ? (
-                            <input
+                            <CurrencyInput
                               className="pdv__price-edit"
-                              type="number"
-                              min={0}
-                              step="0.01"
                               value={line.basePrice}
-                              onChange={(e) => changeLineBasePrice(line.key, Number(e.target.value))}
+                              ariaLabel="Preço base do item"
                               title="Preço base (antes da tabela)"
+                              onChange={(val) => changeLineBasePrice(line.key, val)}
                             />
                           ) : (
                             <div>
