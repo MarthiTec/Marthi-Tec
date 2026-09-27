@@ -23,6 +23,8 @@ export type CashSettings = {
   deleteItemPassword: string;
   /** Permite editar preço unitário no grid do PDV. */
   allowEditUnitPrice: boolean;
+  /** Habilita módulo e ações de Orçamento na venda / PDV. */
+  enableQuotes: boolean;
 };
 
 const DEFAULTS: CashSettings = {
@@ -36,6 +38,7 @@ const DEFAULTS: CashSettings = {
   requirePasswordToDeleteItem: false,
   deleteItemPassword: '1234',
   allowEditUnitPrice: false,
+  enableQuotes: true,
 };
 
 let memory: CashSettings | null = null;

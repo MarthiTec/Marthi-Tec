@@ -99,6 +99,13 @@ export type Supplier = {
   updatedAt: string;
 };
 
+export type EmployeePermissions = {
+  posCancelSale?: boolean;
+  posCancelItem?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+};
+
 export type Employee = {
   id: string;
   name: string;
@@ -111,6 +118,7 @@ export type Employee = {
   /** E-mail do usuário de login (normalizado). */
   userEmail: string;
   accessAreas: AccessArea[];
+  permissions?: EmployeePermissions;
   active: boolean;
   sellerId?: string;
   createdAt: string;
@@ -286,6 +294,7 @@ function mapEmployee(row: ApiEmployee): Employee {
     isSystemUser: row.isSystemUser,
     userEmail: row.userEmail ?? '',
     accessAreas: areas,
+    permissions: row.permissions,
     active: row.active,
     sellerId: row.sellerId,
     createdAt: row.createdAt,
@@ -496,6 +505,7 @@ export async function upsertEmployee(
         isSystemUser: input.isSystemUser,
         userEmail,
         accessAreas: areas,
+        permissions: input.permissions,
         active: input.active ?? true,
         sellerId: input.sellerId,
       };
@@ -551,6 +561,7 @@ export async function upsertEmployee(
     isSystemUser: input.isSystemUser,
     userEmail,
     accessAreas: areas,
+    permissions: input.permissions,
     active: input.active,
     sellerId: input.sellerId,
     createdAt: stamp,
@@ -733,6 +744,47 @@ export function userIsStoreAdmin(userEmail: string | null | undefined) {
   const employee = findEmployeeByUserEmail(userEmail);
   if (employee) return employee.active && employee.role === 'admin';
   return linkedSystemUsers().length === 0;
+}
+
+/** Permissão para cancelar venda no PDV */
+export function userCanCancelSale(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return linkedSystemUsers().length === 0;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  return Boolean(emp.permissions?.posCancelSale);
+}
+
+/** Permissão para cancelar / excluir item do carrinho no PDV */
+export function userCanCancelItem(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return linkedSystemUsers().length === 0;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  return Boolean(emp.permissions?.posCancelItem);
+}
+
+/** Permissão para alterar / editar dados cadastrais nos módulos (Produtos, Clientes, etc.) */
+export function userCanEdit(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return linkedSystemUsers().length === 0;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  if (emp.role === 'seller') return Boolean(emp.permissions?.canEdit);
+  return emp.permissions?.canEdit ?? true;
+}
+
+/** Permissão para excluir registros nos módulos cadastrais */
+export function userCanDelete(userEmail: string | null | undefined): boolean {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  if (userIsStoreAdmin(userEmail)) return true;
+  const emp = findEmployeeByUserEmail(userEmail);
+  if (!emp) return linkedSystemUsers().length === 0;
+  if (emp.role === 'admin' || emp.role === 'manager') return true;
+  return Boolean(emp.permissions?.canDelete);
 }
 
 export function navPathToAccessArea(path: string): AccessArea | null {

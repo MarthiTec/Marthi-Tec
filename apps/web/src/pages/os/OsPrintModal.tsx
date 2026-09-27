@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
@@ -14,6 +14,12 @@ import {
   type OsPrintModel,
   type OsPasswordType,
 } from '../../data/osPrintSettings';
+import {
+  downloadOsPdf,
+  generateOsPdfBlob,
+  sendEmailWithPdf,
+  shareOrSendWhatsAppWithFile,
+} from '../../utils/commercialPdf';
 import { OsCommercialPrintView } from './OsCommercialPrintView';
 import { OsPrintSettingsDrawer } from './OsPrintSettingsDrawer';
 
@@ -116,6 +122,80 @@ export function OsPrintModal({ order, open, onClose }: Props) {
     saveSettings({ model });
   }
 
+  const generateWhatsAppMessage = () => {
+    if (!order) return '';
+    const companyTitle =
+      settings.company.tradeName || settings.company.name || 'MARTHI ASSISTÊNCIA TÉCNICA';
+    const linesText = (order.lines || [])
+      .map(
+        (l, idx) =>
+          `${idx + 1}. *${l.name}* (${l.kind === 'part' ? 'Peça' : 'Serviço'}) - Qtd: ${l.qty} | ${money(l.qty * l.unitPrice)}`,
+      )
+      .join('\n');
+
+    return [
+      `*ORDEM DE SERVIÇO - ${companyTitle.toUpperCase()}*`,
+      `🔧 *OS #${order.id}*`,
+      `📅 Data: ${formatDate(order.createdAt)}`,
+      `👤 Cliente: ${order.customerName}`,
+      `📱 Aparelho: ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}`,
+      order.defect ? `⚠️ Defeito: ${order.defect}` : '',
+      linesText ? `\n*Serviços / Peças:*\n${linesText}` : '',
+      `💰 *Total: ${money(workOrderTotal(order))}*`,
+      `\nQualquer dúvida, estamos à disposição!`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!order) return;
+    const pdfBlob = generateOsPdfBlob(order, settings.company);
+    const text = generateWhatsAppMessage();
+    await shareOrSendWhatsAppWithFile({
+      phone: order.customerPhone || '',
+      text,
+      pdfBlob,
+      fileName: `Ordem_Servico_${order.id}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleSendEmail = () => {
+    if (!order) return;
+    const companyTitle =
+      settings.company.tradeName || settings.company.name || 'MARTHI ASSISTÊNCIA TÉCNICA';
+    let targetEmail = order.customerEmail?.trim();
+    if (!targetEmail) {
+      const input = window.prompt(
+        'Informe o e-mail do cliente para envio da Ordem de Serviço:',
+        '',
+      );
+      if (!input || !input.includes('@')) {
+        alert('E-mail não informado ou inválido.');
+        return;
+      }
+      targetEmail = input.trim();
+    }
+    const pdfBlob = generateOsPdfBlob(order, settings.company);
+    const subject = `Ordem de Serviço #${order.id} - ${companyTitle}`;
+    const body = `Prezado(a) ${order.customerName || 'Cliente'},\n\nSegue em anexo a Ordem de Serviço #${order.id} referente ao equipamento ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}.\n\nValor Total: ${money(workOrderTotal(order))}\n\nO documento oficial em formato PDF segue em anexo.\n\nAtenciosamente,\n${companyTitle}\n${settings.company.phone ? `WhatsApp: ${settings.company.phone}` : ''}`;
+
+    sendEmailWithPdf({
+      email: targetEmail,
+      subject,
+      body,
+      pdfBlob,
+      fileName: `Ordem_Servico_${order.id}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    if (!order) return;
+    downloadOsPdf(order, settings.company);
+  };
+
   return createPortal(
     <div className="os-modal-backdrop os-print-modal-backdrop" onClick={onClose}>
       <div
@@ -215,6 +295,36 @@ export function OsPrintModal({ order, open, onClose }: Props) {
           </div>
 
           <div className="os-print-modal__bar-actions">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ background: '#25d366', color: '#fff', borderColor: '#22c55e', fontWeight: 600 }}
+              onClick={handleSendWhatsApp}
+              title="Enviar OS e PDF pelo WhatsApp"
+            >
+              <span>💬 WhatsApp (PDF)</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ background: '#6366f1', color: '#fff', borderColor: '#4f46e5', fontWeight: 600 }}
+              onClick={handleSendEmail}
+              title={
+                order.customerEmail
+                  ? `Enviar OS por e-mail para ${order.customerEmail}`
+                  : 'Enviar OS por e-mail'
+              }
+            >
+              <span>📧 {order.customerEmail ? 'E-mail' : 'Enviar E-mail'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={handleDownloadPdf}
+              title="Baixar PDF da Ordem de Serviço no computador"
+            >
+              <span>📥 Baixar PDF</span>
+            </button>
             <button
               type="button"
               className="btn btn--secondary os-print-modal__btn-config"

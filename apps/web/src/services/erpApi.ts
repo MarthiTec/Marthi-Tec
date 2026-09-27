@@ -403,6 +403,13 @@ export type ApiSupplier = {
   updatedAt: string;
 };
 
+export type ApiEmployeePermissions = {
+  posCancelSale?: boolean;
+  posCancelItem?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+};
+
 export type ApiEmployee = {
   id: string;
   name: string;
@@ -413,6 +420,7 @@ export type ApiEmployee = {
   isSystemUser: boolean;
   userEmail: string;
   accessAreas: AccessArea[];
+  permissions?: ApiEmployeePermissions;
   active: boolean;
   sellerId?: string;
   createdAt: string;

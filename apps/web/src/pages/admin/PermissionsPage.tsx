@@ -30,6 +30,7 @@ import {
   userIsStoreAdmin,
   type AccessArea,
   type Employee,
+  type EmployeePermissions,
   type EmployeeRole,
 } from '../../data/erpRegistry';
 import {
@@ -45,6 +46,7 @@ type FormState = {
   role: EmployeeRole;
   userEmail: string;
   accessAreas: AccessArea[];
+  permissions: EmployeePermissions;
   accessPassword: string;
   active: boolean;
 };
@@ -54,6 +56,12 @@ const EMPTY_FORM: FormState = {
   role: 'operator',
   userEmail: '',
   accessAreas: [],
+  permissions: {
+    posCancelSale: false,
+    posCancelItem: false,
+    canEdit: true,
+    canDelete: false,
+  },
   accessPassword: '',
   active: true,
 };
@@ -177,11 +185,18 @@ export function PermissionsPage() {
     setFormVisible(true);
     setMessage('');
     setError('');
+    const defaultPerms =
+      item.role === 'admin' || item.role === 'manager'
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        : item.role === 'operator'
+          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false }
+          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false };
     setForm({
       employeeId: item.id,
       role: item.role,
       userEmail: item.userEmail || item.email,
       accessAreas: item.role === 'admin' ? [...ALL_ACCESS_AREAS] : [...item.accessAreas],
+      permissions: item.permissions ?? defaultPerms,
       accessPassword: '',
       active: item.active,
     });
@@ -193,6 +208,12 @@ export function PermissionsPage() {
       setForm((current) => ({ ...current, employeeId }));
       return;
     }
+    const defaultPerms =
+      person.role === 'admin' || person.role === 'manager'
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        : person.role === 'operator'
+          ? { posCancelSale: false, posCancelItem: false, canEdit: true, canDelete: false }
+          : { posCancelSale: false, posCancelItem: false, canEdit: false, canDelete: false };
     setForm((current) => ({
       ...current,
       employeeId,
@@ -206,6 +227,7 @@ export function PermissionsPage() {
             : current.accessAreas.length
               ? current.accessAreas
               : defaultAreas(),
+      permissions: person.permissions ?? defaultPerms,
       active: person.active,
     }));
   }
@@ -242,6 +264,11 @@ export function PermissionsPage() {
       return;
     }
 
+    const perms =
+      form.role === 'admin'
+        ? { posCancelSale: true, posCancelItem: true, canEdit: true, canDelete: true }
+        : form.permissions;
+
     const result = await upsertEmployee({
       id: person.id,
       name: person.name,
@@ -252,6 +279,7 @@ export function PermissionsPage() {
       isSystemUser: true,
       userEmail: form.userEmail,
       accessAreas: form.role === 'admin' ? [...ALL_ACCESS_AREAS] : form.accessAreas,
+      permissions: perms,
       active: form.active,
       sellerId: person.sellerId,
     });
@@ -532,27 +560,96 @@ export function PermissionsPage() {
 
           {form.role === 'admin' ? (
             <p className="empty" style={{ marginTop: 12 }}>
-              Administrador tem acesso total, incluindo plano da loja.
+              Administrador tem acesso total a todas as áreas e permissões operacionais.
             </p>
           ) : (
-            <div className="erp-access" style={{ marginTop: 16 }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: '0.82rem', color: 'var(--mute)' }}>
-                Áreas liberadas
-              </h3>
-              <div className="erp-access__grid">
-                {ALL_ACCESS_AREAS.map((area) => (
-                  <label key={area} className="erp-access__item">
+            <>
+              <div className="erp-access" style={{ marginTop: 16 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: '0.82rem', color: 'var(--mute)' }}>
+                  Áreas liberadas
+                </h3>
+                <div className="erp-access__grid">
+                  {ALL_ACCESS_AREAS.map((area) => (
+                    <label key={area} className="erp-access__item">
+                      <input
+                        type="checkbox"
+                        disabled={readOnly}
+                        checked={form.accessAreas.includes(area)}
+                        onChange={() => toggleArea(area)}
+                      />
+                      {ACCESS_AREA_LABEL[area]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="erp-access" style={{ marginTop: 20 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: '0.82rem', color: 'var(--mute)' }}>
+                  Controle de Operações & Permissões Especiais
+                </h3>
+                <p className="empty" style={{ margin: '0 0 10px', fontSize: '0.78rem' }}>
+                  Defina se este usuário tem autorização para cancelar vendas/itens no PDV e alterar ou excluir registros.
+                </p>
+                <div className="erp-access__grid">
+                  <label className="erp-access__item">
                     <input
                       type="checkbox"
                       disabled={readOnly}
-                      checked={form.accessAreas.includes(area)}
-                      onChange={() => toggleArea(area)}
+                      checked={Boolean(form.permissions.posCancelSale)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, posCancelSale: e.target.checked },
+                        }))
+                      }
                     />
-                    {ACCESS_AREA_LABEL[area]}
+                    <span>🗑️ Cancelar Venda no PDV</span>
                   </label>
-                ))}
+                  <label className="erp-access__item">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={Boolean(form.permissions.posCancelItem)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, posCancelItem: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>❌ Cancelar Item no PDV</span>
+                  </label>
+                  <label className="erp-access__item">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={Boolean(form.permissions.canEdit)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, canEdit: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>✏️ Alterar Cadastros (Produtos, Clientes, etc.)</span>
+                  </label>
+                  <label className="erp-access__item">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={Boolean(form.permissions.canDelete)}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, canDelete: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>🗑️ Excluir Cadastros (Lixeira Geral)</span>
+                  </label>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           <p className="empty" style={{ marginTop: 12 }}>

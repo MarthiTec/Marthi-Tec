@@ -36,7 +36,12 @@ import {
   readScaleKg,
   verifyDeleteItemPassword,
 } from '../../data/cashSettings';
-import { listSellers, userIsStoreAdmin } from '../../data/erpRegistry';
+import {
+  listSellers,
+  userCanCancelItem,
+  userCanCancelSale,
+  userIsStoreAdmin,
+} from '../../data/erpRegistry';
 import {
   evaluateCampaignForLine,
   findCampaignsForStock,
@@ -222,6 +227,8 @@ export function CaixaPage() {
   const [customerQuery, setCustomerQuery] = useState('');
   const [deletePrompt, setDeletePrompt] = useState<{ key: string } | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
+  const [cancelSalePrompt, setCancelSalePrompt] = useState(false);
+  const [cancelSalePassword, setCancelSalePassword] = useState('');
   const [askCpf, setAskCpf] = useState(false);
   const [customerCpf, setCustomerCpf] = useState('');
   const [clientPanelOpen, setClientPanelOpen] = useState(false);
@@ -363,15 +370,7 @@ export function CaixaPage() {
     }
   }
 
-  async function handleCancelCurrentSale() {
-    if (!pricedLines.length) return;
-    if (
-      !window.confirm(
-        `Tem certeza que deseja cancelar e descartar a venda atual com ${pricedLines.length} itens? Esta ação não pode ser desfeita.`,
-      )
-    ) {
-      return;
-    }
+  async function executeCancelSale() {
     const oldId = currentLocalId;
     await deleteDraftSale(oldId);
     setLines([]);
@@ -390,6 +389,35 @@ export function CaixaPage() {
     setCurrentLocalId(generateSaleLocalId());
     setMessage('Venda cancelada e descartada.');
     focusCode();
+  }
+
+  async function handleCancelCurrentSale() {
+    if (!pricedLines.length) return;
+    const canCancel = userCanCancelSale(user?.email);
+    if (!canCancel) {
+      setCancelSalePassword('');
+      setCancelSalePrompt(true);
+      return;
+    }
+    if (
+      !window.confirm(
+        `Tem certeza que deseja cancelar e descartar a venda atual com ${pricedLines.length} itens? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+    await executeCancelSale();
+  }
+
+  async function confirmCancelSale(event: FormEvent) {
+    event.preventDefault();
+    if (!verifyDeleteItemPassword(cancelSalePassword)) {
+      setError('Senha administrativa / autorização incorreta.');
+      return;
+    }
+    setCancelSalePrompt(false);
+    setCancelSalePassword('');
+    await executeCancelSale();
   }
 
   const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -982,7 +1010,8 @@ export function CaixaPage() {
 
   function removeLine(key: string) {
     const settings = getCashSettings();
-    if (settings.requirePasswordToDeleteItem) {
+    const canCancelItem = userCanCancelItem(user?.email);
+    if (!canCancelItem || settings.requirePasswordToDeleteItem) {
       setDeletePassword('');
       setDeletePrompt({ key });
       return;
@@ -997,7 +1026,7 @@ export function CaixaPage() {
     event.preventDefault();
     if (!deletePrompt) return;
     if (!verifyDeleteItemPassword(deletePassword)) {
-      setError('Senha administrativa incorreta.');
+      setError('Senha administrativa / autorização incorreta.');
       return;
     }
     setLines(lines.filter((line) => line.key !== deletePrompt.key));
@@ -1314,8 +1343,10 @@ export function CaixaPage() {
         return;
       }
       if (event.altKey && (key === 'o' || key === 'O')) {
-        event.preventDefault();
-        openPanelRef.current('quotes');
+        if (cashSettings.enableQuotes !== false) {
+          event.preventDefault();
+          openPanelRef.current('quotes');
+        }
         return;
       }
       if (event.key === 'F3') {
@@ -1810,10 +1841,12 @@ export function CaixaPage() {
             <kbd>Alt+C</kbd>
             <span>Consultar vendas</span>
           </button>
-          <button type="button" onClick={() => openPanel('quotes')} title="Consultar orçamentos comerciais (Alt+O)">
-            <kbd>Alt+O</kbd>
-            <span>Orçamentos</span>
-          </button>
+          {cashSettings.enableQuotes !== false ? (
+            <button type="button" onClick={() => openPanel('quotes')} title="Consultar orçamentos comerciais (Alt+O)">
+              <kbd>Alt+O</kbd>
+              <span>Orçamentos</span>
+            </button>
+          ) : null}
           <button type="button" onClick={() => openPanel('canceled')}>
             <kbd>Alt+E</kbd>
             <span>Estorno (24h)</span>
@@ -2523,16 +2556,18 @@ export function CaixaPage() {
                 ? `Falta ${money(paySummary.remaining)}`
                 : 'F2 · Confirmar venda'}
             </button>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              style={{ background: '#0284c7', borderColor: '#0369a1', color: '#fff', fontWeight: 600 }}
-              onClick={() => openPanel('save_quote')}
-              disabled={!pricedLines.length}
-              title="Salvar itens do carrinho como proposta/orçamento comercial"
-            >
-              📝 Salvar Orçamento
-            </button>
+            {cashSettings.enableQuotes !== false ? (
+              <button
+                type="button"
+                className="btn btn--secondary"
+                style={{ background: '#0284c7', borderColor: '#0369a1', color: '#fff', fontWeight: 600 }}
+                onClick={() => openPanel('save_quote')}
+                disabled={!pricedLines.length}
+                title="Salvar itens do carrinho como proposta/orçamento comercial"
+              >
+                📝 Salvar Orçamento
+              </button>
+            ) : null}
             {fiscalOn && lastOrderId ? (
               <button type="button" className="btn btn--ghost" onClick={() => emitFiscal(true)}>
                 <AdminIcon name="fiscal" />
@@ -2607,10 +2642,10 @@ export function CaixaPage() {
             }}
           />
           <form className="admin-card pdv__modal-card" onSubmit={confirmDeleteLine}>
-            <h2>Excluir item</h2>
-            <p className="empty">Informe a senha administrativa para remover o lançamento.</p>
+            <h2>Excluir item do carrinho</h2>
+            <p className="empty">Informe a senha administrativa para autorizar a remoção do item.</p>
             <label>
-              Senha
+              Senha administrativa
               <input
                 type="password"
                 value={deletePassword}
@@ -2632,6 +2667,55 @@ export function CaixaPage() {
               </button>
               <button type="submit" className="btn btn--primary">
                 Confirmar exclusão
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {cancelSalePrompt ? (
+        <div className="pdv__modal" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="pdv__modal-backdrop"
+            aria-label="Fechar"
+            onClick={() => {
+              setCancelSalePrompt(false);
+              setCancelSalePassword('');
+            }}
+          />
+          <form className="admin-card pdv__modal-card" onSubmit={confirmCancelSale}>
+            <h2>Autorização: Cancelar Venda</h2>
+            <p className="empty">
+              Seu usuário não possui permissão para cancelar vendas. Digite a senha administrativa para autorizar o cancelamento.
+            </p>
+            <label>
+              Senha administrativa
+              <input
+                type="password"
+                value={cancelSalePassword}
+                onChange={(e) => setCancelSalePassword(e.target.value)}
+                autoFocus
+                autoComplete="current-password"
+              />
+            </label>
+            <div className="pdv__modal-actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setCancelSalePrompt(false);
+                  setCancelSalePassword('');
+                }}
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                className="btn btn--primary"
+                style={{ background: '#ef4444', borderColor: '#dc2626' }}
+              >
+                Autorizar e Cancelar Venda
               </button>
             </div>
           </form>

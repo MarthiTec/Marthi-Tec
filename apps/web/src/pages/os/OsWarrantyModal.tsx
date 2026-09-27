@@ -1,9 +1,15 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import type { WorkOrder, WorkOrderLine } from '../../data/osStore';
 import { useOsPrintSettings } from '../../data/osPrintSettings';
 import { QrCodeView } from '../../components/QrCodeView';
+import {
+  downloadWarrantyPdf,
+  generateWarrantyPdfBlob,
+  sendEmailWithPdf,
+  shareOrSendWhatsAppWithFile,
+} from '../../utils/commercialPdf';
 
 type Props = {
   order: WorkOrder | null;
@@ -144,6 +150,95 @@ export function OsWarrantyModal({ order, open, onClose }: Props) {
     );
   }
 
+  const generateWhatsAppWarrantyMessage = () => {
+    if (!order) return '';
+    const companyTitle =
+      settings.company.tradeName || settings.company.name || 'MARTHI ASSISTÊNCIA TÉCNICA';
+    const itemsText = items
+      .map(
+        (it, idx) =>
+          `${idx + 1}. *${it.name}* (${it.kind === 'part' ? 'Peça' : 'Serviço'}): *${it.days} dias de garantia*`,
+      )
+      .join('\n');
+
+    return [
+      `*CERTIFICADO DE GARANTIA - ${companyTitle.toUpperCase()}*`,
+      `📜 *Garantia OS #${order.id}*`,
+      `📅 Entrega: ${formatIsoToBr(deliveryDate)}`,
+      `👤 Cliente: ${order.customerName}`,
+      `📱 Aparelho: ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}`,
+      order.itemRef ? `IMEI/Série: ${order.itemRef}` : '',
+      `\n*Prazos de Garantia por Item:*\n${itemsText}`,
+      `\n*Condições Gerais:* A garantia cobre exclusivamente vícios e defeitos de fabricação das peças substituídas ou mão de obra técnica discriminada. Não cobre quedas, choques físicos, telas trincadas, contato com líquidos ou rompimento do selo interno.`,
+      `\nO certificado oficial em formato PDF segue em anexo!`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!order) return;
+    const pdfBlob = generateWarrantyPdfBlob({
+      order,
+      company: settings.company,
+      warrantyItems: items,
+      deliveryDate,
+    });
+    const text = generateWhatsAppWarrantyMessage();
+    await shareOrSendWhatsAppWithFile({
+      phone: order.customerPhone || '',
+      text,
+      pdfBlob,
+      fileName: `Termo_Garantia_OS_${order.id}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleSendEmail = () => {
+    if (!order) return;
+    const companyTitle =
+      settings.company.tradeName || settings.company.name || 'MARTHI ASSISTÊNCIA TÉCNICA';
+    let targetEmail = order.customerEmail?.trim();
+    if (!targetEmail) {
+      const input = window.prompt(
+        'Informe o e-mail do cliente para envio do Termo de Garantia:',
+        '',
+      );
+      if (!input || !input.includes('@')) {
+        alert('E-mail não informado ou inválido.');
+        return;
+      }
+      targetEmail = input.trim();
+    }
+    const pdfBlob = generateWarrantyPdfBlob({
+      order,
+      company: settings.company,
+      warrantyItems: items,
+      deliveryDate,
+    });
+    const subject = `Certificado de Garantia OS #${order.id} - ${companyTitle}`;
+    const body = `Prezado(a) ${order.customerName || 'Cliente'},\n\nSegue em anexo o Certificado de Garantia referente à Ordem de Serviço #${order.id} do equipamento ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}.\n\nData de Entrega: ${formatIsoToBr(deliveryDate)}\n\nO documento oficial em formato PDF encontra-se anexado a este e-mail.\n\nAtenciosamente,\n${companyTitle}\n${settings.company.phone ? `WhatsApp: ${settings.company.phone}` : ''}`;
+
+    sendEmailWithPdf({
+      email: targetEmail,
+      subject,
+      body,
+      pdfBlob,
+      fileName: `Termo_Garantia_OS_${order.id}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    if (!order) return;
+    downloadWarrantyPdf({
+      order,
+      company: settings.company,
+      warrantyItems: items,
+      deliveryDate,
+    });
+  };
+
   return createPortal(
     <div className="os-modal-backdrop os-print-modal-backdrop" onClick={onClose}>
       <div
@@ -163,6 +258,36 @@ export function OsWarrantyModal({ order, open, onClose }: Props) {
           </div>
 
           <div className="os-print-modal__bar-actions">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ background: '#25d366', color: '#fff', borderColor: '#22c55e', fontWeight: 600 }}
+              onClick={handleSendWhatsApp}
+              title="Enviar Termo de Garantia e PDF pelo WhatsApp"
+            >
+              <span>💬 WhatsApp (PDF)</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ background: '#6366f1', color: '#fff', borderColor: '#4f46e5', fontWeight: 600 }}
+              onClick={handleSendEmail}
+              title={
+                order.customerEmail
+                  ? `Enviar Termo de Garantia por e-mail para ${order.customerEmail}`
+                  : 'Enviar Garantia por e-mail'
+              }
+            >
+              <span>📧 {order.customerEmail ? 'E-mail' : 'Enviar E-mail'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={handleDownloadPdf}
+              title="Baixar PDF do Termo de Garantia no computador"
+            >
+              <span>📥 Baixar PDF</span>
+            </button>
             <button
               type="button"
               className="btn btn--primary os-print-modal__btn-print"

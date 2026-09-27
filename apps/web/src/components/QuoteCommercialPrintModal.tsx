@@ -7,6 +7,12 @@ import {
   QUOTE_STATUS_LABEL,
   type PosQuote,
 } from '../data/posQuotesStore';
+import {
+  downloadQuotePdf,
+  generateQuotePdfBlob,
+  sendEmailWithPdf,
+  shareOrSendWhatsAppWithFile,
+} from '../utils/commercialPdf';
 import './quoteCommercialPrint.css';
 
 type Props = {
@@ -145,15 +151,47 @@ export function QuoteCommercialPrintModal({
     return msg;
   };
 
-  const handleSendWhatsApp = () => {
-    const text = encodeURIComponent(generateWhatsAppMessage());
-    const cleanPhone = (quote.customerPhone || '').replace(/\D/g, '');
-    let url = `https://api.whatsapp.com/send?text=${text}`;
-    if (cleanPhone.length >= 10) {
-      const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-      url = `https://api.whatsapp.com/send?phone=${fullPhone}&text=${text}`;
+  const handleSendWhatsApp = async () => {
+    const pdfBlob = generateQuotePdfBlob(quote, company);
+    const text = generateWhatsAppMessage();
+    await shareOrSendWhatsAppWithFile({
+      phone: quote.customerPhone || '',
+      text,
+      pdfBlob,
+      fileName: `Proposta_Comercial_${quote.quoteNumber}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleSendEmail = () => {
+    let targetEmail = quote.customerEmail?.trim();
+    if (!targetEmail) {
+      const input = window.prompt(
+        'Informe o e-mail do cliente para enviar a proposta comercial:',
+        '',
+      );
+      if (!input || !input.includes('@')) {
+        alert('E-mail não informado ou inválido.');
+        return;
+      }
+      targetEmail = input.trim();
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const pdfBlob = generateQuotePdfBlob(quote, company);
+    const subject = `Proposta Comercial nº ${quote.quoteNumber} - ${companyTitle}`;
+    const body = `Prezado(a) ${quote.customerName || 'Cliente'},\n\nSegue em anexo a Proposta Comercial nº ${quote.quoteNumber} emitida por ${companyTitle}.\n\nValor Total: ${money(quote.total)}\nValidade da Proposta: até ${formatDate(quote.expiresAt)}\nCondições de Pagamento: ${quote.paymentConditions || 'A combinar'}\n\nO documento oficial em formato PDF encontra-se anexado a este e-mail.\n\nFicamos à disposição para o fechamento!\n\nAtenciosamente,\n${companyTitle}\n${company.phone ? `WhatsApp: ${company.phone}` : ''}`;
+
+    sendEmailWithPdf({
+      email: targetEmail,
+      subject,
+      body,
+      pdfBlob,
+      fileName: `Proposta_Comercial_${quote.quoteNumber}.pdf`,
+      onNotify: (msg) => alert(msg),
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    downloadQuotePdf(quote, company);
   };
 
   const handleCopyText = async () => {
@@ -201,9 +239,29 @@ export function QuoteCommercialPrintModal({
               type="button"
               className="quote-bar-btn quote-bar-btn--whatsapp"
               onClick={handleSendWhatsApp}
-              title="Enviar Proposta pelo WhatsApp"
+              title="Enviar Proposta e PDF pelo WhatsApp"
             >
-              💬 WhatsApp
+              💬 WhatsApp (com PDF)
+            </button>
+            <button
+              type="button"
+              className="quote-bar-btn quote-bar-btn--email"
+              onClick={handleSendEmail}
+              title={
+                quote.customerEmail
+                  ? `Enviar proposta por e-mail para ${quote.customerEmail}`
+                  : 'Enviar proposta comercial por e-mail'
+              }
+            >
+              📧 {quote.customerEmail ? 'E-mail' : 'Enviar E-mail'}
+            </button>
+            <button
+              type="button"
+              className="quote-bar-btn quote-bar-btn--download"
+              onClick={handleDownloadPdf}
+              title="Baixar PDF do Orçamento no computador"
+            >
+              📥 Baixar PDF
             </button>
             <button
               type="button"
@@ -219,7 +277,7 @@ export function QuoteCommercialPrintModal({
               onClick={handlePrint}
               title="Imprimir ou Salvar PDF (Ctrl+P)"
             >
-              🖨️ Imprimir / PDF
+              🖨️ Imprimir
             </button>
             <button
               type="button"

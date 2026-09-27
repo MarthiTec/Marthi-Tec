@@ -1,5 +1,7 @@
 import { AdminPicker } from './AdminPicker';
 import type { ReactNode } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { userCanEdit, userCanDelete } from '../data/erpRegistry';
 
 export type CrudStatusFilter = 'all' | 'active' | 'inactive';
 
@@ -87,11 +89,12 @@ export function CrudIconButton({ action, onClick, disabled, title }: CrudIconBut
   return (
     <button
       type="button"
-      className={`btn btn--ghost btn--icon crud-ico-btn crud-ico-btn--${action}`}
-      onClick={onClick}
+      className={`btn btn--ghost btn--icon crud-ico-btn crud-ico-btn--${action} ${disabled ? 'is-disabled' : ''}`}
+      onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={title ?? meta.label}
       aria-label={title ?? meta.label}
+      style={disabled ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
     >
       <img src={meta.src} alt="" className="crud-ico-img" />
     </button>
@@ -103,16 +106,46 @@ type CrudRowActionsProps = {
   onEdit: () => void;
   onDuplicate?: () => void;
   onDelete: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
-/** Ações compactas: visualizar · editar · duplicar · excluir. */
-export function CrudRowActions({ onView, onEdit, onDuplicate, onDelete }: CrudRowActionsProps) {
+/** Ações compactas: visualizar · editar · duplicar · excluir com controle de permissão por usuário. */
+export function CrudRowActions({
+  onView,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  canEdit,
+  canDelete,
+}: CrudRowActionsProps) {
+  const { user } = useAuth();
+  const allowedEdit = canEdit ?? userCanEdit(user?.email);
+  const allowedDelete = canDelete ?? userCanDelete(user?.email);
+
   return (
     <div className="crud-actions">
       {onView ? <CrudIconButton action="view" onClick={onView} /> : null}
-      <CrudIconButton action="edit" onClick={onEdit} />
-      {onDuplicate ? <CrudIconButton action="duplicate" onClick={onDuplicate} /> : null}
-      <CrudIconButton action="delete" onClick={onDelete} />
+      <CrudIconButton
+        action="edit"
+        onClick={allowedEdit ? onEdit : () => {}}
+        disabled={!allowedEdit}
+        title={allowedEdit ? 'Editar' : 'Você não possui permissão para alterar registros'}
+      />
+      {onDuplicate ? (
+        <CrudIconButton
+          action="duplicate"
+          onClick={allowedEdit ? onDuplicate : () => {}}
+          disabled={!allowedEdit}
+          title={allowedEdit ? 'Duplicar' : 'Você não possui permissão para alterar registros'}
+        />
+      ) : null}
+      <CrudIconButton
+        action="delete"
+        onClick={allowedDelete ? onDelete : () => {}}
+        disabled={!allowedDelete}
+        title={allowedDelete ? 'Excluir' : 'Você não possui permissão para excluir registros'}
+      />
     </div>
   );
 }

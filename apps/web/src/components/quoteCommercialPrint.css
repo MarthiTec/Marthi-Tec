@@ -176,6 +176,32 @@
   color: #ffffff;
 }
 
+/* Botão E-mail */
+.quote-bar-btn--email {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #818cf8;
+}
+
+.quote-bar-btn--email:hover {
+  background: #6366f1;
+  border-color: #4f46e5;
+  color: #ffffff;
+}
+
+/* Botão Download PDF */
+.quote-bar-btn--download {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+}
+
+.quote-bar-btn--download:hover {
+  background: #0284c7;
+  border-color: #0369a1;
+  color: #ffffff;
+}
+
 /* Botão Copiar */
 .quote-bar-btn--copy {
   background: rgba(255, 255, 255, 0.08);
@@ -728,50 +754,244 @@
    ========================================================================== */
 
 @media print {
-  body.is-printing-quote {
-    background: #ffffff !important;
-    color: #000000 !important;
+  /* Oculta completamente a aplicação raiz e outros elementos fora do modal */
+  body.is-printing-quote #root,
+  body:has(> .quote-modal-backdrop) #root {
+    display: none !important;
   }
 
-  body.is-printing-quote * {
-    visibility: hidden;
+  body.is-printing-quote .quote-print-bar,
+  body.is-printing-quote .no-print,
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
   }
 
   body.is-printing-quote .quote-modal-backdrop,
-  body.is-printing-quote .quote-modal-dialog,
-  body.is-printing-quote .quote-document-sheet,
-  body.is-printing-quote .quote-document-sheet * {
-    visibility: visible;
-  }
-
-  body.is-printing-quote .quote-modal-backdrop {
-    position: static;
-    background: none !important;
+  body > .quote-modal-backdrop {
+    position: static !important;
+    background: #ffffff !important;
     padding: 0 !important;
+    margin: 0 !important;
     display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
   }
 
   body.is-printing-quote .quote-modal-dialog {
     max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
     max-height: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     background: #ffffff !important;
     border: none !important;
-  }
-
-  body.is-printing-quote .quote-print-bar,
-  body.is-printing-quote .no-print {
-    display: none !important;
+    display: block !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   body.is-printing-quote .quote-document-sheet {
     padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
     box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Compactação inteligente dos blocos da proposta para impressão A4 de 1 página */
+  .quote-doc-header {
+    padding-bottom: 0.6rem !important;
+    border-bottom: 1.5px solid #cbd5e1 !important;
+    gap: 1rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quote-doc-header__logo-img,
+  .quote-doc-header__logo-placeholder {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .quote-company-name {
+    font-size: 1.15rem !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  .quote-company-sub {
+    font-size: 0.8rem !important;
+  }
+
+  .quote-company-meta {
+    font-size: 0.72rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .quote-doc-header__quote-box {
+    padding: 0.5rem 0.8rem !important;
+    border-radius: 6px !important;
+    min-width: 190px !important;
+    gap: 0.2rem !important;
+  }
+
+  .quote-box__title {
+    font-size: 0.76rem !important;
+  }
+
+  .quote-box__number {
+    font-size: 1.1rem !important;
+    margin: 0.1rem 0 !important;
+  }
+
+  .quote-box__line {
+    font-size: 0.72rem !important;
+  }
+
+  .quote-doc-section {
+    margin-top: 0.45rem !important;
+  }
+
+  .quote-doc-section__title {
+    font-size: 0.7rem !important;
+    margin-bottom: 0.25rem !important;
+    padding-bottom: 0.15rem !important;
+  }
+
+  .quote-doc-client-card {
+    padding: 0.45rem 0.65rem !important;
+    border-radius: 6px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quote-doc-client-grid {
+    gap: 0.35rem 1rem !important;
+  }
+
+  .quote-field-label {
+    font-size: 0.68rem !important;
+  }
+
+  .quote-field-value {
+    font-size: 0.76rem !important;
+  }
+
+  .quote-doc-table-wrap {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .quote-doc-table th {
+    padding: 3.5px 5px !important;
+    font-size: 0.7rem !important;
+    background: #f1f5f9 !important;
+  }
+
+  .quote-doc-table td {
+    padding: 3.5px 5px !important;
+    font-size: 0.74rem !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+  }
+
+  .quote-doc-bottom-grid {
+    margin-top: 0.45rem !important;
+    gap: 0.75rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quote-doc-conditions,
+  .quote-doc-totals {
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 6px !important;
+  }
+
+  .quote-condition-item {
+    font-size: 0.72rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+
+  .quote-condition-notes {
+    margin-top: 0.35rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  .quote-totals-row {
+    font-size: 0.76rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+
+  .quote-totals-row--grand-total {
+    margin-top: 0.35rem !important;
+    padding-top: 0.35rem !important;
+    font-size: 1.05rem !important;
+  }
+
+  .quote-totals-row--grand-total span:last-child {
+    font-size: 1.15rem !important;
+  }
+
+  .quote-doc-footer {
+    margin-top: 0.5rem !important;
+    padding-top: 0.35rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quote-doc-disclaimer {
+    font-size: 0.64rem !important;
+    margin-bottom: 0.6rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .quote-doc-signature-block {
+    margin-top: 1rem !important;
+    gap: 1.5rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quote-doc-signature-box {
+    max-width: 260px !important;
+  }
+
+  .quote-signature-line {
+    margin-bottom: 0.25rem !important;
+  }
+
+  .quote-signature-title {
+    font-size: 0.74rem !important;
+  }
+
+  .quote-signature-sub {
+    font-size: 0.68rem !important;
   }
 
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm;
+    margin: 6mm 8mm;
   }
 }
+

@@ -2318,6 +2318,17 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
               />
               <span>Permitir editar preço unitário no PDV</span>
             </label>
+            <label className="caixa-panel__check">
+              <input
+                type="checkbox"
+                checked={form.enableQuotes ?? true}
+                onChange={(e) => patch('enableQuotes', e.target.checked)}
+              />
+              <span>Habilitar módulo de Orçamentos no PDV</span>
+            </label>
+            <p className="empty">
+              Quando desativado, oculta os botões de emissão e consulta de orçamentos (Alt+O) no caixa.
+            </p>
             <p className="empty">
               Balança ligada: produtos em <strong>KG</strong> entram com o peso lido automaticamente.
             </p>
