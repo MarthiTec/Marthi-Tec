@@ -251,6 +251,7 @@ export function CaixaPage() {
   const [linkedOsId, setLinkedOsId] = useState<string | null>(null);
   const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null);
   const [printQuote, setPrintQuote] = useState<PosQuote | null>(null);
+  const [autoPrintQuote, setAutoPrintQuote] = useState(false);
   const location = useLocation();
 
   function handleConvertQuoteToCart(quote: PosQuote, updatePrices: boolean) {
@@ -2252,9 +2253,13 @@ export function CaixaPage() {
           exchangeOrderId={exchangeOrderId}
           activeQuoteDraft={activeQuoteDraft}
           onConvertQuoteToCart={handleConvertQuoteToCart}
-          onOpenPrintQuote={(q) => setPrintQuote(q)}
-          onQuoteSaved={(q) => {
+          onOpenPrintQuote={(q) => {
+            setAutoPrintQuote(false);
+            setPrintQuote(q);
+          }}
+          onQuoteSaved={(q, shouldAutoPrint) => {
             setLines([]);
+            setAutoPrintQuote(Boolean(shouldAutoPrint));
             setPrintQuote(q);
           }}
           onClose={() => {
@@ -2283,8 +2288,12 @@ export function CaixaPage() {
       <QuoteCommercialPrintModal
         quote={printQuote}
         open={Boolean(printQuote)}
-        onClose={() => setPrintQuote(null)}
+        onClose={() => {
+          setPrintQuote(null);
+          setAutoPrintQuote(false);
+        }}
         operatorName={operatorName}
+        autoPrint={autoPrintQuote}
         onConvertToSale={(q) => handleConvertQuoteToCart(q, false)}
       />
 

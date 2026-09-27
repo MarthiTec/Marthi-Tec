@@ -15,6 +15,7 @@ type Props = {
   onClose: () => void;
   operatorName?: string;
   onConvertToSale?: (quote: PosQuote) => void;
+  autoPrint?: boolean;
 };
 
 function money(v: number) {
@@ -59,6 +60,7 @@ export function QuoteCommercialPrintModal({
   onClose,
   operatorName = 'Operador',
   onConvertToSale,
+  autoPrint = false,
 }: Props) {
   useEffect(() => {
     if (open && quote) {
@@ -69,6 +71,15 @@ export function QuoteCommercialPrintModal({
       document.body.classList.remove('is-printing-quote');
     };
   }, [open, quote, operatorName]);
+
+  useEffect(() => {
+    if (open && quote && autoPrint) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [open, quote, autoPrint]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

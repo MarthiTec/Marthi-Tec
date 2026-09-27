@@ -239,7 +239,7 @@ type PanelProps = {
   activeQuoteDraft?: ActiveQuoteDraft;
   onConvertQuoteToCart?: (quote: PosQuote, updatePrices: boolean) => void;
   onOpenPrintQuote?: (quote: PosQuote) => void;
-  onQuoteSaved?: (quote: PosQuote) => void;
+  onQuoteSaved?: (quote: PosQuote, autoPrint?: boolean) => void;
 };
 
 export function CaixaPanelHost(props: PanelProps) {
@@ -3186,6 +3186,7 @@ function SaveQuotePanel(props: PanelProps) {
   const [deliveryTerm, setDeliveryTerm] = useState(settings.defaultDeliveryTerm || '');
   const [paymentConditions, setPaymentConditions] = useState(settings.defaultPaymentConditions || '');
   const [notes, setNotes] = useState(settings.defaultNotes || '');
+  const [autoPrint, setAutoPrint] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const lines = activeQuoteDraft?.lines || [];
@@ -3262,7 +3263,7 @@ function SaveQuotePanel(props: PanelProps) {
       });
 
       if (onQuoteSaved) {
-        onQuoteSaved(created);
+        onQuoteSaved(created, autoPrint);
       }
 
       onDone(`Orçamento nº ${created.quoteNumber} gerado com sucesso!`);
@@ -3274,7 +3275,7 @@ function SaveQuotePanel(props: PanelProps) {
   }
 
   return (
-    <form className="pdv-quotes-modal" onSubmit={handleSave}>
+    <form className="pdv-save-quote-form" onSubmit={handleSave}>
       <header className="pdv-quotes-head">
         <div>
           <h2>📝 Salvar Operação como Orçamento</h2>
@@ -3287,34 +3288,37 @@ function SaveQuotePanel(props: PanelProps) {
         </button>
       </header>
 
-      {/* DADOS COMERCIAIS */}
-      <div className="pdv__customer-form-grid" style={{ marginBottom: '1rem' }}>
-        <label>
-          Cliente / Razão Social
+      {/* 1. DADOS DO CLIENTE */}
+      <div className="pdv-save-quote-section-title">
+        👤 1. Destinatário / Dados do Cliente
+      </div>
+      <div className="pdv-save-quote-grid">
+        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+          <span>Cliente / Razão Social</span>
           <input
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             placeholder="Nome do cliente ou empresa"
           />
         </label>
-        <label>
-          CPF / CNPJ
+        <label className="pdv-save-quote-field">
+          <span>CPF / CNPJ</span>
           <input
             value={customerDocument}
             onChange={(e) => setCustomerDocument(e.target.value)}
             placeholder="000.000.000-00"
           />
         </label>
-        <label>
-          Telefone / WhatsApp
+        <label className="pdv-save-quote-field">
+          <span>Telefone / WhatsApp</span>
           <input
             value={customerPhone}
             onChange={(e) => setCustomerPhone(e.target.value)}
             placeholder="(00) 00000-0000"
           />
         </label>
-        <label>
-          E-mail de Contato
+        <label className="pdv-save-quote-field">
+          <span>E-mail de Contato</span>
           <input
             type="email"
             value={customerEmail}
@@ -3322,8 +3326,8 @@ function SaveQuotePanel(props: PanelProps) {
             placeholder="contato@cliente.com"
           />
         </label>
-        <label style={{ gridColumn: 'span 2' }}>
-          Endereço / Local de Entrega da Obra
+        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+          <span>Endereço / Local de Entrega da Obra</span>
           <input
             value={customerAddress}
             onChange={(e) => setCustomerAddress(e.target.value)}
@@ -3332,9 +3336,13 @@ function SaveQuotePanel(props: PanelProps) {
         </label>
       </div>
 
-      <div className="pdv__customer-form-grid" style={{ marginBottom: '1rem' }}>
-        <label>
-          Vendedor Responsável
+      {/* 2. CONDIÇÕES COMERCIAIS */}
+      <div className="pdv-save-quote-section-title">
+        📋 2. Condições Comerciais & Validade
+      </div>
+      <div className="pdv-save-quote-grid">
+        <div className="pdv-save-quote-field">
+          <span>Vendedor Responsável</span>
           <AdminPicker
             value={sellerId}
             onChange={(val) => setSellerId(val)}
@@ -3343,9 +3351,9 @@ function SaveQuotePanel(props: PanelProps) {
               ...sellers.map((s) => ({ value: s.id, label: s.name })),
             ]}
           />
-        </label>
-        <label>
-          Validade da Proposta (Dias)
+        </div>
+        <label className="pdv-save-quote-field">
+          <span>Validade da Proposta (Dias)</span>
           <input
             type="number"
             min={1}
@@ -3353,28 +3361,28 @@ function SaveQuotePanel(props: PanelProps) {
             value={validityDays}
             onChange={(e) => setValidityDays(Number(e.target.value) || 1)}
           />
-          <span className="empty" style={{ fontSize: '0.74rem' }}>
-            Válido até: {calculatedExpiresDate.toLocaleDateString('pt-BR')}
+          <span className="pdv-save-quote-hint">
+            Válido até: <strong>{calculatedExpiresDate.toLocaleDateString('pt-BR')}</strong>
           </span>
         </label>
-        <label>
-          Prazo de Entrega
+        <label className="pdv-save-quote-field">
+          <span>Prazo de Entrega</span>
           <input
             value={deliveryTerm}
             onChange={(e) => setDeliveryTerm(e.target.value)}
             placeholder="Ex: Imediato / 3 dias úteis"
           />
         </label>
-        <label>
-          Condições de Pagamento
+        <label className="pdv-save-quote-field">
+          <span>Condições de Pagamento</span>
           <input
             value={paymentConditions}
             onChange={(e) => setPaymentConditions(e.target.value)}
             placeholder="Ex: À vista Pix com 5% ou 12x cartão"
           />
         </label>
-        <label style={{ gridColumn: '1 / -1' }}>
-          Observações / Escopo da Proposta
+        <label className="pdv-save-quote-field pdv-save-quote-grid--span-2">
+          <span>Observações / Escopo da Proposta</span>
           <textarea
             rows={2}
             value={notes}
@@ -3385,14 +3393,14 @@ function SaveQuotePanel(props: PanelProps) {
       </div>
 
       {/* RESUMO DOS ITENS */}
-      <div style={{ background: 'var(--card-2, rgba(255, 255, 255, 0.04))', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--line, rgba(148, 163, 184, 0.2))' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontWeight: 600, color: 'var(--ink, #e8eef4)' }}>
+      <div className="pdv-save-quote-items-box">
+        <div className="pdv-save-quote-items-head">
           <span>Itens ({lines.length} produtos / materiais):</span>
-          <span style={{ color: 'var(--accent, #10b981)' }}>Total: {money(activeQuoteDraft?.total || 0)}</span>
+          <span className="pdv-save-quote-items-total">Total: {money(activeQuoteDraft?.total || 0)}</span>
         </div>
-        <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '0.82rem' }}>
+        <div className="pdv-save-quote-items-list">
           {lines.map((l, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', borderBottom: '1px dashed var(--line, rgba(148, 163, 184, 0.15))', color: 'var(--ink, #e8eef4)' }}>
+            <div key={i} className="pdv-save-quote-item-row">
               <span>
                 {l.qty} {l.unit} × {l.name}
                 {l.promoLabel ? <span style={{ color: 'var(--accent, #10b981)', marginLeft: '0.4rem', fontWeight: 600 }}>({l.promoLabel})</span> : null}
@@ -3403,7 +3411,17 @@ function SaveQuotePanel(props: PanelProps) {
         </div>
       </div>
 
-      <div className="pdv__modal-actions" style={{ marginTop: '1rem' }}>
+      {/* OPÇÃO DE IMPRESSÃO AUTOMÁTICA */}
+      <label className="pdv-save-quote-autoprint-toggle">
+        <input
+          type="checkbox"
+          checked={autoPrint}
+          onChange={(e) => setAutoPrint(e.target.checked)}
+        />
+        <span>🖨️ Abrir proposta e imprimir / PDF automaticamente após salvar</span>
+      </label>
+
+      <div className="pdv__modal-actions" style={{ marginTop: '0.5rem' }}>
         <button type="button" className="btn btn--ghost" onClick={onClose} disabled={saving}>
           Cancelar
         </button>
