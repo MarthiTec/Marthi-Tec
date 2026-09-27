@@ -16,6 +16,9 @@ export type TotemLeadRequest = {
   payment: string;
   installment: string | null;
   priceLabel: string;
+  cashPrice?: number;
+  ticketSenha?: string;
+  sentToCashier?: boolean;
   /** Destino WhatsApp da loja (painel). Sobrescreve EVOLUTION_STORE_NUMBER. */
   storeWhatsApp?: string;
   notifyCustomer?: boolean;
@@ -42,7 +45,14 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
   });
   const ticketId = result.id;
   const customerNotified = Boolean(result.customerNotified);
-  enqueueTotemLead({ ...payload, source: 'totem', id: ticketId });
+  enqueueTotemLead({
+    ...payload,
+    source: 'totem',
+    id: ticketId,
+    cashPrice: payload.cashPrice,
+    ticketSenha: payload.ticketSenha,
+    sentToCashier: payload.sentToCashier ?? true,
+  });
 
   if (shouldSendToKitchen()) {
     try {

@@ -19,11 +19,19 @@ import {
   getAdminState,
   isWeighedUnit,
   normalizeSaleQty,
+  parsePriceLabel,
   stockItemImages,
   type Customer,
   type StockItem,
   type StockUnit,
 } from '../../data/adminStore';
+import {
+  listOpenCashierTickets,
+  markTicketImported,
+  POS_QUEUE_EVENT,
+  ticketVariation,
+  type QueueTicket,
+} from '../../data/posQueueStore';
 import {
   getOpenCashSession,
   openCashDrawer,
@@ -270,6 +278,8 @@ export function CaixaPage() {
   const [lineAdjKey, setLineAdjKey] = useState<string | null>(null);
   const [lineTableKey, setLineTableKey] = useState<string | null>(null);
   const [cashSettings, setCashSettings] = useState(() => getCashSettings());
+  const [totemQueue, setTotemQueue] = useState<QueueTicket[]>(() => listOpenCashierTickets());
+  const [customerPrefill, setCustomerPrefill] = useState<{ name?: string; phone?: string } | undefined>(undefined);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [linkedOsId, setLinkedOsId] = useState<string | null>(null);
   const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null);
@@ -294,6 +304,14 @@ export function CaixaPage() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  useEffect(() => {
+    function onQueueUpdate() {
+      setTotemQueue(listOpenCashierTickets());
+    }
+    window.addEventListener(POS_QUEUE_EVENT, onQueueUpdate);
+    return () => window.removeEventListener(POS_QUEUE_EVENT, onQueueUpdate);
   }, []);
 
   useEffect(() => {
@@ -941,6 +959,61 @@ export function CaixaPage() {
     focusCode();
   }
 
+  function handleImportTotemTicket(ticket: QueueTicket) {
+    const rawPrice = ticket.cashPrice || parsePriceLabel(ticket.priceLabel) || 0;
+    const attrStr = ticketVariation(ticket);
+    const itemFullName = ticket.productName + (attrStr ? ` (${attrStr})` : '');
+    const lineKey = `totem:${ticket.id}:${Date.now()}`;
+    const newLine: CartLine = {
+      key: lineKey,
+      stockId: '',
+      name: itemFullName,
+      sku: 'TOTEM',
+      imei: '',
+      qty: 1,
+      unit: 'UN',
+      basePrice: rawPrice,
+      unitPrice: rawPrice,
+      priceTableId: '',
+      lineDiscount: 0,
+      lineDiscountMode: 'money',
+      lineSurcharge: 0,
+      lineSurchargeMode: 'money',
+      isFrozenPrice: true,
+      isAdHoc: true,
+      itemType: 'product',
+      promoLabel: `Totem ${ticket.ticketSenha || ticket.id}`,
+    };
+    setLines((prev) => [...prev, newLine]);
+
+    const cleanPhone = onlyDigits(ticket.customerPhone);
+    const admin = getAdminState();
+    const existing = admin.customers.find(
+      (c: Customer) =>
+        (cleanPhone && onlyDigits(c.phone) === cleanPhone) ||
+        (cleanPhone && c.name.trim().toLowerCase() === ticket.customerName.trim().toLowerCase())
+    );
+
+    markTicketImported(ticket.id);
+    setTotemQueue(listOpenCashierTickets());
+
+    if (existing) {
+      pickCustomer(existing);
+      setCustomerPrefill(undefined);
+      setPanel(null);
+      setMessage(`Pedido do Totem (${ticket.ticketSenha || ticket.id}) carregado com sucesso para ${existing.name}!`);
+    } else {
+      setWalkIn(false);
+      setCustomerId('');
+      setCustomerName(ticket.customerName);
+      setCustomerPhone(ticket.customerPhone);
+      setCustomerPrefill({ name: ticket.customerName, phone: ticket.customerPhone });
+      setPanel('customer');
+      setMessage(`Pedido do Totem (${ticket.ticketSenha || ticket.id}) carregado! Complete o cadastro do cliente.`);
+    }
+    focusCode();
+  }
+
   function pickCustomer(customer: Customer | undefined) {
     if (!customer) {
       setWalkIn(true);
@@ -1451,6 +1524,13 @@ export function CaixaPage() {
         }
         return;
       }
+      if (event.altKey && (key === 't' || key === 'T')) {
+        if (totemQueue.length > 0) {
+          event.preventDefault();
+          openPanelRef.current('totem_queue');
+        }
+        return;
+      }
       if (event.key === 'F3') {
         event.preventDefault();
         focusCode();
@@ -1678,6 +1758,18 @@ export function CaixaPage() {
           </span>
         </div>
         <div className="caixa-app__top-actions">
+          {totemQueue.length > 0 ? (
+            <button
+              type="button"
+              className="caixa-totem-queue-btn"
+              onClick={() => openPanel('totem_queue')}
+              title={`${totemQueue.length} pedido(s) do Totem aguardando atendimento no caixa (Alt+T)`}
+            >
+              <span className="caixa-totem-queue-btn__bell" aria-hidden>🛎️</span>
+              <span className="caixa-totem-queue-btn__text">Fila Totem</span>
+              <span className="caixa-totem-queue-btn__badge">{totemQueue.length}</span>
+            </button>
+          ) : null}
           <div className={`caixa-app__shortcuts ${shortcutsOpen ? 'is-open' : ''}`}>
             <button
               type="button"
@@ -1737,6 +1829,18 @@ export function CaixaPage() {
                 >
                   <kbd>Alt+A</kbd> venda avulsa
                 </button>
+                {totemQueue.length > 0 ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShortcutsOpen(false);
+                      openPanel('totem_queue');
+                    }}
+                  >
+                    <kbd>Alt+T</kbd> fila totem ({totemQueue.length})
+                  </button>
+                ) : null}
                 <button type="button" role="menuitem" onClick={() => setShortcutsOpen(false)}>
                   <kbd>Alt+1…9</kbd> estoque
                 </button>
@@ -1981,6 +2085,17 @@ export function CaixaPage() {
             <button type="button" onClick={() => openPanel('quotes')} title="Consultar orçamentos comerciais (Alt+O)">
               <kbd>Alt+O</kbd>
               <span>Orçamentos</span>
+            </button>
+          ) : null}
+          {totemQueue.length > 0 ? (
+            <button
+              type="button"
+              className="caixa-app__ops-totem"
+              onClick={() => openPanel('totem_queue')}
+              title="Pedidos aguardando atendimento do Totem"
+            >
+              <kbd>Alt+T</kbd>
+              <span>Fila Totem ({totemQueue.length})</span>
             </button>
           ) : null}
           <button type="button" onClick={() => openPanel('canceled')}>
@@ -2782,6 +2897,7 @@ export function CaixaPage() {
           onClose={() => {
             setPanel(null);
             setExchangeOrderId(null);
+            setCustomerPrefill(undefined);
             focusCode();
           }}
           onDone={(text) => {
@@ -2798,8 +2914,11 @@ export function CaixaPage() {
           onCustomerCreated={(customer) => {
             setCustomers(getAdminState().customers);
             pickCustomer(customer);
+            setCustomerPrefill(undefined);
           }}
           onAddAdHocLine={handleAddAdHocLine}
+          onImportTotemTicket={handleImportTotemTicket}
+          prefillCustomer={customerPrefill}
         />
       ) : null}
 

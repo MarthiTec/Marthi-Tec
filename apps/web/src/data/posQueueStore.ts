@@ -17,6 +17,9 @@ export type QueueTicket = {
   payment: string;
   installment: string | null;
   priceLabel: string;
+  cashPrice?: number;
+  ticketSenha?: string;
+  sentToCashier?: boolean;
   createdAt: string;
   closedAt: string | null;
 };
@@ -102,3 +105,14 @@ export function mergeQueueTickets(local: QueueTicket[], remote: QueueTicket[]) {
   });
   return [...local, ...extra].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+/** Retorna apenas os tickets abertos que foram explicitamente encaminhados para o caixa. */
+export function listOpenCashierTickets(): QueueTicket[] {
+  return load().filter((item) => item.status === 'open' && (item.sentToCashier === true || item.source === 'totem'));
+}
+
+/** Marca o ticket como atendido / importado para o PDV */
+export function markTicketImported(id: string) {
+  return updateQueueTicket(id, 'sold');
+}
+

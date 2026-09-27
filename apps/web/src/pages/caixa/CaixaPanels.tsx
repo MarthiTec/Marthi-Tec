@@ -4,6 +4,13 @@ import { CrudIconButton } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
+  listOpenCashierTickets,
+  updateQueueTicket,
+  ticketVariation,
+  POS_QUEUE_EVENT,
+  type QueueTicket,
+} from '../../data/posQueueStore';
+import {
   listPosQuotes,
   createPosQuote,
   duplicatePosQuote,
@@ -192,6 +199,7 @@ export type CaixaPanel =
   | 'quotes'
   | 'save_quote'
   | 'ad_hoc'
+  | 'totem_queue'
   | null;
 
 export type ActiveQuoteDraft = {
@@ -245,6 +253,8 @@ type PanelProps = {
   onOpenPrintQuote?: (quote: PosQuote) => void;
   onQuoteSaved?: (quote: PosQuote, autoPrint?: boolean) => void;
   onAddAdHocLine?: (item: { name: string; unitPrice: number; qty: number }) => void;
+  onImportTotemTicket?: (ticket: QueueTicket) => void;
+  prefillCustomer?: { name?: string; phone?: string };
 };
 
 export function CaixaPanelHost(props: PanelProps) {
@@ -257,7 +267,7 @@ export function CaixaPanelHost(props: PanelProps) {
           panel === 'save_quote' ? 'pdv__modal-card--save-quote' : ''
         } ${panel === 'quotes' ? 'pdv__modal-card--quotes' : ''} ${
           panel === 'ad_hoc' ? 'pdv__modal-card--ad-hoc' : ''
-        }`}
+        } ${panel === 'totem_queue' ? 'pdv__modal-card--totem' : ''}`}
       >
         {panel === 'sales' ? <SalesPanel {...props} /> : null}
         {panel === 'canceled' ? <CanceledSalesPanel {...props} /> : null}
@@ -274,6 +284,7 @@ export function CaixaPanelHost(props: PanelProps) {
         {panel === 'quotes' ? <QuotesListPanel {...props} /> : null}
         {panel === 'save_quote' ? <SaveQuotePanel {...props} /> : null}
         {panel === 'ad_hoc' ? <AdHocSalePanel {...props} /> : null}
+        {panel === 'totem_queue' ? <TotemQueuePanel {...props} /> : null}
       </div>
     </div>
   );
@@ -2876,10 +2887,10 @@ function formatPhoneLocal(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated }: PanelProps) {
-  const [name, setName] = useState('');
+function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated, prefillCustomer }: PanelProps) {
+  const [name, setName] = useState(() => prefillCustomer?.name || '');
   const [document, setDocument] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => prefillCustomer?.phone ? formatPhoneLocal(prefillCustomer.phone) : '');
   const [email, setEmail] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [street, setStreet] = useState('');
@@ -3650,4 +3661,112 @@ function SaveQuotePanel(props: PanelProps) {
     </form>
   );
 }
+
+function TotemQueuePanel({ onClose, onDone, onImportTotemTicket }: PanelProps) {
+  const [tickets, setTickets] = useState<QueueTicket[]>(() => listOpenCashierTickets());
+
+  useEffect(() => {
+    function refresh() {
+      setTickets(listOpenCashierTickets());
+    }
+    window.addEventListener(POS_QUEUE_EVENT, refresh);
+    return () => window.removeEventListener(POS_QUEUE_EVENT, refresh);
+  }, []);
+
+  function handleImport(ticket: QueueTicket) {
+    if (onImportTotemTicket) {
+      onImportTotemTicket(ticket);
+    }
+  }
+
+  function handleCancel(id: string) {
+    updateQueueTicket(id, 'cancelled');
+    onDone('Pedido do totem cancelado.');
+  }
+
+  return (
+    <div className="caixa-totem-panel">
+      <div className="pdv__modal-head">
+        <div>
+          <h3>🛎️ Fila de Atendimento do Totem</h3>
+          <p className="caixa-panel-subtitle">
+            Pedidos encaminhados pelos totens da loja aguardando conclusão no caixa.
+          </p>
+        </div>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          ✕ Fechar
+        </button>
+      </div>
+
+      {tickets.length === 0 ? (
+        <div className="caixa-totem-empty">
+          <span style={{ fontSize: '2.5rem' }}>🛎️</span>
+          <h4>Nenhum pedido na fila</h4>
+          <p>Quando um cliente encaminhar uma venda do totem para o caixa, ela aparecerá aqui instantaneamente.</p>
+        </div>
+      ) : (
+        <div className="caixa-totem-list">
+          {tickets.map((t) => (
+            <div key={t.id} className="caixa-totem-card">
+              <div className="caixa-totem-card__header">
+                <div className="caixa-totem-card__senha">
+                  <span>Senha:</span>
+                  <strong>{t.ticketSenha || t.id}</strong>
+                </div>
+                <span className="caixa-totem-card__time">
+                  {new Date(t.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div className="caixa-totem-card__body">
+                <div className="caixa-totem-card__customer">
+                  <strong>👤 {t.customerName}</strong>
+                  <span>📱 {t.customerPhone || 'Sem telefone'}</span>
+                  <span className="caixa-totem-card__incomplete-badge">
+                    ⚠️ Dados cadastrais parciais (completar no balcão)
+                  </span>
+                </div>
+
+                <div className="caixa-totem-card__product">
+                  <div className="caixa-totem-card__prod-title">{t.productName}</div>
+                  {ticketVariation(t) && (
+                    <div className="caixa-totem-card__prod-vars">{ticketVariation(t)}</div>
+                  )}
+                  <div className="caixa-totem-card__payment-info">
+                    Pretensão: <strong>{t.payment} {t.installment ? `(${t.installment})` : ''}</strong>
+                  </div>
+                </div>
+
+                <div className="caixa-totem-card__price">
+                  <span>Total:</span>
+                  <strong>{t.priceLabel}</strong>
+                </div>
+              </div>
+
+              <div className="caixa-totem-card__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary caixa-totem-btn-import"
+                  onClick={() => handleImport(t)}
+                  title="Carregar itens e cliente no caixa para completar cadastro e receber"
+                >
+                  ✓ Atender no Caixa & Concluir Cadastro
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost caixa-totem-btn-cancel"
+                  onClick={() => handleCancel(t.id)}
+                  title="Cancelar este pedido"
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 

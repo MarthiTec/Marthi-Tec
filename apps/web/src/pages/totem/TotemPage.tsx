@@ -185,6 +185,7 @@ export function TotemPage() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [ticketId, setTicketId] = useState<string | null>(null);
+  const [sentToCashierDone, setSentToCashierDone] = useState(false);
   const effectiveMode = sessionMode ?? mode;
   const catalogOnly = effectiveMode === 'catalog';
   const showDineIn = offerFulfillment && !catalogOnly;
@@ -244,6 +245,7 @@ export function TotemPage() {
     setExitError(null);
     setConfigs({});
     setTicketId(null);
+    setSentToCashierDone(false);
     setSessionMode(null);
     stopTotemSpeech();
     window.scrollTo({ top: 0 });
@@ -665,7 +667,7 @@ export function TotemPage() {
     setSearch((current) => current.slice(0, -1));
   }
 
-  async function handleWhatsAppSubmit() {
+  async function handleSubmitOrder(destination: 'cashier' | 'whatsapp') {
     if (!selection) return;
     if (!name.trim()) {
       setError('Informe seu nome para confirmar o pedido.');
@@ -689,6 +691,7 @@ export function TotemPage() {
             Number.parseInt(selection.installment, 10) || 12,
           )}`;
     const legacy = toLegacyFields(selection.picked);
+    const isToCashier = destination === 'cashier';
 
     try {
       const result = await submitTotemLead({
@@ -701,14 +704,17 @@ export function TotemPage() {
         installment:
           copy.showInstallments && selection.payment === 'Parcelado' ? selection.installment : null,
         priceLabel,
+        cashPrice: selection.cashPrice,
+        sentToCashier: isToCashier,
       });
       setTicketId(result.ticketId);
+      setSentToCashierDone(isToCashier);
       setStep('done');
       if (canPrintTicket) {
         printCurrentTicket(result.ticketId, selection.product.name, selection.picked, priceLabel);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível enviar a proposta.');
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar o pedido.');
     } finally {
       setSubmitting(false);
     }
@@ -1334,18 +1340,53 @@ export function TotemPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="totem-btn totem-btn--primary totem-btn--block"
-                disabled={
-                  submitting ||
-                  !name.trim() ||
-                  (phoneRequired && onlyDigits(phone).length < 10)
-                }
-                onClick={() => void handleWhatsAppSubmit()}
-              >
-                {submitting ? copy.sendingButton : copy.confirmButton}
-              </button>
+              <div className="totem__checkout-actions" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
+                <button
+                  type="button"
+                  className="totem-btn totem-btn--primary totem-btn--block"
+                  style={{
+                    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                    fontSize: '1.08rem',
+                    fontWeight: 700,
+                    padding: '16px 20px',
+                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                  }}
+                  disabled={
+                    submitting ||
+                    !name.trim() ||
+                    (phoneRequired && onlyDigits(phone).length < 10)
+                  }
+                  onClick={() => void handleSubmitOrder('cashier')}
+                >
+                  <span style={{ fontSize: '1.3rem' }} aria-hidden>🏪</span>
+                  <span>{submitting ? 'Encaminhando ao Caixa…' : 'Encaminhar Venda para o Caixa'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="totem-btn totem-btn--ghost totem-btn--block"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                  }}
+                  disabled={
+                    submitting ||
+                    !name.trim() ||
+                    (phoneRequired && onlyDigits(phone).length < 10)
+                  }
+                  onClick={() => void handleSubmitOrder('whatsapp')}
+                >
+                  <span aria-hidden>📱</span>
+                  <span>{submitting ? copy.sendingButton : 'Concluir pelo WhatsApp'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -1353,20 +1394,43 @@ export function TotemPage() {
 
       {step === 'done' && selection && (
         <section className="totem__done">
-          <h1>{copy.doneTitle}</h1>
+          <h1>{sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
           {senha ? (
             <div className="totem__senha" aria-label={`Senha ${senha}`}>
               {senha}
             </div>
           ) : null}
           <p>
-            {name.trim() ? `Obrigado, ${name.trim()}!` : 'Obrigado!'} {copy.doneHint}
+            {name.trim() ? `Obrigado, ${name.trim()}!` : 'Obrigado!'}{' '}
+            {sentToCashierDone
+              ? 'Seu pedido foi encaminhado com sucesso para a fila do caixa.'
+              : copy.doneHint}
           </p>
           <p>
             <strong>{selection.product.name}</strong>
             {formatPicked(selection.picked) ? ` (${formatPicked(selection.picked)})` : ''}.
           </p>
-          <p className="totem__done-note">O pedido já está na fila do PDV para atendimento.</p>
+          {sentToCashierDone ? (
+            <div
+              style={{
+                background: 'rgba(22, 163, 74, 0.15)',
+                border: '1px solid #16a34a',
+                borderRadius: 12,
+                padding: '16px 20px',
+                margin: '18px 0',
+                textAlign: 'center',
+              }}
+            >
+              <strong style={{ display: 'block', fontSize: '1.15rem', color: '#4ade80', marginBottom: 6 }}>
+                🏪 Dirija-se ao caixa com a sua senha
+              </strong>
+              <span style={{ fontSize: '0.92rem', color: '#e2e8f0', lineHeight: 1.45, display: 'block' }}>
+                O atendente irá chamá-lo no balcão para cadastrar seus dados completos e finalizar o pagamento.
+              </span>
+            </div>
+          ) : (
+            <p className="totem__done-note">O pedido já está na fila do PDV para atendimento.</p>
+          )}
           {canPrintTicket ? (
             <button
               type="button"
