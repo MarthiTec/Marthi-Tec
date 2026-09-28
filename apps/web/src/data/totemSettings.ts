@@ -54,15 +54,18 @@ export type TotemSettings = {
   printTicket: boolean;
   /** Áudio de acessibilidade (voz em português). */
   audioAssist: boolean;
-  /**
-   * WhatsApp da loja que recebe o lead do totem (DDI+DDD+número, ex.: 5524999999999).
-   * O Evolution envia a mensagem PARA este número a partir da instância Marthi.
-   */
+  /** WhatsApp da loja que recebe o lead do totem (DDI+DDD+número, ex.: 5524999999999). */
   storeWhatsApp: string;
   /** Se true, o cliente também recebe um aviso no WhatsApp após o pedido no totem. */
   notifyCustomerOnLead: boolean;
   /** Texto opcional na mensagem (ex.: Shopping Olga Sola, Três Rios). */
   locationLabel: string;
+  /**
+   * Percentual de taxa de cartão embutido no rótulo de parcelamento (12×).
+   * Ex.: 3.5 → preço × 1,035 dividido pelas parcelas.
+   * 0 = sem taxa (padrão).
+   */
+  cardFeePercent: number;
 };
 
 export type TotemCopy = {
@@ -351,6 +354,7 @@ export function defaultTotemSettings(): TotemSettings {
     storeWhatsApp: '',
     notifyCustomerOnLead: false,
     locationLabel: '',
+    cardFeePercent: 0,
   };
 }
 
@@ -434,6 +438,7 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     storeWhatsApp: normalizeWhatsAppDigits(parsed?.storeWhatsApp),
     notifyCustomerOnLead: Boolean(parsed?.notifyCustomerOnLead),
     locationLabel: typeof parsed?.locationLabel === 'string' ? parsed.locationLabel.trim().slice(0, 80) : '',
+    cardFeePercent: Math.max(0, Math.min(100, Number(parsed?.cardFeePercent) || 0)),
   };
 }
 
@@ -482,6 +487,7 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     storeWhatsApp: patch.storeWhatsApp ?? base?.storeWhatsApp,
     notifyCustomerOnLead: patch.notifyCustomerOnLead ?? base?.notifyCustomerOnLead,
     locationLabel: patch.locationLabel ?? base?.locationLabel,
+    cardFeePercent: patch.cardFeePercent ?? base?.cardFeePercent,
   });
 }
 

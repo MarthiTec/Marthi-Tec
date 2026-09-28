@@ -4,6 +4,7 @@ import {
   stockAttributes,
   type ProductAttribute,
 } from './attributeStore';
+import { getTotemSettings } from './totemSettings';
 
 export type VariantQuote = {
   stock: StockItem | null;
@@ -20,9 +21,19 @@ function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export function formatInstallment(price: number, parcels = 12) {
+/**
+ * Formata o rótulo de parcelamento.
+ * @param cardFeePercent Percentual de taxa de cartão a ser embutida no preço parcelado (ex.: 3.5 = 3,5%). Se omitido, usa o cardFeePercent configurado no Totem.
+ */
+export function formatInstallment(price: number, parcels = 12, cardFeePercent?: number) {
   const count = Math.max(1, parcels);
-  const parcel = Math.round((price / count) * 100) / 100;
+  const fee =
+    cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
+      ? cardFeePercent
+      : getTotemSettings().cardFeePercent;
+  const feeMultiplier = 1 + Math.max(0, fee) / 100;
+  const adjusted = price * feeMultiplier;
+  const parcel = Math.round((adjusted / count) * 100) / 100;
   return `${count} X ${money(parcel)}`;
 }
 
@@ -74,6 +85,7 @@ export function quoteTotemVariant(
   fallbackPrice: number,
   config: Record<string, string>,
   stock: StockItem[] = [],
+  cardFeePercent?: number,
 ): VariantQuote {
   const stockAttrs = stockAttributes();
   const attrs = getAttributes().filter((item) => item.active);
@@ -87,12 +99,25 @@ export function quoteTotemVariant(
     price += deltaFor(attr, value);
   }
 
+  // Prioridade: se o item em estoque tiver taxa específica definida (cardRate), usa ela. Senão usa o cardFeePercent fornecido ou padrão de totemSettings.
+  const stockFee =
+    matched?.cardRate !== undefined && matched?.cardRate !== null && Number.isFinite(Number(matched.cardRate))
+      ? Number(matched.cardRate)
+      : undefined;
+
+  const defaultFee =
+    cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
+      ? cardFeePercent
+      : getTotemSettings().cardFeePercent;
+
+  const effectiveFee = stockFee !== undefined ? stockFee : defaultFee;
+
   const cashPrice = Math.max(0, Math.round(price * 100) / 100);
   return {
     stock: matched,
     cashPrice,
     qty: matched?.qty ?? 0,
-    installmentLabel: formatInstallment(cashPrice),
+    installmentLabel: formatInstallment(cashPrice, 12, effectiveFee),
   };
 }
 
@@ -101,7 +126,8 @@ export function quoteFromPicked(
   fallbackPrice: number,
   picked: { id: string; value: string }[],
   stock: StockItem[] = [],
+  cardFeePercent?: number,
 ) {
   const config = Object.fromEntries(picked.map((item) => [item.id, item.value]));
-  return quoteTotemVariant(productName, fallbackPrice, config, stock);
+  return quoteTotemVariant(productName, fallbackPrice, config, stock, cardFeePercent);
 }

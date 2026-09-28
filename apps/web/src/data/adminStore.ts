@@ -62,6 +62,8 @@ export type StockItem = {
   avgCost: number;
   /** Preço de venda base (vista / tabela 0%). */
   price: number;
+  /** Percentual da taxa de cartão (%) para cotação e totem. */
+  cardRate?: number;
   /** Data ISO da última compra/entrada com custo. */
   lastPurchaseAt: string;
   /** Custo unitário da última compra. */
@@ -288,6 +290,12 @@ function normalizeStock(item: StockItem): StockItem {
     cost,
     avgCost: Number.isFinite(avgCost) && avgCost > 0 ? avgCost : cost,
     price: Number(item.price) || 0,
+    cardRate:
+      item.cardRate !== undefined && item.cardRate !== null && Number.isFinite(Number(item.cardRate))
+        ? Number(item.cardRate)
+        : item.attrs?.cardRate !== undefined
+          ? Number(item.attrs.cardRate) || 0
+          : undefined,
     lastPurchaseAt: item.lastPurchaseAt ?? '',
     lastPurchaseCost:
       Number(item.lastPurchaseCost) > 0 ? Number(item.lastPurchaseCost) : cost,
@@ -379,10 +387,28 @@ function load(): AdminState {
       return fresh;
     }
     const next = hydrate(parsed);
+    // Auto-limpeza de produtos mockados de celulares demo antigos
+    const hasDemoStock = next.stock.some(
+      (item) =>
+        /iphone|redmi/i.test(item.name) ||
+        item.sku === 'APL-16P-128' ||
+        item.sku === 'APL-15-128' ||
+        item.sku === 'XIA-RN13-256',
+    );
+    if (hasDemoStock) {
+      next.stock = next.stock.filter(
+        (item) =>
+          !/iphone|redmi/i.test(item.name) &&
+          item.sku !== 'APL-16P-128' &&
+          item.sku !== 'APL-15-128' &&
+          item.sku !== 'XIA-RN13-256',
+      );
+      save(next);
+    }
     const stockNeedsCodes = (parsed.stock ?? []).some(
       (item) => item.barcode === undefined || item.imei === undefined,
     );
-    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes) {
+    if (!parsed.priceTables?.length || !parsed.payments?.length || stockNeedsCodes || hasDemoStock) {
       save(next);
     }
     return next;
@@ -390,6 +416,33 @@ function load(): AdminState {
     const fresh = seed();
     save(fresh);
     return fresh;
+  }
+}
+
+export function clearStockMocks(): AdminState {
+  const state = load();
+  state.stock = [];
+  save(state);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(STOCK_EVENT));
+    try {
+      localStorage.removeItem('marthi.totem.catalog.cache.v2');
+    } catch {
+      /* ignore */
+    }
+  }
+  return state;
+}
+
+export function defaultCardRate(): number {
+  try {
+    const state = load();
+    const cardTable = state.priceTables.find(
+      (t) => t.active && (t.id === 'TAB-CARTAO' || t.name.toLowerCase().includes('cart')),
+    );
+    return cardTable?.percent ?? 5;
+  } catch {
+    return 5;
   }
 }
 
