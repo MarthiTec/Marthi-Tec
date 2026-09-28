@@ -48,7 +48,8 @@ import {
 import { listTotemCatalog, listTotemStock, loadTotemCatalog } from './totemCatalog';
 import './totem.css';
 
-const FILTER_IDLE_MS = 2 * 60 * 1000;
+const TRANSACTION_IDLE_MS = 5 * 60 * 1000;
+const DONE_IDLE_MS = 45 * 1000;
 
 type Step = 'attract' | 'welcome' | 'catalog' | 'checkout' | 'done';
 type BrandFilter = TotemBrand | 'all';
@@ -197,26 +198,21 @@ export function TotemPage() {
   const senha = ticketId ? ticketSenha(ticketId) : '';
   const greeting = storeGreeting();
 
-  const hasActiveQuery =
-    search.trim() !== '' ||
-    brand !== 'all' ||
-    Object.values(filters).some((value) => value && value !== 'all');
-
   const homeStep: Step = showAttractScreen
     ? 'attract'
     : collectNameUpFront
       ? 'welcome'
       : 'catalog';
 
-  const awayFromHome =
-    step !== homeStep ||
-    hasActiveQuery ||
-    Boolean(selection) ||
+  // No catálogo, não devemos resetar a tela de volta para a abertura se o usuário está navegando.
+  // O reset por inatividade só deve ocorrer se houver fluxo inacabado no checkout ou tela final concluída.
+  const needsIdleReset =
+    step === 'done' ||
+    step === 'checkout' ||
     (step === 'welcome' && name.trim() !== '') ||
-    (step !== 'welcome' && name.trim() !== '') ||
-    phone.trim() !== '' ||
-    exitOpen ||
-    contactOpen;
+    Boolean(selection);
+
+  const idleDuration = step === 'done' ? DONE_IDLE_MS : TRANSACTION_IDLE_MS;
 
   function bumpIdle() {
     setIdleTick((current) => current + 1);
@@ -308,23 +304,20 @@ export function TotemPage() {
   }, [brand]);
 
   useEffect(() => {
-    if (!awayFromHome) return;
+    if (!needsIdleReset) return;
     const timer = window.setTimeout(() => {
       resetToHome();
-    }, FILTER_IDLE_MS);
+    }, idleDuration);
     return () => window.clearTimeout(timer);
   }, [
-    awayFromHome,
+    needsIdleReset,
+    idleDuration,
     idleTick,
     step,
-    hasActiveQuery,
     selection,
     name,
     phone,
     exitOpen,
-    search,
-    brand,
-    filters,
     checkoutKb,
     contactOpen,
   ]);
@@ -351,19 +344,34 @@ export function TotemPage() {
   }, [checkoutKb, step]);
 
   useEffect(() => {
+    let lastActivity = 0;
     function onActivity() {
-      bumpIdle();
+      const now = Date.now();
+      if (now - lastActivity > 1000) {
+        lastActivity = now;
+        bumpIdle();
+      }
     }
     const options: AddEventListenerOptions = { capture: true, passive: true };
     window.addEventListener('pointerdown', onActivity, options);
+    window.addEventListener('pointermove', onActivity, options);
+    window.addEventListener('mousemove', onActivity, options);
     window.addEventListener('keydown', onActivity, options);
     window.addEventListener('touchstart', onActivity, options);
+    window.addEventListener('touchmove', onActivity, options);
+    window.addEventListener('wheel', onActivity, options);
     window.addEventListener('scroll', onActivity, options);
+    window.addEventListener('click', onActivity, options);
     return () => {
       window.removeEventListener('pointerdown', onActivity, options);
+      window.removeEventListener('pointermove', onActivity, options);
+      window.removeEventListener('mousemove', onActivity, options);
       window.removeEventListener('keydown', onActivity, options);
       window.removeEventListener('touchstart', onActivity, options);
+      window.removeEventListener('touchmove', onActivity, options);
+      window.removeEventListener('wheel', onActivity, options);
       window.removeEventListener('scroll', onActivity, options);
+      window.removeEventListener('click', onActivity, options);
     };
   }, []);
 

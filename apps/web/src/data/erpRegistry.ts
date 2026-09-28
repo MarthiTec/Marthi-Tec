@@ -150,68 +150,10 @@ function defaultAdminAreas(): AccessArea[] {
 }
 
 function seed(): RegistryState {
-  const stamp = now();
-  const adminId = uid('EMP');
-  const sellerId = uid('VEN');
   return {
-    employees: [
-      {
-        id: adminId,
-        name: 'Administrador da loja',
-        phone: '',
-        email: '',
-        document: '',
-        role: 'admin',
-        isSystemUser: true,
-        userEmail: '',
-        accessAreas: defaultAdminAreas(),
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-      {
-        id: uid('EMP'),
-        name: 'Ana Costa',
-        phone: '(24) 99900-1111',
-        email: 'ana@loja.local',
-        document: '',
-        role: 'operator',
-        isSystemUser: false,
-        userEmail: '',
-        accessAreas: ['os', 'erp_stock', 'erp_customers'],
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
-    sellers: [
-      {
-        id: sellerId,
-        name: 'Bruno Vendas',
-        phone: '(24) 98800-2222',
-        email: 'bruno@loja.local',
-        document: '',
-        commissionPercent: 2,
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
-    suppliers: [
-      {
-        id: uid('FOR'),
-        name: 'Distribuidora Celular Sul',
-        tradeName: 'CelSul',
-        document: '12.345.678/0001-90',
-        phone: '(21) 3333-4444',
-        email: 'compras@celsul.local',
-        city: 'Rio de Janeiro',
-        notes: 'Peças e aparelhos',
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
+    employees: [],
+    sellers: [],
+    suppliers: [],
   };
 }
 
@@ -224,11 +166,19 @@ function load(): RegistryState {
       return seeded;
     }
     const parsed = JSON.parse(raw) as Partial<RegistryState>;
-    return {
-      sellers: Array.isArray(parsed.sellers) ? parsed.sellers : [],
-      suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
-      employees: Array.isArray(parsed.employees) ? parsed.employees : [],
-    };
+    const isMockEmail = (mail?: string) => Boolean(mail && (mail.includes('@loja.local') || mail.includes('@celsul.local')));
+    const isMockName = (name?: string) => Boolean(name && (name === 'Ana Costa' || name === 'Bruno Vendas' || name === 'Distribuidora Celular Sul' || name === 'Administrador da loja'));
+    const sellers = (Array.isArray(parsed.sellers) ? parsed.sellers : []).filter((s) => !isMockEmail(s.email) && !isMockName(s.name));
+    const suppliers = (Array.isArray(parsed.suppliers) ? parsed.suppliers : []).filter((s) => !isMockEmail(s.email) && !isMockName(s.name));
+    const employees = (Array.isArray(parsed.employees) ? parsed.employees : []).filter((e) => !isMockEmail(e.email) && !isMockEmail(e.userEmail) && !isMockName(e.name));
+
+    const state: RegistryState = { sellers, suppliers, employees };
+    const rawCount = (parsed.sellers?.length || 0) + (parsed.suppliers?.length || 0) + (parsed.employees?.length || 0);
+    const cleanCount = sellers.length + suppliers.length + employees.length;
+    if (cleanCount !== rawCount) {
+      save(state);
+    }
+    return state;
   } catch {
     const seeded = seed();
     save(seeded);

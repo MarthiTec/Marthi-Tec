@@ -168,166 +168,9 @@ export function getQuoteSettings(): PosQuoteSettings {
 }
 
 function seedQuotes(): State {
-  const now = new Date();
-  const validUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const expiredDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-
-  const demo1: PosQuote = {
-    id: 'ORC-DEMO-001',
-    quoteNumber: '000101',
-    sequenceNumber: 101,
-    customerId: 'CLI-01',
-    customerName: 'Construtora Horizonte Ltda',
-    customerDocument: '12.345.678/0001-90',
-    customerPhone: '(24) 99888-1122',
-    customerEmail: 'compras@horizonte.eng.br',
-    customerAddress: 'Av. das Indústrias, 450 - Centro',
-    sellerId: 'SELL-01',
-    sellerName: 'Carlos Eduardo',
-    status: 'open',
-    createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    expiresAt: validUntil.toISOString(),
-    validityDays: 7,
-    priceTableName: 'Tabela Atacado / Obras',
-    priceTableId: 'TAB-ATACADO',
-    deliveryTerm: 'Entrega em até 3 dias úteis na obra',
-    paymentConditions: '28 / 56 dias no boleto faturado',
-    notes: 'Proposta para fundação bloco B. Cimento CP-II e argamassa colante AC-III.',
-    subtotal: 3850.0,
-    discount: 150.0,
-    discountMode: 'money',
-    surcharge: 0,
-    surchargeMode: 'money',
-    total: 3700.0,
-    printedCount: 1,
-    lines: [
-      {
-        id: 'line-1',
-        stockId: 'stk-cimento-01',
-        sku: 'CIM-50KG',
-        name: 'Cimento Portland CP II-F 50kg Nacional',
-        unit: 'SC',
-        qty: 80,
-        basePrice: 38.0,
-        unitPrice: 34.5,
-        lineDiscount: 0,
-        lineDiscountMode: 'money',
-        lineSurcharge: 0,
-        lineSurchargeMode: 'money',
-        total: 2760.0,
-        promoLabel: 'Campanha Cimento 50+ un.',
-      },
-      {
-        id: 'line-2',
-        stockId: 'stk-arg-02',
-        sku: 'ARG-AC3-20',
-        name: 'Argamassa Colante AC-III Cinza 20kg',
-        unit: 'SC',
-        qty: 35,
-        basePrice: 32.0,
-        unitPrice: 31.14,
-        lineDiscount: 0,
-        lineDiscountMode: 'money',
-        lineSurcharge: 0,
-        lineSurchargeMode: 'money',
-        total: 1090.0,
-      },
-    ],
-    history: [
-      {
-        id: 'hist-1',
-        actorName: 'Carlos Eduardo',
-        action: 'criou',
-        details: 'Orçamento gerado no PDV para Construtora Horizonte Ltda.',
-        createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 'hist-2',
-        actorName: 'Carlos Eduardo',
-        action: 'enviou',
-        details: 'PDF gerado e enviado por WhatsApp comercial para o engenheiro.',
-        createdAt: new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString(),
-      },
-    ],
-  };
-
-  const demo2: PosQuote = {
-    id: 'ORC-DEMO-002',
-    quoteNumber: '000102',
-    sequenceNumber: 102,
-    customerId: 'CLI-02',
-    customerName: 'Marcos Vinícius Santos',
-    customerDocument: '334.887.992-01',
-    customerPhone: '(24) 98112-4455',
-    customerEmail: 'marcos.reforma@gmail.com',
-    customerAddress: 'Rua das Palmeiras, 112',
-    sellerId: 'SELL-02',
-    sellerName: 'Mariana Lima',
-    status: 'expired',
-    createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    expiresAt: expiredDate.toISOString(),
-    validityDays: 5,
-    priceTableName: 'À Vista',
-    priceTableId: 'TAB-VISTA',
-    deliveryTerm: 'Retirada balcão',
-    paymentConditions: 'Pix com 5% de desconto',
-    notes: 'Tintas e impermeabilização área externa.',
-    subtotal: 1420.0,
-    discount: 71.0,
-    discountMode: 'percent',
-    surcharge: 0,
-    surchargeMode: 'money',
-    total: 1349.0,
-    printedCount: 2,
-    lines: [
-      {
-        id: 'line-201',
-        stockId: 'stk-tinta-01',
-        sku: 'TNT-FOS-18L',
-        name: 'Tinta Acrílica Fosca Premium Branco Neve 18L',
-        unit: 'LT',
-        qty: 2,
-        basePrice: 420.0,
-        unitPrice: 380.0,
-        lineDiscount: 0,
-        lineDiscountMode: 'money',
-        lineSurcharge: 0,
-        lineSurchargeMode: 'money',
-        total: 760.0,
-        promoLabel: 'Semana das Tintas 10%',
-      },
-      {
-        id: 'line-202',
-        stockId: 'stk-imp-01',
-        sku: 'IMP-BLANK-18',
-        name: 'Impermeabilizante Manta Líquida Branca 18kg',
-        unit: 'BD',
-        qty: 2,
-        basePrice: 330.0,
-        unitPrice: 330.0,
-        lineDiscount: 0,
-        lineDiscountMode: 'money',
-        lineSurcharge: 0,
-        lineSurchargeMode: 'money',
-        total: 660.0,
-      },
-    ],
-    history: [
-      {
-        id: 'hist-201',
-        actorName: 'Mariana Lima',
-        action: 'criou',
-        details: 'Orçamento gerado no balcão.',
-        createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-    ],
-  };
-
   return {
-    quotes: [demo1, demo2],
-    lastSequence: 102,
+    quotes: [],
+    lastSequence: 100,
   };
 }
 
@@ -340,12 +183,17 @@ function load(): State {
       return seeded;
     }
     const parsed = JSON.parse(raw) as Partial<State>;
-    const quotes = Array.isArray(parsed.quotes) ? parsed.quotes.map(normalizeQuote) : [];
+    const rawQuotes = Array.isArray(parsed.quotes) ? parsed.quotes.map(normalizeQuote) : [];
+    const quotes = rawQuotes.filter((q) => q.id && !q.id.startsWith('ORC-DEMO-'));
     const maxSeq = quotes.reduce((acc, q) => Math.max(acc, q.sequenceNumber || 0), parsed.lastSequence || 100);
-    return {
+    const state: State = {
       quotes,
       lastSequence: maxSeq,
     };
+    if (quotes.length !== rawQuotes.length) {
+      save(state);
+    }
+    return state;
   } catch {
     return seedQuotes();
   }

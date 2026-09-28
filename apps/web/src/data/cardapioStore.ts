@@ -145,94 +145,7 @@ export const DEFAULT_CONFIG: CardapioConfig = {
   updatedAt: new Date().toISOString(),
 };
 
-export const SEED_ITEMS: CardapioItem[] = [
-  {
-    id: 'ITEM-FEIJOADA',
-    name: 'Feijoada Especial da Casa',
-    description:
-      'Feijoada clássica completa com arroz soltinho, couve fininha, farofa na manteiga e ovo frito.',
-    price: 32.0,
-    imageUrl:
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80',
-    category: 'Promoção do Dia',
-    available: true,
-    order: 1,
-    isPromotion: true,
-    badge: 'Mais Pedido',
-  },
-  {
-    id: 'ITEM-CAMARAO',
-    name: 'Camarão Gratinado Especial',
-    description:
-      'Camarões ao molho cremoso com queijo gratinado e purê especial. Acompanha arroz branco e batata frita.',
-    price: 42.0,
-    imageUrl:
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&auto=format&fit=crop&q=80',
-    category: 'Pratos do Dia',
-    available: true,
-    order: 2,
-    badge: 'Especial do Chef',
-  },
-  {
-    id: 'ITEM-EXECUTIVO',
-    name: 'Prato Executivo Bife Acebolado',
-    description:
-      'Bife macio de alcatra com cebolas douradas na chapa, arroz branco, feijão carioca bem temperado e salada fresca.',
-    price: 29.9,
-    imageUrl:
-      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&auto=format&fit=crop&q=80',
-    category: 'Pratos do Dia',
-    available: true,
-    order: 3,
-  },
-  {
-    id: 'ITEM-LASANHA',
-    name: 'Lasanha à Bolonhesa Gratinada',
-    description:
-      'Massa artesanal intercalada com molho bolonhesa encorpado, queijo muçarela derretido e parmesão dourado no forno.',
-    price: 34.9,
-    imageUrl:
-      'https://images.unsplash.com/photo-1574894709920-11b28e7367e3?w=400&auto=format&fit=crop&q=80',
-    category: 'Pratos do Dia',
-    available: true,
-    order: 4,
-  },
-  {
-    id: 'ITEM-CAPPUCCINO',
-    name: 'Cappuccino Italiano com Canela',
-    description:
-      'Espresso tirado na hora com leite vaporizado sedoso, espuma densa e toque suave de cacau e canela em pó.',
-    price: 14.5,
-    imageUrl:
-      'https://images.unsplash.com/photo-1534778101976-62847782c213?w=400&auto=format&fit=crop&q=80',
-    category: 'Cafés & Bebidas',
-    available: true,
-    order: 5,
-  },
-  {
-    id: 'ITEM-SUCO',
-    name: 'Suco Natural da Fruta 400ml',
-    description: 'Suco natural feito na hora. Opções: Laranja, Maracujá, Limonada Suíça ou Abacaxi com Hortelã.',
-    price: 9.9,
-    imageUrl:
-      'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&auto=format&fit=crop&q=80',
-    category: 'Cafés & Bebidas',
-    available: true,
-    order: 6,
-  },
-  {
-    id: 'ITEM-PUDIM',
-    name: 'Pudim de Leite da Vovó',
-    description:
-      'Pudim tradicional de leite condensado sem furinhos, extremamente lisinho, com calda generosa de caramelo dourado.',
-    price: 12.0,
-    imageUrl:
-      'https://images.unsplash.com/photo-1528975604071-b4dc52a2d18c?w=400&auto=format&fit=crop&q=80',
-    category: 'Sobremesas',
-    available: true,
-    order: 7,
-  },
-];
+export const SEED_ITEMS: CardapioItem[] = [];
 
 function loadState(): CardapioState {
   try {
@@ -246,7 +159,7 @@ function loadState(): CardapioState {
     }
 
     const rawItems = localStorage.getItem(ITEMS_KEY);
-    let items: CardapioItem[] = rawItems ? JSON.parse(rawItems) : SEED_ITEMS;
+    let items: CardapioItem[] = rawItems ? (JSON.parse(rawItems) as CardapioItem[]).filter(i => !i.id?.startsWith("ITEM-FEIJOADA") && !i.id?.startsWith("ITEM-CAMARAO") && !i.id?.startsWith("ITEM-EXECUTIVO") && !i.id?.startsWith("ITEM-LASANHA")) : [];
     if (items.some((i) => i.name.includes('Camarão Escondido'))) {
       items = items.map((i) =>
         i.name.includes('Camarão Escondido')

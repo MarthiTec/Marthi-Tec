@@ -1,4 +1,5 @@
 import {
+  getAdminState,
   stockItemImages,
   type StockItem,
 } from '../../data/adminStore';
@@ -130,17 +131,40 @@ export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
  */
 export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: number })[]> {
   try {
-    const stock = isNestAuthed()
+    const remoteStock = isNestAuthed()
       ? await apiListStock().catch(() => apiGetTotemCatalog())
       : await apiGetTotemCatalog();
-    const forTotem = stock.filter(
-      (item) => item.showOnTotem === true,
-    );
+
+    // Obtém itens do estoque do ERP local que possuem showOnTotem: true
+    const localStock = getAdminState().stock.filter((item) => item.showOnTotem === true);
+
+    // Mescla estoque remoto com o local, preservando os itens locais para evitar que sumam do catálogo
+    const stockMap = new Map<string, StockItem>();
+    for (const item of localStock) {
+      const key = (item.id || item.sku || item.name).trim().toLowerCase();
+      if (key) stockMap.set(key, item);
+    }
+    for (const item of (Array.isArray(remoteStock) ? remoteStock : [])) {
+      if (item.showOnTotem === true) {
+        const key = (item.id || item.sku || item.name).trim().toLowerCase();
+        if (key) stockMap.set(key, item);
+      }
+    }
+
+    const forTotem = stockMap.size > 0
+      ? Array.from(stockMap.values())
+      : (Array.isArray(remoteStock) ? remoteStock.filter((i) => i.showOnTotem === true) : []);
+
     rememberStock(forTotem);
     return groupStockForTotem(forTotem);
   } catch (error) {
     console.warn('[totem] falha ao carregar catálogo Nest, mantendo cache existente:', error);
-    // Blindagem: NUNCA zera o catálogo em caso de erro momentâneo (ex: rate-limit ou queda de rede)
+    // Preserva itens do estoque local se houver
+    const localStock = getAdminState().stock.filter((item) => item.showOnTotem === true);
+    if (localStock.length > 0) {
+      rememberStock(localStock);
+      return groupStockForTotem(localStock);
+    }
     if (catalogStockCache.length > 0) {
       return groupStockForTotem(catalogStockCache);
     }

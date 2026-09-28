@@ -48,52 +48,26 @@ function emit() {
 }
 
 function seed(): Boleto[] {
-  const today = new Date();
-  const due = new Date(today);
-  due.setDate(due.getDate() + 7);
-  const dueIso = due.toISOString().slice(0, 10);
-  return [
-    {
-      id: 'BOL-DEMO1',
-      kind: 'pix',
-      status: 'open',
-      customerName: 'Loja Exemplo Ltda',
-      customerDocument: '12.345.678/0001-90',
-      description: 'Mensalidade Marthi Retaguarda',
-      amount: 289,
-      dueDate: dueIso,
-      pixCopyPaste: '00020126580014BR.GOV.BCB.PIX0136marthi-demo-pix520400005303986540528.905802BR5913Marthi Demo6009TRES RIOS62070503***6304ABCD',
-      createdAt: today.toISOString(),
-    },
-    {
-      id: 'BOL-DEMO2',
-      kind: 'hybrid',
-      status: 'open',
-      customerName: 'Cliente Varejo SP',
-      customerDocument: '123.456.789-00',
-      description: 'Pedido #4821 — restante',
-      amount: 1490.5,
-      dueDate: dueIso,
-      pixCopyPaste: '00020126580014BR.GOV.BCB.PIX0136marthi-hybrid-pix52040000530398654061490.505802BR5913Marthi Demo6009TRES RIOS62070503***6304EFGH',
-      digitableLine: '23793.38128 60000.000003 00000.000400 1 96660000149050',
-      barcode: '23791966600001490503381286000000000000000004',
-      createdAt: today.toISOString(),
-    },
-  ];
+  return [];
 }
 
 function load(): Boleto[] {
-  if (typeof window === 'undefined') return seed();
+  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const initial = seed();
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-      return initial;
+      return seed();
     }
-    return JSON.parse(raw) as Boleto[];
+    const parsed = JSON.parse(raw) as Boleto[];
+    const cleaned = (Array.isArray(parsed) ? parsed : []).filter(
+      (b) => b.id && !b.id.startsWith('BOL-DEMO')
+    );
+    if (cleaned.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
+      save(cleaned);
+    }
+    return cleaned;
   } catch {
-    return seed();
+    return [];
   }
 }
 

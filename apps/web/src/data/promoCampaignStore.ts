@@ -121,78 +121,8 @@ function uid(prefix = 'PROMO') {
 }
 
 function seed(): Store {
-  const today = new Date();
-  const nextMonth = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-
   return {
-    campaigns: [
-      {
-        id: 'PROMO-CIMENTO-VOL',
-        name: 'Campanha Cimento 50+ un. - R$ 34,50',
-        active: true,
-        kind: 'promo_price',
-        promoPrice: 34.5,
-        criteria: {
-          category: 'Cimento',
-          stockIds: [],
-          minQty: 50,
-        },
-        stockIds: [],
-        tiers: [],
-        giftStockId: '',
-        giftMinQty: 0,
-        priority: 10,
-        accumulative: false,
-        startDate: today.toISOString().slice(0, 10),
-        endDate: nextMonth.toISOString().slice(0, 10),
-        note: 'Preço especial de R$ 34,50 para pedidos a partir de 50 sacos de cimento.',
-        createdAt: today.toISOString(),
-      },
-      {
-        id: 'PROMO-TINTAS-10',
-        name: 'Semana das Tintas - 10% OFF',
-        active: true,
-        kind: 'percent',
-        discountPercent: 10,
-        criteria: {
-          category: 'Tintas',
-          stockIds: [],
-          minQty: 1,
-        },
-        stockIds: [],
-        tiers: [],
-        giftStockId: '',
-        giftMinQty: 0,
-        priority: 5,
-        accumulative: false,
-        startDate: today.toISOString().slice(0, 10),
-        endDate: nextMonth.toISOString().slice(0, 10),
-        note: '10% de desconto em todas as tintas.',
-        createdAt: today.toISOString(),
-      },
-      {
-        id: 'PROMO-DEMO-TIER',
-        name: 'Leve 3 Pague R$ 10 (Volume)',
-        active: false,
-        kind: 'tier',
-        criteria: {
-          category: 'Bebidas',
-          stockIds: [],
-          minQty: 3,
-        },
-        stockIds: [],
-        tiers: [
-          { qty: 3, totalPrice: 10 },
-          { qty: 6, totalPrice: 18 },
-        ],
-        giftStockId: '',
-        giftMinQty: 10,
-        priority: 1,
-        accumulative: false,
-        note: 'Exemplo de faixas por volume para categoria Bebidas. Ative após vincular produtos.',
-        createdAt: today.toISOString(),
-      },
-    ],
+    campaigns: [],
   };
 }
 
@@ -289,13 +219,13 @@ function load(): Store {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Store>;
-      const loaded = Array.isArray(parsed.campaigns)
-        ? parsed.campaigns.map(normalize)
-        : seed().campaigns;
+      const rawCampaigns = Array.isArray(parsed.campaigns) ? parsed.campaigns.map(normalize) : [];
+      const loaded = rawCampaigns.filter(
+        (c) => c.id && !c.id.startsWith('PROMO-DEMO') && !c.id.startsWith('PROMO-CIMENTO') && !c.id.startsWith('PROMO-TINTAS')
+      );
       const sanitized = sanitizeCampaigns(loaded);
       memory = { campaigns: sanitized };
-      // Se houve alteração de segurança, salva de volta
-      if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {
+      if (JSON.stringify(sanitized) !== JSON.stringify(rawCampaigns)) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
         } catch {
@@ -307,7 +237,7 @@ function load(): Store {
   } catch {
     /* ignore */
   }
-  memory = { campaigns: sanitizeCampaigns(seed().campaigns) };
+  memory = seed();
   return memory;
 }
 

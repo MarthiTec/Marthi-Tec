@@ -266,39 +266,6 @@ const SEED_CHANNELS: EcommerceChannel[] = [
   },
 ];
 
-const SEED_ORDERS: EcommerceOrder[] = [
-  {
-    id: 'ECO-1001',
-    channelId: 'mercadolivre',
-    externalId: 'ML-2000456789',
-    customerName: 'Ana Souza',
-    amount: 1299.9,
-    status: 'paid',
-    createdAt: new Date(Date.now() - 3600_000).toISOString(),
-    qty: 1,
-  },
-  {
-    id: 'ECO-1002',
-    channelId: 'shopee',
-    externalId: 'SP-998877',
-    customerName: 'Carlos Lima',
-    amount: 189.5,
-    status: 'new',
-    createdAt: new Date(Date.now() - 7200_000).toISOString(),
-    qty: 1,
-  },
-  {
-    id: 'ECO-1003',
-    channelId: 'ifood',
-    externalId: 'IF-445566',
-    customerName: 'Fernanda Dias',
-    amount: 74.9,
-    status: 'shipped',
-    createdAt: new Date(Date.now() - 10_800_000).toISOString(),
-    qty: 1,
-  },
-];
-
 function nestError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -396,7 +363,7 @@ function seed(): State {
       ...item,
       credentials: { ...item.credentials },
     })),
-    orders: isNestAuthed() ? [] : [...SEED_ORDERS],
+    orders: [],
     listings: [],
   };
 }
@@ -404,45 +371,23 @@ function seed(): State {
 function load(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const nestMode = isNestAuthed();
-    // migrate from v1 if present
     if (!raw) {
-      const legacy = localStorage.getItem('marthi.ecommerce.channels.v1');
-      if (legacy) {
-        const parsed = JSON.parse(legacy) as Partial<State>;
-        const next = mergeChannels(parsed.channels);
-        const state: State = {
-          channels: next,
-          orders: Array.isArray(parsed.orders)
-            ? parsed.orders
-            : nestMode
-              ? []
-              : SEED_ORDERS,
-          listings: [],
-        };
-        save(state);
-        return state;
-      }
       const initial = seed();
       save(initial);
       return initial;
     }
     const parsed = JSON.parse(raw) as Partial<State>;
-    return {
+    const rawOrders = Array.isArray(parsed.orders) ? parsed.orders : [];
+    const orders = rawOrders.filter((item) => item.id && !item.id.startsWith('ECO-100'));
+    const state: State = {
       channels: mergeChannels(parsed.channels),
-      orders: Array.isArray(parsed.orders)
-        ? nestMode && parsed.orders.some((item) => item.id.startsWith('ECO-'))
-          ? parsed.orders.filter((item) => !item.id.startsWith('ECO-'))
-          : parsed.orders.length
-            ? parsed.orders
-            : nestMode
-              ? []
-              : SEED_ORDERS
-        : nestMode
-          ? []
-          : SEED_ORDERS,
+      orders,
       listings: Array.isArray(parsed.listings) ? parsed.listings : [],
     };
+    if (orders.length !== rawOrders.length) {
+      save(state);
+    }
+    return state;
   } catch {
     return seed();
   }

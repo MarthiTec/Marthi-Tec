@@ -170,108 +170,14 @@ function today() {
   return now().slice(0, 10);
 }
 
-function addDays(isoDate: string, days: number) {
-  const date = new Date(`${isoDate}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
 
 function seed(): BookState {
-  const stamp = now();
-  const cashId = uid('ACC');
-  const bankId = uid('ACC');
-  const dueSoon = addDays(today(), 5);
-  const dueLater = addDays(today(), 18);
   return {
-    accounts: [
-      {
-        id: cashId,
-        name: 'Caixa loja',
-        bank: 'Espécie',
-        agency: '—',
-        number: 'CAIXA-01',
-        type: 'cash',
-        initialBalance: 800,
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-      {
-        id: bankId,
-        name: 'Conta operacional',
-        bank: 'Banco Exemplo',
-        agency: '0001',
-        number: '12345-6',
-        type: 'checking',
-        initialBalance: 12500,
-        active: true,
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
-    payables: [
-      {
-        id: uid('AP'),
-        description: 'Compra de peças — CelSul',
-        supplierId: '',
-        supplierName: 'Distribuidora Celular Sul',
-        category: 'Fornecedores',
-        amount: 1850,
-        paidAmount: 0,
-        dueDate: dueSoon,
-        status: 'open',
-        accountId: bankId,
-        notes: '',
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-      {
-        id: uid('AP'),
-        description: 'Aluguel da loja',
-        supplierId: '',
-        supplierName: 'Imobiliária Centro',
-        category: 'Aluguel',
-        amount: 3200,
-        paidAmount: 0,
-        dueDate: dueLater,
-        status: 'open',
-        accountId: bankId,
-        notes: '',
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
-    receivables: [
-      {
-        id: uid('AR'),
-        description: 'OS aprovada — restante a receber',
-        customerName: 'Cliente balcão',
-        category: 'Serviços OS',
-        amount: 450,
-        receivedAmount: 0,
-        dueDate: dueSoon,
-        status: 'open',
-        accountId: cashId,
-        notes: '',
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
+    accounts: [],
+    payables: [],
+    receivables: [],
     treasury: [],
-    advances: [
-      {
-        id: uid('ADV'),
-        kind: 'customer',
-        partyName: 'Cliente antecipado',
-        amount: 200,
-        usedAmount: 0,
-        accountId: cashId,
-        notes: 'Sinal de serviço',
-        status: 'open',
-        createdAt: stamp,
-        updatedAt: stamp,
-      },
-    ],
+    advances: [],
   };
 }
 
@@ -284,13 +190,24 @@ function load(): BookState {
       return seeded;
     }
     const parsed = JSON.parse(raw) as Partial<BookState>;
-    return {
-      accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
-      payables: Array.isArray(parsed.payables) ? parsed.payables : [],
-      receivables: Array.isArray(parsed.receivables) ? parsed.receivables : [],
-      treasury: Array.isArray(parsed.treasury) ? parsed.treasury : [],
-      advances: Array.isArray(parsed.advances) ? parsed.advances : [],
-    };
+    const isMockPayable = (p: Payable) => p.description?.includes('CelSul') || p.description?.includes('Aluguel da loja');
+    const isMockReceivable = (r: Receivable) => r.description?.includes('OS aprovada') || r.customerName === 'Cliente balcão';
+    const isMockAdvance = (a: AdvancePayment) => a.partyName === 'Cliente antecipado';
+    const isMockAccount = (acc: BankAccount) => (acc.name === 'Caixa loja' && acc.initialBalance === 800) || (acc.name === 'Conta operacional' && acc.initialBalance === 12500);
+
+    const payables = (Array.isArray(parsed.payables) ? parsed.payables : []).filter((p) => !isMockPayable(p));
+    const receivables = (Array.isArray(parsed.receivables) ? parsed.receivables : []).filter((r) => !isMockReceivable(r));
+    const advances = (Array.isArray(parsed.advances) ? parsed.advances : []).filter((a) => !isMockAdvance(a));
+    const accounts = (Array.isArray(parsed.accounts) ? parsed.accounts : []).filter((acc) => !isMockAccount(acc));
+    const treasury = Array.isArray(parsed.treasury) ? parsed.treasury : [];
+
+    const state: BookState = { accounts, payables, receivables, treasury, advances };
+    const rawCount = (parsed.payables?.length || 0) + (parsed.receivables?.length || 0) + (parsed.accounts?.length || 0);
+    const cleanCount = payables.length + receivables.length + accounts.length;
+    if (cleanCount !== rawCount) {
+      save(state);
+    }
+    return state;
   } catch {
     const seeded = seed();
     save(seeded);
