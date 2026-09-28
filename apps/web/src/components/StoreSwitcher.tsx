@@ -10,7 +10,12 @@ import {
 } from '../data/multiStoreStore';
 import './storeSwitcher.css';
 
-export function StoreSwitcher() {
+type StoreSwitcherProps = {
+  /** compact=true → apenas ícone de loja (topbars de módulos) */
+  compact?: boolean;
+};
+
+export function StoreSwitcher({ compact = false }: StoreSwitcherProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [stores, setStores] = useState<Store[]>(() => listStores());
@@ -55,23 +60,54 @@ export function StoreSwitcher() {
   }
 
   return (
-    <div className="store-switcher" ref={menuRef}>
-      <button
-        type="button"
-        className={`store-switcher__btn ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((prev) => !prev)}
-        title="Alternar Loja / Contexto Operacional"
-        aria-expanded={open}
-      >
-        <span className="store-switcher__icon" aria-hidden>🏢</span>
-        <div className="store-switcher__info">
-          <span className="store-switcher__name">{activeStore.name}</span>
-          <span className="store-switcher__meta">
-            {activeStore.isMatrix ? 'Matriz' : 'Filial'} · {activeStore.cnpj}
-          </span>
-        </div>
-        <span className="store-switcher__chevron" aria-hidden>▾</span>
-      </button>
+    <div className={`store-switcher ${compact ? 'store-switcher--compact' : ''}`} ref={menuRef}>
+      {compact ? (
+        /* Modo compacto: apenas ícone de loja */
+        <button
+          type="button"
+          className={`store-switcher__icon-btn ${open ? 'is-open' : ''}`}
+          onClick={() => setOpen((prev) => !prev)}
+          title={`${activeStore.name} · ${activeStore.isMatrix ? 'Matriz' : 'Filial'} · Trocar loja`}
+          aria-label="Selecionar loja"
+          aria-expanded={open}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          {stores.length > 1 && (
+            <span className="store-switcher__icon-btn-badge" aria-hidden>
+              {stores.filter((s) => s.active).length}
+            </span>
+          )}
+        </button>
+      ) : (
+        /* Modo completo: ícone + nome + CNPJ */
+        <button
+          type="button"
+          className={`store-switcher__btn ${open ? 'is-open' : ''}`}
+          onClick={() => setOpen((prev) => !prev)}
+          title="Alternar Loja / Contexto Operacional"
+          aria-expanded={open}
+        >
+          <span className="store-switcher__icon" aria-hidden>🏢</span>
+          <div className="store-switcher__info">
+            <span className="store-switcher__name">{activeStore.name}</span>
+            <span className="store-switcher__meta">
+              {activeStore.isMatrix ? 'Matriz' : 'Filial'} · {activeStore.cnpj}
+            </span>
+          </div>
+          <span className="store-switcher__chevron" aria-hidden>▾</span>
+        </button>
+      )}
 
       {open && (
         <div className="store-switcher__dropdown" role="menu">
@@ -115,7 +151,7 @@ export function StoreSwitcher() {
                 navigate('/erp/lojas');
               }}
             >
-              ⚙️ Gerenciar Lojas & Licenciamento
+              ⚙️ Gerenciar Lojas &amp; Licenciamento
             </button>
           </div>
         </div>

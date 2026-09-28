@@ -94,13 +94,13 @@ export function FiscalLayout() {
   return (
     <div className={`fiscal-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="fiscal-app__top">
-        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="fiscal-app__mark" />
         <div className="fiscal-app__brand">
           <strong>Marthi Emissor Fiscal</strong>
         </div>
-        <StoreSwitcher />
         <button type="button" className="fiscal-app__exit" onClick={requestExit}>
           Sair
         </button>

@@ -215,15 +215,13 @@ export function OsLayout() {
       }`}
     >
       <header className="os-app__top">
-        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
-        {/* Botão de ícone para acesso ao Ecossistema Marthi imediatamente ao lado do Menu */}
         <OsEcosystemMenu />
-
+        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="os-app__mark" />
         <div className="os-app__brand">
           <strong>Marthi OS</strong>
         </div>
-        <StoreSwitcher />
 
         {/* Filtro centralizado ao topo usando o combobox padrão do sistema AdminPicker */}
         <div className="os-app__period-picker-wrap">

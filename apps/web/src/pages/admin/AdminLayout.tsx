@@ -4,7 +4,6 @@ import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
-import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAccess } from '../../data/auditLog';
@@ -216,7 +215,6 @@ export function AdminLayout() {
       <aside className="admin__sidebar">
         <div className="admin__brand">
           <BrandLogo variant="mark" className="admin__mark" />
-          <StoreSwitcher />
           <button
             type="button"
             className="admin__burger-btn admin__burger-btn--brand"
@@ -319,14 +317,14 @@ export function AdminLayout() {
           </NavLink>
           {isAdmin ? (
             <NavLink
-              to="/painel/ajuda"
-              title="Central de ajuda"
+              to="/erp/lojas"
+              title="Lojas & Licenças"
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
             >
-              <AdminIcon name="help" />
-              <span className="admin__link-label">Central de ajuda</span>
+              <AdminIcon name="store" />
+              <span className="admin__link-label">Lojas &amp; Licenças</span>
             </NavLink>
           ) : null}
           {isAdmin ? (

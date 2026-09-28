@@ -4,6 +4,55 @@
   align-items: center;
 }
 
+/* ── Compact mode: icon-only button ── */
+.store-switcher__icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.18s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.store-switcher__icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.store-switcher__icon-btn:hover,
+.store-switcher__icon-btn.is-open {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+.store-switcher__icon-btn-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #2dd4bf;
+  color: #0f172a;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
 .store-switcher__btn {
   display: flex;
   align-items: center;
@@ -91,6 +140,11 @@ body:not(.is-theme-dark) .admin__brand .store-switcher__btn {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   animation: store-drop-fade 0.15s ease-out;
+}
+
+.store-switcher--compact .store-switcher__dropdown {
+  left: 0;
+  right: auto;
 }
 
 .is-theme-dark .store-switcher__dropdown {
@@ -282,6 +336,7 @@ body:not(.is-theme-dark) .admin__brand .store-switcher__btn {
     max-width: 160px;
   }
   .store-switcher__dropdown {
-    width: 290px;
+    width: min(320px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
   }
 }

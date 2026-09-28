@@ -150,13 +150,13 @@ export function ErpLayout() {
   return (
     <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="erp-app__top">
-        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi Retaguarda</strong>
         </div>
-        <StoreSwitcher />
         <button type="button" className="erp-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>

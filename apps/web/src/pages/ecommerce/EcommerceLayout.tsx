@@ -99,13 +99,13 @@ export function EcommerceLayout() {
   return (
     <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="ecommerce-app__top">
-        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="ecommerce-app__mark" />
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>
         </div>
-        <StoreSwitcher />
         <button type="button" className="ecommerce-app__exit" onClick={requestExit}>
           Sair
         </button>

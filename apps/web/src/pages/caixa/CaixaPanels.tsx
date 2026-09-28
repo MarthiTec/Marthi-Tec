@@ -2213,6 +2213,18 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
   const canConfigureAdHoc = isAdmin || userCanConfigureAdHoc(user?.email);
   const currentTerminalId = getPosTerminalId();
   const [form, setForm] = useState<CashSettings>(() => getCashSettings());
+  const [online, setOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   function patch<K extends keyof CashSettings>(key: K, value: CashSettings[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -2244,6 +2256,41 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
         <p className="empty">Gaveta, balança, impressora{isAdmin ? ' e opções administrativas' : ''}.</p>
       </div>
       <div className="caixa-panel__body">
+        <fieldset className="caixa-settings__set">
+          <legend>Conectividade &amp; Armazenamento Local</legend>
+          <div
+            style={{
+              padding: '0.75rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+              backgroundColor: 'var(--bg-subtle, rgba(255, 255, 255, 0.03))',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.4rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 650 }}>
+              <span
+                style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: online ? '#10b981' : '#f59e0b',
+                  display: 'inline-block',
+                  flexShrink: 0,
+                  boxShadow: online ? '0 0 8px rgba(16, 185, 129, 0.6)' : '0 0 8px rgba(245, 158, 11, 0.6)',
+                }}
+              />
+              <span>
+                {online ? 'Online · Conexão ativa com o servidor' : 'Modo Offline · Desconectado'}
+              </span>
+            </div>
+            <p className="empty" style={{ margin: 0, fontSize: '0.8rem', lineHeight: '1.4' }}>
+              <strong>Salvo local (IndexedDB)</strong>: Todas as vendas em andamento, bipes de itens e alterações de carrinho ficam seguros no banco local deste computador. Mesmo se a conexão cair ou a página for atualizada, nada é perdido.
+            </p>
+          </div>
+        </fieldset>
+
         <fieldset className="caixa-settings__set">
           <legend>Periféricos</legend>
           <label className="caixa-panel__check">
