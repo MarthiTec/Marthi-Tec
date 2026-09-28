@@ -38,8 +38,12 @@ import {
 import {
   NFE_DOC_PURPOSE_HINT,
   NFE_DOC_PURPOSE_LABEL,
+  defaultCfopForPurpose,
   type FiscalDocPurpose,
 } from '../../data/fiscalTaxTables';
+import { STANDARD_CFOPS } from '../../data/fiscalCatalog';
+import { listStores } from '../../data/multiStoreStore';
+import { formatCpfCnpj } from '../../utils/documentUtils';
 import { hasModule } from '../../data/storePlan';
 
 function money(value: number) {
@@ -59,6 +63,7 @@ export function InvoicesPage() {
   const [fiscalTick, setFiscalTick] = useState(0);
   const [cancelReason, setCancelReason] = useState('Cancelamento solicitado pelo emitente');
   const suppliers = useMemo(() => listSuppliers(true), []);
+  const stores = useMemo(() => listStores(), []);
   const stock = useMemo(() => getAdminState().stock, [invoices]);
   const issuer = useMemo(() => getFiscalIssuerSettings(), [fiscalTick, message]);
 
@@ -187,9 +192,17 @@ export function InvoicesPage() {
 
   function partyName(invoice: Invoice) {
     if (invoice.kind === 'entry') {
-      return getSupplier(invoice.supplierId)?.name || 'Fornecedor';
+      return getSupplier(invoice.supplierId)?.name || invoice.customerName || 'Fornecedor';
     }
     return invoice.customerName || 'Destinatário';
+  }
+
+  function partyDocument(invoice: Invoice) {
+    if (invoice.customerDocument?.trim()) return invoice.customerDocument.trim();
+    if (invoice.kind === 'entry' && invoice.supplierId) {
+      return getSupplier(invoice.supplierId)?.document || '';
+    }
+    return '';
   }
 
   function transmit(asNfce = false) {
@@ -202,13 +215,28 @@ export function InvoicesPage() {
       fail('Configure certificado, senha e emitente em Configuração fiscal.');
       return;
     }
+    if (
+      (selected.documentPurpose === 'devolucao' || selected.documentPurpose === 'retorno') &&
+      (!selected.refNfeKey || selected.refNfeKey.length < 44)
+    ) {
+      fail('Notas de devolução ou retorno exigem a chave de acesso da NF-e referenciada (44 dígitos).');
+      return;
+    }
+
+    const docPurpose = selected.documentPurpose ?? 'normal';
+    const cfop = selected.cfopCode || defaultCfopForPurpose(docPurpose, selected.kind);
+
     const result = transmitNfeForInvoice({
       invoiceId: selected.id,
       kind: selected.kind,
       customerName: partyName(selected),
+      customerDocument: partyDocument(selected),
       amount: invoiceTotal(selected),
       asNfce: asNfce && selected.kind === 'exit',
-      documentPurpose: selected.documentPurpose ?? 'normal',
+      documentPurpose: docPurpose,
+      cfopCode: cfop,
+      refNfeKey: selected.refNfeKey,
+      targetStoreId: selected.targetStoreId,
       items: selected.lines.map((line) => ({
         name: line.name,
         qty: line.qty,
@@ -433,23 +461,80 @@ export function InvoicesPage() {
                 </label>
                 <AdminPicker
                   className="span-2"
-                  label="Tipo de documento (NF-e)"
+                  label="Tipo de documento (Finalidade fiscal)"
                   value={selected.documentPurpose ?? 'normal'}
                   disabled={selected.status !== 'draft'}
                   options={(Object.keys(NFE_DOC_PURPOSE_LABEL) as FiscalDocPurpose[]).map((key) => ({
                     value: key,
                     label: NFE_DOC_PURPOSE_LABEL[key],
                   }))}
-                  onChange={(value) =>
-                    void saveDraft({ documentPurpose: value as FiscalDocPurpose })
-                  }
+                  onChange={(value) => {
+                    const purpose = value as FiscalDocPurpose;
+                    const suggestedCfop = defaultCfopForPurpose(purpose, selected.kind);
+                    void saveDraft({
+                      documentPurpose: purpose,
+                      cfopCode: selected.cfopCode || suggestedCfop,
+                    });
+                  }}
                 />
                 <p className="span-2 empty" style={{ margin: 0 }}>
                   {NFE_DOC_PURPOSE_HINT[selected.documentPurpose ?? 'normal']}
                 </p>
-                {selected.kind === 'entry' ? (
+
+                {selected.documentPurpose === 'transferencia' ? (
                   <AdminPicker
                     className="span-2"
+                    label="Filial de Destino / Origem da Transferência"
+                    value={selected.targetStoreId ?? ''}
+                    disabled={selected.status !== 'draft'}
+                    placeholder="Selecione a loja/filial do grupo…"
+                    options={stores.map((s) => ({
+                      value: s.id,
+                      label: `${s.name} · CNPJ ${formatCpfCnpj(s.cnpj)} (${s.city}/${s.state})`,
+                    }))}
+                    onChange={(storeId) => {
+                      const st = stores.find((s) => s.id === storeId);
+                      if (st) {
+                        void saveDraft({
+                          targetStoreId: st.id,
+                          customerName: st.name,
+                          customerDocument: st.cnpj,
+                          cfopCode: selected.kind === 'entry' ? '1152' : '5152',
+                        });
+                      } else {
+                        void saveDraft({ targetStoreId: storeId });
+                      }
+                    }}
+                  />
+                ) : null}
+
+                {selected.documentPurpose === 'devolucao' || selected.documentPurpose === 'retorno' ? (
+                  <label className="span-2">
+                    Chave de acesso da NF-e referenciada (44 dígitos)
+                    <input
+                      value={selected.refNfeKey ?? ''}
+                      maxLength={44}
+                      placeholder="Ex: 35240900000000000191550010000001011000000010"
+                      disabled={selected.status !== 'draft'}
+                      onChange={(e) => void saveDraft({ refNfeKey: e.target.value.replace(/\D/g, '') })}
+                    />
+                  </label>
+                ) : null}
+
+                <AdminPicker
+                  className="span-2"
+                  label="CFOP da Operação"
+                  value={selected.cfopCode || defaultCfopForPurpose(selected.documentPurpose ?? 'normal', selected.kind)}
+                  disabled={selected.status !== 'draft'}
+                  options={STANDARD_CFOPS.map((c) => ({
+                    value: c.code,
+                    label: `${c.code} — ${c.description}`,
+                  }))}
+                  onChange={(value) => void saveDraft({ cfopCode: value })}
+                />
+
+                {selected.kind === 'entry' ? (
+                  <AdminPicker
                     label="Fornecedor"
                     value={selected.supplierId}
                     disabled={selected.status !== 'draft'}
@@ -457,18 +542,36 @@ export function InvoicesPage() {
                       value: item.id,
                       label: item.name,
                     }))}
-                    onChange={(value) => void saveDraft({ supplierId: value })}
+                    onChange={(value) => {
+                      const sup = suppliers.find((s) => s.id === value);
+                      void saveDraft({
+                        supplierId: value,
+                        customerDocument: sup?.document || selected.customerDocument,
+                      });
+                    }}
                   />
                 ) : (
-                  <label className="span-2">
-                    Cliente / destino
+                  <label>
+                    Cliente / Destinatário
                     <input
                       value={selected.customerName}
                       disabled={selected.status !== 'draft'}
+                      placeholder="Nome do cliente ou destinatário"
                       onChange={(e) => void saveDraft({ customerName: e.target.value })}
                     />
                   </label>
                 )}
+
+                <label>
+                  CPF / CNPJ (Destinatário / Fornecedor)
+                  <input
+                    value={selected.customerDocument ?? ''}
+                    disabled={selected.status !== 'draft'}
+                    placeholder="CPF ou CNPJ (inclusive alfanumérico)"
+                    onChange={(e) => void saveDraft({ customerDocument: e.target.value.toUpperCase() })}
+                  />
+                </label>
+
                 <label className="span-2">
                   Observações
                   <textarea

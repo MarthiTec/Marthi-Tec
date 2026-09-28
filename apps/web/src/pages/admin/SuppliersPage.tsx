@@ -51,10 +51,8 @@ import {
   upsertSupplier,
 
   type Supplier,
-
 } from '../../data/erpRegistry';
-
-
+import { formatCpfCnpj } from '../../utils/documentUtils';
 
 const EMPTY = {
 
@@ -396,7 +394,7 @@ export function SuppliersPage() {
 
                     </td>
 
-                    <td>{item.document || '—'}</td>
+                    <td>{item.document ? formatCpfCnpj(item.document) : '—'}</td>
 
                     <td>{item.city || '—'}</td>
 
@@ -484,7 +482,9 @@ export function SuppliersPage() {
 
                 disabled={readOnly}
 
-                onChange={(e) => setForm({ ...form, document: e.target.value })}
+                placeholder="CNPJ ou CPF (inclusive alfanumérico)"
+
+                onChange={(e) => setForm({ ...form, document: e.target.value.toUpperCase() })}
 
               />
 

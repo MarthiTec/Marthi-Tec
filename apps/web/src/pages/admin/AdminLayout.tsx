@@ -19,6 +19,7 @@ import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
 import { AccessDeniedPage } from './AccessDeniedPage';
 import { ModuleLockedPage } from './ModuleLockedPage';
+import { useStoreCustomization } from '../../data/storeSegment';
 import './admin.css';
 
 const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
@@ -174,6 +175,7 @@ export function AdminLayout() {
 
   const userEmail = user.email;
   const isAdmin = userIsStoreAdmin(userEmail);
+  const storeCustom = useStoreCustomization();
 
   if (!isAdmin) {
     return <Navigate to="/" replace />;
@@ -189,6 +191,9 @@ export function AdminLayout() {
   }
 
   function childVisible(to: string) {
+    if (to.includes('/cardapio') && !storeCustom.showCardapioDigital) {
+      return false;
+    }
     const area = navPathToAccessArea(to);
     if (!area) return true;
     return userCanAccessArea(userEmail, area);
@@ -229,7 +234,14 @@ export function AdminLayout() {
         <UserChip variant="sidebar" to="/painel/perfil" />
 
         <nav className="admin__nav" aria-label="Módulos da Retaguarda">
-          {ADMIN_NAV.map((group) => {
+          {ADMIN_NAV
+            .filter((group) => {
+              if (group.id === 'cardapio' && !storeCustom.showCardapioDigital) {
+                return false;
+              }
+              return true;
+            })
+            .map((group) => {
             const unlocked = !group.module || hasModule(group.module);
             const opened = openGroups.includes(group.id);
             const groupActive = navGroupForPath(location.pathname, location.search) === group.id;
@@ -317,7 +329,7 @@ export function AdminLayout() {
           </NavLink>
           {isAdmin ? (
             <NavLink
-              to="/erp/lojas"
+              to="/painel/lojas"
               title="Lojas & Licenças"
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`

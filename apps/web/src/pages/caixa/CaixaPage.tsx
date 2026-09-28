@@ -1419,6 +1419,11 @@ export function CaixaPage() {
           amount: saleTotal,
           customerDocument: saleCpf,
           fiscalIntegrated: fiscalOn,
+          items: pricedLines.map((line) => ({
+            name: line.name,
+            qty: line.qty,
+            unitPrice: line.unitPrice,
+          })),
         });
         if (emitted.ok) {
           docMsg = ` · ${FISCAL_KIND_LABEL[emitted.document.kind]} ${emitted.document.number}`;

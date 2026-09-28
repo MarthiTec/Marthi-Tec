@@ -38,6 +38,10 @@ export type Invoice = {
   documentPurpose: FiscalDocPurpose;
   supplierId: string;
   customerName: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
   issuedAt: string;
   notes: string;
   lines: InvoiceLine[];
@@ -78,6 +82,10 @@ function load(): InvoiceState {
       ? parsed.invoices.map((item) => ({
           ...item,
           documentPurpose: (item as Invoice).documentPurpose ?? 'normal',
+          customerDocument: (item as Invoice).customerDocument ?? '',
+          cfopCode: (item as Invoice).cfopCode ?? '',
+          targetStoreId: (item as Invoice).targetStoreId ?? '',
+          refNfeKey: (item as Invoice).refNfeKey ?? '',
         }))
       : [];
     return { invoices };
@@ -100,6 +108,10 @@ function mapInvoice(row: ApiInvoice): Invoice {
     documentPurpose: (row.documentPurpose as FiscalDocPurpose) || 'normal',
     supplierId: row.supplierId ?? '',
     customerName: row.customerName ?? '',
+    customerDocument: row.customerDocument ?? '',
+    cfopCode: row.cfopCode ?? '',
+    targetStoreId: row.targetStoreId ?? '',
+    refNfeKey: row.refNfeKey ?? '',
     issuedAt: row.issuedAt,
     notes: row.notes ?? '',
     lines: (row.lines ?? []).map((line) => ({
@@ -162,6 +174,11 @@ export async function createInvoice(input: {
   number?: string;
   supplierId?: string;
   customerName?: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
+  documentPurpose?: FiscalDocPurpose;
   issuedAt?: string;
   notes?: string;
 }): Promise<InvoiceResult> {
@@ -176,9 +193,13 @@ export async function createInvoice(input: {
         number: input.number,
         supplierId: input.supplierId,
         customerName: input.customerName,
+        customerDocument: input.customerDocument,
+        cfopCode: input.cfopCode,
+        targetStoreId: input.targetStoreId,
+        refNfeKey: input.refNfeKey,
         issuedAt: input.issuedAt,
         notes: input.notes,
-        documentPurpose: 'normal',
+        documentPurpose: input.documentPurpose ?? 'normal',
       });
       const invoice = mapInvoice(row);
       const state = load();
@@ -196,9 +217,13 @@ export async function createInvoice(input: {
     kind: input.kind,
     number: (input.number ?? '').trim() || uid('DOC'),
     status: 'draft',
-    documentPurpose: 'normal',
+    documentPurpose: input.documentPurpose ?? 'normal',
     supplierId: input.supplierId ?? '',
     customerName: (input.customerName ?? '').trim(),
+    customerDocument: (input.customerDocument ?? '').trim(),
+    cfopCode: (input.cfopCode ?? '').trim(),
+    targetStoreId: (input.targetStoreId ?? '').trim(),
+    refNfeKey: (input.refNfeKey ?? '').trim(),
     issuedAt: input.issuedAt || stamp.slice(0, 10),
     notes: (input.notes ?? '').trim(),
     lines: [],
@@ -216,7 +241,17 @@ export async function updateInvoiceDraft(
   patch: Partial<
     Pick<
       Invoice,
-      'number' | 'supplierId' | 'customerName' | 'issuedAt' | 'notes' | 'lines' | 'documentPurpose'
+      | 'number'
+      | 'supplierId'
+      | 'customerName'
+      | 'customerDocument'
+      | 'cfopCode'
+      | 'targetStoreId'
+      | 'refNfeKey'
+      | 'issuedAt'
+      | 'notes'
+      | 'lines'
+      | 'documentPurpose'
     >
   >,
 ): Promise<InvoiceResult> {
@@ -229,6 +264,10 @@ export async function updateInvoiceDraft(
         number: patch.number,
         supplierId: patch.supplierId,
         customerName: patch.customerName,
+        customerDocument: patch.customerDocument,
+        cfopCode: patch.cfopCode,
+        targetStoreId: patch.targetStoreId,
+        refNfeKey: patch.refNfeKey,
         issuedAt: patch.issuedAt,
         notes: patch.notes,
         documentPurpose: patch.documentPurpose,

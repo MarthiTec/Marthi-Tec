@@ -80,7 +80,6 @@ const NAV_FINANCE: NavItem[] = [
 ];
 
 const NAV_BACK: NavItem[] = [
-  { to: '/erp/lojas', label: 'Lojas & Licenças', icon: 'store' },
   { to: '/erp/relatorios', label: 'Relatórios', icon: 'ops' },
   { to: '/erp/auditoria', label: 'Auditoria', icon: 'ops' },
 ];

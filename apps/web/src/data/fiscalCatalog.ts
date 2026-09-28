@@ -167,10 +167,45 @@ function now() {
   return new Date().toISOString();
 }
 
+export const STANDARD_CFOPS: Omit<CfopCode, 'id'>[] = [
+  // Vendas / Saídas
+  { code: '5102', description: 'Venda de mercadoria adquirida ou recebida de terceiros (mesma UF)', operation: 'out_same', active: true },
+  { code: '6102', description: 'Venda de mercadoria adquirida de terceiros (outra UF)', operation: 'out_other', active: true },
+  { code: '5405', description: 'Venda de mercadoria com substituição tributária (mesma UF)', operation: 'out_same', active: true },
+  { code: '6404', description: 'Venda de mercadoria com substituição tributária (outra UF)', operation: 'out_other', active: true },
+  // Compras / Entradas
+  { code: '1102', description: 'Compra para comercialização (mesma UF)', operation: 'in_same', active: true },
+  { code: '2102', description: 'Compra para comercialização (outra UF)', operation: 'in_other', active: true },
+  { code: '1556', description: 'Compra de material para uso ou consumo (mesma UF)', operation: 'in_same', active: true },
+  { code: '2556', description: 'Compra de material para uso ou consumo (outra UF)', operation: 'in_other', active: true },
+  // Devoluções
+  { code: '1202', description: 'Devolução de venda de mercadoria (mesma UF)', operation: 'in_same', active: true },
+  { code: '2202', description: 'Devolução de venda de mercadoria (outra UF)', operation: 'in_other', active: true },
+  { code: '5202', description: 'Devolução de compra para comercialização (mesma UF)', operation: 'out_same', active: true },
+  { code: '6202', description: 'Devolução de compra para comercialização (outra UF)', operation: 'out_other', active: true },
+  // Transferências entre Lojas / Filiais
+  { code: '5152', description: 'Transferência de mercadoria adquirida ou recebida de terceiros (mesma UF)', operation: 'out_same', active: true },
+  { code: '6152', description: 'Transferência de mercadoria adquirida ou recebida de terceiros (outra UF)', operation: 'out_other', active: true },
+  { code: '1152', description: 'Entrada por transferência para comercialização (mesma UF)', operation: 'in_same', active: true },
+  { code: '2152', description: 'Entrada por transferência para comercialização (outra UF)', operation: 'in_other', active: true },
+  // Bonificação / Doação / Brinde
+  { code: '5910', description: 'Remessa em bonificação, doação ou brinde (mesma UF)', operation: 'out_same', active: true },
+  { code: '6910', description: 'Remessa em bonificação, doação ou brinde (outra UF)', operation: 'out_other', active: true },
+  { code: '1910', description: 'Entrada de bonificação, doação ou brinde (mesma UF)', operation: 'in_same', active: true },
+  { code: '2910', description: 'Entrada de bonificação, doação ou brinde (outra UF)', operation: 'in_other', active: true },
+  // Remessas e Retornos (Conserto / Demonstração)
+  { code: '5915', description: 'Remessa de mercadoria ou bem para conserto ou reparo', operation: 'out_same', active: true },
+  { code: '6915', description: 'Remessa para conserto ou reparo (outra UF)', operation: 'out_other', active: true },
+  { code: '5916', description: 'Retorno de mercadoria ou bem recebido para conserto ou reparo', operation: 'out_same', active: true },
+  { code: '6916', description: 'Retorno para conserto ou reparo (outra UF)', operation: 'out_other', active: true },
+  // Ajustes / Reforma / Outras
+  { code: '5949', description: 'Outra saída de mercadoria ou prestação de serviço não especificado', operation: 'out_same', active: true },
+  { code: '1949', description: 'Outra entrada de mercadoria ou prestação de serviço não especificado', operation: 'in_same', active: true },
+];
+
 function seed(): CatalogState {
   const stamp = now();
   const cfopSale = uid('CFOP');
-  const cfopBuy = uid('CFOP');
   const classId = uid('FIS');
   const whMain = uid('WH');
   const whSec = uid('WH');
@@ -219,29 +254,7 @@ function seed(): CatalogState {
         updatedAt: stamp,
       },
     ],
-    cfops: [
-      {
-        id: cfopSale,
-        code: '5102',
-        description: 'Venda de mercadoria adquirida ou recebida de terceiros',
-        operation: 'out_same',
-        active: true,
-      },
-      {
-        id: cfopBuy,
-        code: '1102',
-        description: 'Compra para comercialização',
-        operation: 'in_same',
-        active: true,
-      },
-      {
-        id: uid('CFOP'),
-        code: '5405',
-        description: 'Venda de mercadoria sujeita ao regime de substituição tributária',
-        operation: 'out_same',
-        active: true,
-      },
-    ],
+    cfops: STANDARD_CFOPS.map((item) => ({ ...item, id: uid('CFOP') })),
     fecps: [
       {
         id: uid('FECP'),
@@ -249,13 +262,6 @@ function seed(): CatalogState {
         description: 'FECP RJ — adicional ICMS',
         rate: 2,
         active: true,
-      },
-      {
-        id: uid('FECP'),
-        uf: 'RJ',
-        description: 'FECP combustíveis (exemplo)',
-        rate: 4,
-        active: false,
       },
     ],
     warehouses: [
@@ -289,15 +295,28 @@ function load(): CatalogState {
       return seeded;
     }
     const parsed = JSON.parse(raw) as Partial<CatalogState>;
-    return {
+    const loadedCfops: CfopCode[] = Array.isArray(parsed.cfops) ? [...parsed.cfops] : [];
+    // Garante que todos os CFOPs padrão estejam presentes no sistema
+    let cfopUpdated = false;
+    for (const std of STANDARD_CFOPS) {
+      if (!loadedCfops.some((c) => c.code === std.code)) {
+        loadedCfops.push({ ...std, id: uid('CFOP') });
+        cfopUpdated = true;
+      }
+    }
+    const nextState: CatalogState = {
       classifications: Array.isArray(parsed.classifications) ? parsed.classifications : [],
-      cfops: Array.isArray(parsed.cfops) ? parsed.cfops : [],
+      cfops: loadedCfops,
       fecps: Array.isArray(parsed.fecps) ? parsed.fecps : [],
       warehouses: Array.isArray(parsed.warehouses) ? parsed.warehouses : [],
       lots: Array.isArray(parsed.lots) ? parsed.lots : [],
       kits: Array.isArray(parsed.kits) ? parsed.kits : [],
       moves: Array.isArray(parsed.moves) ? parsed.moves : [],
     };
+    if (cfopUpdated) {
+      save(nextState);
+    }
+    return nextState;
   } catch {
     const seeded = seed();
     save(seeded);

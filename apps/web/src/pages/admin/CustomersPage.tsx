@@ -31,6 +31,7 @@ import {
   type PosQuote,
 } from '../../data/posQuotesStore';
 import { QuoteCommercialPrintModal } from '../../components/QuoteCommercialPrintModal';
+import { formatCpfCnpj } from '../../utils/documentUtils';
 
 const EMPTY = {
   name: '',
@@ -240,7 +241,7 @@ export function CustomersPage() {
                         </CrudNameButton>
                       </td>
                       <td>{customer.phone}</td>
-                      <td>{customer.document || '—'}</td>
+                      <td>{customer.document ? formatCpfCnpj(customer.document) : '—'}</td>
                       <td>{customer.city || '—'}</td>
                       <td>
                         <span className={`status-pill ${customer.active !== false ? 'status-pill--active' : 'status-pill--inactive'}`}>
@@ -292,8 +293,8 @@ export function CustomersPage() {
               <input
                 value={form.document}
                 disabled={readOnly}
-                onChange={(e) => setForm({ ...form, document: e.target.value })}
-                placeholder="000.000.000-00"
+                onChange={(e) => setForm({ ...form, document: e.target.value.toUpperCase() })}
+                placeholder="CPF ou CNPJ (inclusive alfanumérico)"
               />
             </label>
             <label>

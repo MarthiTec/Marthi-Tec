@@ -17,6 +17,7 @@ import {
   type ApiFiscalLogEntry,
 } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
+import { cleanDocument, isCnpj } from '../utils/documentUtils';
 
 const STORAGE_KEY = 'marthi.fiscal.issuer.v1';
 const LOG_KEY = 'marthi.fiscal.logs.v1';
@@ -323,8 +324,8 @@ export async function saveFiscalIssuerSettings(
     updatedAt: new Date().toISOString(),
   };
 
-  if (next.cnpj && next.cnpj.replace(/\D/g, '').length !== 14) {
-    return { ok: false, error: 'CNPJ do emitente deve ter 14 dígitos.' };
+  if (next.cnpj && !isCnpj(cleanDocument(next.cnpj))) {
+    return { ok: false, error: 'CNPJ do emitente deve ser válido com 14 caracteres (numérico ou alfanumérico).' };
   }
   if (next.cscId && !/^\d{1,6}$/.test(next.cscId.trim())) {
     return { ok: false, error: 'CSC Id deve ser numérico (até 6 dígitos).' };
@@ -408,7 +409,7 @@ export async function clearCertificate(): Promise<FiscalIssuerSettings> {
 export function issuerIsReady(settings = load()) {
   return Boolean(
     settings.emitenteName.trim() &&
-      settings.cnpj.replace(/\D/g, '').length === 14 &&
+      isCnpj(cleanDocument(settings.cnpj)) &&
       settings.certificateFileName &&
       settings.certificatePassword,
   );

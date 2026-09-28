@@ -40,6 +40,10 @@ export type FiscalCClassTrib = {
 export type FiscalDocPurpose =
   | 'normal'
   | 'devolucao'
+  | 'transferencia'
+  | 'bonificacao'
+  | 'remessa'
+  | 'retorno'
   | 'credito_reforma'
   | 'debito_reforma';
 
@@ -52,18 +56,49 @@ type TaxTablesState = {
 };
 
 export const NFE_DOC_PURPOSE_LABEL: Record<FiscalDocPurpose, string> = {
-  normal: 'Normal',
-  devolucao: 'Devolução',
+  normal: 'Normal / Venda',
+  devolucao: 'Devolução de mercadoria',
+  transferencia: 'Transferência entre lojas / filiais',
+  bonificacao: 'Bonificação, brinde ou doação',
+  remessa: 'Remessa (conserto / demonstração)',
+  retorno: 'Retorno de remessa',
   credito_reforma: 'Crédito da reforma (IBS/CBS)',
   debito_reforma: 'Débito da reforma (IBS/CBS)',
 };
 
 export const NFE_DOC_PURPOSE_HINT: Record<FiscalDocPurpose, string> = {
-  normal: 'Operação regular de entrada ou saída.',
-  devolucao: 'Devolução de mercadoria (CFOP de retorno).',
+  normal: 'Operação regular de venda ou saída comercial.',
+  devolucao: 'Devolução de compra ou venda (anulação com estorno de operação).',
+  transferencia: 'Transferência de estoque entre matriz e filiais da rede.',
+  bonificacao: 'Remessa a título gratuito, bonificação, brinde ou amostra.',
+  remessa: 'Remessa de mercadoria para conserto, reparo, testes ou demonstração.',
+  retorno: 'Retorno de mercadoria recebida ou enviada para conserto ou demonstração.',
   credito_reforma: 'Documento de crédito IBS/CBS da reforma tributária.',
   debito_reforma: 'Documento de débito IBS/CBS da reforma tributária.',
 };
+
+/** CFOP padrão sugerido de acordo com a finalidade da nota e a direção (entrada/saída) */
+export function defaultCfopForPurpose(purpose: FiscalDocPurpose, kind: 'entry' | 'exit'): string {
+  switch (purpose) {
+    case 'devolucao':
+      return kind === 'entry' ? '1202' : '5202';
+    case 'transferencia':
+      return kind === 'entry' ? '1152' : '5152';
+    case 'bonificacao':
+      return kind === 'entry' ? '1910' : '5910';
+    case 'remessa':
+      return '5915';
+    case 'retorno':
+      return '5916';
+    case 'credito_reforma':
+      return '1949';
+    case 'debito_reforma':
+      return '5949';
+    case 'normal':
+    default:
+      return kind === 'entry' ? '1102' : '5102';
+  }
+}
 
 const SEED_CSTS: FiscalCstCode[] = [
   { code: '000', name: 'Tributação integral', description: 'CST IBS/CBS — tributação integral', active: true },

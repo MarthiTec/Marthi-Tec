@@ -943,6 +943,10 @@ export type ApiInvoice = {
   documentPurpose: string;
   supplierId: string;
   customerName: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
   issuedAt: string;
   notes: string;
   lines: ApiInvoiceLine[];
@@ -972,6 +976,10 @@ export function apiCreateStockInvoice(body: {
   documentPurpose?: string;
   supplierId?: string;
   customerName?: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
   issuedAt?: string;
   notes?: string;
 }) {
@@ -985,6 +993,10 @@ export function apiUpdateStockInvoice(
     documentPurpose: string;
     supplierId: string;
     customerName: string;
+    customerDocument: string;
+    cfopCode: string;
+    targetStoreId: string;
+    refNfeKey: string;
     issuedAt: string;
     notes: string;
   }>,

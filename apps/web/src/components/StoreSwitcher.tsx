@@ -148,7 +148,7 @@ export function StoreSwitcher({ compact = false }: StoreSwitcherProps) {
               className="store-switcher__manage-btn"
               onClick={() => {
                 setOpen(false);
-                navigate('/erp/lojas');
+                navigate('/painel/lojas');
               }}
             >
               ⚙️ Gerenciar Lojas &amp; Licenciamento
