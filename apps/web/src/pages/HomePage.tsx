@@ -591,7 +591,7 @@ export function HomePage() {
                 onClick={() => setActivePlan(plan.id)}
               >
                 {plan.featured ? (
-                  <span className="plan-card__badge">{plan.commercialCallout || 'Mais escolhido'}</span>
+                  <span className="plan-card__badge">Mais Escolhido</span>
                 ) : null}
                 <h3>{plan.name}</h3>
                 <p className="plan-card__price">

@@ -569,6 +569,10 @@
   text-transform: uppercase;
   color: inherit;
   opacity: 0.85;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plan-card h3 {

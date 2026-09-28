@@ -117,12 +117,18 @@ export function PlansPublicPage() {
                 className={`plan-card ${isFeatured ? 'plan-card--featured' : ''}`}
               >
                 {isFeatured ? (
-                  <div className="plan-card__badge">{plan.commercialCallout || 'Mais escolhido'}</div>
+                  <div className="plan-card__badge">Mais Escolhido</div>
                 ) : null}
 
                 <div>
                   <div className="plan-card__header">
                     <h2 className="plan-card__name">{plan.name}</h2>
+                    {plan.commercialCallout ? (
+                      <div className="plan-card__callout">
+                        <span className="plan-card__callout-dot" aria-hidden="true" />
+                        <span>{plan.commercialCallout}</span>
+                      </div>
+                    ) : null}
                     <p className="plan-card__blurb">{plan.blurb}</p>
                     <div className="plan-card__price-row">
                       {plan.promotionalPrice ? (
