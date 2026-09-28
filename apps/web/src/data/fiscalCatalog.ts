@@ -181,8 +181,12 @@ export const STANDARD_CFOPS: Omit<CfopCode, 'id'>[] = [
   // Devoluções
   { code: '1202', description: 'Devolução de venda de mercadoria (mesma UF)', operation: 'in_same', active: true },
   { code: '2202', description: 'Devolução de venda de mercadoria (outra UF)', operation: 'in_other', active: true },
+  { code: '1411', description: 'Devolução de venda com substituição tributária (mesma UF)', operation: 'in_same', active: true },
+  { code: '2411', description: 'Devolução de venda com substituição tributária (outra UF)', operation: 'in_other', active: true },
   { code: '5202', description: 'Devolução de compra para comercialização (mesma UF)', operation: 'out_same', active: true },
   { code: '6202', description: 'Devolução de compra para comercialização (outra UF)', operation: 'out_other', active: true },
+  { code: '5411', description: 'Devolução de compra com substituição tributária (mesma UF)', operation: 'out_same', active: true },
+  { code: '6411', description: 'Devolução de compra com substituição tributária (outra UF)', operation: 'out_other', active: true },
   // Transferências entre Lojas / Filiais
   { code: '5152', description: 'Transferência de mercadoria adquirida ou recebida de terceiros (mesma UF)', operation: 'out_same', active: true },
   { code: '6152', description: 'Transferência de mercadoria adquirida ou recebida de terceiros (outra UF)', operation: 'out_other', active: true },
@@ -196,12 +200,30 @@ export const STANDARD_CFOPS: Omit<CfopCode, 'id'>[] = [
   // Remessas e Retornos (Conserto / Demonstração)
   { code: '5915', description: 'Remessa de mercadoria ou bem para conserto ou reparo', operation: 'out_same', active: true },
   { code: '6915', description: 'Remessa para conserto ou reparo (outra UF)', operation: 'out_other', active: true },
+  { code: '1915', description: 'Entrada de mercadoria recebida para conserto ou reparo (mesma UF)', operation: 'in_same', active: true },
+  { code: '2915', description: 'Entrada de mercadoria recebida para conserto ou reparo (outra UF)', operation: 'in_other', active: true },
   { code: '5916', description: 'Retorno de mercadoria ou bem recebido para conserto ou reparo', operation: 'out_same', active: true },
   { code: '6916', description: 'Retorno para conserto ou reparo (outra UF)', operation: 'out_other', active: true },
+  { code: '1916', description: 'Retorno de mercadoria remetida para conserto ou reparo (mesma UF)', operation: 'in_same', active: true },
+  { code: '2916', description: 'Retorno de mercadoria remetida para conserto ou reparo (outra UF)', operation: 'in_other', active: true },
   // Ajustes / Reforma / Outras
-  { code: '5949', description: 'Outra saída de mercadoria ou prestação de serviço não especificado', operation: 'out_same', active: true },
-  { code: '1949', description: 'Outra entrada de mercadoria ou prestação de serviço não especificado', operation: 'in_same', active: true },
+  { code: '5949', description: 'Outra saída de mercadoria ou prestação de serviço não especificado (mesma UF)', operation: 'out_same', active: true },
+  { code: '6949', description: 'Outra saída de mercadoria ou prestação de serviço não especificado (outra UF)', operation: 'out_other', active: true },
+  { code: '1949', description: 'Outra entrada de mercadoria ou prestação de serviço não especificado (mesma UF)', operation: 'in_same', active: true },
+  { code: '2949', description: 'Outra entrada de mercadoria ou prestação de serviço não especificado (outra UF)', operation: 'in_other', active: true },
 ];
+
+/** Filtra rigorosamente os CFOPs permitidos por tipo de operação (Entrada 1/2/3 ou Saída 5/6/7) */
+export function listCfopsForKind(kind: 'entry' | 'exit'): Omit<CfopCode, 'id'>[] {
+  if (kind === 'entry') {
+    return STANDARD_CFOPS.filter(
+      (c) => c.code.startsWith('1') || c.code.startsWith('2') || c.code.startsWith('3')
+    );
+  }
+  return STANDARD_CFOPS.filter(
+    (c) => c.code.startsWith('5') || c.code.startsWith('6') || c.code.startsWith('7')
+  );
+}
 
 function seed(): CatalogState {
   const stamp = now();

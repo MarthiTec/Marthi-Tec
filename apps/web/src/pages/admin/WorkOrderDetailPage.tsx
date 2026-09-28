@@ -226,7 +226,8 @@ function WorkOrderDetailBody({ id }: { id: string }) {
 
   function emitNfse() {
     if (!form) return;
-    const amount = workOrderTotal(form);
+    // Na NFS-e (ISS municipal), tributa-se a mão de obra prestada; se for 0, usa o total da OS
+    const amount = form.labor > 0 ? form.labor : workOrderTotal(form);
     const description =
       nfseDesc.trim() ||
       [form.defect, form.diagnosis, form.itemName].filter(Boolean).join(' · ') ||
@@ -1186,9 +1187,18 @@ function WorkOrderDetailBody({ id }: { id: string }) {
               />
             </label>
             <label>
-              Valor do serviço
-              <input value={money(workOrderTotal(form))} readOnly />
+              Valor do serviço tributável (Mão de Obra)
+              <input value={money(form.labor > 0 ? form.labor : workOrderTotal(form))} readOnly />
             </label>
+            {form.parts > 0 ? (
+              <div className="span-2" style={{ fontSize: '0.84rem', color: 'var(--teal)', background: 'var(--card-2)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)' }}>
+                <span>✓ Mão de Obra (NFS-e / ISS): <strong>{money(form.labor)}</strong></span>
+                <span style={{ marginLeft: 16 }}>📦 Peças / Materiais (ICMS / NF-e): <strong>{money(form.parts)}</strong></span>
+                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--mute)', marginTop: 2 }}>
+                  * Peças físicas são mercadorias sujeitas ao ICMS e devem ser faturadas via NF-e/NFC-e para evitar bitributação.
+                </span>
+              </div>
+            ) : null}
             <label className="span-2">
               Descrição do serviço (xDescServ)
               <textarea
@@ -1205,7 +1215,7 @@ function WorkOrderDetailBody({ id }: { id: string }) {
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={locked || workOrderTotal(form) <= 0}
+                disabled={locked || (form.labor <= 0 && workOrderTotal(form) <= 0)}
                 onClick={emitNfse}
               >
                 <AdminIcon name="fiscal" />

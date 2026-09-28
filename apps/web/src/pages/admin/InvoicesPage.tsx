@@ -7,6 +7,7 @@ import { logAction } from '../../data/auditLog';
 import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { getSupplier, listSuppliers } from '../../data/erpRegistry';
 import {
+  buildNfeXmlStub,
   cancelNfeDocument,
   consultNfeStatus,
   FISCAL_KIND_LABEL,
@@ -27,6 +28,7 @@ import {
   createInvoice,
   INVOICE_KIND_LABEL,
   INVOICE_STATUS_LABEL,
+  invoiceItemsTotal,
   invoiceTotal,
   listInvoices,
   postInvoice,
@@ -36,15 +38,16 @@ import {
   type InvoiceKind,
 } from '../../data/invoiceStore';
 import {
-  NFE_DOC_PURPOSE_HINT,
-  NFE_DOC_PURPOSE_LABEL,
   defaultCfopForPurpose,
+  ENTRY_DOC_PURPOSES,
+  EXIT_DOC_PURPOSES,
+  getPurposeHint,
+  getPurposeLabel,
   type FiscalDocPurpose,
 } from '../../data/fiscalTaxTables';
-import { STANDARD_CFOPS } from '../../data/fiscalCatalog';
+import { listCfopsForKind } from '../../data/fiscalCatalog';
 import { listStores } from '../../data/multiStoreStore';
 import { formatCpfCnpj } from '../../utils/documentUtils';
-import { hasModule } from '../../data/storePlan';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -52,7 +55,6 @@ function money(value: number) {
 
 export function InvoicesPage() {
   const { user } = useAuth();
-  const fiscalOn = hasModule('fiscal');
   const [kindFilter, setKindFilter] = useState<'all' | InvoiceKind>('all');
   const [invoices, setInvoices] = useState(() => listInvoices());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -61,7 +63,15 @@ export function InvoicesPage() {
   const [stockId, setStockId] = useState('');
   const [qty, setQty] = useState(1);
   const [fiscalTick, setFiscalTick] = useState(0);
-  const [cancelReason, setCancelReason] = useState('Cancelamento solicitado pelo emitente');
+  const [cancelReason] = useState('Cancelamento solicitado pelo emitente');
+
+  // Modal de XML
+  const [xmlModalDoc, setXmlModalDoc] = useState<FiscalDocument | null>(null);
+  const [xmlCopied, setXmlCopied] = useState(false);
+
+  // Aba do detalhe da nota: 'geral' | 'cabecalho' | 'totais' | 'conformidade'
+  const [detailTab, setDetailTab] = useState<'geral' | 'cabecalho' | 'totais' | 'conformidade'>('geral');
+
   const suppliers = useMemo(() => listSuppliers(true), []);
   const stores = useMemo(() => listStores(), []);
   const stock = useMemo(() => getAdminState().stock, [invoices]);
@@ -77,6 +87,18 @@ export function InvoicesPage() {
     () => (selected ? getFiscalDocumentForRef('invoice', selected.id) : null),
     [selected, fiscalTick],
   );
+
+  // Lista estrita de CFOPs de acordo com a direção da nota selecionada (1/2/3 para entrada, 5/6/7 para saída)
+  const allowedCfops = useMemo(() => {
+    if (!selected) return [];
+    return listCfopsForKind(selected.kind);
+  }, [selected?.kind]);
+
+  // Finalidades permitidas por direção da nota
+  const allowedPurposes = useMemo(() => {
+    if (!selected) return [];
+    return selected.kind === 'entry' ? ENTRY_DOC_PURPOSES : EXIT_DOC_PURPOSES;
+  }, [selected?.kind]);
 
   useEffect(() => {
     function onRefresh() {
@@ -107,8 +129,16 @@ export function InvoicesPage() {
   }
 
   async function create(kind: InvoiceKind) {
+    const defaultPurpose = 'normal';
+    const suggestedCfop = defaultCfopForPurpose(defaultPurpose, kind);
+    const suggestedNatOp = getPurposeLabel(defaultPurpose, kind);
+
     const result = await createInvoice({
       kind,
+      series: issuer.nfeSeries || '1',
+      natOp: suggestedNatOp,
+      cfopCode: suggestedCfop,
+      documentPurpose: defaultPurpose,
       supplierId: kind === 'entry' ? suppliers[0]?.id : '',
       customerName: kind === 'exit' ? '' : '',
     });
@@ -123,7 +153,7 @@ export function InvoicesPage() {
       detail: `${INVOICE_KIND_LABEL[kind]} ${result.invoice.id}`,
     });
     refresh(result.invoice.id);
-    flash('Rascunho criado.');
+    flash('Rascunho criado com CFOP coerente.');
   }
 
   async function saveDraft(patch: Partial<Invoice>) {
@@ -226,6 +256,16 @@ export function InvoicesPage() {
     const docPurpose = selected.documentPurpose ?? 'normal';
     const cfop = selected.cfopCode || defaultCfopForPurpose(docPurpose, selected.kind);
 
+    // Validação estrita de compatibilidade de CFOP com o tipo de operação
+    if (selected.kind === 'entry' && (cfop.startsWith('5') || cfop.startsWith('6') || cfop.startsWith('7'))) {
+      fail(`Erro Fiscal: Operação de ENTRADA não permite CFOP de saída (${cfop}). Selecione um CFOP iniciado por 1 ou 2.`);
+      return;
+    }
+    if (selected.kind === 'exit' && (cfop.startsWith('1') || cfop.startsWith('2') || cfop.startsWith('3'))) {
+      fail(`Erro Fiscal: Operação de SAÍDA não permite CFOP de entrada (${cfop}). Selecione um CFOP iniciado por 5 ou 6.`);
+      return;
+    }
+
     const result = transmitNfeForInvoice({
       invoiceId: selected.id,
       kind: selected.kind,
@@ -248,51 +288,17 @@ export function InvoicesPage() {
       return;
     }
     setFiscalTick((value) => value + 1);
-    logAction({
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-      action: 'nota.transmitir_nfe',
-      detail: `${result.document.kind} ${result.document.number} · ${result.document.accessKey}`,
-    });
     flash(
-      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} transmitida (${SEFAZ_ENV_LABEL[result.document.nfe?.environment ?? issuer.environment]}) · protocolo ${result.document.nfe?.protocol}`,
+      `${asNfce ? FISCAL_KIND_LABEL.nfce : FISCAL_KIND_LABEL.nfe} ${result.document.number} autorizada na SEFAZ.`,
     );
   }
 
-  function consult(doc: FiscalDocument) {
-    const result = consultNfeStatus(doc.id);
-    if (!result.ok) {
-      fail(result.error);
-      return;
-    }
-    setFiscalTick((value) => value + 1);
-    flash(
-      `Consulta SEFAZ: ${result.document.nfe?.statusCode} — ${result.document.nfe?.statusMessage}`,
-    );
+  function danfe(doc: FiscalDocument, print = false) {
+    const res = openDanfePreview(doc, print);
+    if (!res.ok) fail(res.error);
   }
 
-  function cancelFiscal(doc: FiscalDocument) {
-    const result = cancelNfeDocument(doc.id, cancelReason);
-    if (!result.ok) {
-      fail(result.error);
-      return;
-    }
-    setFiscalTick((value) => value + 1);
-    logAction({
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-      action: 'nota.cancelar_nfe',
-      detail: `${result.document.number} · ${cancelReason}`,
-    });
-    flash(`${FISCAL_KIND_LABEL[result.document.kind]} cancelada na SEFAZ.`);
-  }
-
-  function danfe(doc: FiscalDocument, print: boolean) {
-    const result = openDanfePreview(doc, print);
-    if (!result.ok) fail(result.error);
-  }
-
-  function danfeFromNote(print: boolean) {
+  function previewDanfe(print = false) {
     if (!selected) return;
     if (fiscalDoc) {
       danfe(fiscalDoc, print);
@@ -302,6 +308,7 @@ export function InvoicesPage() {
       fail('Inclua itens para visualizar a DANFE.');
       return;
     }
+    const docPurpose = selected.documentPurpose ?? 'normal';
     const draftDoc: FiscalDocument = {
       id: `DRAFT-${selected.id}`,
       kind: 'nfe',
@@ -311,11 +318,11 @@ export function InvoicesPage() {
       customerName: partyName(selected),
       amount: invoiceTotal(selected),
       number: selected.number || '—',
-      series: issuer.nfeSeries || '1',
+      series: selected.series || issuer.nfeSeries || '1',
       accessKey: 'PREVIEW-SEM-TRANSMISSAO',
       provider: 'sefaz_mock',
       createdAt: new Date().toISOString(),
-      message: `Pré-visualização DANFE · ${NFE_DOC_PURPOSE_LABEL[selected.documentPurpose ?? 'normal']} · ainda não transmitida`,
+      message: `Pré-visualização DANFE · ${getPurposeLabel(docPurpose, selected.kind)} · ainda não transmitida`,
       items: selected.lines.map((line) => ({
         name: line.name,
         qty: line.qty,
@@ -328,50 +335,234 @@ export function InvoicesPage() {
         statusCode: '—',
         statusMessage: 'Pré-visualização',
         xmlDigest: '',
-        documentPurpose: selected.documentPurpose ?? 'normal',
+        documentPurpose: docPurpose,
       },
     };
     danfe(draftDoc, print);
   }
 
+  function handleOpenXml(docToView?: FiscalDocument | null) {
+    if (docToView) {
+      setXmlModalDoc(docToView);
+      return;
+    }
+    if (!selected) return;
+    const docPurpose = selected.documentPurpose ?? 'normal';
+    const draftDoc: FiscalDocument = fiscalDoc || {
+      id: `XML-${selected.id}`,
+      kind: 'nfe',
+      status: 'authorized',
+      refType: 'invoice',
+      refId: selected.id,
+      customerName: partyName(selected),
+      customerDocument: partyDocument(selected),
+      cfopCode: selected.cfopCode || defaultCfopForPurpose(docPurpose, selected.kind),
+      amount: invoiceTotal(selected),
+      number: selected.number || '1',
+      series: selected.series || '1',
+      accessKey: `332609${cleanDocument(issuer.cnpj || '00000000000100')}55001${String(selected.number).padStart(9, '0')}1000000018`,
+      provider: 'sefaz_mock',
+      createdAt: new Date().toISOString(),
+      message: selected.notes || 'Emissão regular de nota fiscal',
+      refNfeKey: selected.refNfeKey,
+      items: selected.lines.map((line) => ({
+        name: line.name,
+        qty: line.qty,
+        unitPrice: selected.kind === 'entry' ? line.unitCost : line.unitPrice,
+      })),
+      nfe: {
+        environment: issuer.environment,
+        protocol: '133260000000001',
+        receiptNumber: 'REC2026001',
+        statusCode: '100',
+        statusMessage: 'Autorizado o uso da NF-e',
+        xmlDigest: 'Wp6Z9v8h34+=',
+        documentPurpose: docPurpose,
+      },
+    };
+    setXmlModalDoc(draftDoc);
+  }
+
+  function copyXmlToClipboard(xml: string) {
+    void navigator.clipboard.writeText(xml);
+    setXmlCopied(true);
+    setTimeout(() => setXmlCopied(false), 2500);
+  }
+
+  function downloadXmlFile(doc: FiscalDocument) {
+    const xml = buildNfeXmlStub(doc);
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NFe_${doc.number || doc.id}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleCancelFiscalDoc() {
+    if (!fiscalDoc) return;
+    const reason = window.prompt('Motivo do cancelamento na SEFAZ (mínimo 15 caracteres):', cancelReason);
+    if (!reason || reason.trim().length < 15) {
+      fail('Cancelamento exige justificativa com pelo menos 15 caracteres.');
+      return;
+    }
+    const res = cancelNfeDocument(fiscalDoc.id, reason.trim());
+    if (!res.ok) {
+      fail(res.error);
+      return;
+    }
+    setFiscalTick((v) => v + 1);
+    flash(`NF-e ${fiscalDoc.number} cancelada com sucesso na SEFAZ.`);
+  }
+
+  function handleConsultFiscalDoc() {
+    if (!fiscalDoc) return;
+    const res = consultNfeStatus(fiscalDoc.id);
+    if (!res.ok) {
+      fail(res.error);
+      return;
+    }
+    setFiscalTick((v) => v + 1);
+    flash(`Status SEFAZ consultado: ${res.document.nfe?.statusMessage || 'Autorizado'}.`);
+  }
+
+  function cleanDocument(doc: string) {
+    return doc.replace(/\D/g, '');
+  }
+
+  // Cálculos de totais de impostos
+  const itemsSum = selected ? invoiceItemsTotal(selected) : 0;
+  const finalTotal = selected ? invoiceTotal(selected) : 0;
+  const isTotalsMatch = Math.abs(itemsSum + (Number(selected?.vFrete) || 0) + (Number(selected?.vOutro) || 0) - (Number(selected?.vDesc) || 0) - finalTotal) < 0.01;
+
+  // Auditoria de Conformidade Fácil para a nota selecionada
+  const conformidadeReport = useMemo(() => {
+    if (!selected) return [];
+    const checks: { label: string; ok: boolean; message: string }[] = [];
+
+    // 1. Direção vs CFOP
+    const currentCfop = selected.cfopCode || defaultCfopForPurpose(selected.documentPurpose ?? 'normal', selected.kind);
+    const isEntryCfop = currentCfop.startsWith('1') || currentCfop.startsWith('2') || currentCfop.startsWith('3');
+    const isExitCfop = currentCfop.startsWith('5') || currentCfop.startsWith('6') || currentCfop.startsWith('7');
+    const cfopOk = (selected.kind === 'entry' && isEntryCfop) || (selected.kind === 'exit' && isExitCfop);
+    checks.push({
+      label: 'Coerência CFOP vs Tipo da Nota',
+      ok: cfopOk,
+      message: cfopOk
+        ? `CFOP ${currentCfop} é válido para operação de ${selected.kind === 'entry' ? 'ENTRADA' : 'SAÍDA'}.`
+        : `INCOMPATÍVEL: CFOP ${currentCfop} não pode ser utilizado em operação de ${selected.kind === 'entry' ? 'ENTRADA' : 'SAÍDA'}.`,
+    });
+
+    // 2. Chave referenciada para devolução/retorno
+    if (selected.documentPurpose === 'devolucao' || selected.documentPurpose === 'retorno') {
+      const keyOk = Boolean(selected.refNfeKey && selected.refNfeKey.length === 44);
+      checks.push({
+        label: 'Chave de Acesso Referenciada (44 dígitos)',
+        ok: keyOk,
+        message: keyOk
+          ? `Chave referenciada informada: ${selected.refNfeKey}`
+          : 'Notas de devolução ou retorno exigem a chave de 44 dígitos da NF-e original.',
+      });
+    }
+
+    // 3. Filial para transferência
+    if (selected.documentPurpose === 'transferencia') {
+      const storeOk = Boolean(selected.targetStoreId);
+      checks.push({
+        label: 'Filial de Destino / Origem',
+        ok: storeOk,
+        message: storeOk
+          ? 'Filial vinculada com CNPJ e Inscrição Estadual.'
+          : 'Selecione a loja/filial receptora da transferência.',
+      });
+    }
+
+    // 4. Documento do destinatário/fornecedor
+    const doc = partyDocument(selected);
+    const docOk = doc.length >= 11;
+    checks.push({
+      label: 'Identificação Fiscal (CPF/CNPJ)',
+      ok: docOk,
+      message: docOk ? `Documento informado: ${doc}` : 'Informe o CPF ou CNPJ do destinatário ou fornecedor.',
+    });
+
+    // 5. Itens da nota
+    const hasItems = selected.lines.length > 0;
+    checks.push({
+      label: 'Itens e Produtos Lançados',
+      ok: hasItems,
+      message: hasItems
+        ? `${selected.lines.length} item(ns) incluído(s) com valor total de ${money(itemsSum)}.`
+        : 'A nota deve conter pelo menos 1 item antes de ser transmitida.',
+    });
+
+    // 6. Certificado Digital
+    checks.push({
+      label: 'Certificado Digital A1',
+      ok: issuerIsReadyForNfe(issuer),
+      message: issuerIsReadyForNfe(issuer)
+        ? `Certificado ativo para emitente ${issuer.emitenteName || 'Loja Principal'}.`
+        : 'Configure o certificado A1 em Configuração Fiscal.',
+    });
+
+    return checks;
+  }, [selected, itemsSum, issuer]);
+
   return (
     <section className="admin-page">
+      {/* Card Superior com Status do Certificado Digital A1 */}
+      <div className="fiscal-cert-status-card">
+        <div className="fiscal-cert-status-card__info">
+          <span className={`fiscal-cert-badge ${issuerIsReadyForNfe(issuer) ? 'fiscal-cert-badge--ok' : 'fiscal-cert-badge--warn'}`}>
+            {issuerIsReadyForNfe(issuer) ? '● Certificado A1 Ativo' : '▲ Certificado A1 Pendente'}
+          </span>
+          <span>
+            Emitente: <strong>{issuer.emitenteName || 'Loja Principal'}</strong> · CNPJ: {issuer.cnpj ? formatCpfCnpj(issuer.cnpj) : '—'}
+          </span>
+          <span style={{ fontSize: '0.82rem', color: 'var(--mute)' }}>
+            Ambiente SEFAZ: <strong>{SEFAZ_ENV_LABEL[issuer.environment]}</strong> · Série Padrão: <strong>{issuer.nfeSeries || '1'}</strong>
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link to="/painel/fiscal/config" className="btn btn--ghost btn--sm">
+            ⚙️ Configuração Fiscal
+          </Link>
+          <Link to="/painel/fiscal/cst" className="btn btn--ghost btn--sm">
+            Tributos & cClassTrib
+          </Link>
+        </div>
+      </div>
+
       <div className="admin-toolbar">
         <AdminPicker
           compact
           label="Filtro"
           value={kindFilter}
           options={[
-            { value: 'all', label: 'Todas' },
-            { value: 'entry', label: 'Entradas' },
-            { value: 'exit', label: 'Saídas' },
+            { value: 'all', label: 'Todas as notas' },
+            { value: 'entry', label: 'Notas de Entrada (Compras / Devoluções de Venda)' },
+            { value: 'exit', label: 'Notas de Saída (Vendas / Devoluções de Compra)' },
           ]}
           onChange={(value) => setKindFilter(value as 'all' | InvoiceKind)}
         />
         <button type="button" className="btn btn--primary" onClick={() => void create('entry')}>
-          Nova entrada
+          + Nova Nota de Entrada
         </button>
         <button type="button" className="btn btn--ghost" onClick={() => void create('exit')}>
-          Nova saída
+          + Nova Nota de Saída
         </button>
-        {fiscalOn ? (
-          <>
-            <Link to="/painel/fiscal/config" className="btn btn--ghost">
-              Configuração fiscal
-            </Link>
-            <Link to="/painel/fiscal/cst" className="btn btn--ghost">
-              CST / cClassTrib
-            </Link>
-          </>
-        ) : null}
       </div>
 
-      {message ? <p className="empty">{message}</p> : null}
-      {error ? <p className="qty-low">{error}</p> : null}
+      {message ? <p className="pdv__ok" style={{ marginBottom: 14 }}>{message}</p> : null}
+      {error ? <p className="qty-low" style={{ marginBottom: 14 }}>{error}</p> : null}
 
       <div className="erp-invoices">
+        {/* Painel Esquerdo: Listagem de Notas */}
         <article className="admin-card">
-          <h2>Notas</h2>
+          <h2>Notas Fiscais de Entrada e Saída</h2>
           <div className="admin-table-container">
             <table className="admin-table">
               <thead>
@@ -387,7 +578,7 @@ export function InvoicesPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty">
-                      Nenhuma nota ainda.
+                      Nenhuma nota encontrada neste filtro.
                     </td>
                   </tr>
                 ) : (
@@ -400,15 +591,19 @@ export function InvoicesPage() {
                         style={{ cursor: 'pointer' }}
                         onClick={() => setSelectedId(item.id)}
                       >
-                        <td>{item.id}</td>
-                        <td>{INVOICE_KIND_LABEL[item.kind]}</td>
+                        <td><strong>{item.id}</strong></td>
+                        <td>
+                          <span className={`stock-badge ${item.kind === 'entry' ? 'stock-badge--warn' : 'stock-badge--ok'}`}>
+                            {INVOICE_KIND_LABEL[item.kind]}
+                          </span>
+                        </td>
                         <td>{INVOICE_STATUS_LABEL[item.status]}</td>
                         <td>
                           {doc
                             ? `${FISCAL_KIND_LABEL[doc.kind]} · ${FISCAL_STATUS_LABEL[doc.status]}`
                             : '—'}
                         </td>
-                        <td>{money(invoiceTotal(item))}</td>
+                        <td><strong>{money(invoiceTotal(item))}</strong></td>
                       </tr>
                     );
                   })
@@ -418,378 +613,573 @@ export function InvoicesPage() {
           </div>
         </article>
 
+        {/* Painel Direito: Detalhe, Edição de Cabeçalho e Totais */}
         <article className="admin-card">
           {!selected ? (
             <>
-              <h2>Detalhe</h2>
-              <p className="empty">Selecione ou crie uma nota.</p>
+              <h2>Detalhes da Nota</h2>
+              <p className="empty">Selecione uma nota na lista ao lado ou crie uma nova entrada/saída.</p>
             </>
           ) : (
             <>
-              <h2>
-                {INVOICE_KIND_LABEL[selected.kind]} · {selected.id}
-              </h2>
-              <p className="fiscal-note-meta">
-                Status: <span>{INVOICE_STATUS_LABEL[selected.status]}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <h2 style={{ margin: 0 }}>
+                  {INVOICE_KIND_LABEL[selected.kind]} · {selected.id}
+                </h2>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    onClick={() => handleOpenXml(fiscalDoc)}
+                  >
+                    📄 Exibir XML
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    onClick={() => previewDanfe(false)}
+                  >
+                    🖨️ DANFE
+                  </button>
+                </div>
+              </div>
+
+              <p className="fiscal-note-meta" style={{ marginTop: 6 }}>
+                Status: <strong>{INVOICE_STATUS_LABEL[selected.status]}</strong>
                 {' · '}
-                Total {money(invoiceTotal(selected))}
-                {fiscalOn ? (
-                  <>
-                    {' · '}
-                    Ambiente SEFAZ: <span>{SEFAZ_ENV_LABEL[issuer.environment]}</span>
-                  </>
-                ) : null}
+                Total da Nota: <strong style={{ color: 'var(--teal)' }}>{money(invoiceTotal(selected))}</strong>
+                {' · '}
+                Finalidade: <span>{getPurposeLabel(selected.documentPurpose ?? 'normal', selected.kind)}</span>
               </p>
 
-              <div className="admin-form" style={{ marginTop: 12 }}>
-                <label>
-                  Número / documento
-                  <input
-                    value={selected.number}
-                    disabled={selected.status !== 'draft'}
-                    onChange={(e) => void saveDraft({ number: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Data
-                  <input
-                    type="date"
-                    value={selected.issuedAt.slice(0, 10)}
-                    disabled={selected.status !== 'draft'}
-                    onChange={(e) => void saveDraft({ issuedAt: e.target.value })}
-                  />
-                </label>
-                <AdminPicker
-                  className="span-2"
-                  label="Tipo de documento (Finalidade fiscal)"
-                  value={selected.documentPurpose ?? 'normal'}
-                  disabled={selected.status !== 'draft'}
-                  options={(Object.keys(NFE_DOC_PURPOSE_LABEL) as FiscalDocPurpose[]).map((key) => ({
-                    value: key,
-                    label: NFE_DOC_PURPOSE_LABEL[key],
-                  }))}
-                  onChange={(value) => {
-                    const purpose = value as FiscalDocPurpose;
-                    const suggestedCfop = defaultCfopForPurpose(purpose, selected.kind);
-                    void saveDraft({
-                      documentPurpose: purpose,
-                      cfopCode: selected.cfopCode || suggestedCfop,
-                    });
-                  }}
-                />
-                <p className="span-2 empty" style={{ margin: 0 }}>
-                  {NFE_DOC_PURPOSE_HINT[selected.documentPurpose ?? 'normal']}
-                </p>
+              {/* Abas do Painel de Detalhes da Nota */}
+              <div style={{ display: 'flex', gap: 6, margin: '14px 0 10px', borderBottom: '1px solid var(--line)', paddingBottom: 6 }}>
+                <button
+                  type="button"
+                  className={`btn btn--sm ${detailTab === 'geral' ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setDetailTab('geral')}
+                >
+                  Geral & CFOP
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn--sm ${detailTab === 'cabecalho' ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setDetailTab('cabecalho')}
+                >
+                  Cabeçalho & Transporte
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn--sm ${detailTab === 'totais' ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setDetailTab('totais')}
+                >
+                  Totais & Impostos
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn--sm ${detailTab === 'conformidade' ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setDetailTab('conformidade')}
+                >
+                  ✓ Conformidade Fácil
+                </button>
+              </div>
 
-                {selected.documentPurpose === 'transferencia' ? (
-                  <AdminPicker
-                    className="span-2"
-                    label="Filial de Destino / Origem da Transferência"
-                    value={selected.targetStoreId ?? ''}
-                    disabled={selected.status !== 'draft'}
-                    placeholder="Selecione a loja/filial do grupo…"
-                    options={stores.map((s) => ({
-                      value: s.id,
-                      label: `${s.name} · CNPJ ${formatCpfCnpj(s.cnpj)} (${s.city}/${s.state})`,
-                    }))}
-                    onChange={(storeId) => {
-                      const st = stores.find((s) => s.id === storeId);
-                      if (st) {
-                        void saveDraft({
-                          targetStoreId: st.id,
-                          customerName: st.name,
-                          customerDocument: st.cnpj,
-                          cfopCode: selected.kind === 'entry' ? '1152' : '5152',
-                        });
-                      } else {
-                        void saveDraft({ targetStoreId: storeId });
-                      }
-                    }}
-                  />
-                ) : null}
-
-                {selected.documentPurpose === 'devolucao' || selected.documentPurpose === 'retorno' ? (
-                  <label className="span-2">
-                    Chave de acesso da NF-e referenciada (44 dígitos)
+              {/* ABA 1: GERAL & CFOP */}
+              {detailTab === 'geral' ? (
+                <div className="admin-form" style={{ marginTop: 10 }}>
+                  <label>
+                    Número / Documento
                     <input
-                      value={selected.refNfeKey ?? ''}
-                      maxLength={44}
-                      placeholder="Ex: 35240900000000000191550010000001011000000010"
+                      value={selected.number}
                       disabled={selected.status !== 'draft'}
-                      onChange={(e) => void saveDraft({ refNfeKey: e.target.value.replace(/\D/g, '') })}
+                      onChange={(e) => void saveDraft({ number: e.target.value })}
                     />
                   </label>
-                ) : null}
+                  <label>
+                    Data de Emissão
+                    <input
+                      type="date"
+                      value={selected.issuedAt.slice(0, 10)}
+                      disabled={selected.status !== 'draft'}
+                      onChange={(e) => void saveDraft({ issuedAt: e.target.value })}
+                    />
+                  </label>
 
-                <AdminPicker
-                  className="span-2"
-                  label="CFOP da Operação"
-                  value={selected.cfopCode || defaultCfopForPurpose(selected.documentPurpose ?? 'normal', selected.kind)}
-                  disabled={selected.status !== 'draft'}
-                  options={STANDARD_CFOPS.map((c) => ({
-                    value: c.code,
-                    label: `${c.code} — ${c.description}`,
-                  }))}
-                  onChange={(value) => void saveDraft({ cfopCode: value })}
-                />
-
-                {selected.kind === 'entry' ? (
+                  {/* Finalidade Fiscal Filtrada Estritamente por Tipo de Operação */}
                   <AdminPicker
-                    label="Fornecedor"
-                    value={selected.supplierId}
+                    className="span-2"
+                    label={`Finalidade Fiscal (${selected.kind === 'entry' ? 'Operações de ENTRADA' : 'Operações de SAÍDA'})`}
+                    value={selected.documentPurpose ?? 'normal'}
                     disabled={selected.status !== 'draft'}
-                    options={suppliers.map((item) => ({
-                      value: item.id,
-                      label: item.name,
+                    options={allowedPurposes.map((key) => ({
+                      value: key,
+                      label: getPurposeLabel(key, selected.kind),
                     }))}
                     onChange={(value) => {
-                      const sup = suppliers.find((s) => s.id === value);
+                      const purpose = value as FiscalDocPurpose;
+                      const suggestedCfop = defaultCfopForPurpose(purpose, selected.kind);
+                      const suggestedNatOp = getPurposeLabel(purpose, selected.kind);
                       void saveDraft({
-                        supplierId: value,
-                        customerDocument: sup?.document || selected.customerDocument,
+                        documentPurpose: purpose,
+                        cfopCode: suggestedCfop,
+                        natOp: suggestedNatOp,
                       });
                     }}
                   />
-                ) : (
-                  <label>
-                    Cliente / Destinatário
-                    <input
-                      value={selected.customerName}
+                  <p className="span-2 empty" style={{ margin: 0, fontSize: '0.82rem' }}>
+                    {getPurposeHint(selected.documentPurpose ?? 'normal', selected.kind)}
+                  </p>
+
+                  {/* Transferência entre Filiais */}
+                  {selected.documentPurpose === 'transferencia' ? (
+                    <AdminPicker
+                      className="span-2"
+                      label={`Filial de ${selected.kind === 'entry' ? 'Origem' : 'Destino'} da Transferência`}
+                      value={selected.targetStoreId ?? ''}
                       disabled={selected.status !== 'draft'}
-                      placeholder="Nome do cliente ou destinatário"
-                      onChange={(e) => void saveDraft({ customerName: e.target.value })}
+                      placeholder="Selecione a loja/filial do grupo…"
+                      options={stores.map((s) => ({
+                        value: s.id,
+                        label: `${s.name} · CNPJ ${formatCpfCnpj(s.cnpj)} (${s.city}/${s.state})`,
+                      }))}
+                      onChange={(storeId) => {
+                        const st = stores.find((s) => s.id === storeId);
+                        if (st) {
+                          void saveDraft({
+                            targetStoreId: st.id,
+                            customerName: st.name,
+                            customerDocument: st.cnpj,
+                            cfopCode: selected.kind === 'entry' ? '1152' : '5152',
+                            natOp: selected.kind === 'entry' ? 'TRANSFERENCIA DE ENTRADA P/ COMERCIALIZACAO' : 'TRANSFERENCIA DE MERCADORIAS ENTRE FILIAIS',
+                          });
+                        } else {
+                          void saveDraft({ targetStoreId: storeId });
+                        }
+                      }}
                     />
-                  </label>
-                )}
+                  ) : null}
 
-                <label>
-                  CPF / CNPJ (Destinatário / Fornecedor)
-                  <input
-                    value={selected.customerDocument ?? ''}
-                    disabled={selected.status !== 'draft'}
-                    placeholder="CPF ou CNPJ (inclusive alfanumérico)"
-                    onChange={(e) => void saveDraft({ customerDocument: e.target.value.toUpperCase() })}
-                  />
-                </label>
+                  {/* Chave Referenciada (Devolução ou Retorno) */}
+                  {selected.documentPurpose === 'devolucao' || selected.documentPurpose === 'retorno' ? (
+                    <label className="span-2">
+                      Chave de Acesso da NF-e Referenciada (44 dígitos obrigatórios)
+                      <input
+                        value={selected.refNfeKey ?? ''}
+                        maxLength={44}
+                        placeholder="Ex: 35240900000000000191550010000001011000000010"
+                        disabled={selected.status !== 'draft'}
+                        onChange={(e) => void saveDraft({ refNfeKey: e.target.value.replace(/\D/g, '') })}
+                      />
+                    </label>
+                  ) : null}
 
-                <label className="span-2">
-                  Observações
-                  <textarea
-                    value={selected.notes}
-                    disabled={selected.status !== 'draft'}
-                    onChange={(e) => void saveDraft({ notes: e.target.value })}
-                  />
-                </label>
-              </div>
-
-              {selected.status === 'draft' ? (
-                <div className="erp-invoice-lines">
+                  {/* CFOP da Operação - Filtrado e Estrito */}
                   <AdminPicker
-                    label="Item do estoque"
-                    value={stockId}
-                    placeholder="Selecionar…"
-                    options={stock.map((item) => ({
-                      value: item.id,
-                      label: `${item.name} · qtd ${item.qty}`,
+                    className="span-2"
+                    label={`CFOP da Operação (${selected.kind === 'entry' ? 'Apenas Entradas 1xxx / 2xxx' : 'Apenas Saídas 5xxx / 6xxx'})`}
+                    value={selected.cfopCode || defaultCfopForPurpose(selected.documentPurpose ?? 'normal', selected.kind)}
+                    disabled={selected.status !== 'draft'}
+                    options={allowedCfops.map((c) => ({
+                      value: c.code,
+                      label: `${c.code} — ${c.description}`,
                     }))}
-                    onChange={setStockId}
+                    onChange={(value) => void saveDraft({ cfopCode: value })}
                   />
-                  <label className="erp-invoice-qty">
-                    Qtd
+
+                  {selected.kind === 'entry' ? (
+                    <AdminPicker
+                      label="Fornecedor"
+                      value={selected.supplierId}
+                      disabled={selected.status !== 'draft'}
+                      options={suppliers.map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                      }))}
+                      onChange={(value) => {
+                        const sup = suppliers.find((s) => s.id === value);
+                        void saveDraft({
+                          supplierId: value,
+                          customerName: sup?.name || selected.customerName,
+                          customerDocument: sup?.document || selected.customerDocument,
+                        });
+                      }}
+                    />
+                  ) : (
+                    <label>
+                      Cliente / Destinatário
+                      <input
+                        value={selected.customerName}
+                        disabled={selected.status !== 'draft'}
+                        placeholder="Nome do cliente ou destinatário"
+                        onChange={(e) => void saveDraft({ customerName: e.target.value })}
+                      />
+                    </label>
+                  )}
+
+                  <label>
+                    CPF / CNPJ ({selected.kind === 'entry' ? 'Fornecedor' : 'Destinatário'})
                     <input
-                      type="number"
-                      min={1}
-                      value={qty}
-                      onChange={(e) => setQty(Number(e.target.value) || 1)}
+                      value={selected.customerDocument ?? ''}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="CPF ou CNPJ (inclusive alfanumérico)"
+                      onChange={(e) => void saveDraft({ customerDocument: e.target.value.toUpperCase() })}
                     />
                   </label>
-                  <button type="button" className="btn btn--ghost" onClick={() => void addLine()}>
-                    Incluir item
-                  </button>
                 </div>
               ) : null}
 
-              <div className="admin-table-container" style={{ marginTop: 12 }}>
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qtd</th>
-                      <th>{selected.kind === 'entry' ? 'Custo' : 'Preço'}</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selected.lines.length === 0 ? (
+              {/* ABA 2: CABEÇALHO & TRANSPORTE */}
+              {detailTab === 'cabecalho' ? (
+                <div className="admin-form" style={{ marginTop: 10 }}>
+                  <label>
+                    Série da NF-e
+                    <input
+                      value={selected.series || '1'}
+                      disabled={selected.status !== 'draft'}
+                      onChange={(e) => void saveDraft({ series: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Data/Hora de Saída/Entrada
+                    <input
+                      type="date"
+                      value={selected.movementAt ? selected.movementAt.slice(0, 10) : selected.issuedAt.slice(0, 10)}
+                      disabled={selected.status !== 'draft'}
+                      onChange={(e) => void saveDraft({ movementAt: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="span-2">
+                    Natureza da Operação (Texto impresso no DANFE)
+                    <input
+                      value={selected.natOp || getPurposeLabel(selected.documentPurpose ?? 'normal', selected.kind)}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="Ex: COMPRA PARA COMERCIALIZACAO ou VENDA DE MERCADORIA"
+                      onChange={(e) => void saveDraft({ natOp: e.target.value.toUpperCase() })}
+                    />
+                  </label>
+
+                  <AdminPicker
+                    className="span-2"
+                    label="Modalidade do Frete"
+                    value={selected.modFrete || '9'}
+                    disabled={selected.status !== 'draft'}
+                    options={[
+                      { value: '0', label: '0 — Por conta do Emitente (CIF)' },
+                      { value: '1', label: '1 — Por conta do Destinatário (FOB)' },
+                      { value: '2', label: '2 — Por conta de Terceiros' },
+                      { value: '9', label: '9 — Sem Ocorrência de Transporte' },
+                    ]}
+                    onChange={(val) => void saveDraft({ modFrete: val })}
+                  />
+
+                  <label>
+                    Valor do Frete (R$)
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={selected.vFrete ?? ''}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="0.00"
+                      onChange={(e) => void saveDraft({ vFrete: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+
+                  <label>
+                    Valor do Desconto (R$)
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={selected.vDesc ?? ''}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="0.00"
+                      onChange={(e) => void saveDraft({ vDesc: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+
+                  <label className="span-2">
+                    Outras Despesas Acessórias (R$)
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={selected.vOutro ?? ''}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="0.00"
+                      onChange={(e) => void saveDraft({ vOutro: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+
+                  <label className="span-2">
+                    Informações Complementares de Interesse do Contribuinte (infCpl)
+                    <textarea
+                      rows={3}
+                      value={selected.infCpl || selected.notes}
+                      disabled={selected.status !== 'draft'}
+                      placeholder="Observações fiscais, dados adicionais de tributação, local de entrega..."
+                      onChange={(e) => void saveDraft({ infCpl: e.target.value, notes: e.target.value })}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {/* ABA 3: TOTAIS & IMPOSTOS */}
+              {detailTab === 'totais' ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className="fiscal-totals-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <strong style={{ fontSize: '0.95rem' }}>Quadro de Totais e Tributos da Nota Fiscal</strong>
+                      <span className={`fiscal-coherence-badge ${isTotalsMatch ? 'fiscal-coherence-badge--match' : 'fiscal-coherence-badge--divergent'}`}>
+                        {isTotalsMatch ? '✓ Totais 100% Coerentes' : '⚠️ Divergência nos Totais'}
+                      </span>
+                    </div>
+
+                    <div className="fiscal-totals-grid">
+                      <div className="fiscal-totals-item">
+                        <span>Total dos Produtos</span>
+                        <strong>{money(itemsSum)}</strong>
+                      </div>
+                      <div className="fiscal-totals-item">
+                        <span>Frete (+)</span>
+                        <strong>{money(selected.vFrete || 0)}</strong>
+                      </div>
+                      <div className="fiscal-totals-item">
+                        <span>Desconto (-)</span>
+                        <strong>{money(selected.vDesc || 0)}</strong>
+                      </div>
+                      <div className="fiscal-totals-item">
+                        <span>Total da Nota (vNF)</span>
+                        <strong style={{ color: 'var(--teal)' }}>{money(finalTotal)}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                      <span style={{ fontSize: '0.76rem', color: 'var(--mute)', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Estimativa de Impostos (ICMS, PIS, COFINS e Reforma IBS/CBS)
+                      </span>
+                      <div className="fiscal-totals-grid" style={{ marginTop: 6 }}>
+                        <div className="fiscal-totals-item">
+                          <span>Base ICMS</span>
+                          <strong>{money(finalTotal)}</strong>
+                        </div>
+                        <div className="fiscal-totals-item">
+                          <span>ICMS (18%)</span>
+                          <strong>{money(finalTotal * 0.18)}</strong>
+                        </div>
+                        <div className="fiscal-totals-item">
+                          <span>PIS (1.65%)</span>
+                          <strong>{money(finalTotal * 0.0165)}</strong>
+                        </div>
+                        <div className="fiscal-totals-item">
+                          <span>COFINS (7.6%)</span>
+                          <strong>{money(finalTotal * 0.076)}</strong>
+                        </div>
+                        <div className="fiscal-totals-item">
+                          <span>IBS Reforma (0.1%)</span>
+                          <strong>{money(finalTotal * 0.001)}</strong>
+                        </div>
+                        <div className="fiscal-totals-item">
+                          <span>CBS Reforma (0.9%)</span>
+                          <strong>{money(finalTotal * 0.009)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* ABA 4: CONFORMIDADE FÁCIL */}
+              {detailTab === 'conformidade' ? (
+                <div className="fiscal-conformidade-box">
+                  <div className="fiscal-conformidade-header">
+                    <strong>🛡️ Conformidade Fácil — Validador Pré-SEFAZ</strong>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--mute)' }}>Auditoria em tempo real</span>
+                  </div>
+                  <ul className="fiscal-conformidade-list">
+                    {conformidadeReport.map((c, i) => (
+                      <li key={i} className={`fiscal-conformidade-item ${c.ok ? 'fiscal-conformidade-item--ok' : 'fiscal-conformidade-item--warn'}`}>
+                        <span>{c.ok ? '✓' : '▲'}</span>
+                        <div>
+                          <strong>{c.label}:</strong> {c.message}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Seção de Itens da Nota */}
+              <div style={{ marginTop: 18 }}>
+                <h3 style={{ fontSize: '1rem', margin: '0 0 8px' }}>Itens da Nota Fiscal</h3>
+                {selected.status === 'draft' ? (
+                  <div className="admin-toolbar" style={{ marginBottom: 10 }}>
+                    <AdminPicker
+                      label="Produto / Mercadoria"
+                      value={stockId}
+                      options={[
+                        { value: '', label: 'Selecione o produto do estoque…' },
+                        ...stock.map((item) => ({
+                          value: item.id,
+                          label: `${item.sku ? `[${item.sku}] ` : ''}${item.name} · Custo ${money(item.cost)} · Venda ${money(item.price)}`,
+                        })),
+                      ]}
+                      onChange={(value) => setStockId(value)}
+                    />
+                    <label style={{ maxWidth: 100 }}>
+                      Qtd
+                      <input
+                        type="number"
+                        min="1"
+                        value={qty}
+                        onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                      />
+                    </label>
+                    <button type="button" className="btn btn--primary" onClick={() => void addLine()}>
+                      + Adicionar Item
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className="admin-table-container">
+                  <table className="admin-table">
+                    <thead>
                       <tr>
-                        <td colSpan={4} className="empty">
-                          Sem itens.
-                        </td>
+                        <th>Item</th>
+                        <th>Qtd</th>
+                        <th>V. Unitário</th>
+                        <th>Total</th>
+                        {selected.status === 'draft' ? <th>Ação</th> : null}
                       </tr>
-                    ) : (
-                      selected.lines.map((line) => (
-                        <tr key={line.id}>
-                          <td>{line.name}</td>
-                          <td>{line.qty}</td>
-                          <td>
-                            {money(
-                              (selected.kind === 'entry' ? line.unitCost : line.unitPrice) *
-                                line.qty,
-                            )}
-                          </td>
-                          <td>
-                            {selected.status === 'draft' ? (
-                              <button
-                                type="button"
-                                className="btn btn--ghost"
-                                onClick={() => {
-                                  void (async () => {
-                                    const result = await removeInvoiceLine(selected.id, line.id);
-                                    if (!result.ok) fail(result.error);
-                                    else refresh(selected.id);
-                                  })();
-                                }}
-                              >
-                                Remover
-                              </button>
-                            ) : null}
+                    </thead>
+                    <tbody>
+                      {selected.lines.length === 0 ? (
+                        <tr>
+                          <td colSpan={selected.status === 'draft' ? 5 : 4} className="empty">
+                            Nenhum item adicionado à nota ainda.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        selected.lines.map((line) => {
+                          const unit = selected.kind === 'entry' ? line.unitCost : line.unitPrice;
+                          return (
+                            <tr key={line.id}>
+                              <td>{line.name}</td>
+                              <td>{line.qty}</td>
+                              <td>{money(unit)}</td>
+                              <td>{money(unit * line.qty)}</td>
+                              {selected.status === 'draft' ? (
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost btn--sm"
+                                    onClick={async () => {
+                                      await removeInvoiceLine(selected.id, line.id);
+                                      refresh(selected.id);
+                                    }}
+                                  >
+                                    Remover
+                                  </button>
+                                </td>
+                              ) : null}
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="admin-toolbar" style={{ marginTop: 12 }}>
+              {/* Botões de Ação da Nota */}
+              <div className="admin-toolbar" style={{ marginTop: 18, justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
                 {selected.status === 'draft' ? (
-                  <button type="button" className="btn btn--primary" onClick={() => void post()}>
-                    Lançar nota
-                  </button>
-                ) : null}
-                {selected.status !== 'cancelled' ? (
-                  <button type="button" className="btn btn--ghost" onClick={() => void cancel()}>
-                    Cancelar lançamento
-                  </button>
-                ) : null}
-                {fiscalOn ? (
                   <>
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => danfeFromNote(false)}
-                    >
-                      Visualizar DANFE
+                    <button type="button" className="btn btn--primary" onClick={() => void post()}>
+                      📦 Lançar no Estoque
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost"
-                      onClick={() => danfeFromNote(true)}
-                    >
-                      Imprimir DANFE
+                    <button type="button" className="btn btn--ghost" onClick={() => void cancel()}>
+                      Cancelar Rascunho
                     </button>
                   </>
                 ) : null}
-              </div>
 
-              {fiscalOn ? (
-                <div className="os-nfse-result" style={{ marginTop: 18 }}>
-                  <h3 style={{ margin: '0 0 8px', fontSize: '0.95rem' }}>NF-e / transmissão SEFAZ</h3>
-                  <p className="empty" style={{ marginTop: 0 }}>
-                    Transmitir gera o XML, envia e consulta o recibo. Configure certificado e ambiente em{' '}
-                    <Link to="/painel/fiscal/config">Configuração fiscal</Link>.
-                  </p>
+                {selected.status === 'posted' ? (
+                  <>
+                    <button type="button" className="btn btn--primary" onClick={() => transmit(false)}>
+                      🚀 Transmitir NF-e (SEFAZ)
+                    </button>
+                    {selected.kind === 'exit' ? (
+                      <button type="button" className="btn btn--ghost" onClick={() => transmit(true)}>
+                        🧾 Transmitir como NFC-e
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
 
-                  {fiscalDoc ? (
-                    <>
-                      <p>
-                        <strong>
-                          {FISCAL_KIND_LABEL[fiscalDoc.kind]} {fiscalDoc.number}/{fiscalDoc.series}
-                        </strong>{' '}
-                        · {FISCAL_STATUS_LABEL[fiscalDoc.status]}
-                      </p>
-                      <pre className="os-nfse-pre">
-                        {[
-                          `Ambiente: ${SEFAZ_ENV_LABEL[fiscalDoc.nfe?.environment ?? issuer.environment]}`,
-                          `Chave: ${fiscalDoc.accessKey}`,
-                          `Protocolo: ${fiscalDoc.nfe?.protocol ?? '—'}`,
-                          `Recibo: ${fiscalDoc.nfe?.receiptNumber ?? '—'}`,
-                          `Consulta: ${fiscalDoc.nfe?.statusCode ?? '—'} — ${fiscalDoc.nfe?.statusMessage ?? '—'}`,
-                          fiscalDoc.nfe?.consultedAt
-                            ? `Consultado em: ${new Date(fiscalDoc.nfe.consultedAt).toLocaleString('pt-BR')}`
-                            : '',
-                          fiscalDoc.message,
-                        ]
-                          .filter(Boolean)
-                          .join('\n')}
-                      </pre>
-                      <div className="admin-toolbar" style={{ marginTop: 10 }}>
-                        <button
-                          type="button"
-                          className="btn btn--ghost"
-                          onClick={() => consult(fiscalDoc)}
-                        >
-                          Consultar status
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--ghost"
-                          onClick={() => danfe(fiscalDoc, false)}
-                        >
-                          Visualizar DANFE
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--ghost"
-                          onClick={() => danfe(fiscalDoc, true)}
-                        >
-                          Imprimir DANFE
-                        </button>
-                      </div>
-                      {fiscalDoc.status === 'authorized' ? (
-                        <div className="admin-form" style={{ marginTop: 12 }}>
-                          <label className="span-2">
-                            Justificativa do cancelamento (mín. 15 caracteres)
-                            <input
-                              value={cancelReason}
-                              onChange={(e) => setCancelReason(e.target.value)}
-                            />
-                          </label>
-                          <div className="span-2 admin-toolbar">
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              onClick={() => cancelFiscal(fiscalDoc)}
-                            >
-                              Cancelar NF-e
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <div className="admin-toolbar" style={{ marginTop: 8 }}>
+                {fiscalDoc ? (
+                  <>
+                    <button type="button" className="btn btn--ghost" onClick={handleConsultFiscalDoc}>
+                      🔄 Consultar SEFAZ
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => handleOpenXml(fiscalDoc)}>
+                      📄 Exibir XML da Nota
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => previewDanfe(false)}>
+                      🖨️ Visualizar DANFE
+                    </button>
+                    {fiscalDoc.status === 'authorized' ? (
                       <button
                         type="button"
-                        className="btn btn--primary"
-                        disabled={selected.status !== 'posted'}
-                        onClick={() => transmit(false)}
+                        className="btn btn--ghost"
+                        style={{ color: 'var(--red)' }}
+                        onClick={handleCancelFiscalDoc}
                       >
-                        Transmitir NF-e
+                        ❌ Cancelar NF-e
                       </button>
-                      {!issuerIsReadyForNfe(issuer) ? (
-                        <Link to="/painel/fiscal/config" className="btn btn--ghost">
-                          Cadastrar certificado
-                        </Link>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              ) : null}
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </>
           )}
         </article>
       </div>
+
+      {/* Modal de Exibição do XML da Nota Fiscal */}
+      {xmlModalDoc ? (
+        <div className="fiscal-xml-backdrop" onClick={() => setXmlModalDoc(null)}>
+          <div className="fiscal-xml-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fiscal-xml-header">
+              <h3>XML da NF-e nº {xmlModalDoc.number} (Versão 4.00)</h3>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setXmlModalDoc(null)}
+              >
+                ✕ Fechar
+              </button>
+            </div>
+            <pre className="fiscal-xml-content">
+              {buildNfeXmlStub(xmlModalDoc)}
+            </pre>
+            <div className="fiscal-xml-footer">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => copyXmlToClipboard(buildNfeXmlStub(xmlModalDoc))}
+              >
+                {xmlCopied ? '✓ Copiado!' : '📋 Copiar XML'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => downloadXmlFile(xmlModalDoc)}
+              >
+                ⬇️ Baixar Arquivo .xml
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
