@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -102,7 +102,9 @@ export function CrmLayout() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>

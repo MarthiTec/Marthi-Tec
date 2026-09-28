@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { logAccess } from '../data/auditLog';
 import { markStoreContracted } from '../data/demoLeadStore';
 import { bootstrapErpFromApi } from '../data/erpBootstrap';
@@ -69,6 +70,7 @@ async function applySession(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === LEGACY_DEMO_TOKEN) {
@@ -172,7 +174,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setErpReady(false);
     setErpError(null);
-  }, [user]);
+    try {
+      navigate('/login', { replace: true });
+    } catch {
+      window.location.href = '/login';
+    }
+  }, [user, navigate]);
 
   const refreshErp = useCallback(async () => {
     const ok = await bootstrapErpFromApi();

@@ -59,8 +59,9 @@ export function ExitOrLogoutDialog({
   }
 
   function doLogout() {
-    logout();
     close();
+    logout();
+    navigate('/login', { replace: true });
   }
 
   function leaveModule() {
@@ -168,16 +169,18 @@ export function ExitOrLogoutDialog({
             <strong>{leaveLabel}</strong>
             <span>Fecha este app{requireStorePassword ? ' (pede senha da loja)' : ''}.</span>
           </button>
-          {user ? (
-            <button
-              type="button"
-              className="exit-dialog__choice exit-dialog__choice--logout"
-              onClick={doLogout}
-            >
-              <strong>Log-out</strong>
-              <span>Encerra a conta Marthi neste dispositivo.</span>
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="exit-dialog__choice exit-dialog__choice--logout"
+            onClick={doLogout}
+          >
+            <strong>{user ? 'Log-out' : 'Ir para Login'}</strong>
+            <span>
+              {user
+                ? 'Encerra a conta Marthi e volta para a tela de login.'
+                : 'Acessa a tela de login para entrar com seu usuário.'}
+            </span>
+          </button>
         </div>
         <div className="exit-dialog__actions">
           <button type="button" className="btn btn--ghost" onClick={close}>

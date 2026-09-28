@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -10,8 +10,6 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasDemoAccess } from '../../data/demoLeadStore';
-import { hasModule } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -48,7 +46,7 @@ function isMobileNav() {
 export function FiscalLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   usePresenceSession('fiscal');
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
@@ -58,13 +56,6 @@ export function FiscalLayout() {
     kicker: 'Emissor Fiscal',
     title: 'Documentos fiscais',
   };
-
-  useEffect(() => {
-    const allowed = hasModule('fiscal') || hasDemoAccess('erp') || Boolean(user);
-    if (!allowed && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user]);
 
   useEffect(() => {
     if (isMobileNav()) setNavOpen(false);
@@ -89,6 +80,18 @@ export function FiscalLayout() {
 
   function requestExit() {
     setExitOpen(true);
+  }
+
+  if (loading) {
+    return (
+      <div className={`fiscal-app ${isDark ? 'is-theme-dark' : ''}`}>
+        <p className="empty" style={{ padding: 32 }}>Carregando Emissor Fiscal…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

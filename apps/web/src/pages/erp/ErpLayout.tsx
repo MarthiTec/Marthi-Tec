@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
@@ -10,8 +10,6 @@ import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasDemoAccess } from '../../data/demoLeadStore';
-import { hasModule } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -91,7 +89,7 @@ function isMobileNav() {
 export function ErpLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   usePresenceSession('erp');
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
@@ -103,13 +101,6 @@ export function ErpLayout() {
       ? 'Financeiro da loja'
       : 'Retaguarda',
   };
-
-  useEffect(() => {
-    const allowed = hasModule('erp') || hasDemoAccess('erp') || Boolean(user);
-    if (!allowed && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user]);
 
   useEffect(() => {
     if (isMobileNav()) setNavOpen(false);
@@ -144,6 +135,17 @@ export function ErpLayout() {
         {item.label}
       </NavLink>
     ));
+  }
+  if (loading) {
+    return (
+      <div className={`erp-app erp-app--loading ${isDark ? 'is-theme-dark' : ''}`}>
+        <p className="empty" style={{ padding: 32 }}>Carregando Retaguarda…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

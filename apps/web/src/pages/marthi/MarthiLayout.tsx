@@ -33,7 +33,9 @@ export function MarthiLayout() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!staff) {
     return <Navigate to="/painel" replace />;
