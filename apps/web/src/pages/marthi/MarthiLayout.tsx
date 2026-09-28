@@ -92,6 +92,14 @@ export function MarthiLayout() {
             <span className="admin__link-label">Planos comerciais</span>
           </NavLink>
           <NavLink
+            to="/admin/descontos"
+            title="Desconto progressivo"
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="ops" />
+            <span className="admin__link-label">Desconto progressivo</span>
+          </NavLink>
+          <NavLink
             to="/admin/recebimentos"
             title="Recebimentos & Pix"
             className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
