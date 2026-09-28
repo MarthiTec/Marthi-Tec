@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
@@ -104,6 +105,7 @@ export function EcommerceLayout() {
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>
         </div>
+        <StoreSwitcher />
         <button type="button" className="ecommerce-app__exit" onClick={requestExit}>
           Sair
         </button>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
@@ -1735,6 +1736,7 @@ export function CaixaPage() {
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
         </div>
+        <StoreSwitcher />
         <div
           className={`caixa-persistence-pill ${isOnline ? 'is-online' : 'is-offline'}`}
           title={

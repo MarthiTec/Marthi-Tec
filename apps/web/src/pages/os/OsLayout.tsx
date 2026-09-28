@@ -6,6 +6,7 @@ import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasDemoAccess } from '../../data/demoLeadStore';
@@ -222,6 +223,7 @@ export function OsLayout() {
         <div className="os-app__brand">
           <strong>Marthi OS</strong>
         </div>
+        <StoreSwitcher />
 
         {/* Filtro centralizado ao topo usando o combobox padrão do sistema AdminPicker */}
         <div className="os-app__period-picker-wrap">

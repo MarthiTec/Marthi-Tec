@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
@@ -110,6 +111,7 @@ export function CrmLayout() {
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>
         </div>
+        <StoreSwitcher />
         <button type="button" className="crm-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>

@@ -8,28 +8,36 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--admin-surface, #ffffff);
-  border: 1px solid var(--admin-border, #e2e8f0);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   cursor: pointer;
-  color: var(--admin-text, #1e293b);
+  color: rgba(255, 255, 255, 0.9);
   transition: all 0.2s ease;
   font-family: inherit;
   text-align: left;
-  max-width: 280px;
-}
-
-.is-theme-dark .store-switcher__btn {
-  background: #1e293b;
-  border-color: #334155;
-  color: #f1f5f9;
+  max-width: 260px;
 }
 
 .store-switcher__btn:hover,
 .store-switcher__btn.is-open {
-  border-color: #3b82f6;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Light theme override (when not inside a dark module) */
+.is-theme-light .store-switcher__btn,
+body:not(.is-theme-dark) .admin__brand .store-switcher__btn {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #1e293b;
+}
+
+.is-theme-dark .store-switcher__btn {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #e8eef4;
 }
 
 .store-switcher__icon {

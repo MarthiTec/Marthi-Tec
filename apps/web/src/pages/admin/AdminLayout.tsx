@@ -14,7 +14,7 @@ import {
   userCanAccessArea,
   userIsStoreAdmin,
 } from '../../data/erpRegistry';
-import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
+import { getStoreEntitlement, hasModule, moduleForPath } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
@@ -111,7 +111,7 @@ export function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
+  const [, setPlanTick] = useState(0);
   const [openGroups, setOpenGroups] = useState<string[]>(() => {
     const current = navGroupForPath(window.location.pathname, window.location.search);
     return current ? [current] : ['os'];
@@ -119,7 +119,8 @@ export function AdminLayout() {
 
   useEffect(() => {
     function refreshPlan() {
-      setEntitlement(getStoreEntitlement());
+      getStoreEntitlement();
+      setPlanTick((t) => t + 1);
     }
     window.addEventListener('marthi-plan-updated', refreshPlan);
     return () => window.removeEventListener('marthi-plan-updated', refreshPlan);
@@ -215,12 +216,7 @@ export function AdminLayout() {
       <aside className="admin__sidebar">
         <div className="admin__brand">
           <BrandLogo variant="mark" className="admin__mark" />
-          <div className="admin__brand-text">
-            <strong>Sua Loja</strong>
-            <span>
-              <em className="admin__plan-chip">{planLabel(entitlement.planId)}</em>
-            </span>
-          </div>
+          <StoreSwitcher />
           <button
             type="button"
             className="admin__burger-btn admin__burger-btn--brand"
@@ -376,9 +372,6 @@ export function AdminLayout() {
             <ScreenBackButton home="/painel" />
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
-          </div>
-          <div className="admin__top-store">
-            <StoreSwitcher />
           </div>
           <div id="panel-page-actions" className="admin__heading-actions" />
         </header>
