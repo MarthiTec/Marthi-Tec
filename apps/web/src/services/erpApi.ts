@@ -360,9 +360,12 @@ export function apiGetDashboardSummary(days = 7) {
 /* ── Fase 3 P0: Registry ───────────────────────────────── */
 
 export type AccessArea =
+  | 'painel'
   | 'totem'
   | 'pdv'
   | 'os'
+  | 'erp'
+  | 'fiscal'
   | 'erp_customers'
   | 'erp_stock'
   | 'erp_attrs'

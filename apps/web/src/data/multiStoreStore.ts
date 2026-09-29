@@ -521,3 +521,74 @@ export function recalculateAllStoreLicenses(basePrice = 197): StoreLicense[] {
   writeJson(STORAGE_KEY_LICENSES, licenses);
   return licenses;
 }
+
+/**
+ * Sincroniza a unificação de uma loja filial com a matriz no módulo Multi-Loja.
+ */
+export function syncBranchToMultiStore(
+  matrix: { clientId: string; tradeName: string; document?: string; email: string; phone?: string },
+  branch: { clientId: string; tradeName: string; branchName?: string; document?: string; email: string; phone?: string; status?: string },
+) {
+  const stores = listStores();
+  // Garante que a matriz esteja registrada
+  let matrixStore = stores.find((s) => s.clientAccountId === matrix.clientId && s.isMatrix);
+  if (!matrixStore) {
+    matrixStore = saveStore({
+      clientAccountId: matrix.clientId,
+      name: matrix.tradeName,
+      tradeName: matrix.tradeName,
+      cnpj: matrix.document || '00.000.000/0001-00',
+      email: matrix.email,
+      phone: matrix.phone || '',
+      isMatrix: true,
+      active: true,
+    });
+  }
+
+  // Verifica se a filial já está cadastrada
+  const branchName = branch.branchName || `${branch.tradeName} (Filial)`;
+  let branchStore = stores.find(
+    (s) =>
+      s.clientAccountId === matrix.clientId &&
+      (s.id === `store-${branch.clientId}` ||
+        s.email.toLowerCase() === branch.email.toLowerCase() ||
+        (branch.document && s.cnpj === branch.document)),
+  );
+
+  if (branchStore) {
+    saveStore({
+      ...branchStore,
+      name: branchName,
+      tradeName: branch.tradeName,
+      cnpj: branch.document || branchStore.cnpj,
+      email: branch.email,
+      phone: branch.phone || branchStore.phone,
+      active: branch.status !== 'inactive' && branch.status !== 'blocked',
+      isMatrix: false,
+    });
+  } else {
+    saveStore({
+      id: `store-${branch.clientId}`,
+      clientAccountId: matrix.clientId,
+      name: branchName,
+      tradeName: branch.tradeName,
+      cnpj: branch.document || '00.000.000/0002-00',
+      email: branch.email,
+      phone: branch.phone || '',
+      isMatrix: false,
+      active: branch.status !== 'inactive' && branch.status !== 'blocked',
+    });
+  }
+}
+
+/**
+ * Remove a filial unificada caso ela seja desconectada ou separada.
+ */
+export function removeBranchFromMultiStore(branchClientId: string) {
+  const stores = listStores();
+  const branchStore = stores.find((s) => s.id === `store-${branchClientId}`);
+  if (branchStore) {
+    deleteStore(branchStore.id);
+  }
+}
+

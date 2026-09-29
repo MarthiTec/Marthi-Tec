@@ -7,7 +7,7 @@ export const PLANS = [
     blurb: '1 módulo à escolha + painel da loja com orçamentos básicos. Ideal para começar enxuto.',
     maxModules: 1,
     features: [
-      '1 módulo à escolha (Totem, Cardápio Digital, OS, PDV, Retaguarda, Fiscal ou E-commerce)',
+      '1 módulo à escolha (Totem & Cardápio Digital, OS, PDV + Retaguarda, Fiscal ou E-commerce)',
       'Painel web da loja com perfil de operador e gestão central',
       'Orçamentos comerciais e emissão de propostas básicas',
       'Central com casinha em cada app (mesma experiência integrada)',
@@ -20,14 +20,14 @@ export const PLANS = [
     name: 'Silver',
     price: 'R$ 497',
     period: '/mês',
-    blurb: 'Até 2 módulos + Orçamentos em PDF, Campanhas Promocionais e PDV com persistência.',
+    blurb: 'Até 2 módulos + Orçamentos em PDF, Campanhas Promocionais e PDV integrado à Retaguarda.',
     featured: true,
     maxModules: 2,
     features: [
-      'Até 2 módulos liberados (ex: Retaguarda com Orçamentos + PDV com Campanhas, ou Cardápio Digital + PDV)',
+      'Até 2 módulos liberados (ex: PDV + Retaguarda com Campanhas + Emissor Fiscal, ou Totem + PDV + Retaguarda)',
       'Motor de Campanhas Promocionais (Leve X Pague Y, Faixas de Preço por Volume, Brindes)',
       'Orçamentos Comerciais em PDF com envio direto por WhatsApp e E-mail',
-      'PDV com persistência blindada contra queda de energia e F5 (recuperação automática)',
+      'PDV integrado à retaguarda com persistência blindada contra queda de energia e F5',
       'Multi-usuário no painel com permissões detalhadas por funcionário',
       'Personalização com a marca da sua loja e prioridade no suporte',
     ],
@@ -37,8 +37,8 @@ export const PLANS = [
     name: 'Golden',
     price: 'R$ 597',
     period: '/mês',
-    blurb: 'Ecossistema completo: Totem, Cardápio Digital & Food, OS, PDV, Retaguarda, Fiscal e E-commerce.',
-    maxModules: 7,
+    blurb: 'Ecossistema completo: Totem, Cardápio Digital & Food, OS, PDV + Retaguarda, Fiscal e E-commerce.',
+    maxModules: 5,
     allModules: true,
     features: [
       'Todos os módulos liberados: Totem + Cardápio Digital & KDS + OS + PDV + Retaguarda + Fiscal + E-commerce',
@@ -66,14 +66,9 @@ export const PARTNER_MODULES = [
     blurb: 'Oficina: OS e termo de garantia em PDF via WhatsApp/E-mail, agenda da bancada e integração com PDV.',
   },
   {
-    id: 'pdv',
-    name: 'PDV / Caixa',
-    blurb: 'Frente de caixa veloz, persistência contra queda de energia/F5, motor de campanhas e conversão de orçamentos.',
-  },
-  {
     id: 'erp',
-    name: 'Retaguarda',
-    blurb: 'Estoque completo (balanço/movimentos), orçamentos comerciais em PDF, motor de campanhas e financeiro.',
+    name: 'PDV + Retaguarda',
+    blurb: 'Frente de caixa veloz integrada à retaguarda: estoque completo (balanço/movimentos), orçamentos comerciais em PDF, campanhas e financeiro.',
   },
   {
     id: 'fiscal',
@@ -87,7 +82,7 @@ export const PARTNER_MODULES = [
   },
 ] as const;
 
-export type PartnerModuleId = (typeof PARTNER_MODULES)[number]['id'];
+export type PartnerModuleId = (typeof PARTNER_MODULES)[number]['id'] | 'pdv';
 
 /** Incluso em todo plano — não consome vaga de módulo. */
 export const PLATFORM_INCLUDES = [
@@ -112,9 +107,9 @@ export function normalizePlanId(value: string | null | undefined): PlanId | null
   return PLANS.some((plan) => plan.id === value) ? (value as PlanId) : null;
 }
 
-/** Migra módulo antigo `presales` → `erp` (PDV passa a fazer parte do ERP). */
+/** Migra módulo antigo `presales` e `pdv` → `erp` (PDV e Retaguarda unificados). */
 export function normalizeModuleId(value: string): PartnerModuleId | null {
-  if (value === 'presales') return 'erp';
+  if (value === 'presales' || value === 'pdv') return 'erp';
   return PARTNER_MODULES.some((module) => module.id === value)
     ? (value as PartnerModuleId)
     : null;

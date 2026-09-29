@@ -438,7 +438,7 @@ export async function openCashSession(input: {
       window.dispatchEvent(new CustomEvent('marthi-cash-drawer', { detail: { at: stamp } }));
       return { ok: true, session: mapped };
     } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao abrir caixa.') };
+      console.warn('[cashRegisterStore] Falha ao abrir caixa na API Nest, operando em modo local:', error);
     }
   }
 
@@ -524,7 +524,7 @@ export async function addCashAporte(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      return { ok: false as const, error: nestError(error, 'Falha ao registrar aporte.') };
+      console.warn('[cashRegisterStore] Falha no aporte via Nest, operando em modo local:', error);
     }
   }
 
@@ -586,7 +586,7 @@ export async function addCashSangria(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      return { ok: false as const, error: nestError(error, 'Falha ao registrar sangria.') };
+      console.warn('[cashRegisterStore] Falha na sangria via Nest, operando em modo local:', error);
     }
   }
 
@@ -1076,7 +1076,7 @@ export async function closeCashSession(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      return { ok: false as const, error: nestError(error, 'Falha ao fechar caixa.') };
+      console.warn('[cashRegisterStore] Falha ao fechar caixa na API Nest, operando em modo local:', error);
     }
   }
 
@@ -1132,7 +1132,7 @@ export async function reopenCashSession(input: {
       save(state);
       return { ok: true, session: mapped };
     } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao reabrir caixa.') };
+      console.warn('[cashRegisterStore] Falha ao reabrir caixa na API Nest, operando em modo local:', error);
     }
   }
 

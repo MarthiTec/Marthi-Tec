@@ -197,39 +197,43 @@ export async function updateAttribute(
 export async function saveAttributes(items: ProductAttribute[]) {
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
-    const {
-      apiCreateAttribute,
-      apiListAttributes,
-      apiUpdateAttribute,
-    } = await import('../services/erpApi');
-    const current = await apiListAttributes();
-    const next = items.slice(0, MAX_ATTRIBUTES);
-    const saved: ProductAttribute[] = [];
-    for (const item of next) {
-      const body = {
-        name: item.name,
-        values: item.values,
-        priceDeltas: item.priceDeltas,
-        useOnTotem: item.useOnTotem,
-        filterOnTotem: item.filterOnTotem,
-        useOnStock: item.useOnStock,
-        sort: item.sort,
-        active: item.active,
-      };
-      if (current.some((row) => row.id === item.id)) {
-        saved.push(await apiUpdateAttribute(item.id, body));
-      } else {
-        saved.push(await apiCreateAttribute(body));
+    try {
+      const {
+        apiCreateAttribute,
+        apiListAttributes,
+        apiUpdateAttribute,
+      } = await import('../services/erpApi');
+      const current = await apiListAttributes();
+      const next = items.slice(0, MAX_ATTRIBUTES);
+      const saved: ProductAttribute[] = [];
+      for (const item of next) {
+        const body = {
+          name: item.name,
+          values: item.values,
+          priceDeltas: item.priceDeltas,
+          useOnTotem: item.useOnTotem,
+          filterOnTotem: item.filterOnTotem,
+          useOnStock: item.useOnStock,
+          sort: item.sort,
+          active: item.active,
+        };
+        if (current.some((row) => row.id === item.id)) {
+          saved.push(await apiUpdateAttribute(item.id, body));
+        } else {
+          saved.push(await apiCreateAttribute(body));
+        }
       }
-    }
-    const nextIds = new Set(saved.map((item) => item.id));
-    const merged = [...saved];
-    for (const old of current) {
-      if (!nextIds.has(old.id)) {
-        merged.push(old);
+      const nextIds = new Set(saved.map((item) => item.id));
+      const merged = [...saved];
+      for (const old of current) {
+        if (!nextIds.has(old.id)) {
+          merged.push(old);
+        }
       }
+      return persist(merged);
+    } catch (err) {
+      console.warn('[attributeStore] Falha ao sincronizar atributos com Nest, gravando localmente:', err);
     }
-    return persist(merged);
   }
   return persist(items.slice(0, MAX_ATTRIBUTES));
 }
@@ -237,8 +241,12 @@ export async function saveAttributes(items: ProductAttribute[]) {
 export async function removeAttribute(id: string) {
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
-    const { apiDeleteAttribute } = await import('../services/erpApi');
-    await apiDeleteAttribute(id);
+    try {
+      const { apiDeleteAttribute } = await import('../services/erpApi');
+      await apiDeleteAttribute(id);
+    } catch (err) {
+      console.warn('[attributeStore] Falha ao excluir atributo no Nest, removendo localmente:', err);
+    }
   }
   return persist(load().filter((item) => item.id !== id).slice(0, MAX_ATTRIBUTES));
 }

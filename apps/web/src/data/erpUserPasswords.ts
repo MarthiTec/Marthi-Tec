@@ -40,3 +40,11 @@ export function clearErpUserPassword(email: string) {
   delete map[key];
   save(map);
 }
+
+export function verifyErpUserPassword(email: string, password: string): boolean {
+  const key = email.trim().toLowerCase();
+  if (!key || !password) return false;
+  const map = load();
+  return Boolean(map[key] && map[key] === password.trim());
+}
+

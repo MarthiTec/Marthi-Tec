@@ -96,25 +96,22 @@ export async function saveStoreEntitlement(input: StoreEntitlement) {
   return next;
 }
 
-export function hasModule(id: PartnerModuleId) {
+export function hasModule(id: PartnerModuleId | string) {
   const entitlement = read();
   if (planIncludesAllModules(entitlement.planId)) return true;
-  if (id === 'pdv' && entitlement.modules.includes('erp') && !entitlement.modules.includes('pdv')) {
-    return true;
+  // PDV e Retaguarda são complementares e unificados: ter 'erp' libera ambos.
+  if (id === 'pdv' || id === 'erp') {
+    return entitlement.modules.includes('erp') || entitlement.modules.includes('pdv' as any);
   }
-  return entitlement.modules.includes(id);
+  return entitlement.modules.includes(id as PartnerModuleId);
 }
 
 export function hasRetaguardaModule(): boolean {
-  const entitlement = read();
-  if (planIncludesAllModules(entitlement.planId)) return true;
-  return entitlement.modules.includes('erp');
+  return hasModule('erp');
 }
 
 export function hasPdvModule(): boolean {
-  const entitlement = read();
-  if (planIncludesAllModules(entitlement.planId)) return true;
-  return entitlement.modules.includes('pdv') || entitlement.modules.includes('erp');
+  return hasModule('erp');
 }
 
 export function hasOsModule(): boolean {
@@ -126,22 +123,17 @@ export function hasOsModule(): boolean {
 export type WorkshopCheckoutMode = 'pdv_erp' | 'pdv_only' | 'os_standalone';
 
 export function getWorkshopCheckoutMode(): WorkshopCheckoutMode {
-  const hasRetaguarda = hasRetaguardaModule();
-  const hasPdv = hasPdvModule();
-
-  if (hasRetaguarda && hasPdv) {
-    return 'pdv_erp'; // Cenário A: OS + Retaguarda + PDV
+  const hasErpPdv = hasModule('erp');
+  if (hasErpPdv) {
+    return 'pdv_erp'; // Cenário A: OS + Retaguarda + PDV integrados
   }
-  if (hasPdv && !hasRetaguarda) {
-    return 'pdv_only'; // Cenário B: OS + PDV (sem Retaguarda)
-  }
-  return 'os_standalone'; // Cenário C: Somente OS
+  return 'os_standalone'; // Cenário B: Somente OS
 }
 
 export function moduleForPath(pathname: string): PartnerModuleId | null {
   // Inclui /painel/totem/produtos e /atributos (catálogo lite sem exigir ERP).
   if (pathname.startsWith('/totem') || pathname.startsWith('/painel/totem')) return 'totem';
-  if (pathname.startsWith('/caixa')) return hasModule('pdv') ? 'pdv' : 'erp';
+  if (pathname.startsWith('/caixa')) return 'erp';
   if (pathname.startsWith('/erp') || pathname.startsWith('/painel/erp')) return 'erp';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (

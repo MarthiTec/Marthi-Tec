@@ -268,10 +268,10 @@ export function PlansPublicPage() {
                   <td><strong>✓ Avançado com proteção de margem</strong></td>
                 </tr>
                 <tr>
-                  <td><strong>PDV com Persistência Blindada (F5 / Queda de Energia)</strong></td>
-                  <td>✓ Incluso no PDV</td>
-                  <td>✓ Incluso no PDV</td>
-                  <td><strong>✓ Blindado + Conciliação Financeira</strong></td>
+                  <td><strong>PDV + Retaguarda Integrados (Estoque, Orçamentos & Caixa)</strong></td>
+                  <td>Se escolhido</td>
+                  <td>Se escolhido</td>
+                  <td><strong>✓ Incluso completo</strong></td>
                 </tr>
                 <tr>
                   <td><strong>Cardápio Digital QR Code, Mesas & KDS Cozinha</strong></td>

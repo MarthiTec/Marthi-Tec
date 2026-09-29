@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import { PARTNER_MODULES, type PartnerModuleId } from '../../data/catalog';
 import { getStoreEntitlement, planLabel } from '../../data/storePlan';
 
-export function ModuleLockedPage({ moduleId }: { moduleId: PartnerModuleId }) {
-  const module = PARTNER_MODULES.find((item) => item.id === moduleId);
+export function ModuleLockedPage({ moduleId }: { moduleId: PartnerModuleId | string }) {
+  const targetId = moduleId === 'pdv' ? 'erp' : moduleId;
+  const module = PARTNER_MODULES.find((item) => item.id === targetId);
   const entitlement = getStoreEntitlement();
 
   return (

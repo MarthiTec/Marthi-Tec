@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { userIsStoreAdmin } from '../data/erpRegistry';
 import { ERP_BOOTSTRAP_EVENT } from '../data/erpBootstrap';
 import { getPanelTheme } from '../data/panelThemeStore';
 import { getTotemExitPassword } from '../data/totemSettings';
@@ -27,9 +28,11 @@ type OperatorProfilePanelProps = {
  */
 export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProfilePanelProps) {
   const { user } = useAuth();
-  const fallback = user?.name ?? 'Operador';
+  const isAdmin = user?.role === 'admin' || userIsStoreAdmin(user?.email);
+  const fallbackRole = isAdmin ? 'Administrador' : user?.role === 'manager' ? 'Gerente' : 'Operador';
+  const fallback = user?.name ?? (isAdmin ? 'Administrador' : 'Operador');
   const fallbackEmail = user?.email ?? '';
-  const current = getOperatorProfile(fallback, fallbackEmail);
+  const current = getOperatorProfile(fallback, fallbackEmail, fallbackRole);
 
   const [displayName, setDisplayName] = useState(current.displayName);
   const [role, setRole] = useState(current.role);
@@ -39,26 +42,26 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
   const [address, setAddress] = useState(current.address);
   const [saved, setSaved] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [roleUnlocked, setRoleUnlocked] = useState(false);
+  const [roleUnlocked, setRoleUnlocked] = useState(isAdmin);
   const [managerPassword, setManagerPassword] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
 
   function hydrateForm() {
-    const next = getOperatorProfile(fallback, fallbackEmail);
+    const next = getOperatorProfile(fallback, fallbackEmail, fallbackRole);
     setDisplayName(next.displayName);
     setRole(next.role);
     setPhoto(next.photo);
     setEmail(next.email || fallbackEmail);
     setPhone(next.phone);
     setAddress(next.address);
-    setRoleUnlocked(false);
+    setRoleUnlocked(isAdmin);
     setManagerPassword('');
     setRoleError(null);
   }
 
   useEffect(() => {
     hydrateForm();
-  }, [fallback, fallbackEmail]);
+  }, [fallback, fallbackEmail, fallbackRole, isAdmin]);
 
   useEffect(() => {
     const onSync = () => hydrateForm();
@@ -115,7 +118,7 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
           address,
           theme: getPanelTheme(),
         },
-        { allowRole: roleUnlocked },
+        { allowRole: roleUnlocked, defaultRole: fallbackRole },
       );
       setSaved(true);
       notifyProfileUpdated();
@@ -130,8 +133,10 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
     }
   }
 
+  const isDark = getPanelTheme() === 'dark';
+
   return (
-    <section className="op-profile">
+    <section className={`op-profile ${isDark ? 'op-profile--dark is-theme-dark' : ''}`}>
       <p className="op-profile__lead">
         Seu perfil em todo o {workspaceLabel}. Foto, nome e contato valem no painel, Retaguarda, CRM, PDV,
         OS, fiscal e e-commerce. Cargo só muda com senha de gerente ou pela Retaguarda.

@@ -6,12 +6,15 @@ import {
   listMarthiClients,
   verifyClientLogin,
 } from '../data/marthiClientsStore';
+import { verifyErpUserPassword } from '../data/erpUserPasswords';
+import { findEmployeeByUserEmail } from '../data/erpRegistry';
 import { nestApiUrl } from './config';
 import { readJson } from './http';
 
 const API_URL = nestApiUrl();
 const MARTHI_STAFF_TOKEN_PREFIX = 'marthi-staff-local:';
 const MARTHI_CLIENT_TOKEN_PREFIX = 'marthi-client-token:';
+const MARTHI_EMPLOYEE_TOKEN_PREFIX = 'marthi-employee-token:';
 
 export type AuthUser = {
   id: string;
@@ -63,6 +66,11 @@ export function isLocalMarthiStaffToken(token: string | null | undefined) {
 export function isClientUserToken(token: string | null | undefined) {
   return Boolean(token?.startsWith(MARTHI_CLIENT_TOKEN_PREFIX));
 }
+
+export function isEmployeeUserToken(token: string | null | undefined) {
+  return Boolean(token?.startsWith(MARTHI_EMPLOYEE_TOKEN_PREFIX));
+}
+
 
 async function parseAuth<T>(response: Response): Promise<T> {
   const json = await readJson<T | ApiErrorBody>(response);
@@ -149,8 +157,28 @@ export async function loginWithPassword(email: string, password: string): Promis
     return session;
   }
 
+  // 4. Verificação de colaboradores/operadores cadastrados na equipe da loja
+  const employee = findEmployeeByUserEmail(normEmail);
+  if (employee && employee.active && employee.isSystemUser) {
+    if (verifyErpUserPassword(normEmail, password)) {
+      const session: AuthSession = {
+        token: `${MARTHI_EMPLOYEE_TOKEN_PREFIX}${employee.id}:${Date.now().toString(36)}`,
+        user: {
+          id: `employee:${employee.id}`,
+          email: employee.userEmail || employee.email,
+          name: employee.name,
+          picture: null,
+          provider: 'password',
+          role: employee.role,
+        },
+      };
+      return session;
+    }
+  }
+
   throw new Error('E-mail ou senha inválidos.');
 }
+
 
 export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
   const response = await fetch(`${API_URL}/api/v1/auth/google`, {

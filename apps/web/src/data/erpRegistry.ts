@@ -18,14 +18,19 @@ import {
   type ApiSupplier,
 } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
+import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
+import { listMarthiClients } from './marthiClientsStore';
 
 const STORAGE_KEY = 'marthi.erp.registry.v1';
 
 /** Áreas finas do painel (além do módulo do plano). */
 export type AccessArea =
+  | 'painel'
   | 'totem'
   | 'pdv'
   | 'os'
+  | 'erp'
+  | 'fiscal'
   | 'erp_customers'
   | 'erp_stock'
   | 'erp_attrs'
@@ -42,9 +47,12 @@ export type AccessArea =
   | 'erp_plan';
 
 export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
+  painel: 'Painel (Visão da operação)',
   totem: 'Totem',
-  pdv: 'PDV / pedidos',
+  pdv: 'PDV / Caixa / Pedidos',
   os: 'Ordens de serviço',
+  erp: 'Retaguarda (ERP)',
+  fiscal: 'Emissor Fiscal',
   erp_customers: 'Clientes',
   erp_stock: 'Produtos',
   erp_attrs: 'Atributos',
@@ -149,45 +157,124 @@ function defaultAdminAreas(): AccessArea[] {
   return [...ALL_ACCESS_AREAS];
 }
 
-function seed(): RegistryState {
-  return {
+function seedForTenant(activeTenant: string): RegistryState {
+  const state: RegistryState = {
     employees: [],
     sellers: [],
     suppliers: [],
   };
+
+  if (activeTenant.startsWith('client_')) {
+    const clientId = activeTenant.slice('client_'.length);
+    const client = listMarthiClients().find((c) => c.clientId === clientId);
+    if (client) {
+      state.employees.push({
+        id: uid('EMP'),
+        name: client.tradeName,
+        phone: client.phone || '',
+        email: client.email,
+        document: client.document || '',
+        role: 'admin',
+        isSystemUser: true,
+        userEmail: client.email,
+        accessAreas: [...ALL_ACCESS_AREAS],
+        active: true,
+        createdAt: now(),
+        updatedAt: now(),
+      });
+    }
+  }
+
+  return state;
 }
 
+let memoryRegistryTenant: string | null = null;
+let memoryRegistryState: RegistryState | null = null;
+
 function load(): RegistryState {
+  const activeTenant = getActiveTenantKey();
+  if (memoryRegistryState && memoryRegistryTenant === activeTenant) {
+    return memoryRegistryState;
+  }
+  memoryRegistryTenant = activeTenant;
+  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) {
-      const seeded = seed();
+      const seeded = seedForTenant(activeTenant);
       save(seeded);
+      memoryRegistryState = seeded;
       return seeded;
     }
     const parsed = JSON.parse(raw) as Partial<RegistryState>;
-    const isMockEmail = (mail?: string) => Boolean(mail && (mail.includes('@loja.local') || mail.includes('@celsul.local')));
-    const isMockName = (name?: string) => Boolean(name && (name === 'Ana Costa' || name === 'Bruno Vendas' || name === 'Distribuidora Celular Sul' || name === 'Administrador da loja'));
-    const sellers = (Array.isArray(parsed.sellers) ? parsed.sellers : []).filter((s) => !isMockEmail(s.email) && !isMockName(s.name));
-    const suppliers = (Array.isArray(parsed.suppliers) ? parsed.suppliers : []).filter((s) => !isMockEmail(s.email) && !isMockName(s.name));
-    const employees = (Array.isArray(parsed.employees) ? parsed.employees : []).filter((e) => !isMockEmail(e.email) && !isMockEmail(e.userEmail) && !isMockName(e.name));
+    const isMockEmail = (mail?: string) =>
+      Boolean(
+        mail &&
+          (mail.includes('@loja.local') ||
+            mail.includes('@celsul.local') ||
+            (isRealClientTenant() && mail.includes('teste@marthi.com.br'))),
+      );
+    const isMockName = (name?: string) =>
+      Boolean(
+        name &&
+          (name === 'Ana Costa' ||
+            name === 'Bruno Vendas' ||
+            name === 'Distribuidora Celular Sul' ||
+            name === 'Administrador da loja' ||
+            (isRealClientTenant() && name === 'Operador Caixa')),
+      );
+    const sellers = (Array.isArray(parsed.sellers) ? parsed.sellers : []).filter(
+      (s) => !isMockEmail(s.email) && !isMockName(s.name),
+    );
+    const suppliers = (Array.isArray(parsed.suppliers) ? parsed.suppliers : []).filter(
+      (s) => !isMockEmail(s.email) && !isMockName(s.name),
+    );
+    let employees = (Array.isArray(parsed.employees) ? parsed.employees : []).filter(
+      (e) => !isMockEmail(e.email) && !isMockEmail(e.userEmail) && !isMockName(e.name),
+    );
+
+    // Se o cliente for novo e não tiver funcionário admin ainda, adiciona automaticamente o responsável
+    if (activeTenant.startsWith('client_') && employees.length === 0) {
+      const clientId = activeTenant.slice('client_'.length);
+      const client = listMarthiClients().find((c) => c.clientId === clientId);
+      if (client) {
+        employees = [
+          {
+            id: uid('EMP'),
+            name: client.tradeName,
+            phone: client.phone || '',
+            email: client.email,
+            document: client.document || '',
+            role: 'admin',
+            isSystemUser: true,
+            userEmail: client.email,
+            accessAreas: [...ALL_ACCESS_AREAS],
+            active: true,
+            createdAt: now(),
+            updatedAt: now(),
+          },
+        ];
+      }
+    }
 
     const state: RegistryState = { sellers, suppliers, employees };
-    const rawCount = (parsed.sellers?.length || 0) + (parsed.suppliers?.length || 0) + (parsed.employees?.length || 0);
-    const cleanCount = sellers.length + suppliers.length + employees.length;
-    if (cleanCount !== rawCount) {
-      save(state);
-    }
+    memoryRegistryState = state;
     return state;
   } catch {
-    const seeded = seed();
+    const seeded = seedForTenant(activeTenant);
     save(seeded);
+    memoryRegistryState = seeded;
     return seeded;
   }
 }
 
 function save(state: RegistryState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const activeTenant = getActiveTenantKey();
+  memoryRegistryTenant = activeTenant;
+  memoryRegistryState = state;
+  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  localStorage.setItem(key, JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-erp-registry-updated'));
 }
 
@@ -304,27 +391,31 @@ export async function upsertSeller(
   input: Omit<Seller, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
   if (isNestAuthed()) {
-    const body = {
-      name: input.name.trim(),
-      phone: (input.phone ?? '').trim(),
-      email: (input.email ?? '').trim(),
-      document: (input.document ?? '').trim(),
-      commissionPercent: Math.max(0, Math.min(100, Number(input.commissionPercent ?? 0) || 0)),
-      active: input.active ?? true,
-      employeeId: input.employeeId,
-    };
-    const row = input.id
-      ? await apiUpdateSeller(input.id, body)
-      : await apiCreateSeller(body);
-    const mapped = mapSeller(row);
-    const state = load();
-    const idx = state.sellers.findIndex((item) => item.id === mapped.id);
-    state.sellers =
-      idx >= 0
-        ? state.sellers.map((item) => (item.id === mapped.id ? mapped : item))
-        : [mapped, ...state.sellers];
-    save(state);
-    return state;
+    try {
+      const body = {
+        name: input.name.trim(),
+        phone: (input.phone ?? '').trim(),
+        email: (input.email ?? '').trim(),
+        document: (input.document ?? '').trim(),
+        commissionPercent: Math.max(0, Math.min(100, Number(input.commissionPercent ?? 0) || 0)),
+        active: input.active ?? true,
+        employeeId: input.employeeId,
+      };
+      const row = input.id
+        ? await apiUpdateSeller(input.id, body)
+        : await apiCreateSeller(body);
+      const mapped = mapSeller(row);
+      const state = load();
+      const idx = state.sellers.findIndex((item) => item.id === mapped.id);
+      state.sellers =
+        idx >= 0
+          ? state.sellers.map((item) => (item.id === mapped.id ? mapped : item))
+          : [mapped, ...state.sellers];
+      save(state);
+      return state;
+    } catch (err) {
+      console.warn('[erpRegistry] Falha na API Nest ao salvar vendedor, gravando localmente:', err);
+    }
   }
 
   const state = load();
@@ -352,28 +443,32 @@ export async function upsertSupplier(
   input: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
   if (isNestAuthed()) {
-    const body = {
-      name: input.name.trim(),
-      tradeName: (input.tradeName ?? '').trim(),
-      document: (input.document ?? '').trim(),
-      phone: (input.phone ?? '').trim(),
-      email: (input.email ?? '').trim(),
-      city: (input.city ?? '').trim(),
-      notes: (input.notes ?? '').trim(),
-      active: input.active ?? true,
-    };
-    const row = input.id
-      ? await apiUpdateSupplier(input.id, body)
-      : await apiCreateSupplier(body);
-    const mapped = mapSupplier(row);
-    const state = load();
-    const idx = state.suppliers.findIndex((item) => item.id === mapped.id);
-    state.suppliers =
-      idx >= 0
-        ? state.suppliers.map((item) => (item.id === mapped.id ? mapped : item))
-        : [mapped, ...state.suppliers];
-    save(state);
-    return state;
+    try {
+      const body = {
+        name: input.name.trim(),
+        tradeName: (input.tradeName ?? '').trim(),
+        document: (input.document ?? '').trim(),
+        phone: (input.phone ?? '').trim(),
+        email: (input.email ?? '').trim(),
+        city: (input.city ?? '').trim(),
+        notes: (input.notes ?? '').trim(),
+        active: input.active ?? true,
+      };
+      const row = input.id
+        ? await apiUpdateSupplier(input.id, body)
+        : await apiCreateSupplier(body);
+      const mapped = mapSupplier(row);
+      const state = load();
+      const idx = state.suppliers.findIndex((item) => item.id === mapped.id);
+      state.suppliers =
+        idx >= 0
+          ? state.suppliers.map((item) => (item.id === mapped.id ? mapped : item))
+          : [mapped, ...state.suppliers];
+      save(state);
+      return state;
+    } catch (err) {
+      console.warn('[erpRegistry] Falha na API Nest ao salvar fornecedor, gravando localmente:', err);
+    }
   }
 
   const state = load();
@@ -399,7 +494,11 @@ export async function upsertSupplier(
 
 export async function removeSeller(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteSeller(id);
+    try {
+      await apiDeleteSeller(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir vendedor no Nest:', err);
+    }
   }
   const state = load();
   state.sellers = state.sellers.filter((item) => item.id !== id);
@@ -409,7 +508,11 @@ export async function removeSeller(id: string): Promise<RegistryState> {
 
 export async function removeSupplier(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteSupplier(id);
+    try {
+      await apiDeleteSupplier(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir fornecedor no Nest:', err);
+    }
   }
   const state = load();
   state.suppliers = state.suppliers.filter((item) => item.id !== id);
@@ -419,7 +522,11 @@ export async function removeSupplier(id: string): Promise<RegistryState> {
 
 export async function removeEmployee(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteEmployee(id);
+    try {
+      await apiDeleteEmployee(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir no Nest, removendo localmente:', err);
+    }
   }
   const state = load();
   state.employees = state.employees.filter((item) => item.id !== id);
@@ -474,8 +581,7 @@ export async function upsertEmployee(
       save(state);
       return { ok: true, state, employee: mapped };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao salvar funcionário.';
-      return { ok: false, error: message };
+      console.warn('[erpRegistry] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
     }
   }
 
@@ -551,11 +657,21 @@ export function employeeHasArea(employee: Employee | null, area: AccessArea) {
   if (!employee) return true;
   if (!employee.active) return false;
   if (employee.role === 'admin') return true;
-  return employee.accessAreas.includes(area);
+  if (employee.accessAreas.includes(area)) return true;
+  if (employee.accessAreas.includes('erp') && area.startsWith('erp_')) return true;
+  if (employee.accessAreas.includes('fiscal') && (area === 'erp_fiscal' || area === 'erp_invoices')) return true;
+  return false;
 }
 
+
 export function pathToAccessArea(pathname: string): AccessArea | null {
-  if (pathname.startsWith('/painel/operacoes')) return null;
+  if (
+    pathname === '/painel' ||
+    pathname.startsWith('/painel/operacoes') ||
+    pathname.startsWith('/painel/usuarios')
+  ) {
+    return 'painel';
+  }
   // Catálogo lite do Totem (produtos/atributos) fica sob área totem — não exige erp_stock.
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'pdv';
@@ -679,20 +795,29 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
 
 export function resolveAppHome(userEmail: string | null | undefined): string {
   if (isMarthiStaffEmail(userEmail)) return '/admin';
-  if (userIsStoreAdmin(userEmail)) return '/painel';
   const employee = findEmployeeByUserEmail(userEmail);
+  if (employee && employee.role !== 'admin' && !employee.accessAreas.includes('painel')) {
+    const areas = employee.accessAreas;
+    if (areas.includes('pdv')) return '/caixa';
+    if (areas.includes('totem')) return '/totem';
+    if (areas.includes('os')) return '/os';
+    if (areas.includes('fiscal') || areas.includes('erp_fiscal') || areas.includes('erp_invoices')) return '/fiscal';
+    if (areas.includes('ecommerce')) return '/ecommerce';
+    if (areas.includes('erp')) return '/erp';
+    return '/login';
+  }
+  if (userIsStoreAdmin(userEmail)) return '/painel';
   if (!employee) return '/painel';
-  const areas = employee.accessAreas;
-  if (areas.includes('pdv')) return '/caixa';
-  if (areas.includes('os')) return '/os';
-  if (areas.includes('erp_fiscal') || areas.includes('erp_invoices')) return '/fiscal';
-  if (areas.includes('ecommerce')) return '/ecommerce';
-  if (areas.includes('totem')) return '/painel/totem';
   return '/painel';
 }
 
-/** Administrador da loja (role admin) — ou bootstrap sem usuários vinculados. */
+/** Administrador da loja (role admin) — ou cliente contratante ou bootstrap sem usuários vinculados. */
 export function userIsStoreAdmin(userEmail: string | null | undefined) {
+  if (isMarthiStaffEmail(userEmail)) return true;
+  const norm = normalizeEmail(userEmail || '');
+  if (!norm) return false;
+  const isClient = listMarthiClients().some((c) => c.email.toLowerCase() === norm);
+  if (isClient) return true;
   const employee = findEmployeeByUserEmail(userEmail);
   if (employee) return employee.active && employee.role === 'admin';
   return linkedSystemUsers().length === 0;

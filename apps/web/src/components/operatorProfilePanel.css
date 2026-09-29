@@ -282,16 +282,16 @@
 
 .op-profile__role-lock {
   margin-top: 12px;
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid var(--op-line);
+  background: var(--card-2, #f8fafc);
+  border: 1px solid var(--line, #d8dde3);
 }
 
 .op-profile__role-lock > p {
   margin: 0 0 10px;
   font-size: 0.82rem;
-  color: var(--op-mute);
+  color: var(--mute, #6b7280);
   line-height: 1.4;
 }
 
@@ -304,10 +304,18 @@
 .op-profile__role-unlock input {
   flex: 1 1 180px;
   min-height: 40px;
-  border: 1px solid var(--op-line);
+  border: 1px solid var(--line, #d8dde3);
   border-radius: 10px;
   padding: 0 12px;
   font: inherit;
+  background: var(--surface, #ffffff);
+  color: var(--ink, #12151a);
+  box-sizing: border-box;
+}
+
+.op-profile__role-unlock input:focus {
+  outline: 2px solid rgba(var(--op-accent-rgb), 0.25);
+  border-color: rgba(var(--op-accent-rgb), 0.5);
 }
 
 .op-profile__role-open {
@@ -324,6 +332,124 @@
   justify-content: space-between;
   gap: 10px;
   padding: 14px 18px 16px;
+}
+
+/* ==========================================================================
+   Dark theme overrides conforming to marthi-ui-standards
+   ========================================================================== */
+.is-theme-dark .op-profile,
+.admin--dark .op-profile {
+  --op-ink: var(--ink, #e8eef4);
+  --op-mute: var(--mute, #94a3b8);
+  --op-line: var(--line, rgba(148, 163, 184, 0.22));
+}
+
+.is-theme-dark .op-profile__card,
+.admin--dark .op-profile__card,
+.is-theme-dark .op-profile__form,
+.admin--dark .op-profile__form {
+  background: #171e27;
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e8eef4;
+}
+
+.is-theme-dark .op-profile__avatar,
+.admin--dark .op-profile__avatar {
+  border-color: #171e27;
+}
+
+.is-theme-dark .op-profile__form-head,
+.admin--dark .op-profile__form-head {
+  background: #1c2430;
+  border-bottom-color: rgba(148, 163, 184, 0.22);
+}
+
+.is-theme-dark .op-profile__fieldset,
+.admin--dark .op-profile__fieldset {
+  border-bottom-color: rgba(148, 163, 184, 0.22);
+}
+
+.is-theme-dark .op-profile__grid label,
+.admin--dark .op-profile__grid label {
+  color: #94a3b8;
+}
+
+.is-theme-dark .op-profile__grid input,
+.admin--dark .op-profile__grid input {
+  background: #121820;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e8eef4;
+}
+
+.is-theme-dark .op-profile__grid input:disabled,
+.is-theme-dark .op-profile__grid input:read-only,
+.admin--dark .op-profile__grid input:disabled,
+.admin--dark .op-profile__grid input:read-only {
+  background: rgba(15, 20, 26, 0.6);
+  color: #64748b;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+.is-theme-dark .op-profile__address,
+.admin--dark .op-profile__address {
+  color: #94a3b8;
+}
+
+.op-profile--dark .op-profile__form,
+.is-theme-dark .op-profile__form,
+.admin--dark .op-profile__form {
+  background: #171e27 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  color: #e8eef4 !important;
+}
+
+.op-profile--dark .op-profile__role-lock,
+.is-theme-dark .op-profile__role-lock,
+.admin--dark .op-profile__role-lock {
+  background: #1c2430 !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+}
+
+.op-profile--dark .op-profile__role-lock p,
+.is-theme-dark .op-profile__role-lock p,
+.admin--dark .op-profile__role-lock p {
+  color: #94a3b8 !important;
+}
+
+.op-profile--dark .op-profile__role-unlock input,
+.is-theme-dark .op-profile__role-unlock input,
+.admin--dark .op-profile__role-unlock input {
+  background: #121820 !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #e8eef4 !important;
+}
+
+.op-profile--dark .op-profile__role-unlock input::placeholder,
+.is-theme-dark .op-profile__role-unlock input::placeholder,
+.admin--dark .op-profile__role-unlock input::placeholder {
+  color: #64748b !important;
+}
+
+.op-profile--dark .op-profile__role-unlock button,
+.is-theme-dark .op-profile__role-unlock button,
+.admin--dark .op-profile__role-unlock button {
+  background: #252f3e !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  color: #e2e8f0 !important;
+}
+
+.op-profile--dark .op-profile__role-unlock button:hover,
+.is-theme-dark .op-profile__role-unlock button:hover,
+.admin--dark .op-profile__role-unlock button:hover {
+  background: #2dd4bf !important;
+  border-color: #2dd4bf !important;
+  color: #042f2e !important;
+}
+
+.op-profile--dark .op-profile__role-open,
+.is-theme-dark .op-profile__role-open,
+.admin--dark .op-profile__role-open {
+  color: #4ade80 !important;
 }
 
 @media (max-width: 640px) {

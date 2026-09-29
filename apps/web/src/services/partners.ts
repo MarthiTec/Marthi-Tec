@@ -20,18 +20,69 @@ export type PartnerSignupPayload = {
   contactName: string;
   contactRole: string;
   notes: string;
+  payNow?: boolean;
+  paymentMethod?: string;
+  transactionRef?: string;
 };
+
+const VALID_BACKEND_MODULES = new Set(['totem', 'os', 'erp', 'fiscal', 'ecommerce']);
+
+/**
+ * Normaliza a lista de módulos para o enum estrito aceito pelo backend:
+ * ['totem', 'os', 'erp', 'fiscal', 'ecommerce']
+ * O módulo 'pdv' do catálogo de UI é mapeado para 'erp'.
+ */
+export function normalizeModulesForBackend(modules: string[]): string[] {
+  const result = new Set<string>();
+  for (const m of modules || []) {
+    const key = (m || '').toLowerCase().trim();
+    if (key === 'pdv') {
+      result.add('erp');
+    } else if (VALID_BACKEND_MODULES.has(key)) {
+      result.add(key);
+    }
+  }
+  const array = Array.from(result);
+  return array.length > 0 ? array : ['erp'];
+}
 
 export async function submitPartnerSignup(payload: PartnerSignupPayload) {
   const base = nestApiUrl();
+
+  // Garante apenas os campos estritamente permitidos pela whitelist do backend
+  const sanitizedPayload = {
+    planId: payload.planId,
+    modules: normalizeModulesForBackend(payload.modules),
+    documentType: payload.documentType,
+    document: payload.document,
+    legalName: payload.legalName,
+    tradeName: payload.tradeName,
+    email: payload.email,
+    phone: payload.phone,
+    zipCode: payload.zipCode,
+    street: payload.street,
+    number: payload.number,
+    complement: payload.complement || '',
+    district: payload.district,
+    city: payload.city,
+    state: payload.state,
+    segment: payload.segment || '',
+    contactName: payload.contactName,
+    contactRole: payload.contactRole || '',
+    notes: payload.notes || '',
+    payNow: payload.payNow ?? false,
+    paymentMethod: payload.paymentMethod || 'pix',
+    transactionRef: payload.transactionRef || undefined,
+  };
+
   const response = await fetch(`${base}/api/v1/partners/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(sanitizedPayload),
   });
 
   const body = (await response.json().catch(() => null)) as
-    | { success: true; data: { id: string } }
+    | { success: true; data: { id: string; status?: string; message?: string } }
     | { success: false; error?: { message?: string } }
     | null;
 
@@ -40,6 +91,27 @@ export async function submitPartnerSignup(payload: PartnerSignupPayload) {
       (body && 'error' in body && body.error?.message) ||
         'Não foi possível enviar o cadastro. Tente novamente.',
     );
+  }
+
+  return body.data;
+}
+
+export async function confirmPartnerPayment(payload: {
+  protocol: string;
+  paymentMethod: string;
+  transactionRef?: string;
+  notes?: string;
+}): Promise<{ id: string; status: string; message: string }> {
+  const base = nestApiUrl();
+  const response = await fetch(`${base}/api/v1/partners/payment-confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json();
+  if (!response.ok || !body.success) {
+    throw new Error(body.error?.message || 'Falha ao confirmar pagamento.');
   }
 
   return body.data;

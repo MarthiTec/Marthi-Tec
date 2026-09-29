@@ -136,6 +136,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 export function navGroupForPath(pathname: string, search = '') {
   if (
     pathname.startsWith('/painel/operacoes') ||
+    pathname.startsWith('/painel/usuarios') ||
     pathname.startsWith('/painel/ramo') ||
     pathname.startsWith('/painel/personalizacao')
   ) {

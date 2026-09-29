@@ -95,17 +95,35 @@ export function LoginPage() {
     }
   }
 
-  function handleForgot(event: FormEvent<HTMLFormElement>) {
+  async function handleForgot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setFeedback(null);
     const mail = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
       setError('Informe um e-mail válido.');
       return;
     }
-    setFeedback(
-      'Se este e-mail estiver cadastrado na loja, o gestor receberá o pedido de redefinição. Operadores não criam senha sozinhos — peça ao administrador da loja.',
-    );
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail }),
+      });
+      const json = await res.json();
+      setFeedback(
+        json.data?.message ||
+          'Caso o e-mail informado esteja cadastrado no sistema, enviamos as instruções e o link seguro para redefinição de senha.',
+      );
+    } catch {
+      setFeedback(
+        'Caso o e-mail informado esteja cadastrado no sistema, enviamos as instruções e o link seguro para redefinição de senha.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleSignup(event: FormEvent<HTMLFormElement>) {

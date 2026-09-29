@@ -16,6 +16,7 @@ import {
   apiUpdateStock,
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
+import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
@@ -179,8 +180,6 @@ type AdminState = {
   priceTables: PriceTable[];
   payments: PaymentMethod[];
 };
-
-let memoryState: AdminState | null = null;
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -361,8 +360,12 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
   };
 }
 
+let memoryState: AdminState | null = null;
+let memoryStateTenant: string | null = null;
+
 function load(): AdminState {
-  if (memoryState) {
+  const activeTenant = getActiveTenantKey();
+  if (memoryState && memoryStateTenant === activeTenant) {
     return {
       customers: memoryState.customers.map((item) => ({ ...item })),
       stock: memoryState.stock.map((item) => ({ ...item, attrs: { ...item.attrs }, images: [...item.images] })),
@@ -372,20 +375,49 @@ function load(): AdminState {
       payments: memoryState.payments.map((item) => ({ ...item })),
     };
   }
+
+  memoryStateTenant = activeTenant;
+  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+
   try {
     localStorage.removeItem('marthi.admin.v1');
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) {
+      if (isRealClientTenant()) {
+        const fresh: AdminState = {
+          customers: [],
+          stock: [],
+          orders: [],
+          finance: [],
+          priceTables: seedPriceTables(),
+          payments: seedPayments(),
+        };
+        save(fresh);
+        return fresh;
+      }
       const fresh = seed();
       save(fresh);
       return fresh;
     }
     const parsed = JSON.parse(raw) as Partial<AdminState>;
     if (!parsed.customers || !parsed.stock) {
+      if (isRealClientTenant()) {
+        const fresh: AdminState = {
+          customers: [],
+          stock: [],
+          orders: [],
+          finance: [],
+          priceTables: seedPriceTables(),
+          payments: seedPayments(),
+        };
+        save(fresh);
+        return fresh;
+      }
       const fresh = seed();
       save(fresh);
       return fresh;
     }
+
     const next = hydrate(parsed);
     // Auto-limpeza de produtos mockados de celulares demo antigos
     const hasDemoStock = next.stock.some(
@@ -447,9 +479,12 @@ export function defaultCardRate(): number {
 }
 
 function save(state: AdminState) {
+  const activeTenant = getActiveTenantKey();
+  memoryStateTenant = activeTenant;
   memoryState = state;
+  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
     /* quota / private mode */
   }
@@ -810,7 +845,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
     try {
       await apiDeleteStock(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover estoque.'));
+      console.warn('[adminStore] Falha ao remover no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -827,7 +862,7 @@ export async function removePriceTable(id: string): Promise<AdminState> {
     try {
       await apiDeletePriceTable(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover tabela.'));
+      console.warn('[adminStore] Falha ao remover tabela no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -841,7 +876,7 @@ export async function removePayment(id: string): Promise<AdminState> {
     try {
       await apiDeletePayment(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover pagamento.'));
+      console.warn('[adminStore] Falha ao remover pagamento no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -891,7 +926,7 @@ export async function upsertStockItem(
       void import('./totemLiveSync').then(({ notifyTotemLive }) => notifyTotemLive());
       return state;
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao salvar estoque.'));
+      console.warn('[adminStore] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
     }
   }
 

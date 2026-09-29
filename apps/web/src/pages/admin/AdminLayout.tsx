@@ -10,6 +10,7 @@ import { logAccess } from '../../data/auditLog';
 import {
   canAccessPath,
   navPathToAccessArea,
+  resolveAppHome,
   userCanAccessArea,
   userIsStoreAdmin,
 } from '../../data/erpRegistry';
@@ -26,6 +27,7 @@ const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel': { kicker: 'Retaguarda', title: 'Painel da operação' },
+  '/painel/usuarios': { kicker: 'Equipe', title: 'Usuários & Permissões da Loja' },
   '/painel/operacoes': { kicker: 'Operações', title: 'Operações & Ramo da Loja' },
   '/painel/operacoes/usuarios': { kicker: 'Operações', title: 'Usuários da loja' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
@@ -175,10 +177,15 @@ export function AdminLayout() {
 
   const userEmail = user.email;
   const isAdmin = userIsStoreAdmin(userEmail);
+  const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
   const storeCustom = useStoreCustomization();
 
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
+  if (!canAccessPainel) {
+    const dest = resolveAppHome(userEmail);
+    if (dest && dest !== '/painel' && dest !== location.pathname) {
+      return <Navigate to={dest} replace />;
+    }
+    return <AccessDeniedPage pathname={location.pathname} />;
   }
 
   function toggleGroup(id: string) {
@@ -317,6 +324,18 @@ export function AdminLayout() {
         </nav>
 
         <div className="admin__sidebar-foot">
+          {isAdmin ? (
+            <NavLink
+              to="/painel/usuarios"
+              title="Usuários & Acessos"
+              className={({ isActive }) =>
+                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
+              }
+            >
+              <AdminIcon name="people" />
+              <span className="admin__link-label">Usuários</span>
+            </NavLink>
+          ) : null}
           <NavLink
             to="/painel/operacoes"
             title="Operações"

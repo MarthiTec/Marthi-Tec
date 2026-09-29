@@ -1048,4 +1048,324 @@
   }
 }
 
+/* ==========================================================================
+   Admin Buttons & Theme Dark Enhancements (marthi-ui-standards)
+   ========================================================================== */
+.marthi-ops .btn,
+.marthi-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  padding: 8px 14px;
+  min-height: 36px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-decoration: none;
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+.marthi-ops .btn--primary,
+.marthi-actions .btn--primary {
+  background: #0f766e;
+  border: 1px solid #0d655e;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+}
+
+.marthi-ops .btn--primary:hover,
+.marthi-actions .btn--primary:hover {
+  background: #115e59;
+  border-color: #0f4c47;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.35);
+}
+
+.marthi-ops .btn--ghost,
+.marthi-actions .btn--ghost {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.marthi-ops .btn--ghost:hover,
+.marthi-actions .btn--ghost:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Universal Dark Mode Overrides for /admin (Marthi Admin & Operations)
+   ========================================================================== */
+
+/* Universal primary button in dark mode */
+.admin--dark .btn--primary,
+.is-theme-dark .btn--primary,
+.admin--dark .marthi-ops .btn--primary,
+.is-theme-dark .marthi-ops .btn--primary,
+.admin--dark .admin-page .btn--primary,
+.is-theme-dark .admin-page .btn--primary,
+.admin--dark .marthi-actions .btn--primary,
+.is-theme-dark .marthi-actions .btn--primary,
+.admin--dark .marthi-modal-form .btn--primary,
+.is-theme-dark .marthi-modal-form .btn--primary,
+.admin--dark .marthi-plan-card__foot .btn--primary,
+.is-theme-dark .marthi-plan-card__foot .btn--primary {
+  background: #2dd4bf !important;
+  border: 1px solid #2dd4bf !important;
+  color: #042f2e !important;
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.25) !important;
+  font-weight: 750 !important;
+  cursor: pointer;
+}
+
+.admin--dark .btn--primary:hover,
+.is-theme-dark .btn--primary:hover,
+.admin--dark .marthi-ops .btn--primary:hover,
+.is-theme-dark .marthi-ops .btn--primary:hover,
+.admin--dark .admin-page .btn--primary:hover,
+.is-theme-dark .admin-page .btn--primary:hover,
+.admin--dark .marthi-actions .btn--primary:hover,
+.is-theme-dark .marthi-actions .btn--primary:hover,
+.admin--dark .marthi-modal-form .btn--primary:hover,
+.is-theme-dark .marthi-modal-form .btn--primary:hover,
+.admin--dark .marthi-plan-card__foot .btn--primary:hover,
+.is-theme-dark .marthi-plan-card__foot .btn--primary:hover {
+  background: #5eead4 !important;
+  border-color: #5eead4 !important;
+  color: #042f2e !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(45, 212, 191, 0.4) !important;
+}
+
+/* Universal ghost / secondary button in dark mode */
+.admin--dark .btn--ghost,
+.is-theme-dark .btn--ghost,
+.admin--dark .marthi-ops .btn--ghost,
+.is-theme-dark .marthi-ops .btn--ghost,
+.admin--dark .admin-page .btn--ghost,
+.is-theme-dark .admin-page .btn--ghost,
+.admin--dark .marthi-actions .btn--ghost,
+.is-theme-dark .marthi-actions .btn--ghost,
+.admin--dark .marthi-modal-form .btn--ghost,
+.is-theme-dark .marthi-modal-form .btn--ghost {
+  background: #1c2430 !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  cursor: pointer;
+}
+
+.admin--dark .btn--ghost:hover,
+.is-theme-dark .btn--ghost:hover,
+.admin--dark .marthi-ops .btn--ghost:hover,
+.is-theme-dark .marthi-ops .btn--ghost:hover,
+.admin--dark .admin-page .btn--ghost:hover,
+.is-theme-dark .admin-page .btn--ghost:hover,
+.admin--dark .marthi-actions .btn--ghost:hover,
+.is-theme-dark .marthi-actions .btn--ghost:hover,
+.admin--dark .marthi-modal-form .btn--ghost:hover,
+.is-theme-dark .marthi-modal-form .btn--ghost:hover {
+  background: #252f3e !important;
+  border-color: #2dd4bf !important;
+  color: #5eead4 !important;
+  transform: translateY(-1px);
+}
+
+/* Danger action buttons in dark mode */
+.admin--dark .btn--danger,
+.is-theme-dark .btn--danger,
+.admin--dark .marthi-actions button[style*="#f87171"],
+.is-theme-dark .marthi-actions button[style*="#f87171"] {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+  cursor: pointer;
+}
+
+.admin--dark .btn--danger:hover,
+.is-theme-dark .btn--danger:hover,
+.admin--dark .marthi-actions button[style*="#f87171"]:hover,
+.is-theme-dark .marthi-actions button[style*="#f87171"]:hover {
+  background: rgba(239, 68, 68, 0.3) !important;
+  border-color: rgba(239, 68, 68, 0.65) !important;
+  color: #fee2e2 !important;
+  transform: translateY(-1px);
+}
+
+/* Success action buttons in dark mode */
+.admin--dark .marthi-actions button[style*="#4ade80"],
+.is-theme-dark .marthi-actions button[style*="#4ade80"] {
+  background: rgba(34, 197, 94, 0.16) !important;
+  border: 1px solid rgba(34, 197, 94, 0.4) !important;
+  color: #86efac !important;
+  cursor: pointer;
+}
+
+.admin--dark .marthi-actions button[style*="#4ade80"]:hover,
+.is-theme-dark .marthi-actions button[style*="#4ade80"]:hover {
+  background: rgba(34, 197, 94, 0.3) !important;
+  border-color: rgba(34, 197, 94, 0.65) !important;
+  color: #dcfce7 !important;
+  transform: translateY(-1px);
+}
+
+/* Commercial Plan Cards in dark mode */
+.admin--dark .marthi-plan-card,
+.is-theme-dark .marthi-plan-card {
+  background: #171e27 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  color: #e8eef4 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+.admin--dark .marthi-plan-card.is-featured,
+.is-theme-dark .marthi-plan-card.is-featured {
+  border: 2px solid #2dd4bf !important;
+  box-shadow: 0 0 20px rgba(45, 212, 191, 0.15) !important;
+}
+
+.admin--dark .marthi-plan-card__header,
+.is-theme-dark .marthi-plan-card__header {
+  border-bottom-color: rgba(148, 163, 184, 0.15) !important;
+}
+
+.admin--dark .marthi-plan-card__title,
+.is-theme-dark .marthi-plan-card__title {
+  color: #f8fafc !important;
+}
+
+.admin--dark .marthi-plan-card__amount,
+.is-theme-dark .marthi-plan-card__amount {
+  color: #2dd4bf !important;
+}
+
+.admin--dark .marthi-plan-card__period,
+.is-theme-dark .marthi-plan-card__period {
+  color: #94a3b8 !important;
+}
+
+.admin--dark .marthi-plan-card__blurb,
+.is-theme-dark .marthi-plan-card__blurb {
+  color: #cbd5e1 !important;
+}
+
+.admin--dark .marthi-plan-card__callout,
+.is-theme-dark .marthi-plan-card__callout {
+  color: #94a3b8 !important;
+}
+
+.admin--dark .marthi-plan-card__features li,
+.is-theme-dark .marthi-plan-card__features li {
+  color: #cbd5e1 !important;
+}
+
+.admin--dark .marthi-plan-card__features-more,
+.is-theme-dark .marthi-plan-card__features-more {
+  color: #2dd4bf !important;
+}
+
+.admin--dark .marthi-plan-card__meta,
+.is-theme-dark .marthi-plan-card__meta {
+  color: #94a3b8 !important;
+}
+
+/* Audit section in dark mode */
+.admin--dark .marthi-audit-section,
+.is-theme-dark .marthi-audit-section {
+  background: #171e27 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  color: #e8eef4 !important;
+}
+
+/* Modals in dark mode */
+.admin--dark .marthi-modal-card,
+.is-theme-dark .marthi-modal-card {
+  background: #171e27 !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+  color: #e8eef4 !important;
+}
+
+.admin--dark .marthi-modal-head,
+.is-theme-dark .marthi-modal-head {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2) !important;
+}
+
+.admin--dark .marthi-modal-close,
+.is-theme-dark .marthi-modal-close {
+  background: #1c2430 !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+  color: #e2e8f0 !important;
+}
+
+.admin--dark .marthi-modal-close:hover,
+.is-theme-dark .marthi-modal-close:hover {
+  background: #252f3e !important;
+  border-color: #2dd4bf !important;
+  color: #ffffff !important;
+}
+
+.admin--dark .marthi-form-field span,
+.is-theme-dark .marthi-form-field span,
+.admin--dark .marthi-form-field label,
+.is-theme-dark .marthi-form-field label {
+  color: #94a3b8 !important;
+}
+
+.admin--dark .marthi-form-field input,
+.admin--dark .marthi-form-field select,
+.admin--dark .marthi-form-field textarea,
+.is-theme-dark .marthi-form-field input,
+.is-theme-dark .marthi-form-field select,
+.is-theme-dark .marthi-form-field textarea {
+  background: #121820 !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #e8eef4 !important;
+}
+
+/* Feedback banners in dark mode */
+.admin--dark .marthi-feedback-banner,
+.is-theme-dark .marthi-feedback-banner {
+  background: rgba(45, 212, 191, 0.12) !important;
+  border: 1px solid rgba(45, 212, 191, 0.35) !important;
+  color: #5eead4 !important;
+}
+
+/* Marthi Pills in Dark Mode */
+.admin--dark .marthi-pill--ok,
+.is-theme-dark .marthi-pill--ok {
+  background: rgba(45, 212, 191, 0.16) !important;
+  color: #5eead4 !important;
+  border: 1px solid rgba(45, 212, 191, 0.3) !important;
+}
+
+.admin--dark .marthi-pill--online,
+.is-theme-dark .marthi-pill--online {
+  background: rgba(56, 189, 248, 0.16) !important;
+  color: #7dd3fc !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+}
+
+.admin--dark .marthi-pill--late,
+.is-theme-dark .marthi-pill--late {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(239, 68, 68, 0.35) !important;
+}
+
+.admin--dark .marthi-pill--offline,
+.is-theme-dark .marthi-pill--offline {
+  background: rgba(148, 163, 184, 0.14) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+}
+
+
 
