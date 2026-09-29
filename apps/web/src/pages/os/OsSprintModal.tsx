@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   finishActiveOperation,
   type WorkOrder,
@@ -22,6 +23,7 @@ export function OsSprintModal({
   onClose,
   onCompleted,
 }: Props) {
+  const { user } = useAuth();
   const [nextTitle, setNextTitle] = useState(() => {
     const nextDate = new Date();
     nextDate.setMonth(nextDate.getMonth() + 1);
@@ -53,7 +55,7 @@ export function OsSprintModal({
       const { newOp } = finishActiveOperation(
         operation.id,
         nextTitle.trim(),
-        'Operador Master',
+        user?.name || 'Operador Master',
       );
       onCompleted(newOp);
       onClose();

@@ -394,19 +394,39 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
                 <AdminPicker
                   label="Técnico responsável"
                   value={technician}
-                  options={TECHNICIANS_LIST.map((tech) => ({
-                    value: tech.name,
-                    label: `${tech.name} (${tech.specialty})`,
-                  }))}
+                  options={[
+                    { value: '', label: 'Sem técnico atribuído' },
+                    ...TECHNICIANS_LIST.map((tech) => ({
+                      value: tech.name,
+                      label: `${tech.name}${tech.specialty ? ` (${tech.specialty})` : ''}`,
+                    })),
+                  ]}
                   onChange={setTechnician}
                 />
                 {selectedTechInfo ? (
                   <div className="os-tech-badge" style={{ marginTop: 6 }}>
-                    <img
-                      src={selectedTechInfo.avatarUrl}
-                      alt={selectedTechInfo.name}
-                      className="os-tech-badge__avatar"
-                    />
+                    {selectedTechInfo.avatarUrl ? (
+                      <img
+                        src={selectedTechInfo.avatarUrl}
+                        alt={selectedTechInfo.name}
+                        className="os-tech-badge__avatar"
+                      />
+                    ) : (
+                      <div
+                        className="os-tech-badge__avatar"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        {selectedTechInfo.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <strong>{selectedTechInfo.name}</strong>
                       <small>{selectedTechInfo.role}</small>

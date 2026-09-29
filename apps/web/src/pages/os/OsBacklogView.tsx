@@ -196,7 +196,7 @@ export function OsBacklogView({
               { value: 'unassigned', label: '👤 Não atribuído' },
               ...TECHNICIANS_LIST.map((t) => ({
                 value: t.name,
-                label: `${t.name} (${t.specialty})`,
+                label: t.specialty ? `${t.name} (${t.specialty})` : t.name,
               })),
             ]}
             onChange={(val) => setTechFilter(val)}
@@ -361,10 +361,29 @@ export function OsBacklogView({
                       className="os-backlog-item__tech"
                       title={order.technician ? `Técnico: ${order.technician}` : 'Não atribuído'}
                     >
-                      {tech ? (
+                      {tech || order.technician ? (
                         <div className="os-backlog-tech-chip">
-                          <img src={tech.avatarUrl} alt={tech.name} />
-                          <span>{tech.name.split(' ')[0]}</span>
+                          {tech?.avatarUrl ? (
+                            <img src={tech.avatarUrl} alt={tech.name} />
+                          ) : (
+                            <span
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: '#6366f1',
+                                color: '#fff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {(tech?.name || order.technician || '').substring(0, 2).toUpperCase()}
+                            </span>
+                          )}
+                          <span>{(tech?.name || order.technician || '').split(' ')[0]}</span>
                         </div>
                       ) : (
                         <span className="os-backlog-unassigned">Não atribuído</span>

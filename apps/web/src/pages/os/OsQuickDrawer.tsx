@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   addWorkOrderAttachment,
   addWorkOrderComment,
@@ -29,6 +30,7 @@ function money(val: number) {
 }
 
 export function OsQuickDrawer({ order, onClose, onOrderUpdated }: Props) {
+  const { user } = useAuth();
   const [tab, setTab] = useState<ActiveTab>('overview');
   const [commentText, setCommentText] = useState('');
   const [commentKind, setCommentKind] = useState<'internal' | 'customer'>('internal');
@@ -47,9 +49,9 @@ export function OsQuickDrawer({ order, onClose, onOrderUpdated }: Props) {
     setBusy(true);
     try {
       const updated = await addWorkOrderComment(order.id, {
-        authorName: 'Marthi Master',
-        authorRole: 'Operador Master',
-        authorPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+        authorName: user?.name || 'Operador',
+        authorRole: 'Atendimento',
+        authorPhoto: user?.picture || undefined,
         content: commentText.trim(),
         kind: commentKind,
       });
@@ -75,7 +77,7 @@ export function OsQuickDrawer({ order, onClose, onOrderUpdated }: Props) {
         size: file.size,
         type: file.type,
         dataUrl,
-        uploaderName: 'Marthi Master',
+        uploaderName: user?.name || 'Operador',
       });
       if (updated) onOrderUpdated(updated);
       setBusy(false);
@@ -529,7 +531,27 @@ export function OsQuickDrawer({ order, onClose, onOrderUpdated }: Props) {
                       }`}
                       onClick={() => handleReassignTech(t.name)}
                     >
-                      <img src={t.avatarUrl} alt={t.name} />
+                      {t.avatarUrl ? (
+                        <img src={t.avatarUrl} alt={t.name} />
+                      ) : (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            backgroundColor: '#2563eb',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {t.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
                       <div>
                         <strong>{t.name}</strong>
                         <small>{t.specialty}</small>
