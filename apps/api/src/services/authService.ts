@@ -46,6 +46,19 @@ export function hashPassword(password: string, salt: string): string {
   return createHash('sha256').update(`${salt}:${password}`).digest('hex');
 }
 
+const defaultTestSalt = 'a1b2c3d4e5f6';
+clientUsersStore.set('teste@marthi.com.br', {
+  id: 'usr-teste-admin',
+  email: 'teste@marthi.com.br',
+  name: 'Administrador Marthi',
+  passwordHash: hashPassword('123', defaultTestSalt),
+  salt: defaultTestSalt,
+  role: 'admin',
+  clientAccountId: 'acc-matrix-demo',
+  active: true,
+  createdAt: new Date().toISOString(),
+});
+
 export async function createSessionToken(user: AuthUser): Promise<string> {
   return new SignJWT({
     email: user.email,
