@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
@@ -20,6 +21,7 @@ export function MarthiDiscountsPage() {
   const [rules, setRules] = useState<LicensingDiscountRule[]>(() => listDiscountRules());
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Partial<LicensingDiscountRule> | null>(null);
+  const [viewingRule, setViewingRule] = useState<LicensingDiscountRule | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   function refresh() {
@@ -55,7 +57,26 @@ export function MarthiDiscountsPage() {
 
   function handleOpenEdit(rule: LicensingDiscountRule) {
     setEditingRule({ ...rule });
+    setViewingRule(null);
     setModalOpen(true);
+  }
+
+  function handleDuplicate(rule: LicensingDiscountRule) {
+    const newRule: LicensingDiscountRule = {
+      ...rule,
+      id: `rule-${Date.now().toString(36)}`,
+      name: `${rule.name} (Cópia)`,
+      active: false,
+    };
+    const next = [...rules, newRule];
+    saveDiscountRules(next);
+    logAction({
+      actorName: user?.name ?? 'Admin Marthi',
+      actorEmail: user?.email ?? 'admin@marthi.com.br',
+      action: 'create',
+      detail: `Regra de desconto duplicada a partir de "${rule.name}": ${newRule.name}`,
+    });
+    setFeedback(`Regra duplicada como "${newRule.name}". Edite para ativar.`);
   }
 
   function handleToggleRule(ruleId: string) {
@@ -73,23 +94,21 @@ export function MarthiDiscountsPage() {
     setFeedback(`Regra "${target.name}" ${nextStatus ? 'ativada' : 'desativada'} com sucesso.`);
   }
 
-  function handleDelete(ruleId: string) {
-    const target = rules.find((r) => r.id === ruleId);
-    if (!target) return;
-    if (confirm(`Deseja realmente excluir a faixa de desconto "${target.name}"?`)) {
-      deleteDiscountRule(ruleId);
-      logAction({
-        actorName: user?.name ?? 'Admin Marthi',
-        actorEmail: user?.email ?? 'admin@marthi.com.br',
-        action: 'delete',
-        detail: `Regra de desconto excluída: ${target.name}`,
-      });
-      setFeedback(`Regra "${target.name}" removida.`);
-    }
+  function handleDelete(rule: LicensingDiscountRule) {
+    if (!confirmDelete(`a faixa "${rule.name}"`)) return;
+    deleteDiscountRule(rule.id);
+    logAction({
+      actorName: user?.name ?? 'Admin Marthi',
+      actorEmail: user?.email ?? 'admin@marthi.com.br',
+      action: 'delete',
+      detail: `Regra de desconto excluída: ${rule.name}`,
+    });
+    setFeedback(`Regra "${rule.name}" removida com sucesso.`);
+    if (viewingRule?.id === rule.id) setViewingRule(null);
   }
 
   function handleResetDefault() {
-    if (confirm('Deseja restaurar as faixas de desconto progressivo padrão da Marthi Tecnologia?')) {
+    if (window.confirm('Deseja restaurar as faixas de desconto progressivo padrão da Marthi Tecnologia?')) {
       resetDiscountRulesToDefault();
       logAction({
         actorName: user?.name ?? 'Admin Marthi',
@@ -153,23 +172,23 @@ export function MarthiDiscountsPage() {
           <span className="marthi-page-kicker">Administração Marthi · Licenciamento Multi-Loja</span>
           <h1>Regras de Desconto Progressivo</h1>
           <p className="marthi-page-sub">
-            Controle exclusivo da Marthi para concessão de descontos e precificação por CNPJ. Os clientes visualizam no
-            painel da loja apenas o valor final que estão pagando e o detalhamento das empresas ativas.
+            Controle de descontos progressivos e precificação por CNPJ. Os clientes visualizam no
+            painel da loja apenas o valor líquido final que estão pagando e o detalhamento das empresas ativas.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button type="button" className="btn btn--ghost" onClick={handleResetDefault}>
             <AdminIcon name="restore" />
             Restaurar Padrão
           </button>
           <button type="button" className="btn btn--primary" onClick={handleOpenCreate}>
             <AdminIcon name="plus" />
-            + Nova Faixa de Desconto
+            Nova Faixa de Desconto
           </button>
         </div>
       </header>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(148, 163, 184, 0.25)', paddingBottom: '8px' }}>
+      <div className="marthi-tabs-nav">
         <Link
           to="/admin/planos"
           className="btn btn--ghost"
@@ -189,15 +208,16 @@ export function MarthiDiscountsPage() {
       {feedback && (
         <div
           style={{
-            padding: '10px 16px',
-            marginBottom: '16px',
-            borderRadius: '8px',
-            background: 'rgba(22, 163, 74, 0.1)',
-            border: '1px solid rgba(22, 163, 74, 0.3)',
+            padding: '12px 18px',
+            marginBottom: '20px',
+            borderRadius: '10px',
+            background: 'rgba(22, 163, 74, 0.12)',
+            border: '1px solid rgba(22, 163, 74, 0.35)',
             color: '#15803d',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            fontWeight: 600,
           }}
         >
           <span>✓ {feedback}</span>
@@ -250,8 +270,8 @@ export function MarthiDiscountsPage() {
           </div>
         </div>
 
-        <div className="admin__table-container">
-          <table className="admin__table">
+        <div className="admin-table-container">
+          <table className="admin-table">
             <thead>
               <tr>
                 <th>Nome da Regra Comercial</th>
@@ -261,14 +281,18 @@ export function MarthiDiscountsPage() {
                 <th>Valor / Percentual</th>
                 <th>Status</th>
                 <th>Observações Comerciais</th>
-                <th style={{ width: 180 }}>Ações</th>
+                <th className="admin-table__actions" style={{ textAlign: 'center', width: '180px' }}>
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <tr key={rule.id}>
                   <td>
-                    <strong>{rule.name}</strong>
+                    <CrudNameButton onClick={() => setViewingRule(rule)}>
+                      <strong>{rule.name}</strong>
+                    </CrudNameButton>
                   </td>
                   <td>{rule.minStores} loja(s)</td>
                   <td>{rule.maxStores ? `${rule.maxStores} lojas` : 'Sem limite (N+)'}</td>
@@ -281,50 +305,33 @@ export function MarthiDiscountsPage() {
                     </strong>
                   </td>
                   <td>
-                    <span className={`marthi-pill ${rule.active ? 'marthi-pill--ok' : 'marthi-pill--offline'}`}>
-                      {rule.active ? 'Ativa' : 'Inativa'}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleRule(rule.id)}
+                      className={`marthi-pill ${rule.active ? 'marthi-pill--ok' : 'marthi-pill--offline'}`}
+                      style={{ border: 'none', cursor: 'pointer', padding: '4px 10px' }}
+                      title={`Clique para ${rule.active ? 'desativar' : 'ativar'}`}
+                    >
+                      {rule.active ? '● Ativa' : '○ Inativa'}
+                    </button>
                   </td>
-                  <td style={{ color: 'var(--admin-muted, #64748b)', fontSize: '0.88rem' }}>
+                  <td style={{ color: 'var(--mute, #64748b)', fontSize: '0.88rem' }}>
                     {rule.notes || '—'}
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        style={{ padding: '4px 8px', fontSize: '0.78rem' }}
-                        onClick={() => handleOpenEdit(rule)}
-                        title="Editar faixa de desconto"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        style={{ padding: '4px 8px', fontSize: '0.78rem' }}
-                        onClick={() => handleToggleRule(rule.id)}
-                        title={rule.active ? 'Desativar faixa' : 'Ativar faixa'}
-                      >
-                        {rule.active ? 'Desativar' : 'Ativar'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--danger"
-                        style={{ padding: '4px 8px', fontSize: '0.78rem' }}
-                        onClick={() => handleDelete(rule.id)}
-                        title="Excluir faixa"
-                      >
-                        Excluir
-                      </button>
-                    </div>
+                  <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
+                    <CrudRowActions
+                      onView={() => setViewingRule(rule)}
+                      onEdit={() => handleOpenEdit(rule)}
+                      onDuplicate={() => handleDuplicate(rule)}
+                      onDelete={() => handleDelete(rule)}
+                    />
                   </td>
                 </tr>
               ))}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '32px', color: 'var(--admin-muted)' }}>
-                    Nenhuma regra de desconto cadastrada. Clique em "+ Nova Faixa de Desconto" ou "Restaurar Padrão".
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: 'var(--mute)' }}>
+                    Nenhuma regra de desconto cadastrada. Clique em "Nova Faixa de Desconto" ou "Restaurar Padrão".
                   </td>
                 </tr>
               )}
@@ -332,6 +339,105 @@ export function MarthiDiscountsPage() {
           </table>
         </div>
       </section>
+
+      {/* Modal Consulta / Detalhes (Visualizar) */}
+      {viewingRule && (
+        <div className="marthi-modal-backdrop" onClick={() => setViewingRule(null)}>
+          <div
+            className="marthi-modal-card"
+            style={{ maxWidth: 540 }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header className="marthi-modal-head">
+              <div>
+                <span className="marthi-modal-kicker">Consulta Comercial</span>
+                <h2>{viewingRule.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="marthi-modal-close"
+                onClick={() => setViewingRule(null)}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </header>
+
+            <div className="marthi-modal-form">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="marthi-form-field">
+                  <span>Faixa de Aplicação</span>
+                  <strong>
+                    {viewingRule.minStores} {viewingRule.maxStores ? `até ${viewingRule.maxStores} lojas` : 'lojas em diante (sem teto)'}
+                  </strong>
+                </div>
+                <div className="marthi-form-field">
+                  <span>Desconto Concedido</span>
+                  <strong style={{ color: '#2563eb', fontSize: '1.2rem' }}>
+                    {viewingRule.discountType === 'percent'
+                      ? `${viewingRule.discountValue}% nas filiais`
+                      : `R$ ${viewingRule.discountValue.toFixed(2).replace('.', ',')} por filial`}
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="marthi-form-field">
+                  <span>Status da Regra</span>
+                  <div>
+                    <span className={`marthi-pill ${viewingRule.active ? 'marthi-pill--ok' : 'marthi-pill--offline'}`}>
+                      {viewingRule.active ? 'Ativa no cálculo' : 'Inativa (desconsiderada)'}
+                    </span>
+                  </div>
+                </div>
+                <div className="marthi-form-field">
+                  <span>Tipo de Desconto</span>
+                  <strong>{viewingRule.discountType === 'percent' ? 'Percentual (%)' : 'Valor Fixo (R$)'}</strong>
+                </div>
+              </div>
+
+              <div className="marthi-form-field">
+                <span>Observação Comercial</span>
+                <p style={{ margin: 0, color: 'var(--mute, #64748b)', fontSize: '0.9rem' }}>
+                  {viewingRule.notes || 'Nenhuma observação informada.'}
+                </p>
+              </div>
+
+              <div
+                style={{
+                  padding: '14px',
+                  borderRadius: '10px',
+                  background: 'rgba(45, 212, 191, 0.08)',
+                  border: '1px solid rgba(45, 212, 191, 0.25)',
+                  fontSize: '0.86rem',
+                }}
+              >
+                <strong>Exemplo de cálculo:</strong>
+                <p style={{ margin: '4px 0 0' }}>
+                  Para um lojista com <strong>{Math.max(viewingRule.minStores, 3)} lojas</strong> (1 matriz + {Math.max(viewingRule.minStores, 3) - 1} filiais),
+                  a matriz paga 100% do plano e as {Math.max(viewingRule.minStores, 3) - 1} filiais recebem{' '}
+                  <strong>{viewingRule.discountType === 'percent' ? `${viewingRule.discountValue}% de desconto cada` : `R$ ${viewingRule.discountValue} de desconto cada`}</strong>.
+                </p>
+              </div>
+
+              <div className="marthi-modal-foot" style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn--ghost" onClick={() => setViewingRule(null)}>
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => handleOpenEdit(viewingRule)}
+                >
+                  Editar Faixa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Edição / Criação */}
       {modalOpen && editingRule && (
@@ -446,7 +552,7 @@ export function MarthiDiscountsPage() {
                 <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Faixa Ativa (Disponível para cálculo)</span>
               </label>
 
-              <div className="marthi-modal-actions" style={{ marginTop: '20px' }}>
+              <div className="marthi-modal-foot" style={{ marginTop: '20px' }}>
                 <button type="button" className="btn btn--ghost" onClick={() => setModalOpen(false)}>
                   Cancelar
                 </button>

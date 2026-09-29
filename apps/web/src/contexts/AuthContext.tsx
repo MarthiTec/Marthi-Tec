@@ -15,6 +15,7 @@ import { markPresenceOffline } from '../data/presenceStore';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
+  isClientUserToken,
   isLocalMarthiStaffToken,
   loginWithGoogle as apiLoginWithGoogle,
   loginWithPassword as apiLoginWithPassword,
@@ -59,7 +60,7 @@ async function applySession(
     actorEmail: session.user.email,
     action: 'login',
   });
-  if (isLocalMarthiStaffToken(session.token)) {
+  if (isLocalMarthiStaffToken(session.token) || isClientUserToken(session.token)) {
     setErpReady(true);
     setErpError(null);
     return;
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setUser(current);
         }
-        if (isLocalMarthiStaffToken(saved)) {
+        if (isLocalMarthiStaffToken(saved) || isClientUserToken(saved)) {
           if (active) {
             setErpReady(true);
             setErpError(null);

@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { registerClientUser } from '../services/authService.js';
 
 /**
- * Cadastro público de parceiro (homepage).
- * Persistência em banco fica com o Thiago — por enquanto aceita e devolve protocolo.
+ * Cadastro público de parceiro e contratação comercial.
  */
 export const partnersRouter = Router();
 
 const signupSchema = z
   .object({
-    planId: z.enum(['start', 'growth', 'scale']),
+    planId: z.enum(['bronze', 'silver', 'golden', 'start', 'growth', 'scale']),
     modules: z
-      .array(z.enum(['totem', 'presales', 'os', 'erp']))
+      .array(z.enum(['totem', 'presales', 'os', 'erp', 'fiscal', 'ecommerce', 'pdv']))
       .min(1, 'Selecione ao menos um módulo.'),
     documentType: z.enum(['cnpj', 'cpf']),
     document: z.string().min(11).max(18),
@@ -30,6 +30,7 @@ const signupSchema = z
     contactName: z.string().min(2).max(120),
     contactRole: z.string().max(80).optional().default(''),
     notes: z.string().max(1000).optional().default(''),
+    password: z.string().min(4).optional(),
   })
   .superRefine((data, ctx) => {
     const unique = new Set(data.modules);
@@ -40,39 +41,11 @@ const signupSchema = z
         message: 'Módulos duplicados não são permitidos.',
       });
     }
-
-    if (data.planId === 'start' && data.modules.length !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['modules'],
-        message: 'Plano Start: exatamente 1 módulo.',
-      });
-    }
-
-    if (data.planId === 'growth' && (data.modules.length < 1 || data.modules.length > 2)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['modules'],
-        message: 'Plano Growth: no máximo 2 módulos.',
-      });
-    }
-
-    if (data.planId === 'scale') {
-      const required = ['totem', 'presales', 'os', 'erp'];
-      const missing = required.filter((item) => !data.modules.includes(item as typeof data.modules[number]));
-      if (missing.length > 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['modules'],
-          message: 'Plano Scale: todos os módulos devem estar liberados.',
-        });
-      }
-    }
   });
 
 const pendingSignups: Array<z.infer<typeof signupSchema> & { id: string; createdAt: string }> = [];
 
-partnersRouter.post('/api/v1/partners/signup', (req, res) => {
+partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -95,7 +68,22 @@ partnersRouter.post('/api/v1/partners/signup', (req, res) => {
   pendingSignups.unshift(record);
   if (pendingSignups.length > 200) pendingSignups.pop();
 
-  console.log('[partners] signup', {
+  // Create initial user credentials so they exist in system
+  try {
+    const initialPassword = parsed.data.password || parsed.data.document.replace(/\D/g, '').slice(0, 6) || 'marthi123';
+    await registerClientUser({
+      email: parsed.data.email,
+      password: initialPassword,
+      name: parsed.data.contactName || parsed.data.tradeName,
+      tradeName: parsed.data.tradeName,
+      clientAccountId: id,
+      role: 'admin',
+    });
+  } catch (err) {
+    console.warn('[partners] could not pre-register user account:', err);
+  }
+
+  console.log('[partners] signup created', {
     id,
     planId: record.planId,
     modules: record.modules,
@@ -107,7 +95,7 @@ partnersRouter.post('/api/v1/partners/signup', (req, res) => {
     success: true,
     data: {
       id,
-      message: 'Cadastro recebido. A equipe Marthi entrará em contato.',
+      message: 'Cadastro recebido com sucesso. Conta preparada para ativação.',
     },
   });
 });

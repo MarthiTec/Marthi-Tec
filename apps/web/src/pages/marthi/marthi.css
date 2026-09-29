@@ -846,3 +846,206 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ==========================================================================
+   Marthi Discounts & General Page System
+   ========================================================================== */
+.marthi-page {
+  padding: 8px 4px 32px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.marthi-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.marthi-page-head h1 {
+  margin: 4px 0 6px;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink, #0f172a);
+}
+
+.marthi-page-kicker {
+  font-size: 0.76rem;
+  font-weight: 750;
+  color: var(--accent, #0f766e);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+}
+
+.marthi-page-sub {
+  margin: 0;
+  color: var(--mute, #64748b);
+  max-width: 780px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.marthi-tabs-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line, rgba(148, 163, 184, 0.25));
+  padding-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.marthi-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.marthi-kpi-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.marthi-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.marthi-kpi-card__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--mute, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.marthi-kpi-card__value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ink, #0f172a);
+  letter-spacing: -0.02em;
+}
+
+.marthi-kpi-card__sub {
+  font-size: 0.8rem;
+  color: var(--mute, #64748b);
+  line-height: 1.35;
+}
+
+.marthi-section {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.marthi-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.marthi-section__head h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 750;
+  color: var(--ink, #0f172a);
+}
+
+.marthi-section__head p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--mute, #64748b);
+}
+
+/* Dark theme overrides */
+.admin.admin--dark .marthi-page-head h1,
+.is-theme-dark .marthi-page-head h1,
+.admin.admin--dark .marthi-section__head h2,
+.is-theme-dark .marthi-section__head h2 {
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .marthi-kpi-card,
+.is-theme-dark .marthi-kpi-card,
+.admin.admin--dark .marthi-section,
+.is-theme-dark .marthi-section {
+  background: #161c24;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.admin.admin--dark .marthi-kpi-card__value,
+.is-theme-dark .marthi-kpi-card__value {
+  color: #f8fafc;
+}
+
+.admin.admin--dark .marthi-kpi-card__label,
+.admin.admin--dark .marthi-kpi-card__sub,
+.is-theme-dark .marthi-kpi-card__label,
+.is-theme-dark .marthi-kpi-card__sub {
+  color: #94a3b8;
+}
+
+.admin.admin--dark .admin-table,
+.is-theme-dark .admin-table {
+  color: #e2e8f0;
+}
+
+.admin.admin--dark .admin-table th,
+.is-theme-dark .admin-table th {
+  color: #94a3b8;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin.admin--dark .admin-table td,
+.is-theme-dark .admin-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 900px) {
+  .marthi-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .marthi-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .marthi-page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .marthi-page-head > div:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .marthi-page-head > div:last-child .btn {
+    width: 100%;
+  }
+}
+
+
