@@ -92,19 +92,6 @@ function load(): ProductAttribute[] {
     if (!Array.isArray(parsed) || parsed.length === 0) {
       return [];
     }
-    // Auto-limpeza de mocks residuais de demonstração de celulares (Desert, 64 GB, etc.)
-    const isMockLegacy = parsed.some(
-      (item) =>
-        item.values?.includes('Desert') ||
-        item.values?.includes('Natural') ||
-        (item.id === ATTR_CAP && item.values?.includes('64 GB')) ||
-        item.id === ATTR_RET,
-    );
-    if (isMockLegacy) {
-      localStorage.removeItem(STORAGE_KEY);
-      memoryAttrs = [];
-      return [];
-    }
     return sortAttrs(
       parsed.map((item, index) => {
         const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
@@ -156,21 +143,67 @@ export function getAttributes() {
   return load();
 }
 
+/** Cria um novo atributo de produto via Nest API (se autenticado) ou armazenamento local. */
+export async function createAttribute(payload: Omit<ProductAttribute, 'id'>): Promise<ProductAttribute[]> {
+  const { isNestAuthed } = await import('../services/nestClient');
+  const current = load();
+  if (current.length >= MAX_ATTRIBUTES) {
+    throw new Error(`Máximo de ${MAX_ATTRIBUTES} atributos por loja.`);
+  }
+
+  if (isNestAuthed()) {
+    const { apiCreateAttribute } = await import('../services/erpApi');
+    const created = await apiCreateAttribute({
+      name: payload.name.trim(),
+      values: payload.values,
+      priceDeltas: payload.priceDeltas,
+      useOnTotem: payload.useOnTotem,
+      filterOnTotem: payload.filterOnTotem,
+      useOnStock: payload.useOnStock,
+      sort: payload.sort ?? current.length + 1,
+      active: payload.active,
+    });
+    return persist([created, ...current.filter((item) => item.id !== created.id)]);
+  }
+
+  const localItem: ProductAttribute = {
+    ...payload,
+    name: payload.name.trim(),
+    id: `ATTR-${Date.now().toString(36).toUpperCase()}`,
+    sort: payload.sort ?? current.length + 1,
+  };
+  return persist([localItem, ...current]);
+}
+
+/** Atualiza um atributo existente via Nest API ou armazenamento local. */
+export async function updateAttribute(
+  id: string,
+  payload: Partial<Omit<ProductAttribute, 'id'>>,
+): Promise<ProductAttribute[]> {
+  const { isNestAuthed } = await import('../services/nestClient');
+  const current = load();
+
+  if (isNestAuthed()) {
+    const { apiUpdateAttribute } = await import('../services/erpApi');
+    const updated = await apiUpdateAttribute(id, payload);
+    return persist(current.map((item) => (item.id === id ? updated : item)));
+  }
+
+  return persist(
+    current.map((item) => (item.id === id ? { ...item, ...payload } : item)),
+  );
+}
+
 export async function saveAttributes(items: ProductAttribute[]) {
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
     const {
       apiCreateAttribute,
-      apiDeleteAttribute,
       apiListAttributes,
       apiUpdateAttribute,
     } = await import('../services/erpApi');
     const current = await apiListAttributes();
     const next = items.slice(0, MAX_ATTRIBUTES);
-    const nextIds = new Set(next.map((item) => item.id).filter(Boolean));
-    for (const old of current) {
-      if (!nextIds.has(old.id)) await apiDeleteAttribute(old.id);
-    }
     const saved: ProductAttribute[] = [];
     for (const item of next) {
       const body = {
@@ -189,7 +222,14 @@ export async function saveAttributes(items: ProductAttribute[]) {
         saved.push(await apiCreateAttribute(body));
       }
     }
-    return persist(saved);
+    const nextIds = new Set(saved.map((item) => item.id));
+    const merged = [...saved];
+    for (const old of current) {
+      if (!nextIds.has(old.id)) {
+        merged.push(old);
+      }
+    }
+    return persist(merged);
   }
   return persist(items.slice(0, MAX_ATTRIBUTES));
 }

@@ -15,8 +15,12 @@ export function getAuthToken(): string | null {
 export function isNestAuthed(): boolean {
   const token = getAuthToken();
   if (!token) return false;
-  // Staff local / demo não são JWT Nest
-  if (token.startsWith('marthi-staff-local:') || token === 'marthi-demo-token') {
+  // Staff local / demo / client local não são JWT Nest
+  if (
+    token.startsWith('marthi-staff-local:') ||
+    token.startsWith('marthi-client-token:') ||
+    token === 'marthi-demo-token'
+  ) {
     return false;
   }
   return true;
