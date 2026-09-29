@@ -463,7 +463,7 @@ export async function upsertBankAccount(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao salvar conta.') };
+      console.warn('[financeBook] Falha ao sincronizar conta com Nest, gravando localmente:', error);
     }
   }
 
@@ -542,7 +542,7 @@ export async function upsertPayable(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao salvar conta a pagar.') };
+      console.warn('[financeBook] Falha ao sincronizar conta a pagar com Nest, gravando localmente:', error);
     }
   }
 
@@ -626,7 +626,7 @@ export async function upsertReceivable(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao salvar conta a receber.') };
+      console.warn('[financeBook] Falha ao sincronizar conta a receber com Nest, gravando localmente:', error);
     }
   }
 

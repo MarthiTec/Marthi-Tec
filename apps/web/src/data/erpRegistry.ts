@@ -391,27 +391,31 @@ export async function upsertSeller(
   input: Omit<Seller, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
   if (isNestAuthed()) {
-    const body = {
-      name: input.name.trim(),
-      phone: (input.phone ?? '').trim(),
-      email: (input.email ?? '').trim(),
-      document: (input.document ?? '').trim(),
-      commissionPercent: Math.max(0, Math.min(100, Number(input.commissionPercent ?? 0) || 0)),
-      active: input.active ?? true,
-      employeeId: input.employeeId,
-    };
-    const row = input.id
-      ? await apiUpdateSeller(input.id, body)
-      : await apiCreateSeller(body);
-    const mapped = mapSeller(row);
-    const state = load();
-    const idx = state.sellers.findIndex((item) => item.id === mapped.id);
-    state.sellers =
-      idx >= 0
-        ? state.sellers.map((item) => (item.id === mapped.id ? mapped : item))
-        : [mapped, ...state.sellers];
-    save(state);
-    return state;
+    try {
+      const body = {
+        name: input.name.trim(),
+        phone: (input.phone ?? '').trim(),
+        email: (input.email ?? '').trim(),
+        document: (input.document ?? '').trim(),
+        commissionPercent: Math.max(0, Math.min(100, Number(input.commissionPercent ?? 0) || 0)),
+        active: input.active ?? true,
+        employeeId: input.employeeId,
+      };
+      const row = input.id
+        ? await apiUpdateSeller(input.id, body)
+        : await apiCreateSeller(body);
+      const mapped = mapSeller(row);
+      const state = load();
+      const idx = state.sellers.findIndex((item) => item.id === mapped.id);
+      state.sellers =
+        idx >= 0
+          ? state.sellers.map((item) => (item.id === mapped.id ? mapped : item))
+          : [mapped, ...state.sellers];
+      save(state);
+      return state;
+    } catch (err) {
+      console.warn('[erpRegistry] Falha na API Nest ao salvar vendedor, gravando localmente:', err);
+    }
   }
 
   const state = load();
@@ -439,28 +443,32 @@ export async function upsertSupplier(
   input: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
   if (isNestAuthed()) {
-    const body = {
-      name: input.name.trim(),
-      tradeName: (input.tradeName ?? '').trim(),
-      document: (input.document ?? '').trim(),
-      phone: (input.phone ?? '').trim(),
-      email: (input.email ?? '').trim(),
-      city: (input.city ?? '').trim(),
-      notes: (input.notes ?? '').trim(),
-      active: input.active ?? true,
-    };
-    const row = input.id
-      ? await apiUpdateSupplier(input.id, body)
-      : await apiCreateSupplier(body);
-    const mapped = mapSupplier(row);
-    const state = load();
-    const idx = state.suppliers.findIndex((item) => item.id === mapped.id);
-    state.suppliers =
-      idx >= 0
-        ? state.suppliers.map((item) => (item.id === mapped.id ? mapped : item))
-        : [mapped, ...state.suppliers];
-    save(state);
-    return state;
+    try {
+      const body = {
+        name: input.name.trim(),
+        tradeName: (input.tradeName ?? '').trim(),
+        document: (input.document ?? '').trim(),
+        phone: (input.phone ?? '').trim(),
+        email: (input.email ?? '').trim(),
+        city: (input.city ?? '').trim(),
+        notes: (input.notes ?? '').trim(),
+        active: input.active ?? true,
+      };
+      const row = input.id
+        ? await apiUpdateSupplier(input.id, body)
+        : await apiCreateSupplier(body);
+      const mapped = mapSupplier(row);
+      const state = load();
+      const idx = state.suppliers.findIndex((item) => item.id === mapped.id);
+      state.suppliers =
+        idx >= 0
+          ? state.suppliers.map((item) => (item.id === mapped.id ? mapped : item))
+          : [mapped, ...state.suppliers];
+      save(state);
+      return state;
+    } catch (err) {
+      console.warn('[erpRegistry] Falha na API Nest ao salvar fornecedor, gravando localmente:', err);
+    }
   }
 
   const state = load();
@@ -486,7 +494,11 @@ export async function upsertSupplier(
 
 export async function removeSeller(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteSeller(id);
+    try {
+      await apiDeleteSeller(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir vendedor no Nest:', err);
+    }
   }
   const state = load();
   state.sellers = state.sellers.filter((item) => item.id !== id);
@@ -496,7 +508,11 @@ export async function removeSeller(id: string): Promise<RegistryState> {
 
 export async function removeSupplier(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteSupplier(id);
+    try {
+      await apiDeleteSupplier(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir fornecedor no Nest:', err);
+    }
   }
   const state = load();
   state.suppliers = state.suppliers.filter((item) => item.id !== id);
@@ -506,7 +522,11 @@ export async function removeSupplier(id: string): Promise<RegistryState> {
 
 export async function removeEmployee(id: string): Promise<RegistryState> {
   if (isNestAuthed()) {
-    await apiDeleteEmployee(id);
+    try {
+      await apiDeleteEmployee(id);
+    } catch (err) {
+      console.warn('[erpRegistry] Falha ao excluir no Nest, removendo localmente:', err);
+    }
   }
   const state = load();
   state.employees = state.employees.filter((item) => item.id !== id);
@@ -561,8 +581,7 @@ export async function upsertEmployee(
       save(state);
       return { ok: true, state, employee: mapped };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao salvar funcionário.';
-      return { ok: false, error: message };
+      console.warn('[erpRegistry] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
     }
   }
 

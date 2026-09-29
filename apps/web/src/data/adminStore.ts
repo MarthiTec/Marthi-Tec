@@ -845,7 +845,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
     try {
       await apiDeleteStock(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover estoque.'));
+      console.warn('[adminStore] Falha ao remover no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -862,7 +862,7 @@ export async function removePriceTable(id: string): Promise<AdminState> {
     try {
       await apiDeletePriceTable(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover tabela.'));
+      console.warn('[adminStore] Falha ao remover tabela no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -876,7 +876,7 @@ export async function removePayment(id: string): Promise<AdminState> {
     try {
       await apiDeletePayment(id);
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao remover pagamento.'));
+      console.warn('[adminStore] Falha ao remover pagamento no Nest, removendo localmente:', error);
     }
   }
   const state = load();
@@ -926,7 +926,7 @@ export async function upsertStockItem(
       void import('./totemLiveSync').then(({ notifyTotemLive }) => notifyTotemLive());
       return state;
     } catch (error) {
-      throw new Error(apiErrorMessage(error, 'Falha ao salvar estoque.'));
+      console.warn('[adminStore] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
     }
   }
 

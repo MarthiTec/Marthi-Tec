@@ -15,8 +15,18 @@ export function getAuthToken(): string | null {
 export function isNestAuthed(): boolean {
   const token = getAuthToken();
   if (!token) return false;
-  // Staff local / demo não são JWT Nest
-  if (token.startsWith('marthi-staff-local:') || token === 'marthi-demo-token') {
+  // Tokens locais de demo, staff ou tenants (clientes lojistas e colaboradores) não são JWT Nest
+  if (
+    token.startsWith('marthi-staff-local:') ||
+    token.startsWith('marthi-client-token:') ||
+    token.startsWith('marthi-employee-token:') ||
+    token === 'marthi-demo-token'
+  ) {
+    return false;
+  }
+  // JWT válido do Nest é estruturado em 3 blocos codificados em base64url (header.payload.signature)
+  const parts = token.split('.');
+  if (parts.length !== 3 || !token.startsWith('eyJ')) {
     return false;
   }
   return true;
