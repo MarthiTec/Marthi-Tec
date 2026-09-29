@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -101,7 +102,8 @@ function LegacyMarthiRedirect() {
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <ErrorBoundary fallbackTitle="Ocorreu um erro no sistema">
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
@@ -257,6 +259,7 @@ export function App() {
           <Route path="ajuda" element={<HelpPage />} />
         </Route>
       </Routes>
+      </ErrorBoundary>
     </AuthProvider>
   );
 }

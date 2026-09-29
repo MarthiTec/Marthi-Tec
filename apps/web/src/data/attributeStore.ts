@@ -69,74 +69,110 @@ export function clearAttributes(): ProductAttribute[] {
 }
 
 function sortAttrs(items: ProductAttribute[]) {
-  return [...items].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, 'pt-BR'));
+  if (!Array.isArray(items)) return [];
+  return [...items]
+    .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
+    .sort(
+      (a, b) =>
+        (Number(a.sort) || 0) - (Number(b.sort) || 0) ||
+        String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'),
+    );
 }
 
 function load(): ProductAttribute[] {
   if (memoryAttrs) {
     return sortAttrs(
-      memoryAttrs.map((item) => ({
-        ...item,
-        values: [...item.values],
-        priceDeltas: { ...item.priceDeltas },
-      })),
+      memoryAttrs
+        .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
+        .map((item) => ({
+          ...item,
+          values: Array.isArray(item.values) ? item.values.filter(Boolean) : [],
+          priceDeltas: { ...(item.priceDeltas ?? {}) },
+        })),
     );
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Sem seed automático — totem/ERP hidratam via Nest ou começam limpos.
       return [];
     }
-    const parsed = JSON.parse(raw) as ProductAttribute[];
+    const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
       return [];
     }
     return sortAttrs(
-      parsed.map((item, index) => {
-        const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
-        const priceDeltas = { ...(item.priceDeltas ?? {}) };
-        return {
-          ...item,
-          values,
-          priceDeltas,
-          useOnTotem: Boolean(item.useOnTotem),
-          filterOnTotem: Boolean(item.filterOnTotem),
-          useOnStock: Boolean(item.useOnStock),
-          sort: item.sort ?? index + 1,
-          active: item.active !== false,
-        };
-      }),
+      parsed
+        .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
+        .map((item, index) => {
+          const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
+          const priceDeltas = { ...(item.priceDeltas ?? {}) };
+          return {
+            id: String(item.id || `ATTR-${index}`),
+            name: String(item.name || ''),
+            values,
+            priceDeltas,
+            useOnTotem: Boolean(item.useOnTotem),
+            filterOnTotem: Boolean(item.filterOnTotem),
+            useOnStock: Boolean(item.useOnStock),
+            sort: Number(item.sort) || index + 1,
+            active: item.active !== false,
+          };
+        }),
     );
-  } catch {
+  } catch (err) {
+    console.warn('[attributeStore] Erro ao carregar atributos locais, resetando:', err);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     return [];
   }
 }
 
 function persist(items: ProductAttribute[]) {
-  const next = sortAttrs(items);
+  const safeItems = Array.isArray(items) ? items : [];
+  const next = sortAttrs(safeItems);
   memoryAttrs = next;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
+  }
   return next;
 }
 
 export function replaceAttributes(items: ProductAttribute[]) {
-  return persist(items.slice(0, MAX_ATTRIBUTES));
+  const safeItems = Array.isArray(items) ? items : [];
+  return persist(safeItems.slice(0, MAX_ATTRIBUTES));
 }
 
 /** Hidrata atributos do Nest (público no totem ou autenticado no painel). */
-export async function hydrateAttributesFromApi() {
-  const { isNestAuthed } = await import('../services/nestClient');
-  const { apiGetTotemPublicAttributes, apiListAttributes } = await import('../services/erpApi');
-  const remote = isNestAuthed()
-    ? await apiListAttributes().catch(() => apiGetTotemPublicAttributes())
-    : await apiGetTotemPublicAttributes();
-  return replaceAttributes(remote);
+export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
+  try {
+    const { isNestAuthed } = await import('../services/nestClient');
+    const { apiGetTotemPublicAttributes, apiListAttributes } = await import('../services/erpApi');
+    let remote: unknown = null;
+    if (isNestAuthed()) {
+      try {
+        remote = await apiListAttributes();
+      } catch {
+        remote = await apiGetTotemPublicAttributes().catch(() => null);
+      }
+    } else {
+      remote = await apiGetTotemPublicAttributes().catch(() => null);
+    }
+    if (Array.isArray(remote)) {
+      return replaceAttributes(remote as ProductAttribute[]);
+    }
+    return load();
+  } catch (err) {
+    console.warn('[attributeStore] Falha ao hidratar atributos da API:', err);
+    return load();
+  }
 }
 
 export function getAttributes() {
@@ -238,53 +274,61 @@ export async function saveAttributes(items: ProductAttribute[]) {
   return persist(items.slice(0, MAX_ATTRIBUTES));
 }
 
-export async function removeAttribute(id: string) {
+export async function removeAttribute(id: string): Promise<ProductAttribute[]> {
   const { isNestAuthed } = await import('../services/nestClient');
   if (isNestAuthed()) {
+    const { apiDeleteAttribute } = await import('../services/erpApi');
     try {
-      const { apiDeleteAttribute } = await import('../services/erpApi');
       await apiDeleteAttribute(id);
-    } catch (err) {
-      console.warn('[attributeStore] Falha ao excluir atributo no Nest, removendo localmente:', err);
+    } catch (err: unknown) {
+      const status =
+        typeof err === 'object' && err !== null && 'status' in err
+          ? (err as { status: number }).status
+          : 0;
+      // Se já não existe no backend (404), prossegue removendo localmente
+      if (status !== 404) {
+        throw err;
+      }
     }
   }
-  return persist(load().filter((item) => item.id !== id).slice(0, MAX_ATTRIBUTES));
+  return persist(load().filter((item) => item && item.id !== id).slice(0, MAX_ATTRIBUTES));
 }
 
 export function totemAttributes() {
   return load()
-    .filter((item) => item.active && item.useOnTotem)
+    .filter((item) => item && item.active && item.useOnTotem)
     .slice(0, MAX_ATTRIBUTES);
 }
 
 export function totemFilterAttributes() {
   return load()
-    .filter((item) => item.active && item.filterOnTotem)
+    .filter((item) => item && item.active && item.filterOnTotem)
     .slice(0, MAX_ATTRIBUTES);
 }
 
 export function stockAttributes() {
   return load()
-    .filter((item) => item.active && item.useOnStock)
+    .filter((item) => item && item.active && item.useOnStock)
     .slice(0, MAX_ATTRIBUTES);
 }
 
 export function productAttrValues(
   product: { attrs?: Record<string, string[]>; colors?: string[]; storages?: string[] },
-  attr: ProductAttribute,
+  attr?: ProductAttribute,
 ) {
-  const mapped = product.attrs?.[attr.id];
-  if (mapped?.length) return mapped;
-  const name = attr.name
+  if (!attr || !attr.id) return [];
+  const mapped = product?.attrs?.[attr.id];
+  if (Array.isArray(mapped) && mapped.length) return mapped;
+  const name = String(attr.name ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-  if (name.includes('cor') && product.colors?.length) return product.colors;
-  if ((name.includes('capac') || name.includes('armazen')) && product.storages?.length) {
+  if (name.includes('cor') && product?.colors?.length) return product.colors;
+  if ((name.includes('capac') || name.includes('armazen')) && product?.storages?.length) {
     return product.storages;
   }
   if (name.includes('retir') || attr.id === ATTR_RET) {
-    return product.attrs?.[attr.id] ?? [];
+    return product?.attrs?.[attr.id] ?? [];
   }
   return [];
 }
@@ -292,18 +336,19 @@ export function productAttrValues(
 /** Opções do picker no card: valores do produto, senão os valores cadastrados no atributo. */
 export function resolveTotemAttrOptions(
   product: { attrs?: Record<string, string[]>; colors?: string[]; storages?: string[] },
-  attr: ProductAttribute,
+  attr?: ProductAttribute,
 ) {
+  if (!attr) return [];
   const fromProduct = productAttrValues(product, attr);
   if (fromProduct.length) return fromProduct;
-  return (attr.values ?? []).filter(Boolean);
+  return Array.isArray(attr.values) ? attr.values.filter(Boolean) : [];
 }
 
 /** Atributos que aparecem no card (totem + filtro). */
 export function totemCardAttributes() {
   const byId = new Map<string, ProductAttribute>();
   for (const item of load()) {
-    if (!item.active) continue;
+    if (!item || !item.active) continue;
     if (!item.useOnTotem && !item.filterOnTotem) continue;
     byId.set(item.id, item);
   }

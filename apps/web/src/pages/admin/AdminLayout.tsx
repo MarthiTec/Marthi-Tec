@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
@@ -411,7 +412,9 @@ export function AdminLayout() {
           ) : !aclAllowed ? (
             <AccessDeniedPage pathname={location.pathname} />
           ) : (
-            <Outlet />
+            <ErrorBoundary fallbackTitle="Erro ao carregar módulo do painel">
+              <Outlet />
+            </ErrorBoundary>
           )}
         </div>
       </div>

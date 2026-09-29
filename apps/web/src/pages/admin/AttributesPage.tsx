@@ -62,7 +62,14 @@ export function AttributesPage() {
   const totemSurface = isTotemCatalogPath(location.pathname);
   const catalogFull = hasCapability('catalog.full');
 
-  const [items, setItems] = useState(() => getAttributes());
+  const [items, setItems] = useState<ProductAttribute[]>(() => {
+    try {
+      const initial = getAttributes();
+      return Array.isArray(initial) ? initial : [];
+    } catch {
+      return [];
+    }
+  });
   const [form, setForm] = useState(() => emptyForm(totemSurface));
   const [valueDraft, setValueDraft] = useState('');
   const [deltaDraft, setDeltaDraft] = useState('0');
@@ -77,11 +84,16 @@ export function AttributesPage() {
   useEffect(() => {
     let active = true;
     function refresh() {
-      setItems(getAttributes());
+      try {
+        const next = getAttributes();
+        if (active) setItems(Array.isArray(next) ? next : []);
+      } catch {
+        /* ignore */
+      }
     }
     void hydrateAttributesFromApi()
       .then((res) => {
-        if (active && Array.isArray(res) && res.length > 0) {
+        if (active && Array.isArray(res)) {
           setItems(res);
         }
       })
@@ -97,17 +109,26 @@ export function AttributesPage() {
   }, []);
 
   const readOnly = mode === 'view';
-  const atLimit = mode === 'new' && items.length >= MAX_ATTRIBUTES;
+
+  const safeItems = useMemo(
+    () =>
+      (Array.isArray(items) ? items : []).filter(
+        (item): item is ProductAttribute => Boolean(item && typeof item === 'object'),
+      ),
+    [items],
+  );
+
+  const atLimit = mode === 'new' && safeItems.length >= MAX_ATTRIBUTES;
 
   const filtered = useMemo(
     () =>
-      items.filter(
+      safeItems.filter(
         (item) =>
-          matchesStatus(item.active, status) &&
-          matchesQuery(`${item.name} ${item.values.join(' ')}`, query) &&
-          (!totemSurface || item.useOnTotem || item.filterOnTotem),
+          matchesStatus(Boolean(item.active), status) &&
+          matchesQuery(`${item.name || ''} ${(item.values || []).join(' ')}`, query) &&
+          (!totemSurface || Boolean(item.useOnTotem) || Boolean(item.filterOnTotem)),
       ),
-    [items, query, status, totemSurface],
+    [safeItems, query, status, totemSurface],
   );
 
   function resetForm() {
@@ -133,15 +154,16 @@ export function AttributesPage() {
     if (readOnly) return;
     const next = valueDraft.trim();
     if (!next) return;
-    if (form.values.some((item) => item.toLowerCase() === next.toLowerCase())) {
+    const currentValues = Array.isArray(form.values) ? form.values : [];
+    if (currentValues.some((item) => (item || '').toLowerCase() === next.toLowerCase())) {
       setValueDraft('');
       return;
     }
     const delta = Number(deltaDraft.replace(',', '.')) || 0;
     setForm({
       ...form,
-      values: [...form.values, next],
-      priceDeltas: { ...form.priceDeltas, [next]: delta },
+      values: [...currentValues, next],
+      priceDeltas: { ...(form.priceDeltas || {}), [next]: delta },
     });
     setValueDraft('');
     setDeltaDraft('0');
@@ -158,10 +180,11 @@ export function AttributesPage() {
       return;
     }
 
-    let nextValues = [...form.values];
-    let nextDeltas = { ...form.priceDeltas };
+    const currentValues = Array.isArray(form.values) ? form.values : [];
+    let nextValues = [...currentValues];
+    let nextDeltas = { ...(form.priceDeltas || {}) };
     const draftVal = valueDraft.trim();
-    if (draftVal && !nextValues.some((v) => v.toLowerCase() === draftVal.toLowerCase())) {
+    if (draftVal && !nextValues.some((v) => (v || '').toLowerCase() === draftVal.toLowerCase())) {
       const delta = Number(deltaDraft.replace(',', '.')) || 0;
       nextValues.push(draftVal);
       nextDeltas[draftVal] = delta;
@@ -174,7 +197,7 @@ export function AttributesPage() {
       return;
     }
 
-    if (mode === 'new' && items.length >= MAX_ATTRIBUTES) {
+    if (mode === 'new' && safeItems.length >= MAX_ATTRIBUTES) {
       setError(`Limite de ${MAX_ATTRIBUTES} atributos por loja atingido. Edite ou exclua um existente.`);
       return;
     }
@@ -194,10 +217,10 @@ export function AttributesPage() {
     try {
       if (mode === 'edit' && selectedId) {
         const updated = await updateAttribute(selectedId, payload);
-        setItems(updated);
+        setItems(Array.isArray(updated) ? updated : []);
       } else {
         const created = await createAttribute(payload);
-        setItems(created);
+        setItems(Array.isArray(created) ? created : []);
       }
       resetForm();
       setFormVisible(false);
@@ -209,24 +232,26 @@ export function AttributesPage() {
   }
 
   function loadItem(item: ProductAttribute, nextMode: Mode) {
+    if (!item) return;
     setSelectedId(item.id);
     setMode(nextMode);
     setFormVisible(true);
     setError('');
     setForm({
-      name: item.name,
-      values: item.values,
+      name: item.name || '',
+      values: Array.isArray(item.values) ? [...item.values] : [],
       priceDeltas: { ...(item.priceDeltas ?? {}) },
-      useOnTotem: item.useOnTotem,
-      filterOnTotem: item.filterOnTotem,
-      useOnStock: item.useOnStock,
-      sort: item.sort,
-      active: item.active,
+      useOnTotem: Boolean(item.useOnTotem),
+      filterOnTotem: Boolean(item.filterOnTotem),
+      useOnStock: Boolean(item.useOnStock),
+      sort: typeof item.sort === 'number' ? item.sort : 10,
+      active: item.active !== false,
     });
   }
 
   function handleDuplicate(item: ProductAttribute) {
-    if (items.length >= MAX_ATTRIBUTES) {
+    if (!item) return;
+    if (safeItems.length >= MAX_ATTRIBUTES) {
       setError(`Limite de ${MAX_ATTRIBUTES} atributos por loja atingido. Edite ou exclua um existente.`);
       return;
     }
@@ -235,27 +260,33 @@ export function AttributesPage() {
     setFormVisible(true);
     setError('');
     setForm({
-      name: `${item.name} (cópia)`,
-      values: [...item.values],
+      name: `${item.name || ''} (cópia)`.trim(),
+      values: Array.isArray(item.values) ? [...item.values] : [],
       priceDeltas: { ...(item.priceDeltas ?? {}) },
-      useOnTotem: item.useOnTotem,
-      filterOnTotem: item.filterOnTotem,
-      useOnStock: item.useOnStock,
-      sort: items.length + 1,
-      active: item.active,
+      useOnTotem: Boolean(item.useOnTotem),
+      filterOnTotem: Boolean(item.filterOnTotem),
+      useOnStock: Boolean(item.useOnStock),
+      sort: safeItems.length + 1,
+      active: item.active !== false,
     });
     setValueDraft('');
     setDeltaDraft('0');
   }
 
   async function remove(item: ProductAttribute) {
-    if (!confirmDelete(`o atributo ${item.name}`)) return;
+    if (!item || !confirmDelete(`o atributo ${item.name || ''}`)) return;
     setError('');
     try {
-      setItems(await removeAttribute(item.id));
+      const updated = await removeAttribute(item.id);
+      setItems(Array.isArray(updated) ? updated : []);
       if (selectedId === item.id) closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao remover atributo.');
+      try {
+        setItems(getAttributes());
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -326,39 +357,47 @@ export function AttributesPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
-                      </td>
-                      <td>
-                        {item.values
-                          .map((value) => {
-                            const delta = item.priceDeltas?.[value] ?? 0;
-                            return delta ? `${value} (${moneyDelta(delta)})` : value;
-                          })
-                          .join(', ')}
-                      </td>
-                      <td>
-                        {[
-                          item.useOnTotem ? 'Totem' : null,
-                          item.filterOnTotem ? 'Filtro' : null,
-                          item.useOnStock ? 'Estoque' : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ') || '—'}
-                      </td>
-                      <td>{item.active ? 'Ativo' : 'Inativo'}</td>
-                      <td className="admin-table__actions">
-                        <CrudRowActions
-                          onView={() => loadItem(item, 'view')}
-                          onEdit={() => loadItem(item, 'edit')}
-                          onDuplicate={() => handleDuplicate(item)}
-                          onDelete={() => void remove(item)}
-                        />
-                      </td>
-                    </tr>
-                  ))
+                  filtered.map((item) => {
+                    const values = Array.isArray(item.values) ? item.values : [];
+                    const deltas = item.priceDeltas || {};
+                    return (
+                      <tr key={item.id || item.name}>
+                        <td>
+                          <CrudNameButton onClick={() => loadItem(item, 'view')}>
+                            {item.name || 'Sem nome'}
+                          </CrudNameButton>
+                        </td>
+                        <td>
+                          {values.length === 0
+                            ? '—'
+                            : values
+                                .map((value) => {
+                                  const delta = deltas[value] ?? 0;
+                                  return delta ? `${value} (${moneyDelta(delta)})` : value;
+                                })
+                                .join(', ')}
+                        </td>
+                        <td>
+                          {[
+                            item.useOnTotem ? 'Totem' : null,
+                            item.filterOnTotem ? 'Filtro' : null,
+                            item.useOnStock ? 'Estoque' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || '—'}
+                        </td>
+                        <td>{item.active ? 'Ativo' : 'Inativo'}</td>
+                        <td className="admin-table__actions">
+                          <CrudRowActions
+                            onView={() => loadItem(item, 'view')}
+                            onEdit={() => loadItem(item, 'edit')}
+                            onDuplicate={() => handleDuplicate(item)}
+                            onDelete={() => void remove(item)}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -472,8 +511,9 @@ export function AttributesPage() {
                   className="btn btn--ghost"
                   title={`Incluir ${preset.values.join(', ')}`}
                   onClick={() => {
-                    const merged = [...form.values];
-                    const priceDeltas = { ...form.priceDeltas };
+                    const currentValues = Array.isArray(form.values) ? form.values : [];
+                    const merged = [...currentValues];
+                    const priceDeltas = { ...(form.priceDeltas || {}) };
                     for (const value of preset.values) {
                       if (!merged.includes(value)) {
                         merged.push(value);
@@ -482,7 +522,7 @@ export function AttributesPage() {
                     }
                     setForm({
                       ...form,
-                      name: form.name.trim() || 'Tamanho',
+                      name: (form.name || '').trim() || 'Tamanho',
                       values: merged,
                       priceDeltas,
                       useOnStock: true,
@@ -496,7 +536,7 @@ export function AttributesPage() {
               ))}
             </div>
           ) : null}
-          {form.values.length > 0 ? (
+          {Array.isArray(form.values) && form.values.length > 0 ? (
             <div className="admin-table-container">
               <table className="admin-table attr-values" style={{ marginTop: 12 }}>
                 <thead>
@@ -514,13 +554,13 @@ export function AttributesPage() {
                         <input
                           type="number"
                           step="0.01"
-                          value={form.priceDeltas[value] ?? 0}
+                          value={form.priceDeltas?.[value] ?? 0}
                           disabled={readOnly || saving}
                           onChange={(e) =>
                             setForm({
                               ...form,
                               priceDeltas: {
-                                ...form.priceDeltas,
+                                ...(form.priceDeltas || {}),
                                 [value]: Number(e.target.value) || 0,
                               },
                             })
@@ -533,11 +573,11 @@ export function AttributesPage() {
                           className="btn btn--ghost"
                           disabled={readOnly || saving}
                           onClick={() => {
-                            const nextDeltas = { ...form.priceDeltas };
+                            const nextDeltas = { ...(form.priceDeltas || {}) };
                             delete nextDeltas[value];
                             setForm({
                               ...form,
-                              values: form.values.filter((item) => item !== value),
+                              values: (form.values || []).filter((item) => item !== value),
                               priceDeltas: nextDeltas,
                             });
                           }}
@@ -592,7 +632,7 @@ export function AttributesPage() {
                 type="button"
                 className="btn btn--primary"
                 onClick={() => void submit()}
-                disabled={saving || (mode === 'new' && items.length >= MAX_ATTRIBUTES)}
+                disabled={saving || (mode === 'new' && safeItems.length >= MAX_ATTRIBUTES)}
               >
                 {saving ? 'Salvando…' : mode === 'edit' ? 'Salvar alterações' : 'Cadastrar atributo'}
               </button>
@@ -630,7 +670,7 @@ export function AttributesPage() {
             </p>
           ) : (
             <p className="empty" style={{ marginTop: 12 }}>
-              {items.length} de {MAX_ATTRIBUTES} atributos
+              {safeItems.length} de {MAX_ATTRIBUTES} atributos
             </p>
           )}
         </article>

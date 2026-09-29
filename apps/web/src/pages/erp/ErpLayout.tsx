@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
@@ -234,7 +235,9 @@ export function ErpLayout() {
             <div id="panel-page-actions" className="erp-app__heading-actions" />
           </header>
           <div className="erp-app__content">
-            <Outlet />
+            <ErrorBoundary fallbackTitle="Erro ao carregar módulo da retaguarda">
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </div>
       </div>
