@@ -81,6 +81,7 @@ export function TotemSettingsPage() {
     () => initial.notifyCustomerOnLead,
   );
   const [locationLabel, setLocationLabel] = useState(() => initial.locationLabel);
+  const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,6 +141,7 @@ export function TotemSettingsPage() {
         storeWhatsApp,
         notifyCustomerOnLead,
         locationLabel,
+        cardFeePercent,
       });
       setError(null);
       setSaved(true);
@@ -659,6 +661,32 @@ export function TotemSettingsPage() {
           O totem lista <strong>somente</strong> produtos do estoque no banco com “Exibir no totem”
           marcado. O catálogo demo (iPhones hardcoded / seed de vitrine) foi removido.
         </p>
+      </article>
+
+      <article className="admin-card admin-card--form">
+        <h2>Taxa de Cartão / Parcelamento</h2>
+        <p>
+          Percentual padrão de taxa de cartão (%) embutido no cálculo de parcelas (ex.: 12x) exibido na
+          vitrine e no checkout do totem. Você também pode definir uma taxa específica por produto no
+          cadastro do catálogo.
+        </p>
+        <div className="admin-form">
+          <label>
+            Taxa de cartão padrão do Totem (%)
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              value={cardFeePercent}
+              placeholder="0"
+              onChange={(event) => {
+                setCardFeePercent(Math.max(0, Math.min(100, Number(event.target.value) || 0)));
+                markDirty();
+              }}
+            />
+          </label>
+        </div>
       </article>
 
       <article className="admin-card admin-card--form">

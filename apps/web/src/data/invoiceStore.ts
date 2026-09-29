@@ -33,11 +33,23 @@ export type Invoice = {
   id: string;
   kind: InvoiceKind;
   number: string;
+  series?: string;
+  natOp?: string;
+  movementAt?: string;
+  modFrete?: string;
+  vFrete?: number;
+  vDesc?: number;
+  vOutro?: number;
+  infCpl?: string;
   status: InvoiceStatus;
   /** Tipo do documento fiscal na emissão (finNFe / reforma). */
   documentPurpose: FiscalDocPurpose;
   supplierId: string;
   customerName: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
   issuedAt: string;
   notes: string;
   lines: InvoiceLine[];
@@ -78,6 +90,10 @@ function load(): InvoiceState {
       ? parsed.invoices.map((item) => ({
           ...item,
           documentPurpose: (item as Invoice).documentPurpose ?? 'normal',
+          customerDocument: (item as Invoice).customerDocument ?? '',
+          cfopCode: (item as Invoice).cfopCode ?? '',
+          targetStoreId: (item as Invoice).targetStoreId ?? '',
+          refNfeKey: (item as Invoice).refNfeKey ?? '',
         }))
       : [];
     return { invoices };
@@ -100,6 +116,10 @@ function mapInvoice(row: ApiInvoice): Invoice {
     documentPurpose: (row.documentPurpose as FiscalDocPurpose) || 'normal',
     supplierId: row.supplierId ?? '',
     customerName: row.customerName ?? '',
+    customerDocument: row.customerDocument ?? '',
+    cfopCode: row.cfopCode ?? '',
+    targetStoreId: row.targetStoreId ?? '',
+    refNfeKey: row.refNfeKey ?? '',
     issuedAt: row.issuedAt,
     notes: row.notes ?? '',
     lines: (row.lines ?? []).map((line) => ({
@@ -146,11 +166,19 @@ export function getInvoice(id: string) {
   return load().invoices.find((item) => item.id === id) ?? null;
 }
 
-export function invoiceTotal(invoice: Invoice) {
+export function invoiceItemsTotal(invoice: Invoice): number {
   return invoice.lines.reduce((sum, line) => {
     const unit = invoice.kind === 'entry' ? line.unitCost : line.unitPrice;
     return sum + unit * line.qty;
   }, 0);
+}
+
+export function invoiceTotal(invoice: Invoice): number {
+  const items = invoiceItemsTotal(invoice);
+  const frete = Number(invoice.vFrete) || 0;
+  const outro = Number(invoice.vOutro) || 0;
+  const desc = Number(invoice.vDesc) || 0;
+  return Math.max(0, items + frete + outro - desc);
 }
 
 export type InvoiceResult =
@@ -160,9 +188,22 @@ export type InvoiceResult =
 export async function createInvoice(input: {
   kind: InvoiceKind;
   number?: string;
+  series?: string;
+  natOp?: string;
   supplierId?: string;
   customerName?: string;
+  customerDocument?: string;
+  cfopCode?: string;
+  targetStoreId?: string;
+  refNfeKey?: string;
+  documentPurpose?: FiscalDocPurpose;
   issuedAt?: string;
+  movementAt?: string;
+  modFrete?: string;
+  vFrete?: number;
+  vDesc?: number;
+  vOutro?: number;
+  infCpl?: string;
   notes?: string;
 }): Promise<InvoiceResult> {
   if (input.kind === 'entry' && input.supplierId && !getSupplier(input.supplierId)) {
@@ -176,9 +217,13 @@ export async function createInvoice(input: {
         number: input.number,
         supplierId: input.supplierId,
         customerName: input.customerName,
+        customerDocument: input.customerDocument,
+        cfopCode: input.cfopCode,
+        targetStoreId: input.targetStoreId,
+        refNfeKey: input.refNfeKey,
         issuedAt: input.issuedAt,
         notes: input.notes,
-        documentPurpose: 'normal',
+        documentPurpose: input.documentPurpose ?? 'normal',
       });
       const invoice = mapInvoice(row);
       const state = load();
@@ -195,11 +240,23 @@ export async function createInvoice(input: {
     id: uid(input.kind === 'entry' ? 'NFE' : 'NFS'),
     kind: input.kind,
     number: (input.number ?? '').trim() || uid('DOC'),
+    series: input.series || '1',
+    natOp: input.natOp || '',
     status: 'draft',
-    documentPurpose: 'normal',
+    documentPurpose: input.documentPurpose ?? 'normal',
     supplierId: input.supplierId ?? '',
     customerName: (input.customerName ?? '').trim(),
+    customerDocument: (input.customerDocument ?? '').trim(),
+    cfopCode: (input.cfopCode ?? '').trim(),
+    targetStoreId: (input.targetStoreId ?? '').trim(),
+    refNfeKey: (input.refNfeKey ?? '').trim(),
     issuedAt: input.issuedAt || stamp.slice(0, 10),
+    movementAt: input.movementAt || stamp.slice(0, 10),
+    modFrete: input.modFrete || '9',
+    vFrete: input.vFrete || 0,
+    vDesc: input.vDesc || 0,
+    vOutro: input.vOutro || 0,
+    infCpl: input.infCpl || '',
     notes: (input.notes ?? '').trim(),
     lines: [],
     createdAt: stamp,
@@ -216,7 +273,25 @@ export async function updateInvoiceDraft(
   patch: Partial<
     Pick<
       Invoice,
-      'number' | 'supplierId' | 'customerName' | 'issuedAt' | 'notes' | 'lines' | 'documentPurpose'
+      | 'number'
+      | 'series'
+      | 'natOp'
+      | 'movementAt'
+      | 'modFrete'
+      | 'vFrete'
+      | 'vDesc'
+      | 'vOutro'
+      | 'infCpl'
+      | 'supplierId'
+      | 'customerName'
+      | 'customerDocument'
+      | 'cfopCode'
+      | 'targetStoreId'
+      | 'refNfeKey'
+      | 'issuedAt'
+      | 'notes'
+      | 'lines'
+      | 'documentPurpose'
     >
   >,
 ): Promise<InvoiceResult> {
@@ -229,6 +304,10 @@ export async function updateInvoiceDraft(
         number: patch.number,
         supplierId: patch.supplierId,
         customerName: patch.customerName,
+        customerDocument: patch.customerDocument,
+        cfopCode: patch.cfopCode,
+        targetStoreId: patch.targetStoreId,
+        refNfeKey: patch.refNfeKey,
         issuedAt: patch.issuedAt,
         notes: patch.notes,
         documentPurpose: patch.documentPurpose,

@@ -15,6 +15,7 @@ export type StoreCustomization = {
   showImei: boolean;
   showDevicePassword: boolean;
   showTablesAndKitchen: boolean;
+  showCardapioDigital: boolean;
   showTechnicalBench: boolean;
   showSizeColorGrid: boolean;
   updatedAt: string;
@@ -43,6 +44,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: false,
+      showCardapioDigital: false,
       showTechnicalBench: true,
       showSizeColorGrid: false,
     },
@@ -59,6 +61,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
+      showCardapioDigital: false,
       showTechnicalBench: false,
       showSizeColorGrid: true,
     },
@@ -69,12 +72,13 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     icon: '🍔',
     badge: 'Alimentação & Bebidas',
     description:
-      'Bares, lanchonetes, restaurantes e cafeterias. Ativa mesas, pedidos por comanda e tela de cozinha. Oculta IMEI e senhas de aparelhos.',
+      'Bares, lanchonetes, restaurantes e cafeterias. Ativa mesas, pedidos por comanda, tela de cozinha e cardápio digital. Oculta IMEI e senhas de aparelhos.',
     recommendedModules: ['totem', 'erp'],
     config: {
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: true,
+      showCardapioDigital: true,
       showTechnicalBench: false,
       showSizeColorGrid: false,
     },
@@ -91,6 +95,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
+      showCardapioDigital: false,
       showTechnicalBench: false,
       showSizeColorGrid: false,
     },
@@ -107,6 +112,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
+      showCardapioDigital: false,
       showTechnicalBench: true,
       showSizeColorGrid: false,
     },
@@ -123,6 +129,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: true,
+      showCardapioDigital: true,
       showTechnicalBench: true,
       showSizeColorGrid: true,
     },

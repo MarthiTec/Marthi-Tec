@@ -6,7 +6,14 @@ const CARDS = [
     to: '/fiscal/nfe',
     tag: 'NF-e',
     title: 'Nota fiscal eletrônica',
-    text: 'Entrada e saída de mercadorias, transmissão SEFAZ e DANFE.',
+    text: 'Entrada, devolução, transferência, bonificação e saída com transmissão SEFAZ e DANFE.',
+    ready: () => issuerIsReadyForNfe(),
+  },
+  {
+    to: '/caixa',
+    tag: 'NFC-e',
+    title: 'Nota do Consumidor (PDV)',
+    text: 'Emissão no caixa/PDV com protocolo SEFAZ, chave de 44 dígitos e DANFCE.',
     ready: () => issuerIsReadyForNfe(),
   },
   {

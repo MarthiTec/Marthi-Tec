@@ -392,6 +392,16 @@ export function saveDiscountRules(rules: LicensingDiscountRule[]) {
   window.dispatchEvent(new Event(MULTI_STORE_CHANGED_EVENT));
 }
 
+export function deleteDiscountRule(ruleId: string) {
+  const current = listDiscountRules();
+  const next = current.filter((r) => r.id !== ruleId);
+  saveDiscountRules(next);
+}
+
+export function resetDiscountRulesToDefault() {
+  saveDiscountRules(DEFAULT_DISCOUNT_RULES);
+}
+
 /**
  * Encontra a regra comercial aplicável dado o número total de lojas contratadas.
  */

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
@@ -290,22 +291,7 @@ export function CaixaPage() {
   const [recoveredDrafts, setRecoveredDrafts] = useState<PosDraftSale[]>([]);
   const [selectedRecoveryDraft, setSelectedRecoveryDraft] = useState<PosDraftSale | null>(null);
   const [recoveryPromptOpen, setRecoveryPromptOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  );
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const location = useLocation();
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   useEffect(() => {
     function onQueueUpdate() {
@@ -454,12 +440,9 @@ export function CaixaPage() {
     }
 
     if (lines.length === 0) {
-      setSaveStatus('saved');
       void deleteDraftSale(currentLocalId);
       return;
     }
-
-    setSaveStatus('saving');
 
     persistTimeoutRef.current = setTimeout(async () => {
       try {
@@ -519,10 +502,8 @@ export function CaixaPage() {
         };
 
         await saveDraftSale(draft);
-        setSaveStatus('saved');
       } catch (err) {
         console.error('[CaixaPage] Erro ao persistir venda no IndexedDB:', err);
-        setSaveStatus('saved');
       }
     }, 40);
 
@@ -1438,6 +1419,11 @@ export function CaixaPage() {
           amount: saleTotal,
           customerDocument: saleCpf,
           fiscalIntegrated: fiscalOn,
+          items: pricedLines.map((line) => ({
+            name: line.name,
+            qty: line.qty,
+            unitPrice: line.unitPrice,
+          })),
         });
         if (emitted.ok) {
           docMsg = ` · ${FISCAL_KIND_LABEL[emitted.document.kind]} ${emitted.document.number}`;
@@ -1729,34 +1715,12 @@ export function CaixaPage() {
       }`}
     >
       <header className="caixa-app__top">
-        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="caixa-app__mark" />
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
-        </div>
-        <div
-          className={`caixa-persistence-pill ${isOnline ? 'is-online' : 'is-offline'}`}
-          title={
-            isOnline
-              ? 'Conexão ativa · Venda em andamento sendo salva continuamente no IndexedDB local.'
-              : 'Modo Offline · Sem conexão com a internet. Todos os bipes e alterações estão sendo salvos com segurança no IndexedDB deste computador.'
-          }
-        >
-          <span className="caixa-persistence-pill__dot" />
-          <span className="caixa-persistence-pill__label">
-            {saveStatus === 'saving' ? (
-              'Salvando…'
-            ) : isOnline ? (
-              <>
-                <span className="pdv__desk-only">Online · </span>Salvo local
-              </>
-            ) : (
-              <>
-                <span className="pdv__desk-only">Offline · </span>Salvo no disco
-              </>
-            )}
-          </span>
         </div>
         <div className="caixa-app__top-actions">
           {totemQueue.length > 0 ? (

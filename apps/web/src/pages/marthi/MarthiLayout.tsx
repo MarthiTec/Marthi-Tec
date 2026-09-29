@@ -33,7 +33,9 @@ export function MarthiLayout() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!staff) {
     return <Navigate to="/painel" replace />;
@@ -88,6 +90,14 @@ export function MarthiLayout() {
           >
             <AdminIcon name="receipt" />
             <span className="admin__link-label">Planos comerciais</span>
+          </NavLink>
+          <NavLink
+            to="/admin/descontos"
+            title="Desconto progressivo"
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="ops" />
+            <span className="admin__link-label">Desconto progressivo</span>
           </NavLink>
           <NavLink
             to="/admin/recebimentos"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
@@ -147,6 +148,23 @@ export function MarthiPlansPage() {
           </button>
         </div>
       </header>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(148, 163, 184, 0.25)', paddingBottom: '8px' }}>
+        <button
+          type="button"
+          className="btn btn--primary"
+          style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '0.86rem' }}
+        >
+          Planos Comerciais ({plans.length})
+        </button>
+        <Link
+          to="/admin/descontos"
+          className="btn btn--ghost"
+          style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '0.86rem', textDecoration: 'none' }}
+        >
+          Desconto Progressivo Multi-Loja →
+        </Link>
+      </div>
 
       {feedback ? (
         <div className="marthi-feedback-banner">

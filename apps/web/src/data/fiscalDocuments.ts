@@ -15,6 +15,12 @@ import {
   issuerIsReadyForNfse,
   SEFAZ_ENV_LABEL,
 } from './fiscalIssuerStore';
+import { cleanDocument, formatCpfCnpj } from '../utils/documentUtils';
+import {
+  type FiscalDocPurpose,
+  NFE_DOC_PURPOSE_LABEL,
+  defaultCfopForPurpose,
+} from './fiscalTaxTables';
 
 const STORAGE_KEY = 'marthi.fiscal.docs.v1';
 
@@ -34,7 +40,10 @@ export type NfeSefazTrace = {
   statusMessage: string;
   xmlDigest: string;
   /** Tipo do documento na emissão. */
-  documentPurpose?: 'normal' | 'devolucao' | 'credito_reforma' | 'debito_reforma';
+  documentPurpose?: FiscalDocPurpose;
+  cfopCode?: string;
+  refNfeKey?: string;
+  targetStoreId?: string;
 };
 
 /** Campos da DPS (Declaração de Prestação de Serviços) — Portal Nacional. */
@@ -71,6 +80,9 @@ export type FiscalDocument = {
   refId: string;
   customerName: string;
   customerDocument?: string;
+  cfopCode?: string;
+  refNfeKey?: string;
+  targetStoreId?: string;
   amount: number;
   number: string;
   series: string;
@@ -222,6 +234,7 @@ export function emitNfeFromSale(input: {
   amount: number;
   asNfce?: boolean;
   customerDocument?: string;
+  items?: { name: string; qty: number; unitPrice: number }[];
 }): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
   if (!input.orderId) return { ok: false, error: 'Pedido inválido.' };
   if (input.amount <= 0) return { ok: false, error: 'Valor deve ser maior que zero.' };
@@ -229,8 +242,14 @@ export function emitNfeFromSale(input: {
   const existing = getFiscalDocumentForRef('sale', input.orderId);
   if (existing) return { ok: false, error: `Já existe ${FISCAL_KIND_LABEL[existing.kind]} para este pedido.` };
 
+  const issuer = getFiscalIssuerSettings();
   const kind: FiscalDocKind = input.asNfce ? 'nfce' : 'nfe';
+  const series = input.asNfce ? (issuer.nfceSeries || '1') : (issuer.nfeSeries || '1');
+  const receipt = protocolNumber();
   const state = load();
+
+  const docClean = input.customerDocument ? cleanDocument(input.customerDocument) : '';
+
   const document: FiscalDocument = {
     id: uid('DFE'),
     kind,
@@ -238,17 +257,44 @@ export function emitNfeFromSale(input: {
     refType: 'sale',
     refId: input.orderId,
     customerName: input.customerName || 'Consumidor Final',
-    customerDocument: input.customerDocument || '',
+    customerDocument: docClean,
     amount: input.amount,
     number: String(1000 + state.documents.length + 1),
-    series: '1',
+    series,
     accessKey: fakeAccessKey(44),
-    provider: 'mock',
+    provider: 'sefaz_mock',
     createdAt: new Date().toISOString(),
-    message: `${FISCAL_KIND_LABEL[kind]} simulada (homologação local). Integrar ACBr API / SEFAZ em produção.`,
+    message: `${FISCAL_KIND_LABEL[kind]} emitida · protocolo ${receipt} · ambiente ${SEFAZ_ENV_LABEL[issuer.environment]}`,
+    items: input.items,
+    nfe: {
+      environment: issuer.environment,
+      protocol: receipt,
+      receiptNumber: `REC${receipt.slice(0, 8)}`,
+      consultedAt: new Date().toISOString(),
+      statusCode: '100',
+      statusMessage: `Autorizado o uso da ${FISCAL_KIND_LABEL[kind]}`,
+      xmlDigest: xmlDigest(),
+      documentPurpose: 'normal',
+      cfopCode: '5102',
+    },
   };
   state.documents.unshift(document);
   save(state);
+
+  const family = kind === 'nfce' ? 'nfce' : 'nfe';
+  archiveFiscalXml({
+    family,
+    fileName: `${kind.toUpperCase()}-${document.number}-${document.accessKey.slice(0, 8)}.xml`,
+    xml: buildNfeXmlStub(document),
+    refId: input.orderId,
+  });
+  void appendFiscalLog({
+    family,
+    action: 'emitir',
+    detail: `${document.number}/${document.series} · prot. ${receipt} · ${SEFAZ_ENV_LABEL[issuer.environment]}`,
+    refId: input.orderId,
+  });
+
   return { ok: true, document };
 }
 
@@ -259,6 +305,7 @@ export function emitSaleCheckoutDocument(input: {
   amount: number;
   customerDocument?: string;
   fiscalIntegrated: boolean;
+  items?: { name: string; qty: number; unitPrice: number }[];
 }): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
   if (input.fiscalIntegrated) {
     return emitNfeFromSale({
@@ -267,6 +314,7 @@ export function emitSaleCheckoutDocument(input: {
       amount: input.amount,
       asNfce: true,
       customerDocument: input.customerDocument,
+      items: input.items,
     });
   }
 
@@ -351,7 +399,7 @@ export function emitNfseFromOs(
     aliqIss,
     vIss,
     itemLc116: input.itemLc116?.trim() || service.itemLc116,
-    tomadorDocument: (input.customerDocument ?? '').replace(/\D/g, ''),
+    tomadorDocument: cleanDocument(input.customerDocument ?? ''),
     tomadorName: input.customerName || 'Tomador',
     protocoloAdn: fakeProtocoloAdn(),
   };
@@ -434,7 +482,10 @@ export type TransmitNfeInvoiceInput = {
   items: { name: string; qty: number; unitPrice: number }[];
   /** NFC-e só faz sentido em saída ao consumidor; entrada usa NF-e. */
   asNfce?: boolean;
-  documentPurpose?: 'normal' | 'devolucao' | 'credito_reforma' | 'debito_reforma';
+  documentPurpose?: FiscalDocPurpose;
+  cfopCode?: string;
+  refNfeKey?: string;
+  targetStoreId?: string;
 };
 
 /**
@@ -470,14 +521,9 @@ export function transmitNfeForInvoice(
   const series = input.asNfce ? issuer.nfceSeries || '1' : issuer.nfeSeries || '1';
   const receipt = protocolNumber();
   const purpose = input.documentPurpose ?? 'normal';
-  const purposeLabel =
-    purpose === 'devolucao'
-      ? 'Devolução'
-      : purpose === 'credito_reforma'
-        ? 'Crédito reforma'
-        : purpose === 'debito_reforma'
-          ? 'Débito reforma'
-          : 'Normal';
+  const purposeLabel = NFE_DOC_PURPOSE_LABEL[purpose] || 'Normal';
+  const cfop = input.cfopCode?.trim() || defaultCfopForPurpose(purpose, input.kind);
+  const docClean = input.customerDocument ? cleanDocument(input.customerDocument) : '';
   const state = load();
 
   const document: FiscalDocument = {
@@ -487,14 +533,17 @@ export function transmitNfeForInvoice(
     refType: 'invoice',
     refId: input.invoiceId,
     customerName: input.customerName || (input.kind === 'entry' ? 'Fornecedor' : 'Destinatário'),
-    customerDocument: input.customerDocument || '',
+    customerDocument: docClean,
+    cfopCode: cfop,
+    refNfeKey: input.refNfeKey?.trim() || '',
+    targetStoreId: input.targetStoreId || '',
     amount: input.amount,
     number: String(3000 + state.documents.length + 1),
     series,
     accessKey: fakeAccessKey(44),
     provider: 'sefaz_mock',
     createdAt: new Date().toISOString(),
-    message: `${FISCAL_KIND_LABEL[kind]} ${purposeLabel} · ambiente ${SEFAZ_ENV_LABEL[issuer.environment]} · protocolo ${receipt}`,
+    message: `${FISCAL_KIND_LABEL[kind]} ${purposeLabel} · CFOP ${cfop} · ambiente ${SEFAZ_ENV_LABEL[issuer.environment]} · protocolo ${receipt}`,
     items: input.items,
     nfe: {
       environment: issuer.environment,
@@ -502,9 +551,12 @@ export function transmitNfeForInvoice(
       receiptNumber: `REC${receipt.slice(0, 8)}`,
       consultedAt: new Date().toISOString(),
       statusCode: '100',
-      statusMessage: 'Autorizado o uso da NF-e',
+      statusMessage: `Autorizado o uso da ${FISCAL_KIND_LABEL[kind]}`,
       xmlDigest: xmlDigest(),
       documentPurpose: purpose,
+      cfopCode: cfop,
+      refNfeKey: input.refNfeKey?.trim() || '',
+      targetStoreId: input.targetStoreId || '',
     },
   };
 
@@ -620,12 +672,16 @@ export function buildDanfeHtml(document: FiscalDocument) {
   const envLabel = document.nfe
     ? SEFAZ_ENV_LABEL[document.nfe.environment]
     : SEFAZ_ENV_LABEL[issuer.environment];
+  const purpose = document.nfe?.documentPurpose ?? 'normal';
+  const purposeLabel = NFE_DOC_PURPOSE_LABEL[purpose] || 'Operação Normal';
+  const formattedDoc = document.customerDocument ? formatCpfCnpj(document.customerDocument) : '—';
   const rows = items
     .map(
       (item, index) => `
       <tr>
         <td>${index + 1}</td>
         <td>${escapeHtml(item.name)}</td>
+        <td>${document.cfopCode || (document.kind === 'nfe' ? '5102' : '—')}</td>
         <td>${item.qty}</td>
         <td>${item.unitPrice.toFixed(2)}</td>
         <td>${(item.qty * item.unitPrice).toFixed(2)}</td>
@@ -639,48 +695,76 @@ export function buildDanfeHtml(document: FiscalDocument) {
   <meta charset="utf-8" />
   <title>DANFE ${document.number}</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 24px; }
-    h1 { font-size: 16px; margin: 0 0 4px; }
-    .box { border: 1px solid #222; padding: 10px; margin-bottom: 10px; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 20px; font-size: 13px; line-height: 1.4; }
+    h1 { font-size: 15px; margin: 0 0 4px; }
+    .box { border: 1px solid #222; padding: 8px 12px; margin-bottom: 8px; }
     .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { border: 1px solid #333; padding: 6px; text-align: left; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    th, td { border: 1px solid #333; padding: 5px 8px; text-align: left; }
     th { background: #f0f0f0; }
-    .muted { color: #555; font-size: 12px; }
-    .key { word-break: break-all; font-family: ui-monospace, monospace; font-size: 12px; }
-    @media print { body { margin: 8mm; } .no-print { display: none; } }
+    .muted { color: #555; font-size: 11px; }
+    .key { word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #e0e7ff; color: #3730a3; }
+    @media print { body { margin: 6mm; } .no-print { display: none; } }
   </style>
 </head>
 <body>
-  <div class="no-print muted" style="margin-bottom:12px">Pré-visualização DANFE · ${FISCAL_KIND_LABEL[document.kind]}</div>
+  <div class="no-print muted" style="margin-bottom:10px">Pré-visualização DANFE · ${FISCAL_KIND_LABEL[document.kind]}</div>
   <div class="box grid">
     <div>
       <h1>DANFE — Documento Auxiliar da ${FISCAL_KIND_LABEL[document.kind]}</h1>
-      <div class="muted">${envLabel} · Status: ${FISCAL_STATUS_LABEL[document.status]}</div>
-      <p><strong>${escapeHtml(issuer.emitenteName || 'Emitente')}</strong><br/>
-      CNPJ ${escapeHtml(issuer.cnpj || '—')} · IE ${escapeHtml(issuer.ie || '—')}<br/>
-      ${escapeHtml(issuer.municipio || '')}/${escapeHtml(issuer.uf || '')}</p>
+      <div class="muted">${envLabel} · Status: <strong>${FISCAL_STATUS_LABEL[document.status]}</strong></div>
+      <p style="margin:6px 0 2px"><strong>${escapeHtml(issuer.emitenteName || 'Emitente')}</strong><br/>
+      CNPJ: ${escapeHtml(issuer.cnpj || '—')} · IE: ${escapeHtml(issuer.ie || '—')}<br/>
+      ${escapeHtml(issuer.municipio || '')} / ${escapeHtml(issuer.uf || '')}</p>
     </div>
     <div>
-      <p><strong>Nº ${document.number}</strong> · Série ${document.series}</p>
-      <p class="muted">Protocolo: ${escapeHtml(document.nfe?.protocol || '—')}</p>
-      <p class="key">Chave de acesso<br/>${document.accessKey}</p>
+      <p style="margin:0 0 4px"><strong>Nº ${document.number}</strong> · Série ${document.series}</p>
+      <p class="muted" style="margin:0 0 4px">Protocolo SEFAZ: <strong>${escapeHtml(document.nfe?.protocol || '—')}</strong></p>
+      <p class="key" style="margin:0">Chave de acesso:<br/><strong>${document.accessKey}</strong></p>
     </div>
   </div>
+
+  <div class="box grid-3">
+    <div>
+      <span class="muted">Natureza da Operação</span>
+      <div><strong>${escapeHtml(purposeLabel)}</strong></div>
+    </div>
+    <div>
+      <span class="muted">CFOP Principal</span>
+      <div><strong>${document.cfopCode || '—'}</strong></div>
+    </div>
+    <div>
+      <span class="muted">Finalidade</span>
+      <div><span class="badge">${purpose.toUpperCase()}</span></div>
+    </div>
+  </div>
+
+  ${
+    document.refNfeKey
+      ? `<div class="box" style="background:#fffbeb;border-color:#d97706;">
+          <strong style="color:#b45309">NF-e Referenciada (Devolução / Retorno):</strong>
+          <div class="key" style="margin-top:2px">${escapeHtml(document.refNfeKey)}</div>
+        </div>`
+      : ''
+  }
+
   <div class="box">
     <strong>Destinatário / Remetente</strong>
-    <p>${escapeHtml(document.customerName)}${
-      document.customerDocument ? ` · ${escapeHtml(document.customerDocument)}` : ''
-    }</p>
+    <p style="margin:4px 0 0">
+      ${escapeHtml(document.customerName)} · <strong>${escapeHtml(formattedDoc)}</strong>
+    </p>
   </div>
+
   <div class="box">
     <table>
       <thead>
-        <tr><th>#</th><th>Descrição</th><th>Qtd</th><th>V. Unit</th><th>Total</th></tr>
+        <tr><th>#</th><th>Descrição do Produto / Serviço</th><th>CFOP</th><th>Qtd</th><th>V. Unit (R$)</th><th>Total (R$)</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p style="text-align:right;margin:10px 0 0"><strong>Total R$ ${document.amount.toFixed(2)}</strong></p>
+    <p style="text-align:right;margin:10px 0 0;font-size:14px"><strong>Total da Nota: R$ ${document.amount.toFixed(2)}</strong></p>
   </div>
   <p class="muted">${escapeHtml(document.message)}</p>
 </body>
@@ -695,46 +779,185 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-function buildNfeXmlStub(document: FiscalDocument) {
+export function buildNfeXmlStub(document: FiscalDocument): string {
+  const isEntry = document.refType === 'invoice' && document.message.includes('entrada');
+  const tpNF = isEntry ? '0' : '1';
+  const purpose = document.nfe?.documentPurpose ?? 'normal';
+  let finNFe = '1';
+  if (purpose === 'devolucao' || purpose === 'retorno') finNFe = '4';
+  else if (purpose === 'credito_reforma' || purpose === 'debito_reforma') finNFe = '3';
+
+  const natOp = NFE_DOC_PURPOSE_LABEL[purpose] || (isEntry ? 'Compra para comercializacao' : 'Venda de mercadoria');
+  const cfop = document.cfopCode || (isEntry ? '1102' : '5102');
+  const doc = cleanDocument(document.customerDocument || '');
+  const destDocTag = doc.length === 11 ? `<CPF>${doc}</CPF>` : doc.length === 14 ? `<CNPJ>${doc}</CNPJ>` : '';
+
+  const rawItems = document.items && document.items.length > 0
+    ? document.items
+    : [{ name: natOp, qty: 1, unitPrice: document.amount }];
+
+  const totalAmount = document.amount || rawItems.reduce((acc, it) => acc + it.qty * it.unitPrice, 0);
+
+  const detXml = rawItems
+    .map((item, idx) => {
+      const vProd = (item.qty * item.unitPrice).toFixed(2);
+      const vICMS = (Number(vProd) * 0.18).toFixed(2);
+      const vPIS = (Number(vProd) * 0.0165).toFixed(2);
+      const vCOFINS = (Number(vProd) * 0.076).toFixed(2);
+      const vIBS = (Number(vProd) * 0.001).toFixed(2);
+      const vCBS = (Number(vProd) * 0.009).toFixed(2);
+
+      return `      <det nItem="${idx + 1}">
+        <prod>
+          <cProd>PROD-${String(idx + 1).padStart(3, '0')}</cProd>
+          <xProd>${escapeHtml(item.name)}</xProd>
+          <NCM>85171231</NCM>
+          <CFOP>${cfop}</CFOP>
+          <uCom>UN</uCom>
+          <qCom>${item.qty}</qCom>
+          <vUnCom>${item.unitPrice.toFixed(2)}</vUnCom>
+          <vProd>${vProd}</vProd>
+          <indTot>1</indTot>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMS00>
+              <orig>0</orig>
+              <CST>00</CST>
+              <modBC>3</modBC>
+              <vBC>${vProd}</vBC>
+              <pICMS>18.00</pICMS>
+              <vICMS>${vICMS}</vICMS>
+            </ICMS00>
+          </ICMS>
+          <PIS>
+            <PISAliq>
+              <CST>01</CST>
+              <vBC>${vProd}</vBC>
+              <pPIS>1.65</pPIS>
+              <vPIS>${vPIS}</vPIS>
+            </PISAliq>
+          </PIS>
+          <COFINS>
+            <COFINSAliq>
+              <CST>01</CST>
+              <vBC>${vProd}</vBC>
+              <pCOFINS>7.60</pCOFINS>
+              <vCOFINS>${vCOFINS}</vCOFINS>
+            </COFINSAliq>
+          </COFINS>
+          <IBS>
+            <cClassTrib>000001</cClassTrib>
+            <CST>000</CST>
+            <vBC>${vProd}</vBC>
+            <pIBS>0.10</pIBS>
+            <vIBS>${vIBS}</vIBS>
+          </IBS>
+          <CBS>
+            <cClassTrib>000001</cClassTrib>
+            <CST>000</CST>
+            <vBC>${vProd}</vBC>
+            <pCBS>0.90</pCBS>
+            <vCBS>${vCBS}</vCBS>
+          </CBS>
+        </imposto>
+      </det>`;
+    })
+    .join('\n');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<nfeProc versao="4.00">
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
   <NFe>
-    <infNFe Id="NFe${document.accessKey}">
+    <infNFe Id="NFe${document.accessKey}" versao="4.00">
       <ide>
-        <nNF>${document.number}</nNF>
+        <cUF>33</cUF>
+        <natOp>${escapeHtml(natOp)}</natOp>
+        <mod>${document.kind === 'nfce' ? '65' : '55'}</mod>
         <serie>${document.series}</serie>
+        <nNF>${document.number}</nNF>
+        <dhEmi>${document.createdAt}</dhEmi>
+        <tpNF>${tpNF}</tpNF>
+        <idDest>1</idDest>
+        <cMunFG>3304557</cMunFG>
+        <tpImp>1</tpImp>
+        <tpEmis>1</tpEmis>
         <tpAmb>${document.nfe?.environment === 'producao' ? '1' : '2'}</tpAmb>
+        <finNFe>${finNFe}</finNFe>
+        <indFinal>1</indFinal>
+        <indPres>1</indPres>
+        <procEmi>0</procEmi>
+        <verProc>Marthi 2.6.0</verProc>
+        ${document.refNfeKey ? `<NFref><refNFe>${document.refNfeKey.replace(/\D/g, '')}</refNFe></NFref>` : ''}
       </ide>
       <dest>
+        ${destDocTag}
         <xNome>${escapeHtml(document.customerName)}</xNome>
+        <indIEDest>9</indIEDest>
       </dest>
-      <total><vNF>${document.amount.toFixed(2)}</vNF></total>
+${detXml}
+      <total>
+        <ICMSTot>
+          <vBC>${totalAmount.toFixed(2)}</vBC>
+          <vICMS>${(totalAmount * 0.18).toFixed(2)}</vICMS>
+          <vProd>${totalAmount.toFixed(2)}</vProd>
+          <vFrete>0.00</vFrete>
+          <vSeg>0.00</vSeg>
+          <vDesc>0.00</vDesc>
+          <vOutro>0.00</vOutro>
+          <vNF>${totalAmount.toFixed(2)}</vNF>
+          <vPIS>${(totalAmount * 0.0165).toFixed(2)}</vPIS>
+          <vCOFINS>${(totalAmount * 0.076).toFixed(2)}</vCOFINS>
+        </ICMSTot>
+        <IBSTot>
+          <vBC>${totalAmount.toFixed(2)}</vBC>
+          <vIBS>${(totalAmount * 0.001).toFixed(2)}</vIBS>
+        </IBSTot>
+        <CBSTot>
+          <vBC>${totalAmount.toFixed(2)}</vBC>
+          <vCBS>${(totalAmount * 0.009).toFixed(2)}</vCBS>
+        </CBSTot>
+      </total>
     </infNFe>
   </NFe>
-  <protNFe>
-    <nProt>${document.nfe?.protocol ?? ''}</nProt>
-    <cStat>${document.nfe?.statusCode ?? ''}</cStat>
-    <xMotivo>${escapeHtml(document.nfe?.statusMessage ?? '')}</xMotivo>
+  <protNFe versao="4.00">
+    <infProt>
+      <tpAmb>${document.nfe?.environment === 'producao' ? '1' : '2'}</tpAmb>
+      <verAplic>SVRS_2026</verAplic>
+      <chNFe>${document.accessKey}</chNFe>
+      <dhRecbto>${document.createdAt}</dhRecbto>
+      <nProt>${document.nfe?.protocol || '133260000000001'}</nProt>
+      <digVal>${document.nfe?.xmlDigest || 'Wp6Z9v8h34+='}</digVal>
+      <cStat>${document.nfe?.statusCode || '100'}</cStat>
+      <xMotivo>${escapeHtml(document.nfe?.statusMessage || 'Autorizado o uso da NF-e')}</xMotivo>
+    </infProt>
   </protNFe>
 </nfeProc>
 `;
 }
 
-function buildNfseXmlStub(document: FiscalDocument) {
+export function buildNfseXmlStub(document: FiscalDocument): string {
   const dps = document.nfse;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<NFSe>
-  <infNFSe>
+<NFSe versao="1.00" xmlns="http://www.sped.fazenda.gov.br/nfse">
+  <infNFSe Id="NFSe${document.accessKey}">
     <numero>${document.number}</numero>
     <serie>${document.series}</serie>
+    <dhEmi>${document.createdAt}</dhEmi>
     <chaveAcesso>${document.accessKey}</chaveAcesso>
     <DPS id="${dps?.dpsId ?? ''}">
-      <cLocEmi>${dps?.cLocEmi ?? ''}</cLocEmi>
-      <cTribNac>${dps?.cTribNac ?? ''}</cTribNac>
+      <tpAmb>${dps?.environment === 'producao' ? '1' : '2'}</tpAmb>
+      <cLocEmi>${dps?.cLocEmi ?? '3304557'}</cLocEmi>
+      <cTribNac>${dps?.cTribNac ?? '140101'}</cTribNac>
       <xDescServ>${escapeHtml(dps?.xDescServ ?? '')}</xDescServ>
       <vServ>${(dps?.vServ ?? document.amount).toFixed(2)}</vServ>
+      <aliqIss>${(dps?.aliqIss ?? 5).toFixed(2)}</aliqIss>
+      <vIss>${(dps?.vIss ?? (document.amount * 0.05)).toFixed(2)}</vIss>
     </DPS>
-    <protocoloAdn>${dps?.protocoloAdn ?? ''}</protocoloAdn>
+    <tomador>
+      <xNome>${escapeHtml(document.customerName)}</xNome>
+      ${document.customerDocument ? `<CNPJ_CPF>${cleanDocument(document.customerDocument)}</CNPJ_CPF>` : ''}
+    </tomador>
+    <protocoloAdn>${dps?.protocoloAdn ?? 'ADN20260000001'}</protocoloAdn>
   </infNFSe>
 </NFSe>
 `;
@@ -796,7 +1019,7 @@ export function emitNfseStandalone(
     aliqIss,
     vIss,
     itemLc116: input.itemLc116?.trim() || service.itemLc116,
-    tomadorDocument: (input.customerDocument ?? '').replace(/\D/g, ''),
+    tomadorDocument: cleanDocument(input.customerDocument ?? ''),
     tomadorName: input.customerName.trim(),
     protocoloAdn: fakeProtocoloAdn(),
   };

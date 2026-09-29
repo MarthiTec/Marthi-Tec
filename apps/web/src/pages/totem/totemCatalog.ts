@@ -5,6 +5,7 @@ import {
 } from '../../data/adminStore';
 import { ATTR_CAP, ATTR_COR } from '../../data/attributeStore';
 import { formatInstallment } from '../../data/variantQuote';
+import { getTotemSettings } from '../../data/totemSettings';
 import { apiGetTotemCatalog, apiListStock } from '../../services/erpApi';
 import { isNestAuthed } from '../../services/nestClient';
 import { type TotemBrand, type TotemProduct } from './totemData';
@@ -17,7 +18,20 @@ function readPersistedStockCache(): StockItem[] {
     const raw = localStorage.getItem(TOTEM_CATALOG_CACHE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Limpeza automática de mocks legados residuais no cache
+    const hasLegacy = parsed.some(
+      (item) =>
+        /iphone|redmi/i.test(item.name || '') ||
+        item.sku === 'APL-16P-128' ||
+        item.sku === 'APL-15-128' ||
+        item.sku === 'XIA-RN13-256',
+    );
+    if (hasLegacy) {
+      localStorage.removeItem(TOTEM_CATALOG_CACHE_KEY);
+      return [];
+    }
+    return parsed;
   } catch {
     return [];
   }
@@ -85,6 +99,11 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     const images = rows
       .flatMap((row) => stockItemImages(row))
       .filter((url, index, all) => all.indexOf(url) === index);
+    const stockFee =
+      primary.cardRate !== undefined && primary.cardRate !== null && Number.isFinite(Number(primary.cardRate))
+        ? Number(primary.cardRate)
+        : undefined;
+    const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
 
     return {
       id: stableId(name),
@@ -93,7 +112,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       storages,
       colors,
       cashPrice: primary.price,
-      installmentLabel: formatInstallment(primary.price, 12),
+      installmentLabel: formatInstallment(primary.price, 12, cardFeePercent),
       images: images.length ? images : stockItemImages(primary),
       attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),

@@ -13,12 +13,13 @@ import {
   userCanAccessArea,
   userIsStoreAdmin,
 } from '../../data/erpRegistry';
-import { getStoreEntitlement, hasModule, moduleForPath, planLabel } from '../../data/storePlan';
+import { getStoreEntitlement, hasModule, moduleForPath } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { ADMIN_NAV, childIsActive, navGroupForPath } from './adminNav';
 import { AccessDeniedPage } from './AccessDeniedPage';
 import { ModuleLockedPage } from './ModuleLockedPage';
+import { useStoreCustomization } from '../../data/storeSegment';
 import './admin.css';
 
 const SIDEBAR_KEY = 'marthi_sidebar_collapsed';
@@ -110,7 +111,7 @@ export function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const [entitlement, setEntitlement] = useState(() => getStoreEntitlement());
+  const [, setPlanTick] = useState(0);
   const [openGroups, setOpenGroups] = useState<string[]>(() => {
     const current = navGroupForPath(window.location.pathname, window.location.search);
     return current ? [current] : ['os'];
@@ -118,7 +119,8 @@ export function AdminLayout() {
 
   useEffect(() => {
     function refreshPlan() {
-      setEntitlement(getStoreEntitlement());
+      getStoreEntitlement();
+      setPlanTick((t) => t + 1);
     }
     window.addEventListener('marthi-plan-updated', refreshPlan);
     return () => window.removeEventListener('marthi-plan-updated', refreshPlan);
@@ -173,6 +175,7 @@ export function AdminLayout() {
 
   const userEmail = user.email;
   const isAdmin = userIsStoreAdmin(userEmail);
+  const storeCustom = useStoreCustomization();
 
   if (!isAdmin) {
     return <Navigate to="/" replace />;
@@ -188,6 +191,9 @@ export function AdminLayout() {
   }
 
   function childVisible(to: string) {
+    if (to.includes('/cardapio') && !storeCustom.showCardapioDigital) {
+      return false;
+    }
     const area = navPathToAccessArea(to);
     if (!area) return true;
     return userCanAccessArea(userEmail, area);
@@ -214,12 +220,6 @@ export function AdminLayout() {
       <aside className="admin__sidebar">
         <div className="admin__brand">
           <BrandLogo variant="mark" className="admin__mark" />
-          <div className="admin__brand-text">
-            <strong>Sua Loja</strong>
-            <span>
-              <em className="admin__plan-chip">{planLabel(entitlement.planId)}</em>
-            </span>
-          </div>
           <button
             type="button"
             className="admin__burger-btn admin__burger-btn--brand"
@@ -234,7 +234,14 @@ export function AdminLayout() {
         <UserChip variant="sidebar" to="/painel/perfil" />
 
         <nav className="admin__nav" aria-label="Módulos da Retaguarda">
-          {ADMIN_NAV.map((group) => {
+          {ADMIN_NAV
+            .filter((group) => {
+              if (group.id === 'cardapio' && !storeCustom.showCardapioDigital) {
+                return false;
+              }
+              return true;
+            })
+            .map((group) => {
             const unlocked = !group.module || hasModule(group.module);
             const opened = openGroups.includes(group.id);
             const groupActive = navGroupForPath(location.pathname, location.search) === group.id;
@@ -322,14 +329,14 @@ export function AdminLayout() {
           </NavLink>
           {isAdmin ? (
             <NavLink
-              to="/painel/ajuda"
-              title="Central de ajuda"
+              to="/painel/lojas"
+              title="Lojas & Licenças"
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
             >
-              <AdminIcon name="help" />
-              <span className="admin__link-label">Central de ajuda</span>
+              <AdminIcon name="store" />
+              <span className="admin__link-label">Lojas &amp; Licenças</span>
             </NavLink>
           ) : null}
           {isAdmin ? (

@@ -723,6 +723,11 @@
   border-color: #334155;
 }
 
+.multi-store-tab {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .multi-store-header {
     flex-direction: column;
@@ -735,5 +740,38 @@
   }
   .multi-store-form-field.span-2 {
     min-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .multi-store-page {
+    padding: 12px;
+  }
+  .multi-store-header__info h1 {
+    font-size: 1.25rem;
+  }
+  .multi-store-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .multi-store-actions-bar button {
+    width: 100%;
+    justify-content: center;
+  }
+  .multi-store-modal {
+    width: 95vw;
+    margin: 8px auto;
+    max-height: 94vh;
+  }
+  .multi-store-modal__body {
+    padding: 14px;
+  }
+  .multi-store-modal__footer {
+    flex-direction: column-reverse;
+  }
+  .multi-store-modal__footer button {
+    width: 100%;
+    justify-content: center;
   }
 }

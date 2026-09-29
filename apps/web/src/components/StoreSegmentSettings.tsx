@@ -258,6 +258,30 @@ export function StoreSegmentSettings({
                       fontSize: '0.72rem',
                       padding: '2px 8px',
                       borderRadius: 10,
+                      background: preset.config.showCardapioDigital
+                        ? isDark
+                          ? 'rgba(196, 138, 57, 0.25)'
+                          : '#fef3c7'
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : '#f1f5f9',
+                      color: preset.config.showCardapioDigital
+                        ? isDark
+                          ? '#fcd34d'
+                          : '#b45309'
+                        : isDark
+                        ? '#94a3b8'
+                        : '#64748b',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cardápio: {preset.config.showCardapioDigital ? 'Ativo' : 'Oculto'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '2px 8px',
+                      borderRadius: 10,
                       background: preset.config.showSizeColorGrid
                         ? isDark
                           ? 'rgba(251, 191, 36, 0.2)'
@@ -569,6 +593,98 @@ export function StoreSegmentSettings({
                     height: 18,
                     width: 18,
                     left: config.showTablesAndKitchen ? 22 : 3,
+                    bottom: 3,
+                    backgroundColor: '#fff',
+                    transition: '0.2s',
+                    borderRadius: '50%',
+                  }}
+                />
+              </span>
+            </label>
+          </div>
+
+          {/* Toggle: Cardápio Digital */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 18px',
+              borderRadius: 10,
+              background: config.showCardapioDigital
+                ? isDark
+                  ? 'rgba(196, 138, 57, 0.16)'
+                  : 'rgba(196, 138, 57, 0.05)'
+                : isDark
+                ? '#121820'
+                : '#f8fafc',
+              border: config.showCardapioDigital
+                ? isDark
+                  ? '1px solid rgba(251, 191, 36, 0.35)'
+                  : '1px solid var(--line)'
+                : isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid var(--line)',
+              gap: 16,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>
+                  Cardápio Digital &amp; Display de Mesa (QR Code)
+                </strong>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    background: config.showCardapioDigital
+                      ? isDark
+                        ? 'rgba(234, 179, 8, 0.2)'
+                        : '#fef3c7'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.06)'
+                      : '#f1f5f9',
+                    color: config.showCardapioDigital
+                      ? isDark
+                        ? '#facc15'
+                        : '#b45309'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
+                    padding: '2px 8px',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                  }}
+                >
+                  {config.showCardapioDigital ? 'Ativo no Painel' : 'Oculto'}
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--mute)' }}>
+                Habilita a gestão de pratos, pratos do dia, display de mesa com QR Code e pedidos online. Ideal para restaurantes, bares, lanchonetes e cafeterias.
+              </p>
+            </div>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, flexShrink: 0, cursor: 'pointer', touchAction: 'manipulation' }}>
+              <input
+                type="checkbox"
+                checked={config.showCardapioDigital}
+                onChange={() => handleToggle('showCardapioDigital')}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: config.showCardapioDigital ? (isDark ? '#d97706' : '#b45309') : (isDark ? '#334155' : '#cbd5e1'),
+                  transition: '0.2s',
+                  borderRadius: 24,
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    height: 18,
+                    width: 18,
+                    left: config.showCardapioDigital ? 22 : 3,
                     bottom: 3,
                     backgroundColor: '#fff',
                     transition: '0.2s',

@@ -40,6 +40,7 @@ import { onStockChanged } from '../../data/ecommerceStore';
 import { refreshAdminSlices } from '../../data/erpBootstrap';
 import { hasCapability, isTotemCatalogPath } from '../../data/moduleCapabilities';
 import { fileToProductImage } from '../../data/operatorProfile';
+import { formatInstallment } from '../../data/variantQuote';
 import { isNestAuthed } from '../../services/nestClient';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
@@ -206,6 +207,7 @@ export function StockPage() {
       cost: item.cost,
       avgCost: item.avgCost,
       price: item.price,
+      cardRate: item.cardRate,
       lastPurchaseAt: item.lastPurchaseAt,
       lastPurchaseCost: item.lastPurchaseCost,
       kind: item.kind,
@@ -646,6 +648,11 @@ export function StockPage() {
                     <td>{avg.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="price-red">
                       {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {item.cardRate !== undefined ? (
+                        <div className="empty" style={{ fontSize: '0.78rem' }}>
+                          Cartão: +{item.cardRate}%
+                        </div>
+                      ) : null}
                     </td>
                     <td>{margin === '—' ? '—' : `${margin}%`}</td>
                     <td className="admin-table__actions">
@@ -912,6 +919,32 @@ export function StockPage() {
                   onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                 />
               </label>
+              <label>
+                Taxa de cartão (%)
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={form.cardRate ?? ''}
+                  disabled={readOnly}
+                  placeholder="Padrão totem"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      cardRate: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              {form.price > 0 ? (
+                <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
+                  <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12, form.cardRate)}
+                  {form.cardRate !== undefined
+                    ? ` (com taxa de ${form.cardRate}% deste produto)`
+                    : ' (usando taxa padrão do totem)'}
+                </p>
+              ) : null}
               {!lite ? (
                 <p className="empty span-2">
                   Markup{' '}
@@ -1019,6 +1052,7 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     cost: 0,
     avgCost: 0,
     price: 0,
+    cardRate: undefined,
     lastPurchaseAt: '',
     lastPurchaseCost: 0,
     kind: 'device',

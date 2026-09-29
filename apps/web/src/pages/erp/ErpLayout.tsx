@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
@@ -10,8 +10,6 @@ import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasDemoAccess } from '../../data/demoLeadStore';
-import { hasModule } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -80,7 +78,6 @@ const NAV_FINANCE: NavItem[] = [
 ];
 
 const NAV_BACK: NavItem[] = [
-  { to: '/erp/lojas', label: 'Lojas & Licenças', icon: 'store' },
   { to: '/erp/relatorios', label: 'Relatórios', icon: 'ops' },
   { to: '/erp/auditoria', label: 'Auditoria', icon: 'ops' },
 ];
@@ -92,7 +89,7 @@ function isMobileNav() {
 export function ErpLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   usePresenceSession('erp');
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
@@ -104,13 +101,6 @@ export function ErpLayout() {
       ? 'Financeiro da loja'
       : 'Retaguarda',
   };
-
-  useEffect(() => {
-    const allowed = hasModule('erp') || hasDemoAccess('erp') || Boolean(user);
-    if (!allowed && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user]);
 
   useEffect(() => {
     if (isMobileNav()) setNavOpen(false);
@@ -146,13 +136,24 @@ export function ErpLayout() {
       </NavLink>
     ));
   }
+  if (loading) {
+    return (
+      <div className={`erp-app erp-app--loading ${isDark ? 'is-theme-dark' : ''}`}>
+        <p className="empty" style={{ padding: 32 }}>Carregando Retaguarda…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="erp-app__top">
-        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
-        <StoreSwitcher />
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi Retaguarda</strong>

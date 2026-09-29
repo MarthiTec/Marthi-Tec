@@ -123,6 +123,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/crm', label: 'Visão no painel', end: true },
     ],
   },
+  {
+    id: 'help',
+    label: 'Central de ajuda',
+    icon: 'help',
+    to: '/painel/ajuda',
+    end: true,
+    module: null,
+  },
 ];
 
 export function navGroupForPath(pathname: string, search = '') {

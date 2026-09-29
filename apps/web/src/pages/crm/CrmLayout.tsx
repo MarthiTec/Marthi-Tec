@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
+import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
@@ -100,12 +102,16 @@ export function CrmLayout() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="crm-app__top">
+        <OsEcosystemMenu />
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="crm-app__mark" />
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>

@@ -40,6 +40,10 @@ export type FiscalCClassTrib = {
 export type FiscalDocPurpose =
   | 'normal'
   | 'devolucao'
+  | 'transferencia'
+  | 'bonificacao'
+  | 'remessa'
+  | 'retorno'
   | 'credito_reforma'
   | 'debito_reforma';
 
@@ -51,19 +55,144 @@ type TaxTablesState = {
   lastSyncMessage: string;
 };
 
+export const ENTRY_DOC_PURPOSES: FiscalDocPurpose[] = [
+  'normal',
+  'devolucao',
+  'transferencia',
+  'bonificacao',
+  'retorno',
+  'credito_reforma',
+];
+
+export const EXIT_DOC_PURPOSES: FiscalDocPurpose[] = [
+  'normal',
+  'devolucao',
+  'transferencia',
+  'bonificacao',
+  'remessa',
+  'debito_reforma',
+];
+
 export const NFE_DOC_PURPOSE_LABEL: Record<FiscalDocPurpose, string> = {
-  normal: 'Normal',
-  devolucao: 'Devolução',
+  normal: 'Normal / Venda',
+  devolucao: 'Devolução de mercadoria',
+  transferencia: 'Transferência entre lojas / filiais',
+  bonificacao: 'Bonificação, brinde ou doação',
+  remessa: 'Remessa (conserto / demonstração)',
+  retorno: 'Retorno de remessa',
   credito_reforma: 'Crédito da reforma (IBS/CBS)',
   debito_reforma: 'Débito da reforma (IBS/CBS)',
 };
 
+export function getPurposeLabel(purpose: FiscalDocPurpose, kind: 'entry' | 'exit'): string {
+  if (kind === 'entry') {
+    switch (purpose) {
+      case 'normal':
+        return 'Compra / Entrada para Comercialização';
+      case 'devolucao':
+        return 'Devolução de Venda (Entrada no Estoque)';
+      case 'transferencia':
+        return 'Transferência de Entrada (Recebimento de Filial)';
+      case 'bonificacao':
+        return 'Entrada em Bonificação, Brinde ou Doação';
+      case 'retorno':
+        return 'Retorno de Mercadoria / Conserto (Entrada)';
+      case 'credito_reforma':
+        return 'Nota de Ajuste / Crédito Fiscal (IBS/CBS / ICMS)';
+      default:
+        return NFE_DOC_PURPOSE_LABEL[purpose] || 'Entrada de mercadoria';
+    }
+  }
+
+  switch (purpose) {
+    case 'normal':
+      return 'Venda / Saída Comercial';
+    case 'devolucao':
+      return 'Devolução de Compra (Saída para Fornecedor)';
+    case 'transferencia':
+      return 'Transferência de Saída (Remessa para Filial)';
+    case 'bonificacao':
+      return 'Saída em Bonificação, Brinde ou Doação';
+    case 'remessa':
+      return 'Remessa para Conserto / Demonstração (Saída)';
+    case 'debito_reforma':
+      return 'Nota de Ajuste / Débito Fiscal (IBS/CBS / ICMS)';
+    default:
+      return NFE_DOC_PURPOSE_LABEL[purpose] || 'Saída de mercadoria';
+  }
+}
+
 export const NFE_DOC_PURPOSE_HINT: Record<FiscalDocPurpose, string> = {
-  normal: 'Operação regular de entrada ou saída.',
-  devolucao: 'Devolução de mercadoria (CFOP de retorno).',
+  normal: 'Operação regular de venda ou saída comercial.',
+  devolucao: 'Devolução de compra ou venda (anulação com estorno de operação).',
+  transferencia: 'Transferência de estoque entre matriz e filiais da rede.',
+  bonificacao: 'Remessa a título gratuito, bonificação, brinde ou amostra.',
+  remessa: 'Remessa de mercadoria para conserto, reparo, testes ou demonstração.',
+  retorno: 'Retorno de mercadoria recebida ou enviada para conserto ou demonstração.',
   credito_reforma: 'Documento de crédito IBS/CBS da reforma tributária.',
   debito_reforma: 'Documento de débito IBS/CBS da reforma tributária.',
 };
+
+export function getPurposeHint(purpose: FiscalDocPurpose, kind: 'entry' | 'exit'): string {
+  if (kind === 'entry') {
+    switch (purpose) {
+      case 'normal':
+        return 'Operação de compra de fornecedor ou entrada de mercadorias no estoque.';
+      case 'devolucao':
+        return 'Recebimento de mercadoria devolvida por cliente (anulação com estorno de venda).';
+      case 'transferencia':
+        return 'Recebimento de mercadorias transferidas de outra filial do grupo.';
+      case 'bonificacao':
+        return 'Entrada de mercadorias recebidas a título gratuito, brinde ou bonificação.';
+      case 'retorno':
+        return 'Retorno de mercadoria enviada para conserto, demonstração ou feira.';
+      case 'credito_reforma':
+        return 'Documento fiscal de ajuste para apropriação de crédito de imposto (Entrada).';
+      default:
+        return 'Operação de entrada de mercadorias.';
+    }
+  }
+
+  switch (purpose) {
+    case 'normal':
+      return 'Operação regular de venda mercantil ou saída comercial de produtos.';
+    case 'devolucao':
+      return 'Devolução de compra enviada para fornecedor com anulação e estorno.';
+    case 'transferencia':
+      return 'Envio de mercadorias da loja atual para outra filial da rede.';
+    case 'bonificacao':
+      return 'Remessa a título gratuito, bonificação comercial, brinde ou amostra.';
+    case 'remessa':
+      return 'Remessa de mercadoria própria para conserto, reparo ou demonstração.';
+    case 'debito_reforma':
+      return 'Documento fiscal de ajuste para estorno ou débito de imposto (Saída).';
+    default:
+      return 'Operação de saída de mercadorias.';
+  }
+}
+
+/** CFOP padrão sugerido de acordo com a finalidade da nota e a direção (entrada/saída) */
+export function defaultCfopForPurpose(purpose: FiscalDocPurpose, kind: 'entry' | 'exit'): string {
+  switch (purpose) {
+    case 'devolucao':
+      return kind === 'entry' ? '1202' : '5202';
+    case 'transferencia':
+      return kind === 'entry' ? '1152' : '5152';
+    case 'bonificacao':
+      return kind === 'entry' ? '1910' : '5910';
+    case 'remessa':
+      return kind === 'entry' ? '1915' : '5915';
+    case 'retorno':
+      return kind === 'entry' ? '1916' : '5916';
+    case 'credito_reforma':
+      return '1949';
+    case 'debito_reforma':
+      return '5949';
+    case 'normal':
+    default:
+      return kind === 'entry' ? '1102' : '5102';
+  }
+}
 
 const SEED_CSTS: FiscalCstCode[] = [
   { code: '000', name: 'Tributação integral', description: 'CST IBS/CBS — tributação integral', active: true },

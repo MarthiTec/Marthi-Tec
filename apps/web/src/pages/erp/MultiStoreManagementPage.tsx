@@ -7,21 +7,18 @@ import {
   deleteStore,
   getActiveStoreId,
   getClientAccount,
-  listDiscountRules,
   listStores,
-  saveDiscountRules,
   saveStore,
   setActiveStoreId,
   MULTI_STORE_CHANGED_EVENT,
   STORE_CONTEXT_CHANGED_EVENT,
   type ClientAccount,
-  type LicensingDiscountRule,
   type Store,
   type StoreTaxRegime,
 } from '../../data/multiStoreStore';
 import './multiStore.css';
 
-type Tab = 'stores' | 'licensing' | 'rules' | 'isolation';
+type Tab = 'stores' | 'licensing' | 'isolation';
 
 const TAX_REGIME_OPTIONS = [
   { value: 'simples_nacional', label: 'Simples Nacional' },
@@ -35,7 +32,6 @@ export function MultiStoreManagementPage() {
   const [stores, setStores] = useState<Store[]>(() => listStores());
   const [clientAccount, setClientAccount] = useState<ClientAccount>(() => getClientAccount());
   const [activeStoreId, setActiveStore] = useState<string>(() => getActiveStoreId());
-  const [discountRules, setRules] = useState<LicensingDiscountRule[]>(() => listDiscountRules());
   const [licensingSummary, setLicensingSummary] = useState(() => calculateLicensingSummary());
 
   // Modal Loja
@@ -43,16 +39,11 @@ export function MultiStoreManagementPage() {
   const [editingStore, setEditingStore] = useState<Partial<Store>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Modal Regra Comercial
-  const [ruleModalOpen, setRuleModalOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<Partial<LicensingDiscountRule>>({});
-
   useEffect(() => {
     function refresh() {
       setStores(listStores());
       setClientAccount(getClientAccount());
       setActiveStore(getActiveStoreId());
-      setRules(listDiscountRules());
       setLicensingSummary(calculateLicensingSummary());
     }
 
@@ -144,35 +135,6 @@ export function MultiStoreManagementPage() {
     }
   }
 
-  function handleSaveRule() {
-    if (!editingRule.name?.trim()) return;
-    const rules = [...discountRules];
-    if (editingRule.id) {
-      const idx = rules.findIndex((r) => r.id === editingRule.id);
-      if (idx >= 0) {
-        rules[idx] = { ...rules[idx], ...(editingRule as LicensingDiscountRule) };
-      }
-    } else {
-      rules.push({
-        id: `rule-${Date.now().toString(36)}`,
-        name: editingRule.name.trim(),
-        minStores: Number(editingRule.minStores) || 1,
-        maxStores: editingRule.maxStores ? Number(editingRule.maxStores) : null,
-        discountType: editingRule.discountType || 'percent',
-        discountValue: Number(editingRule.discountValue) || 0,
-        active: editingRule.active !== false,
-        notes: editingRule.notes || '',
-      });
-    }
-    saveDiscountRules(rules);
-    setRuleModalOpen(false);
-  }
-
-  function handleToggleRule(ruleId: string) {
-    const next = discountRules.map((r) => (r.id === ruleId ? { ...r, active: !r.active } : r));
-    saveDiscountRules(next);
-  }
-
   return (
     <div className="multi-store-page">
       <header className="multi-store-header">
@@ -211,14 +173,6 @@ export function MultiStoreManagementPage() {
         >
           <AdminIcon name="fiscal" />
           Licenciamento por CNPJ & Descontos
-        </button>
-        <button
-          type="button"
-          className={`multi-store-tab ${activeTab === 'rules' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('rules')}
-        >
-          <AdminIcon name="ops" />
-          Regras de Desconto Progressivo
         </button>
         <button
           type="button"
@@ -325,6 +279,26 @@ export function MultiStoreManagementPage() {
       {/* TAB 2: LICENCIAMENTO */}
       {activeTab === 'licensing' && (
         <section className="multi-store-section">
+          <div
+            style={{
+              padding: '12px 18px',
+              borderRadius: '12px',
+              background: 'rgba(37, 99, 235, 0.08)',
+              border: '1px solid rgba(37, 99, 235, 0.2)',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '0.88rem',
+              color: 'var(--admin-text, #1e293b)',
+            }}
+          >
+            <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
+            <div>
+              <strong>Política Comercial de Licenciamento & Descontos Multi-Loja:</strong> As regras de desconto progressivo por quantidade de CNPJs ativos são gerenciadas centralmente pela equipe <strong>Marthi Tecnologia</strong>. Quaisquer faixas e condições acordadas são calculadas e aplicadas automaticamente no demonstrativo abaixo.
+            </div>
+          </div>
+
           <div className="multi-store-licensing-overview">
             <div className="multi-store-stat-card">
               <span className="multi-store-stat-label">Total de Lojas Contratadas</span>
@@ -432,91 +406,7 @@ export function MultiStoreManagementPage() {
         </section>
       )}
 
-      {/* TAB 3: REGRAS DE DESCONTO */}
-      {activeTab === 'rules' && (
-        <section className="multi-store-section">
-          <div className="multi-store-actions-bar">
-            <div>
-              <h3>Tabela de Regras de Desconto Progressivo</h3>
-              <p className="multi-store-subtext">
-                Defina a política comercial para redes com múltiplas lojas. Os descontos são aplicados dinamicamente
-                a partir da segunda loja cadastrada.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="multi-store-btn-primary"
-              onClick={() => {
-                setEditingRule({
-                  name: '',
-                  minStores: 2,
-                  maxStores: null,
-                  discountType: 'percent',
-                  discountValue: 15,
-                  active: true,
-                  notes: '',
-                });
-                setRuleModalOpen(true);
-              }}
-            >
-              + Nova Faixa de Desconto
-            </button>
-          </div>
-
-          <div className="multi-store-table-container">
-            <table className="multi-store-table">
-              <thead>
-                <tr>
-                  <th>Nome da Regra Comercial</th>
-                  <th>Qtd. Mínima</th>
-                  <th>Qtd. Máxima</th>
-                  <th>Tipo de Desconto</th>
-                  <th>Valor / Percentual</th>
-                  <th>Status</th>
-                  <th>Observações</th>
-                  <th style={{ width: 100 }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discountRules.map((rule) => (
-                  <tr key={rule.id}>
-                    <td>
-                      <strong>{rule.name}</strong>
-                    </td>
-                    <td>{rule.minStores} loja(s)</td>
-                    <td>{rule.maxStores ? `${rule.maxStores} lojas` : 'Sem limite (N+)'}</td>
-                    <td>{rule.discountType === 'percent' ? 'Percentual (%)' : 'Valor Fixo (R$)'}</td>
-                    <td>
-                      <strong style={{ color: '#2563eb' }}>
-                        {rule.discountType === 'percent'
-                          ? `${rule.discountValue}%`
-                          : `R$ ${rule.discountValue.toFixed(2).replace('.', ',')}`}
-                      </strong>
-                    </td>
-                    <td>
-                      <span className={`multi-store-status-pill ${rule.active ? 'is-active' : 'is-inactive'}`}>
-                        {rule.active ? 'Ativa' : 'Inativa'}
-                      </span>
-                    </td>
-                    <td>{rule.notes || '—'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="multi-store-btn-switch"
-                        onClick={() => handleToggleRule(rule.id)}
-                      >
-                        {rule.active ? 'Desativar' : 'Ativar'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* TAB 4: ISOLAMENTO DE DADOS */}
+      {/* TAB 3: ISOLAMENTO DE DADOS */}
       {activeTab === 'isolation' && (
         <section className="multi-store-section">
           <div className="multi-store-card">
@@ -796,108 +686,6 @@ export function MultiStoreManagementPage() {
               </button>
               <button type="button" className="multi-store-btn-primary" onClick={handleSaveStore}>
                 Salvar Loja
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REGRA COMERCIAL */}
-      {ruleModalOpen && (
-        <div className="multi-store-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="multi-store-modal" style={{ maxWidth: 540 }}>
-            <div className="multi-store-modal__header">
-              <h2>Nova Regra de Desconto Multi-Loja</h2>
-              <button
-                type="button"
-                className="multi-store-modal__close"
-                onClick={() => setRuleModalOpen(false)}
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="multi-store-modal__body">
-              <label className="multi-store-form-field">
-                <span>Nome da Regra Comercial</span>
-                <input
-                  type="text"
-                  value={editingRule.name || ''}
-                  onChange={(e) => setEditingRule({ ...editingRule, name: e.target.value })}
-                  placeholder="Ex: 2 Lojas (15% off a partir da 2ª loja)"
-                />
-              </label>
-
-              <div className="multi-store-form-row">
-                <label className="multi-store-form-field">
-                  <span>Qtd. Mínima de Lojas</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={editingRule.minStores ?? 2}
-                    onChange={(e) => setEditingRule({ ...editingRule, minStores: Number(e.target.value) })}
-                  />
-                </label>
-
-                <label className="multi-store-form-field">
-                  <span>Qtd. Máxima (vazio = ilimitado)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={editingRule.maxStores ?? ''}
-                    onChange={(e) =>
-                      setEditingRule({
-                        ...editingRule,
-                        maxStores: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="Sem teto"
-                  />
-                </label>
-              </div>
-
-              <div className="multi-store-form-row">
-                <div className="multi-store-form-field">
-                  <AdminPicker
-                    label="Tipo de Desconto"
-                    value={editingRule.discountType || 'percent'}
-                    options={[
-                      { value: 'percent', label: 'Percentual (%)' },
-                      { value: 'fixed', label: 'Valor Fixo (R$)' },
-                    ]}
-                    onChange={(val) => setEditingRule({ ...editingRule, discountType: val as 'percent' | 'fixed' })}
-                  />
-                </div>
-
-                <label className="multi-store-form-field">
-                  <span>Valor do Desconto</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editingRule.discountValue ?? 15}
-                    onChange={(e) => setEditingRule({ ...editingRule, discountValue: Number(e.target.value) })}
-                  />
-                </label>
-              </div>
-
-              <label className="multi-store-form-field">
-                <span>Observação Comercial</span>
-                <input
-                  type="text"
-                  value={editingRule.notes || ''}
-                  onChange={(e) => setEditingRule({ ...editingRule, notes: e.target.value })}
-                  placeholder="Ex: Aplicável a redes regionais"
-                />
-              </label>
-            </div>
-
-            <div className="multi-store-modal__footer">
-              <button type="button" className="multi-store-btn-secondary" onClick={() => setRuleModalOpen(false)}>
-                Cancelar
-              </button>
-              <button type="button" className="multi-store-btn-primary" onClick={handleSaveRule}>
-                Salvar Regra
               </button>
             </div>
           </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
@@ -9,8 +10,6 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasDemoAccess } from '../../data/demoLeadStore';
-import { hasModule } from '../../data/storePlan';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -52,7 +51,7 @@ function isMobileNav() {
 export function EcommerceLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   usePresenceSession('ecommerce');
   const { isDark } = usePanelTheme();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
@@ -62,13 +61,6 @@ export function EcommerceLayout() {
     kicker: 'E-commerce',
     title: 'Canais de venda',
   };
-
-  useEffect(() => {
-    const allowed = hasModule('ecommerce') || hasDemoAccess('erp') || Boolean(user);
-    if (!allowed && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user]);
 
   useEffect(() => {
     if (isMobileNav()) setNavOpen(false);
@@ -95,11 +87,24 @@ export function EcommerceLayout() {
     setExitOpen(true);
   }
 
+  if (loading) {
+    return (
+      <div className={`ecommerce-app ${isDark ? 'is-theme-dark' : ''}`}>
+        <p className="empty" style={{ padding: 32 }}>Carregando E-commerce…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="ecommerce-app__top">
-        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
         <OsEcosystemMenu />
+        <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="ecommerce-app__mark" />
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>

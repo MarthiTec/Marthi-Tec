@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasDemoAccess } from '../../data/demoLeadStore';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -56,7 +56,7 @@ export function OsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   usePresenceSession('os');
   const { isDark } = usePanelTheme();
   const [exitOpen, setExitOpen] = useState(false);
@@ -76,12 +76,6 @@ export function OsLayout() {
   useEffect(() => {
     if (isProfile) setOpsMenuOpen(true);
   }, [isProfile]);
-
-  useEffect(() => {
-    if (!hasDemoAccess('os') && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user]);
 
   function openPanel(next: Exclude<OsPanel, null>) {
     setOpsMenuOpen(false);
@@ -207,6 +201,18 @@ export function OsLayout() {
     setExitOpen(true);
   }
 
+  if (loading) {
+    return (
+      <div className={`os-app os-app--loading ${isDark ? 'is-theme-dark' : ''}`}>
+        <p className="empty" style={{ padding: 32 }}>Carregando Oficina…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <div
       className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''} ${isProfile ? 'is-profile-dock' : ''} ${
@@ -214,10 +220,9 @@ export function OsLayout() {
       }`}
     >
       <header className="os-app__top">
-        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
-        {/* Botão de ícone para acesso ao Ecossistema Marthi imediatamente ao lado do Menu */}
         <OsEcosystemMenu />
-
+        <ModuleMenuButton open={opsMenuOpen} onClick={() => setOpsMenuOpen((open) => !open)} />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="os-app__mark" />
         <div className="os-app__brand">
           <strong>Marthi OS</strong>

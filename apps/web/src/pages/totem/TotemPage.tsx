@@ -62,6 +62,7 @@ type Selection = {
   installment: string;
   cashPrice: number;
   installmentLabel: string;
+  cardFeePercent?: number;
 };
 
 function uniqueSorted(values: string[]) {
@@ -596,6 +597,11 @@ export function TotemPage() {
       });
     }
     const quote = quoteFromPicked(product.name, product.cashPrice, picked, listTotemStock());
+    const stockFee =
+      quote.stock?.cardRate !== undefined && quote.stock?.cardRate !== null && Number.isFinite(Number(quote.stock.cardRate))
+        ? Number(quote.stock.cardRate)
+        : undefined;
+    const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
     setSelection({
       product,
       picked,
@@ -603,6 +609,7 @@ export function TotemPage() {
       installment: INSTALLMENTS[0],
       cashPrice: quote.cashPrice,
       installmentLabel: quote.installmentLabel,
+      cardFeePercent,
     });
     setError(null);
     setKeyboardOpen(false);
@@ -1344,6 +1351,7 @@ export function TotemPage() {
                       ? `${selection.installment} · ${formatInstallment(
                           selection.cashPrice,
                           Number.parseInt(selection.installment, 10) || 12,
+                          selection.cardFeePercent,
                         )}`
                       : formatBRL(selection.cashPrice)}
                   </strong>

@@ -52,52 +52,20 @@ export const ATTRIBUTES_EVENT = 'marthi-attributes-updated';
 let memoryAttrs: ProductAttribute[] | null = null;
 
 export function seedAttributes(): ProductAttribute[] {
-  return [
-    {
-      id: ATTR_COR,
-      name: 'Cor',
-      values: ['Desert', 'Preto', 'Branco', 'Natural', 'Azul', 'Rosa', 'Roxo', 'Verde', 'Vermelho'],
-      priceDeltas: {},
-      useOnTotem: true,
-      filterOnTotem: true,
-      useOnStock: true,
-      sort: 1,
-      active: true,
-    },
-    {
-      id: ATTR_CAP,
-      name: 'Capacidade',
-      values: ['64 GB', '128 GB', '256 GB', '512 GB'],
-      priceDeltas: {},
-      useOnTotem: true,
-      filterOnTotem: true,
-      useOnStock: true,
-      sort: 2,
-      active: true,
-    },
-    {
-      id: ATTR_RET,
-      name: 'Retirada',
-      values: ['Pronta entrega', 'Por encomenda'],
-      priceDeltas: { 'Pronta entrega': 0, 'Por encomenda': 250 },
-      useOnTotem: true,
-      filterOnTotem: false,
-      useOnStock: false,
-      sort: 3,
-      active: true,
-    },
-    {
-      id: ATTR_TAM,
-      name: 'Tamanho',
-      values: [...SIZE_VALUE_PRESETS[0].values],
-      priceDeltas: {},
-      useOnTotem: true,
-      filterOnTotem: true,
-      useOnStock: true,
-      sort: 4,
-      active: true,
-    },
-  ];
+  return [];
+}
+
+export function clearAttributes(): ProductAttribute[] {
+  memoryAttrs = [];
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
+  }
+  return [];
 }
 
 function sortAttrs(items: ProductAttribute[]) {
@@ -117,21 +85,30 @@ function load(): ProductAttribute[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Sem seed automático — totem/ERP hidratam via Nest.
+      // Sem seed automático — totem/ERP hidratam via Nest ou começam limpos.
       return [];
     }
     const parsed = JSON.parse(raw) as ProductAttribute[];
     if (!Array.isArray(parsed) || parsed.length === 0) {
       return [];
     }
+    // Auto-limpeza de mocks residuais de demonstração de celulares (Desert, 64 GB, etc.)
+    const isMockLegacy = parsed.some(
+      (item) =>
+        item.values?.includes('Desert') ||
+        item.values?.includes('Natural') ||
+        (item.id === ATTR_CAP && item.values?.includes('64 GB')) ||
+        item.id === ATTR_RET,
+    );
+    if (isMockLegacy) {
+      localStorage.removeItem(STORAGE_KEY);
+      memoryAttrs = [];
+      return [];
+    }
     return sortAttrs(
       parsed.map((item, index) => {
         const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
         const priceDeltas = { ...(item.priceDeltas ?? {}) };
-        if (item.id === ATTR_RET && priceDeltas['Por encomenda'] === undefined) {
-          priceDeltas['Pronta entrega'] = priceDeltas['Pronta entrega'] ?? 0;
-          priceDeltas['Por encomenda'] = 250;
-        }
         return {
           ...item,
           values,
