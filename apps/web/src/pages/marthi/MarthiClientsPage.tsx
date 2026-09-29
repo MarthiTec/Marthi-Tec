@@ -22,6 +22,7 @@ import {
 } from '../../data/marthiClientsStore';
 import { PRESENCE_EVENT } from '../../data/presenceStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { lookupCnpjData } from '../../services/cnpj';
 
 function formatLastSeen(iso: string | null) {
   if (!iso) return '—';
@@ -95,6 +96,8 @@ export function MarthiClientsPage() {
 
   // New Client Creation Modal
   const [isCreating, setIsCreating] = useState(false);
+  const [modalCnpjLoading, setModalCnpjLoading] = useState(false);
+  const [modalCnpjStatus, setModalCnpjStatus] = useState<string | null>(null);
   const [newForm, setNewForm] = useState<NewClientForm>({
     tradeName: '',
     legalName: '',
@@ -107,8 +110,46 @@ export function MarthiClientsPage() {
     status: 'active',
     paymentOk: false, // Default pending payment
     notes: '',
-    modules: ['totem', 'pdv'],
+    modules: ['totem', 'erp'],
   });
+
+  async function handleModalCnpjLookup(raw: string) {
+    const clean = raw.replace(/\D/g, '');
+    if (clean.length !== 14) return;
+    setModalCnpjLoading(true);
+    setModalCnpjStatus('Consultando dados na Receita Federal e SEFAZ…');
+    try {
+      const data = await lookupCnpjData(clean);
+      setNewForm((prev) => ({
+        ...prev,
+        document: data.cnpj,
+        tradeName: prev.tradeName || data.tradeName,
+        legalName: prev.legalName || data.legalName,
+        phone: prev.phone || data.phone,
+        email: prev.email || data.email,
+        notes: [
+          prev.notes,
+          data.stateRegistration ? `IE: ${data.stateRegistration}` : '',
+          data.street
+            ? `${data.street}, ${data.number || 'S/N'} - ${data.district}, ${data.city}/${data.state} (CEP: ${data.zipCode})`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      }));
+      setModalCnpjStatus(
+        data.stateRegistration
+          ? `✓ Dados, IE (${data.stateRegistration}) e endereço preenchidos!`
+          : '✓ Dados da empresa e endereço preenchidos!',
+      );
+    } catch (err) {
+      setModalCnpjStatus(
+        err instanceof Error ? err.message : 'Falha ao consultar CNPJ.',
+      );
+    } finally {
+      setModalCnpjLoading(false);
+    }
+  }
 
   // Manual Payment Activation Modal
   const [paymentModalClient, setPaymentModalClient] = useState<MarthiClient | null>(null);
@@ -160,6 +201,7 @@ export function MarthiClientsPage() {
   }
 
   function handleOpenCreate() {
+    setModalCnpjStatus(null);
     setNewForm({
       tradeName: '',
       legalName: '',
@@ -172,7 +214,7 @@ export function MarthiClientsPage() {
       status: 'active',
       paymentOk: false,
       notes: '',
-      modules: ['totem', 'pdv'],
+      modules: ['totem', 'erp'],
     });
     setFormError(null);
     setIsCreating(true);
@@ -793,12 +835,55 @@ export function MarthiClientsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <label className="marthi-form-field">
                   <span>CNPJ ou CPF</span>
-                  <input
-                    type="text"
-                    value={newForm.document}
-                    onChange={(e) => setNewForm({ ...newForm, document: e.target.value })}
-                    placeholder="00.000.000/0001-00"
-                  />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text"
+                      value={newForm.document}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewForm({ ...newForm, document: val });
+                        const digits = val.replace(/\D/g, '');
+                        if (digits.length === 14) {
+                          void handleModalCnpjLookup(digits);
+                        } else {
+                          setModalCnpjStatus(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        const digits = newForm.document.replace(/\D/g, '');
+                        if (digits.length === 14) {
+                          void handleModalCnpjLookup(digits);
+                        }
+                      }}
+                      placeholder="00.000.000/0001-00"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      style={{ padding: '0 10px', fontSize: '0.78rem' }}
+                      disabled={modalCnpjLoading || newForm.document.replace(/\D/g, '').length !== 14}
+                      onClick={() => void handleModalCnpjLookup(newForm.document)}
+                      title="Consultar CNPJ na Receita Federal e SEFAZ"
+                    >
+                      {modalCnpjLoading ? '…' : 'Buscar'}
+                    </button>
+                  </div>
+                  {modalCnpjStatus && (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: modalCnpjStatus.startsWith('✓')
+                          ? '#059669'
+                          : modalCnpjStatus.includes('Falha') || modalCnpjStatus.includes('inválido')
+                            ? '#dc2626'
+                            : '#0284c7',
+                      }}
+                    >
+                      {modalCnpjStatus}
+                    </span>
+                  )}
                 </label>
 
                 <label className="marthi-form-field">

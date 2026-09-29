@@ -489,6 +489,58 @@
   color: var(--teal-deep);
 }
 
+.partner__hint--success {
+  color: #059669;
+  font-weight: 700;
+}
+
+.partner__hint--error {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.partner__hint--info {
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.partner__input-action {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.partner__input-action input {
+  flex: 1;
+}
+
+.partner__btn-lookup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  min-height: 48px;
+  border-radius: 12px;
+  background: #0f766e;
+  color: #fff;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.partner__btn-lookup:hover:not(:disabled) {
+  background: #0d5f58;
+  transform: translateY(-1px);
+}
+
+.partner__btn-lookup:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .partner__span-2 {
   grid-column: span 2;
 }

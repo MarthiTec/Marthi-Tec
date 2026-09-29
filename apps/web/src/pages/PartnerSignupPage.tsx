@@ -14,6 +14,8 @@ import {
   type PlanId,
 } from '../data/catalog';
 import { submitPartnerSignup } from '../services/partners';
+import { lookupCnpjData } from '../services/cnpj';
+import { isValidCnpj, isValidCpf } from '../utils/documentUtils';
 import { markStoreContracted } from '../data/demoLeadStore';
 import { saveStoreEntitlement } from '../data/storePlan';
 import {
@@ -33,6 +35,7 @@ type FormState = {
   document: string;
   legalName: string;
   tradeName: string;
+  stateRegistration: string;
   email: string;
   phone: string;
   zipCode: string;
@@ -105,6 +108,7 @@ function initialForm(planFromQuery: string | null): FormState {
     document: '',
     legalName: '',
     tradeName: '',
+    stateRegistration: '',
     email: '',
     phone: '',
     zipCode: '',
@@ -136,11 +140,64 @@ export function PartnerSignupPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [cepStatus, setCepStatus] = useState<string | null>(null);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjStatus, setCnpjStatus] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<StoreSegmentId>('assistencia_tecnica');
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
   const lockedAllModules = planIncludesAllModules(form.planId);
+
+  async function handleCnpjLookup(raw: string) {
+    const digits = onlyDigits(raw);
+    if (digits.length !== 14) {
+      setCnpjStatus(null);
+      return;
+    }
+    if (!isValidCnpj(digits)) {
+      setCnpjStatus({
+        type: 'error',
+        message: 'CNPJ inválido (dígitos verificadores incorretos).',
+      });
+      return;
+    }
+    setCnpjLoading(true);
+    setCnpjStatus({ type: 'info', message: 'Consultando dados na Receita Federal e SEFAZ…' });
+    try {
+      const data = await lookupCnpjData(digits);
+      setForm((current) => ({
+        ...current,
+        legalName: data.legalName || current.legalName,
+        tradeName: data.tradeName || current.tradeName,
+        stateRegistration: data.stateRegistration || current.stateRegistration,
+        zipCode: data.zipCode || current.zipCode,
+        street: data.street || current.street,
+        number: data.number || current.number,
+        complement: data.complement || current.complement,
+        district: data.district || current.district,
+        city: data.city || current.city,
+        state: data.state || current.state,
+        phone: data.phone || current.phone,
+        email: current.email || data.email || '',
+      }));
+      const ieInfo = data.stateRegistration ? ` · IE: ${data.stateRegistration}` : '';
+      setCnpjStatus({
+        type: 'success',
+        message: `✓ Dados da empresa, endereço${ieInfo} preenchidos via Receita Federal / SEFAZ.`,
+      });
+      setCepStatus(null);
+    } catch (err) {
+      setCnpjStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Não foi possível consultar os dados do CNPJ.',
+      });
+    } finally {
+      setCnpjLoading(false);
+    }
+  }
 
   function handleSelectSegment(preset: SegmentPreset) {
     setSelectedSegment(preset.id);
@@ -222,7 +279,7 @@ export function PartnerSignupPage() {
     if (current === 1 && !form.planId) return 'Selecione um plano.';
     if (current === 2) {
       if (form.modules.length === 0) {
-        return 'Escolha ao menos um módulo (Totem, OS, Retaguarda/PDV, Fiscal ou E-commerce).';
+        return 'Escolha ao menos um módulo (Totem & Cardápio Digital, OS, PDV + Retaguarda, Fiscal ou E-commerce).';
       }
       if (lockedAllModules && form.modules.length < PARTNER_MODULES.length) {
         return 'No plano Golden todos os módulos ficam liberados.';
@@ -239,11 +296,14 @@ export function PartnerSignupPage() {
     }
     if (current === 3 || current === 4) {
       const docDigits = onlyDigits(form.document);
-      const expected = form.documentType === 'cnpj' ? 14 : 11;
-      if (docDigits.length !== expected) {
-        return form.documentType === 'cnpj'
-          ? 'Informe um CNPJ válido.'
-          : 'Informe um CPF válido.';
+      if (form.documentType === 'cnpj') {
+        if (docDigits.length !== 14 || !isValidCnpj(docDigits)) {
+          return 'Informe um CNPJ válido com dígitos verificadores corretos.';
+        }
+      } else {
+        if (docDigits.length !== 11 || !isValidCpf(docDigits)) {
+          return 'Informe um CPF válido com dígitos verificadores corretos.';
+        }
       }
       if (!form.legalName.trim()) {
         return form.documentType === 'cnpj'
@@ -293,6 +353,10 @@ export function PartnerSignupPage() {
 
     setSubmitting(true);
     setError(null);
+
+    const ieInfo = form.stateRegistration.trim() ? `IE: ${form.stateRegistration.trim()}` : '';
+    const notesMerged = [form.notes.trim(), ieInfo].filter(Boolean).join(' · ');
+
     try {
       const result = await submitPartnerSignup({
         planId: form.planId,
@@ -313,7 +377,7 @@ export function PartnerSignupPage() {
         segment: form.segment.trim(),
         contactName: form.contactName.trim(),
         contactRole: form.contactRole.trim(),
-        notes: form.notes.trim(),
+        notes: notesMerged,
       });
       await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
       applySegmentPreset(selectedSegment);
@@ -336,7 +400,7 @@ export function PartnerSignupPage() {
           email: form.email.trim(),
           planId: form.planId,
           modules: form.modules,
-          notes: form.notes.trim() || `Cadastro parceiro · ${selectedPlan.name}`,
+          notes: notesMerged || `Cadastro parceiro · ${selectedPlan.name}`,
         });
       });
     } catch (err) {
@@ -590,30 +654,89 @@ export function PartnerSignupPage() {
 
             <div className="partner__grid">
               <label>
-                {form.documentType === 'cnpj' ? 'CNPJ' : 'CPF'}
-                <input
-                  value={form.document}
-                  onChange={(e) => patch('document', maskDocument(form.documentType, e.target.value))}
-                  inputMode="numeric"
-                  required
-                />
+                <span>{form.documentType === 'cnpj' ? 'CNPJ' : 'CPF'}</span>
+                <div className="partner__input-action">
+                  <input
+                    value={form.document}
+                    onChange={(e) => {
+                      const next = maskDocument(form.documentType, e.target.value);
+                      patch('document', next);
+                      if (form.documentType === 'cnpj') {
+                        const digits = onlyDigits(next);
+                        if (digits.length === 14) {
+                          void handleCnpjLookup(digits);
+                        } else {
+                          setCnpjStatus(null);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (form.documentType === 'cnpj') {
+                        void handleCnpjLookup(form.document);
+                      }
+                    }}
+                    inputMode="numeric"
+                    placeholder={form.documentType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    required
+                  />
+                  {form.documentType === 'cnpj' && (
+                    <button
+                      type="button"
+                      className="partner__btn-lookup"
+                      disabled={cnpjLoading || onlyDigits(form.document).length !== 14}
+                      onClick={() => void handleCnpjLookup(form.document)}
+                      title="Consultar dados da empresa na Receita Federal e SEFAZ"
+                    >
+                      {cnpjLoading ? 'Buscando…' : 'Buscar'}
+                    </button>
+                  )}
+                </div>
+                {cnpjStatus ? (
+                  <span className={`partner__hint partner__hint--${cnpjStatus.type}`}>
+                    {cnpjStatus.message}
+                  </span>
+                ) : form.documentType === 'cnpj' ? (
+                  <span className="partner__hint" style={{ color: 'var(--mute)' }}>
+                    Ao preencher o CNPJ, buscamos IE e endereço na Receita Federal e SEFAZ.
+                  </span>
+                ) : null}
               </label>
+
               <label>
                 {form.documentType === 'cnpj' ? 'Razão social' : 'Nome completo'}
                 <input
                   value={form.legalName}
                   onChange={(e) => patch('legalName', e.target.value)}
+                  placeholder={form.documentType === 'cnpj' ? 'Razão social da empresa' : 'Nome completo'}
                   required
                 />
               </label>
+
               <label>
                 Nome fantasia
                 <input
                   value={form.tradeName}
                   onChange={(e) => patch('tradeName', e.target.value)}
+                  placeholder="Nome fantasia da loja"
                   required
                 />
               </label>
+
+              {form.documentType === 'cnpj' && (
+                <label>
+                  Inscrição Estadual (IE)
+                  <input
+                    value={form.stateRegistration}
+                    onChange={(e) => patch('stateRegistration', e.target.value.toUpperCase())}
+                    placeholder="Número da IE ou ISENTO"
+                  />
+                  <span className="partner__hint" style={{ color: 'var(--mute)' }}>
+                    {form.stateRegistration
+                      ? 'Preenchido automaticamente via SEFAZ'
+                      : 'Opcional (ou ISENTO se não contribuinte)'}
+                  </span>
+                </label>
+              )}
               <label>
                 Segmento (opcional)
                 <input

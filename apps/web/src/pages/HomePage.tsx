@@ -578,8 +578,7 @@ export function HomePage() {
             <p className="eyebrow">Planos</p>
             <h2>Escolha o ritmo da sua operação</h2>
             <p className="section__sub">
-              O painel da loja entra em todo plano. Os módulos (Totem, Cardápio Digital, OS, PDV com campanhas,
-              Retaguarda com orçamentos em PDF, Fiscal ou E-commerce) você combina conforme o Bronze, Silver ou Golden.
+              O painel da loja entra em todo plano. Os módulos (Totem & Cardápio Digital, OS, PDV + Retaguarda integrado com campanhas e orçamentos em PDF, Fiscal ou E-commerce) você combina conforme o Bronze, Silver ou Golden.
             </p>
           </div>
           <div className="plans">

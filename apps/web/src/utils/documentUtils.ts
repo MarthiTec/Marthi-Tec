@@ -22,6 +22,31 @@ export function isCpf(cleanDoc: string): boolean {
 }
 
 /**
+ * Validação matemática rigorosa de CPF pelo algoritmo de módulo 11 (dígitos verificadores).
+ */
+export function isValidCpf(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(digits[i], 10) * (10 - i);
+  }
+  let rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  if (rem !== parseInt(digits[9], 10)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(digits[i], 10) * (11 - i);
+  }
+  rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  return rem === parseInt(digits[10], 10);
+}
+
+/**
  * Verifica se é CNPJ válido em tamanho e formato (14 caracteres alfanuméricos).
  * Aceita tanto o modelo tradicional numérico quanto o novo CNPJ alfanumérico.
  */
@@ -29,6 +54,39 @@ export function isCnpj(cleanDoc: string): boolean {
   if (cleanDoc.length !== 14) return false;
   // Deve conter 12 caracteres alfanuméricos e 2 dígitos numéricos finais
   return /^[A-Z0-9]{12}\d{2}$/i.test(cleanDoc) || /^[A-Z0-9]{14}$/i.test(cleanDoc);
+}
+
+/**
+ * Validação matemática rigorosa de CNPJ pelo algoritmo oficial de módulo 11.
+ * Compatível tanto com CNPJs numéricos tradicionais quanto com alfanuméricos (IN RFB nº 2.229/2024).
+ */
+export function isValidCnpj(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const clean = cleanDocument(value);
+  if (clean.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(clean)) return false;
+
+  const getCharValue = (ch: string) => ch.charCodeAt(0) - 48;
+
+  // Primeiro dígito verificador
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let sum1 = 0;
+  for (let i = 0; i < 12; i++) {
+    sum1 += getCharValue(clean[i]) * weights1[i];
+  }
+  const rem1 = sum1 % 11;
+  const dv1 = rem1 < 2 ? 0 : 11 - rem1;
+  if (getCharValue(clean[12]) !== dv1) return false;
+
+  // Segundo dígito verificador
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let sum2 = 0;
+  for (let i = 0; i < 13; i++) {
+    sum2 += getCharValue(clean[i]) * weights2[i];
+  }
+  const rem2 = sum2 % 11;
+  const dv2 = rem2 < 2 ? 0 : 11 - rem2;
+  return getCharValue(clean[13]) === dv2;
 }
 
 /** Formata string como CNPJ (XX.XXX.XXX/XXXX-XX), preservando letras do CNPJ alfanumérico */
