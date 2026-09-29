@@ -28,14 +28,29 @@ function getLogoBase64(): string {
 }
 
 function getMailTransporter() {
-  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
+  const user = env.SMTP_USER || '';
+  const pass = env.SMTP_PASS || '';
+  let host = env.SMTP_HOST || '';
+  let port = env.SMTP_PORT || 587;
+  let secure = env.SMTP_SECURE || false;
+
+  if (!host && user.toLowerCase().endsWith('@gmail.com')) {
+    host = 'smtp.gmail.com';
+    port = 465;
+    secure = true;
+  }
+
+  if (host && user && pass) {
     return nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      secure: env.SMTP_SECURE,
+      host,
+      port,
+      secure,
       auth: {
-        user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
+        user,
+        pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     });
   }
@@ -358,10 +373,46 @@ export async function sendPasswordResetEmail(payload: ResetPasswordEmailPayload)
   });
 }
 
+import { pool } from '../db/pool.js';
+
+async function recordEmailAudit(data: {
+  recipient: string;
+  subject: string;
+  sender: string;
+  status: 'sent' | 'failed' | 'simulated';
+  messageId?: string;
+  errorMessage?: string;
+}) {
+  if (pool) {
+    try {
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS audit_email_logs (
+          id TEXT PRIMARY KEY,
+          recipient TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          sender TEXT NOT NULL,
+          status TEXT NOT NULL,
+          message_id TEXT,
+          error_message TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`,
+      );
+      const id = `EML-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      await pool.query(
+        `INSERT INTO audit_email_logs (id, recipient, subject, sender, status, message_id, error_message)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, data.recipient, data.subject, data.sender, data.status, data.messageId || null, data.errorMessage || null],
+      );
+    } catch {
+      // ignore
+    }
+  }
+}
+
 /**
- * Função interna de envio com suporte a Nodemailer SMTP ou graceful logger sandbox
+ * Função de envio com suporte a Nodemailer SMTP ou graceful logger sandbox
  */
-async function sendMail(options: {
+export async function sendMail(options: {
   to: string;
   subject: string;
   html: string;
@@ -379,10 +430,24 @@ async function sendMail(options: {
         text: options.text,
       });
       console.log(`[emailService] E-mail enviado com sucesso via SMTP para ${options.to} (ID: ${info.messageId})`);
+      await recordEmailAudit({
+        recipient: options.to,
+        subject: options.subject,
+        sender: env.SMTP_FROM,
+        status: 'sent',
+        messageId: info.messageId,
+      });
       return { success: true, messageId: info.messageId };
     } catch (err) {
-      console.error(`[emailService] Falha ao enviar via SMTP para ${options.to}:`, err);
-      // Fallback to logged delivery so execution flow never interrupts
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[emailService] Falha ao enviar via SMTP para ${options.to}:`, msg);
+      await recordEmailAudit({
+        recipient: options.to,
+        subject: options.subject,
+        sender: env.SMTP_FROM,
+        status: 'failed',
+        errorMessage: msg,
+      });
     }
   }
 
@@ -393,6 +458,14 @@ async function sendMail(options: {
     to: options.to,
     subject: options.subject,
     date: new Date().toISOString(),
+  });
+
+  await recordEmailAudit({
+    recipient: options.to,
+    subject: options.subject,
+    sender: env.SMTP_FROM,
+    status: 'simulated',
+    messageId: simulatedId,
   });
 
   return { success: true, messageId: simulatedId };

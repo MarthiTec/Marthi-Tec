@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ingestContractInterestToCrm } from '../data/crmStore';
 import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
 import { isMarthiStaffEmail } from '../data/marthiStaff';
+import { nestApiUrl } from '../services/config';
 
 type AuthView = 'login' | 'forgot' | 'signup';
 
@@ -107,14 +108,15 @@ export function LoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/v1/auth/forgot-password', {
+      const apiUrl = nestApiUrl();
+      const res = await fetch(`${apiUrl}/api/v1/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: mail }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
       setFeedback(
-        json.data?.message ||
+        json?.data?.message ||
           'Caso o e-mail informado esteja cadastrado no sistema, enviamos as instruções e o link seguro para redefinição de senha.',
       );
     } catch {

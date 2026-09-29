@@ -2,6 +2,7 @@ import { getPlanById, normalizePlanId, type PartnerModuleId, type PlanId } from 
 import { listCrmLeads } from './crmStore';
 import { listPresenceEntries } from './presenceStore';
 import { syncBranchToMultiStore, removeBranchFromMultiStore } from './multiStoreStore';
+import { nestApiUrl } from '../services/config';
 
 const STORAGE_KEY = 'marthi.ops.clients.v2';
 export const MARTHI_CLIENTS_EVENT = 'marthi-clients-updated';
@@ -278,9 +279,14 @@ export function upsertMarthiClient(
 ): MarthiClient {
   const state = load();
   const email = input.email.trim().toLowerCase();
-  const existingIdx = state.clients.findIndex(
-    (item) => item.clientId === input.clientId || (email && item.email === email),
-  );
+  const docDigits = (input.document || '').replace(/\D/g, '');
+  const existingIdx = state.clients.findIndex((item) => {
+    if (input.clientId && item.clientId === input.clientId) return true;
+    const itemDoc = (item.document || '').replace(/\D/g, '');
+    if (docDigits && itemDoc && docDigits === itemDoc) return true;
+    if (email && item.email.toLowerCase() === email) return true;
+    return false;
+  });
   const planId = normalizePlanId(input.planId) ?? 'bronze';
   const parentClientId = input.parentClientId ? input.parentClientId.trim() : null;
   const companyType: CompanyRelation = parentClientId ? 'branch' : input.companyType || 'independent';
@@ -396,7 +402,8 @@ export async function createMarthiClientWithSecureActivation(input: {
   // Notifica o backend para pré-registro e envio do link de ativação seguro
   if (input.paymentOk) {
     try {
-      await fetch('/api/v1/admin/clients/resend-activation', {
+      const apiUrl = nestApiUrl();
+      await fetch(`${apiUrl}/api/v1/admin/clients/resend-activation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -497,7 +504,8 @@ export async function identifyClientPaymentAndActivate(
 
   // Aciona a API de confirmação de pagamento para idempotência, geração de token seguro e disparo de e-mails
   try {
-    await fetch('/api/v1/partners/payment-confirm', {
+    const apiUrl = nestApiUrl();
+    await fetch(`${apiUrl}/api/v1/partners/payment-confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -534,7 +542,8 @@ export async function resendClientActivationEmail(
   }
 
   try {
-    const res = await fetch('/api/v1/admin/clients/resend-activation', {
+    const apiUrl = nestApiUrl();
+    const res = await fetch(`${apiUrl}/api/v1/admin/clients/resend-activation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -546,15 +555,21 @@ export async function resendClientActivationEmail(
         planName: getPlanById(client.planId).name,
       }),
     });
-    const json = await res.json();
-    return {
-      success: res.ok,
-      message: json.data?.message || `Link de ativação reenviado para ${client.email}.`,
-    };
-  } catch {
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json?.error?.message || `Falha ao reenviar e-mail para ${client.email}.`,
+      };
+    }
     return {
       success: true,
-      message: `Link de ativação reenviado para ${client.email} com sucesso.`,
+      message: json?.data?.message || `Link de ativação reenviado para ${client.email}.`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : `Falha ao comunicar com o servidor de e-mail.`,
     };
   }
 }
@@ -567,7 +582,8 @@ export async function forceClientPasswordReset(
   actorName: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch('/api/v1/admin/clients/force-reset', {
+    const apiUrl = nestApiUrl();
+    const res = await fetch(`${apiUrl}/api/v1/admin/clients/force-reset`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -578,15 +594,21 @@ export async function forceClientPasswordReset(
         clientName: client.tradeName,
       }),
     });
-    const json = await res.json();
-    return {
-      success: res.ok,
-      message: json.data?.message || `E-mail de redefinição de senha enviado para ${client.email}.`,
-    };
-  } catch {
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json?.error?.message || `Falha ao enviar e-mail de redefinição para ${client.email}.`,
+      };
+    }
     return {
       success: true,
-      message: `E-mail de redefinição de senha enviado para ${client.email}.`,
+      message: json?.data?.message || `E-mail de redefinição de senha enviado para ${client.email}.`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : `Falha ao comunicar com o servidor de e-mail.`,
     };
   }
 }
@@ -602,20 +624,27 @@ export async function sendClientPhoneVerification(
   }
   const clean = client.phone.replace(/\D/g, '');
   try {
-    const res = await fetch('/api/v1/auth/otp/send', {
+    const apiUrl = nestApiUrl();
+    const res = await fetch(`${apiUrl}/api/v1/auth/otp/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: clean, name: client.tradeName }),
     });
-    const json = await res.json();
-    return {
-      success: res.ok,
-      message: json.data?.message || 'Código OTP enviado via WhatsApp / SMS.',
-    };
-  } catch {
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json?.error?.message || 'Falha ao enviar código OTP.',
+      };
+    }
     return {
       success: true,
-      message: 'Código de confirmação enviado para o WhatsApp do cliente.',
+      message: json?.data?.message || 'Código OTP enviado via WhatsApp / SMS.',
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Falha ao enviar código de verificação.',
     };
   }
 }

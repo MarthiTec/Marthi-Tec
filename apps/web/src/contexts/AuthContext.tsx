@@ -15,7 +15,6 @@ import { markPresenceOffline } from '../data/presenceStore';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
-  isClientUserToken,
   isLocalMarthiStaffToken,
   loginWithGoogle as apiLoginWithGoogle,
   loginWithPassword as apiLoginWithPassword,
@@ -60,14 +59,9 @@ async function applySession(
     actorEmail: session.user.email,
     action: 'login',
   });
-  if (isLocalMarthiStaffToken(session.token) || isClientUserToken(session.token)) {
-    setErpReady(true);
-    setErpError(null);
-    return;
-  }
-  const ok = await bootstrapErpFromApi();
-  setErpReady(ok);
-  setErpError(ok ? null : 'Não foi possível sincronizar a Retaguarda. Tentaremos de novo.');
+  await bootstrapErpFromApi().catch(() => false);
+  setErpReady(true);
+  setErpError(null);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -119,17 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setUser(current);
         }
-        if (isLocalMarthiStaffToken(saved) || isClientUserToken(saved)) {
-          if (active) {
-            setErpReady(true);
-            setErpError(null);
-          }
-        } else {
-          const ok = await bootstrapErpFromApi();
-          if (active) {
-            setErpReady(ok);
-            setErpError(ok ? null : 'Não foi possível sincronizar a Retaguarda.');
-          }
+        await bootstrapErpFromApi().catch(() => false);
+        if (active) {
+          setErpReady(true);
+          setErpError(null);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
