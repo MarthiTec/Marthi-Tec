@@ -1,6 +1,10 @@
 import { getPanelTheme, syncThemeForProfile, type PanelTheme } from './panelThemeStore';
 
-const STORAGE_KEY = 'marthi.operator.profile';
+function storageKeyForUser(email?: string): string {
+  const norm = email?.trim().toLowerCase();
+  return norm ? `marthi.operator.profile:${norm}` : 'marthi.operator.profile';
+}
+
 export const PROFILE_EVENT = 'marthi-profile-updated';
 
 export type OperatorProfile = {
@@ -29,10 +33,14 @@ function fallbackTheme(): PanelTheme {
   return 'light';
 }
 
-function emptyProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile {
+function emptyProfile(
+  fallbackName: string,
+  fallbackEmail = '',
+  defaultRole = DEFAULT_ROLE,
+): OperatorProfile {
   return {
     displayName: fallbackName,
-    role: DEFAULT_ROLE,
+    role: defaultRole,
     photo: null,
     email: fallbackEmail,
     phone: '',
@@ -45,37 +53,64 @@ function normalizeProfile(
   partial: Partial<OperatorProfile>,
   fallbackName: string,
   fallbackEmail = '',
+  defaultRole = DEFAULT_ROLE,
 ): OperatorProfile {
+  const normEmail = partial.email?.trim() || fallbackEmail;
+  const isMock = normEmail === 'teste@marthi.com.br' && fallbackEmail && fallbackEmail !== 'teste@marthi.com.br';
+  const roleRaw = partial.role?.trim();
+  const effectiveRole =
+    !roleRaw || (roleRaw === 'Operador' && defaultRole === 'Administrador')
+      ? defaultRole
+      : roleRaw;
+
   return {
-    displayName: partial.displayName?.trim() || fallbackName,
-    role: partial.role?.trim() || DEFAULT_ROLE,
+    displayName: isMock ? fallbackName : partial.displayName?.trim() || fallbackName,
+    role: effectiveRole,
     photo: partial.photo?.trim() || null,
-    email: partial.email?.trim() || fallbackEmail,
+    email: isMock ? fallbackEmail : normEmail,
     phone: partial.phone?.trim() || '',
     address: partial.address?.trim() || '',
     theme: partial.theme === 'dark' || partial.theme === 'light' ? partial.theme : fallbackTheme(),
   };
 }
 
-export function getOperatorProfile(fallbackName: string, fallbackEmail = ''): OperatorProfile {
+export function getOperatorProfile(
+  fallbackName: string,
+  fallbackEmail = '',
+  fallbackRole = DEFAULT_ROLE,
+): OperatorProfile {
+  const targetEmail = fallbackEmail.trim().toLowerCase();
+
   if (memoryProfile) {
-    return normalizeProfile(memoryProfile, fallbackName, fallbackEmail || memoryProfile.email);
+    const memEmail = memoryProfile.email.trim().toLowerCase();
+    if (!targetEmail || memEmail === targetEmail) {
+      return normalizeProfile(memoryProfile, fallbackName, targetEmail || memEmail, fallbackRole);
+    }
+    memoryProfile = null;
   }
+
+  const key = storageKeyForUser(targetEmail);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<OperatorProfile>;
-      return normalizeProfile(parsed, fallbackName, fallbackEmail);
+      const parsedEmail = (parsed.email ?? '').trim().toLowerCase();
+      // Não herda dados de teste@marthi.com.br se o usuário logado for diferente
+      if (!targetEmail || !parsedEmail || parsedEmail === targetEmail) {
+        return normalizeProfile(parsed, fallbackName, targetEmail || parsedEmail, fallbackRole);
+      }
     }
   } catch {
     /* ignore */
   }
-  return emptyProfile(fallbackName, fallbackEmail);
+
+  return emptyProfile(fallbackName, targetEmail, fallbackRole);
 }
 
 export function replaceOperatorProfileCache(profile: OperatorProfile) {
   memoryProfile = normalizeProfile(profile, profile.displayName, profile.email);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
+  const key = storageKeyForUser(profile.email);
+  localStorage.setItem(key, JSON.stringify(memoryProfile));
   syncThemeForProfile(memoryProfile.email || memoryProfile.displayName, memoryProfile.theme);
 }
 
@@ -83,7 +118,8 @@ export function replaceOperatorProfileCache(profile: OperatorProfile) {
 export function patchOperatorProfileTheme(theme: PanelTheme) {
   if (!memoryProfile) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const key = storageKeyForUser();
+      const raw = localStorage.getItem(key);
       if (raw) {
         memoryProfile = normalizeProfile(JSON.parse(raw) as Partial<OperatorProfile>, 'Operador');
       }
@@ -94,7 +130,8 @@ export function patchOperatorProfileTheme(theme: PanelTheme) {
   if (!memoryProfile) return;
   memoryProfile = { ...memoryProfile, theme };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryProfile));
+    const key = storageKeyForUser(memoryProfile.email);
+    localStorage.setItem(key, JSON.stringify(memoryProfile));
   } catch {
     /* ignore */
   }
@@ -102,9 +139,9 @@ export function patchOperatorProfileTheme(theme: PanelTheme) {
 
 export async function saveOperatorProfile(
   profile: Omit<OperatorProfile, 'theme'> & { theme?: PanelTheme },
-  options?: { allowRole?: boolean },
+  options?: { allowRole?: boolean; defaultRole?: string },
 ) {
-  const current = getOperatorProfile(profile.displayName, profile.email);
+  const current = getOperatorProfile(profile.displayName, profile.email, options?.defaultRole || DEFAULT_ROLE);
   const next = normalizeProfile(
     {
       ...profile,
@@ -113,6 +150,7 @@ export async function saveOperatorProfile(
     },
     profile.displayName,
     profile.email,
+    options?.defaultRole || DEFAULT_ROLE,
   );
 
   const { isNestAuthed } = await import('../services/nestClient');

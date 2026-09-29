@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { userIsStoreAdmin } from '../data/erpRegistry';
 import {
   getOperatorProfile,
   PROFILE_EVENT,
@@ -9,19 +10,21 @@ import {
 
 export function useOperatorProfile() {
   const { user } = useAuth();
-  const fallback = user?.name ?? 'Operador';
+  const isAdmin = user?.role === 'admin' || userIsStoreAdmin(user?.email);
+  const fallbackRole = isAdmin ? 'Administrador' : user?.role === 'manager' ? 'Gerente' : 'Operador';
+  const fallback = user?.name ?? (isAdmin ? 'Administrador' : 'Operador');
   const fallbackEmail = user?.email ?? '';
   const [profile, setProfile] = useState<OperatorProfile>(() =>
-    getOperatorProfile(fallback, fallbackEmail),
+    getOperatorProfile(fallback, fallbackEmail, fallbackRole),
   );
 
   useEffect(() => {
-    setProfile(getOperatorProfile(fallback, fallbackEmail));
-  }, [fallback, fallbackEmail]);
+    setProfile(getOperatorProfile(fallback, fallbackEmail, fallbackRole));
+  }, [fallback, fallbackEmail, fallbackRole]);
 
   useEffect(() => {
     function refresh() {
-      setProfile(getOperatorProfile(fallback, fallbackEmail));
+      setProfile(getOperatorProfile(fallback, fallbackEmail, fallbackRole));
     }
     window.addEventListener(PROFILE_EVENT, refresh);
     window.addEventListener('storage', refresh);

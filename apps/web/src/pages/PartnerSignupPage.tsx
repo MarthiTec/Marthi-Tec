@@ -357,6 +357,8 @@ export function PartnerSignupPage() {
     const ieInfo = form.stateRegistration.trim() ? `IE: ${form.stateRegistration.trim()}` : '';
     const notesMerged = [form.notes.trim(), ieInfo].filter(Boolean).join(' · ');
 
+    const txRef = `PAY-${Date.now().toString(36).toUpperCase()}`;
+
     try {
       const result = await submitPartnerSignup({
         planId: form.planId,
@@ -378,6 +380,9 @@ export function PartnerSignupPage() {
         contactName: form.contactName.trim(),
         contactRole: form.contactRole.trim(),
         notes: notesMerged,
+        payNow: true,
+        paymentMethod: payMethod,
+        transactionRef: txRef,
       });
       await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
       applySegmentPreset(selectedSegment);
@@ -397,14 +402,18 @@ export function PartnerSignupPage() {
         ingestPartnerSignupToMarthiClients({
           protocol: result.id,
           tradeName: form.tradeName.trim() || form.legalName.trim(),
+          legalName: form.legalName.trim(),
+          document: form.document.trim(),
+          phone: form.phone.trim(),
           email: form.email.trim(),
           planId: form.planId,
           modules: form.modules,
+          paymentOk: true,
           notes: notesMerged || `Cadastro parceiro · ${selectedPlan.name}`,
         });
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao enviar cadastro.');
+      setError(err instanceof Error ? err.message : 'Falha ao processar contratação.');
     } finally {
       setSubmitting(false);
     }
@@ -413,24 +422,41 @@ export function PartnerSignupPage() {
   if (protocol) {
     return (
       <div className="partner">
-        <div className="partner__shell partner__shell--success">
+        <div className="partner__shell partner__shell--success" style={{ maxWidth: '620px', textAlign: 'center' }}>
           <BrandLogo variant="lockup" className="partner__lockup" />
-          <h1>Cadastro enviado</h1>
-          <p>
-            Recebemos o interesse de <strong>{form.tradeName}</strong> no plano{' '}
-            <strong>{selectedPlan.name}</strong> ({selectedPlan.price}
-            {selectedPlan.period}).
+          <h1 style={{ color: '#4ade80', margin: '20px 0 12px' }}>Contratação Confirmada com Sucesso! 🚀</h1>
+          <p style={{ fontSize: '16px', lineHeight: 1.6, color: '#e2e8f0' }}>
+            Parabéns! O investimento para o plano <strong>{selectedPlan.name}</strong> foi aprovado.
+            A conta da empresa <strong>{form.tradeName}</strong> já foi criada no sistema.
           </p>
-          <p className="partner__protocol">
-            Protocolo: <strong>{protocol}</strong>
+          <div
+            style={{
+              background: 'rgba(45, 212, 191, 0.08)',
+              border: '1px solid rgba(45, 212, 191, 0.25)',
+              borderRadius: '8px',
+              padding: '16px',
+              margin: '20px 0',
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#cbd5e1' }}>
+              📧 <strong>E-mail de ativação enviado para:</strong>{' '}
+              <span style={{ color: '#2dd4bf', fontWeight: 600 }}>{form.email}</span>
+            </p>
+            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>
+              Por segurança, não criamos senhas automáticas em texto puro. Enviamos um link seguro
+              de uso único para você definir sua própria senha de acesso.
+            </p>
+          </div>
+          <p className="partner__protocol" style={{ margin: '16px 0' }}>
+            Protocolo da Contratação: <strong>{protocol}</strong>
           </p>
-          <p>A equipe Marthi entrará em contato para validar o contrato e liberar o ambiente.</p>
-          <div className="partner__actions">
-            <Link to="/" className="btn btn--primary">
-              Voltar à home
+          <div className="partner__actions" style={{ justifyContent: 'center', marginTop: '24px' }}>
+            <Link to="/login" className="btn btn--primary">
+              Ir para Tela de Acesso
             </Link>
-            <Link to="/login" className="btn btn--ghost">
-              Já sou parceiro
+            <Link to="/" className="btn btn--ghost">
+              Voltar ao Site
             </Link>
           </div>
         </div>

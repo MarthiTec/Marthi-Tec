@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { AdminPicker } from './AdminPicker';
 import {
   confirmDelete,
@@ -40,19 +39,34 @@ import {
 } from '../data/erpUserPasswords';
 import { hasModule } from '../data/storePlan';
 
+export const PRIMARY_MODULE_AREAS: AccessArea[] = [
+  'painel',
+  'totem',
+  'pdv',
+  'os',
+  'erp',
+  'fiscal',
+  'ecommerce',
+];
+
 export function areasAvailableOnPlan(): AccessArea[] {
   return ALL_ACCESS_AREAS.filter((area) => {
     switch (area) {
+      case 'painel':
+        return true;
       case 'totem':
         return hasModule('totem');
       case 'os':
         return hasModule('os');
       case 'ecommerce':
         return hasModule('ecommerce');
+      case 'fiscal':
       case 'erp_fiscal':
       case 'erp_invoices':
         return hasModule('fiscal');
       case 'pdv':
+        return true;
+      case 'erp':
       case 'erp_customers':
       case 'erp_stock':
       case 'erp_attrs':
@@ -98,16 +112,19 @@ const EMPTY = {
 type Mode = 'new' | 'edit' | 'view';
 
 type Props = {
-  variant: 'operations' | 'full';
+  variant: 'operations' | 'full' | 'painel';
   id?: string;
 };
 
-/** Cadastro de funcionários / usuários do sistema (compartilhado entre Operações e ERP). */
+/** Cadastro de funcionários / usuários do sistema (compartilhado entre Painel, Operações e ERP). */
 export function TeamUsersSection({ variant, id }: Props) {
   const { user } = useAuth();
   const planAreas = useMemo(() => areasAvailableOnPlan(), []);
   const showSellerLink = variant === 'full' && hasModule('erp');
-  const areaOptions = variant === 'operations' ? planAreas : ALL_ACCESS_AREAS;
+  const isPainelVariant = variant === 'painel' || variant === 'operations';
+  const areaOptions = isPainelVariant
+    ? PRIMARY_MODULE_AREAS.filter((a) => planAreas.includes(a))
+    : ALL_ACCESS_AREAS;
 
   const [items, setItems] = useState(() => listEmployees());
   const [sellers] = useState(() => (showSellerLink ? listSellers(true) : []));
@@ -281,7 +298,7 @@ export function TeamUsersSection({ variant, id }: Props) {
       {!formVisible ? (
         <HeadingNewButton
           onClick={startNew}
-          label={variant === 'operations' ? 'Novo usuário' : 'Novo funcionário'}
+          label={variant === 'full' ? 'Novo funcionário' : 'Novo usuário'}
         />
       ) : readOnly ? (
         <>
@@ -304,8 +321,18 @@ export function TeamUsersSection({ variant, id }: Props) {
       {!formVisible ? (
         <>
           <article className="admin-card">
-            <h2>{variant === 'operations' ? 'Usuários da loja' : 'Funcionários'}</h2>
-            {variant === 'operations' ? (
+            <h2>
+              {variant === 'painel'
+                ? 'Usuários & Permissões da Loja'
+                : variant === 'operations'
+                  ? 'Usuários da loja'
+                  : 'Funcionários'}
+            </h2>
+            {variant === 'painel' ? (
+              <p>
+                Cadastre os operadores e administradores da sua loja, defina o cargo e marque quais módulos estarão liberados (Painel, Totem, PDV, OS, Retaguarda, etc.). Usuários sem acesso ao Painel são direcionados diretamente ao seu módulo ao fazer login.
+              </p>
+            ) : variant === 'operations' ? (
               <p>
                 Cadastre quem pode entrar no sistema sem depender da Retaguarda: e-mail de login, função e
                 áreas liberadas conforme o plano.
@@ -318,17 +345,7 @@ export function TeamUsersSection({ variant, id }: Props) {
               </p>
             )}
             <p className="empty" style={{ marginTop: 8 }}>
-              A conta (Google/senha do backend) precisa existir; vincule o mesmo e-mail aqui.{' '}
-              {variant === 'operations' && hasModule('erp') ? (
-                <>
-                  RH completo em <Link to="/erp/funcionarios">Retaguarda → Funcionários</Link>. Áreas em{' '}
-                  <Link to="/erp/permissoes">Permissões</Link>.
-                </>
-              ) : hasModule('erp') ? (
-                <>
-                  Ajuste rápido de áreas em <Link to="/erp/permissoes">Permissões</Link>.
-                </>
-              ) : null}
+              O e-mail de login e a senha definidos aqui permitem que o colaborador faça login diretamente na tela de acesso.
             </p>
           </article>
 
@@ -345,9 +362,9 @@ export function TeamUsersSection({ variant, id }: Props) {
                 <tr>
                   <th>Nome</th>
                   <th>Cargo</th>
-                  <th>Usuário?</th>
                   <th>Login</th>
                   <th>Senha</th>
+                  <th>Módulos liberados</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -356,7 +373,7 @@ export function TeamUsersSection({ variant, id }: Props) {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="empty">
-                      Nenhum funcionário encontrado.
+                      Nenhum usuário ou funcionário encontrado.
                     </td>
                   </tr>
                 ) : (
@@ -370,12 +387,60 @@ export function TeamUsersSection({ variant, id }: Props) {
                           </CrudNameButton>
                         </td>
                         <td>{EMPLOYEE_ROLE_LABEL[item.role]}</td>
-                        <td>{item.isSystemUser ? 'Sim' : 'Não'}</td>
                         <td>{item.isSystemUser ? item.userEmail || item.email || '—' : '—'}</td>
                         <td>
                           {item.isSystemUser && email
                             ? getErpUserPasswordHint(email)
                             : '—'}
+                        </td>
+                        <td>
+                          {item.role === 'admin' ? (
+                            <span className="marthi-pill marthi-pill--ok" style={{ fontSize: '0.72rem' }}>
+                              Todos (Admin)
+                            </span>
+                          ) : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {item.accessAreas.includes('painel') ? (
+                                <span className="marthi-pill marthi-pill--ok" style={{ fontSize: '0.72rem' }}>
+                                  Painel
+                                </span>
+                              ) : (
+                                <span className="marthi-pill marthi-pill--late" style={{ fontSize: '0.72rem' }} title="Sem acesso ao Painel">
+                                  Sem Painel
+                                </span>
+                              )}
+                              {item.accessAreas.includes('pdv') && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(29, 78, 216, 0.15)', color: '#60a5fa' }}>
+                                  PDV
+                                </span>
+                              )}
+                              {item.accessAreas.includes('totem') && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(15, 118, 110, 0.15)', color: '#2dd4bf' }}>
+                                  Totem
+                                </span>
+                              )}
+                              {item.accessAreas.includes('os') && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(180, 83, 9, 0.15)', color: '#fbbf24' }}>
+                                  OS
+                                </span>
+                              )}
+                              {item.accessAreas.includes('erp') && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(14, 116, 144, 0.15)', color: '#38bdf8' }}>
+                                  Retaguarda
+                                </span>
+                              )}
+                              {(item.accessAreas.includes('fiscal') || item.accessAreas.includes('erp_fiscal')) && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc' }}>
+                                  Fiscal
+                                </span>
+                              )}
+                              {item.accessAreas.includes('ecommerce') && (
+                                <span className="marthi-pill" style={{ fontSize: '0.72rem', background: 'rgba(219, 39, 119, 0.15)', color: '#f472b6' }}>
+                                  E-com
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td>{item.active ? 'Ativo' : 'Inativo'}</td>
                         <td className="admin-table__actions">
@@ -508,7 +573,7 @@ export function TeamUsersSection({ variant, id }: Props) {
             ) : null}
             {form.isSystemUser ? (
               <label className="span-2">
-                Senha de acesso à Retaguarda (local)
+                Senha de acesso local (para login no sistema)
                 <input
                   type="password"
                   value={form.accessPassword}
@@ -529,9 +594,26 @@ export function TeamUsersSection({ variant, id }: Props) {
 
           {form.isSystemUser && form.role !== 'admin' ? (
             <div className="erp-access" style={{ marginTop: 16 }}>
+              <div
+                style={{
+                  background: 'rgba(45, 212, 191, 0.08)',
+                  border: '1px solid rgba(45, 212, 191, 0.25)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '14px',
+                  fontSize: '0.85rem',
+                  lineHeight: '1.45',
+                  color: 'var(--ink, #e2e8f0)',
+                }}
+              >
+                <strong style={{ color: '#2dd4bf' }}>🔒 Regra de Acesso ao Painel:</strong> Se a opção{' '}
+                <strong>Painel (Visão da operação)</strong> não estiver selecionada para este usuário, ele NÃO
+                terá acesso a este Painel Administrativo. Ao realizar login com seu e-mail e senha, o sistema irá
+                encaminhá-lo diretamente para seu módulo operacional liberado (ex.: Frente de Caixa no PDV, Totem,
+                ou Ordem de Serviço).
+              </div>
               <h3 style={{ margin: '0 0 8px', fontSize: '0.82rem', color: 'var(--mute)' }}>
-                Áreas liberadas
-                {variant === 'operations' ? ' (conforme seu plano)' : null}
+                Módulos e Áreas Liberadas para este Usuário
               </h3>
               <div className="erp-access__grid">
                 {areaOptions.map((area) => (
@@ -548,6 +630,7 @@ export function TeamUsersSection({ variant, id }: Props) {
               </div>
             </div>
           ) : null}
+
 
           {form.role === 'admin' ? (
             <p className="empty" style={{ marginTop: 12 }}>

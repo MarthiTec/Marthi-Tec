@@ -20,6 +20,9 @@ export type PartnerSignupPayload = {
   contactName: string;
   contactRole: string;
   notes: string;
+  payNow?: boolean;
+  paymentMethod?: string;
+  transactionRef?: string;
 };
 
 const VALID_BACKEND_MODULES = new Set(['totem', 'os', 'erp', 'fiscal', 'ecommerce']);
@@ -67,6 +70,9 @@ export async function submitPartnerSignup(payload: PartnerSignupPayload) {
     contactName: payload.contactName,
     contactRole: payload.contactRole || '',
     notes: payload.notes || '',
+    payNow: payload.payNow ?? false,
+    paymentMethod: payload.paymentMethod || 'pix',
+    transactionRef: payload.transactionRef || undefined,
   };
 
   const response = await fetch(`${base}/api/v1/partners/signup`, {
@@ -76,7 +82,7 @@ export async function submitPartnerSignup(payload: PartnerSignupPayload) {
   });
 
   const body = (await response.json().catch(() => null)) as
-    | { success: true; data: { id: string } }
+    | { success: true; data: { id: string; status?: string; message?: string } }
     | { success: false; error?: { message?: string } }
     | null;
 
@@ -85,6 +91,27 @@ export async function submitPartnerSignup(payload: PartnerSignupPayload) {
       (body && 'error' in body && body.error?.message) ||
         'Não foi possível enviar o cadastro. Tente novamente.',
     );
+  }
+
+  return body.data;
+}
+
+export async function confirmPartnerPayment(payload: {
+  protocol: string;
+  paymentMethod: string;
+  transactionRef?: string;
+  notes?: string;
+}): Promise<{ id: string; status: string; message: string }> {
+  const base = nestApiUrl();
+  const response = await fetch(`${base}/api/v1/partners/payment-confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json();
+  if (!response.ok || !body.success) {
+    throw new Error(body.error?.message || 'Falha ao confirmar pagamento.');
   }
 
   return body.data;

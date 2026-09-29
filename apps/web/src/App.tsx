@@ -3,6 +3,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { SetupPasswordPage } from './pages/SetupPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { PlansPublicPage } from './pages/PlansPublicPage';
 import { AboutPage } from './pages/AboutPage';
@@ -88,6 +90,7 @@ import { CardapioPublicPage } from './pages/cardapio/CardapioPublicPage';
 import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
 import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
 import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
+import { PainelUsersPage } from './pages/admin/PainelUsersPage';
 
 function LegacyMarthiRedirect() {
   const location = useLocation();
@@ -109,6 +112,10 @@ export function App() {
         <Route path="/fale-conosco" element={<Navigate to="/contato" replace />} />
         <Route path="/parceiro" element={<PartnerSignupPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/criar-senha" element={<SetupPasswordPage />} />
+        <Route path="/definir-senha" element={<Navigate to="/criar-senha" replace />} />
+        <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
+        <Route path="/recuperar-senha" element={<Navigate to="/login?view=forgot" replace />} />
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />
         <Route path="/totem" element={<TotemPage />} />
         <Route path="/caixa" element={<CaixaPage />} />
@@ -197,6 +204,7 @@ export function App() {
         <Route path="/painel" element={<AdminLayout />}>
           <Route index element={<AdminHomePage />} />
           <Route path="lojas" element={<MultiStoreManagementPage />} />
+          <Route path="usuarios" element={<PainelUsersPage />} />
           <Route path="operacoes" element={<OperationsPage />} />
           <Route path="operacoes/usuarios" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
