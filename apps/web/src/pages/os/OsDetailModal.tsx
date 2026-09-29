@@ -376,8 +376,8 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
     setBusy(true);
     try {
       const updated = await addWorkOrderComment(order.id, {
-        authorName: user?.name || 'Ramon de Freitas',
-        authorRole: 'Analista de Suporte',
+        authorName: user?.name || 'Operador',
+        authorRole: 'Atendimento',
         authorPhoto: user?.picture || undefined,
         content: text.trim(),
         kind: commentKind,
@@ -420,7 +420,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
     setBusy(true);
     try {
       const updated = await addWorkOrderWorklog(order.id, {
-        technicianName: worklogTech || order.technician || user?.name || 'Carlos Lima',
+        technicianName: worklogTech || order.technician || user?.name || 'Técnico',
         technicianRole: 'Bancada Técnica',
         minutesSpent: mins,
         description: worklogDescription.trim(),
@@ -449,7 +449,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
         size: file.size,
         type: file.type,
         dataUrl,
-        uploaderName: 'Marthi Master',
+        uploaderName: user?.name || 'Operador',
       });
       if (updated) onOrderUpdated(updated);
       setBusy(false);
@@ -929,13 +929,13 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                       <div
                         className="os-jira-feed-avatar-initials"
                         style={{
-                          backgroundColor: getAvatarColor(user?.name || 'Ramon de Freitas'),
+                          backgroundColor: getAvatarColor(user?.name || 'Operador'),
                           width: 32,
                           height: 32,
                           fontSize: '0.78rem',
                         }}
                       >
-                        {getInitials(user?.name || 'Ramon de Freitas')}
+                        {getInitials(user?.name || 'Operador')}
                       </div>
                     )}
                   </div>
@@ -1918,6 +1918,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
       <OsSimplifiedCheckoutModal
         open={checkoutOpen}
         order={order}
+        operatorName={user?.name || 'Operador'}
         onClose={() => setCheckoutOpen(false)}
         onPaymentRegistered={(updated) => {
           setCheckoutOpen(false);

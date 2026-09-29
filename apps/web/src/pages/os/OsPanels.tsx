@@ -77,7 +77,7 @@ function OsConsultPanel({
             setQuery(e.target.value);
             setSelected(null);
           }}
-          placeholder="OS-… / Maria / IMEI / Ana"
+          placeholder="OS-… / Cliente / IMEI / Modelo"
           autoFocus
         />
       </label>

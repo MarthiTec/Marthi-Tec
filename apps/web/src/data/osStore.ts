@@ -13,6 +13,7 @@ import {
   apiUpdateWorkOrder,
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
+import { listEmployees, EMPLOYEE_ROLE_LABEL } from './erpRegistry';
 
 const STORAGE_KEY = 'marthi.os.v2';
 export const OS_STATE_EVENT = 'marthi-os-state';
@@ -138,7 +139,7 @@ export type TechnicianInfo = {
   id: string;
   name: string;
   role: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   specialty: string;
   active: boolean;
 };
@@ -279,40 +280,60 @@ export const PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
   urgent: 'Urgente',
 };
 
-export const TECHNICIANS_LIST: TechnicianInfo[] = [
-  {
-    id: 'tech-1',
-    name: 'Ana Costa',
-    role: 'Especialista Apple & Microeletrônica',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    specialty: 'Placas e iPhones',
-    active: true,
+export function listTechnicianInfos(): TechnicianInfo[] {
+  const map = new Map<string, TechnicianInfo>();
+  try {
+    const employees = listEmployees().filter((e) => e.active);
+    for (const e of employees) {
+      map.set(e.name.toLowerCase(), {
+        id: e.id,
+        name: e.name,
+        role: EMPLOYEE_ROLE_LABEL[e.role] ?? 'Técnico',
+        avatarUrl: undefined,
+        specialty: e.role === 'admin' ? 'Administração' : 'Bancada Técnica',
+        active: e.active,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const orders = listWorkOrders();
+    for (const o of orders) {
+      const name = (o.technician || '').trim();
+      if (name && !map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), {
+          id: `tech-${name.toLowerCase().replace(/\s+/g, '-')}`,
+          name,
+          role: 'Técnico Responsável',
+          avatarUrl: undefined,
+          specialty: 'Bancada Técnica',
+          active: true,
+        });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return [...map.values()];
+}
+
+export const TECHNICIANS_LIST: TechnicianInfo[] = new Proxy([] as TechnicianInfo[], {
+  get(target, prop, receiver) {
+    const current = listTechnicianInfos();
+    if (prop === 'length') return current.length;
+    if (typeof prop === 'string' && !isNaN(Number(prop))) {
+      return current[Number(prop)];
+    }
+    const val = (current as any)[prop];
+    if (typeof val === 'function') {
+      return val.bind(current);
+    }
+    return Reflect.get(target, prop, receiver);
   },
-  {
-    id: 'tech-2',
-    name: 'Carlos Lima',
-    role: 'Técnico Sênior de Hardware & Notebooks',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    specialty: 'Notebooks e PCs',
-    active: true,
-  },
-  {
-    id: 'tech-3',
-    name: 'Lucas Silva',
-    role: 'Técnico de Bancada & Telas',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    specialty: 'Troca de Telas e Baterias',
-    active: true,
-  },
-  {
-    id: 'tech-4',
-    name: 'Marthi Teste',
-    role: 'Operador Master & Triagem',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    specialty: 'Revisão Técnica e Triagem',
-    active: true,
-  },
-];
+});
 
 export function getTechnicianByName(name?: string | null): TechnicianInfo | undefined {
   if (!name) return undefined;
@@ -321,52 +342,50 @@ export function getTechnicianByName(name?: string | null): TechnicianInfo | unde
 
 const OPERATIONS_STORAGE_KEY = 'marthi.os.operations.v1';
 
-export const DEFAULT_OPERATIONS: WorkOrderOperation[] = [
-  {
-    id: 'op-2026-09',
-    code: 'OP-2026-09',
-    title: 'Operação Setembro 2026',
+export function createDefaultOperation(): WorkOrderOperation {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const monthName = now.toLocaleDateString('pt-BR', { month: 'long' });
+  const capitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  const firstDay = `${year}-${month}-01`;
+  const lastDay = new Date(year, now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  return {
+    id: `op-${year}-${month}`,
+    code: `OP-${year}-${month}`,
+    title: `Operação ${capitalized} ${year}`,
     status: 'active',
-    startDate: '2026-09-01',
-    endDate: '2026-09-30',
-    masterOperatorName: 'Marthi Master',
+    startDate: firstDay,
+    endDate: lastDay,
+    masterOperatorName: 'Operador',
     targetOrdersCount: 20,
-  },
-  {
-    id: 'op-2026-08',
-    code: 'OP-2026-08',
-    title: 'Operação Agosto 2026',
-    status: 'completed',
-    startDate: '2026-08-01',
-    endDate: '2026-08-31',
-    completedAt: '2026-08-31T23:59:59.000Z',
-    masterOperatorName: 'Marthi Master',
-    targetOrdersCount: 25,
-  },
-  {
-    id: 'op-2026-07',
-    code: 'OP-2026-07',
-    title: 'Operação Julho 2026',
-    status: 'completed',
-    startDate: '2026-07-01',
-    endDate: '2026-07-31',
-    completedAt: '2026-07-31T23:59:59.000Z',
-    masterOperatorName: 'Marthi Master',
-    targetOrdersCount: 22,
-  },
-];
+  };
+}
+
+export const DEFAULT_OPERATIONS: WorkOrderOperation[] = [];
 
 export function listOperations(): WorkOrderOperation[] {
   try {
     const raw = localStorage.getItem(OPERATIONS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const clean = parsed.filter(
+          (op: WorkOrderOperation) =>
+            op.id !== 'op-2026-08' &&
+            op.id !== 'op-2026-07' &&
+            op.masterOperatorName !== 'Marthi Master',
+        );
+        if (clean.length > 0) return clean;
+      }
     }
   } catch {
     /* ignore */
   }
-  return DEFAULT_OPERATIONS;
+  const defaultOp = createDefaultOperation();
+  saveOperations([defaultOp]);
+  return [defaultOp];
 }
 
 export function saveOperations(ops: WorkOrderOperation[]) {
@@ -812,10 +831,11 @@ export async function updateWorkOrder(
     }
     if (!patch.history) {
       const historyEntries: WorkOrderHistoryEntry[] = [];
+      const author = (patch as any).authorName || 'Operador';
       if (patch.status !== undefined && patch.status !== item.status) {
         historyEntries.push({
           id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: 'Ramon de Freitas',
+          authorName: author,
           field: 'Status',
           action: 'alterou',
           fromValue: STATUS_LABEL[item.status] ?? item.status,
@@ -826,7 +846,7 @@ export async function updateWorkOrder(
       if (patch.priority !== undefined && patch.priority !== item.priority) {
         historyEntries.push({
           id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: 'Ramon de Freitas',
+          authorName: author,
           field: 'Prioridade',
           action: 'alterou',
           fromValue: PRIORITY_LABEL[item.priority] ?? item.priority,
@@ -837,7 +857,7 @@ export async function updateWorkOrder(
       if (patch.technician !== undefined && patch.technician !== item.technician) {
         historyEntries.push({
           id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: 'Ramon de Freitas',
+          authorName: author,
           field: 'Técnico Responsável',
           action: 'alterou',
           fromValue: item.technician || 'Nenhum',
@@ -1410,11 +1430,10 @@ export function addDays(date: Date, days: number) {
   return next;
 }
 
-export function listTechnicians() {
+export function listTechnicians(): string[] {
   const names = new Set<string>();
-  for (const order of listWorkOrders()) {
-    const name = order.technician.trim();
-    if (name) names.add(name);
+  for (const t of listTechnicianInfos()) {
+    if (t.name) names.add(t.name);
   }
   return [...names].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }

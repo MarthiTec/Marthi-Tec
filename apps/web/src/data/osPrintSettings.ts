@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getFiscalIssuerSettings } from './fiscalIssuerStore';
 import { getTotemSettings } from './totemSettings';
 import { MARTHI_COMPANY } from './companyContact';
@@ -57,14 +57,14 @@ export function getDefaultCompanyData(): CompanyPrintData {
 
   const name = fiscal.emitenteName || totem.storeName || MARTHI_COMPANY.legalName;
   const tradeName = totem.storeName || fiscal.emitenteName || MARTHI_COMPANY.legalName;
-  const document = fiscal.cnpj || '61.506.270/0001-63';
+  const document = fiscal.cnpj || '';
   const ie = fiscal.ie || '';
   const im = fiscal.im || '';
   const address = totem.locationLabel || MARTHI_COMPANY.addressLine;
   const neighborhood = MARTHI_COMPANY.district;
   const city = fiscal.municipio || MARTHI_COMPANY.city;
   const state = fiscal.uf || MARTHI_COMPANY.stateUf;
-  const zip = '25.812-461';
+  const zip = '';
   const phone = totem.storeWhatsApp ? `(24) ${totem.storeWhatsApp}` : MARTHI_COMPANY.whatsappDisplay;
   const email = MARTHI_COMPANY.email;
   const logoUrl = totem.storeLogo || '';
@@ -111,14 +111,23 @@ export function getOsPrintSettings(): OsPrintSettings {
     const parsed = JSON.parse(raw) as Partial<OsPrintSettings>;
     const defaults = defaultOsPrintSettings();
 
+    const company = {
+      ...defaults.company,
+      ...(parsed.company || {}),
+      logoUrl: parsed.company?.logoUrl || defaults.company.logoUrl,
+    };
+
+    // Remove legacy mock values if present in user storage
+    if (company.document === '61.506.270/0001-63') {
+      company.document = defaults.company.document;
+    }
+    if (company.zip === '25.812-461') {
+      company.zip = '';
+    }
+
     return {
       model: parsed.model === 'default' ? 'default' : 'commercial',
-      company: {
-        ...defaults.company,
-        ...(parsed.company || {}),
-        // If logo is empty in local settings but exists in totem, use it
-        logoUrl: parsed.company?.logoUrl || defaults.company.logoUrl,
-      },
+      company,
       qrCode: {
         ...defaults.qrCode,
         ...(parsed.qrCode || {}),

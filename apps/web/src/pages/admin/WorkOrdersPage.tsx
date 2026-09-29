@@ -587,7 +587,26 @@ export function WorkOrdersPage() {
                 onClick={() => setSelectedTech(isSelected ? null : tech.name)}
                 title={`${tech.name} (${tech.role}) — ${count} chamados`}
               >
-                <img src={tech.avatarUrl} alt={tech.name} />
+                {tech.avatarUrl ? (
+                  <img src={tech.avatarUrl} alt={tech.name} />
+                ) : (
+                  <span
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#2563eb',
+                      color: '#fff',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      borderRadius: '50%',
+                    }}
+                  >
+                    {tech.name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
                 {count > 0 ? <span className="os-jira-avatar-count">{count}</span> : null}
               </button>
             );
@@ -719,7 +738,7 @@ export function WorkOrdersPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ex.: iPhone, Carlos, Placa..."
+                placeholder="Ex.: iPhone, Cliente, Placa..."
               />
             </label>
 
@@ -911,7 +930,26 @@ export function WorkOrdersPage() {
                       <td>
                         <div className="os-table-tech">
                           {techObj ? (
-                            <img src={techObj.avatarUrl} alt={techObj.name} />
+                            techObj.avatarUrl ? (
+                              <img src={techObj.avatarUrl} alt={techObj.name} />
+                            ) : (
+                              <span
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  backgroundColor: '#2563eb',
+                                  color: '#fff',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {techObj.name.slice(0, 2).toUpperCase()}
+                              </span>
+                            )
                           ) : (
                             <span className="os-table-tech__placeholder">👤</span>
                           )}
@@ -1388,12 +1426,30 @@ function JiraWorkOrderCard({
 
             {/* Foto do Técnico no Card (Imagem 1) */}
             {techObj ? (
-              <img
-                src={techObj.avatarUrl}
-                alt={techObj.name}
-                className="os-jira-card__tech-avatar"
-                title={`Atribuído a: ${techObj.name}`}
-              />
+              techObj.avatarUrl ? (
+                <img
+                  src={techObj.avatarUrl}
+                  alt={techObj.name}
+                  className="os-jira-card__tech-avatar"
+                  title={`Atribuído a: ${techObj.name}`}
+                />
+              ) : (
+                <span
+                  className="os-jira-card__tech-avatar"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#6366f1',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.65rem'
+                  }}
+                  title={`Atribuído a: ${techObj.name}`}
+                >
+                  {techObj.name.substring(0, 2).toUpperCase()}
+                </span>
+              )
             ) : (
               <span
                 className="os-jira-card__tech-avatar os-jira-card__tech-avatar--empty"

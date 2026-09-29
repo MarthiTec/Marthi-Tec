@@ -1,4 +1,4 @@
-﻿import {
+import {
   workOrderTotal,
   type WorkOrder,
 } from '../../data/osStore';
@@ -75,10 +75,10 @@ function ShopCopy({ order, settings, passwordType, customPassword, customImei }:
 }) {
   const total = workOrderTotal(order);
   const company = settings.company;
-  const companyName = company.name?.trim() || company.tradeName?.trim() || 'MARTHI TECNOLOGIA & ASSISTÊNCIA';
-  const tradeName = company.tradeName?.trim() || company.name?.trim() || 'ASSISTÊNCIA TÉCNICA ESPECIALIZADA';
-  const phone = company.phone?.trim() || '(24) 99811-2200';
-  const document = company.document?.trim() || '61.506.270/0001-63';
+  const companyName = company.name?.trim() || company.tradeName?.trim() || 'Assistência Técnica';
+  const tradeName = company.tradeName?.trim() || company.name?.trim() || 'Ordem de Serviço';
+  const phone = company.phone?.trim() || '';
+  const document = company.document?.trim() || '';
   const displayedPassword = customPassword !== undefined ? customPassword : order.devicePassword;
   const imei = resolveImei(order, customImei);
 
@@ -278,11 +278,11 @@ function CustomerCopy({ order, settings, customImei }: {
 }) {
   const total = workOrderTotal(order);
   const company = settings.company;
-  const companyName = company.name?.trim() || company.tradeName?.trim() || 'MARTHI TECNOLOGIA & ASSISTÊNCIA';
-  const tradeName = company.tradeName?.trim() || company.name?.trim() || 'ASSISTÊNCIA TÉCNICA ESPECIALIZADA';
-  const phone = company.phone?.trim() || '(24) 99811-2200';
-  const document = company.document?.trim() || '61.506.270/0001-63';
-  const address = company.address?.trim() || 'Rua da Tecnologia, Centro';
+  const companyName = company.name?.trim() || company.tradeName?.trim() || 'Assistência Técnica';
+  const tradeName = company.tradeName?.trim() || company.name?.trim() || 'Ordem de Serviço';
+  const phone = company.phone?.trim() || '';
+  const document = company.document?.trim() || '';
+  const address = company.address?.trim() || '';
   const qr = settings.qrCode;
   const imei = resolveImei(order, customImei);
   const warrantyDate = calculateWarrantyUntil(order.deliveredAt || order.createdAt, settings.warranty.defaultDays || 90);

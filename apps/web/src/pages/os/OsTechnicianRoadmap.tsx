@@ -87,6 +87,13 @@ export function OsTechnicianRoadmap({ orders, onOpenOrder }: Props) {
       </header>
 
       <div className="os-roadmap__grid">
+        {techData.length === 0 && unassigned.length === 0 ? (
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b', gridColumn: '1 / -1' }}>
+            <p style={{ margin: 0, fontWeight: 500, fontSize: '1rem' }}>Nenhum chamado ativo ou técnico no momento.</p>
+            <small>Cadastre membros da equipe em Configurações &gt; Equipe ou abra uma nova Ordem de Serviço.</small>
+          </div>
+        ) : null}
+
         {techData.map(({ tech, open, urgent, capacityPercent }) => {
           const isOverloaded = capacityPercent >= 85;
           return (
@@ -94,7 +101,24 @@ export function OsTechnicianRoadmap({ orders, onOpenOrder }: Props) {
               <header className="os-roadmap-card__head">
                 <div className="os-roadmap-card__user">
                   <div className="os-roadmap-card__avatar-wrap">
-                    <img src={tech.avatarUrl} alt={tech.name} className="os-roadmap-card__avatar" />
+                    {tech.avatarUrl ? (
+                      <img src={tech.avatarUrl} alt={tech.name} className="os-roadmap-card__avatar" />
+                    ) : (
+                      <div
+                        className="os-roadmap-card__avatar"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        {tech.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <span className="os-roadmap-card__online-dot" title="Online na bancada" />
                   </div>
                   <div>

@@ -416,6 +416,11 @@ export function OsDashboardView({
           </div>
 
           <div className="os-dash-tech-workload-list">
+            {techWorkload.length === 0 ? (
+              <p className="empty" style={{ margin: '16px 0', textAlign: 'center', color: '#64748b' }}>
+                Nenhum técnico cadastrado ou com ordens atribuídas.
+              </p>
+            ) : null}
             {techWorkload.map((tech) => {
               const maxLoad = Math.max(...techWorkload.map((t) => t.totalActive), 1);
               const barWidth = Math.round((tech.totalActive / maxLoad) * 100);
@@ -423,7 +428,25 @@ export function OsDashboardView({
               return (
                 <div key={tech.id} className="os-dash-tech-row">
                   <div className="os-dash-tech-profile">
-                    <img src={tech.avatarUrl} alt={tech.name} className="os-dash-tech-avatar" />
+                    {tech.avatarUrl ? (
+                      <img src={tech.avatarUrl} alt={tech.name} className="os-dash-tech-avatar" />
+                    ) : (
+                      <div
+                        className="os-dash-tech-avatar"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: '0.85rem',
+                          borderRadius: '50%',
+                        }}
+                      >
+                        {tech.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div className="os-dash-tech-names">
                       <strong>{tech.name}</strong>
                       <small>{tech.specialty}</small>
