@@ -168,7 +168,11 @@ function seedForTenant(activeTenant: string): RegistryState {
   const isCellPontoTenant =
     activeTenant.includes('ACC-MARTHI-DEMO') ||
     activeTenant.includes('gilvan') ||
-    activeTenant === 'client_CLI-DEMO-01';
+    activeTenant.includes('mariana') ||
+    activeTenant.includes('cell') ||
+    activeTenant.startsWith('emp_') ||
+    activeTenant === 'client_CLI-DEMO-01' ||
+    activeTenant === 'default';
 
   if (isCellPontoTenant) {
     state.employees.push({
@@ -191,10 +195,10 @@ function seedForTenant(activeTenant: string): RegistryState {
       phone: '(24) 98124-4253',
       email: 'marianaveigatav@gmail.com',
       document: '123.456.789-00',
-      role: 'operator',
+      role: 'admin',
       isSystemUser: true,
       userEmail: 'marianaveigatav@gmail.com',
-      accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+      accessAreas: [...ALL_ACCESS_AREAS],
       active: true,
       createdAt: now(),
       updatedAt: now(),
@@ -321,6 +325,18 @@ function load(): RegistryState {
           },
         ];
       }
+    }
+
+    const isCellPontoTenant =
+      activeTenant === 'default' ||
+      activeTenant.toLowerCase().includes('cell') ||
+      activeTenant.toLowerCase().includes('gilvan') ||
+      activeTenant.toLowerCase().includes('mariana') ||
+      activeTenant.startsWith('emp_');
+
+    if (employees.length === 0 && isCellPontoTenant) {
+      const seeded = seedForTenant(activeTenant);
+      employees = seeded.employees;
     }
 
     const state: RegistryState = { sellers, suppliers, employees };

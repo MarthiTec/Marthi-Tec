@@ -24,6 +24,7 @@ import {
   ACCESS_AREA_LABEL,
   ALL_ACCESS_AREAS,
   EMPLOYEE_ROLE_LABEL,
+  hydrateErpRegistryFromApi,
   listEmployees,
   listSellers,
   removeEmployee,
@@ -154,6 +155,9 @@ export function TeamUsersSection({ variant, id }: Props) {
     function refresh() {
       setItems(listEmployees());
     }
+    void hydrateErpRegistryFromApi().finally(() => {
+      setItems(listEmployees());
+    });
     window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
     window.addEventListener('marthi-erp-registry-updated', refresh);
     return () => {

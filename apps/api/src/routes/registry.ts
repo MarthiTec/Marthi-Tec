@@ -70,7 +70,46 @@ const sellerSchema = z.object({
 
 /* ── In-Memory Fallbacks ────────────────────────────────── */
 
-const memoryEmployees = new Map<string, any>();
+const memoryEmployees = new Map<string, any>([
+  [
+    'EMP-GILVAN-01',
+    {
+      id: 'EMP-GILVAN-01',
+      storeId: 'STR-DEMO-01',
+      name: 'Gilvan Teodoro',
+      phone: '(24) 98124-4253',
+      email: 'gilvanteodo@gmail.com',
+      document: '61.506.270/0001-63',
+      role: 'admin',
+      isSystemUser: true,
+      userEmail: 'gilvanteodo@gmail.com',
+      accessAreas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
+      permissions: { all: true },
+      active: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: new Date().toISOString(),
+    },
+  ],
+  [
+    'EMP-MARIANA-01',
+    {
+      id: 'EMP-MARIANA-01',
+      storeId: 'STR-DEMO-01',
+      name: 'Mariana Veiga',
+      phone: '(24) 98124-4253',
+      email: 'marianaveigatav@gmail.com',
+      document: '123.456.789-00',
+      role: 'admin',
+      isSystemUser: true,
+      userEmail: 'marianaveigatav@gmail.com',
+      accessAreas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
+      permissions: { all: true },
+      active: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: new Date().toISOString(),
+    },
+  ],
+]);
 const memoryCustomers = new Map<string, any>();
 const memorySuppliers = new Map<string, any>();
 const memorySellers = new Map<string, any>();

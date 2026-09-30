@@ -26,12 +26,28 @@ const storeSchema = z.object({
   isMatrix: z.boolean().default(false),
   active: z.boolean().default(true),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
+  accessToken: z.string().optional(),
 });
 
 const storePlanSchema = z.object({
   planId: z.enum(['bronze', 'silver', 'golden', 'start', 'growth', 'scale']),
   modules: z.array(z.string()).default([]),
 });
+
+export function generateStoreAccessToken(cnpj: string, email: string, storeId?: string): string {
+  const cleanDoc = (cnpj || '').replace(/\D/g, '') || '00000000000000';
+  const docPart = cleanDoc.slice(-6);
+  const hashPart = Math.abs(
+    (cleanDoc + (email || '')).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0),
+  )
+    .toString(36)
+    .toUpperCase()
+    .padStart(5, '0')
+    .slice(-5);
+  const prefix = (storeId || 'STR').replace(/[^a-zA-Z0-9]/g, '').slice(-3).toUpperCase();
+  const randPart = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `TK-${prefix || 'STR'}-${docPart}-${hashPart}-${randPart}`;
+}
 
 const memoryStores = new Map<string, any>([
   [
@@ -45,6 +61,7 @@ const memoryStores = new Map<string, any>([
       document: '61.506.270/0001-63',
       stateRegistration: 'ISENTO',
       municipalRegistration: '12345',
+      accessToken: 'TK-001-000163-CPTR-88A1',
       email: 'matriz@cellponto.com.br',
       phone: '(24) 98124-4253',
       zipCode: '25800-000',
@@ -85,6 +102,7 @@ storesRouter.get('/api/v1/account', requireAuth, async (req, res, next) => {
             document: r.document || '61.506.270/0001-63',
             email: r.email || req.user?.email || 'gilvanteodo@gmail.com',
             phone: r.phone || '(24) 98124-4253',
+            accessToken: r.access_token || 'TK-001-000163-CPTR-88A1',
             createdAt: r.created_at,
             updatedAt: r.updated_at,
           },
@@ -102,6 +120,7 @@ storesRouter.get('/api/v1/account', requireAuth, async (req, res, next) => {
         document: '61.506.270/0001-63',
         email: req.user?.email || 'gilvanteodo@gmail.com',
         phone: '(24) 98124-4253',
+        accessToken: 'TK-001-000163-CPTR-88A1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -156,6 +175,7 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
           municipalRegistration: r.municipal_registration || '',
           email: r.email,
           phone: r.phone,
+          accessToken: r.access_token || generateStoreAccessToken(r.document, r.email, r.id),
           zipCode: r.zip_code,
           street: r.street,
           number: r.number,
@@ -178,7 +198,10 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
 
     const items = Array.from(memoryStores.values()).filter(
       (s) => s.clientAccountId === clientAccountId && s.active !== false,
-    );
+    ).map((s) => ({
+      ...s,
+      accessToken: s.accessToken || generateStoreAccessToken(s.document, s.email, s.id),
+    }));
     res.json({ success: true, data: items });
   } catch (error) {
     next(error);
@@ -459,6 +482,208 @@ storesRouter.put('/api/v1/store/plan', requireAuth, async (req, res, next) => {
         planId: body.planId,
         userLimit: limit,
         modules: body.modules,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* ── Admin Gestão de Clientes & Tokens de Acesso (/admin/clientes) ── */
+
+const adminClientSchema = z.object({
+  clientId: z.string().optional(),
+  tradeName: z.string().min(1, 'Nome fantasia é obrigatório.'),
+  legalName: z.string().optional().default(''),
+  document: z.string().default(''),
+  email: z.string().email('E-mail inválido.'),
+  phone: z.string().optional().default(''),
+  planId: z.enum(['bronze', 'silver', 'golden', 'start', 'growth', 'scale']).default('golden'),
+  modules: z.array(z.string()).default(['totem', 'os', 'erp', 'fiscal', 'ecommerce']),
+  status: z.enum(['active', 'blocked', 'inactive']).default('active'),
+  paymentOk: z.boolean().default(true),
+  monthlyAmount: z.coerce.number().default(597),
+  notes: z.string().optional().default(''),
+  accessToken: z.string().optional(),
+  parentClientId: z.string().optional().nullable(),
+  branchName: z.string().optional(),
+});
+
+storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
+  try {
+    if (pool) {
+      const sql = `
+        SELECT c.*, 
+               s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
+               l.plan_id, l.modules
+        FROM client_accounts c
+        LEFT JOIN stores s ON s.client_account_id = c.id
+        LEFT JOIN store_licenses l ON l.client_account_id = c.id
+        ORDER BY c.created_at ASC
+      `;
+      const result = await pool.query(sql);
+      const map = new Map<string, any>();
+
+      for (const row of result.rows) {
+        if (!map.has(row.id)) {
+          const rawDoc = row.document || '';
+          const token = row.access_token || row.store_token || generateStoreAccessToken(rawDoc, row.email, row.id);
+          map.set(row.id, {
+            clientId: row.id,
+            tradeName: row.trade_name,
+            legalName: row.legal_name || row.trade_name,
+            document: rawDoc,
+            email: row.email,
+            phone: row.phone || '',
+            planId: row.plan_id || 'golden',
+            modules: row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+            status: row.status || 'active',
+            contractingStatus: 'acesso_ativado',
+            paymentOk: true,
+            monthlyAmount: row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597,
+            contractedAt: row.created_at,
+            passwordConfigured: true,
+            phoneVerified: true,
+            notes: '',
+            accessToken: token,
+          });
+        }
+      }
+
+      if (map.size > 0) {
+        res.json({ success: true, data: Array.from(map.values()) });
+        return;
+      }
+    }
+
+    // Fallback padrão se banco ainda não populado
+    res.json({
+      success: true,
+      data: [
+        {
+          clientId: 'CLI-DEMO-01',
+          tradeName: 'Cell Ponto',
+          legalName: 'Cell Ponto Telecomunicações LTDA',
+          document: '61.506.270/0001-63',
+          phone: '(24) 98124-4253',
+          email: 'gilvanteodo@gmail.com',
+          planId: 'golden',
+          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+          status: 'active',
+          contractingStatus: 'acesso_ativado',
+          paymentOk: true,
+          monthlyAmount: 597,
+          contractedAt: '2026-01-01T00:00:00.000Z',
+          passwordConfigured: true,
+          phoneVerified: true,
+          notes: 'Empresa Matriz Cell Ponto',
+          accessToken: 'TK-001-000163-CPTR-88A1',
+        },
+      ],
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
+  try {
+    const body = adminClientSchema.parse(req.body);
+    const clientId = body.clientId || `CLI-${Date.now().toString(36).toUpperCase()}`;
+    const cleanDoc = body.document.trim();
+    const token = body.accessToken || generateStoreAccessToken(cleanDoc, body.email, clientId);
+
+    if (pool) {
+      // 1. client_accounts
+      await pool.query(
+        `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
+         VALUES ($1, $2, $3, 'cnpj', $4, $5, $6, $2, $7, $8)
+         ON CONFLICT (document) DO UPDATE SET
+           trade_name = EXCLUDED.trade_name,
+           legal_name = EXCLUDED.legal_name,
+           email = EXCLUDED.email,
+           phone = EXCLUDED.phone,
+           status = EXCLUDED.status,
+           access_token = EXCLUDED.access_token,
+           updated_at = now()`,
+        [clientId, body.tradeName, body.legalName || body.tradeName, cleanDoc, body.email, body.phone, body.status, token],
+      );
+
+      // 2. stores
+      const storeId = `STR-${clientId.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`;
+      await pool.query(
+        `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, is_matrix, active, access_token)
+         VALUES ($1, $2, $3, $4, 'cnpj', $5, $6, $7, true, true, $8)
+         ON CONFLICT (client_account_id, document) DO UPDATE SET
+           trade_name = EXCLUDED.trade_name,
+           email = EXCLUDED.email,
+           phone = EXCLUDED.phone,
+           access_token = EXCLUDED.access_token,
+           active = true`,
+        [storeId, clientId, body.tradeName, body.legalName || body.tradeName, cleanDoc, body.email, body.phone, token],
+      );
+
+      // 3. store_licenses
+      let dbPlan = 'scale';
+      if (body.planId === 'bronze' || body.planId === 'start') dbPlan = 'start';
+      else if (body.planId === 'silver' || body.planId === 'growth') dbPlan = 'growth';
+
+      await pool.query(
+        `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
+         VALUES ($1, $2, $3, $4::plan_id, $5::module_id[], 'active')
+         ON CONFLICT (store_id) DO UPDATE
+         SET plan_id = $4::plan_id, modules = $5::module_id[], updated_at = now()`,
+        [`LIC-${storeId}`, storeId, clientId, dbPlan, ['totem', 'os', 'erp', 'fiscal']],
+      );
+
+      // 4. employees
+      await pool.query(
+        `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
+         VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, $5, '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+         ON CONFLICT (id) DO UPDATE SET active = true, is_system_user = true, access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb`,
+        [`EMP-${clientId.slice(-6)}`, storeId, body.tradeName, body.phone, body.email, cleanDoc],
+      );
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...body,
+        clientId,
+        accessToken: token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
+  try {
+    const clientId = req.params.id;
+    const body = adminClientSchema.partial().parse(req.body);
+
+    if (pool && clientId) {
+      if (body.tradeName || body.document || body.email || body.status || body.accessToken) {
+        await pool.query(
+          `UPDATE client_accounts
+           SET trade_name = COALESCE($1, trade_name),
+               document = COALESCE($2, document),
+               email = COALESCE($3, email),
+               status = COALESCE($4, status),
+               access_token = COALESCE($5, access_token),
+               updated_at = now()
+           WHERE id = $6`,
+          [body.tradeName, body.document, body.email, body.status, body.accessToken, clientId],
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: clientId,
+        ...body,
       },
     });
   } catch (error) {

@@ -55,7 +55,23 @@ export type MarthiClient = {
   companyType?: CompanyRelation;
   parentClientId?: string | null;
   branchName?: string;
+  accessToken?: string;
 };
+
+export function generateClientAccessToken(cnpj?: string, email?: string, clientId?: string): string {
+  const cleanDoc = (cnpj || '').replace(/\D/g, '') || '00000000000000';
+  const docPart = cleanDoc.slice(-6);
+  const hashPart = Math.abs(
+    (cleanDoc + (email || '')).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0),
+  )
+    .toString(36)
+    .toUpperCase()
+    .padStart(5, '0')
+    .slice(-5);
+  const prefix = (clientId || 'CLI').replace(/[^a-zA-Z0-9]/g, '').slice(-3).toUpperCase();
+  const randPart = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `TK-${prefix || 'CLI'}-${docPart}-${hashPart}-${randPart}`;
+}
 
 type State = {
   clients: MarthiClient[];
@@ -163,6 +179,7 @@ function normalizeClient(raw: Partial<MarthiClient>): MarthiClient {
         : 'independent',
     parentClientId: raw.parentClientId?.trim() || null,
     branchName: raw.branchName?.trim() || undefined,
+    accessToken: raw.accessToken || generateClientAccessToken(raw.document, raw.email, raw.clientId),
   };
 }
 
@@ -175,11 +192,12 @@ function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
     const demoClients: MarthiClient[] = [
       {
         clientId: 'CLI-DEMO-01',
-        tradeName: 'Cell Ponto (demo)',
+        tradeName: 'Cell Ponto',
         legalName: 'Cell Ponto Telecomunicações LTDA',
-        document: '32.145.890/0001-20',
-        phone: '(21) 98765-4321',
-        email: 'contato@cellponto.local',
+        document: '61.506.270/0001-63',
+        phone: '(24) 98124-4253',
+        email: 'gilvanteodo@gmail.com',
+        accessToken: 'TK-001-000163-CPTR-88A1',
         planId: 'golden',
         modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
         status: 'active',
@@ -190,7 +208,7 @@ function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
         activatedAt: now(),
         firstAccessAt: now(),
         lastSeenAt: null,
-        notes: 'Cliente demo ativo no sistema.',
+        notes: 'Conta Matriz Cell Ponto (Gilvan Teodoro)',
         passwordConfigured: true,
         phoneVerified: true,
         phoneVerifiedAt: now(),
@@ -270,6 +288,68 @@ export function listMarthiClients() {
   return withPresence(seeded).sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'pt-BR'));
 }
 
+let isHydrating = false;
+
+export async function hydrateMarthiClientsFromApi(): Promise<MarthiClient[]> {
+  if (isHydrating) return listMarthiClients();
+  isHydrating = true;
+  try {
+    const apiUrl = nestApiUrl();
+    const res = await fetch(`${apiUrl}/api/v1/admin/clients`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return listMarthiClients();
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      const state = load();
+      const existingMap = new Map(state.clients.map((c) => [c.clientId, c]));
+
+      for (const item of json.data) {
+        const normalized = normalizeClient(item);
+        const existing = existingMap.get(normalized.clientId);
+        if (existing) {
+          existingMap.set(normalized.clientId, {
+            ...existing,
+            ...normalized,
+            accessToken: normalized.accessToken || existing.accessToken,
+          });
+        } else {
+          existingMap.set(normalized.clientId, normalized);
+        }
+      }
+
+      state.clients = Array.from(existingMap.values());
+      save(state);
+      return listMarthiClients();
+    }
+  } catch (err) {
+    console.warn('[marthiClientsStore] Hydrate from API fallback:', err);
+  } finally {
+    isHydrating = false;
+  }
+  return listMarthiClients();
+}
+
+export function regenerateClientAccessToken(clientId: string): string | null {
+  const state = load();
+  const client = state.clients.find((c) => c.clientId === clientId);
+  if (!client) return null;
+  const newToken = generateClientAccessToken(client.document, client.email, client.clientId);
+  client.accessToken = newToken;
+  save(state);
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(client),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+  return newToken;
+}
+
 export function getMarthiClient(clientId: string) {
   return listMarthiClients().find((item) => item.clientId === clientId) ?? null;
 }
@@ -335,6 +415,19 @@ export function upsertMarthiClient(
   }
 
   save(state);
+
+  // Persist to Postgres API in background
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
   return next;
 }
 

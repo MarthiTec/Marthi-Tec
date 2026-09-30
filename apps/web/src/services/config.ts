@@ -1,19 +1,20 @@
-/** Nest público. Usado no build do site quando VITE_API_URL não foi definido. */
-const PUBLIC_NEST_URL = 'https://marthi-backend.discloud.app';
+/** URL de fallback público quando VITE_API_URL não foi definido e fora do navegador. */
+const PUBLIC_NEST_URL = 'https://marthi-totem.discloud.app';
 
 /**
- * Nest API (Marthi-Backend).
- * Dev com VITE_API_URL vazio: mesma origem, e o Vite encaminha para o Nest local.
- * Build de produção sem a variável: o site chama o Nest, não a API Express.
+ * API Marthi (Nest / Express).
+ * Se VITE_API_URL estiver definido, utiliza o valor configurado.
+ * Em desenvolvimento local, usa string vazia para ativar o proxy do Vite.
+ * Em produção no navegador, usa window.location.origin para conectar com a mesma instância (same-origin).
  */
 export function nestApiUrl() {
   const configured = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
   if (configured) return configured;
   if (import.meta.env.DEV) return '';
+  if (typeof window !== 'undefined' && window.location.origin) return window.location.origin;
   return PUBLIC_NEST_URL;
 }
 
-/** @deprecated O site não guarda mais leads/PDV. Tudo vai para o Nest. */
 export function edgeApiUrl() {
   return nestApiUrl();
 }
