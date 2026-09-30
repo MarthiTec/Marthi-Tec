@@ -171,6 +171,15 @@ export function TotemPage() {
   const [printTicket, setPrintTicket] = useState(() => getTotemSettings().printTicket);
   const [audioAssist, setAudioAssist] = useState(() => getTotemSettings().audioAssist);
   const [showAttractScreen, setShowAttractScreen] = useState(() => getTotemSettings().showAttractScreen);
+  const [showActionButtons, setShowActionButtons] = useState(
+    () => getTotemSettings().showActionButtons !== false,
+  );
+  const [customGreetingText, setCustomGreetingText] = useState(
+    () => getTotemSettings().customGreetingText || '',
+  );
+  const [customSubtitleText, setCustomSubtitleText] = useState(
+    () => getTotemSettings().customSubtitleText || '',
+  );
   const [storeName, setStoreName] = useState(() => getTotemSettings().storeName);
   const [storeLogo, setStoreLogo] = useState(() => getTotemSettings().storeLogo);
   const [attractBackground, setAttractBackground] = useState(() => getTotemSettings().attractBackground);
@@ -198,7 +207,7 @@ export function TotemPage() {
   const phoneRequired = askPhoneOnCheckout && !canPrintTicket;
   const copy = totemCopy(vertical);
   const senha = ticketId ? ticketSenha(ticketId) : '';
-  const greeting = storeGreeting();
+  const greeting = customGreetingText?.trim() || storeGreeting();
 
   const homeStep: Step = showAttractScreen
     ? 'attract'
@@ -517,6 +526,9 @@ export function TotemPage() {
       setPrintTicket(settings.printTicket);
       setAudioAssist(settings.audioAssist);
       setShowAttractScreen(settings.showAttractScreen);
+      setShowActionButtons(settings.showActionButtons !== false);
+      setCustomGreetingText(settings.customGreetingText || '');
+      setCustomSubtitleText(settings.customSubtitleText || '');
       setStoreName(settings.storeName);
       setStoreLogo(settings.storeLogo);
       setAttractBackground(settings.attractBackground);
@@ -813,6 +825,9 @@ export function TotemPage() {
           gradientColor={attractGradientColor}
           backgroundImage={attractBackground}
           layout={attractLayout}
+          showActionButtons={showActionButtons}
+          customGreetingText={customGreetingText}
+          customSubtitleText={customSubtitleText}
           onStartOrder={beginOrder}
           onBrowseCatalog={beginCatalogBrowse}
         />

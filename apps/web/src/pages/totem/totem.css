@@ -271,6 +271,28 @@ body.totem-html-scroll #root {
   animation: totem-dot 1.8s ease-out infinite;
 }
 
+.totem-attract--no-buttons {
+  user-select: none;
+}
+
+.totem-attract__custom-text {
+  margin: 16px auto 0;
+  max-width: min(88vw, 540px);
+  font-size: clamp(1.1rem, 2.2vw, 1.45rem);
+  line-height: 1.5;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 14px 22px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
 .totem-attract__actions {
   display: grid;
   gap: 14px;

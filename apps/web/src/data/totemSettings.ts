@@ -27,6 +27,12 @@ export type TotemSettings = {
   columns: TotemColumns;
   /** Tela de boas-vindas com logo e botões grandes. */
   showAttractScreen: boolean;
+  /** Exibir botões de ação na tela de abertura (Iniciar pedido / Catálogo). Se falso, exibe só imagem e texto. */
+  showActionButtons: boolean;
+  /** Mensagem de saudação personalizada. Se vazia, usa storeGreeting() (Bom dia / Boa tarde / Boa noite). */
+  customGreetingText: string;
+  /** Texto ou comunicado que o usuário quiser escrever e exibir na tela de abertura. */
+  customSubtitleText: string;
   /** Nome da loja na tela de abertura e no ticket. */
   storeName: string;
   /** Logo da loja (data URL). Sem arquivo, usa a marca Marthi. */
@@ -341,6 +347,9 @@ export function defaultTotemSettings(): TotemSettings {
     vertical: 'general',
     columns: general.preset.columns,
     showAttractScreen: true,
+    showActionButtons: true,
+    customGreetingText: '',
+    customSubtitleText: '',
     storeName: 'Sua Loja',
     storeLogo: null,
     attractBackground: null,
@@ -425,6 +434,9 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     vertical: normalizeVertical(parsed?.vertical),
     columns: normalizeColumns(parsed?.columns),
     showAttractScreen: parsed?.showAttractScreen !== false,
+    showActionButtons: parsed?.showActionButtons !== false,
+    customGreetingText: typeof parsed?.customGreetingText === 'string' ? parsed.customGreetingText.slice(0, 120) : '',
+    customSubtitleText: typeof parsed?.customSubtitleText === 'string' ? parsed.customSubtitleText.slice(0, 300) : '',
     storeName: storeName || 'Sua Loja',
     storeLogo,
     attractBackground: normalizeDataImage(parsed?.attractBackground),
@@ -474,6 +486,9 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     vertical: patch.vertical ?? base?.vertical,
     columns: patch.columns ?? base?.columns,
     showAttractScreen: patch.showAttractScreen ?? base?.showAttractScreen,
+    showActionButtons: patch.showActionButtons !== undefined ? patch.showActionButtons : base?.showActionButtons,
+    customGreetingText: patch.customGreetingText !== undefined ? patch.customGreetingText : base?.customGreetingText,
+    customSubtitleText: patch.customSubtitleText !== undefined ? patch.customSubtitleText : base?.customSubtitleText,
     storeName: patch.storeName ?? base?.storeName,
     storeLogo: patch.storeLogo !== undefined ? patch.storeLogo : base?.storeLogo,
     attractBackground: patch.attractBackground !== undefined ? patch.attractBackground : base?.attractBackground,
@@ -497,6 +512,11 @@ export function getTotemSettings() {
 
 export function getTotemExitPassword() {
   return read().exitPassword;
+}
+
+export function effectiveGreeting(customText?: string): string {
+  if (customText && customText.trim()) return customText.trim();
+  return storeGreeting();
 }
 
 /** Carrega settings do Nest (público ou autenticado). Sem seed mock. */

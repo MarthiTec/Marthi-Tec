@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TotemAttractScene } from '../totem/TotemAttractScene';
 import { TotemRigPreview } from './TotemRigPreview';
@@ -7,6 +7,7 @@ import {
   fileToAttractBackground,
   fileToStoreLogo,
   getTotemSettings,
+  hydrateTotemSettingsFromApi,
   saveTotemSettings,
   storeGreeting,
   totemCopy,
@@ -65,6 +66,15 @@ export function TotemSettingsPage() {
   const [columns, setColumns] = useState<TotemColumns>(() => initial.columns);
   const [askCustomerName, setAskCustomerName] = useState(() => initial.askCustomerName);
   const [showAttractScreen, setShowAttractScreen] = useState(() => initial.showAttractScreen);
+  const [showActionButtons, setShowActionButtons] = useState(
+    () => initial.showActionButtons !== false,
+  );
+  const [customGreetingText, setCustomGreetingText] = useState(
+    () => initial.customGreetingText || '',
+  );
+  const [customSubtitleText, setCustomSubtitleText] = useState(
+    () => initial.customSubtitleText || '',
+  );
   const [storeName, setStoreName] = useState(() => initial.storeName);
   const [storeLogo, setStoreLogo] = useState(() => initial.storeLogo);
   const [attractBackground, setAttractBackground] = useState(() => initial.attractBackground);
@@ -84,6 +94,43 @@ export function TotemSettingsPage() {
   const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    hydrateTotemSettingsFromApi()
+      .then((s) => {
+        if (!mounted) return;
+        setVertical(s.vertical);
+        setMode(s.mode);
+        setExitPassword(s.exitPassword);
+        setConfirmPassword(s.exitPassword);
+        setColumns(s.columns);
+        setShowAttractScreen(s.showAttractScreen);
+        setShowActionButtons(s.showActionButtons !== false);
+        setCustomGreetingText(s.customGreetingText || '');
+        setCustomSubtitleText(s.customSubtitleText || '');
+        setStoreName(s.storeName);
+        setStoreLogo(s.storeLogo);
+        setAttractBackground(s.attractBackground);
+        setAttractGradientColor(s.attractGradientColor);
+        setAttractLayout(s.attractLayout);
+        setKeyboardPlacement(s.keyboardPlacement);
+        setAskCustomerName(s.askCustomerName);
+        setOfferFulfillment(s.offerFulfillment);
+        setPrintTicket(s.printTicket);
+        setAudioAssist(s.audioAssist);
+        setStoreWhatsApp(s.storeWhatsApp);
+        setNotifyCustomerOnLead(s.notifyCustomerOnLead);
+        setLocationLabel(s.locationLabel);
+        setCardFeePercent(s.cardFeePercent ?? 0);
+      })
+      .catch((err) => {
+        console.warn('[TotemSettingsPage] Carregando cache local:', err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const copy = totemCopy(vertical);
   const catalogOnly = mode === 'catalog';
@@ -128,6 +175,9 @@ export function TotemSettingsPage() {
         shareStockWithErp: true,
         columns,
         showAttractScreen,
+        showActionButtons,
+        customGreetingText,
+        customSubtitleText,
         storeName,
         storeLogo,
         attractBackground,
@@ -248,6 +298,9 @@ export function TotemSettingsPage() {
                   gradientColor={attractGradientColor}
                   backgroundImage={attractBackground}
                   layout="logoPromo"
+                  showActionButtons={showActionButtons}
+                  customGreetingText={customGreetingText}
+                  customSubtitleText={customSubtitleText}
                 />
               </div>
               <strong>Logo + propaganda</strong>
@@ -273,6 +326,9 @@ export function TotemSettingsPage() {
                   gradientColor={attractGradientColor}
                   backgroundImage={attractBackground}
                   layout="standard"
+                  showActionButtons={showActionButtons}
+                  customGreetingText={customGreetingText}
+                  customSubtitleText={customSubtitleText}
                 />
               </div>
               <strong>Abertura padrão</strong>
@@ -280,6 +336,76 @@ export function TotemSettingsPage() {
             </button>
           </div>
         ) : null}
+
+        {showAttractScreen ? (
+          <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--line, #e2e8f0)' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 6px' }}>Botões e Textos da Tela Inicial</h3>
+            <p style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--mute, #64748b)' }}>
+              Defina se a tela terá botões interativos ou se funcionará como uma vitrine limpa (apenas fotos e textos), além de personalizar as mensagens de boas-vindas.
+            </p>
+            <div className="plan-picker">
+              <button
+                type="button"
+                className={`plan-picker__card ${showActionButtons ? 'is-active' : ''}`}
+                onClick={() => {
+                  setShowActionButtons(true);
+                  markDirty();
+                }}
+              >
+                <strong>Com botões de ação (Padrão)</strong>
+                <span>Exibe os botões "Iniciar um novo pedido" e "Ver catálogo de produtos".</span>
+              </button>
+              <button
+                type="button"
+                className={`plan-picker__card ${!showActionButtons ? 'is-active' : ''}`}
+                onClick={() => {
+                  setShowActionButtons(false);
+                  markDirty();
+                }}
+              >
+                <strong>Modo Vitrine Limpa (Sem botões)</strong>
+                <span>Não exibe botões: mostra apenas as imagens e o texto que você definir.</span>
+              </button>
+            </div>
+
+            <div className="admin-form" style={{ marginTop: 16 }}>
+              <label>
+                Mensagem de saudação personalizada
+                <input
+                  type="text"
+                  value={customGreetingText}
+                  maxLength={100}
+                  placeholder={`Padrão automático: ${storeGreeting()} (alterna conforme horário)`}
+                  onChange={(event) => {
+                    setCustomGreetingText(event.target.value);
+                    markDirty();
+                  }}
+                />
+                <span style={{ fontSize: '0.82rem', color: 'var(--mute, #64748b)', marginTop: 4 }}>
+                  Deixe em branco para usar o padrão automático: Bom dia / Boa tarde / Boa noite.
+                </span>
+              </label>
+
+              <label className="span-2">
+                Texto ou comunicado para exibir na tela (opcional)
+                <textarea
+                  rows={2}
+                  value={customSubtitleText}
+                  maxLength={250}
+                  placeholder="Ex.: Sejam bem-vindos! Confira novidades da semana e condições especiais."
+                  onChange={(event) => {
+                    setCustomSubtitleText(event.target.value);
+                    markDirty();
+                  }}
+                />
+                <span style={{ fontSize: '0.82rem', color: 'var(--mute, #64748b)', marginTop: 4 }}>
+                  Texto adicional em destaque que será escrito e exibido na tela de abertura do totem.
+                </span>
+              </label>
+            </div>
+          </div>
+        ) : null}
+
         <div className="admin-form" style={{ marginTop: 16 }}>
           <label>
             Nome da loja na tela
@@ -417,6 +543,9 @@ export function TotemSettingsPage() {
                     gradientColor={attractGradientColor}
                     backgroundImage={attractBackground}
                     layout={attractLayout}
+                    showActionButtons={showActionButtons}
+                    customGreetingText={customGreetingText}
+                    customSubtitleText={customSubtitleText}
                   />
                 ) : (
                   <div className="totem-screen-preview__catalog">
@@ -752,8 +881,8 @@ export function TotemSettingsPage() {
       <article className="admin-card admin-card--form">
         <h2>Senha para sair do totem e do PDV</h2>
         <p>
-          Protege a saída das telas /totem e /caixa. Só quem souber a senha consegue fechar o
-          quiosque ou o caixa e voltar para a home.
+          Protege a saída das telas /totem e /caixa. Esta senha pertence à empresa contratante e fica salva no
+          banco de dados para liberar a saída em qualquer totem ou terminal da loja.
         </p>
         <div className="admin-form">
           <label>
@@ -790,7 +919,11 @@ export function TotemSettingsPage() {
           <button type="button" className="btn btn--primary" onClick={() => void save()}>
             Salvar configurações do totem
           </button>
-          {saved ? <span className="empty">Configurações do totem salvas. Abra /totem para ver.</span> : null}
+          {saved ? (
+            <span className="empty" style={{ color: 'var(--accent, #0f766e)', fontWeight: 600 }}>
+              ✓ Configurações salvas no banco de dados da empresa! Abra /totem para conferir.
+            </span>
+          ) : null}
         </div>
       </article>
 
