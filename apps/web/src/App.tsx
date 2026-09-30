@@ -58,6 +58,7 @@ import { FinancePage } from './pages/admin/FinancePage';
 import { PosPage } from './pages/admin/PosPage';
 import { PriceTablesPage } from './pages/admin/PriceTablesPage';
 import { PaymentsPage } from './pages/admin/PaymentsPage';
+import { CardRatesPage } from './pages/admin/CardRatesPage';
 import { ProfilePage } from './pages/admin/ProfilePage';
 import { WorkOrdersPage } from './pages/admin/WorkOrdersPage';
 import { WorkOrderNewPage } from './pages/admin/WorkOrderNewPage';
@@ -196,6 +197,7 @@ export function App() {
           <Route path="vendedores" element={<SellersPage />} />
           <Route path="fornecedores" element={<SuppliersPage />} />
           <Route path="financeiro" element={<FinancePage />} />
+          <Route path="taxas-cartao" element={<CardRatesPage />} />
           <Route path="boletos" element={<ErpBoletosPage />} />
           <Route path="relatorios" element={<ErpReportsPage />} />
           <Route path="auditoria" element={<AuditPage />} />
@@ -233,6 +235,7 @@ export function App() {
           <Route path="campanhas" element={<Navigate to="/erp/campanhas" replace />} />
           <Route path="orcamentos" element={<Navigate to="/erp/orcamentos" replace />} />
           <Route path="pagamentos" element={<PaymentsPage />} />
+          <Route path="taxas-cartao" element={<CardRatesPage />} />
           <Route path="financeiro" element={<Navigate to="/erp/financeiro" replace />} />
           <Route path="vendedores" element={<Navigate to="/erp/vendedores" replace />} />
           <Route path="fornecedores" element={<Navigate to="/erp/fornecedores" replace />} />

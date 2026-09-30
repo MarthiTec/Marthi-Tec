@@ -19,9 +19,19 @@ import {
 } from '../../data/multiStoreStore';
 import { isNestAuthed } from '../../services/nestClient';
 import { apiCreateStore, apiDeleteStore, apiUpdateStore } from '../../services/erpApi';
+import { applySegmentPreset, type StoreSegmentId } from '../../data/storeSegment';
 import './multiStore.css';
 
 type Tab = 'stores' | 'licensing' | 'isolation';
+
+const STORE_SEGMENT_OPTIONS = [
+  { value: 'assistencia_tecnica', label: '🔧 Oficina & Assistência Técnica' },
+  { value: 'vestuario_moda', label: '👗 Moda, Vestuário & Calçados' },
+  { value: 'restaurante_gastronomia', label: '🍔 Restaurante, Bar & Gastronomia' },
+  { value: 'varejo_geral', label: '🛒 Varejo Geral, Mercado & Utilidades' },
+  { value: 'prestador_servicos', label: '📋 Prestador de Serviços Gerais' },
+  { value: 'personalizado', label: '⚙️ Personalizado (Campos Manuais)' },
+];
 
 const TAX_REGIME_OPTIONS = [
   { value: 'simples_nacional', label: 'Simples Nacional' },
@@ -80,6 +90,7 @@ export function MultiStoreManagementPage() {
       state: 'SP',
       ibgeCityCode: '',
       taxRegime: 'simples_nacional',
+      segmentId: 'assistencia_tecnica',
       active: true,
       isMatrix: stores.length === 0,
     });
@@ -137,7 +148,9 @@ export function MultiStoreManagementPage() {
         ...editingStore,
         name: editingStore.name.trim(),
         cnpj: editingStore.cnpj.trim(),
+        segmentId: editingStore.segmentId || 'assistencia_tecnica',
       });
+      applySegmentPreset(saved.segmentId || 'assistencia_tecnica', saved.id);
 
       if (isNestAuthed()) {
         const payload = {
@@ -245,6 +258,7 @@ export function MultiStoreManagementPage() {
                   <th>Cód</th>
                   <th>Loja / Razão Social</th>
                   <th>CNPJ</th>
+                  <th>Ramo / Segmento</th>
                   <th>Inscrição Est.</th>
                   <th>Cidade / UF</th>
                   <th>Regime Tributário</th>
@@ -270,6 +284,11 @@ export function MultiStoreManagementPage() {
                       </td>
                       <td>
                         <code className="multi-store-cnpj">{s.cnpj}</code>
+                      </td>
+                      <td>
+                        <span className="multi-store-regime" style={{ fontWeight: 650 }}>
+                          {STORE_SEGMENT_OPTIONS.find((o) => o.value === (s.segmentId || 'assistencia_tecnica'))?.label || '🔧 Oficina'}
+                        </span>
                       </td>
                       <td>{s.stateRegistration || '—'}</td>
                       <td>
@@ -595,6 +614,15 @@ export function MultiStoreManagementPage() {
               </div>
 
               <div className="multi-store-form-row">
+                <div className="multi-store-form-field">
+                  <AdminPicker
+                    label="Ramo de Atividade da Loja *"
+                    value={editingStore.segmentId || 'assistencia_tecnica'}
+                    options={STORE_SEGMENT_OPTIONS}
+                    onChange={(val) => setEditingStore({ ...editingStore, segmentId: val as StoreSegmentId })}
+                  />
+                </div>
+
                 <div className="multi-store-form-field">
                   <AdminPicker
                     label="Regime Tributário"

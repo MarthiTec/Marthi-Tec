@@ -15,6 +15,7 @@ import {
   apiListStores,
 } from '../services/erpApi';
 import { getActiveTenantKey, tenantScopedKey } from './tenantContext';
+import type { StoreSegmentId } from './storeSegment';
 
 export type ClientAccount = {
   id: string;
@@ -51,6 +52,7 @@ export type Store = {
   taxRegime: StoreTaxRegime;
   active: boolean;
   isMatrix: boolean;
+  segmentId?: StoreSegmentId;
   createdAt: string;
   updatedAt: string;
 };
@@ -141,6 +143,7 @@ export const DEFAULT_STORES: Store[] = [
     taxRegime: 'simples_nacional',
     active: true,
     isMatrix: true,
+    segmentId: 'assistencia_tecnica',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: new Date().toISOString(),
   },
@@ -206,6 +209,7 @@ export function cleanLegacyMocks() {
             val.includes('12.345.678') ||
             val.includes('Shopping Plaza') ||
             val.includes('Loja Matriz Centro') ||
+            val.includes('00.000.000/0001-00') ||
             val.includes('varejobrasil.com.br')),
       );
 
@@ -220,6 +224,23 @@ export function cleanLegacyMocks() {
       }
     }
     keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    // Expurga cache residual de marthi.store.segment_config se possuir restaurante ou flags de salão
+    const segRaw = localStorage.getItem('marthi.store.segment_config');
+    if (segRaw) {
+      try {
+        const parsedSeg = JSON.parse(segRaw);
+        if (
+          parsedSeg.showCardapioDigital === true ||
+          parsedSeg.showTablesAndKitchen === true ||
+          parsedSeg.segmentId === 'restaurante_gastronomia'
+        ) {
+          localStorage.removeItem('marthi.store.segment_config');
+        }
+      } catch {
+        localStorage.removeItem('marthi.store.segment_config');
+      }
+    }
   } catch (e) {
     console.warn('[multiStore] cleanLegacyMocks error', e);
   }
@@ -255,13 +276,27 @@ export function resolveDefaultClientAccount(): ClientAccount {
     const clientId = tenantKey.slice('client_'.length);
     const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
     if (client) {
+      const realDoc =
+        client.document && client.document !== '00.000.000/0001-00'
+          ? client.document
+          : '61.506.270/0001-63';
+      const realTrade =
+        client.tradeName && !client.tradeName.includes('demo') && client.tradeName !== 'Cliente'
+          ? client.tradeName
+          : 'Cell Ponto';
+      const realLegal =
+        client.legalName ||
+        (realTrade.toLowerCase().includes('cell')
+          ? 'Cell Ponto Telecomunicações LTDA'
+          : realTrade);
+
       return {
         id: client.clientId,
-        legalName: client.legalName || client.tradeName,
-        tradeName: client.tradeName,
-        document: client.document || '00.000.000/0001-00',
-        email: client.email,
-        phone: client.phone || '',
+        legalName: realLegal,
+        tradeName: realTrade,
+        document: realDoc,
+        email: client.email || 'gilvanteodo@gmail.com',
+        phone: client.phone || '(24) 98124-4253',
         createdAt: client.contractedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -277,22 +312,31 @@ export function resolveDefaultStores(): Store[] {
     const clientId = tenantKey.slice('client_'.length);
     const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
     if (client) {
+      const realDoc =
+        client.document && client.document !== '00.000.000/0001-00'
+          ? client.document
+          : '61.506.270/0001-63';
+      const realTrade =
+        client.tradeName && !client.tradeName.includes('demo') && client.tradeName !== 'Cliente'
+          ? client.tradeName
+          : 'Cell Ponto Matriz';
+
       return [
         {
           id: `store-${client.clientId}`,
           clientAccountId: client.clientId,
           code: '001',
-          name: client.tradeName || client.legalName || 'Loja Matriz',
-          tradeName: client.tradeName,
-          cnpj: client.document || '00.000.000/0001-00',
+          name: realTrade,
+          tradeName: realTrade,
+          cnpj: realDoc,
           stateRegistration: 'ISENTO',
-          municipalRegistration: '',
-          email: client.email,
-          phone: client.phone || '',
+          municipalRegistration: '12345',
+          email: client.email || 'matriz@cellponto.com.br',
+          phone: client.phone || '(24) 98124-4253',
           zipCode: '25800-000',
-          street: '',
-          number: '',
-          complement: '',
+          street: 'Rua Prefeito Walter Franklin',
+          number: '120',
+          complement: 'Loja 01',
           neighborhood: 'Centro',
           city: 'Três Rios',
           state: 'RJ',
@@ -300,6 +344,7 @@ export function resolveDefaultStores(): Store[] {
           taxRegime: 'simples_nacional',
           active: true,
           isMatrix: true,
+          segmentId: 'assistencia_tecnica',
           createdAt: client.contractedAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -414,6 +459,7 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
         taxRegime: store.taxRegime || 'simples_nacional',
         active: store.active !== false,
         isMatrix: Boolean(store.isMatrix),
+        segmentId: store.segmentId || 'assistencia_tecnica',
         createdAt: now,
         updatedAt: now,
       };
@@ -442,6 +488,7 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
       taxRegime: store.taxRegime || 'simples_nacional',
       active: store.active !== false,
       isMatrix: stores.length === 0 ? true : Boolean(store.isMatrix),
+      segmentId: store.segmentId || 'assistencia_tecnica',
       createdAt: now,
       updatedAt: now,
     };

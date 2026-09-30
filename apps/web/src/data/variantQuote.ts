@@ -5,6 +5,7 @@ import {
   type ProductAttribute,
 } from './attributeStore';
 import { getTotemSettings } from './totemSettings';
+import { getTotemCardRate } from './cardRatesStore';
 
 export type VariantQuote = {
   stock: StockItem | null;
@@ -23,14 +24,14 @@ function money(value: number) {
 
 /**
  * Formata o rótulo de parcelamento.
- * @param cardFeePercent Percentual de taxa de cartão a ser embutida no preço parcelado (ex.: 3.5 = 3,5%). Se omitido, usa o cardFeePercent configurado no Totem.
+ * @param cardFeePercent Percentual de taxa de cartão a ser embutida no preço parcelado (ex.: 3.5 = 3,5%). Se omitido, usa a taxa da bandeira/maquininha padrão do Totem.
  */
 export function formatInstallment(price: number, parcels = 12, cardFeePercent?: number) {
   const count = Math.max(1, parcels);
   const fee =
     cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
       ? cardFeePercent
-      : getTotemSettings().cardFeePercent;
+      : (getTotemCardRate(count)?.rate ?? getTotemSettings().cardFeePercent ?? 0);
   const feeMultiplier = 1 + Math.max(0, fee) / 100;
   const adjusted = price * feeMultiplier;
   const parcel = Math.round((adjusted / count) * 100) / 100;
@@ -108,7 +109,7 @@ export function quoteTotemVariant(
   const defaultFee =
     cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
       ? cardFeePercent
-      : getTotemSettings().cardFeePercent;
+      : (getTotemCardRate(12)?.rate ?? getTotemSettings().cardFeePercent ?? 0);
 
   const effectiveFee = stockFee !== undefined ? stockFee : defaultFee;
 

@@ -41,6 +41,7 @@ import { refreshAdminSlices } from '../../data/erpBootstrap';
 import { hasCapability, isTotemCatalogPath } from '../../data/moduleCapabilities';
 import { fileToProductImage } from '../../data/operatorProfile';
 import { formatInstallment } from '../../data/variantQuote';
+import { getTotemCardRate } from '../../data/cardRatesStore';
 import { isNestAuthed } from '../../services/nestClient';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
@@ -983,11 +984,9 @@ export function StockPage() {
                     <td>{avg.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="price-red">
                       {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      {item.cardRate !== undefined ? (
-                        <div className="empty" style={{ fontSize: '0.78rem' }}>
-                          Cartão: +{item.cardRate}%
-                        </div>
-                      ) : null}
+                      <div className="empty" style={{ fontSize: '0.78rem' }}>
+                        12x de {formatInstallment(item.price, 12).split('X')[1]?.trim() ?? ''}
+                      </div>
                     </td>
                     <td>{margin === '—' ? '—' : `${margin}%`}</td>
                     <td className="admin-table__actions">
@@ -1215,7 +1214,10 @@ export function StockPage() {
                 <div>
                   <h3 style={{ margin: 0 }}>Grade de Itens e Variações</h3>
                   <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>
-                    Cada linha representa um item com seus atributos, preço, taxa de cartão e cálculo de parcelas em 12x para o totem.
+                    Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 12x para o Totem. As taxas de cartão são centralizadas em{' '}
+                    <Link to="/painel/taxas-cartao" style={{ color: 'var(--accent, #2dd4bf)', textDecoration: 'underline' }}>
+                      Taxas de Cartão & Maquininhas ({getTotemCardRate(12).brandName}: {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}%)
+                    </Link>.
                   </p>
                 </div>
                 {!readOnly ? (
@@ -1278,7 +1280,6 @@ export function StockPage() {
                       })}
                       <th>SKU</th>
                       <th>Preço à vista</th>
-                      <th>Taxa cartão (%)</th>
                       <th>Parcelado (12x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
@@ -1289,17 +1290,13 @@ export function StockPage() {
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 8} className="empty">
+                        <td colSpan={selectedAttrIds.length + 7} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
                     ) : (
                       variations.map((row, index) => {
-                        const effectiveRate =
-                          row.cardRate !== undefined && !Number.isNaN(row.cardRate)
-                            ? row.cardRate
-                            : form.cardRate;
-                        const installmentText = formatInstallment(row.price, 12, effectiveRate);
+                        const installmentText = formatInstallment(row.price, 12);
 
                         return (
                           <tr key={row.tempKey}>
@@ -1360,25 +1357,6 @@ export function StockPage() {
                                 style={{ width: 95 }}
                                 onChange={(e) =>
                                   updateVariationRow(index, 'price', Number(e.target.value))
-                                }
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={row.cardRate ?? ''}
-                                disabled={readOnly}
-                                placeholder="Padrão"
-                                style={{ width: 75 }}
-                                onChange={(e) =>
-                                  updateVariationRow(
-                                    index,
-                                    'cardRate',
-                                    e.target.value === '' ? undefined : Number(e.target.value),
-                                  )
                                 }
                               />
                             </td>
@@ -1583,30 +1561,17 @@ export function StockPage() {
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>
-                  <label>
-                    Taxa de cartão (%)
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      value={form.cardRate ?? ''}
-                      disabled={readOnly}
-                      placeholder="Padrão totem"
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          cardRate: e.target.value === '' ? undefined : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
-                      <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12, form.cardRate)}
-                      {form.cardRate !== undefined
-                        ? ` (com taxa de ${form.cardRate}% deste produto)`
-                        : ' (usando taxa padrão do totem)'}
+                      <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12)}{' '}
+                      <span style={{ fontSize: '0.82rem' }}>
+                        (baseado na maquininha padrão: {getTotemCardRate(12).brandName} a{' '}
+                        {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}% — configure em{' '}
+                        <Link to="/painel/taxas-cartao" style={{ textDecoration: 'underline' }}>
+                          Taxas de Cartão
+                        </Link>
+                        )
+                      </span>
                     </p>
                   ) : null}
                   {!lite ? (

@@ -1,5 +1,6 @@
 import { listEmployees } from './erpRegistry';
 import { getOperatorProfile, PROFILE_EVENT } from './operatorProfile';
+import { tenantScopedKey } from './tenantContext';
 
 const STORAGE_KEY = 'marthi.team.presence.v1';
 export const PRESENCE_EVENT = 'marthi-presence-updated';
@@ -87,21 +88,36 @@ function empty(): State {
   return { entries: [] };
 }
 
+function isMockPresence(entry: TeamPresence): boolean {
+  const name = entry.displayName.toLowerCase();
+  const mail = (entry.email || '').toLowerCase();
+  return (
+    name.includes('marthi basic') ||
+    name.includes('marthi teste') ||
+    name === 'operador' ||
+    mail.includes('@loja.local') ||
+    mail.includes('@celsul.local')
+  );
+}
+
 function load(): State {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = tenantScopedKey(STORAGE_KEY);
+    const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty();
     const parsed = JSON.parse(raw) as Partial<State>;
-    return {
-      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-    };
+    const entries = (Array.isArray(parsed.entries) ? parsed.entries : []).filter(
+      (e) => !isMockPresence(e),
+    );
+    return { entries };
   } catch {
     return empty();
   }
 }
 
 function save(state: State) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const key = tenantScopedKey(STORAGE_KEY);
+  localStorage.setItem(key, JSON.stringify(state));
   window.dispatchEvent(new Event(PRESENCE_EVENT));
 }
 
@@ -130,27 +146,46 @@ export function listPresenceEntries() {
 
 /** Equipe do ERP + presença ao vivo (quem está logado / onde / status). */
 export function listTeamPresenceBoard(currentUserKey?: string): TeamPresence[] {
+  const employees = listEmployees(true).filter((e) => e.isSystemUser);
   const live = listPresenceEntries();
-  const byKey = new Map(live.map((item) => [item.userKey, item]));
+  const liveByKey = new Map(live.map((item) => [item.userKey, item]));
   const stamp = now();
 
-  for (const employee of listEmployees(true)) {
-    if (!employee.isSystemUser) continue;
+  const byKey = new Map<string, TeamPresence>();
+
+  for (const employee of employees) {
     const key = resolvePresenceUserKey(employee.userEmail || employee.email, employee.name);
-    if (byKey.has(key)) continue;
-    byKey.set(key, {
-      userKey: key,
-      displayName: employee.name,
-      role: employee.role,
-      photo: null,
-      email: employee.userEmail || employee.email,
-      module: 'offline',
-      availability: 'away',
-      awayReason: null,
-      awayNote: '',
-      updatedAt: stamp,
-      lastSeenAt: stamp,
-    });
+    const existing = liveByKey.get(key);
+    if (existing) {
+      byKey.set(key, {
+        ...existing,
+        displayName: employee.name || existing.displayName,
+        role: employee.role || existing.role,
+        email: employee.userEmail || employee.email || existing.email,
+      });
+    } else {
+      byKey.set(key, {
+        userKey: key,
+        displayName: employee.name,
+        role: employee.role,
+        photo: null,
+        email: employee.userEmail || employee.email,
+        module: 'offline',
+        availability: 'away',
+        awayReason: null,
+        awayNote: '',
+        updatedAt: stamp,
+        lastSeenAt: stamp,
+      });
+    }
+  }
+
+  // Se o usuário atual logado não estiver na lista de employees da loja, adiciona ele
+  if (currentUserKey && !byKey.has(currentUserKey)) {
+    const meLive = liveByKey.get(currentUserKey);
+    if (meLive && !isMockPresence(meLive)) {
+      byKey.set(currentUserKey, meLive);
+    }
   }
 
   const rows = [...byKey.values()];

@@ -199,3 +199,93 @@
     padding-left: 54px;
   }
 }
+
+/* ── Dark Mode Parity (.is-theme-dark / .admin--dark) ── */
+.is-theme-dark .presence-board,
+.admin--dark .presence-board {
+  background: var(--card, #171e27);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .presence-board__stats span,
+.admin--dark .presence-board__stats span {
+  background: var(--card-2, #1c2430);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .presence-board__stats strong,
+.admin--dark .presence-board__stats strong {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .presence-board__row,
+.admin--dark .presence-board__row {
+  border-color: var(--line, rgba(255, 255, 255, 0.08));
+  background: var(--card-2, #1c2430);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .presence-board__row:hover,
+.admin--dark .presence-board__row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.is-theme-dark .presence-board__row.is-me,
+.admin--dark .presence-board__row.is-me {
+  border-color: rgba(45, 212, 191, 0.4);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.is-theme-dark .presence-board__avatar,
+.admin--dark .presence-board__avatar {
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: none;
+  background: #134e4a;
+}
+
+.is-theme-dark .presence-board__pulse,
+.admin--dark .presence-board__pulse {
+  border-color: var(--card-2, #1c2430);
+}
+
+.is-theme-dark .presence-board__meta strong,
+.admin--dark .presence-board__meta strong {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .presence-board__meta small,
+.admin--dark .presence-board__meta small {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .presence-board__meta em,
+.admin--dark .presence-board__meta em {
+  color: var(--accent, #2dd4bf);
+  background: rgba(45, 212, 191, 0.15);
+}
+
+.is-theme-dark .presence-board__badge,
+.admin--dark .presence-board__badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .presence-board__row.is-online:not(.is-away) .presence-board__badge,
+.admin--dark .presence-board__row.is-online:not(.is-away) .presence-board__badge {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}
+
+.is-theme-dark .presence-board__row.is-away .presence-board__badge,
+.admin--dark .presence-board__row.is-away .presence-board__badge {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+.is-theme-dark .presence-board__place,
+.admin--dark .presence-board__place {
+  color: var(--mute, #94a3b8);
+}
+

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -193,7 +194,15 @@ export function PaymentsPage() {
     <section className="admin-page">
       {headingActions}
       {!formVisible ? (
-        <article className="admin-card">
+        <article className="admin-card">
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <button type="button" className="btn btn--primary btn--sm" style={{ pointerEvents: 'none' }}>
+              Formas de Pagamento
+            </button>
+            <Link to="/painel/taxas-cartao" className="btn btn--outline btn--sm">
+              Taxas de Cartão &amp; Maquininhas
+            </Link>
+          </div>
           <CrudListBar
             query={query}
             onQueryChange={setQuery}

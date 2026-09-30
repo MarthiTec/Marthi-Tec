@@ -5,6 +5,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAccess } from '../../data/auditLog';
@@ -58,6 +59,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/cfop': { kicker: 'Produtos', title: 'CFOP e FECP' },
   '/painel/tabelas': { kicker: 'Produtos', title: 'Tabelas de preço' },
   '/painel/pagamentos': { kicker: 'Vendas', title: 'Formas de pagamento' },
+  '/painel/taxas-cartao': { kicker: 'Vendas & Financeiro', title: 'Taxas de Cartão & Maquininhas' },
   '/painel/financeiro': { kicker: 'Retaguarda', title: 'Financeiro' },
   '/painel/auditoria': { kicker: 'Retaguarda', title: 'Auditoria e acessos' },
   '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
@@ -202,6 +204,9 @@ export function AdminLayout() {
     if (to.includes('/cardapio') && !storeCustom.showCardapioDigital) {
       return false;
     }
+    if ((to === '/mesa' || to === '/cozinha') && !storeCustom.showTablesAndKitchen) {
+      return false;
+    }
     const area = navPathToAccessArea(to);
     if (!area) return true;
     return userCanAccessArea(userEmail, area);
@@ -337,16 +342,18 @@ export function AdminLayout() {
               <span className="admin__link-label">Usuários</span>
             </NavLink>
           ) : null}
-          <NavLink
-            to="/painel/operacoes"
-            title="Operações"
-            className={({ isActive }) =>
-              `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
-            }
-          >
-            <AdminIcon name="ops" />
-            <span className="admin__link-label">Operações</span>
-          </NavLink>
+          {isAdmin ? (
+            <NavLink
+              to="/painel/operacoes"
+              title="Operações"
+              className={({ isActive }) =>
+                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
+              }
+            >
+              <AdminIcon name="ops" />
+              <span className="admin__link-label">Operações</span>
+            </NavLink>
+          ) : null}
           {isAdmin ? (
             <NavLink
               to="/painel/lojas"
@@ -404,6 +411,7 @@ export function AdminLayout() {
             <h1>{page.title}</h1>
           </div>
           <div id="panel-page-actions" className="admin__heading-actions" />
+          <StoreSwitcher />
         </header>
 
         <div className="admin__main">

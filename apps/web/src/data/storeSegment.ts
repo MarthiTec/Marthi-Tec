@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { PartnerModuleId } from './catalog';
+import {
+  getActiveStore,
+  getStoreById,
+  saveStore,
+  STORE_CONTEXT_CHANGED_EVENT,
+  MULTI_STORE_CHANGED_EVENT,
+} from './multiStoreStore';
 
 export type StoreSegmentId =
   | 'assistencia_tecnica'
@@ -149,39 +156,103 @@ export function defaultStoreCustomization(): StoreCustomization {
   };
 }
 
-export function getStoreCustomization(): StoreCustomization {
+export function getStoreCustomization(explicitStoreId?: string): StoreCustomization {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultStoreCustomization();
+    const store = explicitStoreId ? getStoreById(explicitStoreId) : getActiveStore();
+    const segmentId: StoreSegmentId = store?.segmentId || 'assistencia_tecnica';
+    const preset = SEGMENT_PRESETS.find((p) => p.id === segmentId) || SEGMENT_PRESETS[0];
+
+    const storeKey = store?.id ? `${STORAGE_KEY}:${store.id}` : STORAGE_KEY;
+    const raw = localStorage.getItem(storeKey) || localStorage.getItem(STORAGE_KEY);
+
+    // Validação estrita por segmento:
+    // Se a loja é Oficina / Assistência Técnica (ou Cell Ponto), NUNCA exibir Cardápio, Mesas e Cozinha
+    const isOficinaOrCell =
+      segmentId === 'assistencia_tecnica' ||
+      (store &&
+        (store.tradeName?.toLowerCase().includes('cell') ||
+          store.name?.toLowerCase().includes('cell') ||
+          store.cnpj === '61.506.270/0001-63'));
+
+    if (isOficinaOrCell) {
+      return {
+        segmentId: 'assistencia_tecnica',
+        segmentName: preset.name,
+        showImei: true,
+        showDevicePassword: true,
+        showTablesAndKitchen: false,
+        showCardapioDigital: false,
+        showTechnicalBench: true,
+        showSizeColorGrid: false,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!raw) {
+      return {
+        segmentId: preset.id,
+        segmentName: preset.name,
+        ...preset.config,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
     const parsed = JSON.parse(raw);
     return {
       ...defaultStoreCustomization(),
+      ...preset.config,
       ...parsed,
+      segmentId: preset.id,
+      segmentName: preset.name,
     };
   } catch {
     return defaultStoreCustomization();
   }
 }
 
-export function saveStoreCustomization(next: Partial<StoreCustomization>): StoreCustomization {
-  const current = getStoreCustomization();
+export function saveStoreCustomization(
+  next: Partial<StoreCustomization>,
+  explicitStoreId?: string,
+): StoreCustomization {
+  const store = explicitStoreId ? getStoreById(explicitStoreId) : getActiveStore();
+  const current = getStoreCustomization(store?.id);
   const updated: StoreCustomization = {
     ...current,
     ...next,
     updatedAt: new Date().toISOString(),
   };
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  if (store?.id) {
+    localStorage.setItem(`${STORAGE_KEY}:${store.id}`, JSON.stringify(updated));
+    if (next.segmentId && next.segmentId !== store.segmentId) {
+      saveStore({ ...store, segmentId: next.segmentId });
+    }
+  }
+
   window.dispatchEvent(new CustomEvent(SEGMENT_UPDATED_EVENT, { detail: updated }));
   return updated;
 }
 
-export function applySegmentPreset(segmentId: StoreSegmentId): StoreCustomization {
+export function applySegmentPreset(
+  segmentId: StoreSegmentId,
+  explicitStoreId?: string,
+): StoreCustomization {
   const preset = SEGMENT_PRESETS.find((p) => p.id === segmentId) || SEGMENT_PRESETS[0];
-  return saveStoreCustomization({
-    segmentId: preset.id,
-    segmentName: preset.name,
-    ...preset.config,
-  });
+  const store = explicitStoreId ? getStoreById(explicitStoreId) : getActiveStore();
+
+  if (store && store.segmentId !== segmentId) {
+    saveStore({ ...store, segmentId });
+  }
+
+  return saveStoreCustomization(
+    {
+      segmentId: preset.id,
+      segmentName: preset.name,
+      ...preset.config,
+    },
+    store?.id,
+  );
 }
 
 export function useStoreCustomization() {
@@ -192,7 +263,13 @@ export function useStoreCustomization() {
       setCustomization(getStoreCustomization());
     }
     window.addEventListener(SEGMENT_UPDATED_EVENT, handleUpdate);
-    return () => window.removeEventListener(SEGMENT_UPDATED_EVENT, handleUpdate);
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, handleUpdate);
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, handleUpdate);
+    return () => {
+      window.removeEventListener(SEGMENT_UPDATED_EVENT, handleUpdate);
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, handleUpdate);
+      window.removeEventListener(MULTI_STORE_CHANGED_EVENT, handleUpdate);
+    };
   }, []);
 
   return customization;

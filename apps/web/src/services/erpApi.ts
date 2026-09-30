@@ -1902,3 +1902,14 @@ export function apiDeleteStore(id: string) {
   return nestDelete<{ ok: true }>(`/stores/${id}`);
 }
 
+/* ── Card Machines & Brand Rates ────────────────────────── */
+
+export function apiGetCardMachines() {
+  return nestGet<any[]>('/card-machines');
+}
+
+export function apiSaveCardMachines(machines: any[]) {
+  return nestPut<{ ok: true; count: number }>('/card-machines', { machines });
+}
+
+

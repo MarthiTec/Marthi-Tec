@@ -13,6 +13,7 @@ import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
+import { useStoreCustomization } from '../../data/storeSegment';
 import '../admin/admin.css';
 import './erp.css';
 
@@ -75,6 +76,7 @@ const NAV_PEOPLE: NavItem[] = [
 
 const NAV_FINANCE: NavItem[] = [
   { to: '/erp/financeiro', label: 'Financeiro', icon: 'ops' },
+  { to: '/erp/taxas-cartao', label: 'Taxas & Maquininhas', icon: 'ops' },
   { to: '/erp/boletos', label: 'Boletos', icon: 'fiscal' },
 ];
 
@@ -93,6 +95,7 @@ export function ErpLayout() {
   const { user, loading } = useAuth();
   usePresenceSession('erp');
   const { isDark } = usePanelTheme();
+  const storeCustom = useStoreCustomization();
   const [navOpen, setNavOpen] = useState(() => !isMobileNav());
   const [exitOpen, setExitOpen] = useState(false);
 
@@ -154,7 +157,7 @@ export function ErpLayout() {
       <header className="erp-app__top">
         <OsEcosystemMenu />
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
-        <StoreSwitcher compact />
+        <StoreSwitcher />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi Retaguarda</strong>
@@ -203,8 +206,23 @@ export function ErpLayout() {
             Central
           </NavLink>
 
-          <p className="erp-app__side-label">Atendimento & Salão</p>
-          {renderNav(NAV_FOOD)}
+          {storeCustom.showCardapioDigital || storeCustom.showTablesAndKitchen ? (
+            <>
+              <p className="erp-app__side-label">Atendimento & Salão</p>
+              {renderNav(
+                NAV_FOOD.filter((item) => {
+                  if (item.to.includes('cardapio') && !storeCustom.showCardapioDigital) return false;
+                  if (
+                    (item.to === '/mesa' || item.to === '/cozinha') &&
+                    !storeCustom.showTablesAndKitchen
+                  ) {
+                    return false;
+                  }
+                  return true;
+                }),
+              )}
+            </>
+          ) : null}
 
           <p className="erp-app__side-label">Produtos</p>
           {renderNav(NAV_PRODUCTS)}
@@ -219,7 +237,12 @@ export function ErpLayout() {
           {renderNav(NAV_BACK)}
 
           <p className="erp-app__side-note">
-            PDV, totem e emissão fiscal ficam nos apps próprios.{' '}
+            Outros módulos ficam nos apps próprios.{' '}
+            {storeCustom.showTechnicalBench ? (
+              <>
+                <NavLink to="/os">Oficina (OS)</NavLink> ·{' '}
+              </>
+            ) : null}
             <NavLink to="/caixa">Caixa</NavLink> · <NavLink to="/fiscal">Fiscal</NavLink>
           </p>
           <ModuleSideFoot />

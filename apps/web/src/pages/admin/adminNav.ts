@@ -52,6 +52,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
+      { to: '/painel/taxas-cartao', label: 'Taxas & Maquininhas' },
     ],
   },
   {
@@ -73,7 +74,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
-      { to: '/painel/cardapio', label: 'Cardápio Digital' },
     ],
   },
   {
