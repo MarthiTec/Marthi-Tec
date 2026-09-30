@@ -13,6 +13,7 @@ import { replaceOperatorProfileCache } from './operatorProfile';
 import { replaceStoreEntitlement } from './storePlan';
 import { replaceTotemSettings } from './totemSettings';
 import { hydrateErpRegistryFromApi } from './erpRegistry';
+import { hydrateMultiStoreFromApi } from './multiStoreStore';
 import { hydrateFinanceBookFromApi } from './financeBook';
 import { hydrateCashFromApi } from './cashRegisterStore';
 import {
@@ -108,6 +109,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
     ]);
     await Promise.all([
       hydrateErpRegistryFromApi(),
+      hydrateMultiStoreFromApi(),
       hydrateFinanceBookFromApi(),
       hydrateWarehouseCatalogFromApi(),
       hydrateFiscalCatalogFromApi(),

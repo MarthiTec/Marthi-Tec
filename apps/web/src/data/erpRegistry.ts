@@ -165,7 +165,41 @@ function seedForTenant(activeTenant: string): RegistryState {
     suppliers: [],
   };
 
-  if (activeTenant.startsWith('client_')) {
+  const isCellPontoTenant =
+    activeTenant.includes('ACC-MARTHI-DEMO') ||
+    activeTenant.includes('gilvan') ||
+    activeTenant === 'client_CLI-DEMO-01';
+
+  if (isCellPontoTenant) {
+    state.employees.push({
+      id: 'EMP-GILVAN-01',
+      name: 'Gilvan Teodoro',
+      phone: '(24) 98124-4253',
+      email: 'gilvanteodo@gmail.com',
+      document: '61.506.270/0001-63',
+      role: 'admin',
+      isSystemUser: true,
+      userEmail: 'gilvanteodo@gmail.com',
+      accessAreas: [...ALL_ACCESS_AREAS],
+      active: true,
+      createdAt: now(),
+      updatedAt: now(),
+    });
+    state.employees.push({
+      id: 'EMP-MARIANA-01',
+      name: 'Mariana Veiga',
+      phone: '(24) 98124-4253',
+      email: 'marianaveigatav@gmail.com',
+      document: '123.456.789-00',
+      role: 'operator',
+      isSystemUser: true,
+      userEmail: 'marianaveigatav@gmail.com',
+      accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+      active: true,
+      createdAt: now(),
+      updatedAt: now(),
+    });
+  } else if (activeTenant.startsWith('client_')) {
     const clientId = activeTenant.slice('client_'.length);
     const client = listMarthiClients().find((c) => c.clientId === clientId);
     if (client) {
@@ -183,7 +217,21 @@ function seedForTenant(activeTenant: string): RegistryState {
         createdAt: now(),
         updatedAt: now(),
       });
-      if (client.clientId === 'CLI-DEMO-01' || client.tradeName.toLowerCase().includes('cell')) {
+      if (client.tradeName.toLowerCase().includes('cell')) {
+        state.employees.push({
+          id: 'EMP-GILVAN-01',
+          name: 'Gilvan Teodoro',
+          phone: '(24) 98124-4253',
+          email: 'gilvanteodo@gmail.com',
+          document: '61.506.270/0001-63',
+          role: 'admin',
+          isSystemUser: true,
+          userEmail: 'gilvanteodo@gmail.com',
+          accessAreas: [...ALL_ACCESS_AREAS],
+          active: true,
+          createdAt: now(),
+          updatedAt: now(),
+        });
         state.employees.push({
           id: 'EMP-MARIANA-01',
           name: 'Mariana Veiga',

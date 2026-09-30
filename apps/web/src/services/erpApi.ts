@@ -1840,3 +1840,65 @@ export function apiTrackTotemClick(body: { productId: string; productName: strin
 export function apiGetTotemAnalyticsSummary() {
   return nestGet<ApiTotemAnalyticsSummary>('/totem/analytics/summary');
 }
+
+/* ── Lojas & Filiais (/stores & /account) ───────────────── */
+
+export type ApiStoreRow = {
+  id: string;
+  clientAccountId: string;
+  tradeName: string;
+  legalName: string;
+  documentType: 'cnpj' | 'cpf';
+  document: string;
+  stateRegistration: string;
+  municipalRegistration: string;
+  email: string;
+  phone: string;
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  district: string;
+  city: string;
+  state: string;
+  taxRegime: string;
+  isMatrix: boolean;
+  active: boolean;
+  planId?: string;
+  modules?: string[];
+  discountPercent?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiClientAccountRow = {
+  id: string;
+  legalName: string;
+  tradeName: string;
+  document: string;
+  email: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function apiListStores() {
+  return nestGet<ApiStoreRow[]>('/stores');
+}
+
+export function apiGetClientAccount() {
+  return nestGet<ApiClientAccountRow>('/account');
+}
+
+export function apiCreateStore(body: Partial<ApiStoreRow> & { tradeName: string; document: string }) {
+  return nestPost<ApiStoreRow>('/stores', body);
+}
+
+export function apiUpdateStore(id: string, body: Partial<ApiStoreRow>) {
+  return nestPatch<ApiStoreRow>(`/stores/${id}`, body);
+}
+
+export function apiDeleteStore(id: string) {
+  return nestDelete<{ ok: true }>(`/stores/${id}`);
+}
+

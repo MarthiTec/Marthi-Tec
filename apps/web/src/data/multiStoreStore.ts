@@ -9,6 +9,13 @@
  *   LicensingDiscountRules (Regras dinâmicas e configuráveis de desconto progressivo)
  */
 
+import { isNestAuthed } from '../services/nestClient';
+import {
+  apiGetClientAccount,
+  apiListStores,
+} from '../services/erpApi';
+import { getActiveTenantKey, tenantScopedKey } from './tenantContext';
+
 export type ClientAccount = {
   id: string;
   legalName: string;
@@ -94,71 +101,52 @@ const STORAGE_KEY_ACTIVE_STORE_ID = 'marthi.multi_store.active_store_id.v1';
 export const MULTI_STORE_CHANGED_EVENT = 'marthi-multi-store-changed';
 export const STORE_CONTEXT_CHANGED_EVENT = 'marthi-store-context-changed';
 
-const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
-  id: 'CLI-001',
-  legalName: 'Grupo Varejista do Brasil Ltda',
-  tradeName: 'Grupo Varejo Brasil',
-  document: '12.345.678/0001-90',
-  email: 'contato@varejobrasil.com.br',
-  phone: '(11) 3200-5500',
-  createdAt: new Date().toISOString(),
+/**
+ * Conta comercial padrão para a empresa habilitada Cell Ponto (Gilvan Teodoro)
+ */
+export const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
+  id: 'ACC-MARTHI-DEMO',
+  legalName: 'Cell Ponto Telecomunicações LTDA',
+  tradeName: 'Cell Ponto',
+  document: '61.506.270/0001-63',
+  email: 'gilvanteodo@gmail.com',
+  phone: '(24) 98124-4253',
+  createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: new Date().toISOString(),
 };
 
-const DEFAULT_STORES: Store[] = [
+/**
+ * Loja padrão única habilitada para a Cell Ponto (Matriz em Três Rios / RJ)
+ */
+export const DEFAULT_STORES: Store[] = [
   {
-    id: 'store-matriz-01',
-    clientAccountId: 'CLI-001',
+    id: 'STR-DEMO-01',
+    clientAccountId: 'ACC-MARTHI-DEMO',
     code: '001',
-    name: 'Loja Matriz Centro',
-    tradeName: 'Marthi Tech - Matriz Centro',
-    cnpj: '12.345.678/0001-90',
-    stateRegistration: '123.456.789.110',
-    municipalRegistration: '9876543-2',
-    email: 'matriz@varejobrasil.com.br',
-    phone: '(11) 3200-5501',
-    zipCode: '01001-000',
-    street: 'Praça da Sé',
-    number: '100',
-    complement: 'Andar 2',
-    neighborhood: 'Sé',
-    city: 'São Paulo',
-    state: 'SP',
-    ibgeCityCode: '3550308',
+    name: 'Cell Ponto Matriz',
+    tradeName: 'Cell Ponto',
+    cnpj: '61.506.270/0001-63',
+    stateRegistration: 'ISENTO',
+    municipalRegistration: '12345',
+    email: 'matriz@cellponto.com.br',
+    phone: '(24) 98124-4253',
+    zipCode: '25800-000',
+    street: 'Rua Prefeito Walter Franklin',
+    number: '120',
+    complement: 'Loja 01',
+    neighborhood: 'Centro',
+    city: 'Três Rios',
+    state: 'RJ',
+    ibgeCityCode: '3306008',
     taxRegime: 'simples_nacional',
     active: true,
     isMatrix: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'store-filial-02',
-    clientAccountId: 'CLI-001',
-    code: '002',
-    name: 'Loja Filial Shopping Plaza',
-    tradeName: 'Marthi Tech - Shopping Plaza',
-    cnpj: '12.345.678/0002-71',
-    stateRegistration: '123.456.789.111',
-    municipalRegistration: '9876543-3',
-    email: 'filial1@varejobrasil.com.br',
-    phone: '(11) 3200-5502',
-    zipCode: '04578-000',
-    street: 'Av. das Nações Unidas',
-    number: '12551',
-    complement: 'Loja 204 Piso 2',
-    neighborhood: 'Brooklin',
-    city: 'São Paulo',
-    state: 'SP',
-    ibgeCityCode: '3550308',
-    taxRegime: 'simples_nacional',
-    active: true,
-    isMatrix: false,
-    createdAt: new Date().toISOString(),
+    createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: new Date().toISOString(),
   },
 ];
 
-const DEFAULT_DISCOUNT_RULES: LicensingDiscountRule[] = [
+export const DEFAULT_DISCOUNT_RULES: LicensingDiscountRule[] = [
   {
     id: 'rule-single',
     name: '1 Loja (Sem Desconto Multi-Loja)',
@@ -201,6 +189,126 @@ const DEFAULT_DISCOUNT_RULES: LicensingDiscountRule[] = [
   },
 ];
 
+let hasCleanedLegacyMocks = false;
+
+/**
+ * Remove permanentemente quaisquer resíduos de mocks anteriores
+ * (como "Grupo Varejista do Brasil" ou CNPJ 12.345.678) do localStorage.
+ */
+export function cleanLegacyMocks() {
+  if (hasCleanedLegacyMocks || typeof window === 'undefined') return;
+  hasCleanedLegacyMocks = true;
+  try {
+    const isMock = (val: string | null) =>
+      Boolean(
+        val &&
+          (val.includes('Grupo Varejista') ||
+            val.includes('12.345.678') ||
+            val.includes('Shopping Plaza') ||
+            val.includes('Loja Matriz Centro') ||
+            val.includes('varejobrasil.com.br')),
+      );
+
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('marthi.multi_store') || k.includes('multi_store'))) {
+        const v = localStorage.getItem(k);
+        if (isMock(v)) {
+          keysToRemove.push(k);
+        }
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('[multiStore] cleanLegacyMocks error', e);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  cleanLegacyMocks();
+}
+
+function getLocalMarthiClients(): Array<{
+  clientId: string;
+  tradeName: string;
+  legalName?: string;
+  document?: string;
+  email: string;
+  phone?: string;
+  contractedAt?: string;
+}> {
+  try {
+    const raw = localStorage.getItem('marthi.ops.clients.v2');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.clients) ? parsed.clients : [];
+  } catch {
+    return [];
+  }
+}
+
+export function resolveDefaultClientAccount(): ClientAccount {
+  cleanLegacyMocks();
+  const tenantKey = getActiveTenantKey();
+  if (tenantKey.startsWith('client_')) {
+    const clientId = tenantKey.slice('client_'.length);
+    const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
+    if (client) {
+      return {
+        id: client.clientId,
+        legalName: client.legalName || client.tradeName,
+        tradeName: client.tradeName,
+        document: client.document || '00.000.000/0001-00',
+        email: client.email,
+        phone: client.phone || '',
+        createdAt: client.contractedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+  }
+  return DEFAULT_CLIENT_ACCOUNT;
+}
+
+export function resolveDefaultStores(): Store[] {
+  cleanLegacyMocks();
+  const tenantKey = getActiveTenantKey();
+  if (tenantKey.startsWith('client_')) {
+    const clientId = tenantKey.slice('client_'.length);
+    const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
+    if (client) {
+      return [
+        {
+          id: `store-${client.clientId}`,
+          clientAccountId: client.clientId,
+          code: '001',
+          name: client.tradeName || client.legalName || 'Loja Matriz',
+          tradeName: client.tradeName,
+          cnpj: client.document || '00.000.000/0001-00',
+          stateRegistration: 'ISENTO',
+          municipalRegistration: '',
+          email: client.email,
+          phone: client.phone || '',
+          zipCode: '25800-000',
+          street: '',
+          number: '',
+          complement: '',
+          neighborhood: 'Centro',
+          city: 'Três Rios',
+          state: 'RJ',
+          ibgeCityCode: '',
+          taxRegime: 'simples_nacional',
+          active: true,
+          isMatrix: true,
+          createdAt: client.contractedAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+    }
+  }
+  return DEFAULT_STORES;
+}
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -223,12 +331,19 @@ function writeJson<T>(key: string, value: T) {
 // CLIENT ACCOUNT
 // ----------------------------------------------------
 export function getClientAccount(): ClientAccount {
-  return readJson<ClientAccount>(STORAGE_KEY_CLIENT_ACCOUNT, DEFAULT_CLIENT_ACCOUNT);
+  cleanLegacyMocks();
+  const key = tenantScopedKey(STORAGE_KEY_CLIENT_ACCOUNT);
+  const account = readJson<ClientAccount>(key, resolveDefaultClientAccount());
+  if (account.legalName.includes('Grupo Varejista') || account.document.includes('12.345.678')) {
+    return resolveDefaultClientAccount();
+  }
+  return account;
 }
 
 export function saveClientAccount(account: ClientAccount): ClientAccount {
   account.updatedAt = new Date().toISOString();
-  writeJson(STORAGE_KEY_CLIENT_ACCOUNT, account);
+  const key = tenantScopedKey(STORAGE_KEY_CLIENT_ACCOUNT);
+  writeJson(key, account);
   window.dispatchEvent(new Event(MULTI_STORE_CHANGED_EVENT));
   return account;
 }
@@ -237,8 +352,24 @@ export function saveClientAccount(account: ClientAccount): ClientAccount {
 // STORES
 // ----------------------------------------------------
 export function listStores(): Store[] {
-  const stores = readJson<Store[]>(STORAGE_KEY_STORES, DEFAULT_STORES);
-  return stores;
+  cleanLegacyMocks();
+  const key = tenantScopedKey(STORAGE_KEY_STORES);
+  const fallback = resolveDefaultStores();
+  const stores = readJson<Store[]>(key, fallback);
+
+  // Filtragem definitiva para evitar que qualquer mock residual seja exibido
+  const filtered = stores.filter(
+    (s) =>
+      !s.cnpj.includes('12.345.678') &&
+      !s.name.includes('Shopping Plaza') &&
+      !s.name.includes('Loja Matriz Centro') &&
+      !s.email.includes('varejobrasil.com.br'),
+  );
+
+  if (filtered.length === 0) {
+    return fallback;
+  }
+  return filtered;
 }
 
 export function getStoreById(storeId: string): Store | null {
@@ -278,8 +409,8 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
         complement: store.complement || '',
         neighborhood: store.neighborhood || '',
         city: store.city || '',
-        state: store.state || 'SP',
-        ibgeCityCode: store.ibgeCityCode || '3550308',
+        state: store.state || 'RJ',
+        ibgeCityCode: store.ibgeCityCode || '',
         taxRegime: store.taxRegime || 'simples_nacional',
         active: store.active !== false,
         isMatrix: Boolean(store.isMatrix),
@@ -306,8 +437,8 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
       complement: store.complement || '',
       neighborhood: store.neighborhood || '',
       city: store.city || '',
-      state: store.state || 'SP',
-      ibgeCityCode: store.ibgeCityCode || '3550308',
+      state: store.state || 'RJ',
+      ibgeCityCode: store.ibgeCityCode || '',
       taxRegime: store.taxRegime || 'simples_nacional',
       active: store.active !== false,
       isMatrix: stores.length === 0 ? true : Boolean(store.isMatrix),
@@ -324,7 +455,8 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
     });
   }
 
-  writeJson(STORAGE_KEY_STORES, stores);
+  const key = tenantScopedKey(STORAGE_KEY_STORES);
+  writeJson(key, stores);
   recalculateAllStoreLicenses();
   window.dispatchEvent(new Event(MULTI_STORE_CHANGED_EVENT));
   return saved;
@@ -338,7 +470,8 @@ export function deleteStore(storeId: string): boolean {
     if (stores.length > 1 && target?.isMatrix) return false;
   }
   const filtered = stores.filter((s) => s.id !== storeId);
-  writeJson(STORAGE_KEY_STORES, filtered);
+  const key = tenantScopedKey(STORAGE_KEY_STORES);
+  writeJson(key, filtered);
 
   if (getActiveStoreId() === storeId && filtered.length > 0) {
     setActiveStoreId(filtered[0].id);
@@ -355,14 +488,15 @@ export function deleteStore(storeId: string): boolean {
 export function getActiveStoreId(): string {
   const stores = listStores();
   if (stores.length === 0) return '';
-  const storedId = localStorage.getItem(STORAGE_KEY_ACTIVE_STORE_ID);
+  const key = tenantScopedKey(STORAGE_KEY_ACTIVE_STORE_ID);
+  const storedId = localStorage.getItem(key);
   if (storedId && stores.some((s) => s.id === storedId && s.active)) {
     return storedId;
   }
   // Fallback: matriz ou primeira ativa
   const matrix = stores.find((s) => s.isMatrix && s.active);
   const fallbackId = matrix ? matrix.id : (stores.find((s) => s.active)?.id ?? stores[0].id);
-  localStorage.setItem(STORAGE_KEY_ACTIVE_STORE_ID, fallbackId);
+  localStorage.setItem(key, fallbackId);
   return fallbackId;
 }
 
@@ -374,7 +508,8 @@ export function getActiveStore(): Store | null {
 export function setActiveStoreId(storeId: string): boolean {
   const store = getStoreById(storeId);
   if (!store || !store.active) return false;
-  localStorage.setItem(STORAGE_KEY_ACTIVE_STORE_ID, storeId);
+  const key = tenantScopedKey(STORAGE_KEY_ACTIVE_STORE_ID);
+  localStorage.setItem(key, storeId);
   window.dispatchEvent(new CustomEvent(STORE_CONTEXT_CHANGED_EVENT, { detail: { storeId, store } }));
   return true;
 }
@@ -383,11 +518,13 @@ export function setActiveStoreId(storeId: string): boolean {
 // DISCOUNT RULES & LICENSING ENGINE
 // ----------------------------------------------------
 export function listDiscountRules(): LicensingDiscountRule[] {
-  return readJson<LicensingDiscountRule[]>(STORAGE_KEY_RULES, DEFAULT_DISCOUNT_RULES);
+  const key = tenantScopedKey(STORAGE_KEY_RULES);
+  return readJson<LicensingDiscountRule[]>(key, DEFAULT_DISCOUNT_RULES);
 }
 
 export function saveDiscountRules(rules: LicensingDiscountRule[]) {
-  writeJson(STORAGE_KEY_RULES, rules);
+  const key = tenantScopedKey(STORAGE_KEY_RULES);
+  writeJson(key, rules);
   recalculateAllStoreLicenses();
   window.dispatchEvent(new Event(MULTI_STORE_CHANGED_EVENT));
 }
@@ -491,7 +628,8 @@ export function calculateLicensingSummary(basePrice = 197): StoreLicensingSummar
 }
 
 export function listStoreLicenses(): StoreLicense[] {
-  const licenses = readJson<StoreLicense[]>(STORAGE_KEY_LICENSES, []);
+  const key = tenantScopedKey(STORAGE_KEY_LICENSES);
+  const licenses = readJson<StoreLicense[]>(key, []);
   if (licenses.length === 0) {
     return recalculateAllStoreLicenses();
   }
@@ -507,7 +645,7 @@ export function recalculateAllStoreLicenses(basePrice = 197): StoreLicense[] {
   const licenses: StoreLicense[] = summary.items.map((item) => ({
     id: `LIC-${item.store.id}`,
     storeId: item.store.id,
-    planId: 'bronze',
+    planId: 'golden',
     status: 'active',
     baseMonthlyPrice: item.basePrice,
     discountAmount: item.discountValue,
@@ -518,7 +656,8 @@ export function recalculateAllStoreLicenses(basePrice = 197): StoreLicense[] {
     createdAt: now,
   }));
 
-  writeJson(STORAGE_KEY_LICENSES, licenses);
+  const key = tenantScopedKey(STORAGE_KEY_LICENSES);
+  writeJson(key, licenses);
   return licenses;
 }
 
@@ -592,3 +731,73 @@ export function removeBranchFromMultiStore(branchClientId: string) {
   }
 }
 
+/**
+ * Hidrata a conta comercial contratante e as lojas reais conectadas ao backend Nest
+ */
+export async function hydrateMultiStoreFromApi(): Promise<boolean> {
+  if (!isNestAuthed()) return false;
+  try {
+    const [accountRow, storesRows] = await Promise.all([
+      apiGetClientAccount().catch(() => null),
+      apiListStores().catch(() => null),
+    ]);
+
+    let changed = false;
+
+    if (accountRow && accountRow.id) {
+      const mappedAccount: ClientAccount = {
+        id: accountRow.id,
+        legalName: accountRow.legalName,
+        tradeName: accountRow.tradeName || accountRow.legalName,
+        document: accountRow.document,
+        email: accountRow.email || '',
+        phone: accountRow.phone || '',
+        createdAt: accountRow.createdAt || new Date().toISOString(),
+        updatedAt: accountRow.updatedAt || new Date().toISOString(),
+      };
+      saveClientAccount(mappedAccount);
+      changed = true;
+    }
+
+    if (Array.isArray(storesRows) && storesRows.length > 0) {
+      const mappedStores: Store[] = storesRows.map((s, idx) => ({
+        id: s.id,
+        clientAccountId: s.clientAccountId,
+        code: String(idx + 1).padStart(3, '0'),
+        name: s.tradeName || s.legalName,
+        tradeName: s.tradeName || s.legalName,
+        cnpj: s.document,
+        stateRegistration: s.stateRegistration || '',
+        municipalRegistration: s.municipalRegistration || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        zipCode: s.zipCode || '',
+        street: s.street || '',
+        number: s.number || '',
+        complement: s.complement || '',
+        neighborhood: s.district || '',
+        city: s.city || '',
+        state: s.state || 'RJ',
+        ibgeCityCode: '',
+        taxRegime: (s.taxRegime as StoreTaxRegime) || 'simples_nacional',
+        active: s.active !== false,
+        isMatrix: Boolean(s.isMatrix),
+        createdAt: s.createdAt || new Date().toISOString(),
+        updatedAt: s.updatedAt || new Date().toISOString(),
+      }));
+
+      const key = tenantScopedKey(STORAGE_KEY_STORES);
+      writeJson(key, mappedStores);
+      recalculateAllStoreLicenses();
+      changed = true;
+    }
+
+    if (changed) {
+      window.dispatchEvent(new Event(MULTI_STORE_CHANGED_EVENT));
+    }
+    return true;
+  } catch (err) {
+    console.warn('[multiStore] Failed to hydrate from API:', err);
+    return false;
+  }
+}

@@ -33,7 +33,83 @@ const storePlanSchema = z.object({
   modules: z.array(z.string()).default([]),
 });
 
-const memoryStores = new Map<string, any>();
+const memoryStores = new Map<string, any>([
+  [
+    'STR-DEMO-01',
+    {
+      id: 'STR-DEMO-01',
+      clientAccountId: 'ACC-MARTHI-DEMO',
+      tradeName: 'Cell Ponto Matriz',
+      legalName: 'Cell Ponto Telecomunicações LTDA',
+      documentType: 'cnpj',
+      document: '61.506.270/0001-63',
+      stateRegistration: 'ISENTO',
+      municipalRegistration: '12345',
+      email: 'matriz@cellponto.com.br',
+      phone: '(24) 98124-4253',
+      zipCode: '25800-000',
+      street: 'Rua Prefeito Walter Franklin',
+      number: '120',
+      complement: 'Loja 01',
+      district: 'Centro',
+      city: 'Três Rios',
+      state: 'RJ',
+      taxRegime: 'simples_nacional',
+      isMatrix: true,
+      active: true,
+      planId: 'golden',
+      modules: ['totem', 'os', 'erp', 'fiscal'],
+      discountPercent: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ],
+]);
+
+/**
+ * Consulta da conta comercial contratante do cliente logado
+ */
+storesRouter.get('/api/v1/account', requireAuth, async (req, res, next) => {
+  try {
+    const clientAccountId = req.clientAccountId!;
+    if (pool) {
+      const result = await pool.query('SELECT * FROM client_accounts WHERE id = $1', [clientAccountId]);
+      if (result.rows.length > 0) {
+        const r = result.rows[0];
+        res.json({
+          success: true,
+          data: {
+            id: r.id,
+            legalName: r.legal_name || 'Cell Ponto Telecomunicações LTDA',
+            tradeName: r.trade_name || 'Cell Ponto',
+            document: r.document || '61.506.270/0001-63',
+            email: r.email || req.user?.email || 'gilvanteodo@gmail.com',
+            phone: r.phone || '(24) 98124-4253',
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+          },
+        });
+        return;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: clientAccountId || 'ACC-MARTHI-DEMO',
+        legalName: 'Cell Ponto Telecomunicações LTDA',
+        tradeName: 'Cell Ponto',
+        document: '61.506.270/0001-63',
+        email: req.user?.email || 'gilvanteodo@gmail.com',
+        phone: '(24) 98124-4253',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * Listar lojas / filiais vinculadas à conta do cliente
@@ -41,16 +117,32 @@ const memoryStores = new Map<string, any>();
 storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
   try {
     const clientAccountId = req.clientAccountId!;
+    const userId = req.user?.id;
 
     if (pool) {
-      const sql = `
+      // Se o usuário possuir lojas autorizadas específicas em user_stores, filtra por elas
+      const userStoreCount = await pool.query(
+        `SELECT COUNT(*)::int as total FROM user_stores WHERE user_id = $1`,
+        [userId],
+      );
+      const hasRestrictedStores = (userStoreCount.rows[0]?.total || 0) > 0;
+
+      let sql = `
         SELECT s.*, l.plan_id, l.modules, l.discount_percent, l.final_price
         FROM stores s
         LEFT JOIN store_licenses l ON l.store_id = s.id
-        WHERE s.client_account_id = $1
-        ORDER BY s.is_matrix DESC, s.created_at ASC
+        WHERE s.client_account_id = $1 AND s.active = true
       `;
-      const result = await pool.query(sql, [clientAccountId]);
+      const params: any[] = [clientAccountId];
+
+      if (hasRestrictedStores && req.user?.role !== 'admin') {
+        sql += ` AND s.id IN (SELECT store_id FROM user_stores WHERE user_id = $2)`;
+        params.push(userId);
+      }
+
+      sql += ` ORDER BY s.is_matrix DESC, s.created_at ASC`;
+      const result = await pool.query(sql, params);
+
       res.json({
         success: true,
         data: result.rows.map((r) => ({
@@ -84,7 +176,9 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
       return;
     }
 
-    const items = Array.from(memoryStores.values()).filter((s) => s.clientAccountId === clientAccountId);
+    const items = Array.from(memoryStores.values()).filter(
+      (s) => s.clientAccountId === clientAccountId && s.active !== false,
+    );
     res.json({ success: true, data: items });
   } catch (error) {
     next(error);
@@ -265,6 +359,45 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
     const updated = { ...curr, ...body, updatedAt: new Date().toISOString() };
     memoryStores.set(id, updated);
     res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Desativar / Excluir filial
+ */
+storesRouter.delete('/api/v1/stores/:id', requireAuth, async (req, res, next) => {
+  try {
+    const clientAccountId = req.clientAccountId!;
+    const id = req.params.id;
+
+    if (pool) {
+      const chk = await pool.query('SELECT is_matrix FROM stores WHERE id = $1 AND client_account_id = $2', [id, clientAccountId]);
+      if (chk.rows.length === 0) {
+        res.status(404).json({ success: false, error: { message: 'Loja não encontrada.' } });
+        return;
+      }
+      if (chk.rows[0].is_matrix) {
+        const total = await pool.query('SELECT COUNT(*)::int as count FROM stores WHERE client_account_id = $1 AND active = true', [clientAccountId]);
+        if ((total.rows[0]?.count || 0) > 1) {
+          res.status(400).json({ success: false, error: { message: 'A Loja Matriz não pode ser excluída enquanto houver filiais ativas.' } });
+          return;
+        }
+      }
+      await pool.query('UPDATE stores SET active = false, updated_at = now() WHERE id = $1 AND client_account_id = $2', [id, clientAccountId]);
+      res.json({ success: true, data: { ok: true } });
+      return;
+    }
+
+    const curr = memoryStores.get(id);
+    if (!curr || curr.clientAccountId !== clientAccountId) {
+      res.status(404).json({ success: false, error: { message: 'Loja não encontrada.' } });
+      return;
+    }
+    curr.active = false;
+    memoryStores.set(id, curr);
+    res.json({ success: true, data: { ok: true } });
   } catch (error) {
     next(error);
   }

@@ -7,6 +7,7 @@ import {
   deleteStore,
   getActiveStoreId,
   getClientAccount,
+  hydrateMultiStoreFromApi,
   listStores,
   saveStore,
   setActiveStoreId,
@@ -16,6 +17,8 @@ import {
   type Store,
   type StoreTaxRegime,
 } from '../../data/multiStoreStore';
+import { isNestAuthed } from '../../services/nestClient';
+import { apiCreateStore, apiDeleteStore, apiUpdateStore } from '../../services/erpApi';
 import './multiStore.css';
 
 type Tab = 'stores' | 'licensing' | 'isolation';
@@ -46,6 +49,10 @@ export function MultiStoreManagementPage() {
       setActiveStore(getActiveStoreId());
       setLicensingSummary(calculateLicensingSummary());
     }
+
+    hydrateMultiStoreFromApi().then(() => {
+      refresh();
+    });
 
     window.addEventListener(MULTI_STORE_CHANGED_EVENT, refresh);
     window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, refresh);
@@ -100,7 +107,7 @@ export function MultiStoreManagementPage() {
     setModalOpen(true);
   }
 
-  function handleDelete(storeId: string) {
+  async function handleDelete(storeId: string) {
     const s = stores.find((it) => it.id === storeId);
     if (!s) return;
     if (s.isMatrix && stores.length > 1) {
@@ -109,10 +116,13 @@ export function MultiStoreManagementPage() {
     }
     if (confirmDelete(`Deseja realmente remover a loja "${s.name}" (CNPJ: ${s.cnpj})?`)) {
       deleteStore(storeId);
+      if (isNestAuthed()) {
+        await apiDeleteStore(storeId).catch((err) => console.warn('Falha ao remover loja da API', err));
+      }
     }
   }
 
-  function handleSaveStore() {
+  async function handleSaveStore() {
     if (!editingStore.name?.trim()) {
       setFormError('Informe a Razão Social ou Nome da Loja.');
       return;
@@ -123,11 +133,43 @@ export function MultiStoreManagementPage() {
     }
 
     try {
-      saveStore({
+      const saved = saveStore({
         ...editingStore,
         name: editingStore.name.trim(),
         cnpj: editingStore.cnpj.trim(),
       });
+
+      if (isNestAuthed()) {
+        const payload = {
+          tradeName: saved.tradeName,
+          legalName: saved.name,
+          document: saved.cnpj,
+          email: saved.email,
+          phone: saved.phone,
+          stateRegistration: saved.stateRegistration,
+          municipalRegistration: saved.municipalRegistration,
+          zipCode: saved.zipCode,
+          street: saved.street,
+          number: saved.number,
+          complement: saved.complement,
+          district: saved.neighborhood,
+          city: saved.city,
+          state: saved.state,
+          taxRegime: saved.taxRegime,
+          isMatrix: saved.isMatrix,
+          active: saved.active,
+        };
+        if (editingStore.id) {
+          await apiUpdateStore(editingStore.id, payload).catch((err) =>
+            console.warn('Falha ao atualizar filial na API', err),
+          );
+        } else {
+          await apiCreateStore(payload).catch((err) =>
+            console.warn('Falha ao criar filial na API', err),
+          );
+        }
+      }
+
       setModalOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar loja.';

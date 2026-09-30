@@ -5,6 +5,7 @@ type PasswordMap = Record<string, string>;
 
 const DEFAULT_SEEDS: PasswordMap = {
   'marianaveigatav@gmail.com': '1234',
+  'gilvanteodo@gmail.com': '1234',
 };
 
 function load(): PasswordMap {

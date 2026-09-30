@@ -72,6 +72,19 @@ clientUsersStore.set('marianaveigatav@gmail.com', {
   createdAt: new Date().toISOString(),
 });
 
+const gilvanSalt = 'c1d2e3f4a5b6';
+clientUsersStore.set('gilvanteodo@gmail.com', {
+  id: 'usr-gilvan-cellponto',
+  email: 'gilvanteodo@gmail.com',
+  name: 'Gilvan Teodoro',
+  passwordHash: hashPassword('1234', gilvanSalt),
+  salt: gilvanSalt,
+  role: 'admin',
+  clientAccountId: 'ACC-MARTHI-DEMO',
+  active: true,
+  createdAt: new Date().toISOString(),
+});
+
 export function upsertClientUserInMemory(
   email: string,
   name: string,
