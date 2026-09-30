@@ -2168,7 +2168,9 @@ export function CaixaPage() {
           <article className="admin-card pdv__scan">
             <form className="pdv__code" onSubmit={scan}>
               <label className="pdv__code-field">
-                {customization.showImei ? 'Código / SKU / IMEI' : 'Código / SKU / Barras'}
+                <span className="pdv__code-label">
+                  {customization.showImei ? 'Código / SKU / IMEI' : 'Código / SKU / Barras'}
+                </span>
                 <input
                   ref={codeRef}
                   autoFocus
@@ -2176,6 +2178,12 @@ export function CaixaPage() {
                   onChange={(e) => {
                     setCode(e.target.value);
                     setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      scan();
+                    }
                   }}
                   placeholder={codePlaceholder}
                   autoComplete="off"
@@ -2200,45 +2208,38 @@ export function CaixaPage() {
                   </div>
                 ) : null}
               </label>
-              <button type="submit" className="btn btn--primary">
-                Incluir
-              </button>
-              <button
-                type="button"
-                className="btn btn--secondary pdv__adhoc-btn"
-                onClick={() => {
-                  if (!cashOpen) {
-                    setError('Abra o caixa antes de lançar vendas (F7).');
-                  } else if (canLaunchAdHoc) {
-                    openPanel('ad_hoc');
-                  } else {
-                    setError('Venda Avulsa desativada neste caixa ou usuário sem permissão.');
+              <button type="submit" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+              <div className="pdv__code-side">
+                <button
+                  type="button"
+                  className="pdv__adhoc-desc"
+                  onClick={() => {
+                    if (!cashOpen) {
+                      setError('Abra o caixa antes de lançar vendas (F7).');
+                    } else if (canLaunchAdHoc) {
+                      openPanel('ad_hoc');
+                    } else {
+                      setError('Venda Avulsa desativada neste caixa ou usuário sem permissão.');
+                    }
+                  }}
+                  disabled={!cashOpen}
+                  title={
+                    canLaunchAdHoc
+                      ? 'Lançar produto ou serviço avulso sem estoque (Alt+A)'
+                      : 'Venda Avulsa não permitida neste caixa ou usuário sem permissão'
                   }
-                }}
-                disabled={!cashOpen}
-                title={
-                  canLaunchAdHoc
-                    ? 'Lançar produto ou serviço avulso sem estoque (Alt+A)'
-                    : 'Venda Avulsa não permitida neste caixa ou usuário sem permissão'
-                }
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                + Venda Avulsa
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary pdv__pay-btn"
-                onClick={finish}
-                disabled={!pricedLines.length}
-              >
-                Fechar {money(total)}
-              </button>
+                >
+                  <strong>+ Venda Avulsa</strong>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary pdv__pay-btn"
+                  onClick={finish}
+                  disabled={!pricedLines.length}
+                >
+                  Fechar {money(total)}
+                </button>
+              </div>
             </form>
             {pendingQty != null ? (
               <p className="pdv__ok">

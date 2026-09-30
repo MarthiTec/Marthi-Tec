@@ -550,6 +550,73 @@
   gap: 8px;
 }
 
+.pdv--caixa .pdv__code {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.pdv--caixa .pdv__code-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.pdv--caixa .pdv__code-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.pdv--caixa .pdv__adhoc-desc {
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  margin: 0;
+  color: #2dd4bf;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.15s ease;
+  line-height: 1.2;
+}
+
+.pdv--caixa .pdv__adhoc-desc strong {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pdv--caixa .pdv__adhoc-desc:hover:not(:disabled) {
+  opacity: 0.82;
+  text-decoration: underline;
+}
+
+.pdv--caixa .pdv__adhoc-desc:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pdv--caixa .pdv__pay-btn {
+  min-width: 170px;
+  min-height: 48px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.caixa-app:not(.is-theme-dark) .pdv--caixa .pdv__adhoc-desc {
+  color: #0f766e;
+}
+
 .pdv__code-field {
   position: relative;
 }
@@ -1203,9 +1270,20 @@
   }
 
   .pdv--caixa .pdv__code {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
+  }
+
+  .pdv--caixa .pdv__code-side {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .pdv--caixa .pdv__adhoc-desc {
+    text-align: right;
+    justify-content: flex-end;
   }
 
   .pdv--caixa .pdv__code .btn,
