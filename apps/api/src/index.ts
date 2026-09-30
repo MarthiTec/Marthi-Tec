@@ -161,8 +161,11 @@ async function bootstrapDatabase() {
         'cnpj', '61.506.270/0001-63', 'ISENTO', '12345', 'matriz@cellponto.com.br', '(24) 98124-4253',
         '25800-000', 'Rua Prefeito Walter Franklin', '120', 'Loja 01', 'Centro', 'Três Rios', 'RJ',
         'simples_nacional', true, true, 'TK-001-000163-CPTR-88A1'
-      ) ON CONFLICT (client_account_id, document) DO UPDATE SET
+      ) ON CONFLICT (id) DO UPDATE SET
+        client_account_id = 'ACC-MARTHI-DEMO',
         trade_name = 'Cell Ponto Matriz',
+        legal_name = 'Cell Ponto Telecomunicações LTDA',
+        document = '61.506.270/0001-63',
         email = 'matriz@cellponto.com.br',
         access_token = 'TK-001-000163-CPTR-88A1',
         active = true,

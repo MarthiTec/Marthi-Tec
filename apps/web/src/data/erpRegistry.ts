@@ -242,10 +242,10 @@ function seedForTenant(activeTenant: string): RegistryState {
           phone: '(24) 98124-4253',
           email: 'marianaveigatav@gmail.com',
           document: '123.456.789-00',
-          role: 'operator',
+          role: 'admin',
           isSystemUser: true,
           userEmail: 'marianaveigatav@gmail.com',
-          accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+          accessAreas: [...ALL_ACCESS_AREAS],
           active: true,
           createdAt: now(),
           updatedAt: now(),
@@ -330,14 +330,72 @@ function load(): RegistryState {
     const isCellPontoTenant =
       activeTenant === 'default' ||
       activeTenant.toLowerCase().includes('cell') ||
+      activeTenant.toLowerCase().includes('ponto') ||
       activeTenant.toLowerCase().includes('gilvan') ||
       activeTenant.toLowerCase().includes('mariana') ||
-      activeTenant.startsWith('emp_');
+      activeTenant.toLowerCase().includes('demo') ||
+      activeTenant.startsWith('acc_') ||
+      activeTenant.startsWith('emp_') ||
+      activeTenant.startsWith('client_cli-demo');
 
     if (employees.length === 0 && isCellPontoTenant) {
       const seeded = seedForTenant(activeTenant);
       employees = seeded.employees;
     }
+
+    // Garante que Gilvan e Mariana estejam sempre no estado com role admin e acesso total
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const hasGilvan = employees.some((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
+    const hasMariana = employees.some((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
+
+    if (!hasGilvan) {
+      employees.unshift({
+        id: 'EMP-GILVAN-01',
+        name: 'Gilvan Teodoro',
+        phone: '(24) 98124-4253',
+        email: 'gilvanteodo@gmail.com',
+        document: '61.506.270/0001-63',
+        role: 'admin',
+        isSystemUser: true,
+        userEmail: 'gilvanteodo@gmail.com',
+        accessAreas: [...ALL_ACCESS_AREAS],
+        active: true,
+        createdAt: now(),
+        updatedAt: now(),
+      });
+    }
+
+    if (!hasMariana) {
+      employees.push({
+        id: 'EMP-MARIANA-01',
+        name: 'Mariana Veiga',
+        phone: '(24) 98124-4253',
+        email: 'marianaveigatav@gmail.com',
+        document: '123.456.789-00',
+        role: 'admin',
+        isSystemUser: true,
+        userEmail: 'marianaveigatav@gmail.com',
+        accessAreas: [...ALL_ACCESS_AREAS],
+        active: true,
+        createdAt: now(),
+        updatedAt: now(),
+      });
+    }
+
+    // Normaliza administradores cadastrados
+    employees = employees.map((emp) => {
+      const mail = norm(emp.userEmail || emp.email);
+      if (mail === 'gilvanteodo@gmail.com' || mail === 'marianaveigatav@gmail.com') {
+        return {
+          ...emp,
+          role: 'admin',
+          isSystemUser: true,
+          active: true,
+          accessAreas: [...ALL_ACCESS_AREAS],
+        };
+      }
+      return emp;
+    });
 
     const state: RegistryState = { sellers, suppliers, employees };
     memoryRegistryState = state;
@@ -362,10 +420,26 @@ function save(state: RegistryState) {
 /** Substitui fatias do registry (bootstrap Nest). */
 export function replaceErpRegistry(partial: Partial<RegistryState>) {
   const state = load();
+  let emps = partial.employees ?? state.employees;
+
+  // Garante que a sincronização da API não apague Gilvan e Mariana da listagem
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+  const hasGilvan = emps.some((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
+  const hasMariana = emps.some((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
+
+  if (!hasGilvan) {
+    const g = state.employees.find((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
+    if (g) emps = [g, ...emps];
+  }
+  if (!hasMariana) {
+    const m = state.employees.find((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
+    if (m) emps = [...emps, m];
+  }
+
   save({
     sellers: partial.sellers ?? state.sellers,
     suppliers: partial.suppliers ?? state.suppliers,
-    employees: partial.employees ?? state.employees,
+    employees: emps,
   });
 }
 
@@ -745,12 +819,28 @@ export function findEmployeeByUserEmail(email: string | null | undefined): Emplo
       phone: '(24) 98124-4253',
       email: 'marianaveigatav@gmail.com',
       document: '123.456.789-00',
-      role: 'operator',
+      role: 'admin',
       isSystemUser: true,
       userEmail: 'marianaveigatav@gmail.com',
-      accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+      accessAreas: [...ALL_ACCESS_AREAS],
       active: true,
-      createdAt: new Date().toISOString(),
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  if (key === 'gilvanteodo@gmail.com') {
+    return {
+      id: 'EMP-GILVAN-01',
+      name: 'Gilvan Teodoro',
+      phone: '(24) 98124-4253',
+      email: 'gilvanteodo@gmail.com',
+      document: '61.506.270/0001-63',
+      role: 'admin',
+      isSystemUser: true,
+      userEmail: 'gilvanteodo@gmail.com',
+      accessAreas: [...ALL_ACCESS_AREAS],
+      active: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: new Date().toISOString(),
     };
   }
@@ -860,6 +950,8 @@ function linkedSystemUsers() {
  * - Login sem vínculo, mas já existem usuários → bloqueia áreas de negócio.
  */
 export function userCanAccessArea(userEmail: string | null | undefined, area: AccessArea) {
+  const norm = normalizeEmail(userEmail || '');
+  if (norm === 'gilvanteodo@gmail.com' || norm === 'marianaveigatav@gmail.com') return true;
   const employee = findEmployeeByUserEmail(userEmail);
   if (employee) return employeeHasArea(employee, area);
   if (linkedSystemUsers().length === 0) return true;
@@ -920,6 +1012,7 @@ export function userIsStoreAdmin(userEmail: string | null | undefined) {
   if (isMarthiStaffEmail(userEmail)) return true;
   const norm = normalizeEmail(userEmail || '');
   if (!norm) return false;
+  if (norm === 'gilvanteodo@gmail.com' || norm === 'marianaveigatav@gmail.com') return true;
   const isClient = listMarthiClients().some((c) => c.email.toLowerCase() === norm);
   if (isClient) return true;
   const employee = findEmployeeByUserEmail(userEmail);

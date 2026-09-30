@@ -157,6 +157,17 @@ button.user-chip {
   white-space: nowrap;
 }
 
+.user-chip__company {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.65rem;
+  color: #2dd4bf;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Mesma largura dos botões da lateral */
 .user-chip--sidebar {
   display: flex;

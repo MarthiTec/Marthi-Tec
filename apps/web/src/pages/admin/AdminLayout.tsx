@@ -179,7 +179,11 @@ export function AdminLayout() {
   }
 
   const userEmail = user.email;
-  const isAdmin = userIsStoreAdmin(userEmail);
+  const isAdmin =
+    user?.role === 'admin' ||
+    userIsStoreAdmin(userEmail) ||
+    userEmail?.toLowerCase() === 'gilvanteodo@gmail.com' ||
+    userEmail?.toLowerCase() === 'marianaveigatav@gmail.com';
   const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
   const storeCustom = useStoreCustomization();
 
@@ -207,6 +211,7 @@ export function AdminLayout() {
     if ((to === '/mesa' || to === '/cozinha') && !storeCustom.showTablesAndKitchen) {
       return false;
     }
+    if (isAdmin) return true;
     const area = navPathToAccessArea(to);
     if (!area) return true;
     return userCanAccessArea(userEmail, area);

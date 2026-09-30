@@ -14,6 +14,7 @@ import {
 } from '../data/operatorProfile';
 import { PresenceStatusControl } from './PresenceStatusControl';
 import { PanelThemeToggle } from './PanelThemeToggle';
+import { getClientAccount, getActiveStore } from '../data/multiStoreStore';
 import './operatorProfilePanel.css';
 
 type OperatorProfilePanelProps = {
@@ -33,6 +34,8 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
   const fallback = user?.name ?? (isAdmin ? 'Administrador' : 'Operador');
   const fallbackEmail = user?.email ?? '';
   const current = getOperatorProfile(fallback, fallbackEmail, fallbackRole);
+  const account = getClientAccount();
+  const store = getActiveStore();
 
   const [displayName, setDisplayName] = useState(current.displayName);
   const [role, setRole] = useState(current.role);
@@ -276,6 +279,36 @@ export function OperatorProfilePanel({ workspaceLabel = 'Marthi' }: OperatorProf
                 }}
                 placeholder="Rua, número, bairro, cidade — UF"
               />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset className="op-profile__fieldset">
+          <legend>🏢 Informações da Empresa &amp; Loja Vinculada</legend>
+          <div className="op-profile__grid">
+            <label>
+              Empresa (Razão Social)
+              <input value={account.legalName || 'Cell Ponto Telecomunicações LTDA'} readOnly className="is-readonly" />
+            </label>
+            <label>
+              Nome Fantasia
+              <input value={account.tradeName || 'Cell Ponto'} readOnly className="is-readonly" />
+            </label>
+            <label>
+              CNPJ da Empresa
+              <input value={account.document || store?.cnpj || '61.506.270/0001-63'} readOnly className="is-readonly" />
+            </label>
+            <label>
+              Unidade / Loja Atual
+              <input value={`${store?.name || 'Cell Ponto Matriz'} (${store?.isMatrix ? 'Matriz' : 'Filial'})`} readOnly className="is-readonly" />
+            </label>
+            <label className="op-profile__span-2">
+              Endereço Operacional
+              <input value={`${store?.street || 'Rua Prefeito Walter Franklin'}, ${store?.number || '120'} - ${store?.neighborhood || 'Centro'}, ${store?.city || 'Três Rios'}/${store?.state || 'RJ'}`} readOnly className="is-readonly" />
+            </label>
+            <label className="op-profile__span-2">
+              Token de Acesso da Loja
+              <input value={store?.accessToken || 'TK-001-000163-CPTR-88A1'} readOnly className="is-readonly" />
             </label>
           </div>
         </fieldset>
