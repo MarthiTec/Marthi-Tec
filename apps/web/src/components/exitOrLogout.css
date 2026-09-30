@@ -92,6 +92,16 @@
   line-height: 1.35;
 }
 
+.exit-dialog__choice--panel {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.exit-dialog__choice--panel:hover {
+  border-color: #0f766e;
+  background: rgba(45, 212, 191, 0.16);
+}
+
 .exit-dialog__choice--logout {
   border-color: rgba(185, 28, 28, 0.25);
   background: #fff5f5;

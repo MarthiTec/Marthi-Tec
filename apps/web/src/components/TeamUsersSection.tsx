@@ -348,7 +348,7 @@ export function TeamUsersSection({ variant, id }: Props) {
                       : 'Funcionários'}
                 </h2>
               </div>
-              <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, padding: '8px 12px', minWidth: 260 }}>
+              <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, padding: '8px 12px', flex: '1 1 240px', minWidth: 0, maxWidth: '100%' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main, #fff)' }}>
                   {store?.name || 'Cell Ponto Matriz'}
                 </div>
@@ -389,10 +389,11 @@ export function TeamUsersSection({ variant, id }: Props) {
               status={status}
               onStatusChange={setStatus}
             />
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
                   <th>Cargo</th>
                   <th>Login</th>
                   <th>Senha</th>
@@ -488,9 +489,10 @@ export function TeamUsersSection({ variant, id }: Props) {
                 )}
               </tbody>
             </table>
-          </article>
-        </>
-      ) : null}
+          </div>
+        </article>
+      </>
+    ) : null}
 
       {formVisible ? (
         <article className="admin-card">

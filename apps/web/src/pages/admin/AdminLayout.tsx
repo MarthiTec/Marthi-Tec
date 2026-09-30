@@ -222,11 +222,17 @@ export function AdminLayout() {
   }
 
   function onBurgerClick() {
-    if (window.matchMedia('(max-width: 720px)').matches) {
+    if (window.matchMedia('(max-width: 960px)').matches) {
       setMenuOpen((open) => !open);
       return;
     }
     setSidebarCollapsed(!collapsed);
+  }
+
+  function closeMobileMenu() {
+    if (window.matchMedia('(max-width: 960px)').matches) {
+      setMenuOpen(false);
+    }
   }
 
   return (
@@ -243,7 +249,13 @@ export function AdminLayout() {
             className="admin__burger-btn admin__burger-btn--brand"
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
             title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-            onClick={onBurgerClick}
+            onClick={() => {
+              if (window.matchMedia('(max-width: 960px)').matches) {
+                setMenuOpen(false);
+              } else {
+                setSidebarCollapsed(!collapsed);
+              }
+            }}
           >
             <AdminIcon name={collapsed ? 'expand' : 'collapse'} />
           </button>
@@ -271,6 +283,7 @@ export function AdminLayout() {
                   to={group.to ?? '/painel'}
                   end={group.end}
                   title={group.label}
+                  onClick={closeMobileMenu}
                   className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
                 >
                   <AdminIcon name={group.icon} />
@@ -311,6 +324,7 @@ export function AdminLayout() {
                           key={child.to}
                           to={child.to}
                           end={child.end}
+                          onClick={closeMobileMenu}
                           className={() =>
                             `admin__sub-link ${child.openApp ? 'admin__sub-link--open-app' : ''} ${
                               childIsActive(child, location.pathname, location.search.slice(1))
@@ -339,6 +353,7 @@ export function AdminLayout() {
             <NavLink
               to="/painel/usuarios"
               title="Usuários & Acessos"
+              onClick={closeMobileMenu}
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
@@ -351,6 +366,7 @@ export function AdminLayout() {
             <NavLink
               to="/painel/operacoes"
               title="Operações"
+              onClick={closeMobileMenu}
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
@@ -363,6 +379,7 @@ export function AdminLayout() {
             <NavLink
               to="/painel/lojas"
               title="Lojas & Licenças"
+              onClick={closeMobileMenu}
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
@@ -375,6 +392,7 @@ export function AdminLayout() {
             <NavLink
               to="/painel/plano"
               title="Plano da loja"
+              onClick={closeMobileMenu}
               className={({ isActive }) =>
                 `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
               }
@@ -410,8 +428,10 @@ export function AdminLayout() {
               <i />
             </span>
           </button>
+          {location.pathname !== '/painel' && location.pathname !== '/painel/' ? (
+            <ScreenBackButton home="/painel" label="Painel" />
+          ) : null}
           <div className="admin__title">
-            <ScreenBackButton home="/painel" />
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
           </div>

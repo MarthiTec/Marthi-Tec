@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { BrandLogo } from '../../components/BrandLogo';
 import {
   formatPicked,
@@ -658,6 +659,8 @@ export function TotemPage() {
   const namedHello = collectNameUpFront ? customerFirstName(name) : '';
   const namedWelcome = namedHello ? customerWelcomeLine(name, greeting, storeName) : '';
 
+  const { user } = useAuth();
+
   function requestExit() {
     setExitPassword('');
     setExitError(null);
@@ -671,7 +674,7 @@ export function TotemPage() {
       return;
     }
     setExitOpen(false);
-    navigate('/');
+    navigate(user ? '/painel' : '/');
   }
 
   function appendSearch(char: string) {

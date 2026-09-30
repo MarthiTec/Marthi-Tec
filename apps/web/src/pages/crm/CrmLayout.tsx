@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -10,6 +10,7 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
 import { usePresenceSession } from '../../hooks/usePresence';
@@ -116,6 +117,12 @@ export function CrmLayout() {
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>
         </div>
+        {userIsStoreAdmin(user?.email) ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
         <button type="button" className="crm-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>
@@ -197,6 +204,7 @@ export function CrmLayout() {
         onClose={() => setExitOpen(false)}
         appName="CRM"
         exitActionLabel="Sair do CRM"
+        afterExitTo="/painel"
       />
 
       <CrmSellerAlerts />

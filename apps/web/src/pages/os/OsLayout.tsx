@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
@@ -9,6 +9,7 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -247,6 +248,13 @@ export function OsLayout() {
           />
         </div>
 
+        {userIsStoreAdmin(user?.email) ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
+
         <button type="button" className="os-app__exit" onClick={requestExit}>
           Sair
         </button>
@@ -363,6 +371,7 @@ export function OsLayout() {
         onClose={() => setExitOpen(false)}
         appName="oficina"
         exitActionLabel="Sair da oficina"
+        afterExitTo="/painel"
       />
     </div>
   );

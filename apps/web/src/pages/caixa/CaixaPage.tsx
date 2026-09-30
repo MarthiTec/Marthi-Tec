@@ -1722,6 +1722,12 @@ export function CaixaPage() {
         <div className="caixa-app__brand">
           <strong>PDV · Caixa</strong>
         </div>
+        {isAdmin ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
         <div className="caixa-app__top-actions">
           {totemQueue.length > 0 ? (
             <button

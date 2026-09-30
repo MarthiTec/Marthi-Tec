@@ -30,13 +30,15 @@ export function ExitOrLogoutDialog({
   onClose,
   appName,
   exitActionLabel,
-  afterExitTo = '/',
+  afterExitTo,
   requireStorePassword = true,
   logoutOnly = false,
   onModuleExit,
 }: ExitOrLogoutDialogProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const defaultDest = user ? '/painel' : '/';
+  const targetExitPath = afterExitTo ?? defaultDest;
   const [step, setStep] = useState<Step>('choose');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export function ExitOrLogoutDialog({
 
   function leaveModule() {
     onModuleExit?.();
-    navigate(afterExitTo);
+    navigate(targetExitPath);
     close();
   }
 
@@ -165,6 +167,20 @@ export function ExitOrLogoutDialog({
         <h2 id={titleId}>Sair</h2>
         <p>Escolha se quer apenas deixar o {appName} ou encerrar a sessão (Log-out).</p>
         <div className="exit-dialog__choices">
+          {appName !== 'Painel' && user ? (
+            <button
+              type="button"
+              className="exit-dialog__choice exit-dialog__choice--panel"
+              onClick={() => {
+                onModuleExit?.();
+                navigate('/painel');
+                close();
+              }}
+            >
+              <strong>Voltar ao Painel Administrativo</strong>
+              <span>Acessar a central de gestão, relatórios e cadastros da loja.</span>
+            </button>
+          ) : null}
           <button type="button" className="exit-dialog__choice" onClick={onPickExit}>
             <strong>{leaveLabel}</strong>
             <span>Fecha este app{requireStorePassword ? ' (pede senha da loja)' : ''}.</span>

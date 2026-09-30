@@ -5108,28 +5108,57 @@ select.caixa-mov-input {
 
   .admin.is-menu-open .admin__sidebar {
     transform: none;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.45);
   }
 
   .admin__burger-btn--top {
     display: grid;
+    z-index: 25;
+    flex-shrink: 0;
+  }
+
+  .admin.admin--dark .admin__burger-btn--top,
+  .is-theme-dark .admin__burger-btn--top {
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
   }
 
   .admin.is-menu-open .admin__backdrop {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 30;
+    z-index: 85;
     border: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-tap-highlight-color: transparent;
   }
 
   .admin__top {
-    padding: 0 14px !important;
-    gap: 10px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+
+  .admin__title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
   }
 
   .admin__title h1 {
-    font-size: 1.15rem !important;
+    font-size: 1.05rem !important;
+  }
+
+  .admin__title .admin__kicker {
+    font-size: 0.65rem !important;
+  }
+
+  #panel-page-actions .btn,
+  .admin__heading-actions .btn {
+    padding: 5px 10px !important;
+    font-size: 0.75rem !important;
+    min-height: 34px !important;
   }
 
   .admin__workspace {
@@ -5211,14 +5240,20 @@ select.caixa-mov-input {
   .admin-table-container,
   .admin-table-wrap,
   .table-wrap,
-  .table-container,
-  .admin-card > .admin-table,
-  .admin-card:has(.admin-table) {
+  .table-container {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     display: block !important;
+  }
+
+  .admin-table-container .admin-table,
+  .admin-table-wrap .admin-table,
+  .table-wrap .admin-table {
+    display: table !important;
+    width: 100% !important;
+    min-width: 580px !important;
   }
 }
 
