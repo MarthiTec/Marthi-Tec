@@ -20,6 +20,12 @@ import {
 import { isNestAuthed } from '../../services/nestClient';
 import { apiCreateStore, apiDeleteStore, apiUpdateStore } from '../../services/erpApi';
 import { applySegmentPreset, type StoreSegmentId } from '../../data/storeSegment';
+import {
+  executeStoreReplication,
+  getReplicationLogs,
+  REPLICATION_EVENT,
+  type ReplicationLog,
+} from '../../data/storeReplicationStore';
 import './multiStore.css';
 
 type Tab = 'stores' | 'licensing' | 'isolation';
@@ -52,12 +58,36 @@ export function MultiStoreManagementPage() {
   const [editingStore, setEditingStore] = useState<Partial<Store>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Estados de Replicação entre Filiais
+  const [repSourceId, setRepSourceId] = useState<string>(() => stores[0]?.id || '');
+  const [repTargetId, setRepTargetId] = useState<string>(() => (stores.length > 1 ? stores[1]?.id : ''));
+  const [repProducts, setRepProducts] = useState(true);
+  const [repResetStockQty, setRepResetStockQty] = useState(false);
+  const [repCustomers, setRepCustomers] = useState(true);
+  const [repSellers, setRepSellers] = useState(true);
+  const [repCampaigns, setRepCampaigns] = useState(true);
+  const [repExecuting, setRepExecuting] = useState(false);
+  const [repFeedback, setRepFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [repLogs, setRepLogs] = useState<ReplicationLog[]>(() => getReplicationLogs());
+  const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
+
   useEffect(() => {
     function refresh() {
-      setStores(listStores());
+      const freshStores = listStores();
+      setStores(freshStores);
       setClientAccount(getClientAccount());
       setActiveStore(getActiveStoreId());
       setLicensingSummary(calculateLicensingSummary());
+      setRepLogs(getReplicationLogs());
+
+      if (freshStores.length > 0) {
+        setRepSourceId((prev) => (prev && freshStores.some((s) => s.id === prev) ? prev : freshStores[0].id));
+        setRepTargetId((prev) => {
+          if (prev && freshStores.some((s) => s.id === prev) && prev !== freshStores[0].id) return prev;
+          const other = freshStores.find((s) => s.id !== freshStores[0].id);
+          return other ? other.id : '';
+        });
+      }
     }
 
     hydrateMultiStoreFromApi().then(() => {
@@ -66,11 +96,64 @@ export function MultiStoreManagementPage() {
 
     window.addEventListener(MULTI_STORE_CHANGED_EVENT, refresh);
     window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, refresh);
+    window.addEventListener(REPLICATION_EVENT, refresh);
     return () => {
       window.removeEventListener(MULTI_STORE_CHANGED_EVENT, refresh);
       window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, refresh);
+      window.removeEventListener(REPLICATION_EVENT, refresh);
     };
   }, []);
+
+  async function handleExecuteReplication() {
+    if (!repSourceId || !repTargetId) {
+      setRepFeedback({ type: 'error', message: 'Selecione a Loja de Origem e a Loja de Destino.' });
+      return;
+    }
+    if (repSourceId === repTargetId) {
+      setRepFeedback({ type: 'error', message: 'A Loja de Origem e a Loja de Destino devem ser diferentes.' });
+      return;
+    }
+    if (!repProducts && !repCustomers && !repSellers && !repCampaigns) {
+      setRepFeedback({
+        type: 'error',
+        message: 'Selecione ao menos um módulo para replicar (Produtos, Clientes, Vendedores ou Campanhas).',
+      });
+      return;
+    }
+
+    setRepExecuting(true);
+    setRepFeedback(null);
+    try {
+      const res = await executeStoreReplication({
+        sourceStoreId: repSourceId,
+        targetStoreId: repTargetId,
+        modules: {
+          products: repProducts,
+          resetStockQty: repResetStockQty,
+          customers: repCustomers,
+          sellers: repSellers,
+          campaigns: repCampaigns,
+        },
+        operatorName: clientAccount.tradeName || clientAccount.legalName || 'Administrador',
+      });
+      setRepFeedback({ type: 'success', message: res.message });
+      setRepLogs(getReplicationLogs());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha na replicação de dados entre filiais.';
+      setRepFeedback({ type: 'error', message: msg });
+    } finally {
+      setRepExecuting(false);
+    }
+  }
+
+  function handleCopyToken(token?: string, storeId?: string) {
+    if (!token) return;
+    void navigator.clipboard.writeText(token);
+    if (storeId) {
+      setCopiedTokenId(storeId);
+      setTimeout(() => setCopiedTokenId(null), 3000);
+    }
+  }
 
   function handleOpenCreate() {
     setEditingStore({
@@ -87,7 +170,7 @@ export function MultiStoreManagementPage() {
       complement: '',
       neighborhood: '',
       city: '',
-      state: 'SP',
+      state: 'RJ',
       ibgeCityCode: '',
       taxRegime: 'simples_nacional',
       segmentId: 'assistencia_tecnica',
@@ -108,6 +191,7 @@ export function MultiStoreManagementPage() {
     setEditingStore({
       ...store,
       id: undefined,
+      accessToken: undefined,
       code: '',
       name: `${store.name} (Cópia)`,
       tradeName: `${store.tradeName} (Cópia)`,
@@ -234,8 +318,8 @@ export function MultiStoreManagementPage() {
           className={`multi-store-tab ${activeTab === 'isolation' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('isolation')}
         >
-          <AdminIcon name="box" />
-          Matriz de Isolamento de Dados
+          <AdminIcon name="restore" />
+          Isolamento & Replicação entre Filiais
         </button>
       </nav>
 
@@ -258,8 +342,9 @@ export function MultiStoreManagementPage() {
                   <th>Cód</th>
                   <th>Loja / Razão Social</th>
                   <th>CNPJ</th>
+                  <th>Token de Acesso</th>
                   <th>Ramo / Segmento</th>
-                  <th>Inscrição Est.</th>
+                  <th>Inscrições (IE / IM)</th>
                   <th>Cidade / UF</th>
                   <th>Regime Tributário</th>
                   <th>Status</th>
@@ -286,11 +371,43 @@ export function MultiStoreManagementPage() {
                         <code className="multi-store-cnpj">{s.cnpj}</code>
                       </td>
                       <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <code
+                            style={{
+                              fontSize: '0.74rem',
+                              color: '#4ade80',
+                              background: 'rgba(74, 222, 128, 0.12)',
+                              padding: '3px 6px',
+                              borderRadius: 4,
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {s.accessToken ? `${s.accessToken.slice(0, 11)}…` : '—'}
+                          </code>
+                          {s.accessToken && (
+                            <button
+                              type="button"
+                              className="multi-store-btn-switch"
+                              style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                              onClick={() => handleCopyToken(s.accessToken, s.id)}
+                              title="Copiar Token de Acesso da Empresa / Filial"
+                            >
+                              {copiedTokenId === s.id ? '✓ Copiado' : 'Copiar'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td>
                         <span className="multi-store-regime" style={{ fontWeight: 650 }}>
                           {STORE_SEGMENT_OPTIONS.find((o) => o.value === (s.segmentId || 'assistencia_tecnica'))?.label || '🔧 Oficina'}
                         </span>
                       </td>
-                      <td>{s.stateRegistration || '—'}</td>
+                      <td>
+                        <div style={{ fontSize: '0.8rem', lineHeight: 1.35 }}>
+                          <div><strong>IE:</strong> {s.stateRegistration || 'ISENTO'}</div>
+                          <div style={{ color: 'var(--admin-muted, #94a3b8)' }}><strong>IM:</strong> {s.municipalRegistration || '—'}</div>
+                        </div>
+                      </td>
                       <td>
                         {s.city} / {s.state}
                       </td>
@@ -467,15 +584,251 @@ export function MultiStoreManagementPage() {
         </section>
       )}
 
-      {/* TAB 3: ISOLAMENTO DE DADOS */}
+      {/* TAB 3: ISOLAMENTO & REPLICAÇÃO DE DADOS */}
       {activeTab === 'isolation' && (
-        <section className="multi-store-section">
+        <section className="multi-store-section" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Card Principal: Central de Replicação de Cadastros */}
           <div className="multi-store-card">
             <div className="multi-store-card__header">
-              <h3>Garantia de Isolamento de Dados por Loja (Multi-Tenant Seguro)</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '1.5rem' }}>🔄</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--admin-text)' }}>
+                    Central de Replicação & Sincronização entre Filiais
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--admin-muted)' }}>
+                    Replique cadastros de <strong>Produtos</strong>, <strong>Clientes</strong>, <strong>Vendedores</strong> e{' '}
+                    <strong>Campanhas</strong> da matriz para as filiais (ou entre filiais do mesmo grupo).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {repFeedback && (
+              <div
+                style={{
+                  margin: '16px 20px 0',
+                  padding: '12px 16px',
+                  borderRadius: 8,
+                  fontSize: '0.88rem',
+                  fontWeight: 500,
+                  background: repFeedback.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  color: repFeedback.type === 'success' ? '#16a34a' : '#ef4444',
+                  border: `1px solid ${repFeedback.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                }}
+              >
+                {repFeedback.type === 'success' ? '✓ ' : '⚠️ '} {repFeedback.message}
+              </div>
+            )}
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Seleção de Lojas */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                <div>
+                  <AdminPicker
+                    label="1. Loja de Origem (Copiar de onde?)"
+                    value={repSourceId}
+                    options={stores.map((s) => ({
+                      value: s.id,
+                      label: `${s.isMatrix ? '🏢 [Matriz] ' : '🏬 '}${s.tradeName || s.name} (${s.cnpj})`,
+                    }))}
+                    onChange={(val) => setRepSourceId(val)}
+                  />
+                  <small style={{ color: 'var(--admin-muted)', fontSize: '0.76rem', display: 'block', marginTop: 4 }}>
+                    A loja com os cadastros que servirão de base.
+                  </small>
+                </div>
+
+                <div>
+                  <AdminPicker
+                    label="2. Loja de Destino (Para qual filial enviar?)"
+                    value={repTargetId}
+                    options={stores
+                      .filter((s) => s.id !== repSourceId)
+                      .map((s) => ({
+                        value: s.id,
+                        label: `${s.isMatrix ? '🏢 [Matriz] ' : '🏬 '}${s.tradeName || s.name} (${s.cnpj})`,
+                      }))}
+                    onChange={(val) => setRepTargetId(val)}
+                  />
+                  <small style={{ color: 'var(--admin-muted)', fontSize: '0.76rem', display: 'block', marginTop: 4 }}>
+                    A filial receptora que receberá as informações sincronizadas.
+                  </small>
+                </div>
+              </div>
+
+              {/* Módulos Permitidos para Replicação */}
+              <div
+                style={{
+                  background: 'var(--admin-surface-subtle, rgba(241, 245, 249, 0.5))',
+                  border: '1px solid var(--admin-border, #e2e8f0)',
+                  borderRadius: 10,
+                  padding: '16px',
+                }}
+              >
+                <h4 style={{ margin: '0 0 12px', fontSize: '0.92rem', color: 'var(--admin-text)' }}>
+                  3. Selecione os cadastros a serem replicados:
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={repProducts}
+                      onChange={(e) => setRepProducts(e.target.checked)}
+                      style={{ marginTop: 3, width: 16, height: 16 }}
+                    />
+                    <div>
+                      <strong style={{ fontSize: '0.88rem', display: 'block' }}>📦 Produtos & Catálogo de Estoque</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--admin-muted)' }}>
+                        SKUs, códigos de barras, preços de venda, custos e fotos de produtos.
+                      </span>
+                      {repProducts && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={repResetStockQty}
+                            onChange={(e) => setRepResetStockQty(e.target.checked)}
+                            style={{ width: 14, height: 14 }}
+                          />
+                          <span style={{ fontSize: '0.74rem', color: '#2563eb' }}>
+                            Zerar quantidade na filial (para contagem de balanço inicial)
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={repCustomers}
+                      onChange={(e) => setRepCustomers(e.target.checked)}
+                      style={{ marginTop: 3, width: 16, height: 16 }}
+                    />
+                    <div>
+                      <strong style={{ fontSize: '0.88rem', display: 'block' }}>👥 Clientes & Contatos</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--admin-muted)' }}>
+                        Base de clientes, telefones, e-mails, endereços e histórico de contato.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={repSellers}
+                      onChange={(e) => setRepSellers(e.target.checked)}
+                      style={{ marginTop: 3, width: 16, height: 16 }}
+                    />
+                    <div>
+                      <strong style={{ fontSize: '0.88rem', display: 'block' }}>💼 Vendedores & Comissões</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--admin-muted)' }}>
+                        Equipe comercial e taxas de comissão para fechamento de vendas.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={repCampaigns}
+                      onChange={(e) => setRepCampaigns(e.target.checked)}
+                      style={{ marginTop: 3, width: 16, height: 16 }}
+                    />
+                    <div>
+                      <strong style={{ fontSize: '0.88rem', display: 'block' }}>🏷️ Campanhas & Tabelas de Preço</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--admin-muted)' }}>
+                        Promoções vigentes, regras de atacado e condições de pagamento.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* SEGURANÇA E ISOLAMENTO ESTREITO (NUNCA REPLICÁVEIS) */}
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.06)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+              >
+                <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+                <div>
+                  <strong style={{ color: '#dc2626', fontSize: '0.88rem', display: 'block', marginBottom: 2 }}>
+                    Segregação Rígida de Caixa e OS (100% Individuais e Intransferíveis)
+                  </strong>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--admin-muted)', lineHeight: 1.45 }}>
+                    Por conformidade fiscal e auditoria comercial, o <strong>Sistema de Caixa / PDV</strong> (sessões de caixa, saldo, sangrias e suprimentos) e o <strong>Sistema de Ordens de Serviço (OS)</strong> (aparelhos na bancada, diagnósticos técnicos, senhas de clientes e termos de garantia) são <strong>estritamente individuais por filial</strong> e nunca são misturados ou replicados.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botão de Ação */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="multi-store-btn-primary"
+                  onClick={handleExecuteReplication}
+                  disabled={repExecuting || !repSourceId || !repTargetId || repSourceId === repTargetId}
+                  style={{ minWidth: 260, padding: '12px 22px', fontSize: '0.95rem' }}
+                >
+                  {repExecuting ? 'Processando Replicação…' : '🚀 Executar Replicação entre Filiais'}
+                </button>
+              </div>
+            </div>
+
+            {/* Histórico de Replicações Recentes */}
+            {repLogs.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--admin-border, #e2e8f0)', padding: '18px 20px' }}>
+                <h4 style={{ margin: '0 0 10px', fontSize: '0.9rem', color: 'var(--admin-text)' }}>
+                  Auditoria de Replicações Realizadas:
+                </h4>
+                <div className="multi-store-table-container">
+                  <table className="multi-store-table" style={{ fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Data / Hora</th>
+                        <th>Loja Origem</th>
+                        <th>Loja Destino</th>
+                        <th>Produtos</th>
+                        <th>Clientes</th>
+                        <th>Vendedores</th>
+                        <th>Campanhas</th>
+                        <th>Operador</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repLogs.slice(0, 5).map((log) => (
+                        <tr key={log.id}>
+                          <td>{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
+                          <td><strong>{log.sourceStoreName}</strong></td>
+                          <td><strong>{log.targetStoreName}</strong></td>
+                          <td>{log.productsCount > 0 ? `+${log.productsCount}` : '—'}</td>
+                          <td>{log.customersCount > 0 ? `+${log.customersCount}` : '—'}</td>
+                          <td>{log.sellersCount > 0 ? `+${log.sellersCount}` : '—'}</td>
+                          <td>{log.campaignsCount > 0 ? `+${log.campaignsCount}` : '—'}</td>
+                          <td>{log.operatorName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Matriz de Garantia de Isolamento de Dados */}
+          <div className="multi-store-card">
+            <div className="multi-store-card__header">
+              <h3>Matriz de Isolamento e Conformidade por CNPJ</h3>
               <p>
                 Cada módulo do sistema Marthi opera estritamente sob o escopo da <code>store_id</code> selecionada.
-                Dados nunca vazam entre filiais.
               </p>
             </div>
 
@@ -491,7 +844,7 @@ export function MultiStoreManagementPage() {
 
               <div className="multi-store-isolation-item">
                 <span className="multi-store-isolation-icon">💳</span>
-                <strong>Caixa & PDV</strong>
+                <strong>Caixa & PDV (Estritamente Individual)</strong>
                 <p>
                   Terminais de venda, abertura e fechamento de sessões, sangrias, suprimentos e vendas (inclusive Venda
                   Avulsa) pertencem exclusivamente ao caixa e CNPJ da loja atual.
@@ -500,7 +853,7 @@ export function MultiStoreManagementPage() {
 
               <div className="multi-store-isolation-item">
                 <span className="multi-store-isolation-icon">🛠️</span>
-                <strong>Ordens de Serviço (OS)</strong>
+                <strong>Ordens de Serviço / OS (Estritamente Individual)</strong>
                 <p>
                   Equipamentos recebidos, diagnósticos, senhas (desenho/texto), garantias de peças/mão de obra e
                   assinaturas digitais são vinculadas à oficina e equipe técnica da loja emissora.
@@ -610,6 +963,52 @@ export function MultiStoreManagementPage() {
                     onChange={(e) => setEditingStore({ ...editingStore, stateRegistration: e.target.value })}
                     placeholder="Isento ou numeração"
                   />
+                </label>
+
+                <label className="multi-store-form-field">
+                  <span>Inscrição Municipal (IM)</span>
+                  <input
+                    type="text"
+                    value={editingStore.municipalRegistration || ''}
+                    onChange={(e) => setEditingStore({ ...editingStore, municipalRegistration: e.target.value })}
+                    placeholder="Número do alvará / IM"
+                  />
+                </label>
+              </div>
+
+              <div className="multi-store-form-row">
+                <label className="multi-store-form-field span-2">
+                  <span>Token de Acesso da Loja / Filial (CNPJ & E-mail)</span>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingStore.accessToken || '(Gerado automaticamente ao salvar)'}
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        color: '#4ade80',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        letterSpacing: '0.5px',
+                      }}
+                    />
+                    {editingStore.accessToken && (
+                      <button
+                        type="button"
+                        className="multi-store-btn-switch"
+                        style={{ whiteSpace: 'nowrap', padding: '8px 14px' }}
+                        onClick={() => {
+                          void navigator.clipboard.writeText(editingStore.accessToken || '');
+                          alert('✓ Token de acesso copiado com sucesso!');
+                        }}
+                      >
+                        Copiar Token
+                      </button>
+                    )}
+                  </div>
+                  <small style={{ color: 'var(--admin-muted, #94a3b8)', marginTop: 4, display: 'block', fontSize: '0.75rem' }}>
+                    Token seguro exclusivo por CNPJ/E-mail que isola os módulos (Totem, Retaguarda, OS, PDV, Fiscal e E-commerce).
+                  </small>
                 </label>
               </div>
 

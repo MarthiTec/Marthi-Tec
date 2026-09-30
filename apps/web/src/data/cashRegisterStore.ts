@@ -19,9 +19,26 @@ import {
   type ApiStoreCredit,
 } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
+import {
+  getActiveStoreId,
+  getActiveStore,
+  STORE_CONTEXT_CHANGED_EVENT,
+} from './multiStoreStore';
 
 const STORAGE_KEY = 'marthi.cash.register.v2';
 const LEGACY_KEY = 'marthi.cash.register.v1';
+
+export function getCashStorageKey(): string {
+  try {
+    const storeId = getActiveStoreId();
+    if (storeId) {
+      return `marthi.cash.register.v2:${storeId}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return STORAGE_KEY;
+}
 
 function roundMoney(value: number) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -181,8 +198,23 @@ function nowIso(override?: string) {
 }
 
 function load(): State {
+  const currentKey = getCashStorageKey();
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+    let raw = localStorage.getItem(currentKey);
+    if (!raw && currentKey !== STORAGE_KEY) {
+      const globalRaw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+      if (globalRaw) {
+        const store = getActiveStore();
+        if (store?.isMatrix) {
+          raw = globalRaw;
+          try {
+            localStorage.setItem(currentKey, globalRaw);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
     if (!raw) return { sessions: [], credits: [], exchanges: [] };
     const parsed = JSON.parse(raw) as Partial<State> & { sessions?: CashSession[] };
     return {
@@ -202,8 +234,23 @@ function load(): State {
 }
 
 function save(state: State) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const currentKey = getCashStorageKey();
+  try {
+    localStorage.setItem(currentKey, JSON.stringify(state));
+    const store = getActiveStore();
+    if (!store || store.isMatrix) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  } catch {
+    /* ignore */
+  }
   window.dispatchEvent(new Event('marthi-cash-updated'));
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, () => {
+    window.dispatchEvent(new Event('marthi-cash-updated'));
+  });
 }
 
 function nestError(error: unknown, fallback: string): string {

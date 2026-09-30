@@ -143,6 +143,15 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
   },
 ];
 
+export const STORE_SEGMENT_OPTIONS: { value: StoreSegmentId; label: string }[] = [
+  { value: 'assistencia_tecnica', label: '🔧 Oficina, Assistência Técnica & Eletrônicos' },
+  { value: 'vestuario_moda', label: '👗 Moda, Vestuário & Calçados' },
+  { value: 'restaurante_gastronomia', label: '🍔 Restaurante, Bar & Gastronomia' },
+  { value: 'varejo_geral', label: '🛒 Varejo Geral, Mercado & Utilidades' },
+  { value: 'prestador_servicos', label: '📋 Prestador de Serviços Gerais' },
+  { value: 'personalizado', label: '⚙️ Personalizado (Ajuste Fino)' },
+];
+
 const STORAGE_KEY = 'marthi.store.segment_config';
 export const SEGMENT_UPDATED_EVENT = 'marthi-segment-updated';
 

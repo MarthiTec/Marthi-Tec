@@ -14,9 +14,25 @@ import {
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
 import { listEmployees, EMPLOYEE_ROLE_LABEL } from './erpRegistry';
+import {
+  getActiveStoreId,
+  getActiveStore,
+  STORE_CONTEXT_CHANGED_EVENT,
+} from './multiStoreStore';
 
-const STORAGE_KEY = 'marthi.os.v2';
 export const OS_STATE_EVENT = 'marthi-os-state';
+
+export function getOsStorageKey(): string {
+  try {
+    const storeId = getActiveStoreId();
+    if (storeId) {
+      return `marthi.os.v2:${storeId}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'marthi.os.v2';
+}
 
 export type WorkOrderStatus =
   | 'backlog'
@@ -622,42 +638,89 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
 
 
 
+let memoryOrdersKey: string | null = null;
+
 function load(): WorkOrder[] {
-  if (memoryOrders) {
+  const currentKey = getOsStorageKey();
+  if (memoryOrders && memoryOrdersKey === currentKey) {
     return memoryOrders
       .filter((item) => !item.id?.startsWith('OS-710') && item.operationId !== 'op-2026-09')
       .map((item) => normalizeWorkOrder(item));
   }
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    let raw = localStorage.getItem(currentKey);
+    // Retrocompatibilidade: se a chave escopada da loja estiver vazia, mas existir a global marthi.os.v2
+    if (!raw && currentKey !== 'marthi.os.v2') {
+      const globalRaw = localStorage.getItem('marthi.os.v2');
+      if (globalRaw) {
+        const store = getActiveStore();
+        if (store?.isMatrix) {
+          raw = globalRaw;
+          try {
+            localStorage.setItem(currentKey, globalRaw);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+
+    if (!raw) {
+      memoryOrders = [];
+      memoryOrdersKey = currentKey;
+      return [];
+    }
+
     const parsed = JSON.parse(raw) as Partial<WorkOrder>[];
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      memoryOrders = [];
+      memoryOrdersKey = currentKey;
+      return [];
+    }
+
     const cleaned = parsed
       .filter((item) => item.id && !item.id.startsWith('OS-710') && item.operationId !== 'op-2026-09')
       .map((item) =>
         normalizeWorkOrder(item as Partial<WorkOrder> & Pick<WorkOrder, 'id'>),
       );
+    memoryOrders = cleaned;
+    memoryOrdersKey = currentKey;
     if (cleaned.length !== parsed.length) {
       save(cleaned);
     }
     return cleaned;
   } catch {
+    memoryOrders = [];
+    memoryOrdersKey = currentKey;
     return [];
   }
 }
 
 function save(items: WorkOrder[]) {
+  const currentKey = getOsStorageKey();
   memoryOrders = items;
+  memoryOrdersKey = currentKey;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(currentKey, JSON.stringify(items));
+    const store = getActiveStore();
+    if (!store || store.isMatrix) {
+      localStorage.setItem('marthi.os.v2', JSON.stringify(items));
+    }
   } catch {
     /* ignore */
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(OS_STATE_EVENT));
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, () => {
+    memoryOrders = null;
+    memoryOrdersKey = null;
+    window.dispatchEvent(new Event(OS_STATE_EVENT));
+  });
 }
 
 export function replaceWorkOrders(items: WorkOrder[]) {

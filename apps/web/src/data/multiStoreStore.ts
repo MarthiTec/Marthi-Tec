@@ -39,6 +39,7 @@ export type Store = {
   cnpj: string;
   stateRegistration: string;
   municipalRegistration: string;
+  accessToken?: string;
   email: string;
   phone: string;
   zipCode: string;
@@ -104,6 +105,25 @@ export const MULTI_STORE_CHANGED_EVENT = 'marthi-multi-store-changed';
 export const STORE_CONTEXT_CHANGED_EVENT = 'marthi-store-context-changed';
 
 /**
+ * Gera um Token de Acesso exclusivo para a empresa/filial a partir do seu CNPJ, E-mail e Identificador.
+ * Vincula credenciais individuais e seguras em todos os módulos (Totem, Retaguarda, OS, PDV, Fiscal, E-commerce, Usuários).
+ */
+export function generateStoreAccessToken(cnpj: string, email: string, storeId?: string): string {
+  const cleanDoc = (cnpj || '').replace(/\D/g, '') || '00000000000000';
+  const docPart = cleanDoc.slice(-6);
+  const hashPart = Math.abs(
+    (cleanDoc + (email || '')).split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0),
+  )
+    .toString(36)
+    .toUpperCase()
+    .padStart(5, '0')
+    .slice(-5);
+  const prefix = (storeId || 'STR').replace(/[^a-zA-Z0-9]/g, '').slice(-3).toUpperCase();
+  const randPart = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `TK-${prefix || 'STR'}-${docPart}-${hashPart}-${randPart}`;
+}
+
+/**
  * Conta comercial padrão para a empresa habilitada Cell Ponto (Gilvan Teodoro)
  */
 export const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
@@ -130,6 +150,7 @@ export const DEFAULT_STORES: Store[] = [
     cnpj: '61.506.270/0001-63',
     stateRegistration: 'ISENTO',
     municipalRegistration: '12345',
+    accessToken: 'TK-001-000163-CPTR-88A1',
     email: 'matriz@cellponto.com.br',
     phone: '(24) 98124-4253',
     zipCode: '25800-000',
@@ -331,6 +352,7 @@ export function resolveDefaultStores(): Store[] {
           cnpj: realDoc,
           stateRegistration: 'ISENTO',
           municipalRegistration: '12345',
+          accessToken: `TK-001-${(realDoc.replace(/\D/g, '') || '000163').slice(-6)}-CPTR-88A1`,
           email: client.email || 'matriz@cellponto.com.br',
           phone: client.phone || '(24) 98124-4253',
           zipCode: '25800-000',
@@ -411,10 +433,26 @@ export function listStores(): Store[] {
       !s.email.includes('varejobrasil.com.br'),
   );
 
-  if (filtered.length === 0) {
-    return fallback;
+  const list = filtered.length === 0 ? fallback : filtered;
+
+  // Garante que toda loja tenha seu Token de Acesso exclusivo preenchido
+  let hasMissingToken = false;
+  const withTokens = list.map((s) => {
+    if (!s.accessToken) {
+      hasMissingToken = true;
+      return {
+        ...s,
+        accessToken: generateStoreAccessToken(s.cnpj, s.email, s.id),
+      };
+    }
+    return s;
+  });
+
+  if (hasMissingToken) {
+    writeJson(key, withTokens);
   }
-  return filtered;
+
+  return withTokens;
 }
 
 export function getStoreById(storeId: string): Store | null {
@@ -422,10 +460,35 @@ export function getStoreById(storeId: string): Store | null {
   return stores.find((s) => s.id === storeId) ?? null;
 }
 
+export function getStoreAccessToken(storeId: string): string {
+  const store = getStoreById(storeId);
+  if (store?.accessToken) return store.accessToken;
+  if (store) {
+    const token = generateStoreAccessToken(store.cnpj, store.email, store.id);
+    saveStore({ ...store, accessToken: token });
+    return token;
+  }
+  return '';
+}
+
+export function regenerateStoreAccessToken(storeId: string): string {
+  const store = getStoreById(storeId);
+  if (!store) return '';
+  const token = generateStoreAccessToken(store.cnpj, store.email, store.id);
+  saveStore({ ...store, accessToken: token });
+  return token;
+}
+
 export function saveStore(store: Partial<Store> & { name: string; cnpj: string }): Store {
   const stores = listStores();
   const now = new Date().toISOString();
   let saved: Store;
+
+  const existing = store.id ? stores.find((s) => s.id === store.id) : undefined;
+  const token =
+    store.accessToken ||
+    existing?.accessToken ||
+    generateStoreAccessToken(store.cnpj, store.email || '', store.id);
 
   if (store.id) {
     const idx = stores.findIndex((s) => s.id === store.id);
@@ -433,6 +496,7 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
       saved = {
         ...stores[idx],
         ...store,
+        accessToken: token,
         updatedAt: now,
       };
       stores[idx] = saved;
@@ -446,6 +510,7 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
         cnpj: store.cnpj.trim(),
         stateRegistration: store.stateRegistration || '',
         municipalRegistration: store.municipalRegistration || '',
+        accessToken: token,
         email: store.email || '',
         phone: store.phone || '',
         zipCode: store.zipCode || '',
@@ -475,6 +540,7 @@ export function saveStore(store: Partial<Store> & { name: string; cnpj: string }
       cnpj: store.cnpj.trim(),
       stateRegistration: store.stateRegistration || '',
       municipalRegistration: store.municipalRegistration || '',
+      accessToken: token,
       email: store.email || '',
       phone: store.phone || '',
       zipCode: store.zipCode || '',

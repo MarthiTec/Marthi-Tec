@@ -20,10 +20,15 @@ import { markStoreContracted } from '../data/demoLeadStore';
 import { saveStoreEntitlement } from '../data/storePlan';
 import {
   SEGMENT_PRESETS,
+  STORE_SEGMENT_OPTIONS,
   applySegmentPreset,
   type SegmentPreset,
   type StoreSegmentId,
 } from '../data/storeSegment';
+import {
+  generateStoreAccessToken,
+  saveStore,
+} from '../data/multiStoreStore';
 import './partner-signup.css';
 
 type Step = 1 | 2 | 3 | 4;
@@ -36,6 +41,7 @@ type FormState = {
   legalName: string;
   tradeName: string;
   stateRegistration: string;
+  municipalRegistration: string;
   email: string;
   phone: string;
   zipCode: string;
@@ -46,6 +52,7 @@ type FormState = {
   city: string;
   state: string;
   segment: string;
+  segmentId: StoreSegmentId;
   contactName: string;
   contactRole: string;
   notes: string;
@@ -109,6 +116,7 @@ function initialForm(planFromQuery: string | null): FormState {
     legalName: '',
     tradeName: '',
     stateRegistration: '',
+    municipalRegistration: '',
     email: '',
     phone: '',
     zipCode: '',
@@ -118,7 +126,8 @@ function initialForm(planFromQuery: string | null): FormState {
     district: '',
     city: '',
     state: 'RJ',
-    segment: '',
+    segment: 'Oficina & Celulares',
+    segmentId: 'assistencia_tecnica',
     contactName: '',
     contactRole: '',
     notes: '',
@@ -146,6 +155,8 @@ export function PartnerSignupPage() {
     message: string;
   } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<StoreSegmentId>('assistencia_tecnica');
+  const [companyAccessToken, setCompanyAccessToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
@@ -355,9 +366,14 @@ export function PartnerSignupPage() {
     setError(null);
 
     const ieInfo = form.stateRegistration.trim() ? `IE: ${form.stateRegistration.trim()}` : '';
-    const notesMerged = [form.notes.trim(), ieInfo].filter(Boolean).join(' · ');
+    const imInfo = form.municipalRegistration.trim() ? `IM: ${form.municipalRegistration.trim()}` : '';
+    const notesMerged = [form.notes.trim(), ieInfo, imInfo].filter(Boolean).join(' · ');
 
     const txRef = `PAY-${Date.now().toString(36).toUpperCase()}`;
+
+    // Gera o Token de Acesso exclusivo para a empresa contratante
+    const generatedToken = generateStoreAccessToken(form.document, form.email);
+    setCompanyAccessToken(generatedToken);
 
     try {
       const result = await submitPartnerSignup({
@@ -384,6 +400,29 @@ export function PartnerSignupPage() {
         paymentMethod: payMethod,
         transactionRef: txRef,
       });
+
+      // Salva ou atualiza a loja matriz com seu Token de Acesso e Ramo configurados
+      saveStore({
+        code: '001',
+        name: form.legalName.trim(),
+        tradeName: form.tradeName.trim(),
+        cnpj: form.document.trim(),
+        stateRegistration: form.stateRegistration.trim(),
+        municipalRegistration: form.municipalRegistration.trim(),
+        accessToken: generatedToken,
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        zipCode: form.zipCode.trim(),
+        street: form.street.trim(),
+        number: form.number.trim(),
+        complement: form.complement.trim(),
+        neighborhood: form.district.trim(),
+        city: form.city.trim(),
+        state: form.state,
+        isMatrix: true,
+        segmentId: selectedSegment,
+      });
+
       await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
       applySegmentPreset(selectedSegment);
       markStoreContracted();
@@ -429,6 +468,58 @@ export function PartnerSignupPage() {
             Parabéns! O investimento para o plano <strong>{selectedPlan.name}</strong> foi aprovado.
             A conta da empresa <strong>{form.tradeName}</strong> já foi criada no sistema.
           </p>
+
+          {/* Card do Token de Acesso da Empresa */}
+          {companyAccessToken && (
+            <div
+              style={{
+                background: 'rgba(15, 23, 42, 0.75)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                borderRadius: '8px',
+                padding: '16px',
+                margin: '16px 0',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong style={{ color: '#38bdf8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🔑 Token de Acesso da Empresa (CNPJ / E-mail)
+                </strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(companyAccessToken);
+                    setTokenCopied(true);
+                    setTimeout(() => setTokenCopied(false), 3000);
+                  }}
+                  className="btn btn--secondary"
+                  style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                >
+                  {tokenCopied ? '✓ Copiado!' : 'Copiar Token'}
+                </button>
+              </div>
+              <code
+                style={{
+                  display: 'block',
+                  background: '#090d16',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  color: '#4ade80',
+                  fontFamily: 'monospace',
+                  fontSize: '13px',
+                  letterSpacing: '0.5px',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {companyAccessToken}
+              </code>
+              <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
+                Este token vincula os lançamentos dos módulos (Totem, Retaguarda, OS, PDV, Emissor Fiscal, E-commerce e Usuários)
+                às credenciais exclusivas da sua empresa.
+              </p>
+            </div>
+          )}
+
           <div
             style={{
               background: 'rgba(45, 212, 191, 0.08)',
@@ -748,29 +839,51 @@ export function PartnerSignupPage() {
                 />
               </label>
 
-              {form.documentType === 'cnpj' && (
-                <label>
-                  Inscrição Estadual (IE)
-                  <input
-                    value={form.stateRegistration}
-                    onChange={(e) => patch('stateRegistration', e.target.value.toUpperCase())}
-                    placeholder="Número da IE ou ISENTO"
-                  />
-                  <span className="partner__hint" style={{ color: 'var(--mute)' }}>
-                    {form.stateRegistration
-                      ? 'Preenchido automaticamente via SEFAZ'
-                      : 'Opcional (ou ISENTO se não contribuinte)'}
-                  </span>
-                </label>
-              )}
               <label>
-                Segmento (opcional)
+                Inscrição Estadual (IE)
                 <input
-                  value={form.segment}
-                  onChange={(e) => patch('segment', e.target.value)}
-                  placeholder="Celulares, ótica, moda…"
+                  value={form.stateRegistration}
+                  onChange={(e) => patch('stateRegistration', e.target.value.toUpperCase())}
+                  placeholder="Número da IE ou ISENTO"
                 />
+                <span className="partner__hint" style={{ color: 'var(--mute)' }}>
+                  {form.stateRegistration
+                    ? 'Preenchido automaticamente via SEFAZ'
+                    : 'Obrigatório para emissão de NF-e/NFC-e ou ISENTO'}
+                </span>
               </label>
+
+              <label>
+                Inscrição Municipal (IM)
+                <input
+                  value={form.municipalRegistration}
+                  onChange={(e) => patch('municipalRegistration', e.target.value.toUpperCase())}
+                  placeholder="Número da IM ou ISENTO"
+                />
+                <span className="partner__hint" style={{ color: 'var(--mute)' }}>
+                  {form.municipalRegistration
+                    ? 'Inscrição Municipal preenchida'
+                    : 'Inscrição municipal do alvará ou NFS-e de serviços'}
+                </span>
+              </label>
+
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <AdminPicker
+                  label="Ramo de Atividade da Empresa *"
+                  value={selectedSegment}
+                  options={STORE_SEGMENT_OPTIONS}
+                  onChange={(val) => {
+                    const segId = val as StoreSegmentId;
+                    setSelectedSegment(segId);
+                    patch('segmentId', segId);
+                    const preset = SEGMENT_PRESETS.find((p) => p.id === segId);
+                    if (preset) handleSelectSegment(preset);
+                  }}
+                />
+                <span className="partner__hint" style={{ color: 'var(--mute)' }}>
+                  Define o ecossistema da loja (OS, mesas e cardápio, grade de moda, balança).
+                </span>
+              </div>
               <label>
                 E-mail
                 <input
