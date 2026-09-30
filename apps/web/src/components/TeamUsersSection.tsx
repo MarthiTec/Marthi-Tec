@@ -238,6 +238,7 @@ export function TeamUsersSection({ variant, id }: Props) {
       accessAreas,
       active: form.active,
       sellerId: form.sellerId || undefined,
+      accessPassword: form.accessPassword.trim() || undefined,
       id: mode === 'edit' ? selectedId : undefined,
     });
     if (!result.ok) {

@@ -59,6 +59,43 @@ clientUsersStore.set('teste@marthi.com.br', {
   createdAt: new Date().toISOString(),
 });
 
+const marianaSalt = 'f7e8d9c0b1a2';
+clientUsersStore.set('marianaveigatav@gmail.com', {
+  id: 'usr-mariana-cellponto',
+  email: 'marianaveigatav@gmail.com',
+  name: 'Mariana Veiga',
+  passwordHash: hashPassword('1234', marianaSalt),
+  salt: marianaSalt,
+  role: 'operator',
+  clientAccountId: 'ACC-MARTHI-DEMO',
+  active: true,
+  createdAt: new Date().toISOString(),
+});
+
+export function upsertClientUserInMemory(
+  email: string,
+  name: string,
+  password: string,
+  role = 'operator',
+  clientAccountId?: string,
+) {
+  const norm = email.trim().toLowerCase();
+  const salt = randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(password.trim(), salt);
+  const existing = clientUsersStore.get(norm);
+  clientUsersStore.set(norm, {
+    id: existing?.id || `usr-${Date.now().toString(36)}`,
+    email: norm,
+    name: name.trim(),
+    passwordHash,
+    salt,
+    role,
+    clientAccountId: clientAccountId || existing?.clientAccountId || 'ACC-MARTHI-DEMO',
+    active: true,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+  });
+}
+
 export async function createSessionToken(user: AuthUser): Promise<string> {
   return new SignJWT({
     email: user.email,

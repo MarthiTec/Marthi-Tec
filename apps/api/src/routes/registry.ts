@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
-import { hashPassword } from '../services/authService.js';
+import { hashPassword, upsertClientUserInMemory } from '../services/authService.js';
 import { randomBytes } from 'node:crypto';
 
 export const registryRouter = Router();
@@ -261,6 +261,9 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
       updatedAt: new Date().toISOString(),
     };
     memoryEmployees.set(empId, record);
+    if (body.isSystemUser && cleanUserEmail) {
+      upsertClientUserInMemory(cleanUserEmail, body.name, body.accessPassword || '123456', body.role, clientAccountId);
+    }
     res.status(201).json({ success: true, data: record });
   } catch (error) {
     next(error);
@@ -270,6 +273,7 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
 registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
+    const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
     const id = req.params.id;
     const body = employeeSchema.partial().parse(req.body);
 
@@ -313,10 +317,34 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
         if (body.accessPassword && cleanEmail) {
           const salt = randomBytes(16).toString('hex');
           const passHash = hashPassword(body.accessPassword.trim(), salt);
+          const userId = `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           await client.query(
-            `UPDATE users SET password_hash = $1 WHERE lower(email) = lower($2)`,
-            [`${salt}:${passHash}`, cleanEmail],
+            `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+             VALUES ($1, $2, $3, $4, 'password', $5, $6, true)
+             ON CONFLICT (email) DO UPDATE
+             SET password_hash = $5, name = $4, active = true, global_role = $6`,
+            [
+              userId,
+              clientAccountId,
+              cleanEmail,
+              (body.name || curr.name).trim(),
+              `${salt}:${passHash}`,
+              body.role || curr.role,
+            ],
           );
+          await client.query(
+            `INSERT INTO user_stores (id, user_id, store_id, role, permissions)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (user_id, store_id) DO UPDATE SET role = $4, permissions = $5`,
+            [
+              `UST-${Date.now().toString(36)}`,
+              userId,
+              storeId,
+              body.role || curr.role,
+              JSON.stringify(body.permissions || curr.permissions || {}),
+            ],
+          );
+          upsertClientUserInMemory(cleanEmail, body.name || curr.name, body.accessPassword, body.role || curr.role, clientAccountId);
         }
 
         await client.query(
@@ -390,6 +418,10 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
     }
     const updated = { ...current, ...body, updatedAt: new Date().toISOString() };
     memoryEmployees.set(id, updated);
+    if (body.accessPassword && (body.userEmail || current.userEmail)) {
+      const email = (body.userEmail || current.userEmail).trim().toLowerCase();
+      upsertClientUserInMemory(email, body.name || current.name, body.accessPassword, body.role || current.role, req.clientAccountId);
+    }
     res.json({ success: true, data: updated });
   } catch (error) {
     next(error);

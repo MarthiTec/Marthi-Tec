@@ -284,6 +284,7 @@ export function PermissionsPage() {
       permissions: perms,
       active: form.active,
       sellerId: person.sellerId,
+      accessPassword: form.accessPassword.trim() || undefined,
     });
 
     if (!result.ok) {

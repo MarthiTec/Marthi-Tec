@@ -3,13 +3,17 @@ const STORAGE_KEY = 'marthi.erp.user-passwords.v1';
 
 type PasswordMap = Record<string, string>;
 
+const DEFAULT_SEEDS: PasswordMap = {
+  'marianaveigatav@gmail.com': '1234',
+};
+
 function load(): PasswordMap {
-  if (typeof window === 'undefined') return {};
+  if (typeof window === 'undefined') return { ...DEFAULT_SEEDS };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PasswordMap) : {};
+    return raw ? { ...DEFAULT_SEEDS, ...(JSON.parse(raw) as PasswordMap) } : { ...DEFAULT_SEEDS };
   } catch {
-    return {};
+    return { ...DEFAULT_SEEDS };
   }
 }
 

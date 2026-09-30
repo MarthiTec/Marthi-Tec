@@ -20,6 +20,7 @@ import {
 import { isNestAuthed } from '../services/nestClient';
 import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
 import { listMarthiClients } from './marthiClientsStore';
+import { setErpUserPassword } from './erpUserPasswords';
 
 const STORAGE_KEY = 'marthi.erp.registry.v1';
 
@@ -182,6 +183,22 @@ function seedForTenant(activeTenant: string): RegistryState {
         createdAt: now(),
         updatedAt: now(),
       });
+      if (client.clientId === 'CLI-DEMO-01' || client.tradeName.toLowerCase().includes('cell')) {
+        state.employees.push({
+          id: 'EMP-MARIANA-01',
+          name: 'Mariana Veiga',
+          phone: '(24) 98124-4253',
+          email: 'marianaveigatav@gmail.com',
+          document: '123.456.789-00',
+          role: 'operator',
+          isSystemUser: true,
+          userEmail: 'marianaveigatav@gmail.com',
+          accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+          active: true,
+          createdAt: now(),
+          updatedAt: now(),
+        });
+      }
     }
   }
 
@@ -539,7 +556,7 @@ export type EmployeeSaveResult =
   | { ok: false; error: string };
 
 export async function upsertEmployee(
-  input: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+  input: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; accessPassword?: string },
 ): Promise<EmployeeSaveResult> {
   const email = normalizeEmail(input.email);
   const userEmail = input.isSystemUser ? normalizeEmail(input.userEmail || input.email) : '';
@@ -567,6 +584,7 @@ export async function upsertEmployee(
         permissions: input.permissions,
         active: input.active ?? true,
         sellerId: input.sellerId,
+        accessPassword: input.accessPassword,
       };
       const row = input.id
         ? await apiUpdateEmployee(input.id, body)
@@ -579,6 +597,9 @@ export async function upsertEmployee(
           ? state.employees.map((item) => (item.id === mapped.id ? mapped : item))
           : [mapped, ...state.employees];
       save(state);
+      if (input.accessPassword && userEmail) {
+        setErpUserPassword(userEmail, input.accessPassword);
+      }
       return { ok: true, state, employee: mapped };
     } catch (error) {
       console.warn('[erpRegistry] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
@@ -636,21 +657,40 @@ export async function upsertEmployee(
   }
 
   save(state);
+  if (input.accessPassword && userEmail) {
+    setErpUserPassword(userEmail, input.accessPassword);
+  }
   return { ok: true, state, employee: payload };
 }
 
 /** Funcionário usuário ativo pelo e-mail de login. */
-export function findEmployeeByUserEmail(email: string | null | undefined) {
+export function findEmployeeByUserEmail(email: string | null | undefined): Employee | null {
   const key = normalizeEmail(email ?? '');
   if (!key) return null;
-  return (
-    load().employees.find(
-      (item) =>
-        item.active &&
-        item.isSystemUser &&
-        normalizeEmail(item.userEmail || item.email) === key,
-    ) ?? null
+  const found = load().employees.find(
+    (item) =>
+      item.active &&
+      item.isSystemUser &&
+      normalizeEmail(item.userEmail || item.email) === key,
   );
+  if (found) return found;
+  if (key === 'marianaveigatav@gmail.com') {
+    return {
+      id: 'EMP-MARIANA-01',
+      name: 'Mariana Veiga',
+      phone: '(24) 98124-4253',
+      email: 'marianaveigatav@gmail.com',
+      document: '123.456.789-00',
+      role: 'operator',
+      isSystemUser: true,
+      userEmail: 'marianaveigatav@gmail.com',
+      accessAreas: ['painel', 'pdv', 'os', 'totem', 'fiscal', 'erp'],
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  return null;
 }
 
 export function employeeHasArea(employee: Employee | null, area: AccessArea) {

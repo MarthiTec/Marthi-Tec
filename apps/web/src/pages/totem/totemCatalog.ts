@@ -98,7 +98,8 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     const primary = priced[0];
     const images = rows
       .flatMap((row) => stockItemImages(row))
-      .filter((url, index, all) => all.indexOf(url) === index);
+      .filter((url, index, all) => all.indexOf(url) === index)
+      .slice(0, 4);
     const stockFee =
       primary.cardRate !== undefined && primary.cardRate !== null && Number.isFinite(Number(primary.cardRate))
         ? Number(primary.cardRate)
@@ -113,7 +114,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       colors,
       cashPrice: primary.price,
       installmentLabel: formatInstallment(primary.price, 12, cardFeePercent),
-      images: images.length ? images : stockItemImages(primary),
+      images: (images.length ? images : stockItemImages(primary)).slice(0, 4),
       attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),
     };

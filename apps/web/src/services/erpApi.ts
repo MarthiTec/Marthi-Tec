@@ -430,6 +430,7 @@ export type ApiEmployee = {
   permissions?: ApiEmployeePermissions;
   active: boolean;
   sellerId?: string;
+  accessPassword?: string;
   createdAt: string;
   updatedAt: string;
 };

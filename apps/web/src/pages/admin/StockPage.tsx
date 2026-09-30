@@ -29,7 +29,7 @@ import {
   type StockItem,
   type StockKind,
 } from '../../data/adminStore';
-import { ATTRIBUTES_EVENT, stockAttributes } from '../../data/attributeStore';
+import { ATTRIBUTES_EVENT, getAttributes, stockAttributes } from '../../data/attributeStore';
 import { listSuppliers } from '../../data/erpRegistry';
 import {
   getFiscalClassification,
@@ -45,6 +45,21 @@ import { isNestAuthed } from '../../services/nestClient';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 type Mode = 'new' | 'edit' | 'view';
+
+export type StockVariationRow = {
+  id?: string;
+  tempKey: string;
+  sku: string;
+  barcode: string;
+  imei: string;
+  attrs: Record<string, string>;
+  price: number;
+  cardRate?: number;
+  qty: number;
+  minQty: number;
+  cost: number;
+  condition: StockCondition;
+};
 
 const REFRESH_EVENTS = [
   'marthi-admin-state',
@@ -63,7 +78,10 @@ export function StockPage() {
   const nameRef = useRef<HTMLInputElement>(null);
   const formAnchorRef = useRef<HTMLDivElement>(null);
 
-  const [attrDefs, setAttrDefs] = useState(() => stockAttributes());
+  const [attrDefs, setAttrDefs] = useState(() => {
+    const stock = stockAttributes();
+    return stock.length > 0 ? stock : getAttributes().filter((a) => a.active);
+  });
   const [items, setItems] = useState(() => getAdminState().stock);
   const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id), totemSurface));
   const [mode, setMode] = useState<Mode>('new');
@@ -80,15 +98,36 @@ export function StockPage() {
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
+
+  // ── Estado da Grade de Variações de Produto ────────────────────────
+  const [useVariations, setUseVariations] = useState(false);
+  const [variations, setVariations] = useState<StockVariationRow[]>([]);
+  const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
+  const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
+
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   const suppliers = useMemo(() => listSuppliers(true), []);
-  const productPhoto = form.images[0] || '';
   const readOnly = mode === 'view';
+
+  const corAttrDef = useMemo(() => {
+    return (
+      attrDefs.find((item) => /cor|color/i.test(item.name)) ??
+      attrDefs.find((item) => item.id === 'ATTR-COR')
+    );
+  }, [attrDefs]);
+
+  const capAttrDef = useMemo(() => {
+    return (
+      attrDefs.find((item) => /capac|armazen|mem[oó]ria|storage/i.test(item.name)) ??
+      attrDefs.find((item) => item.id === 'ATTR-CAP')
+    );
+  }, [attrDefs]);
 
   useEffect(() => {
     function refreshAttrs() {
-      setAttrDefs(stockAttributes());
+      const stock = stockAttributes();
+      setAttrDefs(stock.length > 0 ? stock : getAttributes().filter((a) => a.active));
     }
     function refreshStock() {
       setItems(getAdminState().stock);
@@ -152,6 +191,10 @@ export function StockPage() {
     setSelectedId(null);
     setMode('new');
     setError('');
+    setUseVariations(false);
+    setVariations([]);
+    setOriginalVariationIds([]);
+    setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
   }
 
   function closeForm() {
@@ -165,34 +208,277 @@ export function StockPage() {
     focusNameField();
   }
 
-  async function onProductPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  // ── Gestão de Fotos (Limite Estrito de até 4 Fotos) ─────────────────
+  async function onAddPhotos(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!file || readOnly) return;
+    if (!files.length || readOnly) return;
+    const availableSlots = 4 - form.images.length;
+    if (availableSlots <= 0) {
+      setError('Limite máximo de 4 fotos por produto atingido.');
+      return;
+    }
+    const toProcess = files.slice(0, availableSlots);
+    if (files.length > availableSlots) {
+      setError(`Apenas as primeiras ${availableSlots} fotos foram adicionadas (limite máximo de 4 fotos).`);
+    } else {
+      setError('');
+    }
     try {
-      const next = await fileToProductImage(file);
+      const processed = await Promise.all(toProcess.map((f) => fileToProductImage(f)));
       setForm((current) => ({
         ...current,
-        images: [next, ...current.images.slice(1)],
+        images: [...current.images, ...processed].slice(0, 4),
       }));
-      setError('');
     } catch {
-      setError('Não foi possível usar esta imagem. Tente outro arquivo.');
+      setError('Não foi possível processar algumas imagens. Tente outros arquivos.');
     }
   }
 
-  function clearProductPhoto() {
+  function removePhoto(indexToRemove: number) {
     if (readOnly) return;
     setForm((current) => ({
       ...current,
-      images: current.images.slice(1),
+      images: current.images.filter((_, idx) => idx !== indexToRemove),
     }));
+  }
+
+  function makePrimaryPhoto(indexToPromote: number) {
+    if (readOnly || indexToPromote === 0) return;
+    setForm((current) => {
+      const selected = current.images[indexToPromote];
+      const rest = current.images.filter((_, idx) => idx !== indexToPromote);
+      return {
+        ...current,
+        images: [selected, ...rest],
+      };
+    });
+  }
+
+  // ── Gestão da Grade de Variações ──────────────────────────────────
+  function enableVariations() {
+    if (useVariations) return;
+    setUseVariations(true);
+    if (variations.length === 0) {
+      const corId = corAttrDef?.id || 'ATTR-COR';
+      const capId = capAttrDef?.id || 'ATTR-CAP';
+      const initialAttrs: Record<string, string> = { ...form.attrs };
+      if (form.color && corId) initialAttrs[corId] = form.color;
+      if (form.capacity && capId) initialAttrs[capId] = form.capacity;
+      setVariations([
+        {
+          id: selectedId || undefined,
+          tempKey: `init_${Date.now()}`,
+          sku: form.sku,
+          barcode: form.barcode,
+          imei: form.imei,
+          attrs: initialAttrs,
+          price: form.price || 0,
+          cardRate: form.cardRate,
+          qty: form.qty || 1,
+          minQty: form.minQty || 1,
+          cost: form.cost || 0,
+          condition: form.condition || 'new',
+        },
+      ]);
+    }
+  }
+
+  function toggleVariationAttr(attrId: string) {
+    if (readOnly) return;
+    setSelectedAttrIds((curr) =>
+      curr.includes(attrId) ? curr.filter((id) => id !== attrId) : [...curr, attrId],
+    );
+  }
+
+  function addVariationRow() {
+    if (readOnly) return;
+    const lastRow = variations[variations.length - 1];
+    const newAttrs: Record<string, string> = {};
+    for (const attrId of selectedAttrIds) {
+      newAttrs[attrId] = lastRow?.attrs[attrId] || '';
+    }
+    const nextSku = form.sku ? `${form.sku}-${variations.length + 1}` : '';
+    const newRow: StockVariationRow = {
+      tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      sku: nextSku,
+      barcode: '',
+      imei: '',
+      attrs: newAttrs,
+      price: lastRow?.price || form.price || 0,
+      cardRate: lastRow?.cardRate ?? form.cardRate,
+      qty: 1,
+      minQty: 1,
+      cost: lastRow?.cost || form.cost || 0,
+      condition: lastRow?.condition || form.condition || 'new',
+    };
+    setVariations((curr) => [...curr, newRow]);
+  }
+
+  function duplicateVariationRow(index: number) {
+    if (readOnly) return;
+    const target = variations[index];
+    if (!target) return;
+    const cloned: StockVariationRow = {
+      ...target,
+      id: undefined,
+      tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      sku: target.sku ? `${target.sku}-CP` : '',
+      barcode: '',
+      imei: '',
+      attrs: { ...target.attrs },
+    };
+    setVariations((curr) => {
+      const copy = [...curr];
+      copy.splice(index + 1, 0, cloned);
+      return copy;
+    });
+  }
+
+  function removeVariationRow(index: number) {
+    if (readOnly) return;
+    setVariations((curr) => curr.filter((_, idx) => idx !== index));
+  }
+
+  function updateVariationRow<K extends keyof StockVariationRow>(
+    index: number,
+    field: K,
+    value: StockVariationRow[K],
+  ) {
+    if (readOnly) return;
+    setVariations((curr) => {
+      const copy = [...curr];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  }
+
+  function updateVariationAttr(index: number, attrId: string, attrVal: string) {
+    if (readOnly) return;
+    setVariations((curr) => {
+      const copy = [...curr];
+      const rowAttrs = { ...(copy[index]?.attrs ?? {}), [attrId]: attrVal };
+      copy[index] = { ...copy[index], attrs: rowAttrs };
+      return copy;
+    });
+  }
+
+  function generateCombinations() {
+    if (readOnly) return;
+    const activeDefs = attrDefs.filter((a) => selectedAttrIds.includes(a.id) && a.values.length > 0);
+    if (activeDefs.length === 0) {
+      setError('Selecione ao menos um atributo com valores cadastrados para gerar combinações.');
+      return;
+    }
+    let cartesian: Record<string, string>[] = [{}];
+    for (const def of activeDefs) {
+      const nextCartesian: Record<string, string>[] = [];
+      for (const item of cartesian) {
+        for (const val of def.values) {
+          nextCartesian.push({ ...item, [def.id]: val });
+        }
+      }
+      cartesian = nextCartesian;
+    }
+
+    if (cartesian.length > 50) {
+      setError(`Essa combinação geraria ${cartesian.length} variações. Selecione menos opções.`);
+      return;
+    }
+
+    const generated: StockVariationRow[] = cartesian.map((comboAttrs, idx) => {
+      const attrVals = Object.values(comboAttrs).filter(Boolean);
+      const codeSuffix = attrVals.map((v) => v.slice(0, 3).toUpperCase()).join('-');
+      return {
+        tempKey: `gen_${Date.now()}_${idx}`,
+        sku: form.sku ? `${form.sku}-${codeSuffix}` : codeSuffix,
+        barcode: '',
+        imei: '',
+        attrs: comboAttrs,
+        price: form.price || 0,
+        cardRate: form.cardRate,
+        qty: 1,
+        minQty: 1,
+        cost: form.cost || 0,
+        condition: form.condition || 'new',
+      };
+    });
+
+    setVariations(generated);
+    setError('');
   }
 
   function openForm(item: StockItem, nextMode: Mode) {
     setSelectedId(item.id);
     setMode(nextMode);
     setFormVisible(true);
+
+    const siblings = items.filter(
+      (row) => row.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+    );
+    const hasMultiple = siblings.length > 1;
+    setUseVariations(hasMultiple);
+
+    const corId = corAttrDef?.id || 'ATTR-COR';
+    const capId = capAttrDef?.id || 'ATTR-CAP';
+
+    if (hasMultiple) {
+      const rows: StockVariationRow[] = siblings.map((sib) => ({
+        id: sib.id,
+        tempKey: sib.id,
+        sku: sib.sku,
+        barcode: sib.barcode || '',
+        imei: sib.imei || '',
+        attrs: {
+          ...sib.attrs,
+          ...(sib.color && corId ? { [corId]: sib.color } : {}),
+          ...(sib.capacity && capId ? { [capId]: sib.capacity } : {}),
+        },
+        price: sib.price,
+        cardRate: sib.cardRate,
+        qty: sib.qty,
+        minQty: sib.minQty,
+        cost: sib.cost,
+        condition: sib.condition,
+      }));
+      setVariations(rows);
+      setOriginalVariationIds(siblings.map((s) => s.id));
+      const used = new Set<string>();
+      for (const sib of siblings) {
+        for (const [k, v] of Object.entries(sib.attrs ?? {})) {
+          if (v) used.add(k);
+        }
+        if (sib.color && corId) used.add(corId);
+        if (sib.capacity && capId) used.add(capId);
+      }
+      setSelectedAttrIds(
+        used.size > 0 ? Array.from(used) : attrDefs.slice(0, 2).map((a) => a.id),
+      );
+    } else {
+      setVariations([
+        {
+          id: item.id,
+          tempKey: item.id || `var_${Date.now()}`,
+          sku: item.sku,
+          barcode: item.barcode || '',
+          imei: item.imei || '',
+          attrs: {
+            ...item.attrs,
+            ...(item.color && corId ? { [corId]: item.color } : {}),
+            ...(item.capacity && capId ? { [capId]: item.capacity } : {}),
+          },
+          price: item.price,
+          cardRate: item.cardRate,
+          qty: item.qty,
+          minQty: item.minQty,
+          cost: item.cost,
+          condition: item.condition,
+        },
+      ]);
+      setOriginalVariationIds(item.id ? [item.id] : []);
+      setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
+    }
+
     setForm({
       name: item.name,
       sku: item.sku,
@@ -215,7 +501,7 @@ export function StockPage() {
       unit: item.unit ?? 'UN',
       sourceWorkOrderId: item.sourceWorkOrderId,
       showOnTotem: item.showOnTotem,
-      images: [...(item.images ?? [])],
+      images: [...(item.images ?? [])].slice(0, 4),
       supplierId: item.supplierId ?? '',
       fiscalClassificationId: item.fiscalClassificationId ?? '',
       warehouseId: item.warehouseId ?? '',
@@ -233,64 +519,113 @@ export function StockPage() {
 
   async function submit() {
     if (readOnly || !form.name.trim()) return;
-    const payload = {
-      ...form,
-      color: form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('cor'))?.id ?? ''] ?? form.color,
-      capacity:
-        form.attrs[attrDefs.find((item) => item.name.toLowerCase().includes('capac'))?.id ?? ''] ??
-        form.capacity,
-      avgCost: form.avgCost || form.cost,
-      lastPurchaseCost: form.lastPurchaseCost || form.cost,
-      lastPurchaseAt: form.lastPurchaseAt || (form.cost > 0 ? new Date().toISOString() : ''),
-    };
     setError('');
-    const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
+
     try {
-      const state = await upsertStockItem(
-        mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
-      );
-      setItems(state.stock);
-      const savedId =
-        mode === 'edit' && selectedId
-          ? selectedId
-          : state.stock.find((row) => row.sku === payload.sku)?.id ?? state.stock[0]?.id;
-      onStockChanged(savedId);
-      if (prev && savedId && prev.qty !== payload.qty) {
-        const delta = payload.qty - prev.qty;
-        void import('../../data/stockLedger').then(({ logStockMovements }) => {
-          logStockMovements([
-            {
-              stockId: savedId,
-              stockName: payload.name,
-              sku: payload.sku,
-              type: 'adjust',
-              qty: Math.abs(delta),
-              direction: delta >= 0 ? 1 : -1,
-              unitCost: payload.avgCost || payload.cost,
-              balanceAfter: payload.qty,
-              note: 'Ajuste via cadastro de produto',
-            },
-          ]);
-        });
-      } else if (!prev && savedId && payload.qty > 0) {
-        void import('../../data/stockLedger').then(({ logStockMovements }) => {
-          logStockMovements([
-            {
-              stockId: savedId,
-              stockName: payload.name,
-              sku: payload.sku,
-              type: 'entry',
-              qty: payload.qty,
-              direction: 1,
-              unitCost: payload.avgCost || payload.cost,
-              balanceAfter: payload.qty,
-              note: 'Saldo inicial no cadastro',
-            },
-          ]);
-        });
+      const corId = corAttrDef?.id || 'ATTR-COR';
+      const capId = capAttrDef?.id || 'ATTR-CAP';
+
+      if (useVariations) {
+        if (variations.length === 0) {
+          setError('Adicione ao menos uma variação na grade ou volte para Produto Simples.');
+          return;
+        }
+
+        for (const row of variations) {
+          const corVal = row.attrs[corId] || (corAttrDef ? row.attrs[corAttrDef.name] : '') || '';
+          const capVal = row.attrs[capId] || (capAttrDef ? row.attrs[capAttrDef.name] : '') || '';
+          const payload: Omit<StockItem, 'id'> & { id?: string } = {
+            ...(row.id ? { id: row.id } : {}),
+            name: form.name.trim(),
+            sku:
+              row.sku.trim() ||
+              `${form.sku || 'SKU'}-${(corVal || 'VAR').slice(0, 3)}-${(capVal || Math.random().toString(36).slice(2, 6))}`.toUpperCase(),
+            barcode: row.barcode.trim(),
+            imei: row.imei.trim(),
+            color: corVal,
+            capacity: capVal,
+            attrs: { ...row.attrs },
+            qty: Number(row.qty) || 0,
+            minQty: Number(row.minQty) || 0,
+            maxQty: form.maxQty ?? 10,
+            cost: Number(row.cost) || 0,
+            avgCost: Number(row.cost) || form.avgCost || 0,
+            price: Number(row.price) || 0,
+            cardRate:
+              row.cardRate !== undefined && !Number.isNaN(row.cardRate)
+                ? Number(row.cardRate)
+                : form.cardRate,
+            lastPurchaseCost: Number(row.cost) || form.lastPurchaseCost || 0,
+            lastPurchaseAt: form.lastPurchaseAt || new Date().toISOString(),
+            kind: form.kind,
+            condition: row.condition || form.condition,
+            unit: form.unit,
+            showOnTotem: form.showOnTotem,
+            images: [...form.images].slice(0, 4),
+            supplierId: form.supplierId || '',
+            fiscalClassificationId: form.fiscalClassificationId || '',
+            warehouseId: form.warehouseId || '',
+            trackLot: Boolean(form.trackLot),
+            isKit: Boolean(form.isKit),
+          };
+          await upsertStockItem(payload);
+        }
+
+        // Remove variações excluídas na grade
+        const activeIds = new Set(variations.map((v) => v.id).filter(Boolean));
+        for (const oldId of originalVariationIds) {
+          if (!activeIds.has(oldId)) {
+            await removeStockItem(oldId);
+          }
+        }
+
+        const state = getAdminState();
+        setItems(state.stock);
+        onStockChanged(state.stock[0]?.id);
+        resetForm();
+        setFormVisible(false);
+      } else {
+        // Produto simples
+        const payload = {
+          ...form,
+          images: form.images.slice(0, 4),
+          color: form.attrs[corId] ?? form.color,
+          capacity: form.attrs[capId] ?? form.capacity,
+          avgCost: form.avgCost || form.cost,
+          lastPurchaseCost: form.lastPurchaseCost || form.cost,
+          lastPurchaseAt: form.lastPurchaseAt || (form.cost > 0 ? new Date().toISOString() : ''),
+        };
+        const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
+        const state = await upsertStockItem(
+          mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
+        );
+        setItems(state.stock);
+        const savedId =
+          mode === 'edit' && selectedId
+            ? selectedId
+            : state.stock.find((row) => row.sku === payload.sku)?.id ?? state.stock[0]?.id;
+        onStockChanged(savedId);
+        if (prev && savedId && prev.qty !== payload.qty) {
+          const delta = payload.qty - prev.qty;
+          void import('../../data/stockLedger').then(({ logStockMovements }) => {
+            logStockMovements([
+              {
+                stockId: savedId,
+                stockName: payload.name,
+                sku: payload.sku,
+                type: 'adjust',
+                qty: Math.abs(delta),
+                direction: delta >= 0 ? 1 : -1,
+                unitCost: payload.avgCost || payload.cost,
+                balanceAfter: payload.qty,
+                note: 'Ajuste via cadastro de produto',
+              },
+            ]);
+          });
+        }
+        resetForm();
+        setFormVisible(false);
       }
-      resetForm();
-      setFormVisible(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
     }
@@ -696,31 +1031,67 @@ export function StockPage() {
           <article className="admin-card stock-form-card">
             <h3>Identificação</h3>
             <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
-              <div className="stock-photo-picker">
-                <label
-                  className={`stock-photo-picker__frame ${readOnly ? 'is-readonly' : ''}`}
-                  title={readOnly ? 'Foto do produto' : 'Clique para alterar a foto'}
-                >
-                  {productPhoto ? (
-                    <img src={productPhoto} alt="" />
-                  ) : (
-                    <span className="stock-photo-picker__empty">Foto</span>
-                  )}
-                  {!readOnly ? (
-                    <>
-                      <input type="file" accept="image/*" onChange={onProductPhoto} />
-                      <em className="stock-photo-picker__hint">
-                        {productPhoto ? 'Trocar foto' : 'Adicionar foto'}
-                      </em>
-                    </>
+              <div className="stock-photo-picker" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span className="admin-field-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  Fotos do produto ({form.images.length}/4)
+                </span>
+                <div className="stock-photos-gallery">
+                  {form.images.map((imgSrc, index) => (
+                    <div
+                      key={index}
+                      className="stock-photo-slot"
+                      title={index === 0 ? 'Foto de capa (Principal)' : 'Clique para tornar foto de capa'}
+                      onClick={() => !readOnly && index > 0 && makePrimaryPhoto(index)}
+                      style={{ cursor: !readOnly && index > 0 ? 'pointer' : 'default' }}
+                    >
+                      <img src={imgSrc} alt={`Foto ${index + 1}`} />
+                      {index === 0 ? (
+                        <span className="stock-photo-slot__badge">Principal</span>
+                      ) : !readOnly ? (
+                        <span
+                          className="stock-photo-slot__badge"
+                          style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                        >
+                          Foto {index + 1}
+                        </span>
+                      ) : null}
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          className="stock-photo-slot__remove"
+                          title="Remover foto"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePhoto(index);
+                          }}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+
+                  {!readOnly && form.images.length < 4 ? (
+                    <label
+                      className="stock-photo-slot stock-photo-slot--add"
+                      title="Adicionar foto (máximo 4 fotos)"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={onAddPhotos}
+                      />
+                      <span>+ Foto</span>
+                      <small>({form.images.length}/4)</small>
+                    </label>
                   ) : null}
-                </label>
-                {!readOnly && productPhoto ? (
-                  <button type="button" className="btn btn--ghost stock-photo-picker__clear" onClick={clearProductPhoto}>
-                    Remover foto
-                  </button>
-                ) : null}
+                </div>
+                <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.78rem' }}>
+                  Limite em até 4 fotos por produto (a primeira é a capa no Totem e ERP).
+                </p>
               </div>
+
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
                 <label className="span-2">
                   Produto
@@ -812,159 +1183,454 @@ export function StockPage() {
             </div>
           </article>
 
-          <article className="admin-card stock-form-card">
-            <h3>Atributos e variações</h3>
-            <p className="empty" style={{ marginTop: 0 }}>
-              Cor, capacidade, tamanho (PP–XG / calçados) e demais variações vêm de{' '}
-              <Link to={totemSurface ? '/painel/totem/atributos' : '/erp/atributos'}>Atributos</Link>
-              .
-            </p>
-            <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-              {visibleAttrs.length === 0 ? (
-                <p className="empty span-2">Nenhum atributo ativo para estoque.</p>
-              ) : (
-                visibleAttrs.map((attr) => (
-                  <AdminPicker
-                    key={attr.id}
-                    label={attr.name}
-                    value={form.attrs[attr.id] ?? ''}
-                    placeholder="Selecionar"
-                    disabled={readOnly}
-                    options={attr.values.map((value) => ({ value, label: value }))}
-                    onChange={(value) =>
-                      setForm({ ...form, attrs: { ...form.attrs, [attr.id]: value } })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </article>
+          <div className="stock-variation-tabs">
+            <button
+              type="button"
+              className={`stock-variation-tab ${!useVariations ? 'is-active' : ''}`}
+              onClick={() => !readOnly && setUseVariations(false)}
+            >
+              Produto Simples (Item Único)
+            </button>
+            <button
+              type="button"
+              className={`stock-variation-tab ${useVariations ? 'is-active' : ''}`}
+              onClick={() => !readOnly && enableVariations()}
+            >
+              Grade de Variações ({variations.length} {variations.length === 1 ? 'item' : 'itens'})
+            </button>
+          </div>
 
-          <article className="admin-card stock-form-card">
-            <h3>Estoque</h3>
-            <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-              <label>
-                Quantidade ({form.unit === 'KG' ? 'KG' : 'UN'})
-                <input
-                  type="number"
-                  min={0}
-                  step={form.unit === 'KG' ? 0.001 : 1}
-                  value={form.qty}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                Mínimo
-                <input
-                  type="number"
-                  value={form.minQty}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, minQty: Number(e.target.value) })}
-                />
-              </label>
-              {!lite ? (
-                <label>
-                  Máximo
-                  <input
-                    type="number"
-                    value={form.maxQty}
-                    disabled={readOnly}
-                    onChange={(e) => setForm({ ...form, maxQty: Number(e.target.value) })}
-                  />
-                </label>
-              ) : null}
-            </div>
-          </article>
+          {useVariations ? (
+            <article className="admin-card stock-form-card">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                  marginBottom: 8,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0 }}>Grade de Itens e Variações</h3>
+                  <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>
+                    Cada linha representa um item com seus atributos, preço, taxa de cartão e cálculo de parcelas em 12x para o totem.
+                  </p>
+                </div>
+                {!readOnly ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn--outline btn--sm"
+                      onClick={generateCombinations}
+                      title="Gera combinações dos atributos ativos"
+                    >
+                      Gerar combinações
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      onClick={addVariationRow}
+                    >
+                      + Nova Linha de Variação
+                    </button>
+                  </div>
+                ) : null}
+              </div>
 
-          <article className="admin-card stock-form-card">
-            <h3>Preços e custos</h3>
-            <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-              {!lite ? (
-                <label>
-                  Custo (última compra)
-                  <input
-                    type="number"
-                    value={form.cost}
-                    disabled={readOnly}
-                    onChange={(e) => {
-                      const cost = Number(e.target.value);
-                      setForm({
-                        ...form,
-                        cost,
-                        avgCost: form.avgCost || cost,
-                        lastPurchaseCost: cost,
-                      });
-                    }}
-                  />
-                </label>
-              ) : null}
-              {!lite ? (
-                <label>
-                  Custo médio
-                  <input
-                    type="number"
-                    value={form.avgCost}
-                    disabled={readOnly}
-                    onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
-                  />
-                </label>
-              ) : null}
-              <label>
-                Preço base
-                <input
-                  type="number"
-                  value={form.price}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                Taxa de cartão (%)
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={form.cardRate ?? ''}
-                  disabled={readOnly}
-                  placeholder="Padrão totem"
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      cardRate: e.target.value === '' ? undefined : Number(e.target.value),
+              <div className="stock-variation-toolbar">
+                <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                  Atributos na grade:
+                </span>
+                <div className="stock-variation-attr-pills">
+                  {attrDefs.length === 0 ? (
+                    <span className="empty" style={{ fontSize: '0.78rem' }}>
+                      Nenhum atributo cadastrado no sistema.
+                    </span>
+                  ) : (
+                    attrDefs.map((attr) => {
+                      const selected = selectedAttrIds.includes(attr.id);
+                      return (
+                        <button
+                          key={attr.id}
+                          type="button"
+                          className={`stock-attr-pill ${selected ? 'is-selected' : ''}`}
+                          onClick={() => toggleVariationAttr(attr.id)}
+                          title={`Clique para ${selected ? 'remover' : 'adicionar'} ${attr.name} nas colunas da grade`}
+                        >
+                          {selected ? '✓ ' : '+ '}
+                          {attr.name}
+                        </button>
+                      );
                     })
-                  }
-                />
-              </label>
-              {form.price > 0 ? (
-                <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
-                  <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12, form.cardRate)}
-                  {form.cardRate !== undefined
-                    ? ` (com taxa de ${form.cardRate}% deste produto)`
-                    : ' (usando taxa padrão do totem)'}
-                </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="admin-table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      {selectedAttrIds.map((attrId) => {
+                        const def = attrDefs.find((a) => a.id === attrId);
+                        return <th key={attrId}>{def?.name || attrId}</th>;
+                      })}
+                      <th>SKU</th>
+                      <th>Preço à vista</th>
+                      <th>Taxa cartão (%)</th>
+                      <th>Parcelado (12x)</th>
+                      <th>Qtd</th>
+                      <th>Mín</th>
+                      <th>Custo</th>
+                      {!readOnly ? <th className="col-actions">Ações</th> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variations.length === 0 ? (
+                      <tr>
+                        <td colSpan={selectedAttrIds.length + 8} className="empty">
+                          Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
+                        </td>
+                      </tr>
+                    ) : (
+                      variations.map((row, index) => {
+                        const effectiveRate =
+                          row.cardRate !== undefined && !Number.isNaN(row.cardRate)
+                            ? row.cardRate
+                            : form.cardRate;
+                        const installmentText = formatInstallment(row.price, 12, effectiveRate);
+
+                        return (
+                          <tr key={row.tempKey}>
+                            {selectedAttrIds.map((attrId) => {
+                              const def = attrDefs.find((a) => a.id === attrId);
+                              const options = (def?.values ?? []).map((v) => ({
+                                value: v,
+                                label: v,
+                              }));
+                              const val = row.attrs[attrId] ?? '';
+
+                              return (
+                                <td key={attrId} style={{ minWidth: 130 }}>
+                                  {options.length > 0 ? (
+                                    <AdminPicker
+                                      compact
+                                      label={def?.name || 'Atributo'}
+                                      value={val}
+                                      placeholder="Selecionar"
+                                      disabled={readOnly}
+                                      options={options}
+                                      onChange={(selectedVal) =>
+                                        updateVariationAttr(index, attrId, selectedVal)
+                                      }
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      value={val}
+                                      disabled={readOnly}
+                                      placeholder="Valor"
+                                      style={{ minWidth: 90 }}
+                                      onChange={(e) =>
+                                        updateVariationAttr(index, attrId, e.target.value)
+                                      }
+                                    />
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td>
+                              <input
+                                type="text"
+                                value={row.sku}
+                                disabled={readOnly}
+                                placeholder="SKU"
+                                style={{ width: 110 }}
+                                onChange={(e) => updateVariationRow(index, 'sku', e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={row.price}
+                                disabled={readOnly}
+                                style={{ width: 95 }}
+                                onChange={(e) =>
+                                  updateVariationRow(index, 'price', Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.1"
+                                value={row.cardRate ?? ''}
+                                disabled={readOnly}
+                                placeholder="Padrão"
+                                style={{ width: 75 }}
+                                onChange={(e) =>
+                                  updateVariationRow(
+                                    index,
+                                    'cardRate',
+                                    e.target.value === '' ? undefined : Number(e.target.value),
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              <span
+                                className="stock-installment-badge"
+                                title="Cálculo automático de 12x para totem"
+                              >
+                                {installmentText}
+                              </span>
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                value={row.qty}
+                                disabled={readOnly}
+                                style={{ width: 65 }}
+                                onChange={(e) =>
+                                  updateVariationRow(index, 'qty', Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                value={row.minQty}
+                                disabled={readOnly}
+                                style={{ width: 60 }}
+                                onChange={(e) =>
+                                  updateVariationRow(index, 'minQty', Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={row.cost}
+                                disabled={readOnly}
+                                style={{ width: 85 }}
+                                onChange={(e) =>
+                                  updateVariationRow(index, 'cost', Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            {!readOnly ? (
+                              <td className="col-actions">
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost btn--xs"
+                                    onClick={() => duplicateVariationRow(index)}
+                                    title="Duplicar esta linha com os mesmos valores"
+                                  >
+                                    Duplicar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn--danger btn--xs"
+                                    onClick={() => removeVariationRow(index)}
+                                    title="Remover esta variação"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </td>
+                            ) : null}
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {variations.length > 0 ? (
+                <div className="stock-variation-summary">
+                  <span>
+                    <strong>Total de Variações:</strong> {variations.length}
+                  </span>
+                  <span>
+                    <strong>Estoque Total:</strong>{' '}
+                    {variations.reduce((sum, r) => sum + (Number(r.qty) || 0), 0)} itens
+                  </span>
+                  <span>
+                    <strong>Faixa de Preços:</strong> R${' '}
+                    {Math.min(...variations.map((r) => Number(r.price) || 0)).toFixed(2)} até R${' '}
+                    {Math.max(...variations.map((r) => Number(r.price) || 0)).toFixed(2)}
+                  </span>
+                </div>
               ) : null}
-              {!lite ? (
-                <p className="empty span-2">
-                  Markup{' '}
-                  {form.avgCost || form.cost
-                    ? `${(((form.price - (form.avgCost || form.cost)) / (form.avgCost || form.cost)) * 100).toFixed(1)}%`
-                    : '—'}{' '}
-                  · margem{' '}
-                  {form.price
-                    ? `${(((form.price - (form.avgCost || form.cost)) / form.price) * 100).toFixed(1)}%`
-                    : '—'}{' '}
-                  ·{' '}
-                  <Link to="/erp/balanco">balanço</Link>
-                  {' · '}
-                  <Link to="/erp/movimentos">movimentos</Link>
-                  {' · '}
-                  <Link to="/erp/tabelas">tipos de preço</Link>
+            </article>
+          ) : (
+            <>
+              <article className="admin-card stock-form-card">
+                <h3>Atributos e variações</h3>
+                <p className="empty" style={{ marginTop: 0 }}>
+                  Cor, capacidade, tamanho (PP–XG / calçados) e demais variações vêm de{' '}
+                  <Link to={totemSurface ? '/painel/totem/atributos' : '/erp/atributos'}>Atributos</Link>
+                  .
                 </p>
-              ) : null}
-            </div>
-          </article>
+                <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+                  {visibleAttrs.length === 0 ? (
+                    <p className="empty span-2">Nenhum atributo ativo para estoque.</p>
+                  ) : (
+                    visibleAttrs.map((attr) => (
+                      <AdminPicker
+                        key={attr.id}
+                        label={attr.name}
+                        value={form.attrs[attr.id] ?? ''}
+                        placeholder="Selecionar"
+                        disabled={readOnly}
+                        options={attr.values.map((value) => ({ value, label: value }))}
+                        onChange={(value) =>
+                          setForm({ ...form, attrs: { ...form.attrs, [attr.id]: value } })
+                        }
+                      />
+                    ))
+                  )}
+                </div>
+              </article>
+
+              <article className="admin-card stock-form-card">
+                <h3>Estoque</h3>
+                <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+                  <label>
+                    Quantidade ({form.unit === 'KG' ? 'KG' : 'UN'})
+                    <input
+                      type="number"
+                      min={0}
+                      step={form.unit === 'KG' ? 0.001 : 1}
+                      value={form.qty}
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Mínimo
+                    <input
+                      type="number"
+                      value={form.minQty}
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, minQty: Number(e.target.value) })}
+                    />
+                  </label>
+                  {!lite ? (
+                    <label>
+                      Máximo
+                      <input
+                        type="number"
+                        value={form.maxQty}
+                        disabled={readOnly}
+                        onChange={(e) => setForm({ ...form, maxQty: Number(e.target.value) })}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="admin-card stock-form-card">
+                <h3>Preços e custos</h3>
+                <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+                  {!lite ? (
+                    <label>
+                      Custo (última compra)
+                      <input
+                        type="number"
+                        value={form.cost}
+                        disabled={readOnly}
+                        onChange={(e) => {
+                          const cost = Number(e.target.value);
+                          setForm({
+                            ...form,
+                            cost,
+                            avgCost: form.avgCost || cost,
+                            lastPurchaseCost: cost,
+                          });
+                        }}
+                      />
+                    </label>
+                  ) : null}
+                  {!lite ? (
+                    <label>
+                      Custo médio
+                      <input
+                        type="number"
+                        value={form.avgCost}
+                        disabled={readOnly}
+                        onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
+                      />
+                    </label>
+                  ) : null}
+                  <label>
+                    Preço base
+                    <input
+                      type="number"
+                      value={form.price}
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    Taxa de cartão (%)
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={form.cardRate ?? ''}
+                      disabled={readOnly}
+                      placeholder="Padrão totem"
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          cardRate: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  {form.price > 0 ? (
+                    <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
+                      <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12, form.cardRate)}
+                      {form.cardRate !== undefined
+                        ? ` (com taxa de ${form.cardRate}% deste produto)`
+                        : ' (usando taxa padrão do totem)'}
+                    </p>
+                  ) : null}
+                  {!lite ? (
+                    <p className="empty span-2">
+                      Markup{' '}
+                      {form.avgCost || form.cost
+                        ? `${(((form.price - (form.avgCost || form.cost)) / (form.avgCost || form.cost)) * 100).toFixed(1)}%`
+                        : '—'}{' '}
+                      · margem{' '}
+                      {form.price
+                        ? `${(((form.price - (form.avgCost || form.cost)) / form.price) * 100).toFixed(1)}%`
+                        : '—'}{' '}
+                      ·{' '}
+                      <Link to="/erp/balanco">balanço</Link>
+                      {' · '}
+                      <Link to="/erp/movimentos">movimentos</Link>
+                      {' · '}
+                      <Link to="/erp/tabelas">tipos de preço</Link>
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            </>
+          )}
 
           {!lite ? (
             <article className="admin-card stock-form-card">

@@ -549,6 +549,7 @@ function toNestStockBody(item: StockItem) {
     minQty: item.minQty,
     cost: item.cost,
     price: item.price,
+    cardRate: item.cardRate,
     condition: item.condition,
     showOnTotem: item.showOnTotem,
     images: item.images?.length ? item.images : undefined,

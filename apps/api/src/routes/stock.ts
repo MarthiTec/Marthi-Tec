@@ -24,9 +24,29 @@ const stockItemSchema = z.object({
   trackLot: z.boolean().default(false),
   isKit: z.boolean().default(false),
   active: z.boolean().default(true),
+  attrs: z.record(z.any()).optional().default({}),
+  color: z.string().optional().default(''),
+  capacity: z.string().optional().default(''),
+  cardRate: z.coerce.number().optional().default(0),
+  showOnTotem: z.boolean().optional().default(true),
+  images: z.array(z.string()).optional().default([]),
 });
 
-function formatStockRow(row: any) {
+export function formatStockRow(row: any) {
+  let attrs: Record<string, string> = {};
+  if (typeof row.attrs === 'string') {
+    try { attrs = JSON.parse(row.attrs); } catch {}
+  } else if (row.attrs && typeof row.attrs === 'object') {
+    attrs = row.attrs;
+  }
+
+  let images: string[] = [];
+  if (typeof row.images === 'string') {
+    try { images = JSON.parse(row.images); } catch {}
+  } else if (Array.isArray(row.images)) {
+    images = row.images;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -35,19 +55,25 @@ function formatStockRow(row: any) {
     imei: row.imei || '',
     unit: row.unit || 'UN',
     qty: Number(row.qty) || 0,
-    minQty: Number(row.min_qty) || 0,
+    minQty: Number(row.min_qty ?? row.minQty) || 0,
     cost: Number(row.cost) || 0,
     price: Number(row.price) || 0,
     kind: row.kind,
     condition: row.condition,
     category: row.category || 'Geral',
     brand: row.brand || '',
-    supplierId: row.supplier_id || undefined,
-    trackLot: Boolean(row.track_lot),
-    isKit: Boolean(row.is_kit),
+    supplierId: row.supplier_id || row.supplierId || undefined,
+    trackLot: Boolean(row.track_lot ?? row.trackLot),
+    isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    attrs,
+    color: row.color || '',
+    capacity: row.capacity || '',
+    cardRate: Number(row.card_rate ?? row.cardRate) || 0,
+    showOnTotem: row.show_on_totem !== undefined ? Boolean(row.show_on_totem) : (row.showOnTotem !== undefined ? Boolean(row.showOnTotem) : true),
+    images,
+    createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
   };
 }
 
@@ -95,7 +121,8 @@ stockRouter.get('/api/v1/stock', requireAuth, async (req, res, next) => {
 
       const sql = `
         SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-               kind, condition, category, brand, supplier_id, track_lot, is_kit, active, created_at, updated_at
+               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+               attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
         FROM stock_items
         WHERE ${conditions.join(' AND ')}
         ORDER BY name ASC
@@ -118,7 +145,7 @@ stockRouter.get('/api/v1/stock', requireAuth, async (req, res, next) => {
       items = items.filter((i) => i.qty <= i.minQty);
     }
 
-    res.json({ success: true, data: items });
+    res.json({ success: true, data: items.map(formatStockRow) });
   } catch (error) {
     next(error);
   }
@@ -139,7 +166,8 @@ stockRouter.get('/api/v1/stock/lookup', requireAuth, async (req, res, next) => {
     if (pool) {
       const sql = `
         SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-               kind, condition, category, brand, supplier_id, track_lot, is_kit, active, created_at, updated_at
+               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+               attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
         FROM stock_items
         WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
         LIMIT 1
@@ -156,7 +184,7 @@ stockRouter.get('/api/v1/stock/lookup', requireAuth, async (req, res, next) => {
     const item = Array.from(memoryStock.values()).find(
       (i) => i.storeId === storeId && (i.barcode === code || i.sku === code || i.imei === code),
     );
-    res.json({ success: true, data: item || null });
+    res.json({ success: true, data: item ? formatStockRow(item) : null });
   } catch (error) {
     next(error);
   }
@@ -179,8 +207,9 @@ stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
         await client.query(
           `INSERT INTO stock_items (
             id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-            kind, condition, category, brand, supplier_id, track_lot, is_kit, active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+            kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+            attrs, color, capacity, card_rate, show_on_totem, images
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
           [
             id,
             storeId,
@@ -201,6 +230,12 @@ stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
             body.trackLot,
             body.isKit,
             body.active,
+            JSON.stringify(body.attrs || {}),
+            body.color || '',
+            body.capacity || '',
+            body.cardRate || 0,
+            body.showOnTotem !== undefined ? body.showOnTotem : true,
+            JSON.stringify(body.images || []),
           ],
         );
 
@@ -304,8 +339,14 @@ stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
                category = COALESCE($12, category),
                brand = COALESCE($13, brand),
                active = COALESCE($14, active),
+               attrs = COALESCE($15, attrs),
+               color = COALESCE($16, color),
+               capacity = COALESCE($17, capacity),
+               card_rate = COALESCE($18, card_rate),
+               show_on_totem = COALESCE($19, show_on_totem),
+               images = COALESCE($20, images),
                updated_at = now()
-           WHERE id = $15 AND store_id = $16`,
+           WHERE id = $21 AND store_id = $22`,
           [
             body.name,
             body.sku,
@@ -321,6 +362,12 @@ stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
             body.category,
             body.brand,
             body.active,
+            body.attrs !== undefined ? JSON.stringify(body.attrs) : null,
+            body.color,
+            body.capacity,
+            body.cardRate,
+            body.showOnTotem,
+            body.images !== undefined ? JSON.stringify(body.images) : null,
             id,
             storeId,
           ],
@@ -382,7 +429,9 @@ stockRouter.get('/api/v1/products', requireAuth, async (req, res, next) => {
 
     if (pool) {
       const itemsRes = await pool.query(
-        `SELECT id, name, sku, barcode, price, qty, category, brand, active
+        `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+                kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+                attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
          FROM stock_items
          WHERE store_id = $1 AND active = true
          ORDER BY name ASC`,
@@ -393,7 +442,7 @@ stockRouter.get('/api/v1/products', requireAuth, async (req, res, next) => {
     }
 
     const items = Array.from(memoryStock.values()).filter((i) => i.storeId === storeId && i.active !== false);
-    res.json({ success: true, data: items });
+    res.json({ success: true, data: items.map(formatStockRow) });
   } catch (error) {
     next(error);
   }
