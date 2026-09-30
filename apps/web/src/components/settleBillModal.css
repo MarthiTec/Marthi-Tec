@@ -1,0 +1,349 @@
+/* SettleBillModal - Modal de Baixa Financeira */
+.settle-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 14, 20, 0.65);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.settle-modal-card {
+  width: min(600px, 100%);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--line, rgba(16, 20, 24, 0.12));
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  color: var(--ink, #101418);
+  overflow: hidden;
+  animation: settleModalFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settleModalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.settle-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line, rgba(16, 20, 24, 0.08));
+}
+
+.settle-modal-header h2 {
+  margin: 4px 0 0 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.settle-modal-badge {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.settle-modal-badge.is-payable {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.settle-modal-badge.is-receivable {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.settle-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--mute, #5c6b66);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.settle-modal-close:hover {
+  background: var(--line, rgba(0, 0, 0, 0.06));
+  color: var(--ink, #101418);
+}
+
+.settle-modal-error {
+  margin: 12px 24px 0 24px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #b91c1c;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.settle-modal-summary {
+  background: var(--card-2, #f8fafc);
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line, rgba(16, 20, 24, 0.08));
+}
+
+.settle-summary-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+}
+
+.settle-summary-label {
+  color: var(--mute, #64748b);
+  min-width: 90px;
+}
+
+.settle-summary-value {
+  color: var(--ink, #0f172a);
+  word-break: break-word;
+}
+
+.settle-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line, rgba(16, 20, 24, 0.1));
+}
+
+.settle-summary-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--mute, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.settle-modal-form {
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.settle-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.settle-form-row--three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.settle-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settle-form-field span {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink, #1e293b);
+}
+
+.settle-form-field input {
+  padding: 9px 12px;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  border: 1px solid var(--line, rgba(16, 20, 24, 0.15));
+  background: var(--card, #ffffff);
+  color: var(--ink, #0f172a);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.settle-form-field input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.settle-field-hint {
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.settle-hint--warn {
+  color: #d97706;
+  font-weight: 500;
+}
+
+/* Card do Valor Líquido Efetivo */
+.settle-net-card {
+  background: var(--card-2, #f1f5f9);
+  border: 1px solid var(--line, rgba(16, 20, 24, 0.1));
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settle-net-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: var(--mute, #64748b);
+}
+
+.settle-tag--add {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.settle-tag--sub {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.settle-net-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1px dashed var(--line, rgba(0, 0, 0, 0.1));
+  padding-top: 6px;
+}
+
+.settle-net-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.settle-net-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.settle-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line, rgba(16, 20, 24, 0.08));
+  background: var(--card, #ffffff);
+}
+
+/* Tema Escuro (.is-theme-dark / .admin--dark) */
+.is-theme-dark .settle-modal-card,
+.admin--dark .settle-modal-card {
+  background: #151d2a;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.is-theme-dark .settle-modal-header,
+.admin--dark .settle-modal-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .settle-modal-summary,
+.admin--dark .settle-modal-summary {
+  background: #111823;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .settle-summary-sub,
+.admin--dark .settle-summary-sub,
+.is-theme-dark .settle-summary-label,
+.admin--dark .settle-summary-label {
+  color: #94a3b8;
+}
+
+.is-theme-dark .settle-summary-value,
+.admin--dark .settle-summary-value {
+  color: #f1f5f9;
+}
+
+.is-theme-dark .settle-form-field span,
+.admin--dark .settle-form-field span {
+  color: #e2e8f0;
+}
+
+.is-theme-dark .settle-form-field input,
+.admin--dark .settle-form-field input {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+}
+
+.is-theme-dark .settle-form-field input:focus,
+.admin--dark .settle-form-field input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.is-theme-dark .settle-net-card,
+.admin--dark .settle-net-card {
+  background: #192333;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.is-theme-dark .settle-net-label,
+.admin--dark .settle-net-label {
+  color: #f1f5f9;
+}
+
+.is-theme-dark .settle-modal-actions,
+.admin--dark .settle-modal-actions {
+  background: #151d2a;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Responsividade Mobile */
+@media (max-width: 600px) {
+  .settle-form-row,
+  .settle-form-row--three {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .settle-modal-card {
+    border-radius: 12px;
+  }
+
+  .settle-modal-header,
+  .settle-modal-summary,
+  .settle-modal-form,
+  .settle-modal-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

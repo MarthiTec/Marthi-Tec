@@ -17,6 +17,10 @@ const payableSchema = z.object({
   dueDate: z.string().min(4, 'Data de vencimento é obrigatória.'),
   accountId: z.string().optional().nullable(),
   notes: z.string().default(''),
+  documentNumber: z.string().optional().default(''),
+  invoiceId: z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().default(''),
+  invoiceType: z.string().optional().default(''),
 });
 
 const receivableSchema = z.object({
@@ -29,6 +33,24 @@ const receivableSchema = z.object({
   dueDate: z.string().min(4, 'Data de vencimento é obrigatória.'),
   accountId: z.string().optional().nullable(),
   notes: z.string().default(''),
+  documentNumber: z.string().optional().default(''),
+  invoiceId: z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().default(''),
+  invoiceType: z.string().optional().default(''),
+});
+
+const settleBillSchema = z.object({
+  amount: z.coerce.number().min(0.01, 'Valor da baixa deve ser maior que zero.').optional(),
+  interestAmount: z.coerce.number().min(0).default(0).optional(),
+  fineAmount: z.coerce.number().min(0).default(0).optional(),
+  discountAmount: z.coerce.number().min(0).default(0).optional(),
+  paymentDate: z.string().optional(),
+  accountId: z.string().optional().nullable(),
+  documentNumber: z.string().optional().default(''),
+  invoiceId: z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().default(''),
+  invoiceType: z.string().optional().default(''),
+  notes: z.string().optional().default(''),
 });
 
 const bankAccountSchema = z.object({
@@ -183,7 +205,8 @@ financeRouter.get('/api/v1/finance/payables', requireAuth, async (req, res, next
     if (pool) {
       const result = await pool.query(
         `SELECT id, description, supplier_id, supplier_name, category, amount, paid_amount,
-                due_date, status, account_id, paid_at, notes, created_at, updated_at
+                due_date, status, account_id, paid_at, notes, document_number, interest_amount,
+                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at
          FROM payables
          WHERE store_id = $1
          ORDER BY due_date ASC`,
@@ -204,6 +227,13 @@ financeRouter.get('/api/v1/finance/payables', requireAuth, async (req, res, next
           accountId: r.account_id || undefined,
           paidAt: r.paid_at || undefined,
           notes: r.notes || '',
+          documentNumber: r.document_number || '',
+          interestAmount: Number(r.interest_amount) || 0,
+          fineAmount: Number(r.fine_amount) || 0,
+          discountAmount: Number(r.discount_amount) || 0,
+          invoiceId: r.invoice_id || undefined,
+          invoiceNumber: r.invoice_number || '',
+          invoiceType: r.invoice_type || undefined,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         })),
@@ -228,8 +258,9 @@ financeRouter.post('/api/v1/finance/payables', requireAuth, async (req, res, nex
       await pool.query(
         `INSERT INTO payables (
           id, store_id, description, supplier_id, supplier_name, category, amount,
-          paid_amount, due_date, status, account_id, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10)`,
+          paid_amount, due_date, status, account_id, notes, document_number,
+          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14)`,
         [
           id,
           storeId,
@@ -241,6 +272,10 @@ financeRouter.post('/api/v1/finance/payables', requireAuth, async (req, res, nex
           body.dueDate,
           body.accountId || null,
           body.notes.trim(),
+          body.documentNumber || '',
+          body.invoiceId || null,
+          body.invoiceNumber || '',
+          body.invoiceType || '',
         ],
       );
       const resQuery = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
@@ -276,9 +311,27 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
          SET description = COALESCE($1, description), supplier_id = COALESCE($2, supplier_id),
              supplier_name = COALESCE($3, supplier_name), category = COALESCE($4, category),
              amount = COALESCE($5, amount), due_date = COALESCE($6, due_date),
-             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes), updated_at = now()
-         WHERE id = $9 AND store_id = $10`,
-        [body.description, body.supplierId, body.supplierName, body.category, body.amount, body.dueDate, body.accountId, body.notes, id, storeId],
+             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes),
+             document_number = COALESCE($9, document_number), invoice_id = COALESCE($10, invoice_id),
+             invoice_number = COALESCE($11, invoice_number), invoice_type = COALESCE($12, invoice_type),
+             updated_at = now()
+         WHERE id = $13 AND store_id = $14`,
+        [
+          body.description,
+          body.supplierId,
+          body.supplierName,
+          body.category,
+          body.amount,
+          body.dueDate,
+          body.accountId,
+          body.notes,
+          body.documentNumber,
+          body.invoiceId,
+          body.invoiceNumber,
+          body.invoiceType,
+          id,
+          storeId,
+        ],
       );
       const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
       res.json({ success: true, data: updated.rows[0] });
@@ -299,13 +352,14 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
 });
 
 /**
- * Baixar conta a pagar (com movimentação atômica no banco)
+ * Baixar conta a pagar (com movimentação atômica, juros, multa, desconto, pagamento parcial e vínculo fiscal)
  */
 financeRouter.post('/api/v1/finance/payables/:id/pay', requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
-    const paidAt = new Date().toISOString();
+    const body = settleBillSchema.parse(req.body || {});
+    const paidAt = body.paymentDate || new Date().toISOString();
 
     if (pool) {
       const client = await pool.connect();
@@ -320,27 +374,61 @@ financeRouter.post('/api/v1/finance/payables/:id/pay', requireAuth, async (req, 
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const totalAmount = Number(curr.amount) || 0;
+        const currentPaid = Number(curr.paid_amount) || 0;
+        const remaining = Math.max(0, totalAmount - currentPaid);
+        const payAmount = body.amount && body.amount > 0 ? Math.min(body.amount, remaining) : remaining;
+
+        const interest = Number(body.interestAmount) || 0;
+        const fine = Number(body.fineAmount) || 0;
+        const discount = Number(body.discountAmount) || 0;
+        const netAmount = Math.max(0, payAmount + interest + fine - discount);
+
+        const newPaidAmount = currentPaid + payAmount;
+        const isFullyPaid = newPaidAmount >= totalAmount - 0.001;
+        const nextStatus = isFullyPaid ? 'paid' : 'partial';
+
+        const accountId = body.accountId || curr.account_id;
+        const docNum = body.documentNumber || curr.document_number || '';
+        const invId = body.invoiceId || curr.invoice_id;
+        const invNum = body.invoiceNumber || curr.invoice_number || '';
 
         await client.query(
-          `UPDATE payables SET status = 'paid', paid_amount = amount, paid_at = now(), updated_at = now() WHERE id = $1`,
-          [id],
+          `UPDATE payables
+           SET status = $1, paid_amount = $2, paid_at = $3, updated_at = now(),
+               interest_amount = COALESCE(interest_amount, 0) + $4,
+               fine_amount = COALESCE(fine_amount, 0) + $5,
+               discount_amount = COALESCE(discount_amount, 0) + $6,
+               account_id = COALESCE($7, account_id),
+               document_number = COALESCE(NULLIF($8, ''), document_number),
+               invoice_id = COALESCE($9, invoice_id),
+               invoice_number = COALESCE(NULLIF($10, ''), invoice_number)
+           WHERE id = $11`,
+          [nextStatus, newPaidAmount, paidAt, interest, fine, discount, accountId, docNum, invId, invNum, id],
         );
 
-        // Registra saída no livro caixa
+        // Registra saída líquida no livro caixa
         const entryId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const noteParts = [
+          `Baixa ${isFullyPaid ? 'total' : 'parcial'}: ${curr.description}`,
+          docNum ? `Doc: ${docNum}` : null,
+          invNum ? `NF: ${invNum}` : null,
+          interest ? `+Juros R$ ${interest.toFixed(2)}` : null,
+          fine ? `+Multa R$ ${fine.toFixed(2)}` : null,
+          discount ? `-Desc R$ ${discount.toFixed(2)}` : null,
+        ].filter(Boolean).join(' · ');
+
         await client.query(
           `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name)
            VALUES ($1, $2, 'out', $3, $4, 'manual', $5, $6, $7, $8)`,
-          [entryId, storeId, `Pagamento: ${curr.description}`, amount, id, accountId, curr.category, req.user?.name || 'Operador'],
+          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador'],
         );
 
         // Debita da conta bancária se vinculada
         if (accountId) {
           await client.query(
             `UPDATE bank_accounts SET current_balance = current_balance - $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
+            [netAmount, accountId, storeId],
           );
         }
 
@@ -362,9 +450,13 @@ financeRouter.post('/api/v1/finance/payables/:id/pay', requireAuth, async (req, 
       res.status(404).json({ success: false, error: { message: 'Conta não encontrada.' } });
       return;
     }
-    curr.status = 'paid';
-    curr.paidAmount = curr.amount;
+    const payAmount = body.amount && body.amount > 0 ? body.amount : (curr.amount - curr.paidAmount);
+    curr.paidAmount = (curr.paidAmount || 0) + payAmount;
+    curr.status = curr.paidAmount >= curr.amount - 0.001 ? 'paid' : 'partial';
     curr.paidAt = paidAt;
+    curr.documentNumber = body.documentNumber || curr.documentNumber;
+    curr.invoiceId = body.invoiceId || curr.invoiceId;
+    curr.invoiceNumber = body.invoiceNumber || curr.invoiceNumber;
     res.json({ success: true, data: curr });
   } catch (error) {
     next(error);
@@ -460,7 +552,8 @@ financeRouter.get('/api/v1/finance/receivables', requireAuth, async (req, res, n
     if (pool) {
       const result = await pool.query(
         `SELECT id, description, customer_id, customer_name, category, amount, received_amount,
-                due_date, status, account_id, received_at, notes, created_at, updated_at
+                due_date, status, account_id, received_at, notes, document_number, interest_amount,
+                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at
          FROM receivables
          WHERE store_id = $1
          ORDER BY due_date ASC`,
@@ -481,6 +574,13 @@ financeRouter.get('/api/v1/finance/receivables', requireAuth, async (req, res, n
           accountId: r.account_id || undefined,
           receivedAt: r.received_at || undefined,
           notes: r.notes || '',
+          documentNumber: r.document_number || '',
+          interestAmount: Number(r.interest_amount) || 0,
+          fineAmount: Number(r.fine_amount) || 0,
+          discountAmount: Number(r.discount_amount) || 0,
+          invoiceId: r.invoice_id || undefined,
+          invoiceNumber: r.invoice_number || '',
+          invoiceType: r.invoice_type || undefined,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         })),
@@ -505,8 +605,9 @@ financeRouter.post('/api/v1/finance/receivables', requireAuth, async (req, res, 
       await pool.query(
         `INSERT INTO receivables (
           id, store_id, description, customer_id, customer_name, category, amount,
-          received_amount, due_date, status, account_id, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10)`,
+          received_amount, due_date, status, account_id, notes, document_number,
+          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14)`,
         [
           id,
           storeId,
@@ -518,6 +619,10 @@ financeRouter.post('/api/v1/finance/receivables', requireAuth, async (req, res, 
           body.dueDate,
           body.accountId || null,
           body.notes.trim(),
+          body.documentNumber || '',
+          body.invoiceId || null,
+          body.invoiceNumber || '',
+          body.invoiceType || '',
         ],
       );
       const resQuery = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
@@ -553,9 +658,27 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
          SET description = COALESCE($1, description), customer_id = COALESCE($2, customer_id),
              customer_name = COALESCE($3, customer_name), category = COALESCE($4, category),
              amount = COALESCE($5, amount), due_date = COALESCE($6, due_date),
-             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes), updated_at = now()
-         WHERE id = $9 AND store_id = $10`,
-        [body.description, body.customerId, body.customerName, body.category, body.amount, body.dueDate, body.accountId, body.notes, id, storeId],
+             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes),
+             document_number = COALESCE($9, document_number), invoice_id = COALESCE($10, invoice_id),
+             invoice_number = COALESCE($11, invoice_number), invoice_type = COALESCE($12, invoice_type),
+             updated_at = now()
+         WHERE id = $13 AND store_id = $14`,
+        [
+          body.description,
+          body.customerId,
+          body.customerName,
+          body.category,
+          body.amount,
+          body.dueDate,
+          body.accountId,
+          body.notes,
+          body.documentNumber,
+          body.invoiceId,
+          body.invoiceNumber,
+          body.invoiceType,
+          id,
+          storeId,
+        ],
       );
       const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
       res.json({ success: true, data: updated.rows[0] });
@@ -576,13 +699,14 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
 });
 
 /**
- * Baixar conta a receber
+ * Baixar conta a receber (com movimentação atômica, juros, multa, desconto, recebimento parcial e vínculo fiscal)
  */
 financeRouter.post('/api/v1/finance/receivables/:id/receive', requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
-    const receivedAt = new Date().toISOString();
+    const body = settleBillSchema.parse(req.body || {});
+    const receivedAt = body.paymentDate || new Date().toISOString();
 
     if (pool) {
       const client = await pool.connect();
@@ -597,27 +721,61 @@ financeRouter.post('/api/v1/finance/receivables/:id/receive', requireAuth, async
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const totalAmount = Number(curr.amount) || 0;
+        const currentReceived = Number(curr.received_amount) || 0;
+        const remaining = Math.max(0, totalAmount - currentReceived);
+        const receiveAmount = body.amount && body.amount > 0 ? Math.min(body.amount, remaining) : remaining;
+
+        const interest = Number(body.interestAmount) || 0;
+        const fine = Number(body.fineAmount) || 0;
+        const discount = Number(body.discountAmount) || 0;
+        const netAmount = Math.max(0, receiveAmount + interest + fine - discount);
+
+        const newReceivedAmount = currentReceived + receiveAmount;
+        const isFullyReceived = newReceivedAmount >= totalAmount - 0.001;
+        const nextStatus = isFullyReceived ? 'paid' : 'partial';
+
+        const accountId = body.accountId || curr.account_id;
+        const docNum = body.documentNumber || curr.document_number || '';
+        const invId = body.invoiceId || curr.invoice_id;
+        const invNum = body.invoiceNumber || curr.invoice_number || '';
 
         await client.query(
-          `UPDATE receivables SET status = 'paid', received_amount = amount, received_at = now(), updated_at = now() WHERE id = $1`,
-          [id],
+          `UPDATE receivables
+           SET status = $1, received_amount = $2, received_at = $3, updated_at = now(),
+               interest_amount = COALESCE(interest_amount, 0) + $4,
+               fine_amount = COALESCE(fine_amount, 0) + $5,
+               discount_amount = COALESCE(discount_amount, 0) + $6,
+               account_id = COALESCE($7, account_id),
+               document_number = COALESCE(NULLIF($8, ''), document_number),
+               invoice_id = COALESCE($9, invoice_id),
+               invoice_number = COALESCE(NULLIF($10, ''), invoice_number)
+           WHERE id = $11`,
+          [nextStatus, newReceivedAmount, receivedAt, interest, fine, discount, accountId, docNum, invId, invNum, id],
         );
 
-        // Registra entrada no livro caixa
+        // Registra entrada líquida no livro caixa
         const entryId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const noteParts = [
+          `Recebimento ${isFullyReceived ? 'total' : 'parcial'}: ${curr.description}`,
+          docNum ? `Doc: ${docNum}` : null,
+          invNum ? `NF: ${invNum}` : null,
+          interest ? `+Juros R$ ${interest.toFixed(2)}` : null,
+          fine ? `+Multa R$ ${fine.toFixed(2)}` : null,
+          discount ? `-Desc R$ ${discount.toFixed(2)}` : null,
+        ].filter(Boolean).join(' · ');
+
         await client.query(
           `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name)
            VALUES ($1, $2, 'in', $3, $4, 'manual', $5, $6, $7, $8)`,
-          [entryId, storeId, `Recebimento: ${curr.description}`, amount, id, accountId, curr.category, req.user?.name || 'Operador'],
+          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador'],
         );
 
         // Credita na conta bancária se vinculada
         if (accountId) {
           await client.query(
             `UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
+            [netAmount, accountId, storeId],
           );
         }
 
@@ -636,9 +794,13 @@ financeRouter.post('/api/v1/finance/receivables/:id/receive', requireAuth, async
 
     const curr = memoryReceivables.get(id);
     if (!curr || curr.storeId !== storeId) return res.status(404).json({ success: false });
-    curr.status = 'paid';
-    curr.receivedAmount = curr.amount;
+    const receiveAmount = body.amount && body.amount > 0 ? body.amount : (curr.amount - curr.receivedAmount);
+    curr.receivedAmount = (curr.receivedAmount || 0) + receiveAmount;
+    curr.status = curr.receivedAmount >= curr.amount - 0.001 ? 'paid' : 'partial';
     curr.receivedAt = receivedAt;
+    curr.documentNumber = body.documentNumber || curr.documentNumber;
+    curr.invoiceId = body.invoiceId || curr.invoiceId;
+    curr.invoiceNumber = body.invoiceNumber || curr.invoiceNumber;
     res.json({ success: true, data: curr });
   } catch (error) {
     next(error);

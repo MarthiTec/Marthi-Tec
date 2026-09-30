@@ -7,6 +7,7 @@ import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
+import { EvolutionWhatsAppSection } from '../../components/EvolutionWhatsAppSection';
 import {
   deleteOperationShortcut,
   listOperationShortcuts,
@@ -38,16 +39,16 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-type OpsTab = 'ramo' | 'atalhos' | 'usuarios';
+type OpsTab = 'ramo' | 'atalhos' | 'whatsapp' | 'usuarios';
 
-/** Ramo da loja, atalhos configuráveis e equipe da operação. */
+/** Ramo da loja, atalhos configuráveis, Evolution WhatsApp e equipe da operação. */
 export function OperationsPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
   const [tab, setTab] = useState<OpsTab>(() => {
-    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'usuarios') return tabParam;
+    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'whatsapp' || tabParam === 'usuarios') return tabParam;
     if (location.pathname.endsWith('/usuarios')) return 'usuarios';
     return 'ramo';
   });
@@ -219,12 +220,22 @@ export function OperationsPage() {
 
         <button
           type="button"
+          className={`btn ${tab === 'whatsapp' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('whatsapp')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="whatsapp" />
+          <span>WhatsApp &amp; Evolution API</span>
+        </button>
+
+        <button
+          type="button"
           className={`btn ${tab === 'usuarios' ? 'btn--primary' : 'btn--ghost'}`}
           onClick={() => switchTab('usuarios')}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
         >
           <AdminIcon name="people" />
-          <span>Equipe & Usuários da Loja</span>
+          <span>Equipe &amp; Usuários da Loja</span>
         </button>
       </div>
 
@@ -408,7 +419,12 @@ export function OperationsPage() {
         </>
       ) : null}
 
-      {/* ABA 3: Equipe & Usuários da Loja */}
+      {/* ABA 3: WhatsApp & Evolution API */}
+      {tab === 'whatsapp' ? (
+        <EvolutionWhatsAppSection />
+      ) : null}
+
+      {/* ABA 4: Equipe & Usuários da Loja */}
       {tab === 'usuarios' ? (
         <>
           <TeamPresenceBoard />

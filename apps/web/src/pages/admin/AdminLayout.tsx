@@ -179,7 +179,7 @@ export function AdminLayout() {
   }
 
   const userEmail = user.email;
-  const isAdmin = userIsStoreAdmin(userEmail);
+  const isAdmin = user?.role === 'admin' || userIsStoreAdmin(userEmail);
   const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
   const storeCustom = useStoreCustomization();
 

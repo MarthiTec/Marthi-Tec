@@ -311,31 +311,61 @@
 .admin.admin--dark .ops-form__status,
 .is-theme-dark .ops-form__grid label,
 .is-theme-dark .ops-form__status {
-  color: #cbd5e1;
+  color: var(--ink, #e8eef4);
+}
+
+.admin.admin--dark .ops-form__head h2,
+.admin.admin--dark .ops-board__head h2,
+.is-theme-dark .ops-form__head h2,
+.is-theme-dark .ops-board__head h2 {
+  color: var(--ink, #e8eef4);
+}
+
+.admin.admin--dark .ops-form__head p,
+.admin.admin--dark .ops-board__head p,
+.is-theme-dark .ops-form__head p,
+.is-theme-dark .ops-board__head p {
+  color: var(--mute, #94a3b8);
+}
+
+.admin.admin--dark .ops-users--ops,
+.is-theme-dark .ops-users--ops {
+  border-top-color: var(--line, rgba(255, 255, 255, 0.08));
+}
+
+.admin.admin--dark .ops-form,
+.is-theme-dark .ops-form,
+.admin.admin--dark .ops-board,
+.is-theme-dark .ops-board,
+.admin.admin--dark .evolution-whatsapp-card,
+.is-theme-dark .evolution-whatsapp-card {
+  background: var(--card, #171e27);
+  border-color: var(--line, rgba(255, 255, 255, 0.08));
+  color: var(--ink, #e8eef4);
 }
 
 .admin.admin--dark .ops-form__grid input,
 .admin.admin--dark .ops-form__grid select,
 .is-theme-dark .ops-form__grid input,
 .is-theme-dark .ops-form__grid select {
-  background: #121820;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #e8eef4;
+  background: var(--card-2, #121820);
+  border-color: var(--line, rgba(255, 255, 255, 0.14));
+  color: var(--ink, #e8eef4);
 }
 
 .admin.admin--dark .ops-form__grid input:focus,
 .admin.admin--dark .ops-form__grid select:focus,
 .is-theme-dark .ops-form__grid input:focus,
 .is-theme-dark .ops-form__grid select:focus {
-  border-color: #2dd4bf;
+  border-color: var(--accent, #2dd4bf);
   outline: none;
 }
 
 .admin.admin--dark .ops-status-toggle,
 .is-theme-dark .ops-status-toggle {
-  background: #171e27;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #e8eef4;
+  background: var(--card-2, #171e27);
+  border-color: var(--line, rgba(255, 255, 255, 0.14));
+  color: var(--ink, #e8eef4);
 }
 
 .admin.admin--dark .ops-status-toggle.is-on,
@@ -356,14 +386,14 @@
 .admin.admin--dark .ops-tile__panel,
 .is-theme-dark .ops-tile__link,
 .is-theme-dark .ops-tile__panel {
-  background: #171e27;
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #e8eef4;
+  background: var(--card, #171e27);
+  border-color: var(--line, rgba(255, 255, 255, 0.1));
+  color: var(--ink, #e8eef4);
 }
 
 .admin.admin--dark .ops-tile__link:hover,
 .is-theme-dark .ops-tile__link:hover {
-  background: #1c2430;
+  background: var(--card-2, #1c2430);
   border-color: var(--ops-accent, #2dd4bf);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
@@ -371,13 +401,13 @@
 .admin.admin--dark .ops-tile__link.is-disabled,
 .is-theme-dark .ops-tile__link.is-disabled {
   background: #131922;
-  color: #64748b;
+  color: var(--mute, #64748b);
   border-color: rgba(255, 255, 255, 0.05);
 }
 
 .admin.admin--dark .ops-tile__body small,
 .is-theme-dark .ops-tile__body small {
-  color: #94a3b8;
+  color: var(--mute, #94a3b8);
 }
 
 .admin.admin--dark .ops-tile__status,

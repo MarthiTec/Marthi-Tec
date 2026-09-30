@@ -24,12 +24,81 @@ export function ErpReportsPage() {
   const low = stock.filter((item) => stockBalanceStatus(item) === 'low');
   const recentMoves = listStockMovements(6);
 
+  function handleShareWhatsApp() {
+    const lines = [
+      `📊 *Marthi ERP - Relatório Geral da Operação*`,
+      `📅 *Emissão:* ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      '────────────────────────',
+      `🏦 *Tesouraria / Saldos:* ${money(totalTreasury())}`,
+      `📈 *A Receber (Aberto):* ${money(receivablesOpenTotal())}`,
+      `📉 *A Pagar (Aberto):* ${money(payablesOpenTotal())}`,
+      `🎯 *Resultado do Mês:* ${money(dre.result)} (Receita: ${money(dre.revenue)} | Despesas: ${money(dre.expenses)})`,
+      `📦 *Estoque Total a Custo:* ${money(snap.inventory)} (Venda estimada: ${money(snap.retail)})`,
+      `⚠️ *Itens com Estoque Baixo:* ${low.length}`,
+      '────────────────────────',
+      '_Emitido via Marthi ERP_',
+    ];
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(lines.join('\n'))}`;
+    window.open(url, '_blank');
+  }
+
+  function handleShareEmail() {
+    const subject = `Marthi ERP - Relatório Geral da Operação`;
+    const lines = [
+      `Marthi ERP - Relatório Geral da Operação`,
+      `Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`,
+      '',
+      `Tesouraria / Saldos: ${money(totalTreasury())}`,
+      `A Receber (Aberto): ${money(receivablesOpenTotal())}`,
+      `A Pagar (Aberto): ${money(payablesOpenTotal())}`,
+      `Resultado do Mês: ${money(dre.result)} (Receita: ${money(dre.revenue)} | Despesas: ${money(dre.expenses)})`,
+      `Estoque Total a Custo: ${money(snap.inventory)} (Venda estimada: ${money(snap.retail)})`,
+      `Itens com Estoque Baixo: ${low.length}`,
+      '',
+      'Enviado automaticamente pelo Marthi ERP.',
+    ];
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+  }
+
   return (
     <section className="admin-page">
-      <p className="empty" style={{ marginTop: 0 }}>
-        Demonstrativos rápidos da retaguarda. Para operação detalhada use financeiro, balanço e
-        movimentos.
-      </p>
+      <div className="dash-card__head" style={{ marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 className="admin-page__title" style={{ margin: 0 }}>Relatórios &amp; Indicadores</h1>
+          <p className="empty" style={{ margin: '4px 0 0 0' }}>
+            Demonstrativos rápidos da retaguarda financeira, estoque e movimentações da loja.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            style={{ fontSize: '0.84rem', padding: '7px 14px' }}
+            onClick={handleShareWhatsApp}
+            title="Compartilhar indicadores consolidados por WhatsApp"
+          >
+            📱 Enviar no WhatsApp
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ fontSize: '0.84rem', padding: '7px 14px' }}
+            onClick={handleShareEmail}
+            title="Enviar relatório por e-mail"
+          >
+            ✉️ Enviar por E-mail
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ fontSize: '0.84rem', padding: '7px 14px' }}
+            onClick={() => window.print()}
+            title="Imprimir ou salvar em PDF"
+          >
+            🖨️ Imprimir Relatório
+          </button>
+        </div>
+      </div>
 
       <div className="admin-grid">
         <article className="admin-card">

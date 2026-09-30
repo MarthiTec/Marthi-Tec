@@ -605,6 +605,13 @@ export type ApiPayable = {
   status: 'open' | 'partial' | 'paid' | 'cancelled';
   accountId: string;
   notes: string;
+  documentNumber?: string;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
@@ -621,6 +628,13 @@ export type ApiReceivable = {
   status: 'open' | 'partial' | 'paid' | 'cancelled';
   accountId: string;
   notes: string;
+  documentNumber?: string;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
   createdAt: string;
   updatedAt: string;
   receivedAt?: string;
@@ -697,9 +711,23 @@ export function apiUpdatePayable(
   return nestPatch<ApiPayable>(`/payables/${id}`, body);
 }
 
+export type ApiSettleBillPayload = {
+  amount?: number;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  accountId?: string;
+  at?: string;
+  documentNumber?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
+  notes?: string;
+};
+
 export function apiPayPayable(
   id: string,
-  body: { amount: number; accountId?: string; at?: string },
+  body: ApiSettleBillPayload | { amount: number; accountId?: string; at?: string },
 ) {
   return nestPost<ApiPayable>(`/payables/${id}/pay`, body);
 }
@@ -739,7 +767,7 @@ export function apiUpdateReceivable(
 
 export function apiReceiveReceivable(
   id: string,
-  body: { amount: number; accountId?: string; at?: string },
+  body: ApiSettleBillPayload | { amount: number; accountId?: string; at?: string },
 ) {
   return nestPost<ApiReceivable>(`/receivables/${id}/receive`, body);
 }

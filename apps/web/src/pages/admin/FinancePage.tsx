@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { SettleBillModal } from '../../components/SettleBillModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   addFinance,
@@ -31,8 +32,8 @@ import {
   receivablesOpenTotal,
   refundAdvance,
   REVENUE_CATEGORIES,
-  settlePayable,
-  settleReceivable,
+  settlePayableDetailed,
+  settleReceivableDetailed,
   totalTreasury,
   TREASURY_KIND_LABEL,
   upsertBankAccount,
@@ -40,6 +41,9 @@ import {
   upsertReceivable,
   type AdvanceKind,
   type BankAccountType,
+  type Payable,
+  type Receivable,
+  type SettleBillOptions,
   type TreasuryKind,
 } from '../../data/financeBook';
 import { listSuppliers } from '../../data/erpRegistry';
@@ -98,6 +102,33 @@ function parseTab(value: string | null): TabId {
 function parseMoney(raw: string) {
   const value = Number(raw.replace(',', '.'));
   return Number.isFinite(value) ? value : 0;
+}
+
+function shareFinancialReportWhatsApp(title: string, lines: string[]) {
+  const body = [
+    `📊 *Marthi ERP - ${title}*`,
+    `📅 *Data de Emissão:* ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+    '────────────────────────',
+    ...lines,
+    '────────────────────────',
+    '_Enviado automaticamente pelo Sistema Marthi ERP_',
+  ].join('\n');
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(body)}`;
+  window.open(url, '_blank');
+}
+
+function shareFinancialReportEmail(title: string, lines: string[]) {
+  const subject = `Marthi ERP - Relatório Financeiro: ${title}`;
+  const body = [
+    `Marthi ERP - ${title}`,
+    `Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+    '',
+    ...lines,
+    '',
+    'Enviado automaticamente pelo Sistema Marthi ERP.',
+  ].join('\n');
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
 }
 
 export function FinancePage() {
@@ -388,8 +419,57 @@ function ResumoPanel({
   onGo: (tab: TabId) => void;
   onSection: (section: SectionId) => void;
 }) {
+  function handleShareSummaryWhatsApp() {
+    const reportLines = [
+      `📑 *Resumo Financeiro Consolidado*`,
+      `💰 *Saldo em Caixa Operacional:* ${money(cashBalance)}`,
+      `🏦 *Tesouraria / Bancos:* ${money(treasuryTotal)}`,
+      `📈 *A Receber (Aberto):* ${money(receivables)}`,
+      `📉 *A Pagar (Aberto):* ${money(payables)}`,
+      `🎯 *Resultado do Mês (${dre.month}):* ${money(dre.result)}`,
+      `   • Receita: ${money(dre.revenue)}`,
+      `   • Despesas: ${money(dre.expenses)}`,
+      `🧾 *Boletos em Cobrança:* ${boletosOpen} (${money(boletosAmount)})`,
+    ];
+    shareFinancialReportWhatsApp('Resumo Financeiro Consolidado', reportLines);
+  }
+
+  function handleShareSummaryEmail() {
+    const reportLines = [
+      `Resumo Financeiro Consolidado`,
+      `Saldo em Caixa Operacional: ${money(cashBalance)}`,
+      `Tesouraria / Bancos: ${money(treasuryTotal)}`,
+      `A Receber (Aberto): ${money(receivables)}`,
+      `A Pagar (Aberto): ${money(payables)}`,
+      `Resultado do Mês (${dre.month}): ${money(dre.result)} (Receita: ${money(dre.revenue)} | Despesas: ${money(dre.expenses)})`,
+      `Boletos em Cobrança: ${boletosOpen} (${money(boletosAmount)})`,
+    ];
+    shareFinancialReportEmail('Resumo Financeiro Consolidado', reportLines);
+  }
+
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+          onClick={handleShareSummaryWhatsApp}
+          title="Compartilhar resumo financeiro por WhatsApp"
+        >
+          📱 Enviar Resumo por WhatsApp
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+          onClick={handleShareSummaryEmail}
+          title="Enviar resumo financeiro por e-mail"
+        >
+          ✉️ Enviar Resumo por E-mail
+        </button>
+      </div>
+
       <div className="admin-grid">
         <article className="admin-card">
           <h2>Saldo caixa</h2>
@@ -531,6 +611,35 @@ function ExtratoPanel({
     }
   }
 
+  function handleShareWhatsApp() {
+    const totalIn = entries.filter((e) => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+    const totalOut = entries.filter((e) => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+    const reportLines = [
+      `📑 *Extrato Financeiro Operacional*`,
+      `🟢 *Entradas:* +${money(totalIn)}`,
+      `🔴 *Saídas:* -${money(totalOut)}`,
+      `💰 *Saldo Líquido:* ${money(totalIn - totalOut)}`,
+      '',
+      ...entries.slice(0, 12).map((e) => `• ${new Date(e.createdAt).toLocaleDateString('pt-BR')} | ${e.label} | ${e.type === 'in' ? '+' : '-'}${money(e.amount)}`),
+      entries.length > 12 ? `... e mais ${entries.length - 12} lançamentos.` : '',
+    ].filter(Boolean);
+    shareFinancialReportWhatsApp('Extrato Operacional', reportLines);
+  }
+
+  function handleShareEmail() {
+    const totalIn = entries.filter((e) => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
+    const totalOut = entries.filter((e) => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
+    const reportLines = [
+      `Extrato Financeiro Operacional`,
+      `Entradas: +${money(totalIn)}`,
+      `Saídas: -${money(totalOut)}`,
+      `Saldo Líquido: ${money(totalIn - totalOut)}`,
+      '',
+      ...entries.map((e) => `${new Date(e.createdAt).toLocaleDateString('pt-BR')} | ${FINANCE_SOURCE_LABEL[e.source]} | ${e.label} | ${e.type === 'in' ? '+' : '-'}${money(e.amount)}`),
+    ];
+    shareFinancialReportEmail('Extrato Operacional', reportLines);
+  }
+
   return (
     <>
       <article className="admin-card">
@@ -561,21 +670,41 @@ function ExtratoPanel({
         </div>
       </article>
       <article className="admin-card">
-        <div className="admin-toolbar" style={{ marginBottom: 12 }}>
+        <div className="dash-card__head" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
           <h2 style={{ margin: 0, flex: 1 }}>Extrato</h2>
-          <AdminPicker
-            compact
-            label="Origem"
-            value={sourceFilter}
-            options={[
-              { value: 'all', label: 'Todas' },
-              ...(Object.keys(FINANCE_SOURCE_LABEL) as FinanceSource[]).map((key) => ({
-                value: key,
-                label: FINANCE_SOURCE_LABEL[key],
-              })),
-            ]}
-            onChange={(value) => setSourceFilter(value as 'all' | FinanceSource)}
-          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <AdminPicker
+              compact
+              label="Origem"
+              value={sourceFilter}
+              options={[
+                { value: 'all', label: 'Todas' },
+                ...(Object.keys(FINANCE_SOURCE_LABEL) as FinanceSource[]).map((key) => ({
+                  value: key,
+                  label: FINANCE_SOURCE_LABEL[key],
+                })),
+              ]}
+              onChange={(value) => setSourceFilter(value as 'all' | FinanceSource)}
+            />
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareWhatsApp}
+              title="Compartilhar extrato via WhatsApp"
+            >
+              📱 Enviar por WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareEmail}
+              title="Enviar extrato por e-mail"
+            >
+              ✉️ Enviar por E-mail
+            </button>
+          </div>
         </div>
         <table className="admin-table">
           <thead>
@@ -633,6 +762,8 @@ function PagarPanel({
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [settleItem, setSettleItem] = useState<Payable | null>(null);
 
   async function submit() {
     const result = await upsertPayable({
@@ -643,6 +774,7 @@ function PagarPanel({
       amount: parseMoney(amount),
       dueDate,
       accountId,
+      documentNumber: documentNumber.trim() || undefined,
     });
     if (!result.ok) {
       onError(result.error);
@@ -651,7 +783,44 @@ function PagarPanel({
     setDescription('');
     setSupplierName('');
     setAmount('');
+    setDocumentNumber('');
     onSaved(`Conta a pagar ${result.data.id}`);
+  }
+
+  async function handleConfirmSettle(options: SettleBillOptions) {
+    if (!settleItem) return;
+    const result = await settlePayableDetailed(settleItem.id, options);
+    if (!result.ok) {
+      onError(result.error);
+      throw new Error(result.error);
+    }
+    onSaved(`Baixa efetuada: ${settleItem.id} (${settleItem.description})`);
+    setSettleItem(null);
+  }
+
+  function handleShareWhatsApp() {
+    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
+    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.paidAmount), 0);
+    const lines = [
+      `📑 *Relatório de Contas a Pagar*`,
+      `🔴 *Total em Aberto:* ${money(totalOpen)} (${openItems.length} títulos)`,
+      '',
+      ...openItems.slice(0, 10).map((i) => `• ${i.description} (${i.supplierName || 'Avulso'}) - *${money(i.amount - i.paidAmount)}* (Venc: ${i.dueDate})${i.documentNumber ? ` [Doc: ${i.documentNumber}]` : ''}`),
+      openItems.length > 10 ? `... e mais ${openItems.length - 10} contas.` : '',
+    ].filter(Boolean);
+    shareFinancialReportWhatsApp('Contas a Pagar', lines);
+  }
+
+  function handleShareEmail() {
+    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
+    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.paidAmount), 0);
+    const lines = [
+      `Relatório de Contas a Pagar`,
+      `Total em Aberto: ${money(totalOpen)} (${openItems.length} títulos)`,
+      '',
+      ...openItems.map((i) => `- ${i.description} | ${i.supplierName || 'Avulso'} | ${money(i.amount - i.paidAmount)} | Venc: ${i.dueDate}${i.documentNumber ? ` | Doc: ${i.documentNumber}` : ''}`),
+    ];
+    shareFinancialReportEmail('Contas a Pagar', lines);
   }
 
   return (
@@ -685,12 +854,20 @@ function PagarPanel({
             onChange={setCategory}
           />
           <label>
-            Valor
+            Valor (R$)
             <input value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label>
             Vencimento
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
+          <label>
+            Nº Documento / Boleto / Nota
+            <input
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              placeholder="Ex: BOL-1290, NF-842"
+            />
           </label>
           <AdminPicker
             label="Conta para baixa"
@@ -705,12 +882,36 @@ function PagarPanel({
           </button>
         </div>
       </article>
+
       <article className="admin-card">
-        <h2>Contas a pagar</h2>
+        <div className="dash-card__head" style={{ marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>Contas a pagar</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareWhatsApp}
+              title="Compartilhar resumo das contas a pagar por WhatsApp"
+            >
+              📱 Enviar por WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareEmail}
+              title="Enviar relatório por e-mail"
+            >
+              ✉️ Enviar por E-mail
+            </button>
+          </div>
+        </div>
+
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Descrição</th>
+              <th>Descrição &amp; Detalhes</th>
               <th>Fornecedor</th>
               <th>Venc.</th>
               <th>Valor</th>
@@ -724,15 +925,23 @@ function PagarPanel({
               return (
                 <tr key={item.id} className={isOverdue(item.dueDate, item.status) ? 'is-overdue' : ''}>
                   <td>
-                    {item.description}
-                    <div className="empty">{item.category}</div>
+                    <strong>{item.description}</strong>
+                    <div className="empty" style={{ fontSize: '0.8rem', marginTop: 2 }}>
+                      {item.category}
+                      {item.documentNumber ? ` · Doc: ${item.documentNumber}` : ''}
+                      {item.invoiceNumber ? ` · 📑 ${item.invoiceNumber}` : ''}
+                      {item.interestAmount ? ` · +Juros: ${money(item.interestAmount)}` : ''}
+                      {item.discountAmount ? ` · -Desc: ${money(item.discountAmount)}` : ''}
+                    </div>
                   </td>
                   <td>{item.supplierName || '—'}</td>
                   <td>{item.dueDate}</td>
                   <td>
-                    {money(item.amount)}
+                    <strong>{money(item.amount)}</strong>
                     {item.paidAmount > 0 ? (
-                      <div className="empty">pago {money(item.paidAmount)}</div>
+                      <div className="empty" style={{ fontSize: '0.78rem' }}>
+                        restam {money(open)} · pago {money(item.paidAmount)}
+                      </div>
                     ) : null}
                   </td>
                   <td>{BILL_STATUS_LABEL[item.status]}</td>
@@ -741,14 +950,10 @@ function PagarPanel({
                       {item.status === 'open' || item.status === 'partial' ? (
                         <button
                           type="button"
-                          className="btn btn--ghost"
-                          onClick={() => {
-                            void (async () => {
-                              const result = await settlePayable(item.id, open);
-                              if (!result.ok) onError(result.error);
-                              else onSaved(`Baixa ${item.id}`);
-                            })();
-                          }}
+                          className="btn btn--primary"
+                          style={{ padding: '5px 12px', fontSize: '0.82rem' }}
+                          onClick={() => setSettleItem(item)}
+                          title="Dar baixa completa ou parcial com juros/multa/desconto"
                         >
                           Pagar
                         </button>
@@ -776,6 +981,15 @@ function PagarPanel({
           </tbody>
         </table>
       </article>
+
+      <SettleBillModal
+        open={Boolean(settleItem)}
+        kind="payable"
+        item={settleItem}
+        accounts={accounts}
+        onConfirm={handleConfirmSettle}
+        onClose={() => setSettleItem(null)}
+      />
     </>
   );
 }
@@ -797,6 +1011,8 @@ function ReceberPanel({
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [settleItem, setSettleItem] = useState<Receivable | null>(null);
 
   async function submit() {
     const result = await upsertReceivable({
@@ -806,6 +1022,7 @@ function ReceberPanel({
       amount: parseMoney(amount),
       dueDate,
       accountId,
+      documentNumber: documentNumber.trim() || undefined,
     });
     if (!result.ok) {
       onError(result.error);
@@ -814,7 +1031,44 @@ function ReceberPanel({
     setDescription('');
     setCustomerName('');
     setAmount('');
+    setDocumentNumber('');
     onSaved(`Conta a receber ${result.data.id}`);
+  }
+
+  async function handleConfirmSettle(options: SettleBillOptions) {
+    if (!settleItem) return;
+    const result = await settleReceivableDetailed(settleItem.id, options);
+    if (!result.ok) {
+      onError(result.error);
+      throw new Error(result.error);
+    }
+    onSaved(`Recebimento efetuado: ${settleItem.id} (${settleItem.description})`);
+    setSettleItem(null);
+  }
+
+  function handleShareWhatsApp() {
+    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
+    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.receivedAmount), 0);
+    const lines = [
+      `📈 *Relatório de Contas a Receber*`,
+      `🟢 *Total em Aberto:* ${money(totalOpen)} (${openItems.length} títulos)`,
+      '',
+      ...openItems.slice(0, 10).map((i) => `• ${i.description} (${i.customerName}) - *${money(i.amount - i.receivedAmount)}* (Venc: ${i.dueDate})${i.documentNumber ? ` [Doc: ${i.documentNumber}]` : ''}`),
+      openItems.length > 10 ? `... e mais ${openItems.length - 10} recebimentos pendentes.` : '',
+    ].filter(Boolean);
+    shareFinancialReportWhatsApp('Contas a Receber', lines);
+  }
+
+  function handleShareEmail() {
+    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
+    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.receivedAmount), 0);
+    const lines = [
+      `Relatório de Contas a Receber`,
+      `Total em Aberto: ${money(totalOpen)} (${openItems.length} títulos)`,
+      '',
+      ...openItems.map((i) => `- ${i.description} | ${i.customerName} | ${money(i.amount - i.receivedAmount)} | Venc: ${i.dueDate}${i.documentNumber ? ` | Doc: ${i.documentNumber}` : ''}`),
+    ];
+    shareFinancialReportEmail('Contas a Receber', lines);
   }
 
   return (
@@ -837,12 +1091,20 @@ function ReceberPanel({
             onChange={setCategory}
           />
           <label>
-            Valor
+            Valor (R$)
             <input value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label>
             Vencimento
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
+          <label>
+            Nº Documento / Boleto / Nota
+            <input
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              placeholder="Ex: BOL-1290, NF-842"
+            />
           </label>
           <AdminPicker
             label="Conta para baixa"
@@ -857,12 +1119,36 @@ function ReceberPanel({
           </button>
         </div>
       </article>
+
       <article className="admin-card">
-        <h2>Contas a receber</h2>
+        <div className="dash-card__head" style={{ marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>Contas a receber</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareWhatsApp}
+              title="Compartilhar resumo das contas a receber por WhatsApp"
+            >
+              📱 Enviar por WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              onClick={handleShareEmail}
+              title="Enviar relatório por e-mail"
+            >
+              ✉️ Enviar por E-mail
+            </button>
+          </div>
+        </div>
+
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Descrição</th>
+              <th>Descrição &amp; Detalhes</th>
               <th>Cliente</th>
               <th>Venc.</th>
               <th>Valor</th>
@@ -876,15 +1162,23 @@ function ReceberPanel({
               return (
                 <tr key={item.id} className={isOverdue(item.dueDate, item.status) ? 'is-overdue' : ''}>
                   <td>
-                    {item.description}
-                    <div className="empty">{item.category}</div>
+                    <strong>{item.description}</strong>
+                    <div className="empty" style={{ fontSize: '0.8rem', marginTop: 2 }}>
+                      {item.category}
+                      {item.documentNumber ? ` · Doc: ${item.documentNumber}` : ''}
+                      {item.invoiceNumber ? ` · 📑 ${item.invoiceNumber}` : ''}
+                      {item.interestAmount ? ` · +Juros: ${money(item.interestAmount)}` : ''}
+                      {item.discountAmount ? ` · -Desc: ${money(item.discountAmount)}` : ''}
+                    </div>
                   </td>
                   <td>{item.customerName}</td>
                   <td>{item.dueDate}</td>
                   <td>
-                    {money(item.amount)}
+                    <strong>{money(item.amount)}</strong>
                     {item.receivedAmount > 0 ? (
-                      <div className="empty">recebido {money(item.receivedAmount)}</div>
+                      <div className="empty" style={{ fontSize: '0.78rem' }}>
+                        restam {money(open)} · recebido {money(item.receivedAmount)}
+                      </div>
                     ) : null}
                   </td>
                   <td>{BILL_STATUS_LABEL[item.status]}</td>
@@ -893,14 +1187,10 @@ function ReceberPanel({
                       {item.status === 'open' || item.status === 'partial' ? (
                         <button
                           type="button"
-                          className="btn btn--ghost"
-                          onClick={() => {
-                            void (async () => {
-                              const result = await settleReceivable(item.id, open);
-                              if (!result.ok) onError(result.error);
-                              else onSaved(`Recebimento ${item.id}`);
-                            })();
-                          }}
+                          className="btn btn--primary"
+                          style={{ padding: '5px 12px', fontSize: '0.82rem' }}
+                          onClick={() => setSettleItem(item)}
+                          title="Dar baixa de recebimento com cálculo líquido e documento"
                         >
                           Receber
                         </button>
@@ -928,6 +1218,15 @@ function ReceberPanel({
           </tbody>
         </table>
       </article>
+
+      <SettleBillModal
+        open={Boolean(settleItem)}
+        kind="receivable"
+        item={settleItem}
+        accounts={accounts}
+        onConfirm={handleConfirmSettle}
+        onClose={() => setSettleItem(null)}
+      />
     </>
   );
 }
@@ -1304,15 +1603,59 @@ function DrePanel({
   lines: ReturnType<typeof buildDre>['lines'];
   result: number;
 }) {
+  function handleShareWhatsApp() {
+    const reportLines = [
+      `📑 *Demonstrativo de Resultado do Exercício (DRE)*`,
+      `🗓️ *Mês de Referência:* ${month}`,
+      `💰 *Resultado Líquido do Período:* ${money(result)}`,
+      '',
+      ...lines.map((l) => `${l.kind === 'total' ? '🔹 *' : '• '}${l.label}: ${money(l.amount)}${l.kind === 'total' ? '*' : ''}`),
+    ];
+    shareFinancialReportWhatsApp(`DRE ${month}`, reportLines);
+  }
+
+  function handleShareEmail() {
+    const reportLines = [
+      `Demonstrativo de Resultado do Exercício (DRE) - ${month}`,
+      `Resultado Líquido do Período: ${money(result)}`,
+      '',
+      ...lines.map((l) => `${l.label}: ${money(l.amount)}`),
+    ];
+    shareFinancialReportEmail(`DRE ${month}`, reportLines);
+  }
+
   return (
     <article className="admin-card">
-      <div className="dash-card__head">
-        <h2>DRE · {month}</h2>
-        <strong className={result >= 0 ? 'price-red' : 'qty-low'}>{money(result)}</strong>
+      <div className="dash-card__head" style={{ flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>DRE · {month}</h2>
+          <strong className={result >= 0 ? 'price-red' : 'qty-low'} style={{ fontSize: '1.25rem', marginTop: 4, display: 'inline-block' }}>
+            {money(result)}
+          </strong>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+            onClick={handleShareWhatsApp}
+            title="Compartilhar DRE via WhatsApp"
+          >
+            📱 Enviar DRE por WhatsApp
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+            onClick={handleShareEmail}
+            title="Enviar DRE por e-mail"
+          >
+            ✉️ Enviar DRE por E-mail
+          </button>
+        </div>
       </div>
       <p className="empty">
-        Demonstrativo simplificado: caixa do mês + baixas de contas a pagar/receber. MVP local —
-        depois consolida no backend.
+        Demonstrativo consolidado: fluxo de caixa + baixas com juros/multas/descontos e vínculos fiscais.
       </p>
       <table className="admin-table fin-dre-table">
         <thead>

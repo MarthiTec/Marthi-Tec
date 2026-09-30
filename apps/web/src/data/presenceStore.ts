@@ -88,15 +88,22 @@ function empty(): State {
   return { entries: [] };
 }
 
-function isMockPresence(entry: TeamPresence): boolean {
-  const name = entry.displayName.toLowerCase();
+function isMockPresence(entry: { displayName?: string; email?: string; userKey?: string }): boolean {
+  const name = (entry.displayName || '').toLowerCase();
   const mail = (entry.email || '').toLowerCase();
+  const key = (entry.userKey || '').toLowerCase();
   return (
     name.includes('marthi basic') ||
     name.includes('marthi teste') ||
-    name === 'operador' ||
+    name.trim() === 'operador' ||
+    name.trim() === 'operador caixa' ||
+    name.includes('administrador da loja') ||
     mail.includes('@loja.local') ||
-    mail.includes('@celsul.local')
+    mail.includes('@celsul.local') ||
+    mail.includes('@parceiro.local') ||
+    key.includes('marthi basic') ||
+    key.includes('marthi teste') ||
+    key === 'local:operador'
   );
 }
 
@@ -141,12 +148,12 @@ export function getPresence(userKey: string): TeamPresence | null {
 }
 
 export function listPresenceEntries() {
-  return [...load().entries].sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
+  return [...load().entries].filter((e) => !isMockPresence(e)).sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
 }
 
 /** Equipe do ERP + presença ao vivo (quem está logado / onde / status). */
 export function listTeamPresenceBoard(currentUserKey?: string): TeamPresence[] {
-  const employees = listEmployees(true).filter((e) => e.isSystemUser);
+  const employees = listEmployees(true).filter((e) => e.isSystemUser && !isMockPresence({ displayName: e.name, email: e.userEmail || e.email }));
   const live = listPresenceEntries();
   const liveByKey = new Map(live.map((item) => [item.userKey, item]));
   const stamp = now();
@@ -154,9 +161,10 @@ export function listTeamPresenceBoard(currentUserKey?: string): TeamPresence[] {
   const byKey = new Map<string, TeamPresence>();
 
   for (const employee of employees) {
+    if (isMockPresence({ displayName: employee.name, email: employee.userEmail || employee.email })) continue;
     const key = resolvePresenceUserKey(employee.userEmail || employee.email, employee.name);
     const existing = liveByKey.get(key);
-    if (existing) {
+    if (existing && !isMockPresence(existing)) {
       byKey.set(key, {
         ...existing,
         displayName: employee.name || existing.displayName,

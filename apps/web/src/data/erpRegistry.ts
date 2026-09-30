@@ -278,6 +278,7 @@ function load(): RegistryState {
         mail &&
           (mail.includes('@loja.local') ||
             mail.includes('@celsul.local') ||
+            mail.includes('@parceiro.local') ||
             (isRealClientTenant() && mail.includes('teste@marthi.com.br'))),
       );
     const isMockName = (name?: string) =>
@@ -287,6 +288,10 @@ function load(): RegistryState {
             name === 'Bruno Vendas' ||
             name === 'Distribuidora Celular Sul' ||
             name === 'Administrador da loja' ||
+            name.toLowerCase().includes('marthi basic') ||
+            name.toLowerCase().includes('marthi teste') ||
+            name.trim().toLowerCase() === 'operador' ||
+            name.trim().toLowerCase() === 'operador caixa' ||
             (isRealClientTenant() && name === 'Operador Caixa')),
       );
     const sellers = (Array.isArray(parsed.sellers) ? parsed.sellers : []).filter(

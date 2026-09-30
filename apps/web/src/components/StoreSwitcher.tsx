@@ -62,29 +62,23 @@ export function StoreSwitcher({ compact = false }: StoreSwitcherProps) {
   return (
     <div className={`store-switcher ${compact ? 'store-switcher--compact' : ''}`} ref={menuRef}>
       {compact ? (
-        /* Modo compacto: apenas ícone de loja */
+        /* Modo compacto: ícone + nome da loja + chevron */
         <button
           type="button"
-          className={`store-switcher__icon-btn ${open ? 'is-open' : ''}`}
+          className={`store-switcher__compact-btn ${open ? 'is-open' : ''}`}
           onClick={() => setOpen((prev) => !prev)}
-          title={`${activeStore.name} · ${activeStore.isMatrix ? 'Matriz' : 'Filial'} · Trocar loja`}
+          title={`${activeStore.name} · ${activeStore.isMatrix ? 'Matriz' : 'Filial'} · Clique para alternar loja`}
           aria-label="Selecionar loja"
           aria-expanded={open}
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
+          <span className="store-switcher__compact-icon" aria-hidden="true">🏢</span>
+          <span className="store-switcher__compact-name">{activeStore.name}</span>
+          {activeStore.isMatrix && (
+            <span className="store-switcher__compact-tag">Matriz</span>
+          )}
+          <span className="store-switcher__chevron" aria-hidden="true">▾</span>
           {stores.length > 1 && (
-            <span className="store-switcher__icon-btn-badge" aria-hidden>
+            <span className="store-switcher__icon-btn-badge" aria-hidden="true" title={`${stores.filter((s) => s.active).length} lojas ativas`}>
               {stores.filter((s) => s.active).length}
             </span>
           )}

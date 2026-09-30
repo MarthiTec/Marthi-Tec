@@ -15,6 +15,7 @@ import { financeRouter } from './routes/finance.js';
 import { posRouter } from './routes/pos.js';
 import { profileRouter } from './routes/profile.js';
 import { totemRouter } from './routes/totem.js';
+import { whatsappRouter } from './routes/whatsapp.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
@@ -63,6 +64,7 @@ app.use(financeRouter);
 app.use(posRouter);
 app.use(profileRouter);
 app.use(totemRouter);
+app.use(whatsappRouter);
 
 // Proxy residual para qualquer rota externa legada
 app.use(proxyUnmatchedApi);

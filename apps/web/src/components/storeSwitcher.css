@@ -4,7 +4,64 @@
   align-items: center;
 }
 
-/* ── Compact mode: icon-only button ── */
+/* ── Compact mode: compact pill with store name & switcher ── */
+.store-switcher__compact-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+  max-width: 220px;
+}
+
+.store-switcher__compact-btn:hover,
+.store-switcher__compact-btn.is-open {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(45, 212, 191, 0.5);
+  color: #fff;
+}
+
+.store-switcher__compact-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.store-switcher__compact-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(45, 212, 191, 0.2);
+  color: #2dd4bf;
+}
+
+.is-theme-light .store-switcher__compact-btn,
+body:not(.is-theme-dark) .admin__brand .store-switcher__compact-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+}
+
+.is-theme-light .store-switcher__compact-btn:hover,
+body:not(.is-theme-dark) .admin__brand .store-switcher__compact-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(15, 118, 110, 0.4);
+}
+
 .store-switcher__icon-btn {
   position: relative;
   display: flex;

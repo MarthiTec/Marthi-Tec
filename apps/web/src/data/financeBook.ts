@@ -1,4 +1,4 @@
-import { getAdminState, type FinanceEntry } from './adminStore';
+import { addFinance, getAdminState, type FinanceEntry } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import {
   apiApplyAdvance,
@@ -45,6 +45,20 @@ export type BankAccount = {
 
 export type BillStatus = 'open' | 'partial' | 'paid' | 'cancelled';
 
+export type SettleBillOptions = {
+  amount: number;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  paymentDate?: string;
+  accountId?: string;
+  documentNumber?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
+  notes?: string;
+};
+
 export type Payable = {
   id: string;
   description: string;
@@ -57,6 +71,13 @@ export type Payable = {
   status: BillStatus;
   accountId: string;
   notes: string;
+  documentNumber?: string;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
@@ -73,6 +94,13 @@ export type Receivable = {
   status: BillStatus;
   accountId: string;
   notes: string;
+  documentNumber?: string;
+  interestAmount?: number;
+  fineAmount?: number;
+  discountAmount?: number;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
   createdAt: string;
   updatedAt: string;
   receivedAt?: string;
@@ -248,6 +276,13 @@ function mapPayable(row: ApiPayable): Payable {
     status: row.status,
     accountId: row.accountId,
     notes: row.notes ?? '',
+    documentNumber: row.documentNumber,
+    interestAmount: row.interestAmount,
+    fineAmount: row.fineAmount,
+    discountAmount: row.discountAmount,
+    invoiceId: row.invoiceId,
+    invoiceNumber: row.invoiceNumber,
+    invoiceType: row.invoiceType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     paidAt: row.paidAt,
@@ -266,6 +301,13 @@ function mapReceivable(row: ApiReceivable): Receivable {
     status: row.status,
     accountId: row.accountId,
     notes: row.notes ?? '',
+    documentNumber: row.documentNumber,
+    interestAmount: row.interestAmount,
+    fineAmount: row.fineAmount,
+    discountAmount: row.discountAmount,
+    invoiceId: row.invoiceId,
+    invoiceNumber: row.invoiceNumber,
+    invoiceType: row.invoiceType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     receivedAt: row.receivedAt,
@@ -514,6 +556,10 @@ export async function upsertPayable(input: {
   dueDate: string;
   accountId: string;
   notes?: string;
+  documentNumber?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
 }): Promise<BookResult<Payable>> {
   if (!input.description.trim()) return { ok: false, error: 'Informe a descrição.' };
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
@@ -532,6 +578,10 @@ export async function upsertPayable(input: {
         dueDate: input.dueDate || today(),
         accountId: input.accountId,
         notes: (input.notes ?? '').trim(),
+        documentNumber: input.documentNumber,
+        invoiceId: input.invoiceId,
+        invoiceNumber: input.invoiceNumber,
+        invoiceType: input.invoiceType,
       };
       const row = input.id
         ? await apiUpdatePayable(input.id, body)
@@ -564,6 +614,10 @@ export async function upsertPayable(input: {
       dueDate: input.dueDate || today(),
       accountId: input.accountId,
       notes: (input.notes ?? '').trim(),
+      documentNumber: input.documentNumber ?? current.documentNumber,
+      invoiceId: input.invoiceId ?? current.invoiceId,
+      invoiceNumber: input.invoiceNumber ?? current.invoiceNumber,
+      invoiceType: input.invoiceType ?? current.invoiceType,
       updatedAt: stamp,
     };
     state.payables = state.payables.map((item) => (item.id === input.id ? next : item));
@@ -582,6 +636,10 @@ export async function upsertPayable(input: {
     status: 'open',
     accountId: input.accountId,
     notes: (input.notes ?? '').trim(),
+    documentNumber: input.documentNumber,
+    invoiceId: input.invoiceId,
+    invoiceNumber: input.invoiceNumber,
+    invoiceType: input.invoiceType,
     createdAt: stamp,
     updatedAt: stamp,
   };
@@ -599,6 +657,10 @@ export async function upsertReceivable(input: {
   dueDate: string;
   accountId: string;
   notes?: string;
+  documentNumber?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceType?: string;
 }): Promise<BookResult<Receivable>> {
   if (!input.description.trim()) return { ok: false, error: 'Informe a descrição.' };
   if (!input.customerName.trim()) return { ok: false, error: 'Informe o cliente.' };
@@ -616,6 +678,10 @@ export async function upsertReceivable(input: {
         dueDate: input.dueDate || today(),
         accountId: input.accountId,
         notes: (input.notes ?? '').trim(),
+        documentNumber: input.documentNumber,
+        invoiceId: input.invoiceId,
+        invoiceNumber: input.invoiceNumber,
+        invoiceType: input.invoiceType,
       };
       const row = input.id
         ? await apiUpdateReceivable(input.id, body)
@@ -647,6 +713,10 @@ export async function upsertReceivable(input: {
       dueDate: input.dueDate || today(),
       accountId: input.accountId,
       notes: (input.notes ?? '').trim(),
+      documentNumber: input.documentNumber ?? current.documentNumber,
+      invoiceId: input.invoiceId ?? current.invoiceId,
+      invoiceNumber: input.invoiceNumber ?? current.invoiceNumber,
+      invoiceType: input.invoiceType ?? current.invoiceType,
       updatedAt: stamp,
     };
     state.receivables = state.receivables.map((item) => (item.id === input.id ? next : item));
@@ -664,6 +734,10 @@ export async function upsertReceivable(input: {
     status: 'open',
     accountId: input.accountId,
     notes: (input.notes ?? '').trim(),
+    documentNumber: input.documentNumber,
+    invoiceId: input.invoiceId,
+    invoiceNumber: input.invoiceNumber,
+    invoiceType: input.invoiceType,
     createdAt: stamp,
     updatedAt: stamp,
   };
@@ -672,10 +746,31 @@ export async function upsertReceivable(input: {
   return { ok: true, data: created };
 }
 
-export async function settlePayable(id: string, amount: number): Promise<BookResult<Payable>> {
+export async function settlePayableDetailed(
+  id: string,
+  options: SettleBillOptions,
+): Promise<BookResult<Payable>> {
+  const amount = Number(options.amount) || 0;
+  const interestAmount = Number(options.interestAmount) || 0;
+  const fineAmount = Number(options.fineAmount) || 0;
+  const discountAmount = Number(options.discountAmount) || 0;
+  const netAmount = Math.max(0, amount + interestAmount + fineAmount - discountAmount);
+
   if (isNestAuthed()) {
     try {
-      const row = await apiPayPayable(id, { amount });
+      const row = await apiPayPayable(id, {
+        amount,
+        interestAmount,
+        fineAmount,
+        discountAmount,
+        accountId: options.accountId,
+        at: options.paymentDate,
+        documentNumber: options.documentNumber,
+        invoiceId: options.invoiceId,
+        invoiceNumber: options.invoiceNumber,
+        invoiceType: options.invoiceType,
+        notes: options.notes,
+      });
       const mapped = mapPayable(row);
       const state = load();
       putPayable(state, mapped);
@@ -695,26 +790,70 @@ export async function settlePayable(id: string, amount: number): Promise<BookRes
   const pay = Math.min(openRemainderPayable(current), Math.max(0, amount));
   if (pay <= 0) return { ok: false, error: 'Informe um valor válido.' };
   const paidAmount = current.paidAmount + pay;
-  const stamp = now();
+  const stamp = options.paymentDate ? `${options.paymentDate}T12:00:00.000Z` : now();
   const next: Payable = {
     ...current,
     paidAmount,
     status: paidAmount >= current.amount - 0.001 ? 'paid' : 'partial',
     paidAt: paidAmount >= current.amount - 0.001 ? stamp : current.paidAt,
-    updatedAt: stamp,
+    accountId: options.accountId || current.accountId,
+    documentNumber: options.documentNumber || current.documentNumber,
+    interestAmount: (current.interestAmount || 0) + interestAmount,
+    fineAmount: (current.fineAmount || 0) + fineAmount,
+    discountAmount: (current.discountAmount || 0) + discountAmount,
+    invoiceId: options.invoiceId || current.invoiceId,
+    invoiceNumber: options.invoiceNumber || current.invoiceNumber,
+    invoiceType: options.invoiceType || current.invoiceType,
+    updatedAt: now(),
   };
   state.payables = state.payables.map((item) => (item.id === id ? next : item));
   save(state);
+
+  // Registra no livro caixa (extrato)
+  try {
+    await addFinance({
+      type: 'out',
+      amount: netAmount,
+      label: `Baixa Pagamento: ${current.description}${options.documentNumber ? ` (Doc: ${options.documentNumber})` : ''}`,
+      source: 'manual',
+      refId: current.id,
+    });
+  } catch (e) {
+    console.warn('[financeBook] addFinance erro ao registrar baixa:', e);
+  }
+
   return { ok: true, data: next };
 }
 
-export async function settleReceivable(
+export async function settlePayable(id: string, amount: number): Promise<BookResult<Payable>> {
+  return settlePayableDetailed(id, { amount });
+}
+
+export async function settleReceivableDetailed(
   id: string,
-  amount: number,
+  options: SettleBillOptions,
 ): Promise<BookResult<Receivable>> {
+  const amount = Number(options.amount) || 0;
+  const interestAmount = Number(options.interestAmount) || 0;
+  const fineAmount = Number(options.fineAmount) || 0;
+  const discountAmount = Number(options.discountAmount) || 0;
+  const netAmount = Math.max(0, amount + interestAmount + fineAmount - discountAmount);
+
   if (isNestAuthed()) {
     try {
-      const row = await apiReceiveReceivable(id, { amount });
+      const row = await apiReceiveReceivable(id, {
+        amount,
+        interestAmount,
+        fineAmount,
+        discountAmount,
+        accountId: options.accountId,
+        at: options.paymentDate,
+        documentNumber: options.documentNumber,
+        invoiceId: options.invoiceId,
+        invoiceNumber: options.invoiceNumber,
+        invoiceType: options.invoiceType,
+        notes: options.notes,
+      });
       const mapped = mapReceivable(row);
       const state = load();
       putReceivable(state, mapped);
@@ -734,17 +873,46 @@ export async function settleReceivable(
   const receive = Math.min(openRemainderReceivable(current), Math.max(0, amount));
   if (receive <= 0) return { ok: false, error: 'Informe um valor válido.' };
   const receivedAmount = current.receivedAmount + receive;
-  const stamp = now();
+  const stamp = options.paymentDate ? `${options.paymentDate}T12:00:00.000Z` : now();
   const next: Receivable = {
     ...current,
     receivedAmount,
     status: receivedAmount >= current.amount - 0.001 ? 'paid' : 'partial',
     receivedAt: receivedAmount >= current.amount - 0.001 ? stamp : current.receivedAt,
-    updatedAt: stamp,
+    accountId: options.accountId || current.accountId,
+    documentNumber: options.documentNumber || current.documentNumber,
+    interestAmount: (current.interestAmount || 0) + interestAmount,
+    fineAmount: (current.fineAmount || 0) + fineAmount,
+    discountAmount: (current.discountAmount || 0) + discountAmount,
+    invoiceId: options.invoiceId || current.invoiceId,
+    invoiceNumber: options.invoiceNumber || current.invoiceNumber,
+    invoiceType: options.invoiceType || current.invoiceType,
+    updatedAt: now(),
   };
   state.receivables = state.receivables.map((item) => (item.id === id ? next : item));
   save(state);
+
+  // Registra no livro caixa (extrato)
+  try {
+    await addFinance({
+      type: 'in',
+      amount: netAmount,
+      label: `Recebimento: ${current.description}${options.documentNumber ? ` (Doc: ${options.documentNumber})` : ''}`,
+      source: 'manual',
+      refId: current.id,
+    });
+  } catch (e) {
+    console.warn('[financeBook] addFinance erro ao registrar recebimento:', e);
+  }
+
   return { ok: true, data: next };
+}
+
+export async function settleReceivable(
+  id: string,
+  amount: number,
+): Promise<BookResult<Receivable>> {
+  return settleReceivableDetailed(id, { amount });
 }
 
 export async function cancelBill(

@@ -401,8 +401,16 @@ export function getClientAccount(): ClientAccount {
   cleanLegacyMocks();
   const key = tenantScopedKey(STORAGE_KEY_CLIENT_ACCOUNT);
   const account = readJson<ClientAccount>(key, resolveDefaultClientAccount());
-  if (account.legalName.includes('Grupo Varejista') || account.document.includes('12.345.678')) {
-    return resolveDefaultClientAccount();
+  if (
+    account.legalName.includes('Grupo Varejista') ||
+    account.document.includes('12.345.678') ||
+    account.document === '00.000.000/0001-00' ||
+    !account.document ||
+    account.tradeName === 'Gilvan Teodo'
+  ) {
+    const fixed = resolveDefaultClientAccount();
+    writeJson(key, fixed);
+    return fixed;
   }
   return account;
 }
@@ -435,20 +443,32 @@ export function listStores(): Store[] {
 
   const list = filtered.length === 0 ? fallback : filtered;
 
-  // Garante que toda loja tenha seu Token de Acesso exclusivo preenchido
-  let hasMissingToken = false;
+  // Garante que toda loja tenha seu Token de Acesso exclusivo preenchido e CNPJ real
+  let hasUpdated = false;
   const withTokens = list.map((s) => {
-    if (!s.accessToken) {
-      hasMissingToken = true;
-      return {
+    let currentStore = s;
+    if (s.cnpj === '00.000.000/0001-00' || !s.cnpj || s.name === 'Gilvan Teodo') {
+      currentStore = {
         ...s,
-        accessToken: generateStoreAccessToken(s.cnpj, s.email, s.id),
+        cnpj: '61.506.270/0001-63',
+        name: s.isMatrix ? 'Cell Ponto Matriz' : s.name,
+        tradeName: s.isMatrix ? 'Cell Ponto' : s.tradeName,
+        city: 'Três Rios',
+        state: 'RJ',
+      };
+      hasUpdated = true;
+    }
+    if (!currentStore.accessToken) {
+      hasUpdated = true;
+      return {
+        ...currentStore,
+        accessToken: generateStoreAccessToken(currentStore.cnpj, currentStore.email, currentStore.id),
       };
     }
-    return s;
+    return currentStore;
   });
 
-  if (hasMissingToken) {
+  if (hasUpdated) {
     writeJson(key, withTokens);
   }
 
