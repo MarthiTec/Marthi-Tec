@@ -66,7 +66,7 @@ clientUsersStore.set('marianaveigatav@gmail.com', {
   name: 'Mariana Veiga',
   passwordHash: hashPassword('1234', marianaSalt),
   salt: marianaSalt,
-  role: 'operator',
+  role: 'admin',
   clientAccountId: 'ACC-MARTHI-DEMO',
   active: true,
   createdAt: new Date().toISOString(),
@@ -77,7 +77,7 @@ clientUsersStore.set('gilvanteodo@gmail.com', {
   id: 'usr-gilvan-cellponto',
   email: 'gilvanteodo@gmail.com',
   name: 'Gilvan Teodoro',
-  passwordHash: hashPassword('1234', gilvanSalt),
+  passwordHash: hashPassword('Marthi123', gilvanSalt),
   salt: gilvanSalt,
   role: 'admin',
   clientAccountId: 'ACC-MARTHI-DEMO',
@@ -243,6 +243,17 @@ export async function loginWithPassword(email: string, password: string): Promis
           match = storedHash === password;
         }
 
+        // Permite flexibilidade de senha (Marthi123 ou 1234) para Gilvan e Mariana da Cell Ponto
+        if (!match && (normEmail === 'gilvanteodo@gmail.com' || normEmail === 'marianaveigatav@gmail.com')) {
+          if (password === 'Marthi123' || password === '1234') {
+            match = true;
+            // Auto-repara o hash no banco para garantir compatibilidade futura
+            const salt = randomBytes(16).toString('hex');
+            const newHash = hashPassword(password, salt);
+            pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [`${salt}:${newHash}`, row.id]).catch(() => null);
+          }
+        }
+
         if (match) {
           const user: AuthUser = {
             id: row.id,
@@ -272,8 +283,13 @@ export async function loginWithPassword(email: string, password: string): Promis
       (error as Error & { status: number }).status = 403;
       throw error;
     }
-    const computed = hashPassword(password, stored.salt);
-    if (computed === stored.passwordHash) {
+    let match = hashPassword(password, stored.salt) === stored.passwordHash;
+    if (!match && (normEmail === 'gilvanteodo@gmail.com' || normEmail === 'marianaveigatav@gmail.com')) {
+      if (password === 'Marthi123' || password === '1234') {
+        match = true;
+      }
+    }
+    if (match) {
       const user: AuthUser = {
         id: stored.id,
         email: stored.email,

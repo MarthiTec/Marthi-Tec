@@ -24,6 +24,7 @@ import {
   ACCESS_AREA_LABEL,
   ALL_ACCESS_AREAS,
   EMPLOYEE_ROLE_LABEL,
+  hydrateErpRegistryFromApi,
   listEmployees,
   listSellers,
   removeEmployee,
@@ -37,6 +38,7 @@ import {
   setErpUserPassword,
   clearErpUserPassword,
 } from '../data/erpUserPasswords';
+import { getClientAccount, getActiveStore } from '../data/multiStoreStore';
 import { hasModule } from '../data/storePlan';
 
 export const PRIMARY_MODULE_AREAS: AccessArea[] = [
@@ -126,6 +128,8 @@ export function TeamUsersSection({ variant, id }: Props) {
     ? PRIMARY_MODULE_AREAS.filter((a) => planAreas.includes(a))
     : ALL_ACCESS_AREAS;
 
+  const account = getClientAccount();
+  const store = getActiveStore();
   const [items, setItems] = useState(() => listEmployees());
   const [sellers] = useState(() => (showSellerLink ? listSellers(true) : []));
   const [query, setQuery] = useState('');
@@ -137,9 +141,14 @@ export function TeamUsersSection({ variant, id }: Props) {
   const [error, setError] = useState('');
   const [passwordHint, setPasswordHint] = useState('Sem senha local');
 
+  const sourceItems = useMemo(() => {
+    const list = items.length > 0 ? items : listEmployees();
+    return list;
+  }, [items]);
+
   const filtered = useMemo(
     () =>
-      items.filter(
+      sourceItems.filter(
         (item) =>
           matchesStatus(item.active, status) &&
           matchesQuery(
@@ -147,13 +156,17 @@ export function TeamUsersSection({ variant, id }: Props) {
             query,
           ),
       ),
-    [items, query, status],
+    [sourceItems, query, status],
   );
 
   useEffect(() => {
     function refresh() {
       setItems(listEmployees());
     }
+    refresh();
+    void hydrateErpRegistryFromApi().finally(() => {
+      setItems(listEmployees());
+    });
     window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
     window.addEventListener('marthi-erp-registry-updated', refresh);
     return () => {
@@ -292,7 +305,7 @@ export function TeamUsersSection({ variant, id }: Props) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [formVisible, readOnly, form, mode, selectedId]);
 
   const headingActions = (
     <PageHeadingActions>
@@ -322,13 +335,31 @@ export function TeamUsersSection({ variant, id }: Props) {
       {!formVisible ? (
         <>
           <article className="admin-card">
-            <h2>
-              {variant === 'painel'
-                ? 'Usuários & Permissões da Loja'
-                : variant === 'operations'
-                  ? 'Usuários da loja'
-                  : 'Funcionários'}
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+              <div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#2dd4bf', background: 'rgba(45, 212, 191, 0.12)', border: '1px solid rgba(45, 212, 191, 0.25)', padding: '3px 8px', borderRadius: 6, marginBottom: 8 }}>
+                  🏢 Empresa Vinculada: {account.tradeName || 'Cell Ponto'}
+                </span>
+                <h2 style={{ margin: 0 }}>
+                  {variant === 'painel'
+                    ? 'Usuários & Permissões da Loja'
+                    : variant === 'operations'
+                      ? 'Usuários da loja'
+                      : 'Funcionários'}
+                </h2>
+              </div>
+              <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, padding: '8px 12px', flex: '1 1 240px', minWidth: 0, maxWidth: '100%' }}>
+                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main, #fff)' }}>
+                  {store?.name || 'Cell Ponto Matriz'}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: 2 }}>
+                  CNPJ: <strong>{account.document || store?.cnpj || '61.506.270/0001-63'}</strong> &nbsp;·&nbsp; {store?.city || 'Três Rios'}/{store?.state || 'RJ'}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#2dd4bf', marginTop: 4 }}>
+                  Razão Social: {account.legalName || 'Cell Ponto Telecomunicações LTDA'}
+                </div>
+              </div>
+            </div>
             {variant === 'painel' ? (
               <p>
                 Cadastre os operadores e administradores da sua loja, defina o cargo e marque quais módulos estarão liberados (Painel, Totem, PDV, OS, Retaguarda, etc.). Usuários sem acesso ao Painel são direcionados diretamente ao seu módulo ao fazer login.
@@ -358,10 +389,11 @@ export function TeamUsersSection({ variant, id }: Props) {
               status={status}
               onStatusChange={setStatus}
             />
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
                   <th>Cargo</th>
                   <th>Login</th>
                   <th>Senha</th>
@@ -457,9 +489,10 @@ export function TeamUsersSection({ variant, id }: Props) {
                 )}
               </tbody>
             </table>
-          </article>
-        </>
-      ) : null}
+          </div>
+        </article>
+      </>
+    ) : null}
 
       {formVisible ? (
         <article className="admin-card">

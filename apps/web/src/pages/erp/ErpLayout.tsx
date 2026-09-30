@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
@@ -11,6 +11,7 @@ import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { useStoreCustomization } from '../../data/storeSegment';
@@ -157,11 +158,17 @@ export function ErpLayout() {
       <header className="erp-app__top">
         <OsEcosystemMenu />
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
-        <StoreSwitcher />
+        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="erp-app__mark" />
         <div className="erp-app__brand">
           <strong>Marthi Retaguarda</strong>
         </div>
+        {userIsStoreAdmin(user?.email) ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
         <button type="button" className="erp-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>
@@ -270,6 +277,7 @@ export function ErpLayout() {
         onClose={() => setExitOpen(false)}
         appName="Retaguarda"
         exitActionLabel="Sair da Retaguarda"
+        afterExitTo="/painel"
       />
     </div>
   );

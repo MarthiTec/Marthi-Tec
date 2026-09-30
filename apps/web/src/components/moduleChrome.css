@@ -42,28 +42,102 @@
 .screen-back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin: 0 0 8px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--mute, #6b7280);
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  background: var(--card, #ffffff);
+  color: var(--ink, #0f172a);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .screen-back:hover {
-  color: var(--ink, #12151a);
+  background: var(--card-2, #f1f5f9);
+  border-color: var(--accent, #0f766e);
+  color: var(--accent, #0f766e);
+  transform: translateY(-1px);
 }
 
-.admin__top .screen-back {
-  margin: 0 8px 0 0;
-  color: var(--mute);
+.is-theme-dark .screen-back,
+.admin--dark .screen-back,
+.admin--dark .admin__top .screen-back {
+  background: #171e27;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e8eef4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .is-theme-dark .screen-back:hover,
+.admin--dark .screen-back:hover,
 .admin--dark .admin__top .screen-back:hover {
-  color: #fff;
+  background: #1c2430;
+  border-color: #2dd4bf;
+  color: #2dd4bf;
+}
+
+.screen-back__arrow {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.admin__top .screen-back {
+  margin: 0;
+}
+
+/* Botão universal "Painel" para topbars de módulos (ERP, OS, PDV, Fiscal, etc.) */
+.app-to-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #f1f5f9;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.app-to-panel-btn:hover {
+  background: rgba(45, 212, 191, 0.2);
+  border-color: rgba(45, 212, 191, 0.5);
+  color: #2dd4bf;
+  transform: translateY(-1px);
+}
+
+.app-to-panel-btn .admin-ico {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .screen-back {
+    padding: 0 8px;
+    min-height: 34px;
+    font-size: 0.76rem;
+    gap: 4px;
+  }
+
+  .app-to-panel-btn {
+    padding: 0 7px;
+    min-height: 32px;
+    font-size: 0.74rem;
+    gap: 4px;
+  }
 }

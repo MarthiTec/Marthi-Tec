@@ -144,12 +144,29 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       }
 
       if (!resolvedStoreId) {
+        // 1.1 Verificar loja padrão do usuário em user_stores
+        const userStoreRes = await pool.query(
+          `SELECT store_id FROM user_stores WHERE user_id = $1 ORDER BY is_default DESC LIMIT 1`,
+          [user.id],
+        );
+        if (userStoreRes.rows.length > 0 && userStoreRes.rows[0].store_id) {
+          resolvedStoreId = userStoreRes.rows[0].store_id;
+        }
+      }
+
+      if (!resolvedStoreId) {
         const defaultStore = await pool.query(
           `SELECT id FROM stores WHERE client_account_id = $1 AND active = true ORDER BY is_matrix DESC, created_at ASC LIMIT 1`,
           [clientAccountId],
         );
         if (defaultStore.rows.length > 0) {
           resolvedStoreId = defaultStore.rows[0].id;
+        } else if (
+          clientAccountId === 'ACC-MARTHI-DEMO' ||
+          user.email === 'gilvanteodo@gmail.com' ||
+          user.email === 'marianaveigatav@gmail.com'
+        ) {
+          resolvedStoreId = 'STR-DEMO-01';
         } else {
           // Cria loja default para a conta se não existir
           const newStoreId = `STR-${Date.now().toString(36).toUpperCase()}`;
@@ -186,7 +203,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   if (!resolvedStoreId) {
-    resolvedStoreId = `STR-TENANT-${clientAccountId}`;
+    if (
+      clientAccountId === 'ACC-MARTHI-DEMO' ||
+      user.email === 'gilvanteodo@gmail.com' ||
+      user.email === 'marianaveigatav@gmail.com'
+    ) {
+      resolvedStoreId = 'STR-DEMO-01';
+    } else {
+      resolvedStoreId = `STR-TENANT-${clientAccountId}`;
+    }
   }
 
   req.user = user;

@@ -10,14 +10,18 @@ import {
   clientPresenceLabel,
   createMarthiClientWithSecureActivation,
   forceClientPasswordReset,
+  generateClientAccessToken,
   getClientBranches,
   getClientMatrix,
+  getMarthiClient,
+  hydrateMarthiClientsFromApi,
   identifyClientPaymentAndActivate,
   listMarthiClients,
   listPotentialMatrixClients,
   MARTHI_CLIENTS_EVENT,
   planLabel,
   planMonthlyAmount,
+  regenerateClientAccessToken,
   resendClientActivationEmail,
   sendClientPhoneVerification,
   setMarthiClientPaymentOk,
@@ -64,6 +68,7 @@ type EditForm = {
   modules: PartnerModuleId[];
   parentClientId: string;
   branchName: string;
+  accessToken?: string;
 };
 
 type NewClientForm = {
@@ -96,6 +101,7 @@ function toEditForm(client: MarthiClient): EditForm {
     modules: [...client.modules],
     parentClientId: client.parentClientId || '',
     branchName: client.branchName || '',
+    accessToken: client.accessToken,
   };
 }
 
@@ -187,6 +193,7 @@ export function MarthiClientsPage() {
 
   useEffect(() => {
     refresh();
+    hydrateMarthiClientsFromApi().then(() => refresh()).catch(() => {});
     window.addEventListener(MARTHI_CLIENTS_EVENT, refresh);
     window.addEventListener(PRESENCE_EVENT, refresh);
     window.addEventListener('storage', refresh);
@@ -353,6 +360,7 @@ export function MarthiClientsPage() {
       modules: editing.modules,
       parentClientId: parentClientId || null,
       branchName,
+      accessToken: editing.accessToken,
     });
 
     logAction({
@@ -690,6 +698,72 @@ export function MarthiClientsPage() {
               )}
             </div>
 
+            {/* Token de Acesso da Loja / API */}
+            <div
+              className="span-2"
+              style={{
+                background: 'rgba(0,0,0,0.18)',
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid var(--line)',
+                display: 'grid',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--ink)' }}>
+                  🔑 Token de Acesso da Loja / Terminais (API)
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '3px 8px', fontSize: '0.74rem' }}
+                    onClick={() => {
+                      if (editing.accessToken) {
+                        navigator.clipboard.writeText(editing.accessToken);
+                        setFlash('Token de acesso copiado!');
+                      }
+                    }}
+                  >
+                    📋 Copiar Token
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '3px 8px', fontSize: '0.74rem', color: 'var(--accent)' }}
+                    onClick={() => {
+                      const client = getMarthiClient(editing.clientId);
+                      const newToken = generateClientAccessToken(client?.document, editing.email, editing.clientId);
+                      setEditing({ ...editing, accessToken: newToken });
+                      setFlash('Novo token gerado! Clique em "Salvar alterações" para registrar no banco.');
+                    }}
+                  >
+                    🔄 Renovar Token
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                readOnly
+                value={editing.accessToken || 'Gerado automaticamente ao salvar'}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.5px',
+                  background: 'var(--bg-input, rgba(0,0,0,0.25))',
+                  color: 'var(--accent, #38bdf8)',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--line)',
+                  userSelect: 'all',
+                }}
+              />
+              <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>
+                Identificador criptográfico único registrado por usuário, CNPJ e e-mail. Permite autenticar terminais, totens e filiais remotas.
+              </span>
+            </div>
+
             <label className="span-2">
               Observações internas
               <textarea
@@ -789,6 +863,7 @@ export function MarthiClientsPage() {
             <thead>
               <tr>
                 <th>Cliente / Responsável</th>
+                <th>Token de Acesso / API</th>
                 <th>Plano &amp; Módulos</th>
                 <th>Pagamento</th>
                 <th>Status da Conta</th>
@@ -801,7 +876,7 @@ export function MarthiClientsPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '36px' }}>
                     <p className="empty">Nenhum cliente encontrado com os filtros atuais.</p>
                   </td>
                 </tr>
@@ -864,6 +939,43 @@ export function MarthiClientsPage() {
                         {client.document ? (
                           <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Doc: {client.document}</span>
                         ) : null}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <code
+                              style={{
+                                fontSize: '0.74rem',
+                                background: 'rgba(0,0,0,0.25)',
+                                padding: '3px 6px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--line)',
+                                color: 'var(--accent, #38bdf8)',
+                                userSelect: 'all',
+                              }}
+                            >
+                              {client.accessToken || '—'}
+                            </code>
+                            {client.accessToken ? (
+                              <button
+                                type="button"
+                                className="btn btn--ghost"
+                                style={{ padding: '2px 6px', fontSize: '0.74rem' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(client.accessToken!);
+                                  setFlash(`Token de ${client.tradeName} copiado!`);
+                                }}
+                                title="Copiar Token de Acesso"
+                              >
+                                📋
+                              </button>
+                            ) : null}
+                          </div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--mute)' }}>
+                            Por Usuário, CNPJ &amp; E-mail
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <strong>{planLabel(client.planId)}</strong>
@@ -989,6 +1101,22 @@ export function MarthiClientsPage() {
                             title="Editar dados cadastrais"
                           >
                             ✏️ Editar
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn--ghost"
+                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                            onClick={() => {
+                              const newToken = regenerateClientAccessToken(client.clientId);
+                              if (newToken) {
+                                refresh();
+                                setFlash(`Novo Token gerado para ${client.tradeName}: ${newToken}`);
+                              }
+                            }}
+                            title="Gerar ou renovar Token de Acesso da loja"
+                          >
+                            🔄 Token
                           </button>
 
                           <button
@@ -1463,6 +1591,29 @@ export function MarthiClientsPage() {
                     <td>{auditClient.document || '—'}</td>
                   </tr>
                   <tr>
+                    <td style={{ color: 'var(--mute)' }}>Token de Acesso (API):</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <code style={{ fontSize: '0.82rem', color: 'var(--accent, #38bdf8)', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
+                          {auditClient.accessToken || '—'}
+                        </code>
+                        {auditClient.accessToken ? (
+                          <button
+                            type="button"
+                            className="btn btn--ghost"
+                            style={{ padding: '2px 6px', fontSize: '0.72rem' }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(auditClient.accessToken!);
+                              setFlash('Token copiado!');
+                            }}
+                          >
+                            📋 Copiar
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
                     <td style={{ color: 'var(--mute)' }}>E-mail:</td>
                     <td>{auditClient.email}</td>
                   </tr>
@@ -1603,6 +1754,14 @@ export function MarthiClientsPage() {
                 <div><strong>Empresa:</strong> {activatedNotice.client.tradeName}</div>
                 <div><strong>E-mail:</strong> {activatedNotice.client.email}</div>
                 <div><strong>Plano:</strong> {planLabel(activatedNotice.client.planId)} ({money(activatedNotice.client.monthlyAmount)}/mês)</div>
+                {activatedNotice.client.accessToken ? (
+                  <div>
+                    <strong>Token de Acesso:</strong>{' '}
+                    <code style={{ fontSize: '0.84rem', color: 'var(--accent, #38bdf8)', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>
+                      {activatedNotice.client.accessToken}
+                    </code>
+                  </div>
+                ) : null}
                 <div style={{ color: '#10b981', fontWeight: 600 }}>
                   ✓ Link de ativação de uso único enviado para o e-mail do cliente
                 </div>

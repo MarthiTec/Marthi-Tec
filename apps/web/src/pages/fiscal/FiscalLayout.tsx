@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -10,6 +10,7 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -104,6 +105,12 @@ export function FiscalLayout() {
         <div className="fiscal-app__brand">
           <strong>Marthi Emissor Fiscal</strong>
         </div>
+        {userIsStoreAdmin(user?.email) ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
         <button type="button" className="fiscal-app__exit" onClick={requestExit}>
           Sair
         </button>
@@ -209,6 +216,7 @@ export function FiscalLayout() {
         onClose={() => setExitOpen(false)}
         appName="emissor"
         exitActionLabel="Sair do emissor"
+        afterExitTo="/painel"
       />
     </div>
   );

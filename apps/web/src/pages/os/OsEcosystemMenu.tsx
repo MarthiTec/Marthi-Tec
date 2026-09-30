@@ -15,6 +15,15 @@ type EcosystemApp = {
 
 const ECOSYSTEM_APPS: EcosystemApp[] = [
   {
+    id: 'painel',
+    name: 'Painel Administrativo',
+    desc: 'Gestão geral, relatórios, cadastros, equipe e configurações',
+    path: '/painel',
+    icon: 'home',
+    badge: 'Central',
+    color: '#0ea5e9',
+  },
+  {
     id: 'os',
     name: 'Oficina & OS',
     desc: 'Ordens de serviço, bancada e kanban de técnicos',

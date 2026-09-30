@@ -3,6 +3,7 @@ import { PresenceStatusControl } from './PresenceStatusControl';
 import { useOperatorProfile } from '../hooks/useOperatorProfile';
 import { useMyPresence } from '../hooks/usePresence';
 import { profileInitials } from '../data/operatorProfile';
+import { getClientAccount, getActiveStore } from '../data/multiStoreStore';
 import './userChip.css';
 
 type UserChipProps = {
@@ -34,6 +35,10 @@ export function UserChip({
 }: UserChipProps) {
   const { profile, photo } = useOperatorProfile();
   const { mine } = useMyPresence();
+  const account = getClientAccount();
+  const store = getActiveStore();
+  const companyName = store?.name || account.tradeName || 'Cell Ponto';
+  const companyDoc = store?.cnpj || account.document || '61.506.270/0001-63';
   const mark = profileInitials(profile.displayName);
   const away = mine?.availability === 'away' && mine.module !== 'offline';
 
@@ -60,6 +65,9 @@ export function UserChip({
           <em>Olá</em>
           <strong>{profile.displayName}</strong>
           <small>{profile.role}</small>
+          <span className="user-chip__company" title={`${companyName} · CNPJ: ${companyDoc}`}>
+            🏢 {companyName} · {companyDoc}
+          </span>
         </span>
       ) : null}
     </>

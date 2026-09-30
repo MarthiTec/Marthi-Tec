@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -10,6 +10,7 @@ import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
 import '../admin/admin.css';
@@ -109,6 +110,12 @@ export function EcommerceLayout() {
         <div className="ecommerce-app__brand">
           <strong>Marthi E-commerce</strong>
         </div>
+        {userIsStoreAdmin(user?.email) ? (
+          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
+            <AdminIcon name="home" />
+            <span>Painel</span>
+          </Link>
+        ) : null}
         <button type="button" className="ecommerce-app__exit" onClick={requestExit}>
           Sair
         </button>
@@ -210,6 +217,7 @@ export function EcommerceLayout() {
         onClose={() => setExitOpen(false)}
         appName="e-commerce"
         exitActionLabel="Sair"
+        afterExitTo="/painel"
       />
     </div>
   );
