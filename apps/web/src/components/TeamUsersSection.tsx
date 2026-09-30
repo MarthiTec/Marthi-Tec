@@ -305,7 +305,7 @@ export function TeamUsersSection({ variant, id }: Props) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [formVisible, readOnly, form, mode, selectedId]);
 
   const headingActions = (
     <PageHeadingActions>

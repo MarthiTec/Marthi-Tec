@@ -113,6 +113,7 @@ export function AdminLayout() {
   const location = useLocation();
   usePresenceSession('painel');
   const { isDark } = usePanelTheme();
+  const storeCustom = useStoreCustomization();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -185,7 +186,6 @@ export function AdminLayout() {
     userEmail?.toLowerCase() === 'gilvanteodo@gmail.com' ||
     userEmail?.toLowerCase() === 'marianaveigatav@gmail.com';
   const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
-  const storeCustom = useStoreCustomization();
 
   if (!canAccessPainel) {
     const dest = resolveAppHome(userEmail);
