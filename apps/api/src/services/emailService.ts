@@ -470,3 +470,87 @@ export async function sendMail(options: {
 
   return { success: true, messageId: simulatedId };
 }
+
+/**
+ * Função de diagnóstico para validar conexão e credenciais SMTP em runtime
+ */
+export async function verifySmtpConfig(testRecipient?: string): Promise<{
+  configured: boolean;
+  connected: boolean;
+  host?: string;
+  port?: number;
+  user?: string;
+  sendResult?: { success: boolean; messageId?: string; error?: string };
+  error?: string;
+}> {
+  const user = env.SMTP_USER || '';
+  const pass = env.SMTP_PASS || '';
+  let host = env.SMTP_HOST || '';
+  let port = env.SMTP_PORT || 587;
+  let secure = env.SMTP_SECURE || false;
+
+  if (!host && user.toLowerCase().endsWith('@gmail.com')) {
+    host = 'smtp.gmail.com';
+    port = 465;
+    secure = true;
+  }
+
+  if (!user || !pass) {
+    return {
+      configured: false,
+      connected: false,
+      error: 'SMTP_USER ou SMTP_PASS não configurados nas variáveis de ambiente da aplicação.',
+    };
+  }
+
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    return {
+      configured: false,
+      connected: false,
+      error: 'Não foi possível instanciar o transporte Nodemailer.',
+    };
+  }
+
+  try {
+    await transporter.verify();
+
+    let sendResult = undefined;
+    if (testRecipient) {
+      try {
+        const info = await transporter.sendMail({
+          from: env.SMTP_FROM,
+          to: testRecipient,
+          subject: 'Teste de Configuração de E-mail — Marthi Tecnologia',
+          text: `Olá! Este é um e-mail de teste disparado pelo sistema Marthi Tecnologia para validar a conexão SMTP.\nData: ${new Date().toLocaleString('pt-BR')}`,
+          html: `<p>Olá!</p><p>Este é um e-mail de teste disparado pelo sistema <strong>Marthi Tecnologia</strong> para validar a conexão SMTP.</p><p><small>Data: ${new Date().toLocaleString('pt-BR')}</small></p>`,
+        });
+        sendResult = { success: true, messageId: info.messageId };
+      } catch (sendErr) {
+        sendResult = {
+          success: false,
+          error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+        };
+      }
+    }
+
+    return {
+      configured: true,
+      connected: true,
+      host,
+      port,
+      user,
+      sendResult,
+    };
+  } catch (err) {
+    return {
+      configured: true,
+      connected: false,
+      host,
+      port,
+      user,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+

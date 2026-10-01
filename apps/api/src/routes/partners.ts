@@ -212,7 +212,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
       monthlyAmount: record.monthlyAmount,
       planName: planDisplayName(record.planId),
       message:
-        record.status === 'pagamento_aprovado'
+        record.status === 'pagamento_aprovado' || record.status === 'acesso_pendente' || record.status === 'cliente_criado'
           ? 'Contratação e pagamento confirmados! Link para criação de senha enviado por e-mail.'
           : 'Contratação registrada com sucesso. Aguardando confirmação do pagamento para ativação.',
     },
