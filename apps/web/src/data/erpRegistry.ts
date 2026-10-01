@@ -711,10 +711,18 @@ export async function upsertEmployee(
 
   if (isNestAuthed()) {
     try {
-      const areas =
+      const NEST_VALID_AREAS = new Set([
+        'totem', 'pdv', 'os', 'erp_customers', 'erp_stock', 'erp_attrs',
+        'erp_prices', 'erp_payments', 'erp_finance', 'erp_sellers',
+        'erp_suppliers', 'erp_employees', 'erp_audit', 'erp_invoices',
+        'erp_fiscal', 'ecommerce', 'erp_plan', 'painel', 'erp', 'fiscal',
+      ]);
+      const areas = (
         input.role === 'admin'
-          ? defaultAdminAreas()
-          : input.accessAreas.filter((area) => ALL_ACCESS_AREAS.includes(area));
+          ? defaultAdminAreas().filter((a) => NEST_VALID_AREAS.has(a))
+          : input.accessAreas.filter((area) => NEST_VALID_AREAS.has(area))
+      ) as AccessArea[];
+
       const body = {
         name: input.name.trim(),
         phone: (input.phone ?? '').trim(),
@@ -745,7 +753,11 @@ export async function upsertEmployee(
       }
       return { ok: true, state, employee: mapped };
     } catch (error) {
-      console.warn('[erpRegistry] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
+      console.error('[erpRegistry] Falha ao sincronizar com Nest:', error);
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Falha ao sincronizar cadastro com o servidor backend.',
+      };
     }
   }
 

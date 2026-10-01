@@ -549,7 +549,6 @@ function toNestStockBody(item: StockItem) {
     minQty: item.minQty,
     cost: item.cost,
     price: item.price,
-    cardRate: item.cardRate,
     condition: item.condition,
     showOnTotem: item.showOnTotem,
     images: item.images?.length ? item.images : undefined,
@@ -927,7 +926,8 @@ export async function upsertStockItem(
       void import('./totemLiveSync').then(({ notifyTotemLive }) => notifyTotemLive());
       return state;
     } catch (error) {
-      console.warn('[adminStore] Falha ao sincronizar com Nest, prosseguindo com gravação local:', error);
+      console.error('[adminStore] Falha ao sincronizar estoque com Nest:', error);
+      throw error;
     }
   }
 
