@@ -30,3 +30,9 @@ SET whatsapp_settings = CASE
       ELSE smtp_settings
     END
 WHERE id = 'STR-DEMO-01' OR is_matrix = true;
+
+-- Garante que qualquer registro com host da discloud seja corrigido para a instancia correta 'marthi'
+UPDATE stores
+SET whatsapp_settings = jsonb_set(whatsapp_settings, '{instance}', '"marthi"')
+WHERE whatsapp_settings->>'instance' LIKE '%discloud.app%' OR whatsapp_settings->>'instance' = 'marthi-tec';
+

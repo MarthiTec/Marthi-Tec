@@ -41,6 +41,14 @@ const storeWhatsAppSchema = z.object({
   locationLabel: z.string().optional().default(''),
 });
 
+export function normalizeInstanceName(raw?: string): string {
+  const norm = (raw || '').trim();
+  if (!norm || norm.includes('discloud.app') || norm.includes('http') || norm === 'marthi-tec') {
+    return 'marthi';
+  }
+  return norm;
+}
+
 async function getStoreWhatsAppConfig(storeId: string): Promise<StoreWhatsAppConfig> {
   if (pool) {
     try {
@@ -52,6 +60,7 @@ async function getStoreWhatsAppConfig(storeId: string): Promise<StoreWhatsAppCon
         return {
           ...defaultWhatsAppConfig,
           ...raw,
+          instance: normalizeInstanceName(raw?.instance),
         };
       }
     } catch (err) {
@@ -59,7 +68,11 @@ async function getStoreWhatsAppConfig(storeId: string): Promise<StoreWhatsAppCon
     }
   }
 
-  return memoryWhatsAppConfigs.get(storeId) || memoryWhatsAppConfigs.get('STR-DEMO-01') || { ...defaultWhatsAppConfig };
+  const mem = memoryWhatsAppConfigs.get(storeId) || memoryWhatsAppConfigs.get('STR-DEMO-01') || { ...defaultWhatsAppConfig };
+  return {
+    ...mem,
+    instance: normalizeInstanceName(mem.instance),
+  };
 }
 
 // ── 1. Rotas de Configuração da Loja (Operações) ───────────────────────────
@@ -81,6 +94,7 @@ whatsappRouter.put('/api/v1/store/whatsapp-settings', requireOrDemoAuth, async (
     const merged = {
       ...defaultWhatsAppConfig,
       ...body,
+      instance: normalizeInstanceName(body.instance),
       baseUrl: body.baseUrl.replace(/\/$/, ''),
     };
 
@@ -102,14 +116,14 @@ whatsappRouter.put('/api/v1/store/whatsapp-settings', requireOrDemoAuth, async (
   }
 });
 
-// ── 2. Rotas Operacionais (Status, QR Code, Teste) ──────────────────────────
+// ── 2. Rotas Operacionais (Status, QR Code, Desconectar, Teste) ─────────────
 
 whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response) => {
   const storeId = req.header('x-store-id') || (typeof req.query.storeId === 'string' ? req.query.storeId : 'STR-DEMO-01');
   const cfg = await getStoreWhatsAppConfig(storeId);
 
   const baseUrl = cfg.baseUrl;
-  const instance = cfg.instance;
+  const instance = normalizeInstanceName(cfg.instance);
   const apiKey = cfg.apiKey;
   const storeNumber = cfg.storeNumber;
 
@@ -168,11 +182,12 @@ whatsappRouter.post('/api/v1/whatsapp/test', async (req: Request, res: Response,
     const { number, message } = testMessageSchema.parse(req.body);
     const storeId = req.header('x-store-id') || 'STR-DEMO-01';
     const cfg = await getStoreWhatsAppConfig(storeId);
+    const instance = normalizeInstanceName(cfg.instance);
 
     const text = message?.trim() || '✅ *Marthi ERP*: Conexão com Evolution API ativa com sucesso!';
     const result = await sendEvolutionText(number, text, {
       baseUrl: cfg.baseUrl,
-      instance: cfg.instance,
+      instance,
       apiKey: cfg.apiKey,
     });
 
@@ -202,18 +217,35 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
   const cfg = await getStoreWhatsAppConfig(storeId);
 
   const baseUrl = cfg.baseUrl;
-  const instance = cfg.instance;
+  const instance = normalizeInstanceName(cfg.instance);
   const apiKey = cfg.apiKey;
+  const forceNew = req.query.force === 'true' || req.query.forceNew === 'true';
 
   try {
+    if (forceNew) {
+      try {
+        await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {
+          method: 'DELETE',
+          headers: { apikey: apiKey },
+        });
+      } catch (logoutErr) {
+        console.warn('[whatsapp] Aviso ao efetuar logout antes de gerar QR:', logoutErr);
+      }
+    }
+
     const response = await fetch(`${baseUrl}/instance/connect/${encodeURIComponent(instance)}`, {
       method: 'GET',
       headers: { apikey: apiKey },
     });
 
     const data = await response.json();
+
+    const state = data?.instance?.state;
+    const isAlreadyConnected = state === 'open' && !data?.base64 && !data?.qrcode?.base64 && !data?.code;
+
     res.json({
       success: true,
+      alreadyConnected: isAlreadyConnected,
       data,
     });
   } catch (error) {
@@ -223,3 +255,26 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
     });
   }
 });
+
+whatsappRouter.post('/api/v1/whatsapp/disconnect', requireOrDemoAuth, async (req: Request, res: Response) => {
+  const storeId = req.storeId || 'STR-DEMO-01';
+  const cfg = await getStoreWhatsAppConfig(storeId);
+  const baseUrl = cfg.baseUrl;
+  const instance = normalizeInstanceName(cfg.instance);
+  const apiKey = cfg.apiKey;
+
+  try {
+    const response = await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {
+      method: 'DELETE',
+      headers: { apikey: apiKey },
+    });
+    const data = await response.json();
+    res.json({ success: true, message: 'WhatsApp desconectado da instância com sucesso.', data });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: { message: error instanceof Error ? error.message : 'Falha ao desconectar WhatsApp.' },
+    });
+  }
+});
+

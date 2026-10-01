@@ -480,3 +480,149 @@
   }
 }
 
+/* ── Estilos de Formulário de Comunicação & Mensageria ────────────────────────── */
+.comm-card {
+  display: grid;
+  gap: 20px;
+}
+
+.comm-form-row {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.comm-form-row--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.comm-form-row--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .comm-form-row--3 {
+    grid-template-columns: 1fr;
+  }
+  .comm-form-row--2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comm-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.comm-field__label {
+  display: flex;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ink, #1d1d1f);
+  height: 22px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-theme-dark .comm-field__label,
+.admin--dark .comm-field__label {
+  color: var(--ink, #e8eef4);
+}
+
+.comm-field__input {
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #cbd5e1);
+  background: var(--card, #fff);
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.is-theme-dark .comm-field__input,
+.admin--dark .comm-field__input {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--card-2, #1c2430);
+  color: var(--ink, #e8eef4);
+}
+
+.comm-field__input:focus {
+  border-color: var(--accent, #0f766e);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+}
+
+.comm-field__pass-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.comm-field__pass-wrap .comm-field__input {
+  padding-right: 44px;
+}
+
+.comm-field__pass-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: var(--mute, #64748b);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comm-field .admin-picker {
+  width: 100%;
+}
+
+.comm-field .admin-picker__trigger {
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: var(--card, #fff);
+  border-color: var(--line, #cbd5e1);
+}
+
+.is-theme-dark .comm-field .admin-picker__trigger,
+.admin--dark .comm-field .admin-picker__trigger {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink, #e8eef4);
+}
+
+.comm-field__hint {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--mute, #64748b);
+  margin-top: 6px;
+  line-height: 1.35;
+  min-height: 32px;
+}
+
+.is-theme-dark .comm-field__hint,
+.admin--dark .comm-field__hint {
+  color: var(--mute, #94a3b8);
+}
+
+

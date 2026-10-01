@@ -1,16 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { AdminIcon } from './AdminIcons';
 import { AdminPicker } from './AdminPicker';
-import { nestApiUrl } from '../services/config';
 import {
   apiGetStoreWhatsAppSettings,
   apiPutStoreWhatsAppSettings,
+  apiGetWhatsAppStatus,
+  apiGetWhatsAppQrCode,
+  apiDisconnectWhatsApp,
   apiGetStoreSmtpSettings,
   apiPutStoreSmtpSettings,
   apiTestStoreSmtp,
   type StoreWhatsAppSettings,
   type StoreSmtpSettings,
 } from '../services/erpApi';
+import { nestApiUrl } from '../services/config';
 
 type EvolutionStatus = {
   connected: boolean;
@@ -42,6 +45,7 @@ export function CommunicationSettingsSection() {
   const [showAdvancedWa, setShowAdvancedWa] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
+  const [disconnectingWa, setDisconnectingWa] = useState(false);
   const [waTestNumber, setWaTestNumber] = useState('');
   const [waTestMessage, setWaTestMessage] = useState('');
   const [waTesting, setWaTesting] = useState(false);
@@ -76,7 +80,11 @@ export function CommunicationSettingsSection() {
     try {
       const res = await apiGetStoreWhatsAppSettings();
       if (res) {
-        setWhatsappSettings((prev) => ({ ...prev, ...res }));
+        setWhatsappSettings((prev) => ({
+          ...prev,
+          ...res,
+          instance: res.instance && !res.instance.includes('discloud.app') ? res.instance : 'marthi',
+        }));
         if (res.storeNumber && !waTestNumber) {
           setWaTestNumber(res.storeNumber);
         }
@@ -91,13 +99,15 @@ export function CommunicationSettingsSection() {
   async function checkWhatsAppStatus() {
     setWhatsappLoading(true);
     try {
-      const url = `${nestApiUrl()}/api/v1/whatsapp/status`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.success) {
-        setWhatsappStatus(json);
-        if (json.storeNumber && !waTestNumber) {
-          setWaTestNumber(json.storeNumber);
+      const res = await apiGetWhatsAppStatus();
+      if (res && res.success) {
+        setWhatsappStatus(res);
+        if (res.storeNumber && !waTestNumber) {
+          setWaTestNumber(res.storeNumber);
+        }
+        if (res.connected) {
+          // Se já está conectado, limpa qualquer QR code aberto
+          setQrCodeData(null);
         }
       } else {
         setWhatsappStatus({
@@ -106,7 +116,7 @@ export function CommunicationSettingsSection() {
           instance: whatsappSettings.instance || 'marthi',
           baseUrl: whatsappSettings.baseUrl || 'https://marthi-tec.discloud.app',
           storeNumber: whatsappSettings.storeNumber || '5524981244253',
-          error: json.error || 'Falha ao consultar status da Evolution.',
+          error: res?.error || 'Instância offline ou aguardando conexão.',
         });
       }
     } catch {
@@ -116,7 +126,7 @@ export function CommunicationSettingsSection() {
         instance: whatsappSettings.instance || 'marthi',
         baseUrl: whatsappSettings.baseUrl || 'https://marthi-tec.discloud.app',
         storeNumber: whatsappSettings.storeNumber || '5524981244253',
-        error: 'Serviço de WhatsApp inacessível.',
+        error: 'Serviço de WhatsApp inacessível no momento.',
       });
     } finally {
       setWhatsappLoading(false);
@@ -128,7 +138,13 @@ export function CommunicationSettingsSection() {
     setWhatsappSaving(true);
     setWaFeedback(null);
     try {
-      const updated = await apiPutStoreWhatsAppSettings(whatsappSettings);
+      const sanitized = {
+        ...whatsappSettings,
+        instance: whatsappSettings.instance && !whatsappSettings.instance.includes('discloud.app')
+          ? whatsappSettings.instance.trim()
+          : 'marthi',
+      };
+      const updated = await apiPutStoreWhatsAppSettings(sanitized);
       setWhatsappSettings(updated);
       setWaFeedback({ type: 'success', message: 'Configurações de WhatsApp salvas com sucesso no banco de dados!' });
       void checkWhatsAppStatus();
@@ -140,23 +156,80 @@ export function CommunicationSettingsSection() {
     }
   }
 
-  async function handleFetchQrCode() {
+  async function handleFetchQrCode(forceNew = false) {
     setLoadingQr(true);
     setWaFeedback(null);
     try {
-      const url = `${nestApiUrl()}/api/v1/whatsapp/qrcode`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.success && json.data) {
-        const qr = json.data?.base64 || json.data?.qrcode?.base64 || json.data?.code;
-        setQrCodeData(qr);
-      } else {
-        setWaFeedback({ type: 'error', message: 'Não foi possível gerar QR Code. A instância pode já estar conectada.' });
+      const res = await apiGetWhatsAppQrCode(forceNew);
+      if (res.alreadyConnected || res.state === 'open') {
+        setQrCodeData(null);
+        setWhatsappStatus((prev) => ({
+          connected: true,
+          state: 'open',
+          instance: prev?.instance || 'marthi',
+          baseUrl: prev?.baseUrl || 'https://marthi-tec.discloud.app',
+          storeNumber: prev?.storeNumber || whatsappSettings.storeNumber || '5524981244253',
+        }));
+        setWaFeedback({
+          type: 'success',
+          message: 'O WhatsApp desta instância (marthi) já está conectado e pronto para disparar mensagens!',
+        });
+        return;
       }
-    } catch {
-      setWaFeedback({ type: 'error', message: 'Erro ao solicitar QR Code.' });
+
+      const qr =
+        res.data?.base64 ||
+        res.data?.qrcode?.base64 ||
+        res.data?.code ||
+        res.data?.qrcode?.code;
+
+      if (qr) {
+        setQrCodeData(qr);
+        setWaFeedback({
+          type: 'success',
+          message: 'QR Code gerado! Abra o WhatsApp no celular e escaneie o código abaixo.',
+        });
+      } else {
+        setWaFeedback({
+          type: 'error',
+          message: 'Não foi possível renderizar o QR Code. A instância pode já estar conectada ou reiniciando.',
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao solicitar QR Code.';
+      setWaFeedback({ type: 'error', message: msg });
     } finally {
       setLoadingQr(false);
+    }
+  }
+
+  async function handleDisconnectWhatsApp() {
+    if (!window.confirm('Deseja realmente desconectar o WhatsApp desta loja? Será necessário ler um novo QR Code para reconectar.')) {
+      return;
+    }
+    setDisconnectingWa(true);
+    setWaFeedback(null);
+    try {
+      await apiDisconnectWhatsApp();
+      setQrCodeData(null);
+      setWhatsappStatus((prev) => ({
+        connected: false,
+        state: 'close',
+        instance: prev?.instance || 'marthi',
+        baseUrl: prev?.baseUrl || 'https://marthi-tec.discloud.app',
+        storeNumber: prev?.storeNumber || '5524981244253',
+      }));
+      setWaFeedback({
+        type: 'success',
+        message: 'WhatsApp desconectado com sucesso. Clique em "Ler QR Code" para conectar um novo aparelho.',
+      });
+      // Busca automaticamente o novo QR Code
+      void handleFetchQrCode(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao desconectar WhatsApp.';
+      setWaFeedback({ type: 'error', message: msg });
+    } finally {
+      setDisconnectingWa(false);
     }
   }
 
@@ -295,7 +368,7 @@ export function CommunicationSettingsSection() {
             onClick={() => setActiveTab('email')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: '0.86rem' }}
           >
-            <span>✉️</span>
+            <AdminIcon name="mail" />
             <span>E-mail (SMTP)</span>
           </button>
         </div>
@@ -347,7 +420,7 @@ export function CommunicationSettingsSection() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn btn--ghost"
@@ -359,11 +432,22 @@ export function CommunicationSettingsSection() {
                 <span>{whatsappLoading ? 'Verificando…' : 'Verificar status'}</span>
               </button>
 
-              {!isWaConnected && (
+              {isWaConnected ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => void handleDisconnectWhatsApp()}
+                  disabled={disconnectingWa}
+                  style={{ fontSize: '0.85rem', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
+                  title="Desconecta este chip para ler outro WhatsApp com QR Code"
+                >
+                  <span>{disconnectingWa ? 'Desconectando…' : 'Desconectar / Trocar de WhatsApp'}</span>
+                </button>
+              ) : (
                 <button
                   type="button"
                   className="btn btn--primary"
-                  onClick={() => void handleFetchQrCode()}
+                  onClick={() => void handleFetchQrCode(false)}
                   disabled={loadingQr}
                   style={{ fontSize: '0.85rem' }}
                 >
@@ -388,13 +472,19 @@ export function CommunicationSettingsSection() {
               <p style={{ margin: '0 0 16px', color: 'var(--mute, #94a3b8)', fontSize: '0.88rem' }}>
                 Abra o WhatsApp no celular &gt; <strong>Aparelhos Conectados</strong> &gt; <strong>Conectar um Aparelho</strong>.
               </p>
-              <img
-                src={qrCodeData.startsWith('data:') ? qrCodeData : `data:image/png;base64,${qrCodeData}`}
-                alt="QR Code WhatsApp"
-                style={{ maxWidth: 260, borderRadius: 10, background: '#fff', padding: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
-              />
-              <div style={{ marginTop: 12 }}>
-                <button type="button" className="btn btn--ghost" onClick={() => setQrCodeData(null)}>
+              <div style={{ display: 'inline-block', padding: 12, background: '#fff', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                <img
+                  src={qrCodeData.startsWith('data:') ? qrCodeData : `data:image/png;base64,${qrCodeData}`}
+                  alt="QR Code WhatsApp"
+                  style={{ maxWidth: 260, width: '100%', height: 'auto', display: 'block' }}
+                />
+              </div>
+              <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>
+                <button type="button" className="btn btn--ghost" onClick={() => void handleFetchQrCode(true)} disabled={loadingQr}>
+                  <AdminIcon name="sync" />
+                  <span>Atualizar QR Code</span>
+                </button>
+                <button type="button" className="btn btn--primary" onClick={() => setQrCodeData(null)}>
                   Fechar QR Code
                 </button>
               </div>
@@ -449,48 +539,41 @@ export function CommunicationSettingsSection() {
                 </label>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  WhatsApp Comercial da Loja (com DDI e DDD)
+              {/* Linha de Campos Alinhada: WhatsApp Comercial e Identificação do Local */}
+              <div className="comm-form-row comm-form-row--2">
+                <div className="comm-field">
+                  <label htmlFor="wa-store-number" className="comm-field__label">
+                    WhatsApp Comercial da Loja (com DDI e DDD)
+                  </label>
                   <input
+                    id="wa-store-number"
                     type="text"
+                    className="comm-field__input"
                     value={whatsappSettings.storeNumber}
                     onChange={(e) => setWhatsappSettings({ ...whatsappSettings, storeNumber: e.target.value })}
                     placeholder="Ex.: 5524981244253"
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Número que recebe alertas de novos pedidos do totem, orçamentos e fechamento de caixa.
-                  </small>
-                </label>
+                  </span>
+                </div>
 
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Identificação do Local / Shopping (opcional)
+                <div className="comm-field">
+                  <label htmlFor="wa-location-label" className="comm-field__label">
+                    Identificação do Local / Shopping (opcional)
+                  </label>
                   <input
+                    id="wa-location-label"
                     type="text"
+                    className="comm-field__input"
                     value={whatsappSettings.locationLabel}
                     onChange={(e) => setWhatsappSettings({ ...whatsappSettings, locationLabel: e.target.value })}
                     placeholder="Ex.: Cell Ponto Três Rios ou Shopping Olga Sola"
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Aparece no cabeçalho ou rodapé das mensagens disparadas para facilitar a identificação da filial.
-                  </small>
-                </label>
+                  </span>
+                </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
@@ -518,60 +601,51 @@ export function CommunicationSettingsSection() {
                 </button>
 
                 {showAdvancedWa && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 14 }}>
-                    <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650 }}>
-                      URL Base da Evolution API
+                  <div className="comm-form-row comm-form-row--3" style={{ marginTop: 14 }}>
+                    <div className="comm-field">
+                      <label htmlFor="wa-base-url" className="comm-field__label">
+                        URL Base da Evolution API
+                      </label>
                       <input
+                        id="wa-base-url"
                         type="text"
+                        className="comm-field__input"
                         value={whatsappSettings.baseUrl}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, baseUrl: e.target.value })}
                         placeholder="https://marthi-tec.discloud.app"
-                        style={{
-                          minHeight: 38,
-                          padding: '6px 12px',
-                          borderRadius: 8,
-                          border: '1px solid var(--line, #cbd5e1)',
-                          background: 'var(--card, #fff)',
-                          color: 'var(--ink, #0f172a)',
-                        }}
                       />
-                    </label>
+                      <span className="comm-field__hint">Servidor oficial Evolution na nuvem.</span>
+                    </div>
 
-                    <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650 }}>
-                      Nome da Instância Evolution
+                    <div className="comm-field">
+                      <label htmlFor="wa-instance" className="comm-field__label">
+                        Nome da Instância Evolution
+                      </label>
                       <input
+                        id="wa-instance"
                         type="text"
+                        className="comm-field__input"
                         value={whatsappSettings.instance}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, instance: e.target.value })}
                         placeholder="marthi"
-                        style={{
-                          minHeight: 38,
-                          padding: '6px 12px',
-                          borderRadius: 8,
-                          border: '1px solid var(--line, #cbd5e1)',
-                          background: 'var(--card, #fff)',
-                          color: 'var(--ink, #0f172a)',
-                        }}
                       />
-                    </label>
+                      <span className="comm-field__hint">Instância pareada (padrão: marthi).</span>
+                    </div>
 
-                    <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650 }}>
-                      Chave de Autenticação (apikey)
+                    <div className="comm-field">
+                      <label htmlFor="wa-api-key" className="comm-field__label">
+                        Chave de Autenticação (apikey)
+                      </label>
                       <input
+                        id="wa-api-key"
                         type="text"
+                        className="comm-field__input"
                         value={whatsappSettings.apiKey}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, apiKey: e.target.value })}
                         placeholder="5E280C9D-239A-4D8B-A765-63D00C291331"
-                        style={{
-                          minHeight: 38,
-                          padding: '6px 12px',
-                          borderRadius: 8,
-                          border: '1px solid var(--line, #cbd5e1)',
-                          background: 'var(--card, #fff)',
-                          color: 'var(--ink, #0f172a)',
-                        }}
                       />
-                    </label>
+                      <span className="comm-field__hint">Chave de segurança da API.</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -601,42 +675,36 @@ export function CommunicationSettingsSection() {
               Envie uma mensagem instantânea para validar que o WhatsApp está entregando mensagens aos seus clientes.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-              <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650 }}>
-                Número de Destino (com DDD)
+            <div className="comm-form-row comm-form-row--2">
+              <div className="comm-field">
+                <label htmlFor="wa-test-num" className="comm-field__label">
+                  Número de Destino (com DDD)
+                </label>
                 <input
+                  id="wa-test-num"
                   type="text"
+                  className="comm-field__input"
                   value={waTestNumber}
                   onChange={(e) => setWaTestNumber(e.target.value)}
                   placeholder="Ex.: (24) 98124-4253 ou 24981244253"
-                  style={{
-                    minHeight: 38,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--line, #cbd5e1)',
-                    background: 'var(--card, #fff)',
-                    color: 'var(--ink, #0f172a)',
-                  }}
                 />
-              </label>
+                <span className="comm-field__hint">Destino da mensagem de teste.</span>
+              </div>
 
-              <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650 }}>
-                Mensagem personalizada (opcional)
+              <div className="comm-field">
+                <label htmlFor="wa-test-msg" className="comm-field__label">
+                  Mensagem personalizada (opcional)
+                </label>
                 <input
+                  id="wa-test-msg"
                   type="text"
+                  className="comm-field__input"
                   value={waTestMessage}
                   onChange={(e) => setWaTestMessage(e.target.value)}
                   placeholder="Ex.: Teste de conexão Marthi ERP / Totem"
-                  style={{
-                    minHeight: 38,
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--line, #cbd5e1)',
-                    background: 'var(--card, #fff)',
-                    color: 'var(--ink, #0f172a)',
-                  }}
                 />
-              </label>
+                <span className="comm-field__hint">Texto que será enviado ao destinatário.</span>
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
@@ -713,55 +781,51 @@ export function CommunicationSettingsSection() {
                 </label>
               </div>
 
-              {/* Grid de Parâmetros SMTP */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Servidor SMTP (SMTP_HOST)
+              {/* LINHA 1 (Alinhamento Perfeito): Host, Porta e Segurança */}
+              <div className="comm-form-row comm-form-row--3">
+                <div className="comm-field">
+                  <label htmlFor="smtp-host" className="comm-field__label">
+                    Servidor SMTP (SMTP_HOST)
+                  </label>
                   <input
+                    id="smtp-host"
                     type="text"
                     required
+                    className="comm-field__input"
                     value={smtpSettings.host}
                     onChange={(e) => setSmtpSettings({ ...smtpSettings, host: e.target.value })}
                     placeholder="Ex.: smtp.gmail.com ou mail.suaempresa.com.br"
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Ex.: smtp.gmail.com, smtp.office365.com, mail.sualoja.com.br
-                  </small>
-                </label>
+                  </span>
+                </div>
 
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Porta (SMTP_PORT)
+                <div className="comm-field">
+                  <label htmlFor="smtp-port" className="comm-field__label">
+                    Porta (SMTP_PORT)
+                  </label>
                   <input
+                    id="smtp-port"
                     type="number"
                     required
+                    className="comm-field__input"
                     value={smtpSettings.port}
                     onChange={(e) => setSmtpSettings({ ...smtpSettings, port: Number(e.target.value) })}
                     placeholder="465 ou 587"
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Porta 465 (SSL) ou 587 (TLS).
-                  </small>
-                </label>
+                  </span>
+                </div>
 
-                <div style={{ display: 'grid', gap: 6 }}>
+                <div className="comm-field">
+                  <label className="comm-field__label">
+                    Segurança de Conexão (SMTP_SECURE)
+                  </label>
                   <AdminPicker
-                    label="Segurança de Conexão (SMTP_SECURE)"
+                    compact
+                    label="Segurança de Conexão"
                     value={smtpSettings.secure ? 'ssl' : 'tls'}
                     options={[
                       { value: 'ssl', label: 'SSL / TLS Seguro (Porta 465 recomendada)' },
@@ -769,94 +833,76 @@ export function CommunicationSettingsSection() {
                     ]}
                     onChange={(val) => setSmtpSettings({ ...smtpSettings, secure: val === 'ssl' })}
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Use SSL para a maioria dos provedores com porta 465.
-                  </small>
+                  </span>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Usuário / E-mail de Autenticação (SMTP_USER)
+              {/* LINHA 2 (Alinhamento Perfeito): Usuário, Senha e Remetente */}
+              <div className="comm-form-row comm-form-row--3">
+                <div className="comm-field">
+                  <label htmlFor="smtp-user" className="comm-field__label">
+                    Usuário / E-mail (SMTP_USER)
+                  </label>
                   <input
+                    id="smtp-user"
                     type="text"
                     required
+                    className="comm-field__input"
                     value={smtpSettings.user}
                     onChange={(e) => setSmtpSettings({ ...smtpSettings, user: e.target.value })}
-                    placeholder="Ex.: contato@suaempresa.com.br ou conta@gmail.com"
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
+                    placeholder="contato@suaempresa.com.br"
                   />
-                </label>
+                  <span className="comm-field__hint">
+                    E-mail ou login da conta utilizado para autenticação.
+                  </span>
+                </div>
 
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Senha do E-mail ou Senha de App (SMTP_PASS)
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div className="comm-field">
+                  <label htmlFor="smtp-pass" className="comm-field__label">
+                    Senha de E-mail / App (SMTP_PASS)
+                  </label>
+                  <div className="comm-field__pass-wrap">
                     <input
+                      id="smtp-pass"
                       type={showSmtpPass ? 'text' : 'password'}
+                      className="comm-field__input"
                       value={smtpSettings.pass || ''}
                       onChange={(e) => setSmtpSettings({ ...smtpSettings, pass: e.target.value })}
-                      placeholder={smtpSettings.hasPassword ? '•••••••• (senha já configurada)' : 'Digite a senha do e-mail'}
-                      style={{
-                        width: '100%',
-                        minHeight: 40,
-                        padding: '8px 40px 8px 14px',
-                        borderRadius: 8,
-                        border: '1px solid var(--line, #cbd5e1)',
-                        background: 'var(--card, #fff)',
-                        color: 'var(--ink, #0f172a)',
-                      }}
+                      placeholder={smtpSettings.hasPassword ? '•••••••• (senha gravada)' : 'Digite a senha do e-mail'}
                     />
                     <button
                       type="button"
+                      className="comm-field__pass-toggle"
                       onClick={() => setShowSmtpPass((val) => !val)}
                       title={showSmtpPass ? 'Ocultar senha' : 'Ver senha'}
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 4,
-                        color: 'var(--mute, #64748b)',
-                        fontSize: '1rem',
-                      }}
                     >
                       {showSmtpPass ? '🙈' : '👁️'}
                     </button>
                   </div>
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Para Gmail ou Outlook, utilize uma <strong>Senha de App</strong> de 16 caracteres.
-                  </small>
-                </label>
+                  </span>
+                </div>
 
-                <label style={{ display: 'grid', gap: 6, fontSize: '0.85rem', fontWeight: 650 }}>
-                  Remetente Oficial (SMTP_FROM)
+                <div className="comm-field">
+                  <label htmlFor="smtp-from" className="comm-field__label">
+                    Remetente Oficial (SMTP_FROM)
+                  </label>
                   <input
+                    id="smtp-from"
                     type="text"
                     required
+                    className="comm-field__input"
                     value={smtpSettings.from}
                     onChange={(e) => setSmtpSettings({ ...smtpSettings, from: e.target.value })}
-                    placeholder='Ex.: "Cell Ponto" <contato@cellponto.com.br>'
-                    style={{
-                      minHeight: 40,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--line, #cbd5e1)',
-                      background: 'var(--card, #fff)',
-                      color: 'var(--ink, #0f172a)',
-                    }}
+                    placeholder='"Loja Central" <contato@sualoja.com.br>'
                   />
-                  <small style={{ color: 'var(--mute, #64748b)', fontWeight: 400 }}>
+                  <span className="comm-field__hint">
                     Nome e endereço visível para o cliente na caixa de entrada.
-                  </small>
-                </label>
+                  </span>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
@@ -885,32 +931,28 @@ export function CommunicationSettingsSection() {
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-              <label style={{ display: 'grid', gap: 4, fontSize: '0.82rem', fontWeight: 650, flex: '1 1 280px' }}>
-                E-mail Destinatário de Teste
+              <div className="comm-field" style={{ flex: '1 1 280px' }}>
+                <label htmlFor="smtp-test-dest" className="comm-field__label">
+                  E-mail Destinatário de Teste
+                </label>
                 <input
+                  id="smtp-test-dest"
                   type="email"
+                  className="comm-field__input"
                   value={smtpTestRecipient}
                   onChange={(e) => setSmtpTestRecipient(e.target.value)}
                   placeholder="Ex.: seuemail@gmail.com"
-                  style={{
-                    minHeight: 40,
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: '1px solid var(--line, #cbd5e1)',
-                    background: 'var(--card, #fff)',
-                    color: 'var(--ink, #0f172a)',
-                  }}
                 />
-              </label>
+              </div>
 
               <button
                 type="button"
                 className="btn btn--primary"
                 onClick={() => void handleSendSmtpTest()}
                 disabled={smtpTesting}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 40, padding: '0 20px' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 20px' }}
               >
-                <span>✉️</span>
+                <AdminIcon name="mail" />
                 <span>{smtpTesting ? 'Testando conexão…' : 'Enviar E-mail de Teste'}</span>
               </button>
             </div>

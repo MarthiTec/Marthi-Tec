@@ -362,6 +362,33 @@ export function apiPutStoreWhatsAppSettings(body: StoreWhatsAppSettings) {
   return nestPut<StoreWhatsAppSettings>('/store/whatsapp-settings', body);
 }
 
+export function apiGetWhatsAppStatus() {
+  return nestGet<{
+    success: boolean;
+    connected: boolean;
+    state: string;
+    instance: string;
+    baseUrl: string;
+    storeNumber: string;
+    error?: string;
+  }>('/whatsapp/status');
+}
+
+export function apiGetWhatsAppQrCode(forceNew?: boolean) {
+  const qs = forceNew ? '?force=true' : '';
+  return nestGet<{
+    success: boolean;
+    alreadyConnected?: boolean;
+    state?: string;
+    message?: string;
+    data?: any;
+  }>(`/whatsapp/qrcode${qs}`);
+}
+
+export function apiDisconnectWhatsApp() {
+  return nestPost<{ success: boolean; message: string }>('/whatsapp/disconnect', {});
+}
+
 export function apiGetStoreSmtpSettings() {
   return nestGet<StoreSmtpSettings>('/store/smtp-settings');
 }
