@@ -7,7 +7,7 @@ import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
-import { EvolutionWhatsAppSection } from '../../components/EvolutionWhatsAppSection';
+import { CommunicationSettingsSection } from '../../components/CommunicationSettingsSection';
 import {
   deleteOperationShortcut,
   listOperationShortcuts,
@@ -39,17 +39,19 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-type OpsTab = 'ramo' | 'atalhos' | 'whatsapp' | 'usuarios';
+type OpsTab = 'ramo' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
 
-/** Ramo da loja, atalhos configuráveis, Evolution WhatsApp e equipe da operação. */
+/** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
   const [tab, setTab] = useState<OpsTab>(() => {
-    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'whatsapp' || tabParam === 'usuarios') return tabParam;
+    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'usuarios') return tabParam;
+    if (tabParam === 'whatsapp') return 'comunicacao';
     if (location.pathname.endsWith('/usuarios')) return 'usuarios';
+    if (location.pathname.endsWith('/comunicacao') || location.pathname.endsWith('/whatsapp')) return 'comunicacao';
     return 'ramo';
   });
 
@@ -220,12 +222,12 @@ export function OperationsPage() {
 
         <button
           type="button"
-          className={`btn ${tab === 'whatsapp' ? 'btn--primary' : 'btn--ghost'}`}
-          onClick={() => switchTab('whatsapp')}
+          className={`btn ${tab === 'comunicacao' || tab === 'whatsapp' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('comunicacao')}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
         >
           <AdminIcon name="whatsapp" />
-          <span>WhatsApp &amp; Evolution API</span>
+          <span>Comunicação (WhatsApp &amp; E-mail)</span>
         </button>
 
         <button
@@ -419,9 +421,9 @@ export function OperationsPage() {
         </>
       ) : null}
 
-      {/* ABA 3: WhatsApp & Evolution API */}
-      {tab === 'whatsapp' ? (
-        <EvolutionWhatsAppSection />
+      {/* ABA 3: Comunicação & Mensageria (WhatsApp & E-mail) */}
+      {tab === 'comunicacao' || tab === 'whatsapp' ? (
+        <CommunicationSettingsSection />
       ) : null}
 
       {/* ABA 4: Equipe & Usuários da Loja */}

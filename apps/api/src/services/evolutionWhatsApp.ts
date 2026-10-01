@@ -62,18 +62,22 @@ export function buildTotemLeadMessage(
   ].join('\n');
 }
 
-export async function sendEvolutionText(number: string, text: string): Promise<{
+export async function sendEvolutionText(
+  number: string,
+  text: string,
+  customConfig?: { baseUrl?: string; instance?: string; apiKey?: string },
+): Promise<{
   ok: boolean;
   status: number;
   body: unknown;
 }> {
-  const baseUrl = env.EVOLUTION_BASE_URL?.replace(/\/$/, '');
-  const instance = env.EVOLUTION_INSTANCE;
-  const apiKey = env.EVOLUTION_API_KEY;
+  const baseUrl = (customConfig?.baseUrl || env.EVOLUTION_BASE_URL)?.replace(/\/$/, '');
+  const instance = customConfig?.instance || env.EVOLUTION_INSTANCE;
+  const apiKey = customConfig?.apiKey || env.EVOLUTION_API_KEY;
 
   if (!baseUrl || !instance || !apiKey) {
     const error = new Error(
-      'Evolution não configurado. Defina EVOLUTION_BASE_URL, EVOLUTION_INSTANCE e EVOLUTION_API_KEY.',
+      'Evolution não configurado. Defina a URL base, instância e API Key da Evolution API nas Operações.',
     );
     (error as Error & { status: number }).status = 501;
     throw error;

@@ -818,63 +818,14 @@ export function TotemSettingsPage() {
         </div>
       </article>
 
-      <article className="admin-card admin-card--form">
-        <h2>WhatsApp do Totem (Evolution)</h2>
+      <article className="admin-card">
+        <h2>WhatsApp e Notificações</h2>
         <p>
-          O QR Code é lido <strong>uma vez</strong> no Evolution Manager (
-          <a href="https://marthi-tec.discloud.app" target="_blank" rel="noreferrer">
-            marthi-tec.discloud.app
-          </a>
-          ): pareia o chip/WhatsApp da instância Marthi. Depois disso, o sistema só usa a API
-          (URL + instância + API key no servidor) para <strong>enviar</strong> mensagens.
-        </p>
-        <p>
-          Aqui no painel a loja informa o número que vai <strong>receber</strong> o lead do totem —
-          não é preciso escanear QR de novo por loja. Trabalhe conosco / suporte usam o número
-          comercial Marthi (mesmo Evolution, outro destino).
-        </p>
-        <div className="admin-form">
-          <label>
-            WhatsApp da loja (com DDI)
-            <input
-              type="tel"
-              inputMode="tel"
-              value={storeWhatsApp}
-              placeholder="5524999999999"
-              onChange={(event) => {
-                setStoreWhatsApp(event.target.value.replace(/\D/g, '').slice(0, 15));
-                markDirty();
-              }}
-            />
-          </label>
-          <label>
-            Local / shopping (opcional na mensagem)
-            <input
-              type="text"
-              value={locationLabel}
-              maxLength={80}
-              placeholder="Ex.: Shopping Olga Sola, Três Rios"
-              onChange={(event) => {
-                setLocationLabel(event.target.value);
-                markDirty();
-              }}
-            />
-          </label>
-          <label className="admin-check">
-            <input
-              type="checkbox"
-              checked={notifyCustomerOnLead}
-              onChange={(event) => {
-                setNotifyCustomerOnLead(event.target.checked);
-                markDirty();
-              }}
-            />
-            <span>Também avisar o cliente no WhatsApp após o pedido</span>
-          </label>
-        </div>
-        <p className="empty" style={{ marginTop: 8 }}>
-          Sem número salvo, o pedido ainda abre no PDV, mas o WhatsApp não dispara. Se a Evolution
-          estiver desconectada, reconecte pelo QR no Manager.
+          As configurações da Evolution API e envio de WhatsApp agora são gerenciadas centralmente em{' '}
+          <Link to="/painel/operacoes?tab=comunicacao" style={{ fontWeight: 650, color: 'var(--accent, #0f766e)' }}>
+            Operações → Comunicação &amp; Mensagens
+          </Link>
+          , servindo tanto para os pedidos do Totem quanto para Ordens de Serviço, PDV e comunicados da loja.
         </p>
       </article>
 

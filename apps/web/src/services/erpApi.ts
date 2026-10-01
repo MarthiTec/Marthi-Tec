@@ -333,6 +333,55 @@ export function apiPutTotemSettings(body: Partial<TotemSettings>) {
   return nestPut<TotemSettings>('/store/totem-settings', body);
 }
 
+export type StoreWhatsAppSettings = {
+  enabled: boolean;
+  baseUrl: string;
+  instance: string;
+  apiKey: string;
+  storeNumber: string;
+  notifyCustomer: boolean;
+  locationLabel: string;
+};
+
+export type StoreSmtpSettings = {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass?: string;
+  hasPassword?: boolean;
+  from: string;
+};
+
+export function apiGetStoreWhatsAppSettings() {
+  return nestGet<StoreWhatsAppSettings>('/store/whatsapp-settings');
+}
+
+export function apiPutStoreWhatsAppSettings(body: StoreWhatsAppSettings) {
+  return nestPut<StoreWhatsAppSettings>('/store/whatsapp-settings', body);
+}
+
+export function apiGetStoreSmtpSettings() {
+  return nestGet<StoreSmtpSettings>('/store/smtp-settings');
+}
+
+export function apiPutStoreSmtpSettings(body: Partial<StoreSmtpSettings>) {
+  return nestPut<StoreSmtpSettings>('/store/smtp-settings', body);
+}
+
+export function apiTestStoreSmtp(body: {
+  recipient: string;
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  pass?: string;
+  from?: string;
+}) {
+  return nestPost<{ message: string; messageId?: string }>('/store/smtp-settings/test', body);
+}
+
 export function apiGetOperatorProfile() {
   return nestGet<OperatorProfile>('/me/profile');
 }

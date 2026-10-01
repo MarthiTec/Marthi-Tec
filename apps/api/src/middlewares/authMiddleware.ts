@@ -222,3 +222,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   next();
 }
+
+/**
+ * Middleware que usa requireAuth se o header Authorization estiver presente,
+ * ou recorre à loja STR-DEMO-01 para sessões de demonstração ou testes.
+ */
+export async function requireOrDemoAuth(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.header('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return requireAuth(req, res, next);
+  }
+  req.storeId = req.header('x-store-id') || 'STR-DEMO-01';
+  req.clientAccountId = 'ACC-MARTHI-DEMO';
+  return next();
+}
+

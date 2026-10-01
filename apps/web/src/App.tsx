@@ -211,6 +211,8 @@ export function App() {
           <Route path="usuarios" element={<PainelUsersPage />} />
           <Route path="operacoes" element={<OperationsPage />} />
           <Route path="operacoes/usuarios" element={<OperationsPage />} />
+          <Route path="operacoes/comunicacao" element={<OperationsPage />} />
+          <Route path="operacoes/whatsapp" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="totem" element={<TotemInsightsPage />} />
