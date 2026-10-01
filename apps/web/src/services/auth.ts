@@ -121,11 +121,20 @@ export async function loginWithPassword(email: string, password: string): Promis
       return json.data;
     }
     const json = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    if (json?.error?.message) {
+      throw new Error(json.error.message);
+    }
     if (response.status === 403) {
-      throw new Error(json?.error?.message || 'Conta inativa ou aguardando confirmação de pagamento.');
+      throw new Error('Conta inativa ou aguardando confirmação de pagamento.');
+    }
+    if (response.status === 401) {
+      throw new Error('E-mail ou senha inválidos.');
     }
   } catch (err) {
-    if (err instanceof Error && (err.message.includes('aguardando') || err.message.includes('inativa'))) {
+    if (err instanceof Error) {
+      if (err.name === 'TypeError' || err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
+        throw new Error('Bloqueio de conexão/CORS com a API. Adicione o domínio nas variáveis CORS_ORIGINS do backend.');
+      }
       throw err;
     }
   }
