@@ -11,12 +11,6 @@ export function nestApiUrl() {
   const configured = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
   if (configured) return configured;
   if (import.meta.env.DEV) return '';
-  if (typeof window !== 'undefined' && window.location.origin) {
-    if (window.location.hostname.includes('marthi-totem.discloud.app')) {
-      return PUBLIC_NEST_URL;
-    }
-    return window.location.origin;
-  }
   return PUBLIC_NEST_URL;
 }
 
