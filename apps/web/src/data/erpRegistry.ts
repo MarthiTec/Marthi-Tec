@@ -831,6 +831,22 @@ export function findEmployeeByUserEmail(email: string | null | undefined): Emplo
       normalizeEmail(item.userEmail || item.email) === key,
   );
   if (found) return found;
+  if (key === 'marthi.tecnologia@gmail.com' || key.includes('marthi.tecnologia')) {
+    return {
+      id: 'EMP-MARTHI-ADMIN',
+      name: 'Marthi Tecnologia',
+      phone: '',
+      email: 'marthi.tecnologia@gmail.com',
+      document: '',
+      role: 'admin',
+      isSystemUser: true,
+      userEmail: 'marthi.tecnologia@gmail.com',
+      accessAreas: [...ALL_ACCESS_AREAS],
+      active: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: new Date().toISOString(),
+    };
+  }
   if (key === 'marianaveigatav@gmail.com') {
     return {
       id: 'EMP-MARIANA-01',
@@ -1030,8 +1046,11 @@ export function resolveAppHome(userEmail: string | null | undefined): string {
 export function userIsStoreAdmin(userEmail: string | null | undefined) {
   if (isMarthiStaffEmail(userEmail)) return true;
   const norm = normalizeEmail(userEmail || '');
-  if (!norm) return false;
-  if (norm === 'gilvanteodo@gmail.com' || norm === 'marianaveigatav@gmail.com') return true;
+  if (
+    norm === 'marthi.tecnologia@gmail.com' ||
+    norm === 'gilvanteodo@gmail.com' ||
+    norm === 'marianaveigatav@gmail.com'
+  ) return true;
   const isClient = listMarthiClients().some((c) => c.email.toLowerCase() === norm);
   if (isClient) return true;
   const employee = findEmployeeByUserEmail(userEmail);

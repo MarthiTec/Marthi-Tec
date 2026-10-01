@@ -107,7 +107,24 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       apiGetOperatorProfile(),
       apiListPosTickets(),
     ]);
-    await Promise.all([
+    // 1. Aplica o estado central da retaguarda e plano imediatamente
+    replaceAdminState({
+      customers: customers as Customer[],
+      stock: stock as StockItem[],
+      orders: orders as SalesOrder[],
+      finance: finance as FinanceEntry[],
+      priceTables: priceTables as PriceTable[],
+      payments: payments as PaymentMethod[],
+    });
+    replaceAttributes(attributes);
+    replaceWorkOrders(workOrders);
+    replaceStoreEntitlement(plan);
+    replaceTotemSettings(totemSettings);
+    replaceOperatorProfileCache(profile);
+    replaceQueueTickets(posTickets.items ?? []);
+
+    // 2. Hidratações secundárias em paralelo com tolerância a falhas (rotas opcionais não quebram o app)
+    await Promise.allSettled([
       hydrateErpRegistryFromApi(),
       hydrateMultiStoreFromApi(),
       hydrateFinanceBookFromApi(),
@@ -123,21 +140,6 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       hydrateTotemAnalyticsFromApi(),
       hydrateDashboardFromApi(7),
     ]);
-
-    replaceAdminState({
-      customers: customers as Customer[],
-      stock: stock as StockItem[],
-      orders: orders as SalesOrder[],
-      finance: finance as FinanceEntry[],
-      priceTables: priceTables as PriceTable[],
-      payments: payments as PaymentMethod[],
-    });
-    replaceAttributes(attributes);
-    replaceWorkOrders(workOrders);
-    replaceStoreEntitlement(plan);
-    replaceTotemSettings(totemSettings);
-    replaceOperatorProfileCache(profile);
-    replaceQueueTickets(posTickets.items ?? []);
 
     setBootstrap({ loading: false, ready: true, error: null });
     return true;

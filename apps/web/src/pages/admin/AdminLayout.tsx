@@ -185,6 +185,7 @@ export function AdminLayout() {
   const isAdmin =
     user?.role === 'admin' ||
     userIsStoreAdmin(userEmail) ||
+    userEmail?.toLowerCase() === 'marthi.tecnologia@gmail.com' ||
     userEmail?.toLowerCase() === 'gilvanteodo@gmail.com' ||
     userEmail?.toLowerCase() === 'marianaveigatav@gmail.com';
   const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
@@ -274,7 +275,7 @@ export function AdminLayout() {
               return true;
             })
             .map((group) => {
-            const unlocked = !group.module || hasModule(group.module);
+            const unlocked = isAdmin || !group.module || hasModule(group.module);
             const opened = openGroups.includes(group.id);
             const groupActive = navGroupForPath(location.pathname, location.search) === group.id;
 
