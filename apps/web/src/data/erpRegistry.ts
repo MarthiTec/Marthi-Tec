@@ -574,7 +574,8 @@ export async function upsertSeller(
       save(state);
       return state;
     } catch (err) {
-      console.warn('[erpRegistry] Falha na API Nest ao salvar vendedor, gravando localmente:', err);
+      console.error('[erpRegistry] Falha na API Nest ao salvar vendedor:', err);
+      throw err;
     }
   }
 
@@ -627,7 +628,8 @@ export async function upsertSupplier(
       save(state);
       return state;
     } catch (err) {
-      console.warn('[erpRegistry] Falha na API Nest ao salvar fornecedor, gravando localmente:', err);
+      console.error('[erpRegistry] Falha na API Nest ao salvar fornecedor:', err);
+      throw err;
     }
   }
 

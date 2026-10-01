@@ -263,15 +263,13 @@ stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
       }
     }
 
-    const record = {
-      id,
-      storeId,
-      ...body,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    memoryStock.set(id, record);
-    res.status(201).json({ success: true, data: record });
+    res.status(503).json({
+      success: false,
+      error: {
+        code: 'DATABASE_UNAVAILABLE',
+        message: 'Banco de dados não conectado. Não é permitido gravar dados em memória temporária.',
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -386,14 +384,13 @@ stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
       }
     }
 
-    const current = memoryStock.get(id);
-    if (!current || current.storeId !== storeId) {
-      res.status(404).json({ success: false, error: { message: 'Item não encontrado.' } });
-      return;
-    }
-    const updated = { ...current, ...body, updatedAt: new Date().toISOString() };
-    memoryStock.set(id, updated);
-    res.json({ success: true, data: updated });
+    res.status(503).json({
+      success: false,
+      error: {
+        code: 'DATABASE_UNAVAILABLE',
+        message: 'Banco de dados não conectado. Não é permitido gravar dados em memória temporária.',
+      },
+    });
   } catch (error) {
     next(error);
   }
