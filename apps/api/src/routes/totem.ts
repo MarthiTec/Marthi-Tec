@@ -174,24 +174,28 @@ async function handleSaveSettings(req: Request, res: Response, next: NextFunctio
   }
 }
 
-async function handleGetCatalog(_req: Request, res: Response, next: NextFunction) {
+async function handleGetCatalog(req: Request, res: Response, next: NextFunction) {
   try {
+    const storeId = await resolveStoreId(req);
+
     if (pool) {
       const sql = `
         SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
         FROM stock_items
-        WHERE active = true AND (show_on_totem = true OR show_on_totem IS NULL)
+        WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
+          AND active = true
+          AND (show_on_totem = true OR show_on_totem IS NULL)
         ORDER BY name ASC
       `;
-      const result = await pool.query(sql);
+      const result = await pool.query(sql, [storeId]);
       res.json({ success: true, data: result.rows.map(formatStockRow) });
       return;
     }
 
     const items = Array.from(memoryStock.values())
-      .filter((i) => i.active !== false && i.showOnTotem !== false)
+      .filter((i) => (i.storeId === storeId || i.storeId === 'STR-DEMO-01') && i.active !== false && i.showOnTotem !== false)
       .map(formatStockRow);
     res.json({ success: true, data: items });
   } catch (error) {
@@ -199,22 +203,57 @@ async function handleGetCatalog(_req: Request, res: Response, next: NextFunction
   }
 }
 
-async function handleGetAttributes(_req: Request, res: Response, next: NextFunction) {
+async function handleGetAttributes(req: Request, res: Response, next: NextFunction) {
   try {
+    const storeId = await resolveStoreId(req);
+
     if (pool) {
-      const resQuery = await pool.query(
-        'SELECT * FROM product_attributes WHERE active = true ORDER BY name ASC',
+      const attrsRes = await pool.query(
+        `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
+         FROM product_attributes
+         WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
+           AND active = true
+           AND use_on_totem = true
+           AND UPPER(TRIM(name)) NOT IN ('MAIS UM TESTE PAPAI', 'TESTE')
+         ORDER BY sort ASC, name ASC`,
+        [storeId],
       );
-      if (resQuery.rows.length > 0) {
-        res.json({ success: true, data: resQuery.rows });
+
+      if (attrsRes.rows.length > 0) {
+        const items = [];
+        for (const row of attrsRes.rows) {
+          const valRes = await pool.query(
+            `SELECT value, price_delta, sort FROM product_attribute_values WHERE attribute_id = $1 ORDER BY sort ASC, id ASC`,
+            [row.id],
+          );
+          const values: string[] = [];
+          const priceDeltas: Record<string, number> = {};
+          for (const v of valRes.rows) {
+            values.push(v.value);
+            if (Number(v.price_delta) !== 0) {
+              priceDeltas[v.value] = Number(v.price_delta);
+            }
+          }
+          items.push({
+            id: row.id,
+            name: row.name,
+            values,
+            priceDeltas,
+            useOnTotem: Boolean(row.use_on_totem),
+            filterOnTotem: Boolean(row.filter_on_totem),
+            useOnStock: Boolean(row.use_on_stock),
+            sort: Number(row.sort) || 0,
+            active: Boolean(row.active),
+          });
+        }
+        res.json({ success: true, data: items });
         return;
       }
     }
 
     const fallbackAttrs = [
-      { id: 'attr-cor', name: 'Cor', values: ['Preto', 'Branco', 'Azul', 'Desert', 'Titânio Natural'], active: true, useOnTotem: true, useOnStock: true },
-      { id: 'attr-cap', name: 'Capacidade', values: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], active: true, useOnTotem: true, useOnStock: true },
-      { id: 'attr-ret', name: 'Retirada', values: ['Pronta Entrega', 'Sob Encomenda'], active: true, useOnTotem: true, useOnStock: true },
+      { id: 'attr-cor', name: 'Cor', values: ['Preto', 'Branco', 'Azul', 'Desert', 'Titânio Natural'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 1, priceDeltas: {} },
+      { id: 'attr-cap', name: 'Capacidade', values: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 2, priceDeltas: {} },
     ];
     res.json({ success: true, data: fallbackAttrs });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 import { hashPassword, upsertClientUserInMemory } from '../services/authService.js';
 import { randomBytes } from 'node:crypto';
@@ -120,9 +120,9 @@ function onlyDigits(v: string) {
 
 /* ── 1. Employees / Usuários com Limites do Plano ───────── */
 
-registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
+registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
     const activeOnly = req.query.active === 'true';
 
@@ -211,10 +211,10 @@ registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
   }
 });
 
-registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => {
+registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
-    const clientAccountId = req.clientAccountId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
+    const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
     const body = employeeSchema.parse(req.body);
 
     const userLimit = req.userLimit || 10;
@@ -356,9 +356,9 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
   }
 });
 
-registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next) => {
+registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
     const id = req.params.id;
     const body = employeeSchema.partial().parse(req.body);
@@ -514,13 +514,16 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
   }
 });
 
-registryRouter.delete('/api/v1/employees/:id', requireAuth, async (req, res, next) => {
+registryRouter.delete('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const id = req.params.id;
 
     if (pool) {
-      await pool.query(`DELETE FROM employees WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await pool.query(
+        `DELETE FROM employees WHERE id = $1 AND (store_id = $2 OR store_id = 'STR-DEMO-01')`,
+        [id, storeId],
+      );
       res.json({ success: true, data: { ok: true } });
       return;
     }

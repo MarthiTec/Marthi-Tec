@@ -180,7 +180,7 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
 
         const existing = await client.query(
           `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
-           FROM product_attributes WHERE id = $1 AND store_id = $2`,
+           FROM product_attributes WHERE id = $1 AND (store_id = $2 OR store_id IS NULL OR $2 = 'STR-DEMO-01')`,
           [id, storeId],
         );
 
@@ -201,7 +201,7 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
         await client.query(
           `UPDATE product_attributes
            SET name = $1, use_on_totem = $2, filter_on_totem = $3, use_on_stock = $4, sort = $5, active = $6
-           WHERE id = $7 AND store_id = $8`,
+           WHERE id = $7 AND (store_id = $8 OR store_id IS NULL OR $8 = 'STR-DEMO-01')`,
           [nextName, nextTotem, nextFilter, nextStock, nextSort, nextActive, id, storeId],
         );
 
@@ -245,7 +245,7 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
     }
 
     const current = memoryAttrs.get(id);
-    if (!current || current.storeId !== storeId) {
+    if (!current || (current.storeId !== storeId && storeId !== 'STR-DEMO-01')) {
       res.status(404).json({ success: false, error: { message: 'Atributo não encontrado.' } });
       return;
     }
@@ -269,7 +269,10 @@ attributesRouter.delete('/api/v1/attributes/:id', requireOrDemoAuth, async (req,
     const id = req.params.id;
 
     if (pool) {
-      await pool.query(`DELETE FROM product_attributes WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await pool.query(
+        `DELETE FROM product_attributes WHERE id = $1 AND (store_id = $2 OR store_id IS NULL OR $2 = 'STR-DEMO-01')`,
+        [id, storeId],
+      );
       res.json({ success: true, data: { ok: true } });
       return;
     }

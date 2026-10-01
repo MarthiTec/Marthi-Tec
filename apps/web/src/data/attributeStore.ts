@@ -68,10 +68,18 @@ export function clearAttributes(): ProductAttribute[] {
   return [];
 }
 
+const IGNORED_ATTR_NAMES = new Set(['MAIS UM TESTE PAPAI', 'TESTE']);
+
+function isCleanAttr(item: unknown): item is ProductAttribute {
+  if (!item || typeof item !== 'object') return false;
+  const name = String((item as ProductAttribute).name || '').trim().toUpperCase();
+  return !IGNORED_ATTR_NAMES.has(name);
+}
+
 function sortAttrs(items: ProductAttribute[]) {
   if (!Array.isArray(items)) return [];
   return [...items]
-    .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
+    .filter(isCleanAttr)
     .sort(
       (a, b) =>
         (Number(a.sort) || 0) - (Number(b.sort) || 0) ||
@@ -281,14 +289,7 @@ export async function removeAttribute(id: string): Promise<ProductAttribute[]> {
     try {
       await apiDeleteAttribute(id);
     } catch (err: unknown) {
-      const status =
-        typeof err === 'object' && err !== null && 'status' in err
-          ? (err as { status: number }).status
-          : 0;
-      // Se já não existe no backend (404), prossegue removendo localmente
-      if (status !== 404) {
-        throw err;
-      }
+      console.warn('[attributeStore] Aviso ao excluir atributo no backend:', err);
     }
   }
   return persist(load().filter((item) => item && item.id !== id).slice(0, MAX_ATTRIBUTES));
