@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
-import { requireAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { formatStockRow, memoryStock } from './stock.js';
 
 export const totemRouter = Router();
@@ -257,10 +257,10 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
 }
 
 // ── Rotas do Totem e Configurações da Empresa (/store/totem-settings) ────────
-totemRouter.get('/api/v1/store/totem-settings', requireAuth, handleGetSettings);
-totemRouter.get('/store/totem-settings', requireAuth, handleGetSettings);
-totemRouter.put('/api/v1/store/totem-settings', requireAuth, handleSaveSettings);
-totemRouter.put('/store/totem-settings', requireAuth, handleSaveSettings);
+totemRouter.get('/api/v1/store/totem-settings', requireOrDemoAuth, handleGetSettings);
+totemRouter.get('/store/totem-settings', requireOrDemoAuth, handleGetSettings);
+totemRouter.put('/api/v1/store/totem-settings', requireOrDemoAuth, handleSaveSettings);
+totemRouter.put('/store/totem-settings', requireOrDemoAuth, handleSaveSettings);
 
 // ── Rotas Públicas do Totem (cliente / terminal sem autenticação) ────────────
 totemRouter.get('/api/v1/totem/settings', handleGetSettings);

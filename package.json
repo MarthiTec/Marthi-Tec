@@ -11,7 +11,7 @@
     "start": "node index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
     "dev:web": "npm run dev --workspace=@marthi/web",
-    "build:api": "tsc -p apps/api/tsconfig.json",
+    "build:api": "tsc -p apps/api/tsconfig.json && node -e \"const fs=require('fs'); if(!fs.existsSync('dist/db/migrations')) fs.mkdirSync('dist/db/migrations', {recursive:true}); fs.cpSync('apps/api/src/db/migrations', 'dist/db/migrations', {recursive:true});\"",
     "build:web": "npm --prefix apps/web run build",
     "db:migrate": "npm run db:migrate --workspace=@marthi/api",
     "lint": "npm run lint --workspaces --if-present"

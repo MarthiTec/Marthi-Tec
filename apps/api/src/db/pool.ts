@@ -4,16 +4,23 @@ import { env } from '../config/env.js';
 function sslFromUrl(connectionString: string): PoolConfig['ssl'] | undefined {
   try {
     const url = new URL(connectionString);
-    const mode = (url.searchParams.get('sslmode') ?? env.DB_SSLMODE).toLowerCase();
+    const mode = url.searchParams.get('sslmode')?.toLowerCase();
     if (mode === 'disable' || mode === 'allow') return undefined;
-    if (mode === 'require' || mode === 'prefer' || mode === 'verify-ca' || mode === 'verify-full') {
+    if (mode === 'require' || mode === 'verify-ca' || mode === 'verify-full') {
+      return { rejectUnauthorized: false };
+    }
+    // Hostnames sem ponto (ex.: marthitec216, localhost, postgres) são contêineres internos na VLAN privada
+    if (!url.hostname.includes('.') || url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return undefined;
+    }
+    if (mode === 'prefer') {
       return { rejectUnauthorized: false };
     }
   } catch {
     // ignore parse errors; fall through
   }
   if (env.DB_SSLMODE === 'disable') return undefined;
-  if (env.DB_SSLMODE === 'require' || env.APP_ENV === 'production') {
+  if (env.DB_SSLMODE === 'require') {
     return { rejectUnauthorized: false };
   }
   return undefined;

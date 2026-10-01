@@ -564,7 +564,8 @@ export function MarthiClientsPage() {
   }
 
   function handleCopyWhatsApp(client: MarthiClient) {
-    const text = `🚀 *Seu acesso ao Sistema Marthi está liberado!*\n\nOlá! Confirmamos o pagamento da sua assinatura para a empresa *${client.tradeName}* (${planLabel(client.planId)}).\n\n📧 Enviamos um e-mail para *${client.email}* com seu link seguro para definição da sua senha de acesso pessoal.\n\n🔗 *Link de Acesso:* https://marthi-totem.discloud.app/login\n\nQualquer dúvida, nossa equipe de suporte está à sua disposição!`;
+    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://marthi-totem.discloud.dev';
+    const text = `🚀 *Seu acesso ao Sistema Marthi está liberado!*\n\nOlá! Confirmamos o pagamento da sua assinatura para a empresa *${client.tradeName}* (${planLabel(client.planId)}).\n\n📧 Enviamos um e-mail para *${client.email}* com seu link seguro para definição da sua senha de acesso pessoal.\n\n🔗 *Link de Acesso:* ${origin}/login\n\nQualquer dúvida, nossa equipe de suporte está à sua disposição!`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);

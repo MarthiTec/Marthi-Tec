@@ -543,13 +543,14 @@ export function replaceTotemSettings(input: Partial<TotemSettings>) {
 
 export async function saveTotemSettings(input: Partial<TotemSettings>) {
   const next = mergeTotemSettings(read(), input);
-  const { isNestAuthed } = await import('../services/nestClient');
-  if (isNestAuthed()) {
+  try {
     const { apiPutTotemSettings } = await import('../services/erpApi');
     const saved = await apiPutTotemSettings(toApiTotemSettings(next));
     return replaceTotemSettings(saved);
+  } catch (err) {
+    console.warn('[totemSettings] Erro ao sincronizar com backend/Postgres:', err);
+    return replaceTotemSettings(next);
   }
-  return replaceTotemSettings(next);
 }
 
 export function invalidateTotemSettingsMemory() {

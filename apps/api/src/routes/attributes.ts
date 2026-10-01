@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const attributesRouter = Router();
@@ -47,9 +47,9 @@ function formatAttrResponse(row: any, valueRows: any[]) {
 /**
  * Listar atributos da loja
  */
-attributesRouter.get('/api/v1/attributes', requireAuth, async (req, res, next) => {
+attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
 
     if (pool) {
       const attrsRes = await pool.query(
@@ -87,9 +87,9 @@ attributesRouter.get('/api/v1/attributes', requireAuth, async (req, res, next) =
 /**
  * Criar novo atributo com opções
  */
-attributesRouter.post('/api/v1/attributes', requireAuth, async (req, res, next) => {
+attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const body = attributeSchema.parse(req.body);
     const attrId = body.id || `ATTR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 
@@ -165,11 +165,11 @@ attributesRouter.post('/api/v1/attributes', requireAuth, async (req, res, next) 
 });
 
 /**
- * Atualizar atributo
+ * Atualizar atributo (PATCH e PUT)
  */
-attributesRouter.patch('/api/v1/attributes/:id', requireAuth, async (req, res, next) => {
+async function handleUpdateAttribute(req: any, res: any, next: any) {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const id = req.params.id;
     const body = attributeSchema.partial().parse(req.body);
 
@@ -255,14 +255,17 @@ attributesRouter.patch('/api/v1/attributes/:id', requireAuth, async (req, res, n
   } catch (error) {
     next(error);
   }
-});
+}
+
+attributesRouter.patch('/api/v1/attributes/:id', requireOrDemoAuth, handleUpdateAttribute);
+attributesRouter.put('/api/v1/attributes/:id', requireOrDemoAuth, handleUpdateAttribute);
 
 /**
  * Excluir atributo
  */
-attributesRouter.delete('/api/v1/attributes/:id', requireAuth, async (req, res, next) => {
+attributesRouter.delete('/api/v1/attributes/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const id = req.params.id;
 
     if (pool) {

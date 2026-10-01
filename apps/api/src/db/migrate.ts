@@ -7,13 +7,29 @@ import type { Pool, PoolClient } from 'pg';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
+export function resolveMigrationsDir(): string {
+  const candidates = [
+    path.join(__dirname, 'migrations'),
+    path.join(__dirname, '../../apps/api/src/db/migrations'),
+    path.join(process.cwd(), 'dist/db/migrations'),
+    path.join(process.cwd(), 'apps/api/src/db/migrations'),
+    path.join(process.cwd(), 'apps/api/dist/db/migrations'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return path.join(__dirname, 'migrations');
+}
+
+export const MIGRATIONS_DIR = resolveMigrationsDir();
 
 export async function runMigrations(customPool?: Pool) {
   const db = customPool || pool;
   if (!db) {
     throw new Error('Banco de dados não configurado. Verifique as variáveis DATABASE_URL ou DB_*.');
   }
+
+  const migrationsDir = resolveMigrationsDir();
 
   const client: PoolClient = await db.connect();
   try {
@@ -31,13 +47,13 @@ export async function runMigrations(customPool?: Pool) {
     const appliedSet = new Set(res.rows.map((r) => r.name));
 
     // 3. Ler arquivos .sql da pasta de migrations
-    if (!fs.existsSync(MIGRATIONS_DIR)) {
-      console.log('[migrate] Nenhuma pasta de migrations encontrada em:', MIGRATIONS_DIR);
+    if (!fs.existsSync(migrationsDir)) {
+      console.log('[migrate] Nenhuma pasta de migrations encontrada em:', migrationsDir);
       return [];
     }
 
     const files = fs
-      .readdirSync(MIGRATIONS_DIR)
+      .readdirSync(migrationsDir)
       .filter((f) => f.endsWith('.sql'))
       .sort();
 

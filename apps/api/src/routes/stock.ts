@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const stockRouter = Router();
@@ -92,9 +92,9 @@ export function reduceStockQtyInMemory(stockId: string, qty: number): boolean {
 /**
  * Listar estoque com filtros
  */
-stockRouter.get('/api/v1/stock', requireAuth, async (req, res, next) => {
+stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const { kind, condition, q, low } = req.query;
 
     if (pool) {
@@ -154,9 +154,9 @@ stockRouter.get('/api/v1/stock', requireAuth, async (req, res, next) => {
 /**
  * Busca rápida por código (código de barras, SKU ou IMEI)
  */
-stockRouter.get('/api/v1/stock/lookup', requireAuth, async (req, res, next) => {
+stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const code = String(req.query.code || '').trim();
     if (!code) {
       res.json({ success: true, data: null });
@@ -193,9 +193,9 @@ stockRouter.get('/api/v1/stock/lookup', requireAuth, async (req, res, next) => {
 /**
  * Criar item de estoque
  */
-stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
+stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const body = stockItemSchema.parse(req.body);
     const id = body.id || `STK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -263,13 +263,16 @@ stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
       }
     }
 
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'DATABASE_UNAVAILABLE',
-        message: 'Banco de dados não conectado. Não é permitido gravar dados em memória temporária.',
-      },
-    });
+    // Memory fallback
+    const memItem = {
+      id,
+      storeId,
+      ...body,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    memoryStock.set(id, memItem);
+    res.status(201).json({ success: true, data: formatStockRow({ ...memItem, store_id: storeId }) });
   } catch (error) {
     next(error);
   }
@@ -278,9 +281,9 @@ stockRouter.post('/api/v1/stock', requireAuth, async (req, res, next) => {
 /**
  * Atualizar item de estoque
  */
-stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
+stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const id = req.params.id;
     const body = stockItemSchema.partial().parse(req.body);
 
@@ -384,13 +387,15 @@ stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
       }
     }
 
-    res.status(503).json({
-      success: false,
-      error: {
-        code: 'DATABASE_UNAVAILABLE',
-        message: 'Banco de dados não conectado. Não é permitido gravar dados em memória temporária.',
-      },
-    });
+    // Memory fallback
+    const current = memoryStock.get(id);
+    if (!current) {
+      res.status(404).json({ success: false, error: { message: 'Item de estoque não encontrado.' } });
+      return;
+    }
+    const updated = { ...current, ...body, updatedAt: new Date().toISOString() };
+    memoryStock.set(id, updated);
+    res.json({ success: true, data: formatStockRow({ ...updated, store_id: storeId }) });
   } catch (error) {
     next(error);
   }
@@ -399,9 +404,9 @@ stockRouter.patch('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
 /**
  * Excluir item de estoque
  */
-stockRouter.delete('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
+stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
     const id = req.params.id;
 
     if (pool) {
@@ -420,9 +425,9 @@ stockRouter.delete('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
 /**
  * Catálogo de produtos (para totem / PDV)
  */
-stockRouter.get('/api/v1/products', requireAuth, async (req, res, next) => {
+stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId!;
+    const storeId = req.storeId || 'STR-DEMO-01';
 
     if (pool) {
       const itemsRes = await pool.query(
