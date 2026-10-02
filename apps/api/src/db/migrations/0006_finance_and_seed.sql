@@ -146,6 +146,10 @@ ON CONFLICT (id) DO UPDATE SET
   discount_percent = EXCLUDED.discount_percent;
 
 -- 6.2 Conta Comercial Cliente Demo
+DO $$ BEGIN
+  ALTER TABLE client_accounts ADD CONSTRAINT uq_client_accounts_doc UNIQUE (document);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status)
 VALUES (
   'ACC-MARTHI-DEMO',
@@ -158,7 +162,7 @@ VALUES (
   'Matheus Marçal',
   'active'
 )
-ON CONFLICT (document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = EXCLUDED.trade_name,
   legal_name = EXCLUDED.legal_name;
 
@@ -178,6 +182,7 @@ DO $$ BEGIN
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS tax_regime TEXT NOT NULL DEFAULT 'simples_nacional';
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_matrix BOOLEAN NOT NULL DEFAULT true;
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stores ADD CONSTRAINT uq_stores_account_document UNIQUE (client_account_id, document);
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 INSERT INTO stores (
@@ -230,7 +235,7 @@ VALUES
   false,
   true
 )
-ON CONFLICT (client_account_id, document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = EXCLUDED.trade_name,
   active = EXCLUDED.active;
 
@@ -243,6 +248,7 @@ DO $$ BEGIN
   ALTER TABLE store_licenses ALTER COLUMN plan_id DROP DEFAULT;
   ALTER TABLE store_licenses ALTER COLUMN plan_id TYPE TEXT USING plan_id::TEXT;
   ALTER TABLE store_licenses ALTER COLUMN plan_id SET DEFAULT 'scale';
+  ALTER TABLE store_licenses ADD CONSTRAINT uq_store_licenses_store_id UNIQUE (store_id);
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -275,7 +281,7 @@ DO $$ BEGIN
     507.45,
     'active'
   )
-  ON CONFLICT (store_id) DO UPDATE SET
+  ON CONFLICT (id) DO UPDATE SET
     plan_id = EXCLUDED.plan_id,
     base_price = EXCLUDED.base_price,
     discount_percent = EXCLUDED.discount_percent,

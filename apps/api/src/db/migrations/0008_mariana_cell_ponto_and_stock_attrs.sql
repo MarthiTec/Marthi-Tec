@@ -29,7 +29,7 @@ VALUES (
   'Matheus Marçal',
   'active'
 )
-ON CONFLICT (document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = EXCLUDED.trade_name,
   status = 'active';
 
@@ -61,7 +61,7 @@ VALUES (
   true,
   true
 )
-ON CONFLICT (client_account_id, document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = EXCLUDED.trade_name,
   active = true;
 

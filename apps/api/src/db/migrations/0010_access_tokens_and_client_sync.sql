@@ -26,7 +26,7 @@ VALUES (
   'active',
   'TK-001-000163-CPTR-88A1'
 )
-ON CONFLICT (document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = 'Cell Ponto',
   legal_name = 'Cell Ponto Telecomunicações LTDA',
   email = 'gilvanteodo@gmail.com',
@@ -64,7 +64,7 @@ VALUES (
   true,
   'TK-001-000163-CPTR-88A1'
 )
-ON CONFLICT (client_account_id, document) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
   trade_name = 'Cell Ponto Matriz',
   legal_name = 'Cell Ponto Telecomunicações LTDA',
   phone = '(24) 98124-4253',
