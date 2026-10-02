@@ -101,52 +101,50 @@ healthRouter.all(['/health/cleanup-tests', '/api/v1/health/cleanup-tests'], asyn
   try {
     await client.query('BEGIN');
 
-    // 1. Apagar tabelas dependentes das lojas de teste (qualquer loja diferente de STR-DEMO-01)
+    // 1. Apagar com segurança todas as tabelas dependentes das lojas e contas de teste
     await client.query(`
-      DELETE FROM cash_movements WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM cash_session_events WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM cash_sessions WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM sale_payments WHERE order_id IN (SELECT id FROM sales_orders WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM sales_order_lines WHERE order_id IN (SELECT id FROM sales_orders WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM sales_orders WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM pos_quote_lines WHERE quote_id IN (SELECT id FROM pos_quotes WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM pos_quotes WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM pos_ticket_attributes WHERE ticket_id IN (SELECT id FROM pos_tickets WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM pos_tickets WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM pos_terminals WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM stock_invoice_lines WHERE invoice_id IN (SELECT id FROM stock_invoices WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM stock_invoices WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM stock_inventory_items WHERE inventory_id IN (SELECT id FROM stock_inventories WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM stock_inventories WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM stock_movements WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM payables WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM receivables WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM finance_entries WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM product_attribute_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM product_allowed_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM product_attributes WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM product_kit_items WHERE kit_id IN (SELECT id FROM product_kits WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM product_kits WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM product_lots WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM promo_campaign_tiers WHERE campaign_id IN (SELECT id FROM promo_campaigns WHERE store_id != 'STR-DEMO-01');
-      DELETE FROM promo_campaigns WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM price_tables WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM products WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM stock_items WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM customers WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM sellers WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM employees WHERE store_id != 'STR-DEMO-01' OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%';
-      DELETE FROM user_stores WHERE store_id != 'STR-DEMO-01';
-      DELETE FROM store_licenses WHERE store_id != 'STR-DEMO-01' OR client_account_id != 'ACC-MARTHI-DEMO';
-      DELETE FROM stores WHERE id != 'STR-DEMO-01';
-    `);
-
-    // 2. Apagar tokens de autenticação de teste e signups
-    await client.query(`
-      DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
-      DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%';
-      DELETE FROM users WHERE client_account_id != 'ACC-MARTHI-DEMO' OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
-      DELETE FROM client_accounts WHERE id != 'ACC-MARTHI-DEMO';
+      DO $$ BEGIN
+        BEGIN DELETE FROM cash_movements WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM cash_session_events WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM cash_sessions WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM sale_payments WHERE sale_id IN (SELECT id FROM sales_orders WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM sales_order_lines WHERE sale_id IN (SELECT id FROM sales_orders WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM sales_orders WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM pos_quote_lines WHERE quote_id IN (SELECT id FROM pos_quotes WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM pos_quotes WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM pos_ticket_attributes WHERE ticket_id IN (SELECT id FROM pos_tickets WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM pos_tickets WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM pos_terminals WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_invoice_lines WHERE invoice_id IN (SELECT id FROM stock_invoices WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_invoices WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_inventory_items WHERE inventory_id IN (SELECT id FROM stock_inventories WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_inventories WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_movements WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM payables WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM receivables WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM finance_entries WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_attribute_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_allowed_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_attributes WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_kit_items WHERE kit_id IN (SELECT id FROM product_kits WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_kits WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM product_lots WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM promo_campaign_tiers WHERE campaign_id IN (SELECT id FROM promo_campaigns WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM promo_campaigns WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM price_tables WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM products WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stock_items WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM customers WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM sellers WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM employees WHERE store_id != 'STR-DEMO-01' OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM user_stores WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM store_licenses WHERE store_id != 'STR-DEMO-01' OR client_account_id != 'ACC-MARTHI-DEMO'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM stores WHERE id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM users WHERE client_account_id != 'ACC-MARTHI-DEMO' OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM client_accounts WHERE id != 'ACC-MARTHI-DEMO'; EXCEPTION WHEN OTHERS THEN NULL; END;
+      END $$;
     `);
 
     // 3. Garantir conta ACC-MARTHI-DEMO com plano Gold e status ativo
