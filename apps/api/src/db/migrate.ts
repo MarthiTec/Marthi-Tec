@@ -68,17 +68,34 @@ export async function runMigrations(customPool?: Pool) {
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
-      await client.query('BEGIN');
-      try {
-        await client.query(sql);
-        await client.query('INSERT INTO _migrations (name) VALUES ($1)', [file]);
-        await client.query('COMMIT');
-        newlyApplied.push(file);
-        console.log(`[migrate] ✓ ${file} aplicada com sucesso!`);
-      } catch (err) {
-        await client.query('ROLLBACK');
-        console.error(`[migrate] ✗ Erro ao aplicar migration ${file}:`, err);
-        throw err;
+      const hasAlterType = /ALTER\s+TYPE\s+.*ADD\s+VALUE/i.test(sql);
+      if (hasAlterType) {
+        try {
+          await client.query(sql);
+          await client.query('INSERT INTO _migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [file]);
+          newlyApplied.push(file);
+          console.log(`[migrate] ✓ ${file} aplicada com sucesso!`);
+        } catch (err: any) {
+          console.error(`[migrate] ✗ Erro ao aplicar migration ${file}:`, err);
+          const detailedErr: any = new Error(`[Migration ${file}] ${err.message}`);
+          detailedErr.stack = err.stack;
+          throw detailedErr;
+        }
+      } else {
+        await client.query('BEGIN');
+        try {
+          await client.query(sql);
+          await client.query('INSERT INTO _migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [file]);
+          await client.query('COMMIT');
+          newlyApplied.push(file);
+          console.log(`[migrate] ✓ ${file} aplicada com sucesso!`);
+        } catch (err: any) {
+          await client.query('ROLLBACK');
+          console.error(`[migrate] ✗ Erro ao aplicar migration ${file}:`, err);
+          const detailedErr: any = new Error(`[Migration ${file}] ${err.message}`);
+          detailedErr.stack = err.stack;
+          throw detailedErr;
+        }
       }
     }
 
