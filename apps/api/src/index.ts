@@ -211,34 +211,39 @@ async function bootstrapDatabase() {
     // 5. Vínculo user_stores para AMBOS os administradores
     await pool.query(
       `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-       VALUES
-         ('UST-TEST-01', 'USR-TEST-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
-         ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+       SELECT s.id, u.id, s.store_id, s.role, s.is_default, s.permissions
+       FROM (
+         VALUES
+           ('UST-TEST-01', 'teste@marthi.com.br', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+           ('UST-MARTHI-01', 'marthi.tecnologia@gmail.com', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+       ) AS s(id, email, store_id, role, is_default, permissions)
+       JOIN users u ON u.email = s.email
        ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true`,
     );
 
     // 6. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
     await pool.query(
-      `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
+      `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active, created_at, updated_at)
        VALUES
-         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
-         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
+         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now())
        ON CONFLICT (id) DO UPDATE SET
          role = 'admin',
          is_system_user = true,
          access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-         active = true`,
+         active = true,
+         updated_at = now()`,
     );
 
     // 7. Garante licença ativa com todos os módulos para STR-DEMO-01
     try {
       await pool.query(
         `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-         VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[], 'active')
-         ON CONFLICT (store_id) DO UPDATE SET
+         VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[], 'active')
+         ON CONFLICT (id) DO UPDATE SET
            plan_id = 'scale',
            status = 'active',
-           modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[]`,
+           modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[]`,
       );
     } catch (licErr) {
       console.warn('[marthi-api] Aviso ao sincronizar store_licenses:', licErr);
