@@ -163,6 +163,23 @@ ON CONFLICT (document) DO UPDATE SET
   legal_name = EXCLUDED.legal_name;
 
 -- 6.3 Lojas / CNPJs Vinculados (Loja Matriz e Loja Filial)
+DO $$ BEGIN
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS state_registration TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS municipal_registration TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS zip_code TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS street TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS number TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS complement TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS state CHAR(2) NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS tax_regime TEXT NOT NULL DEFAULT 'simples_nacional';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_matrix BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO stores (
   id, client_account_id, trade_name, legal_name, document_type, document,
   state_registration, municipal_registration, email, phone, zip_code, street,
