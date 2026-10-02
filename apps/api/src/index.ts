@@ -226,15 +226,14 @@ async function bootstrapDatabase() {
 
     // 3. Garante conta da Loja Demonstração Marthi com Plano Gold Ativo
     await pool.query(
-      `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token, plan)
-       VALUES ('ACC-MARTHI-DEMO', 'Marthi Demonstração', 'Marthi Tecnologia e Demonstração LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 98124-4253', 'Administrador Marthi', 'active', 'TK-001-000163-CPTR-88A1', 'golden')
+      `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
+       VALUES ('ACC-MARTHI-DEMO', 'Marthi Demonstração', 'Marthi Tecnologia e Demonstração LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 98124-4253', 'Administrador Marthi', 'active', 'TK-001-000163-CPTR-88A1')
        ON CONFLICT (id) DO UPDATE SET
          trade_name = 'Marthi Demonstração',
          legal_name = 'Marthi Tecnologia e Demonstração LTDA',
          email = 'contato@marthi.com.br',
          access_token = 'TK-001-000163-CPTR-88A1',
-         status = 'active',
-         plan = 'golden'`,
+         status = 'active'`,
     );
 
     // 4. Garante loja matriz Demonstração com Token de Acesso

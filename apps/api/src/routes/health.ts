@@ -157,7 +157,6 @@ healthRouter.all(['/health/cleanup-tests', '/api/v1/health/cleanup-tests'], asyn
           phone = '(24) 98124-4253',
           contact_name = 'Administrador Marthi',
           status = 'active',
-          plan = 'golden',
           access_token = 'TK-001-000163-CPTR-88A1'
       WHERE id = 'ACC-MARTHI-DEMO';
 
