@@ -143,6 +143,11 @@ async function bootstrapDatabase() {
       ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
       ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
       ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+      DO $$ BEGIN
+        ALTER TABLE user_stores ALTER COLUMN role TYPE TEXT USING role::text;
+        ALTER TABLE employees ALTER COLUMN role TYPE TEXT USING role::text;
+      EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 
     // 2. Garante que teste@marthi.com.br e marthi.tecnologia@gmail.com existam no banco com senha 123 e permissão admin
@@ -210,7 +215,11 @@ async function bootstrapDatabase() {
 
     // 5. Vínculo user_stores para AMBOS os administradores
     await pool.query(
-      `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+      `DO $$ BEGIN
+         ALTER TABLE user_stores ALTER COLUMN role TYPE TEXT USING role::text;
+       EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+       INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
        SELECT s.id, u.id, s.store_id, s.role, s.is_default, s.permissions
        FROM (
          VALUES
@@ -218,7 +227,7 @@ async function bootstrapDatabase() {
            ('UST-MARTHI-01', 'marthi.tecnologia@gmail.com', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
        ) AS s(id, email, store_id, role, is_default, permissions)
        JOIN users u ON u.email = s.email
-       ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true`,
+       ON CONFLICT (user_id, store_id) DO UPDATE SET role = EXCLUDED.role, is_default = true`,
     );
 
     // 6. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
