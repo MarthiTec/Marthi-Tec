@@ -84,24 +84,30 @@ DO $$ BEGIN
   ALTER TABLE employees ALTER COLUMN role SET DEFAULT 'operator';
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE employees ALTER COLUMN updated_at SET DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active, created_at, updated_at)
 VALUES
-  ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
-  ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+  ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
+  ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now())
 ON CONFLICT (id) DO UPDATE SET
   role = 'admin',
   is_system_user = true,
   access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-  active = true;
+  active = true,
+  updated_at = now();
 
 -- 5. Garante licença de loja completa para STR-DEMO-01
 DO $$ BEGIN
   INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-  VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[], 'active')
-  ON CONFLICT (store_id) DO UPDATE SET
+  VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[], 'active')
+  ON CONFLICT (id) DO UPDATE SET
     plan_id = 'scale',
     status = 'active',
-    modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[];
+    modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[];
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6. Produtos Iniciais para Vitrine do Totem e ERP Cell Ponto

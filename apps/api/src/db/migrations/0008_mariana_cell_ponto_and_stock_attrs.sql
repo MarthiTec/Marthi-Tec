@@ -118,9 +118,14 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- Cadastro da colaboradora na equipe da loja Cell Ponto
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE employees ALTER COLUMN updated_at SET DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO employees (
   id, store_id, name, phone, email, document, role, is_system_user, user_email,
-  access_areas, permissions, active
+  access_areas, permissions, active, created_at, updated_at
 ) VALUES (
   'EMP-MARIANA-01',
   'STR-DEMO-01',
@@ -133,10 +138,13 @@ INSERT INTO employees (
   'marianaveigatav@gmail.com',
   '["painel","pdv","os","totem","fiscal","erp"]'::jsonb,
   '{"canEdit": true, "canDelete": true, "posCancelSale": true, "posCancelItem": true}'::jsonb,
-  true
+  true,
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE
 SET active = true,
     is_system_user = true,
     user_email = EXCLUDED.user_email,
-    access_areas = EXCLUDED.access_areas;
+    access_areas = EXCLUDED.access_areas,
+    updated_at = now();

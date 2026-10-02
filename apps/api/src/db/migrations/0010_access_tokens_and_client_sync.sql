@@ -160,9 +160,14 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6. Colaboradores na tabela employees
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE employees ALTER COLUMN updated_at SET DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO employees (
   id, store_id, name, phone, email, document, role, is_system_user, user_email,
-  access_areas, permissions, active
+  access_areas, permissions, active, created_at, updated_at
 ) VALUES (
   'EMP-GILVAN-01',
   'STR-DEMO-01',
@@ -175,7 +180,9 @@ INSERT INTO employees (
   'gilvanteodo@gmail.com',
   '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
   '{"all": true}'::jsonb,
-  true
+  true,
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE
 SET name = 'Gilvan Teodoro',
@@ -184,11 +191,12 @@ SET name = 'Gilvan Teodoro',
     role = 'admin',
     is_system_user = true,
     access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-    active = true;
+    active = true,
+    updated_at = now();
 
 INSERT INTO employees (
   id, store_id, name, phone, email, document, role, is_system_user, user_email,
-  access_areas, permissions, active
+  access_areas, permissions, active, created_at, updated_at
 ) VALUES (
   'EMP-MARIANA-01',
   'STR-DEMO-01',
@@ -201,7 +209,9 @@ INSERT INTO employees (
   'marianaveigatav@gmail.com',
   '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
   '{"all": true}'::jsonb,
-  true
+  true,
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE
 SET name = 'Mariana Veiga',
@@ -210,4 +220,5 @@ SET name = 'Mariana Veiga',
     role = 'admin',
     is_system_user = true,
     access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-    active = true;
+    active = true,
+    updated_at = now();
