@@ -323,14 +323,17 @@ ON CONFLICT (id) DO NOTHING;
 DO $$ BEGIN
   ALTER TABLE users ADD COLUMN IF NOT EXISTS client_account_id TEXT DEFAULT 'ACC-MARTHI-DEMO';
   ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'STR-DEMO-01';
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'password';
   ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+  ALTER TABLE users ALTER COLUMN provider SET DEFAULT 'password';
   ALTER TABLE users ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE user_stores ALTER COLUMN created_at SET DEFAULT now();
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-INSERT INTO users (id, client_account_id, store_id, email, name, global_role, active)
+INSERT INTO users (id, client_account_id, store_id, provider, email, name, global_role, active)
 VALUES
-  ('USR-ADMIN', 'ACC-MARTHI-DEMO', 'STR-DEMO-01', 'marthi.tecnologia@gmail.com', 'Administrador Marthi', 'admin', true),
-  ('USR-OPERADOR', 'ACC-MARTHI-DEMO', 'STR-DEMO-01', 'teste@marthi.com.br', 'Operador Caixa', 'operator', true)
+  ('USR-ADMIN', 'ACC-MARTHI-DEMO', 'STR-DEMO-01', 'password', 'marthi.tecnologia@gmail.com', 'Administrador Marthi', 'admin', true),
+  ('USR-OPERADOR', 'ACC-MARTHI-DEMO', 'STR-DEMO-01', 'password', 'teste@marthi.com.br', 'Operador Caixa', 'operator', true)
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
