@@ -203,44 +203,51 @@ ON CONFLICT (client_account_id, document) DO UPDATE SET
 -- 6.4 Licenças por CNPJ (com cálculo de desconto multi-loja)
 DO $$ BEGIN
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
-  ALTER TABLE store_licenses ALTER COLUMN plan_id TYPE TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-INSERT INTO store_licenses (
-  id, store_id, client_account_id, plan_id, modules, base_price,
-  discount_percent, discount_amount, final_price, status
-)
-VALUES
-(
-  'LIC-DEMO-01',
-  'STR-DEMO-01',
-  'ACC-MARTHI-DEMO',
-  'scale',
-  ARRAY['totem', 'presales', 'os', 'erp', 'fiscal']::module_id[],
-  597.00,
-  0.00,
-  0.00,
-  597.00,
-  'active'
-),
-(
-  'LIC-DEMO-02',
-  'STR-DEMO-02',
-  'ACC-MARTHI-DEMO',
-  'scale',
-  ARRAY['totem', 'presales', 'os', 'erp', 'fiscal']::module_id[],
-  597.00,
-  15.00, -- Desconto de 15% por ser 2ª loja da mesma conta
-  89.55,
-  507.45,
-  'active'
-)
-ON CONFLICT (store_id) DO UPDATE SET
-  plan_id = EXCLUDED.plan_id,
-  base_price = EXCLUDED.base_price,
-  discount_percent = EXCLUDED.discount_percent,
-  final_price = EXCLUDED.final_price,
-  status = EXCLUDED.status;
+DO $$ BEGIN
+  ALTER TABLE store_licenses ALTER COLUMN plan_id DROP DEFAULT;
+  ALTER TABLE store_licenses ALTER COLUMN plan_id TYPE TEXT USING plan_id::TEXT;
+  ALTER TABLE store_licenses ALTER COLUMN plan_id SET DEFAULT 'scale';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  INSERT INTO store_licenses (
+    id, store_id, client_account_id, plan_id, modules, base_price,
+    discount_percent, discount_amount, final_price, status
+  )
+  VALUES
+  (
+    'LIC-DEMO-01',
+    'STR-DEMO-01',
+    'ACC-MARTHI-DEMO',
+    'scale',
+    ARRAY['totem', 'presales', 'os', 'erp', 'fiscal']::module_id[],
+    597.00,
+    0.00,
+    0.00,
+    597.00,
+    'active'
+  ),
+  (
+    'LIC-DEMO-02',
+    'STR-DEMO-02',
+    'ACC-MARTHI-DEMO',
+    'scale',
+    ARRAY['totem', 'presales', 'os', 'erp', 'fiscal']::module_id[],
+    597.00,
+    15.00, -- Desconto de 15% por ser 2ª loja da mesma conta
+    89.55,
+    507.45,
+    'active'
+  )
+  ON CONFLICT (store_id) DO UPDATE SET
+    plan_id = EXCLUDED.plan_id,
+    base_price = EXCLUDED.base_price,
+    discount_percent = EXCLUDED.discount_percent,
+    final_price = EXCLUDED.final_price,
+    status = EXCLUDED.status;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6.5 Tabelas de Preço Padrão
 INSERT INTO price_tables (id, store_id, name, percent, active)
