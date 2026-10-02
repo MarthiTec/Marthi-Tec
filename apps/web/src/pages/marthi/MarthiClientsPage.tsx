@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CrudNameButton, CrudRowActions } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import { PARTNER_MODULES, type PartnerModuleId, type PlanId } from '../../data/catalog';
@@ -9,6 +10,7 @@ import {
   CONTRACTING_STATUS_LABEL,
   clientPresenceLabel,
   createMarthiClientWithSecureActivation,
+  deleteMarthiClient,
   forceClientPasswordReset,
   generateClientAccessToken,
   getClientBranches,
@@ -571,6 +573,53 @@ export function MarthiClientsPage() {
     setTimeout(() => setCopied(false), 3000);
   }
 
+  function handleDuplicate(client: MarthiClient) {
+    setFormError(null);
+    setModalCnpjStatus(null);
+    setNewForm({
+      tradeName: `${client.tradeName} (Cópia)`,
+      legalName: client.legalName || '',
+      document: '',
+      email: '',
+      phone: client.phone || '',
+      planId: client.planId,
+      monthlyAmount: String(client.monthlyAmount),
+      status: 'active',
+      paymentOk: client.paymentOk,
+      notes: client.notes ? `[Cópia de ${client.tradeName}]\n${client.notes}` : `[Cópia de ${client.tradeName}]`,
+      modules: [...client.modules],
+      parentClientId: client.parentClientId || (client.companyType === 'matrix' ? client.clientId : ''),
+      branchName: client.companyType === 'matrix' ? 'Nova Filial' : '',
+    });
+    setIsCreating(true);
+  }
+
+  async function handleDelete(client: MarthiClient) {
+    const ok = await confirm({
+      title: 'Excluir Cliente',
+      message: `Tem certeza que deseja excluir o cliente “${client.tradeName}” (${client.email})? Esta operação é irreversível.`,
+      confirmLabel: 'Excluir Cliente',
+      danger: true,
+    });
+    if (!ok) return;
+
+    deleteMarthiClient(client.clientId);
+    logAction({
+      actorName: user?.name ?? 'Admin Marthi',
+      actorEmail: user?.email ?? 'admin@marthi.com.br',
+      action: 'marthi.cliente.excluir',
+      detail: `Cliente excluído: ${client.tradeName} (${client.clientId} - ${client.email})`,
+    });
+    setFlash(`Cliente “${client.tradeName}” excluído.`);
+    refresh();
+    if (auditClient?.clientId === client.clientId) {
+      setAuditClient(null);
+    }
+    if (editing?.clientId === client.clientId) {
+      setEditing(null);
+    }
+  }
+
   return (
     <section className="admin-page">
       {dialog}
@@ -703,10 +752,10 @@ export function MarthiClientsPage() {
             <div
               className="span-2"
               style={{
-                background: 'rgba(0,0,0,0.18)',
+                background: 'var(--card-2, #f8fafc)',
                 padding: '14px',
                 borderRadius: '8px',
-                border: '1px solid var(--line)',
+                border: '1px solid var(--line, #e2e8f0)',
                 display: 'grid',
                 gap: '8px',
               }}
@@ -748,16 +797,13 @@ export function MarthiClientsPage() {
                 type="text"
                 readOnly
                 value={editing.accessToken || 'Gerado automaticamente ao salvar'}
+                className="marthi-token-code"
                 style={{
-                  fontFamily: 'monospace',
+                  width: '100%',
                   fontSize: '0.85rem',
                   letterSpacing: '0.5px',
-                  background: 'var(--bg-input, rgba(0,0,0,0.25))',
-                  color: 'var(--accent, #38bdf8)',
                   padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--line)',
-                  userSelect: 'all',
+                  boxSizing: 'border-box',
                 }}
               />
               <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>
@@ -788,20 +834,48 @@ export function MarthiClientsPage() {
                 ))}
               </div>
             </div>
-            <div className="span-2 admin-toolbar">
-              <button type="button" className="btn btn--primary" onClick={saveEdit}>
-                Salvar alterações
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => {
-                  setEditing(null);
-                  setFormError(null);
-                }}
-              >
-                Cancelar
-              </button>
+            <div className="span-2 admin-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="btn btn--primary" onClick={saveEdit}>
+                  Salvar alterações
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setEditing(null);
+                    setFormError(null);
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ fontSize: '0.8rem' }}
+                  onClick={() => {
+                    const client = getMarthiClient(editing.clientId);
+                    if (client) void runAction({ type: 'resend_activation', client });
+                  }}
+                  title="Reenviar e-mail de ativação"
+                >
+                  📧 Reenviar Ativação
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ fontSize: '0.8rem' }}
+                  onClick={() => {
+                    const client = getMarthiClient(editing.clientId);
+                    if (client) void runAction({ type: 'force_reset', client });
+                  }}
+                  title="Enviar link seguro de redefinição de senha"
+                >
+                  🔑 Redefinir Senha
+                </button>
+              </div>
             </div>
           </div>
         </article>
@@ -871,7 +945,9 @@ export function MarthiClientsPage() {
                 <th>Acesso / Senha</th>
                 <th>Celular / OTP</th>
                 <th>Último Acesso</th>
-                <th style={{ minWidth: '280px', textAlign: 'center' }}>Ações de Gestão &amp; Segurança</th>
+                <th className="admin-table__actions" style={{ textAlign: 'center', width: '130px' }}>
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -884,7 +960,6 @@ export function MarthiClientsPage() {
               ) : (
                 filtered.map((client) => {
                   const presence = clientPresenceLabel(client);
-                  const needsActivation = !client.paymentOk || client.status !== 'active';
                   const branches = client.companyType === 'matrix' ? getClientBranches(client.clientId) : [];
                   const matrix = client.parentClientId ? getClientMatrix(client.clientId) : null;
                   return (
@@ -894,35 +969,19 @@ export function MarthiClientsPage() {
                     >
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <strong>{client.tradeName}</strong>
+                          <CrudNameButton onClick={() => setAuditClient(client)}>
+                            <strong>{client.tradeName}</strong>
+                          </CrudNameButton>
                           {client.companyType === 'matrix' ? (
-                            <span
-                              className="marthi-pill"
-                              style={{
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                color: '#818cf8',
-                                borderColor: 'rgba(99, 102, 241, 0.3)',
-                                fontSize: '0.72rem',
-                                padding: '2px 6px',
-                              }}
-                            >
+                            <span className="marthi-pill marthi-pill--matrix">
                               🏢 Matriz ({branches.length} filial{branches.length === 1 ? '' : 'is'})
                             </span>
                           ) : client.parentClientId ? (
-                            <span
-                              className="marthi-pill"
-                              style={{
-                                background: 'rgba(14, 165, 233, 0.15)',
-                                color: '#38bdf8',
-                                borderColor: 'rgba(14, 165, 233, 0.3)',
-                                fontSize: '0.72rem',
-                                padding: '2px 6px',
-                              }}
-                            >
+                            <span className="marthi-pill marthi-pill--branch">
                               ↳ Filial de {matrix?.tradeName || client.parentClientId}
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--mute)' }}>[Independente]</span>
+                            <span className="marthi-pill marthi-pill--independent">Independente</span>
                           )}
                         </div>
                         {client.branchName ? (
@@ -944,17 +1003,7 @@ export function MarthiClientsPage() {
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <code
-                              style={{
-                                fontSize: '0.74rem',
-                                background: 'rgba(0,0,0,0.25)',
-                                padding: '3px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--line)',
-                                color: 'var(--accent, #38bdf8)',
-                                userSelect: 'all',
-                              }}
-                            >
+                            <code className="marthi-token-code">
                               {client.accessToken || '—'}
                             </code>
                             {client.accessToken ? (
@@ -973,8 +1022,8 @@ export function MarthiClientsPage() {
                               </button>
                             ) : null}
                           </div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--mute)' }}>
-                            Por Usuário, CNPJ &amp; E-mail
+                          <span style={{ fontSize: '0.72rem', color: 'var(--mute)' }}>
+                            Usuário, CNPJ &amp; E-mail
                           </span>
                         </div>
                       </td>
@@ -1002,7 +1051,15 @@ export function MarthiClientsPage() {
                         ) : null}
                       </td>
                       <td>
-                        <span className={`marthi-pill ${client.status === 'active' ? 'marthi-pill--ok' : 'marthi-pill--offline'}`}>
+                        <span
+                          className={`marthi-pill ${
+                            client.status === 'active'
+                              ? 'marthi-pill--ok'
+                              : client.status === 'blocked'
+                              ? 'marthi-pill--late'
+                              : 'marthi-pill--offline'
+                          }`}
+                        >
                           {CLIENT_STATUS_LABEL[client.status]}
                         </span>
                       </td>
@@ -1048,110 +1105,13 @@ export function MarthiClientsPage() {
                           {formatDateTime(client.lastSeenAt)}
                         </div>
                       </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div className="marthi-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                          {needsActivation ? (
-                            <button
-                              type="button"
-                              className="btn btn--primary"
-                              style={{ padding: '4px 8px', fontSize: '0.76rem', background: '#059669', borderColor: '#059669' }}
-                              onClick={() => handleOpenPaymentModal(client)}
-                              title="Identificar pagamento manual e disparar ativação"
-                            >
-                              💰 Ativar Pagamento
-                            </button>
-                          ) : null}
-
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                            onClick={() => void runAction({ type: 'resend_activation', client })}
-                            title="Reenviar e-mail seguro com link de criação de senha"
-                          >
-                            📧 Reenviar Ativação
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                            onClick={() => void runAction({ type: 'force_reset', client })}
-                            title="Enviar link seguro de redefinição de senha para o e-mail do cliente"
-                          >
-                            🔑 Redefinir Senha
-                          </button>
-
-                          {client.phone && !client.phoneVerified ? (
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                              onClick={() => void runAction({ type: 'send_otp', client })}
-                              title="Enviar código de validação OTP para o celular do cliente"
-                            >
-                              📱 Enviar OTP
-                            </button>
-                          ) : null}
-
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                            onClick={() => openEdit(client)}
-                            title="Editar dados cadastrais"
-                          >
-                            ✏️ Editar
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                            onClick={() => {
-                              const newToken = regenerateClientAccessToken(client.clientId);
-                              if (newToken) {
-                                refresh();
-                                setFlash(`Novo Token gerado para ${client.tradeName}: ${newToken}`);
-                              }
-                            }}
-                            title="Gerar ou renovar Token de Acesso da loja"
-                          >
-                            🔄 Token
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn--ghost"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                            onClick={() => setAuditClient(client)}
-                            title="Visualizar detalhes completos e histórico da contratação"
-                          >
-                            📋 Detalhes
-                          </button>
-
-                          {client.status !== 'blocked' ? (
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              style={{ padding: '4px 8px', fontSize: '0.76rem', color: '#f87171' }}
-                              onClick={() => void runAction({ type: 'block', client })}
-                              title="Suspender acesso do cliente"
-                            >
-                              Bloquear
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              style={{ padding: '4px 8px', fontSize: '0.76rem', color: '#4ade80' }}
-                              onClick={() => void runAction({ type: 'reactivate', client })}
-                              title="Liberar acesso do cliente"
-                            >
-                              Reativar
-                            </button>
-                          )}
-                        </div>
+                      <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
+                        <CrudRowActions
+                          onView={() => setAuditClient(client)}
+                          onEdit={() => openEdit(client)}
+                          onDuplicate={() => handleDuplicate(client)}
+                          onDelete={() => void handleDelete(client)}
+                        />
                       </td>
                     </tr>
                   );
@@ -1556,7 +1516,7 @@ export function MarthiClientsPage() {
         <div className="marthi-modal-backdrop" onClick={() => setAuditClient(null)}>
           <div
             className="marthi-modal-card"
-            style={{ maxWidth: 580 }}
+            style={{ maxWidth: 680 }}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -1577,6 +1537,155 @@ export function MarthiClientsPage() {
             </header>
 
             <div className="marthi-modal-form">
+              {/* Painel de Funções e Ações do Registro */}
+              <div className="marthi-client-actions-panel">
+                <div className="marthi-client-actions-panel__title">
+                  <span>⚡ Funções da Conta &amp; Segurança</span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span
+                      className={`marthi-pill ${
+                        auditClient.status === 'active'
+                          ? 'marthi-pill--ok'
+                          : auditClient.status === 'blocked'
+                          ? 'marthi-pill--late'
+                          : 'marthi-pill--offline'
+                      }`}
+                    >
+                      {CLIENT_STATUS_LABEL[auditClient.status]}
+                    </span>
+                    <span
+                      className={`marthi-pill ${
+                        auditClient.paymentOk ? 'marthi-pill--ok' : 'marthi-pill--late'
+                      }`}
+                    >
+                      {auditClient.paymentOk ? '✓ Em dia' : '⏳ Pagamento Pendente'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="marthi-client-actions-panel__grid">
+                  {!auditClient.paymentOk || auditClient.status !== 'active' ? (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', background: '#059669', borderColor: '#059669' }}
+                      onClick={() => handleOpenPaymentModal(auditClient)}
+                      title="Identificar pagamento manual e disparar ativação"
+                    >
+                      💰 Ativar Pagamento (Manual)
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                      onClick={async () => {
+                        await runAction({ type: 'payment', client: auditClient, paymentOk: false });
+                        const updated = getMarthiClient(auditClient.clientId);
+                        if (updated) setAuditClient(updated);
+                      }}
+                      title="Marcar pagamento como pendente"
+                    >
+                      ⏳ Marcar Pagamento Pendente
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    onClick={async () => {
+                      await runAction({ type: 'resend_activation', client: auditClient });
+                      const updated = getMarthiClient(auditClient.clientId);
+                      if (updated) setAuditClient(updated);
+                    }}
+                    title="Reenviar e-mail seguro com link de criação de senha"
+                  >
+                    📧 Reenviar Link de Ativação
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    onClick={() => void runAction({ type: 'force_reset', client: auditClient })}
+                    title="Enviar link seguro de redefinição de senha para o e-mail do cliente"
+                  >
+                    🔑 Redefinir Senha
+                  </button>
+
+                  {auditClient.phone ? (
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                      onClick={() => void runAction({ type: 'send_otp', client: auditClient })}
+                      title="Enviar código de validação OTP para o celular do cliente"
+                    >
+                      📱 Enviar OTP (WhatsApp)
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    onClick={() => {
+                      const newToken = regenerateClientAccessToken(auditClient.clientId);
+                      if (newToken) {
+                        refresh();
+                        const updated = getMarthiClient(auditClient.clientId);
+                        if (updated) setAuditClient(updated);
+                        setFlash(`Novo Token gerado para ${auditClient.tradeName}: ${newToken}`);
+                      }
+                    }}
+                    title="Gerar ou renovar Token de Acesso da loja"
+                  >
+                    🔄 Renovar Token API
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    onClick={() => handleCopyWhatsApp(auditClient)}
+                    title="Copiar mensagem formatada para WhatsApp"
+                  >
+                    {copied ? '✓ Mensagem Copiada!' : '📲 Notificação WhatsApp'}
+                  </button>
+
+                  {auditClient.status !== 'blocked' ? (
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                      onClick={async () => {
+                        await runAction({ type: 'block', client: auditClient });
+                        const updated = getMarthiClient(auditClient.clientId);
+                        if (updated) setAuditClient(updated);
+                      }}
+                      title="Suspender acesso do cliente"
+                    >
+                      🚫 Bloquear Acesso
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#4ade80', borderColor: 'rgba(74, 222, 128, 0.3)' }}
+                      onClick={async () => {
+                        await runAction({ type: 'reactivate', client: auditClient });
+                        const updated = getMarthiClient(auditClient.clientId);
+                        if (updated) setAuditClient(updated);
+                      }}
+                      title="Liberar acesso do cliente"
+                    >
+                      ✅ Reativar Acesso
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <table className="admin-table" style={{ fontSize: '0.85rem' }}>
                 <tbody>
                   <tr>
@@ -1595,7 +1704,7 @@ export function MarthiClientsPage() {
                     <td style={{ color: 'var(--mute)' }}>Token de Acesso (API):</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <code style={{ fontSize: '0.82rem', color: 'var(--accent, #38bdf8)', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
+                        <code className="marthi-token-code" style={{ fontSize: '0.82rem' }}>
                           {auditClient.accessToken || '—'}
                         </code>
                         {auditClient.accessToken ? (
@@ -1655,7 +1764,7 @@ export function MarthiClientsPage() {
                     <td>
                       {auditClient.companyType === 'matrix' ? (
                         <div>
-                          <strong style={{ color: '#818cf8' }}>🏢 Matriz de Grupo Empresarial</strong>
+                          <span className="marthi-pill marthi-pill--matrix">🏢 Matriz de Grupo Empresarial</span>
                           <div style={{ marginTop: '4px', fontSize: '0.8rem' }}>
                             Filiais vinculadas ({getClientBranches(auditClient.clientId).length}):
                             <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
@@ -1669,14 +1778,14 @@ export function MarthiClientsPage() {
                         </div>
                       ) : auditClient.parentClientId ? (
                         <div>
-                          <strong style={{ color: '#38bdf8' }}>↳ Filial Unificada</strong>
+                          <span className="marthi-pill marthi-pill--branch">↳ Filial Unificada</span>
                           <div style={{ marginTop: '2px', fontSize: '0.8rem' }}>
                             Matriz vinculada: <strong>{getClientMatrix(auditClient.clientId)?.tradeName || auditClient.parentClientId}</strong>
                             {auditClient.branchName ? <div>Identificador: {auditClient.branchName}</div> : null}
                           </div>
                         </div>
                       ) : (
-                        <span>Empresa Independente (Sem grupo multi-loja vinculado)</span>
+                        <span className="marthi-pill marthi-pill--independent">Empresa Independente (Sem grupo multi-loja vinculado)</span>
                       )}
                     </td>
                   </tr>
@@ -1693,14 +1802,46 @@ export function MarthiClientsPage() {
                 </tbody>
               </table>
 
-              <div className="marthi-modal-foot">
+              <div className="marthi-modal-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn--primary"
-                  onClick={() => setAuditClient(null)}
+                  className="btn btn--ghost"
+                  style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                  onClick={() => handleDelete(auditClient)}
                 >
-                  Fechar
+                  🗑️ Excluir Cliente
                 </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => {
+                      const client = auditClient;
+                      setAuditClient(null);
+                      handleDuplicate(client);
+                    }}
+                  >
+                    📋 Duplicar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => {
+                      const client = auditClient;
+                      setAuditClient(null);
+                      openEdit(client);
+                    }}
+                  >
+                    ✏️ Editar Cadastro
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => setAuditClient(null)}
+                  >
+                    Fechar
+                  </button>
+                </div>
               </div>
             </div>
           </div>

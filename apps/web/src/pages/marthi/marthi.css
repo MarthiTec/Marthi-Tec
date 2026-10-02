@@ -58,16 +58,75 @@
 .marthi-pill--online {
   background: rgba(15, 118, 110, 0.12);
   color: #0f766e;
+  border: 1px solid rgba(15, 118, 110, 0.25);
 }
 
 .marthi-pill--late {
   background: rgba(185, 28, 28, 0.12);
   color: #b91c1c;
+  border: 1px solid rgba(185, 28, 28, 0.25);
 }
 
 .marthi-pill--offline {
   background: rgba(100, 116, 139, 0.14);
-  color: #64748b;
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.marthi-pill--matrix {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #c4b5fd;
+}
+
+.marthi-pill--branch {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.marthi-pill--independent {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.marthi-token-code {
+  font-family: monospace;
+  font-size: 0.74rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #0284c7;
+  font-weight: 600;
+  user-select: all;
+}
+
+.marthi-client-actions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.marthi-client-actions-panel__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink, #1e293b);
+}
+
+.marthi-client-actions-panel__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .marthi-actions {
@@ -1341,22 +1400,22 @@
 /* Marthi Pills in Dark Mode */
 .admin--dark .marthi-pill--ok,
 .is-theme-dark .marthi-pill--ok {
-  background: rgba(45, 212, 191, 0.16) !important;
-  color: #5eead4 !important;
-  border: 1px solid rgba(45, 212, 191, 0.3) !important;
+  background: rgba(34, 197, 94, 0.16) !important;
+  color: #4ade80 !important;
+  border: 1px solid rgba(34, 197, 94, 0.35) !important;
 }
 
 .admin--dark .marthi-pill--online,
 .is-theme-dark .marthi-pill--online {
   background: rgba(56, 189, 248, 0.16) !important;
-  color: #7dd3fc !important;
-  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
 }
 
 .admin--dark .marthi-pill--late,
 .is-theme-dark .marthi-pill--late {
   background: rgba(239, 68, 68, 0.18) !important;
-  color: #fca5a5 !important;
+  color: #f87171 !important;
   border: 1px solid rgba(239, 68, 68, 0.35) !important;
 }
 
@@ -1364,8 +1423,43 @@
 .is-theme-dark .marthi-pill--offline {
   background: rgba(148, 163, 184, 0.14) !important;
   color: #cbd5e1 !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+}
+
+.admin--dark .marthi-pill--matrix,
+.is-theme-dark .marthi-pill--matrix {
+  background: rgba(129, 140, 248, 0.18) !important;
+  color: #c7d2fe !important;
+  border: 1px solid rgba(129, 140, 248, 0.35) !important;
+}
+
+.admin--dark .marthi-pill--branch,
+.is-theme-dark .marthi-pill--branch {
+  background: rgba(56, 189, 248, 0.18) !important;
+  color: #bae6fd !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+}
+
+.admin--dark .marthi-pill--independent,
+.is-theme-dark .marthi-pill--independent {
+  background: rgba(148, 163, 184, 0.12) !important;
+  color: #94a3b8 !important;
   border: 1px solid rgba(148, 163, 184, 0.2) !important;
 }
+
+.admin--dark .marthi-token-code,
+.is-theme-dark .marthi-token-code {
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+}
+
+.admin--dark .marthi-client-actions-panel,
+.is-theme-dark .marthi-client-actions-panel {
+  background: var(--card-2, #1c2430) !important;
+  border-color: var(--line, rgba(255, 255, 255, 0.1)) !important;
+}
+
 
 
 

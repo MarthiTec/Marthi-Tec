@@ -431,6 +431,38 @@ export function upsertMarthiClient(
   return next;
 }
 
+export function deleteMarthiClient(clientId: string): boolean {
+  const state = load();
+  const idx = state.clients.findIndex((item) => item.clientId === clientId);
+  if (idx < 0) return false;
+  const removed = state.clients.splice(idx, 1)[0];
+  if (removed?.parentClientId) {
+    try {
+      removeBranchFromMultiStore(removed.clientId);
+    } catch {
+      /* ignore */
+    }
+  }
+  state.clients.forEach((c) => {
+    if (c.parentClientId === clientId) {
+      c.parentClientId = null;
+      c.companyType = 'independent';
+    }
+  });
+  save(state);
+
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
+  return true;
+}
+
 export function listPotentialMatrixClients(excludeClientId?: string): MarthiClient[] {
   const clients = listMarthiClients();
   return clients.filter((c) => {
