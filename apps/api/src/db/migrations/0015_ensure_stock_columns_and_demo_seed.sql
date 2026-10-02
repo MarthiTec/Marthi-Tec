@@ -195,3 +195,8 @@ FROM (
 ON CONFLICT (id) DO UPDATE SET
   show_on_totem = true,
   active = true;
+
+-- 7. Limpeza definitiva de contas legadas de teste/mock
+DELETE FROM user_stores WHERE user_id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto');
+DELETE FROM employees WHERE user_email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
+DELETE FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');

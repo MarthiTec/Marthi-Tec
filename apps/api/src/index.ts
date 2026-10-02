@@ -272,6 +272,13 @@ async function bootstrapDatabase() {
       console.log('[marthi-api] ✓ Catálogo inicial de produtos para o Totem inserido com sucesso!');
     }
 
+    // 9. Limpeza definitiva de contas legadas de teste/mock
+    await pool.query(`
+      DELETE FROM user_stores WHERE user_id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto');
+      DELETE FROM employees WHERE user_email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
+      DELETE FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
+    `);
+
     console.log('[marthi-api] ✓ Usuários, Tokens de Acesso, Lojas, Licenças e Catálogo sincronizados no banco de dados!');
   } catch (err) {
     console.error('[marthi-api] Erro ao inicializar banco de dados:', err);
