@@ -1158,7 +1158,7 @@ export function MarthiClientsPage() {
                     required
                     value={newForm.tradeName}
                     onChange={(e) => setNewForm({ ...newForm, tradeName: e.target.value })}
-                    placeholder="Ex: Cell Ponto Assistência"
+                    placeholder="Ex: Smart Tech Assistência"
                   />
                 </label>
 

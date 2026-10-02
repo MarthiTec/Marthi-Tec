@@ -205,8 +205,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
               number, complement, district, city, state, tax_regime, is_matrix, active
             ) VALUES (
               $1, $2, $3, $4, 'cnpj', '00.000.000/0001-91',
-              'ISENTO', '', $5, '(24) 98124-4253', '25800-000', 'Rua Principal',
-              '100', '', 'Centro', 'Três Rios', 'RJ', 'simples_nacional', true, true
+              'ISENTO', '', $5, '(11) 3000-0000', '01310-100', 'Avenida Paulista',
+              '1000', '', 'Bela Vista', 'São Paulo', 'SP', 'simples_nacional', true, true
             ) ON CONFLICT DO NOTHING`,
             [newStoreId, clientAccountId, user.name, user.name, user.email],
           );

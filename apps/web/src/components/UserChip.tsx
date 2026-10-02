@@ -37,8 +37,8 @@ export function UserChip({
   const { mine } = useMyPresence();
   const account = getClientAccount();
   const store = getActiveStore();
-  const companyName = store?.name || account.tradeName || 'Cell Ponto';
-  const companyDoc = store?.cnpj || account.document || '61.506.270/0001-63';
+  const companyName = store?.name || account.tradeName || 'Loja';
+  const companyDoc = store?.cnpj || account.document || '';
   const mark = profileInitials(profile.displayName);
   const away = mine?.availability === 'away' && mine.module !== 'offline';
 

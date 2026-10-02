@@ -337,7 +337,7 @@ export function EvolutionWhatsAppSection() {
         <div style={{ borderLeft: '1px solid var(--line, rgba(255, 255, 255, 0.08))', paddingLeft: 16 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: '0.95rem' }}>Credenciais &amp; Parâmetros da API</h3>
           <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: 'var(--mute, #64748b)' }}>
-            Valores gerenciados pelo servidor Discloud e sincronizados com a Cell Ponto.
+            Valores gerenciados pelo servidor Discloud e sincronizados com a loja ativa.
           </p>
           <div style={{ display: 'grid', gap: 8, fontSize: '0.82rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--line, #e2e8f0)' }}>

@@ -16,7 +16,7 @@ const defaultTotemSettings = {
   showActionButtons: true,
   customGreetingText: '',
   customSubtitleText: '',
-  storeName: 'Cell Ponto',
+  storeName: 'Loja Principal',
   storeLogo: null,
   attractBackground: null,
   attractGradientColor: '#0f766e',
@@ -26,14 +26,14 @@ const defaultTotemSettings = {
   offerFulfillment: true,
   printTicket: false,
   audioAssist: false,
-  storeWhatsApp: '5524981244253',
+  storeWhatsApp: '',
   notifyCustomerOnLead: false,
-  locationLabel: 'Cell Ponto Três Rios',
+  locationLabel: 'Loja Principal',
   cardFeePercent: 12.0,
 };
 
 const memoryTotemSettingsByStore = new Map<string, any>([
-  ['STR-DEMO-01', { ...defaultTotemSettings }],
+  ['STR-DEMO-01', { ...defaultTotemSettings, storeName: 'Loja Demonstração Marthi' }],
 ]);
 
 const totemSettingsSchema = z.object({
@@ -46,7 +46,7 @@ const totemSettingsSchema = z.object({
   showActionButtons: z.boolean().default(true),
   customGreetingText: z.string().optional().default(''),
   customSubtitleText: z.string().optional().default(''),
-  storeName: z.string().default('Cell Ponto'),
+  storeName: z.string().default('Loja Principal'),
   storeLogo: z.string().nullable().optional(),
   attractBackground: z.string().nullable().optional(),
   attractGradientColor: z.string().default('#0f766e'),

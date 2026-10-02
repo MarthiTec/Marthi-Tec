@@ -55,22 +55,22 @@ const memoryStores = new Map<string, any>([
     {
       id: 'STR-DEMO-01',
       clientAccountId: 'ACC-MARTHI-DEMO',
-      tradeName: 'Cell Ponto Matriz',
-      legalName: 'Cell Ponto Telecomunicações LTDA',
+      tradeName: 'Loja Demonstração Marthi',
+      legalName: 'Marthi Tecnologia e Demonstração LTDA',
       documentType: 'cnpj',
-      document: '61.506.270/0001-63',
+      document: '00.000.000/0001-91',
       stateRegistration: 'ISENTO',
       municipalRegistration: '12345',
-      accessToken: 'TK-001-000163-CPTR-88A1',
-      email: 'matriz@cellponto.com.br',
-      phone: '(24) 98124-4253',
-      zipCode: '25800-000',
-      street: 'Rua Prefeito Walter Franklin',
-      number: '120',
-      complement: 'Loja 01',
-      district: 'Centro',
-      city: 'Três Rios',
-      state: 'RJ',
+      accessToken: 'TK-DEMO-000191-MDEM-01',
+      email: 'loja@marthi.com.br',
+      phone: '(11) 3000-0000',
+      zipCode: '01310-100',
+      street: 'Avenida Paulista',
+      number: '1000',
+      complement: 'Sala Demo',
+      district: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
       taxRegime: 'simples_nacional',
       isMatrix: true,
       active: true,
@@ -369,7 +369,7 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
         );
       }
 
-      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1`, [id]);
+      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1 AND client_account_id = $2`, [id, clientAccountId]);
       res.json({ success: true, data: updated.rows[0] });
       return;
     }

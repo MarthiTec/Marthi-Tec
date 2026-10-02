@@ -22,9 +22,9 @@ const defaultWhatsAppConfig: StoreWhatsAppConfig = {
   baseUrl: env.EVOLUTION_BASE_URL?.replace(/\/$/, '') || 'https://marthi-tec.discloud.app',
   instance: env.EVOLUTION_INSTANCE || 'marthi',
   apiKey: env.EVOLUTION_API_KEY || '5E280C9D-239A-4D8B-A765-63D00C291331',
-  storeNumber: env.EVOLUTION_STORE_NUMBER || '5524981244253',
+  storeNumber: env.EVOLUTION_STORE_NUMBER || '',
   notifyCustomer: Boolean(env.EVOLUTION_NOTIFY_CUSTOMER ?? true),
-  locationLabel: env.TOTEM_LOCATION_LABEL || 'Cell Ponto Três Rios',
+  locationLabel: env.TOTEM_LOCATION_LABEL || 'Loja Principal',
 };
 
 const memoryWhatsAppConfigs = new Map<string, StoreWhatsAppConfig>([
@@ -36,7 +36,7 @@ const storeWhatsAppSchema = z.object({
   baseUrl: z.string().default('https://marthi-tec.discloud.app'),
   instance: z.string().default('marthi'),
   apiKey: z.string().default('5E280C9D-239A-4D8B-A765-63D00C291331'),
-  storeNumber: z.string().default('5524981244253'),
+  storeNumber: z.string().default(''),
   notifyCustomer: z.boolean().default(true),
   locationLabel: z.string().optional().default(''),
 });

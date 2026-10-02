@@ -203,40 +203,34 @@ async function bootstrapDatabase() {
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 
-    // 2. Limpeza rigorosa de registros temporários de testes e dados sintéticos
+    // 2. Limpeza rigorosa de registros temporários de testes e dados sintéticos (preservando todas as empresas cadastradas)
     try {
       await pool.query(`
         DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%';
         DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
-        DELETE FROM payables WHERE store_id NOT IN ('STR-DEMO-01');
-        DELETE FROM receivables WHERE store_id NOT IN ('STR-DEMO-01');
-        DELETE FROM product_attributes WHERE store_id NOT IN ('STR-DEMO-01');
-        DELETE FROM products WHERE store_id NOT IN ('STR-DEMO-01');
-        DELETE FROM stock_items WHERE store_id NOT IN ('STR-DEMO-01');
-        DELETE FROM user_stores WHERE store_id NOT IN ('STR-DEMO-01') OR user_id IN (SELECT id FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%');
-        DELETE FROM employees WHERE store_id NOT IN ('STR-DEMO-01') OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%';
-        DELETE FROM stores WHERE id NOT IN ('STR-DEMO-01');
-        DELETE FROM store_licenses WHERE client_account_id NOT IN ('ACC-MARTHI-DEMO');
+        DELETE FROM user_stores WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%');
+        DELETE FROM employees WHERE user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%';
         DELETE FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
-        DELETE FROM client_accounts WHERE id NOT IN ('ACC-MARTHI-DEMO');
       `);
     } catch (cleanErr) {
       console.warn('[marthi-api] Aviso ao executar limpeza de dados de teste:', cleanErr);
     }
 
-    // 3. Garante conta da Loja Demonstração Marthi com Plano Gold Ativo
+    // 3. Garante conta da Loja Demonstração Marthi com Plano Gold Ativo e identidade neutra
     await pool.query(
       `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
-       VALUES ('ACC-MARTHI-DEMO', 'Marthi Demonstração', 'Marthi Tecnologia e Demonstração LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 98124-4253', 'Administrador Marthi', 'active', 'TK-001-000163-CPTR-88A1')
+       VALUES ('ACC-MARTHI-DEMO', 'Marthi Demonstração', 'Marthi Tecnologia e Demonstração LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(11) 3000-0000', 'Administrador Marthi', 'active', 'TK-DEMO-000191-MDEM-01')
        ON CONFLICT (id) DO UPDATE SET
          trade_name = 'Marthi Demonstração',
          legal_name = 'Marthi Tecnologia e Demonstração LTDA',
+         document = '00.000.000/0001-91',
          email = 'contato@marthi.com.br',
-         access_token = 'TK-001-000163-CPTR-88A1',
+         phone = '(11) 3000-0000',
+         access_token = 'TK-DEMO-000191-MDEM-01',
          status = 'active'`,
     );
 
-    // 4. Garante loja matriz Demonstração com Token de Acesso
+    // 4. Garante loja matriz Demonstração com Token de Acesso e endereço neutro
     await pool.query(
       `INSERT INTO stores (
         id, client_account_id, trade_name, legal_name, document_type, document,
@@ -244,16 +238,24 @@ async function bootstrapDatabase() {
         number, complement, district, city, state, tax_regime, is_matrix, active, access_token
       ) VALUES (
         'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'Loja Demonstração Marthi', 'Marthi Tecnologia e Demonstração LTDA',
-        'cnpj', '61.506.270/0001-63', 'ISENTO', '12345', 'loja@marthi.com.br', '(24) 98124-4253',
-        '25800-000', 'Rua Prefeito Walter Franklin', '120', 'Loja 01', 'Centro', 'Três Rios', 'RJ',
-        'simples_nacional', true, true, 'TK-001-000163-CPTR-88A1'
+        'cnpj', '00.000.000/0001-91', 'ISENTO', '12345', 'loja@marthi.com.br', '(11) 3000-0000',
+        '01310-100', 'Avenida Paulista', '1000', 'Sala Demo', 'Bela Vista', 'São Paulo', 'SP',
+        'simples_nacional', true, true, 'TK-DEMO-000191-MDEM-01'
       ) ON CONFLICT (id) DO UPDATE SET
         client_account_id = 'ACC-MARTHI-DEMO',
         trade_name = 'Loja Demonstração Marthi',
         legal_name = 'Marthi Tecnologia e Demonstração LTDA',
-        document = '61.506.270/0001-63',
+        document = '00.000.000/0001-91',
         email = 'loja@marthi.com.br',
-        access_token = 'TK-001-000163-CPTR-88A1',
+        phone = '(11) 3000-0000',
+        zip_code = '01310-100',
+        street = 'Avenida Paulista',
+        number = '1000',
+        complement = 'Sala Demo',
+        district = 'Bela Vista',
+        city = 'São Paulo',
+        state = 'SP',
+        access_token = 'TK-DEMO-000191-MDEM-01',
         active = true,
         is_matrix = true`,
     );
@@ -324,9 +326,10 @@ async function bootstrapDatabase() {
     await pool.query(
       `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active, created_at, updated_at)
        VALUES
-         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Administrador Marthi', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
-         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now())
+         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Administrador Marthi', '(11) 3000-0000', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
+         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(11) 3000-0000', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now())
        ON CONFLICT (id) DO UPDATE SET
+         phone = '(11) 3000-0000',
          role = 'admin',
          is_system_user = true,
          access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,

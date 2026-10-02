@@ -128,11 +128,12 @@ attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, 
           // Garante a loja em stores para não quebrar a FK
           const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
           if (storeExists.rowCount === 0) {
+            const fallbackAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
             await client.query(
               `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
-               VALUES ($1, 'ACC-MARTHI-DEMO', 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 99999-9999', true)
+               VALUES ($1, $2, 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(11) 3000-0000', true)
                ON CONFLICT (id) DO NOTHING`,
-              [storeId],
+              [storeId, fallbackAccountId],
             );
           }
 

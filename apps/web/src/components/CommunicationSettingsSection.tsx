@@ -38,9 +38,9 @@ export function CommunicationSettingsSection() {
     baseUrl: 'https://marthi-tec.discloud.app',
     instance: 'marthi',
     apiKey: '5E280C9D-239A-4D8B-A765-63D00C291331',
-    storeNumber: '5524981244253',
+    storeNumber: '',
     notifyCustomer: true,
-    locationLabel: 'Cell Ponto Três Rios',
+    locationLabel: 'Loja Principal',
   });
   const [showAdvancedWa, setShowAdvancedWa] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
@@ -568,7 +568,7 @@ export function CommunicationSettingsSection() {
                     className="comm-field__input"
                     value={whatsappSettings.locationLabel}
                     onChange={(e) => setWhatsappSettings({ ...whatsappSettings, locationLabel: e.target.value })}
-                    placeholder="Ex.: Cell Ponto Três Rios ou Shopping Olga Sola"
+                    placeholder="Ex.: Loja Centro ou Shopping Matriz"
                   />
                   <span className="comm-field__hint">
                     Aparece no cabeçalho ou rodapé das mensagens disparadas para facilitar a identificação da filial.

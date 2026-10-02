@@ -123,8 +123,27 @@ function load(): State {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty();
     const parsed = JSON.parse(raw) as Partial<State>;
+    const rawClients = Array.isArray(parsed.clients) ? parsed.clients : [];
+    const cleaned = rawClients
+      .filter((c) => {
+        if (c.clientId !== 'ACC-MARTHI-DEMO' && (c.document === '61.506.270/0001-63' || c.tradeName?.includes('Cell Ponto'))) {
+          return false;
+        }
+        return true;
+      })
+      .map((c) => {
+        if (c.clientId === 'ACC-MARTHI-DEMO') {
+          return normalizeClient({
+            ...c,
+            document: '00.000.000/0001-91',
+            phone: '(11) 3000-0000',
+            accessToken: 'TK-DEMO-000191-MDEM-01',
+          });
+        }
+        return normalizeClient(c);
+      });
     return {
-      clients: Array.isArray(parsed.clients) ? parsed.clients.map(normalizeClient) : [],
+      clients: cleaned,
     };
   } catch {
     return empty();
@@ -194,10 +213,10 @@ function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
         clientId: 'ACC-MARTHI-DEMO',
         tradeName: 'Marthi Demonstração',
         legalName: 'Marthi Tecnologia e Demonstração LTDA',
-        document: '61.506.270/0001-63',
-        phone: '(24) 98124-4253',
+        document: '00.000.000/0001-91',
+        phone: '(11) 3000-0000',
         email: 'teste@marthi.com.br',
-        accessToken: 'TK-001-000163-CPTR-88A1',
+        accessToken: 'TK-DEMO-000191-MDEM-01',
         planId: 'golden',
         modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
         status: 'active',

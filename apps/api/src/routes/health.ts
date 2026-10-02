@@ -132,43 +132,41 @@ healthRouter.all(['/health/cleanup-tests', '/api/v1/health/cleanup-tests'], asyn
         BEGIN DELETE FROM promo_campaign_tiers WHERE campaign_id IN (SELECT id FROM promo_campaigns WHERE store_id != 'STR-DEMO-01'); EXCEPTION WHEN OTHERS THEN NULL; END;
         BEGIN DELETE FROM promo_campaigns WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
         BEGIN DELETE FROM price_tables WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM products WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM stock_items WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM customers WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM sellers WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM employees WHERE store_id != 'STR-DEMO-01' OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM user_stores WHERE store_id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM store_licenses WHERE store_id != 'STR-DEMO-01' OR client_account_id != 'ACC-MARTHI-DEMO'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM stores WHERE id != 'STR-DEMO-01'; EXCEPTION WHEN OTHERS THEN NULL; END;
         BEGIN DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
         BEGIN DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM users WHERE client_account_id != 'ACC-MARTHI-DEMO' OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
-        BEGIN DELETE FROM client_accounts WHERE id != 'ACC-MARTHI-DEMO'; EXCEPTION WHEN OTHERS THEN NULL; END;
+        BEGIN DELETE FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%'; EXCEPTION WHEN OTHERS THEN NULL; END;
       END $$;
     `);
 
-    // 3. Garantir conta ACC-MARTHI-DEMO com plano Gold e status ativo
+    // 3. Garantir conta ACC-MARTHI-DEMO com plano Gold, status ativo e dados neutros de demonstração
     await client.query(`
       UPDATE client_accounts
       SET trade_name = 'Marthi Demonstração',
           legal_name = 'Marthi Tecnologia e Demonstração LTDA',
-          document = '61.506.270/0001-63',
+          document = '00.000.000/0001-91',
           email = 'teste@marthi.com.br',
-          phone = '(24) 98124-4253',
+          phone = '(11) 3000-0000',
           contact_name = 'Administrador Marthi',
           status = 'active',
-          access_token = 'TK-001-000163-CPTR-88A1'
+          access_token = 'TK-DEMO-000191-MDEM-01'
       WHERE id = 'ACC-MARTHI-DEMO';
 
       UPDATE stores
       SET trade_name = 'Loja Demonstração Marthi',
           legal_name = 'Marthi Tecnologia e Demonstração LTDA',
-          document = '61.506.270/0001-63',
+          document = '00.000.000/0001-91',
           email = 'loja@marthi.com.br',
-          phone = '(24) 98124-4253',
+          phone = '(11) 3000-0000',
+          zip_code = '01310-100',
+          street = 'Avenida Paulista',
+          number = '1000',
+          complement = 'Sala Demo',
+          district = 'Bela Vista',
+          city = 'São Paulo',
+          state = 'SP',
           is_matrix = true,
           active = true,
-          access_token = 'TK-001-000163-CPTR-88A1'
+          access_token = 'TK-DEMO-000191-MDEM-01'
       WHERE id = 'STR-DEMO-01';
 
       INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)

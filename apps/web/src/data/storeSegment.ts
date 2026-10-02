@@ -175,15 +175,10 @@ export function getStoreCustomization(explicitStoreId?: string): StoreCustomizat
     const raw = localStorage.getItem(storeKey) || localStorage.getItem(STORAGE_KEY);
 
     // Validação estrita por segmento:
-    // Se a loja é Oficina / Assistência Técnica (ou Cell Ponto), NUNCA exibir Cardápio, Mesas e Cozinha
-    const isOficinaOrCell =
-      segmentId === 'assistencia_tecnica' ||
-      (store &&
-        (store.tradeName?.toLowerCase().includes('cell') ||
-          store.name?.toLowerCase().includes('cell') ||
-          store.cnpj === '61.506.270/0001-63'));
+    // Se a loja é Oficina / Assistência Técnica, NUNCA exibir Cardápio, Mesas e Cozinha
+    const isOficina = segmentId === 'assistencia_tecnica';
 
-    if (isOficinaOrCell) {
+    if (isOficina) {
       return {
         segmentId: 'assistencia_tecnica',
         segmentName: preset.name,
