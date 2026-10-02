@@ -22,7 +22,7 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
 import { pool, checkDatabaseConnection } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
-import { hashPassword } from './services/authService.js';
+import { hashPassword, verifySessionToken } from './services/authService.js';
 import { randomBytes } from 'node:crypto';
 
 const app = express();
@@ -68,6 +68,27 @@ app.use(totemRouter);
 app.use(whatsappRouter);
 app.use(communicationRouter);
 
+// Rota administrativa para acionar migrações sob demanda
+app.post('/api/v1/admin/migrate', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+    const token = authHeader.slice(7);
+    const user = await verifySessionToken(token);
+    if (user.role !== 'admin') {
+      res.status(403).json({ success: false, error: 'Forbidden' });
+      return;
+    }
+    const applied = await bootstrapDatabase();
+    res.json({ success: true, message: 'Migrations e dados de inicialização aplicados com sucesso!', applied });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Proxy residual para qualquer rota externa legada
 app.use(proxyUnmatchedApi);
 
@@ -111,23 +132,63 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 /**
- * Inicializa banco, executa migrations e garante integridade do usuário teste@marthi.com.br
+ * Inicializa banco, executa migrations com retry e garante integridade das contas e usuários
  */
 async function bootstrapDatabase() {
   if (!pool) {
     console.log('[marthi-api] Pool de banco não ativo (variáveis não informadas). Operando em memória.');
-    return;
+    return [];
+  }
+
+  // Tenta conectar com retentativas (até 10 tentativas com intervalo de 3s para aguardar DNS/VLAN da Discloud)
+  let connected = false;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    const check = await checkDatabaseConnection();
+    if (check.connected) {
+      connected = true;
+      break;
+    }
+    console.warn(`[marthi-api] Aguardando conexão PostgreSQL (tentativa ${attempt}/10): ${check.error || 'indisponível'}`);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  if (!connected) {
+    console.error('[marthi-api] Falha ao conectar ao PostgreSQL após 10 tentativas. Operando em modo de resiliência.');
+    return [];
   }
 
   try {
-    const check = await checkDatabaseConnection();
-    if (!check.connected) {
-      console.warn('[marthi-api] Falha inicial ao conectar ao PostgreSQL:', check.error);
-      return;
+    // Saneamento preventivo para garantir compatibilidade caso existam tabelas legadas sem client_account_id
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS client_accounts (
+          id TEXT PRIMARY KEY,
+          trade_name TEXT NOT NULL,
+          legal_name TEXT NOT NULL,
+          document_type TEXT NOT NULL DEFAULT 'cnpj',
+          document TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          contact_name TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'active',
+          access_token TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS access_token TEXT;
+        ALTER TABLE stores ADD COLUMN IF NOT EXISTS client_account_id TEXT;
+        ALTER TABLE stores ADD COLUMN IF NOT EXISTS access_token TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS client_account_id TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS global_role TEXT DEFAULT 'operator';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
+      `);
+    } catch (preErr) {
+      console.warn('[marthi-api] Aviso no pre-saneamento DDL:', preErr);
     }
 
     console.log('[marthi-api] PostgreSQL conectado! Executando migrations...');
-    await runMigrations();
+    const applied = await runMigrations();
 
     // 1. Garante que as colunas essenciais na tabela stock_items existam no PostgreSQL
     await pool.query(`
@@ -175,11 +236,43 @@ async function bootstrapDatabase() {
       [marthiAdminEmail, `${marthiSalt}:${marthiHash}`],
     );
 
+    // Garante Gilvan Teodoro no banco com senha Marthi123 e role admin
+    const gilvanEmail = 'gilvanteodo@gmail.com';
+    const gilvanSalt = 'c1d2e3f4a5b6';
+    const gilvanHash = hashPassword('Marthi123', gilvanSalt);
+    await pool.query(
+      `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+       VALUES ('usr-gilvan-cellponto', 'ACC-MARTHI-DEMO', $1, 'Gilvan Teodoro', 'password', $2, 'admin', true)
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = $2,
+         name = 'Gilvan Teodoro',
+         client_account_id = 'ACC-MARTHI-DEMO',
+         active = true,
+         global_role = 'admin'`,
+      [gilvanEmail, `${gilvanSalt}:${gilvanHash}`],
+    );
+
+    // Garante Mariana Veiga no banco com senha 1234 e role admin
+    const marianaEmail = 'marianaveigatav@gmail.com';
+    const marianaSalt = 'f7e8d9c0b1a2';
+    const marianaHash = hashPassword('1234', marianaSalt);
+    await pool.query(
+      `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+       VALUES ('usr-mariana-cellponto', 'ACC-MARTHI-DEMO', $1, 'Mariana Veiga', 'password', $2, 'admin', true)
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = $2,
+         name = 'Mariana Veiga',
+         client_account_id = 'ACC-MARTHI-DEMO',
+         active = true,
+         global_role = 'admin'`,
+      [marianaEmail, `${marianaSalt}:${marianaHash}`],
+    );
+
     // 3. Garante conta Cell Ponto com CNPJ e Token de Acesso
     await pool.query(
       `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
        VALUES ('ACC-MARTHI-DEMO', 'Cell Ponto', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', 'contato@cellponto.com.br', '(24) 98124-4253', 'Administrador', 'active', 'TK-001-000163-CPTR-88A1')
-       ON CONFLICT (document) DO UPDATE SET
+       ON CONFLICT (id) DO UPDATE SET
          trade_name = 'Cell Ponto',
          email = 'contato@cellponto.com.br',
          access_token = 'TK-001-000163-CPTR-88A1',
@@ -208,27 +301,39 @@ async function bootstrapDatabase() {
         is_matrix = true`,
     );
 
-    // 5. Vínculo user_stores para AMBOS os administradores
-    await pool.query(
-      `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-       VALUES
-         ('UST-TEST-01', 'USR-TEST-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
-         ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
-       ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true`,
-    );
+    // 5. Vínculo user_stores para todos os administradores
+    try {
+      await pool.query(
+        `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+         VALUES
+           ('UST-TEST-01', 'USR-TEST-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+           ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+           ('UST-GILVAN-01', 'usr-gilvan-cellponto', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+           ('UST-MARIANA-01', 'usr-mariana-cellponto', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+         ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true`,
+      );
+    } catch (ustErr) {
+      console.warn('[marthi-api] Aviso ao vincular user_stores:', ustErr);
+    }
 
-    // 6. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
-    await pool.query(
-      `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
-       VALUES
-         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
-         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
-       ON CONFLICT (id) DO UPDATE SET
-         role = 'admin',
-         is_system_user = true,
-         access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-         active = true`,
-    );
+    // 6. Garante colaboradores teste, marthi, gilvan e mariana na tabela employees com role admin e todas as áreas de acesso
+    try {
+      await pool.query(
+        `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
+         VALUES
+           ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
+           ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
+           ('EMP-GILVAN-ADMIN', 'STR-DEMO-01', 'Gilvan Teodoro', '(24) 98124-4253', 'gilvanteodo@gmail.com', '', 'admin', true, 'gilvanteodo@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
+           ('EMP-MARIANA-ADMIN', 'STR-DEMO-01', 'Mariana Veiga', '', 'marianaveigatav@gmail.com', '', 'admin', true, 'marianaveigatav@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+         ON CONFLICT (id) DO UPDATE SET
+           role = 'admin',
+           is_system_user = true,
+           access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
+           active = true`,
+      );
+    } catch (empErr) {
+      console.warn('[marthi-api] Aviso ao sincronizar employees:', empErr);
+    }
 
     // 7. Garante licença ativa com todos os módulos para STR-DEMO-01
     try {
@@ -273,8 +378,10 @@ async function bootstrapDatabase() {
     }
 
     console.log('[marthi-api] ✓ Usuários, Tokens de Acesso, Lojas, Licenças e Catálogo sincronizados no banco de dados!');
+    return applied;
   } catch (err) {
     console.error('[marthi-api] Erro ao inicializar banco de dados:', err);
+    return [];
   }
 }
 
