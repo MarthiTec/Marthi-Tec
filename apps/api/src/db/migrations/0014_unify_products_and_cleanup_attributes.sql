@@ -66,6 +66,16 @@ ON CONFLICT (attribute_id, value) DO UPDATE SET
   sort = EXCLUDED.sort;
 
 -- 3. Unificação de Produtos: migrar qualquer produto da tabela legada 'products' para 'stock_items'
+DO $$ BEGIN
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS unit TEXT NOT NULL DEFAULT 'UN';
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Geral';
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS brand TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS show_on_totem BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+  ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 DO $$
 BEGIN
   -- Se products for uma tabela física (não view), executa a migração e conversão

@@ -54,6 +54,11 @@ ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 DO $$ BEGIN
+  ALTER TABLE stock_items ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE stock_items ALTER COLUMN updated_at SET DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
   CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
   CREATE INDEX IF NOT EXISTS idx_stock_items_active ON stock_items(store_id, active);
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
