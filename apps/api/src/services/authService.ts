@@ -71,54 +71,6 @@ clientUsersStore.set('marthi.tecnologia@gmail.com', {
   createdAt: new Date().toISOString(),
 });
 
-clientUsersStore.set('gilvanteodo@gmail.com', {
-  id: 'usr-gilvan-cellponto',
-  email: 'gilvanteodo@gmail.com',
-  name: 'Gilvan Teodoro',
-  passwordHash: hashPassword('Marthi123', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-clientUsersStore.set('marianaveigatav@gmail.com', {
-  id: 'usr-mariana-cellponto',
-  email: 'marianaveigatav@gmail.com',
-  name: 'Mariana Veiga',
-  passwordHash: hashPassword('1234', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-clientUsersStore.set('contato@cellponto.com.br', {
-  id: 'usr-cellponto-matriz',
-  email: 'contato@cellponto.com.br',
-  name: 'Cell Ponto Matriz',
-  passwordHash: hashPassword('123', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-clientUsersStore.set('matriz@cellponto.com.br', {
-  id: 'usr-cellponto-matriz-2',
-  email: 'matriz@cellponto.com.br',
-  name: 'Cell Ponto Matriz',
-  passwordHash: hashPassword('123', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
 export function upsertClientUserInMemory(
   email: string,
   name: string,
@@ -308,19 +260,6 @@ export async function loginWithPassword(email: string, password: string): Promis
       throw error;
     }
     let match = hashPassword(password, stored.salt) === stored.passwordHash;
-    if (!match && [
-      'gilvanteodo@gmail.com',
-      'marianaveigatav@gmail.com',
-      'contato@cellponto.com.br',
-      'matriz@cellponto.com.br',
-      'marthi.tecnologia@gmail.com',
-      'teste@marthi.com.br',
-    ].includes(normEmail)) {
-      const allowed = ['123', '1234', 'marthi123', 'Marthi123', 'admin', 'cellponto'];
-      if (allowed.includes(password)) {
-        match = true;
-      }
-    }
     if (match) {
       const user: AuthUser = {
         id: stored.id,

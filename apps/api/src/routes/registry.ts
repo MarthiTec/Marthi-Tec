@@ -108,41 +108,38 @@ registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next
     const activeOnly = req.query.active === 'true';
 
     if (pool) {
-      try {
-        const sql = `
-          SELECT id, name, phone, email, document, role, is_system_user, user_email,
-                 access_areas, permissions, active, seller_id, created_at, updated_at
-          FROM employees
-          WHERE (store_id = $1 OR store_id = 'STR-DEMO-01' OR store_id IN (SELECT id FROM stores WHERE client_account_id = $2) OR ($2 = 'ACC-MARTHI-DEMO'))
-          ${activeOnly ? 'AND active = true' : ''}
-          ORDER BY name ASC
-        `;
-        const result = await pool.query(sql, [storeId, clientAccountId]);
-        const rows = [...result.rows];
+      const sql = `
+        SELECT id, name, phone, email, document, role, is_system_user, user_email,
+               access_areas, permissions, active, seller_id, created_at, updated_at
+        FROM employees
+        WHERE (store_id = $1 OR store_id = 'STR-DEMO-01' OR store_id IN (SELECT id FROM stores WHERE client_account_id = $2) OR ($2 = 'ACC-MARTHI-DEMO'))
+        ${activeOnly ? 'AND active = true' : ''}
+        ORDER BY name ASC
+      `;
+      const result = await pool.query(sql, [storeId, clientAccountId]);
+      const rows = [...result.rows];
 
-        res.json({
-          success: true,
-          data: rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            phone: r.phone || '',
-            email: r.email || '',
-            document: r.document || '',
-            role: r.role,
-            isSystemUser: Boolean(r.is_system_user),
-            userEmail: r.user_email || '',
-            accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
-            permissions: r.permissions || {},
-            active: Boolean(r.active),
-            sellerId: r.seller_id || undefined,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-          })),
-        });
-        return;
-      } catch (dbErr) {
-        console.warn('[employees] Falha ao consultar banco, usando fallback:', dbErr);
-      }
+
+      res.json({
+        success: true,
+        data: rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          phone: r.phone || '',
+          email: r.email || '',
+          document: r.document || '',
+          role: r.role,
+          isSystemUser: Boolean(r.is_system_user),
+          userEmail: r.user_email || '',
+          accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
+          permissions: r.permissions || {},
+          active: Boolean(r.active),
+          sellerId: r.seller_id || undefined,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+      return;
     }
 
     let items = Array.from(memoryEmployees.values());

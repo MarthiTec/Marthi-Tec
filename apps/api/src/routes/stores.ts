@@ -139,69 +139,61 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
     const userId = req.user?.id;
 
     if (pool) {
-      try {
-        let hasRestrictedStores = false;
-        try {
-          const userStoreCount = await pool.query(
-            `SELECT COUNT(*)::int as total FROM user_stores WHERE user_id = $1`,
-            [userId],
-          );
-          hasRestrictedStores = (userStoreCount.rows[0]?.total || 0) > 0;
-        } catch {
-          // user_stores ainda não existe ou tabela em migração
-        }
+      // Se o usuário possuir lojas autorizadas específicas em user_stores, filtra por elas
+      const userStoreCount = await pool.query(
+        `SELECT COUNT(*)::int as total FROM user_stores WHERE user_id = $1`,
+        [userId],
+      );
+      const hasRestrictedStores = (userStoreCount.rows[0]?.total || 0) > 0;
 
-        let sql = `
-          SELECT s.*, l.plan_id, l.modules, l.discount_percent, l.final_price
-          FROM stores s
-          LEFT JOIN store_licenses l ON l.store_id = s.id
-          WHERE (s.client_account_id = $1 OR $1 = 'ACC-MARTHI-DEMO') AND s.active = true
-        `;
-        const params: any[] = [clientAccountId];
+      let sql = `
+        SELECT s.*, l.plan_id, l.modules, l.discount_percent, l.final_price
+        FROM stores s
+        LEFT JOIN store_licenses l ON l.store_id = s.id
+        WHERE s.client_account_id = $1 AND s.active = true
+      `;
+      const params: any[] = [clientAccountId];
 
-        if (hasRestrictedStores && req.user?.role !== 'admin') {
-          sql += ` AND s.id IN (SELECT store_id FROM user_stores WHERE user_id = $2)`;
-          params.push(userId);
-        }
-
-        sql += ` ORDER BY s.is_matrix DESC, s.created_at ASC`;
-        const result = await pool.query(sql, params);
-
-        res.json({
-          success: true,
-          data: result.rows.map((r) => ({
-            id: r.id,
-            clientAccountId: r.client_account_id,
-            tradeName: r.trade_name,
-            legalName: r.legal_name,
-            documentType: r.document_type,
-            document: r.document,
-            stateRegistration: r.state_registration || '',
-            municipalRegistration: r.municipal_registration || '',
-            email: r.email,
-            phone: r.phone,
-            zipCode: r.zip_code,
-            street: r.street,
-            number: r.number,
-            complement: r.complement,
-            district: r.district,
-            city: r.city,
-            state: r.state,
-            taxRegime: r.tax_regime,
-            isMatrix: r.is_matrix,
-            planId: r.plan_id || 'scale',
-            modules: r.modules || ['totem', 'presales', 'os', 'erp', 'fiscal'],
-            discountPercent: Number(r.discount_percent || 0),
-            finalPrice: Number(r.final_price || 0),
-            active: r.active,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-          })),
-        });
-        return;
-      } catch (dbErr) {
-        console.warn('[stores] Falha ao consultar banco, usando fallback:', dbErr);
+      if (hasRestrictedStores && req.user?.role !== 'admin') {
+        sql += ` AND s.id IN (SELECT store_id FROM user_stores WHERE user_id = $2)`;
+        params.push(userId);
       }
+
+      sql += ` ORDER BY s.is_matrix DESC, s.created_at ASC`;
+      const result = await pool.query(sql, params);
+
+      res.json({
+        success: true,
+        data: result.rows.map((r) => ({
+          id: r.id,
+          clientAccountId: r.client_account_id,
+          tradeName: r.trade_name,
+          legalName: r.legal_name,
+          documentType: r.document_type,
+          document: r.document,
+          stateRegistration: r.state_registration || '',
+          municipalRegistration: r.municipal_registration || '',
+          email: r.email,
+          phone: r.phone,
+          accessToken: r.access_token || generateStoreAccessToken(r.document, r.email, r.id),
+          zipCode: r.zip_code,
+          street: r.street,
+          number: r.number,
+          complement: r.complement || '',
+          district: r.district,
+          city: r.city,
+          state: r.state,
+          taxRegime: r.tax_regime,
+          isMatrix: Boolean(r.is_matrix),
+          active: Boolean(r.active),
+          planId: r.plan_id || 'golden',
+          modules: r.modules || ['totem', 'os', 'erp', 'fiscal'],
+          discountPercent: Number(r.discount_percent) || 0,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      });
+      return;
     }
 
     const items = Array.from(memoryStores.values()).filter(
