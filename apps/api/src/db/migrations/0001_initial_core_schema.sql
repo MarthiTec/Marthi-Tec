@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS store_licenses (
   store_id          TEXT NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
   client_account_id TEXT NOT NULL REFERENCES client_accounts(id) ON DELETE CASCADE,
   plan_id           TEXT NOT NULL DEFAULT 'golden',
-  modules           module_id[] NOT NULL DEFAULT ARRAY['totem', 'presales', 'os', 'erp', 'fiscal']::module_id[],
+  modules           TEXT[] NOT NULL DEFAULT ARRAY['totem', 'os', 'erp', 'fiscal']::TEXT[],
   base_price        NUMERIC(12,2) NOT NULL DEFAULT 0,
   discount_percent  NUMERIC(5,2) NOT NULL DEFAULT 0,
   discount_amount   NUMERIC(12,2) NOT NULL DEFAULT 0,
