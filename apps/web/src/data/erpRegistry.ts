@@ -158,103 +158,12 @@ function defaultAdminAreas(): AccessArea[] {
   return [...ALL_ACCESS_AREAS];
 }
 
-function seedForTenant(activeTenant: string): RegistryState {
-  const state: RegistryState = {
+function seedForTenant(_activeTenant: string): RegistryState {
+  return {
     employees: [],
     sellers: [],
     suppliers: [],
   };
-
-  const isCellPontoTenant =
-    activeTenant.includes('ACC-MARTHI-DEMO') ||
-    activeTenant.includes('gilvan') ||
-    activeTenant.includes('mariana') ||
-    activeTenant.includes('cell') ||
-    activeTenant.startsWith('emp_') ||
-    activeTenant === 'client_CLI-DEMO-01' ||
-    activeTenant === 'default';
-
-  if (isCellPontoTenant) {
-    state.employees.push({
-      id: 'EMP-GILVAN-01',
-      name: 'Gilvan Teodoro',
-      phone: '(24) 98124-4253',
-      email: 'gilvanteodo@gmail.com',
-      document: '61.506.270/0001-63',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'gilvanteodo@gmail.com',
-      accessAreas: [...ALL_ACCESS_AREAS],
-      active: true,
-      createdAt: now(),
-      updatedAt: now(),
-    });
-    state.employees.push({
-      id: 'EMP-MARIANA-01',
-      name: 'Mariana Veiga',
-      phone: '(24) 98124-4253',
-      email: 'marianaveigatav@gmail.com',
-      document: '123.456.789-00',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'marianaveigatav@gmail.com',
-      accessAreas: [...ALL_ACCESS_AREAS],
-      active: true,
-      createdAt: now(),
-      updatedAt: now(),
-    });
-  } else if (activeTenant.startsWith('client_')) {
-    const clientId = activeTenant.slice('client_'.length);
-    const client = listMarthiClients().find((c) => c.clientId === clientId);
-    if (client) {
-      state.employees.push({
-        id: uid('EMP'),
-        name: client.tradeName,
-        phone: client.phone || '',
-        email: client.email,
-        document: client.document || '',
-        role: 'admin',
-        isSystemUser: true,
-        userEmail: client.email,
-        accessAreas: [...ALL_ACCESS_AREAS],
-        active: true,
-        createdAt: now(),
-        updatedAt: now(),
-      });
-      if (client.tradeName.toLowerCase().includes('cell')) {
-        state.employees.push({
-          id: 'EMP-GILVAN-01',
-          name: 'Gilvan Teodoro',
-          phone: '(24) 98124-4253',
-          email: 'gilvanteodo@gmail.com',
-          document: '61.506.270/0001-63',
-          role: 'admin',
-          isSystemUser: true,
-          userEmail: 'gilvanteodo@gmail.com',
-          accessAreas: [...ALL_ACCESS_AREAS],
-          active: true,
-          createdAt: now(),
-          updatedAt: now(),
-        });
-        state.employees.push({
-          id: 'EMP-MARIANA-01',
-          name: 'Mariana Veiga',
-          phone: '(24) 98124-4253',
-          email: 'marianaveigatav@gmail.com',
-          document: '123.456.789-00',
-          role: 'admin',
-          isSystemUser: true,
-          userEmail: 'marianaveigatav@gmail.com',
-          accessAreas: [...ALL_ACCESS_AREAS],
-          active: true,
-          createdAt: now(),
-          updatedAt: now(),
-        });
-      }
-    }
-  }
-
-  return state;
 }
 
 let memoryRegistryTenant: string | null = null;
@@ -332,76 +241,6 @@ function load(): RegistryState {
       }
     }
 
-    const isCellPontoTenant =
-      activeTenant === 'default' ||
-      activeTenant.toLowerCase().includes('cell') ||
-      activeTenant.toLowerCase().includes('ponto') ||
-      activeTenant.toLowerCase().includes('gilvan') ||
-      activeTenant.toLowerCase().includes('mariana') ||
-      activeTenant.toLowerCase().includes('demo') ||
-      activeTenant.startsWith('acc_') ||
-      activeTenant.startsWith('emp_') ||
-      activeTenant.startsWith('client_cli-demo');
-
-    if (employees.length === 0 && isCellPontoTenant) {
-      const seeded = seedForTenant(activeTenant);
-      employees = seeded.employees;
-    }
-
-    // Garante que Gilvan e Mariana estejam sempre no estado com role admin e acesso total
-    const norm = (s?: string) => (s || '').trim().toLowerCase();
-    const hasGilvan = employees.some((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
-    const hasMariana = employees.some((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
-
-    if (!hasGilvan) {
-      employees.unshift({
-        id: 'EMP-GILVAN-01',
-        name: 'Gilvan Teodoro',
-        phone: '(24) 98124-4253',
-        email: 'gilvanteodo@gmail.com',
-        document: '61.506.270/0001-63',
-        role: 'admin',
-        isSystemUser: true,
-        userEmail: 'gilvanteodo@gmail.com',
-        accessAreas: [...ALL_ACCESS_AREAS],
-        active: true,
-        createdAt: now(),
-        updatedAt: now(),
-      });
-    }
-
-    if (!hasMariana) {
-      employees.push({
-        id: 'EMP-MARIANA-01',
-        name: 'Mariana Veiga',
-        phone: '(24) 98124-4253',
-        email: 'marianaveigatav@gmail.com',
-        document: '123.456.789-00',
-        role: 'admin',
-        isSystemUser: true,
-        userEmail: 'marianaveigatav@gmail.com',
-        accessAreas: [...ALL_ACCESS_AREAS],
-        active: true,
-        createdAt: now(),
-        updatedAt: now(),
-      });
-    }
-
-    // Normaliza administradores cadastrados
-    employees = employees.map((emp) => {
-      const mail = norm(emp.userEmail || emp.email);
-      if (mail === 'gilvanteodo@gmail.com' || mail === 'marianaveigatav@gmail.com') {
-        return {
-          ...emp,
-          role: 'admin',
-          isSystemUser: true,
-          active: true,
-          accessAreas: [...ALL_ACCESS_AREAS],
-        };
-      }
-      return emp;
-    });
-
     const state: RegistryState = { sellers, suppliers, employees };
     memoryRegistryState = state;
     return state;
@@ -425,26 +264,10 @@ function save(state: RegistryState) {
 /** Substitui fatias do registry (bootstrap Nest). */
 export function replaceErpRegistry(partial: Partial<RegistryState>) {
   const state = load();
-  let emps = partial.employees ?? state.employees;
-
-  // Garante que a sincronização da API não apague Gilvan e Mariana da listagem
-  const norm = (s?: string) => (s || '').trim().toLowerCase();
-  const hasGilvan = emps.some((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
-  const hasMariana = emps.some((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
-
-  if (!hasGilvan) {
-    const g = state.employees.find((e) => norm(e.userEmail || e.email) === 'gilvanteodo@gmail.com');
-    if (g) emps = [g, ...emps];
-  }
-  if (!hasMariana) {
-    const m = state.employees.find((e) => norm(e.userEmail || e.email) === 'marianaveigatav@gmail.com');
-    if (m) emps = [...emps, m];
-  }
-
   save({
     sellers: partial.sellers ?? state.sellers,
     suppliers: partial.suppliers ?? state.suppliers,
-    employees: emps,
+    employees: partial.employees ?? state.employees,
   });
 }
 
@@ -824,62 +647,14 @@ export async function upsertEmployee(
 export function findEmployeeByUserEmail(email: string | null | undefined): Employee | null {
   const key = normalizeEmail(email ?? '');
   if (!key) return null;
-  const found = load().employees.find(
-    (item) =>
-      item.active &&
-      item.isSystemUser &&
-      normalizeEmail(item.userEmail || item.email) === key,
+  return (
+    load().employees.find(
+      (item) =>
+        item.active &&
+        item.isSystemUser &&
+        normalizeEmail(item.userEmail || item.email) === key,
+    ) ?? null
   );
-  if (found) return found;
-  if (key === 'marthi.tecnologia@gmail.com' || key.includes('marthi.tecnologia')) {
-    return {
-      id: 'EMP-MARTHI-ADMIN',
-      name: 'Marthi Tecnologia',
-      phone: '',
-      email: 'marthi.tecnologia@gmail.com',
-      document: '',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'marthi.tecnologia@gmail.com',
-      accessAreas: [...ALL_ACCESS_AREAS],
-      active: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  if (key === 'marianaveigatav@gmail.com') {
-    return {
-      id: 'EMP-MARIANA-01',
-      name: 'Mariana Veiga',
-      phone: '(24) 98124-4253',
-      email: 'marianaveigatav@gmail.com',
-      document: '123.456.789-00',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'marianaveigatav@gmail.com',
-      accessAreas: [...ALL_ACCESS_AREAS],
-      active: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  if (key === 'gilvanteodo@gmail.com') {
-    return {
-      id: 'EMP-GILVAN-01',
-      name: 'Gilvan Teodoro',
-      phone: '(24) 98124-4253',
-      email: 'gilvanteodo@gmail.com',
-      document: '61.506.270/0001-63',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'gilvanteodo@gmail.com',
-      accessAreas: [...ALL_ACCESS_AREAS],
-      active: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  return null;
 }
 
 export function employeeHasArea(employee: Employee | null, area: AccessArea) {
@@ -985,8 +760,7 @@ function linkedSystemUsers() {
  * - Login sem vínculo, mas já existem usuários → bloqueia áreas de negócio.
  */
 export function userCanAccessArea(userEmail: string | null | undefined, area: AccessArea) {
-  const norm = normalizeEmail(userEmail || '');
-  if (norm === 'gilvanteodo@gmail.com' || norm === 'marianaveigatav@gmail.com') return true;
+  if (isMarthiStaffEmail(userEmail)) return true;
   const employee = findEmployeeByUserEmail(userEmail);
   if (employee) return employeeHasArea(employee, area);
   if (linkedSystemUsers().length === 0) return true;
@@ -994,6 +768,7 @@ export function userCanAccessArea(userEmail: string | null | undefined, area: Ac
 }
 
 export function canAccessPath(pathname: string, userEmail: string | null | undefined) {
+  if (userIsStoreAdmin(userEmail)) return true;
   const area = pathToAccessArea(pathname);
   if (!area) return true;
   return userCanAccessArea(userEmail, area);
@@ -1044,13 +819,9 @@ export function resolveAppHome(userEmail: string | null | undefined): string {
 
 /** Administrador da loja (role admin) — ou cliente contratante ou bootstrap sem usuários vinculados. */
 export function userIsStoreAdmin(userEmail: string | null | undefined) {
+  if (!userEmail) return false;
   if (isMarthiStaffEmail(userEmail)) return true;
-  const norm = normalizeEmail(userEmail || '');
-  if (
-    norm === 'marthi.tecnologia@gmail.com' ||
-    norm === 'gilvanteodo@gmail.com' ||
-    norm === 'marianaveigatav@gmail.com'
-  ) return true;
+  const norm = normalizeEmail(userEmail);
   const isClient = listMarthiClients().some((c) => c.email.toLowerCase() === norm);
   if (isClient) return true;
   const employee = findEmployeeByUserEmail(userEmail);

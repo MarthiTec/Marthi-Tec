@@ -3,18 +3,14 @@ const STORAGE_KEY = 'marthi.erp.user-passwords.v1';
 
 type PasswordMap = Record<string, string>;
 
-const DEFAULT_SEEDS: PasswordMap = {
-  'marianaveigatav@gmail.com': '1234',
-  'gilvanteodo@gmail.com': 'Marthi123',
-};
 
 function load(): PasswordMap {
-  if (typeof window === 'undefined') return { ...DEFAULT_SEEDS };
+  if (typeof window === 'undefined') return {};
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT_SEEDS, ...(JSON.parse(raw) as PasswordMap) } : { ...DEFAULT_SEEDS };
+    return raw ? (JSON.parse(raw) as PasswordMap) : {};
   } catch {
-    return { ...DEFAULT_SEEDS };
+    return {};
   }
 }
 
@@ -50,9 +46,8 @@ export function verifyErpUserPassword(email: string, password: string): boolean 
   const key = email.trim().toLowerCase();
   if (!key || !password) return false;
   const p = password.trim();
-  if (key === 'gilvanteodo@gmail.com' && (p === 'Marthi123' || p === '1234')) return true;
-  if (key === 'marianaveigatav@gmail.com' && (p === '1234' || p === 'Marthi123')) return true;
   const map = load();
   return Boolean(map[key] && map[key] === p);
 }
+
 

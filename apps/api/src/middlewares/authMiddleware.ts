@@ -193,11 +193,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         );
         if (defaultStore.rows.length > 0) {
           resolvedStoreId = defaultStore.rows[0].id;
-        } else if (
-          clientAccountId === 'ACC-MARTHI-DEMO' ||
-          user.email === 'gilvanteodo@gmail.com' ||
-          user.email === 'marianaveigatav@gmail.com'
-        ) {
+        } else if (clientAccountId === 'ACC-MARTHI-DEMO') {
           resolvedStoreId = 'STR-DEMO-01';
         } else {
           // Cria loja default para a conta se não existir
@@ -235,11 +231,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   if (!resolvedStoreId) {
-    if (
-      clientAccountId === 'ACC-MARTHI-DEMO' ||
-      user.email === 'gilvanteodo@gmail.com' ||
-      user.email === 'marianaveigatav@gmail.com'
-    ) {
+    if (clientAccountId === 'ACC-MARTHI-DEMO') {
       resolvedStoreId = 'STR-DEMO-01';
     } else {
       resolvedStoreId = `STR-TENANT-${clientAccountId}`;

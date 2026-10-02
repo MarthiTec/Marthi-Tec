@@ -129,7 +129,7 @@ async function bootstrapDatabase() {
     console.log('[marthi-api] PostgreSQL conectado! Executando migrations...');
     await runMigrations();
 
-    // Garante que teste@marthi.com.br exista no banco com senha 123 e permissão admin
+    // Garante que teste@marthi.com.br e marthi.tecnologia@gmail.com existam no banco com senha 123 e permissão admin
     const testEmail = 'teste@marthi.com.br';
     const testPass = '123';
     const salt = randomBytes(16).toString('hex');
@@ -143,13 +143,29 @@ async function bootstrapDatabase() {
       [testEmail, `${salt}:${pHash}`],
     );
 
-    // Garante conta Cell Ponto com CNPJ, E-mail e Token de Acesso
+    const marthiAdminEmail = 'marthi.tecnologia@gmail.com';
+    const marthiSalt = randomBytes(16).toString('hex');
+    const marthiHash = hashPassword('123', marthiSalt);
+
+    await pool.query(
+      `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+       VALUES ('usr-marthi-admin', 'ACC-MARTHI-DEMO', $1, 'Marthi Tecnologia', 'password', $2, 'admin', true)
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = $2,
+         name = 'Marthi Tecnologia',
+         client_account_id = 'ACC-MARTHI-DEMO',
+         active = true,
+         global_role = 'admin'`,
+      [marthiAdminEmail, `${marthiSalt}:${marthiHash}`],
+    );
+
+    // Garante conta Cell Ponto com CNPJ e Token de Acesso
     await pool.query(
       `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
-       VALUES ('ACC-MARTHI-DEMO', 'Cell Ponto', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', 'gilvanteodo@gmail.com', '(24) 98124-4253', 'Gilvan Teodoro', 'active', 'TK-001-000163-CPTR-88A1')
+       VALUES ('ACC-MARTHI-DEMO', 'Cell Ponto', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', 'contato@cellponto.com.br', '(24) 98124-4253', 'Administrador', 'active', 'TK-001-000163-CPTR-88A1')
        ON CONFLICT (document) DO UPDATE SET
          trade_name = 'Cell Ponto',
-         email = 'gilvanteodo@gmail.com',
+         email = 'contato@cellponto.com.br',
          access_token = 'TK-001-000163-CPTR-88A1',
          status = 'active'`,
     );
@@ -176,67 +192,20 @@ async function bootstrapDatabase() {
         is_matrix = true`,
     );
 
-    // Garante credenciais ativas do Gilvan Teodoro (senha Marthi123 e 1234)
-    const gilvanSalt = 'c1d2e3f4a5b6';
-    const gilvanHash = hashPassword('Marthi123', gilvanSalt);
-    await pool.query(
-      `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
-       VALUES ('usr-gilvan-cellponto', 'ACC-MARTHI-DEMO', 'gilvanteodo@gmail.com', 'Gilvan Teodoro', 'password', $1, 'admin', true)
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash = $1,
-         name = 'Gilvan Teodoro',
-         client_account_id = 'ACC-MARTHI-DEMO',
-         active = true,
-         global_role = 'admin'`,
-      [`${gilvanSalt}:${gilvanHash}`],
-    );
-
-    // Garante credenciais ativas da Mariana Veiga (senha 1234 e Marthi123)
-    const marianaSalt = 'f7e8d9c0b1a2';
-    const marianaHash = hashPassword('1234', marianaSalt);
-    await pool.query(
-      `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
-       VALUES ('usr-mariana-cellponto', 'ACC-MARTHI-DEMO', 'marianaveigatav@gmail.com', 'Mariana Veiga', 'password', $1, 'admin', true)
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash = $1,
-         name = 'Mariana Veiga',
-         client_account_id = 'ACC-MARTHI-DEMO',
-         active = true,
-         global_role = 'admin'`,
-      [`${marianaSalt}:${marianaHash}`],
-    );
-
-    // Vínculo user_stores
+    // Vínculo user_stores para marthi admin
     await pool.query(
       `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-       VALUES ('UST-GILVAN-01', 'usr-gilvan-cellponto', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
-       ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin'`,
-    );
-    await pool.query(
-      `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-       VALUES ('UST-MARIANA-01', 'usr-mariana-cellponto', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+       VALUES ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
        ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin'`,
     );
 
-    // Garante colaboradores na tabela employees para exibição em Usuários & Permissões
+    // Garante colaborador Marthi Tecnologia na tabela employees com role admin e todas as áreas de acesso
     await pool.query(
       `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
-       VALUES ('EMP-GILVAN-01', 'STR-DEMO-01', 'Gilvan Teodoro', '(24) 98124-4253', 'gilvanteodo@gmail.com', '61.506.270/0001-63', 'admin', true, 'gilvanteodo@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+       VALUES ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
        ON CONFLICT (id) DO UPDATE SET
-         name = 'Gilvan Teodoro',
-         user_email = 'gilvanteodo@gmail.com',
-         role = 'admin',
-         is_system_user = true,
-         access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
-         active = true`,
-    );
-
-    await pool.query(
-      `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
-       VALUES ('EMP-MARIANA-01', 'STR-DEMO-01', 'Mariana Veiga', '(24) 98124-4253', 'marianaveigatav@gmail.com', '123.456.789-00', 'admin', true, 'marianaveigatav@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
-       ON CONFLICT (id) DO UPDATE SET
-         name = 'Mariana Veiga',
-         user_email = 'marianaveigatav@gmail.com',
+         name = 'Marthi Tecnologia',
+         user_email = 'marthi.tecnologia@gmail.com',
          role = 'admin',
          is_system_user = true,
          access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,

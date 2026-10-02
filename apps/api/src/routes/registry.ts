@@ -72,36 +72,17 @@ const sellerSchema = z.object({
 
 const memoryEmployees = new Map<string, any>([
   [
-    'EMP-GILVAN-01',
+    'EMP-MARTHI-ADMIN',
     {
-      id: 'EMP-GILVAN-01',
+      id: 'EMP-MARTHI-ADMIN',
       storeId: 'STR-DEMO-01',
-      name: 'Gilvan Teodoro',
-      phone: '(24) 98124-4253',
-      email: 'gilvanteodo@gmail.com',
-      document: '61.506.270/0001-63',
+      name: 'Marthi Tecnologia',
+      phone: '',
+      email: 'marthi.tecnologia@gmail.com',
+      document: '',
       role: 'admin',
       isSystemUser: true,
-      userEmail: 'gilvanteodo@gmail.com',
-      accessAreas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
-      permissions: { all: true },
-      active: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-  [
-    'EMP-MARIANA-01',
-    {
-      id: 'EMP-MARIANA-01',
-      storeId: 'STR-DEMO-01',
-      name: 'Mariana Veiga',
-      phone: '(24) 98124-4253',
-      email: 'marianaveigatav@gmail.com',
-      document: '123.456.789-00',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'marianaveigatav@gmail.com',
+      userEmail: 'marthi.tecnologia@gmail.com',
       accessAreas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
       permissions: { all: true },
       active: true,
@@ -138,45 +119,6 @@ registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next
       const result = await pool.query(sql, [storeId, clientAccountId]);
       const rows = [...result.rows];
 
-      const norm = (s?: string) => (s || '').trim().toLowerCase();
-      const hasGilvan = rows.some((r) => norm(r.user_email || r.email) === 'gilvanteodo@gmail.com');
-      const hasMariana = rows.some((r) => norm(r.user_email || r.email) === 'marianaveigatav@gmail.com');
-
-      if (!hasGilvan) {
-        rows.unshift({
-          id: 'EMP-GILVAN-01',
-          name: 'Gilvan Teodoro',
-          phone: '(24) 98124-4253',
-          email: 'gilvanteodo@gmail.com',
-          document: '61.506.270/0001-63',
-          role: 'admin',
-          is_system_user: true,
-          user_email: 'gilvanteodo@gmail.com',
-          access_areas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
-          permissions: { all: true },
-          active: true,
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: new Date().toISOString(),
-        });
-      }
-
-      if (!hasMariana) {
-        rows.push({
-          id: 'EMP-MARIANA-01',
-          name: 'Mariana Veiga',
-          phone: '(24) 98124-4253',
-          email: 'marianaveigatav@gmail.com',
-          document: '123.456.789-00',
-          role: 'admin',
-          is_system_user: true,
-          user_email: 'marianaveigatav@gmail.com',
-          access_areas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
-          permissions: { all: true },
-          active: true,
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: new Date().toISOString(),
-        });
-      }
 
       res.json({
         success: true,

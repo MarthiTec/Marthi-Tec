@@ -124,14 +124,14 @@ export function generateStoreAccessToken(cnpj: string, email: string, storeId?: 
 }
 
 /**
- * Conta comercial padrão para a empresa habilitada Cell Ponto (Gilvan Teodoro)
+ * Conta comercial padrão para a empresa habilitada Cell Ponto
  */
 export const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
   id: 'ACC-MARTHI-DEMO',
   legalName: 'Cell Ponto Telecomunicações LTDA',
   tradeName: 'Cell Ponto',
   document: '61.506.270/0001-63',
-  email: 'gilvanteodo@gmail.com',
+  email: 'contato@cellponto.com.br',
   phone: '(24) 98124-4253',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: new Date().toISOString(),
@@ -316,7 +316,7 @@ export function resolveDefaultClientAccount(): ClientAccount {
         legalName: realLegal,
         tradeName: realTrade,
         document: realDoc,
-        email: client.email || 'gilvanteodo@gmail.com',
+        email: client.email || '',
         phone: client.phone || '(24) 98124-4253',
         createdAt: client.contractedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),

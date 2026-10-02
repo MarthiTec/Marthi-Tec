@@ -148,9 +148,12 @@ export function AdminLayout() {
     }
   }, [collapsed]);
 
+  const userEmail = user?.email;
+  const isAdmin = user?.role === 'admin' || userIsStoreAdmin(userEmail);
+
   const requiredModule = moduleForPath(location.pathname);
   const moduleAllowed = !requiredModule || hasModule(requiredModule);
-  const aclAllowed = canAccessPath(location.pathname, user?.email);
+  const aclAllowed = isAdmin || canAccessPath(location.pathname, userEmail);
 
   const page = useMemo(
     () => resolveTitle(location.pathname, location.search),
@@ -181,13 +184,6 @@ export function AdminLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const userEmail = user.email;
-  const isAdmin =
-    user?.role === 'admin' ||
-    userIsStoreAdmin(userEmail) ||
-    userEmail?.toLowerCase() === 'marthi.tecnologia@gmail.com' ||
-    userEmail?.toLowerCase() === 'gilvanteodo@gmail.com' ||
-    userEmail?.toLowerCase() === 'marianaveigatav@gmail.com';
   const canAccessPainel = isAdmin || userCanAccessArea(userEmail, 'painel');
 
   if (!canAccessPainel) {

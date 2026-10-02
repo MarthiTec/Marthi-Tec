@@ -59,28 +59,14 @@ clientUsersStore.set('teste@marthi.com.br', {
   createdAt: new Date().toISOString(),
 });
 
-const marianaSalt = 'f7e8d9c0b1a2';
-clientUsersStore.set('marianaveigatav@gmail.com', {
-  id: 'usr-mariana-cellponto',
-  email: 'marianaveigatav@gmail.com',
-  name: 'Mariana Veiga',
-  passwordHash: hashPassword('1234', marianaSalt),
-  salt: marianaSalt,
+clientUsersStore.set('marthi.tecnologia@gmail.com', {
+  id: 'usr-marthi-admin',
+  email: 'marthi.tecnologia@gmail.com',
+  name: 'Marthi Tecnologia',
+  passwordHash: hashPassword('123', defaultTestSalt),
+  salt: defaultTestSalt,
   role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-const gilvanSalt = 'c1d2e3f4a5b6';
-clientUsersStore.set('gilvanteodo@gmail.com', {
-  id: 'usr-gilvan-cellponto',
-  email: 'gilvanteodo@gmail.com',
-  name: 'Gilvan Teodoro',
-  passwordHash: hashPassword('Marthi123', gilvanSalt),
-  salt: gilvanSalt,
-  role: 'admin',
-  clientAccountId: 'ACC-MARTHI-DEMO',
+  clientAccountId: 'acc-matrix-demo',
   active: true,
   createdAt: new Date().toISOString(),
 });
@@ -243,16 +229,6 @@ export async function loginWithPassword(email: string, password: string): Promis
           match = storedHash === password;
         }
 
-        // Permite flexibilidade de senha (Marthi123 ou 1234) para Gilvan e Mariana da Cell Ponto
-        if (!match && (normEmail === 'gilvanteodo@gmail.com' || normEmail === 'marianaveigatav@gmail.com')) {
-          if (password === 'Marthi123' || password === '1234') {
-            match = true;
-            // Auto-repara o hash no banco para garantir compatibilidade futura
-            const salt = randomBytes(16).toString('hex');
-            const newHash = hashPassword(password, salt);
-            pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [`${salt}:${newHash}`, row.id]).catch(() => null);
-          }
-        }
 
         if (match) {
           const user: AuthUser = {
@@ -284,11 +260,6 @@ export async function loginWithPassword(email: string, password: string): Promis
       throw error;
     }
     let match = hashPassword(password, stored.salt) === stored.passwordHash;
-    if (!match && (normEmail === 'gilvanteodo@gmail.com' || normEmail === 'marianaveigatav@gmail.com')) {
-      if (password === 'Marthi123' || password === '1234') {
-        match = true;
-      }
-    }
     if (match) {
       const user: AuthUser = {
         id: stored.id,

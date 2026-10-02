@@ -15,7 +15,6 @@ import { markPresenceOffline } from '../data/presenceStore';
 import {
   fetchAuthProviders,
   fetchCurrentUser,
-  isLocalMarthiStaffToken,
   loginWithGoogle as apiLoginWithGoogle,
   loginWithPassword as apiLoginWithPassword,
   type AuthProviders,
@@ -51,9 +50,7 @@ async function applySession(
   localStorage.setItem(STORAGE_KEY, session.token);
   setToken(session.token);
   setUser(session.user);
-  if (!isLocalMarthiStaffToken(session.token)) {
-    markStoreContracted();
-  }
+  markStoreContracted();
   logAccess({
     actorName: session.user.name,
     actorEmail: session.user.email,
