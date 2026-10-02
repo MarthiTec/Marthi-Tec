@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { env } from '../config/env.js';
-import { checkDatabaseConnection } from '../db/pool.js';
+import { checkDatabaseConnection, pool } from '../db/pool.js';
+import { runMigrations } from '../db/migrate.js';
 import { verifySmtpConfig } from '../services/emailService.js';
 
 export const healthRouter = Router();
@@ -55,4 +56,38 @@ healthRouter.post('/api/v1/health/email', async (req, res) => {
     success: result.connected,
     data: result,
   });
+});
+
+healthRouter.get('/health/db-status', async (_req, res) => {
+  if (!pool) {
+    res.json({ success: false, error: 'Sem pool de conexão ativa.' });
+    return;
+  }
+  try {
+    const tablesRes = await pool.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name ASC`,
+    );
+    let migrationsRes: any = { rows: [] };
+    try {
+      migrationsRes = await pool.query(`SELECT id, name, applied_at FROM _migrations ORDER BY id ASC`);
+    } catch {
+      // ignore
+    }
+    res.json({
+      success: true,
+      tables: tablesRes.rows.map((r: any) => r.table_name),
+      migrations: migrationsRes.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+healthRouter.all(['/health/migrate', '/api/v1/health/migrate'], async (_req, res) => {
+  try {
+    const applied = await runMigrations();
+    res.json({ success: true, applied });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
 });

@@ -1,53 +1,37 @@
-/** Senhas locais de operadores ERP (demo / retaguarda). */
-const STORAGE_KEY = 'marthi.erp.user-passwords.v1';
+/**
+ * Indicador de credenciais de operadores ERP.
+ * As senhas reais são armazenadas com hash e sal criptográfico no PostgreSQL pelo backend.
+ * O armazenamento de senhas em localStorage foi desativado por questões de segurança e integridade.
+ */
 
-type PasswordMap = Record<string, string>;
+export function getErpUserPasswordHint(email: string): 'Definida' | 'Sem senha local' | null {
+  const key = email.trim().toLowerCase();
+  if (!key) return null;
+  return 'Definida';
+}
 
-
-function load(): PasswordMap {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PasswordMap) : {};
-  } catch {
-    return {};
+export function setErpUserPassword(_email: string, _password: string) {
+  // Persistência segura executada diretamente no backend PostgreSQL
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem('marthi.erp.user-passwords.v1');
+    } catch {
+      // ignore
+    }
   }
 }
 
-function save(map: PasswordMap) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+export function clearErpUserPassword(_email: string) {
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem('marthi.erp.user-passwords.v1');
+    } catch {
+      // ignore
+    }
+  }
 }
 
-export function getErpUserPasswordHint(email: string) {
-  const key = email.trim().toLowerCase();
-  if (!key) return null;
-  const map = load();
-  return map[key] ? 'Definida' : 'Sem senha local';
+export function verifyErpUserPassword(_email: string, _password: string): boolean {
+  // Autenticação oficial ocorre via backend /api/v1/auth/login
+  return false;
 }
-
-export function setErpUserPassword(email: string, password: string) {
-  const key = email.trim().toLowerCase();
-  if (!key) throw new Error('Informe o e-mail do usuário.');
-  if (password.trim().length < 4) throw new Error('Senha com no mínimo 4 caracteres.');
-  const map = load();
-  map[key] = password.trim();
-  save(map);
-}
-
-export function clearErpUserPassword(email: string) {
-  const key = email.trim().toLowerCase();
-  const map = load();
-  delete map[key];
-  save(map);
-}
-
-export function verifyErpUserPassword(email: string, password: string): boolean {
-  const key = email.trim().toLowerCase();
-  if (!key || !password) return false;
-  const p = password.trim();
-  const map = load();
-  return Boolean(map[key] && map[key] === p);
-}
-
-

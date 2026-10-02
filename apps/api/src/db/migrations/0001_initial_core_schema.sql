@@ -2,7 +2,9 @@
 -- Contas Contratantes, Lojas/Filiais (Multi-Loja), Licenciamento por CNPJ,
 -- Desconto Progressivo Configurável, Usuários, Clientes, Produtos e Formas de Pagamento.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$ BEGIN
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 1. TIPOS E ENUMS
 DO $$ BEGIN

@@ -185,7 +185,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                  attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
           FROM stock_items
-          WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
+          WHERE store_id = $1
             AND active = true
             AND (show_on_totem = true OR show_on_totem IS NULL)
           ORDER BY name ASC
@@ -199,7 +199,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
     }
 
     const items = Array.from(memoryStock.values())
-      .filter((i) => (i.storeId === storeId || i.storeId === 'STR-DEMO-01') && i.active !== false && i.showOnTotem !== false)
+      .filter((i) => i.storeId === storeId && i.active !== false && i.showOnTotem !== false)
       .map(formatStockRow);
     res.json({ success: true, data: items });
   } catch (error) {
@@ -215,10 +215,9 @@ async function handleGetAttributes(req: Request, res: Response, next: NextFuncti
       const attrsRes = await pool.query(
         `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
          FROM product_attributes
-         WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
+         WHERE store_id = $1
            AND active = true
            AND use_on_totem = true
-           AND UPPER(TRIM(name)) NOT IN ('MAIS UM TESTE PAPAI', 'TESTE')
          ORDER BY sort ASC, name ASC`,
         [storeId],
       );

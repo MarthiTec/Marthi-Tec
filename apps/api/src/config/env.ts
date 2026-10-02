@@ -38,7 +38,12 @@ const envSchema = z.object({
   SMTP_SECURE: z.coerce.boolean().default(false),
   SMTP_FROM: z.string().default('Marthi Tecnologia <marthi.tecnologia@gmail.com>'),
   INTERNAL_NOTIFICATION_EMAIL: z.string().email().default('marthi.tecnologia@gmail.com'),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default(
+    process.env.FRONTEND_URL ||
+    (process.env.DISCLOUD_APP_ID || process.env.NODE_ENV === 'production'
+      ? 'https://marthi-totem.discloud.dev'
+      : 'http://localhost:5173')
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);

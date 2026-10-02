@@ -112,7 +112,7 @@ registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next
         SELECT id, name, phone, email, document, role, is_system_user, user_email,
                access_areas, permissions, active, seller_id, created_at, updated_at
         FROM employees
-        WHERE (store_id = $1 OR store_id = 'STR-DEMO-01' OR store_id IN (SELECT id FROM stores WHERE client_account_id = $2) OR ($2 = 'ACC-MARTHI-DEMO'))
+        WHERE (store_id = $1 OR store_id IN (SELECT id FROM stores WHERE client_account_id = $2))
         ${activeOnly ? 'AND active = true' : ''}
         ORDER BY name ASC
       `;
@@ -463,7 +463,7 @@ registryRouter.delete('/api/v1/employees/:id', requireOrDemoAuth, async (req, re
 
     if (pool) {
       await pool.query(
-        `DELETE FROM employees WHERE id = $1 AND (store_id = $2 OR store_id = 'STR-DEMO-01')`,
+        `DELETE FROM employees WHERE id = $1 AND store_id = $2`,
         [id, storeId],
       );
       res.json({ success: true, data: { ok: true } });

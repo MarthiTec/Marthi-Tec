@@ -56,7 +56,7 @@ attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, n
         const attrsRes = await pool.query(
           `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
            FROM product_attributes
-           WHERE store_id = $1 OR store_id = 'STR-DEMO-01'
+           WHERE store_id = $1
            ORDER BY sort ASC, name ASC`,
           [storeId],
         );
@@ -74,6 +74,12 @@ attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, n
           res.json({ success: true, data: items });
           return;
         }
+
+        // Se a loja não tem atributos no DB, retorna lista vazia (a não ser que seja a loja demo)
+        if (storeId !== 'STR-DEMO-01') {
+          res.json({ success: true, data: [] });
+          return;
+        }
       } catch (dbErr) {
         console.warn('[attributes] Falha ao consultar banco, usando fallback:', dbErr);
       }
@@ -81,10 +87,10 @@ attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, n
 
     // Memory fallback
     let items = Array.from(memoryAttrs.values())
-      .filter((a) => a.storeId === storeId || a.storeId === 'STR-DEMO-01')
+      .filter((a) => a.storeId === storeId)
       .sort((a, b) => a.sort - b.sort);
 
-    if (items.length === 0) {
+    if (items.length === 0 && storeId === 'STR-DEMO-01') {
       items = [
         { id: 'ATTR-COR', storeId, name: 'Cor', values: ['Preto', 'Branco', 'Azul', 'Desert', 'Titânio Natural'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 1, priceDeltas: {} },
         { id: 'ATTR-CAP', storeId, name: 'Capacidade', values: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 2, priceDeltas: {} },
@@ -221,17 +227,18 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
           await client.query('BEGIN');
 
           // Garante a loja em stores para não quebrar a FK
+          const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
           await client.query(
             `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, active)
-             VALUES ($1, 'ACC-MARTHI-DEMO', 'Cell Ponto Matriz', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', true)
+             VALUES ($1, $2, 'Minha Loja', 'Minha Empresa LTDA', 'cnpj', '00.000.000/0001-91', true)
              ON CONFLICT (id) DO NOTHING`,
-            [storeId],
+            [storeId, clientAccountId],
           );
 
           const existing = await client.query(
             `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
              FROM product_attributes
-             WHERE id = $1 OR (LOWER(name) = LOWER($3) AND (store_id = $2 OR store_id IS NULL OR $2 = 'STR-DEMO-01'))`,
+             WHERE (id = $1 OR LOWER(name) = LOWER($3)) AND store_id = $2`,
             [id, storeId, body.name || id],
           );
 
@@ -344,7 +351,7 @@ attributesRouter.delete('/api/v1/attributes/:id', requireOrDemoAuth, async (req,
     if (pool) {
       try {
         await pool.query(
-          `DELETE FROM product_attributes WHERE id = $1 AND (store_id = $2 OR store_id IS NULL OR $2 = 'STR-DEMO-01')`,
+          `DELETE FROM product_attributes WHERE id = $1 AND store_id = $2`,
           [id, storeId],
         );
         res.json({ success: true, data: { ok: true } });

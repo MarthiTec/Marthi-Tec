@@ -462,9 +462,27 @@ export async function setupPasswordWithToken(
     try {
       await pool.query(
         `UPDATE users
-         SET password_hash = $1, active = true
+         SET password_hash = $1, active = true, updated_at = now()
          WHERE lower(email) = lower($2)`,
         [`${salt}:${passwordHash}`, email],
+      );
+
+      const userRes = await pool.query(
+        `SELECT id, client_account_id, name, global_role FROM users WHERE lower(email) = lower($1)`,
+        [email],
+      );
+      if (userRes.rows.length > 0) {
+        user.id = userRes.rows[0].id;
+        user.clientAccountId = userRes.rows[0].client_account_id;
+        user.name = userRes.rows[0].name;
+        user.role = userRes.rows[0].global_role;
+      }
+
+      await pool.query(
+        `UPDATE partner_signups
+         SET status = 'acesso_ativado', updated_at = now()
+         WHERE lower(email) = lower($1) OR id = $2`,
+        [email, consumption.record.clientId || ''],
       );
     } catch (err) {
       console.warn('[authService] DB password setup update fallback:', err);
