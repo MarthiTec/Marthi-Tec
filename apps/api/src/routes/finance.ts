@@ -355,7 +355,7 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
 /**
  * Baixar conta a pagar (com movimentação atômica, juros, multa, desconto, pagamento parcial e vínculo fiscal)
  */
-financeRouter.post('/api/v1/finance/payables/:id/pay', requireAuth, async (req, res, next) => {
+financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payables/:id/settle'], requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
@@ -703,7 +703,7 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
 /**
  * Baixar conta a receber (com movimentação atômica, juros, multa, desconto, recebimento parcial e vínculo fiscal)
  */
-financeRouter.post('/api/v1/finance/receivables/:id/receive', requireAuth, async (req, res, next) => {
+financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/receivables/:id/settle'], requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
