@@ -13,6 +13,18 @@ ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS show_on_totem BOOLEAN NOT NULL 
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN access_areas DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN access_areas TYPE JSONB USING to_jsonb(access_areas);
+  ALTER TABLE employees ALTER COLUMN access_areas SET DEFAULT '[]'::jsonb;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN role DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN role TYPE TEXT USING role::TEXT;
+  ALTER TABLE employees ALTER COLUMN role SET DEFAULT 'operator';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
   CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 

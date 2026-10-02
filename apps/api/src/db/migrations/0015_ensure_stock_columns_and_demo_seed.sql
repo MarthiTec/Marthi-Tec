@@ -59,13 +59,31 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 3. Garante associação de teste@marthi.com.br e marthi.tecnologia@gmail.com com STR-DEMO-01
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES
-  ('UST-TEST-01', 'USR-TEST-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
-  ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
-ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT s.id, u.id, s.store_id, s.role, s.is_default, s.permissions
+  FROM (
+    VALUES
+      ('UST-TEST-01', 'teste@marthi.com.br', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+      ('UST-MARTHI-01', 'marthi.tecnologia@gmail.com', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+  ) AS s(id, email, store_id, role, is_default, permissions)
+  JOIN users u ON u.email = s.email
+  ON CONFLICT (id) DO UPDATE SET role = 'admin', is_default = true;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. Garante colaboradores teste e marthi na tabela employees com role admin e acesso total
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN access_areas DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN access_areas TYPE JSONB USING to_jsonb(access_areas);
+  ALTER TABLE employees ALTER COLUMN access_areas SET DEFAULT '[]'::jsonb;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN role DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN role TYPE TEXT USING role::TEXT;
+  ALTER TABLE employees ALTER COLUMN role SET DEFAULT 'operator';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
 VALUES
   ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),

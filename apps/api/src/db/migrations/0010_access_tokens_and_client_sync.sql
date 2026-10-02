@@ -10,6 +10,18 @@
 ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS access_token TEXT NOT NULL DEFAULT '';
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS access_token TEXT NOT NULL DEFAULT '';
 
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN access_areas DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN access_areas TYPE JSONB USING to_jsonb(access_areas);
+  ALTER TABLE employees ALTER COLUMN access_areas SET DEFAULT '[]'::jsonb;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE employees ALTER COLUMN role DROP DEFAULT;
+  ALTER TABLE employees ALTER COLUMN role TYPE TEXT USING role::TEXT;
+  ALTER TABLE employees ALTER COLUMN role SET DEFAULT 'operator';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 -- 2. Conta Cell Ponto
 INSERT INTO client_accounts (
   id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token
