@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TotemAttractScene } from '../totem/TotemAttractScene';
 import { TotemRigPreview } from './TotemRigPreview';
+import {
+  getActiveStore,
+  saveStore,
+  STORE_CONTEXT_CHANGED_EVENT,
+  MULTI_STORE_CHANGED_EVENT,
+  type Store,
+} from '../../data/multiStoreStore';
+import { AdminPicker } from '../../components/AdminPicker';
 import {
   ATTRACT_COLOR_PRESETS,
   fileToAttractBackground,
@@ -95,6 +103,11 @@ export function TotemSettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Dados Fiscais e Logísticos da loja ativa ─────────────────────────
+  const [storeData, setStoreData] = useState<Partial<Store>>(() => getActiveStore() ?? {});
+  const [fiscalSaved, setFiscalSaved] = useState(false);
+  const [fiscalError, setFiscalError] = useState<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
     hydrateTotemSettingsFromApi()
@@ -131,6 +144,40 @@ export function TotemSettingsPage() {
       mounted = false;
     };
   }, []);
+
+  // Sincroniza os dados da loja ativa quando o contexto muda
+  useEffect(() => {
+    function refreshStore() {
+      const active = getActiveStore();
+      if (active) setStoreData({ ...active });
+    }
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, refreshStore);
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+    return () => {
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, refreshStore);
+      window.removeEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+    };
+  }, []);
+
+  function patchStore(patch: Partial<Store>) {
+    setStoreData((prev) => ({ ...prev, ...patch }));
+    setFiscalSaved(false);
+    setFiscalError(null);
+  }
+
+  function saveFiscalData() {
+    try {
+      if (!storeData.id) {
+        setFiscalError('Nenhuma loja ativa para salvar.');
+        return;
+      }
+      saveStore(storeData as Store);
+      setFiscalSaved(true);
+      setFiscalError(null);
+    } catch (err) {
+      setFiscalError(err instanceof Error ? err.message : 'Falha ao salvar dados da loja.');
+    }
+  }
 
   const copy = totemCopy(vertical);
   const catalogOnly = mode === 'catalog';
@@ -878,6 +925,171 @@ export function TotemSettingsPage() {
         </div>
       </article>
 
+      <article className="admin-card admin-card--form">
+        <h2>Dados Fiscais da Loja</h2>
+        <p>
+          Informações de identificação fiscal da loja ativa. Usados para emissão de notas fiscais e
+          documentos gerados pelo sistema. Todos os campos são opcionais.
+        </p>
+        <div className="admin-form">
+          <label className="span-2">
+            Razão Social
+            <input
+              value={storeData.name || ''}
+              onChange={(e) => patchStore({ name: e.target.value })}
+              placeholder="Ex: Marthi Comércio de Eletrônicos Ltda"
+            />
+          </label>
+          <label>
+            Nome Fantasia
+            <input
+              value={storeData.tradeName || ''}
+              onChange={(e) => patchStore({ tradeName: e.target.value })}
+              placeholder="Ex: Marthi Tech"
+            />
+          </label>
+          <label>
+            CNPJ
+            <input
+              value={storeData.cnpj || ''}
+              onChange={(e) => patchStore({ cnpj: e.target.value })}
+              placeholder="00.000.000/0000-00"
+            />
+          </label>
+          <label>
+            Inscrição Estadual (IE)
+            <input
+              value={storeData.stateRegistration || ''}
+              onChange={(e) => patchStore({ stateRegistration: e.target.value })}
+              placeholder="Número ou ISENTO"
+            />
+          </label>
+          <label>
+            Inscrição Municipal (IM)
+            <input
+              value={storeData.municipalRegistration || ''}
+              onChange={(e) => patchStore({ municipalRegistration: e.target.value })}
+              placeholder="Opcional"
+            />
+          </label>
+          <AdminPicker
+            label="Regime Tributário"
+            value={storeData.taxRegime || 'simples_nacional'}
+            options={[
+              { value: 'simples_nacional', label: 'Simples Nacional' },
+              { value: 'lucro_presumido', label: 'Lucro Presumido' },
+              { value: 'lucro_real', label: 'Lucro Real' },
+              { value: 'mei', label: 'Microempreendedor Individual (MEI)' },
+            ]}
+            onChange={(val) => patchStore({ taxRegime: val as Store['taxRegime'] })}
+          />
+        </div>
+        {fiscalError ? <p className="qty-low" style={{ marginTop: 10 }}>{fiscalError}</p> : null}
+        <div className="admin-toolbar admin-toolbar--stack" style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn--primary" onClick={saveFiscalData}>
+            Salvar dados fiscais
+          </button>
+          {fiscalSaved ? (
+            <span className="empty" style={{ color: 'var(--accent, #0f766e)', fontWeight: 600 }}>
+              ✓ Dados fiscais salvos!
+            </span>
+          ) : null}
+        </div>
+      </article>
+
+      <article className="admin-card admin-card--form">
+        <h2>Dados de Contato e Endereço</h2>
+        <p>
+          Informações logísticas da loja ativa: endereço, telefone e e-mail. Todos os campos são opcionais.
+        </p>
+        <div className="admin-form">
+          <label>
+            Telefone
+            <input
+              value={storeData.phone || ''}
+              onChange={(e) => patchStore({ phone: e.target.value })}
+              placeholder="(00) 00000-0000"
+            />
+          </label>
+          <label>
+            E-mail da loja
+            <input
+              type="email"
+              value={storeData.email || ''}
+              onChange={(e) => patchStore({ email: e.target.value })}
+              placeholder="contato@minhaloja.com.br"
+            />
+          </label>
+          <label>
+            CEP
+            <input
+              value={storeData.zipCode || ''}
+              onChange={(e) => patchStore({ zipCode: e.target.value })}
+              placeholder="00000-000"
+            />
+          </label>
+          <label>
+            Logradouro
+            <input
+              value={storeData.street || ''}
+              onChange={(e) => patchStore({ street: e.target.value })}
+              placeholder="Rua, Av., Travessa..."
+            />
+          </label>
+          <label>
+            Número
+            <input
+              value={storeData.number || ''}
+              onChange={(e) => patchStore({ number: e.target.value })}
+              placeholder="S/N"
+            />
+          </label>
+          <label>
+            Complemento
+            <input
+              value={storeData.complement || ''}
+              onChange={(e) => patchStore({ complement: e.target.value })}
+              placeholder="Sala, Loja, Bloco..."
+            />
+          </label>
+          <label>
+            Bairro
+            <input
+              value={storeData.neighborhood || ''}
+              onChange={(e) => patchStore({ neighborhood: e.target.value })}
+              placeholder="Bairro"
+            />
+          </label>
+          <label>
+            Cidade
+            <input
+              value={storeData.city || ''}
+              onChange={(e) => patchStore({ city: e.target.value })}
+              placeholder="Cidade"
+            />
+          </label>
+          <label>
+            UF
+            <input
+              value={storeData.state || ''}
+              onChange={(e) => patchStore({ state: e.target.value })}
+              placeholder="RJ"
+              maxLength={2}
+              style={{ textTransform: 'uppercase' }}
+            />
+          </label>
+        </div>
+        <div className="admin-toolbar admin-toolbar--stack" style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn--primary" onClick={saveFiscalData}>
+            Salvar dados de contato
+          </button>
+          {fiscalSaved ? (
+            <span className="empty" style={{ color: 'var(--accent, #0f766e)', fontWeight: 600 }}>
+              ✓ Dados salvos!
+            </span>
+          ) : null}
+        </div>
+      </article>
       <article className="admin-card">
         <h2>Catálogo e atributos</h2>
         <p>

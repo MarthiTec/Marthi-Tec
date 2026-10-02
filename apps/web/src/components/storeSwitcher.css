@@ -413,3 +413,45 @@ body:not(.is-theme-dark) .admin__brand .store-switcher__btn {
     white-space: nowrap;
   }
 }
+
+/* ── Admin panel header (light theme) override ── */
+/* O admin__top usa background claro — forçar cores de contraste corretas */
+.admin:not(.admin--dark) .admin__top .store-switcher__btn {
+  background: rgba(15, 118, 110, 0.06);
+  border-color: rgba(15, 118, 110, 0.22);
+  color: #0f172a;
+}
+
+.admin:not(.admin--dark) .admin__top .store-switcher__btn:hover,
+.admin:not(.admin--dark) .admin__top .store-switcher__btn.is-open {
+  background: rgba(15, 118, 110, 0.12);
+  border-color: rgba(15, 118, 110, 0.45);
+  color: #0f172a;
+}
+
+.admin:not(.admin--dark) .admin__top .store-switcher__chevron {
+  color: var(--teal, #0f766e);
+}
+
+.admin:not(.admin--dark) .admin__top .store-switcher__name {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.admin:not(.admin--dark) .admin__top .store-switcher__meta {
+  color: #64748b;
+}
+
+/* Dark theme inside admin */
+.admin.admin--dark .admin__top .store-switcher__btn {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .admin__top .store-switcher__btn:hover,
+.admin.admin--dark .admin__top .store-switcher__btn.is-open {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(45, 212, 191, 0.45);
+}
+

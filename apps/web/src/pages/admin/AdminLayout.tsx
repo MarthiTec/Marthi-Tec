@@ -70,7 +70,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/permissoes': { kicker: 'Pessoas', title: 'Permissões de acesso' },
   '/painel/perfil': { kicker: 'Conta', title: 'Meu perfil' },
   '/painel/crm': { kicker: 'CRM', title: 'Visão do CRM' },
-  '/painel/plano': { kicker: 'Contrato', title: 'Plano da loja' },
+
   '/painel/ramo': { kicker: 'Configurações', title: 'Ramo da Loja & Personalização' },
   '/painel/personalizacao': { kicker: 'Configurações', title: 'Ramo da Loja & Personalização' },
   '/painel/cardapio': { kicker: 'Restaurante', title: 'Cardápio Digital do Dia' },
@@ -387,19 +387,7 @@ export function AdminLayout() {
               <span className="admin__link-label">Lojas &amp; Licenças</span>
             </NavLink>
           ) : null}
-          {isAdmin ? (
-            <NavLink
-              to="/painel/plano"
-              title="Plano da loja"
-              onClick={closeMobileMenu}
-              className={({ isActive }) =>
-                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
-              }
-            >
-              <AdminIcon name="plan" />
-              <span className="admin__link-label">Plano da loja</span>
-            </NavLink>
-          ) : null}
+
           <button
             type="button"
             className="admin__logout"
@@ -439,7 +427,7 @@ export function AdminLayout() {
         </header>
 
         <div className="admin__main">
-          {!moduleAllowed && requiredModule && location.pathname !== '/painel/plano' ? (
+          {!moduleAllowed && requiredModule ? (
             <ModuleLockedPage moduleId={requiredModule} />
           ) : !aclAllowed ? (
             <AccessDeniedPage pathname={location.pathname} />
