@@ -549,14 +549,13 @@ export async function verifySmtpConfig(testRecipient?: string): Promise<{
     let sendResult = undefined;
     if (testRecipient) {
       try {
-        const info = await transporter.sendMail({
-          from: env.SMTP_FROM,
+        const sent = await sendMail({
           to: testRecipient,
           subject: 'Teste de Configuração de E-mail — Marthi Tecnologia',
           text: `Olá! Este é um e-mail de teste disparado pelo sistema Marthi Tecnologia para validar a conexão SMTP.\nData: ${new Date().toLocaleString('pt-BR')}`,
           html: `<p>Olá!</p><p>Este é um e-mail de teste disparado pelo sistema <strong>Marthi Tecnologia</strong> para validar a conexão SMTP.</p><p><small>Data: ${new Date().toLocaleString('pt-BR')}</small></p>`,
         });
-        sendResult = { success: true, messageId: info.messageId };
+        sendResult = { success: sent.success, messageId: sent.messageId };
       } catch (sendErr) {
         sendResult = {
           success: false,
