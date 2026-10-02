@@ -151,11 +151,15 @@ async function bootstrapDatabase() {
         ALTER TABLE payables ADD COLUMN IF NOT EXISTS supplier_id TEXT;
         ALTER TABLE payables ADD COLUMN IF NOT EXISTS supplier_name TEXT DEFAULT '';
         ALTER TABLE payables ADD COLUMN IF NOT EXISTS document_number TEXT DEFAULT '';
+        ALTER TABLE payables ALTER COLUMN created_at SET DEFAULT now();
+        ALTER TABLE payables ALTER COLUMN updated_at SET DEFAULT now();
 
         ALTER TABLE receivables ALTER COLUMN account_id DROP NOT NULL;
         ALTER TABLE receivables ADD COLUMN IF NOT EXISTS customer_id TEXT;
         ALTER TABLE receivables ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
         ALTER TABLE receivables ADD COLUMN IF NOT EXISTS document_number TEXT DEFAULT '';
+        ALTER TABLE receivables ALTER COLUMN created_at SET DEFAULT now();
+        ALTER TABLE receivables ALTER COLUMN updated_at SET DEFAULT now();
 
         ALTER TABLE stores ALTER COLUMN email SET DEFAULT 'contato@marthi.com.br';
         ALTER TABLE stores ALTER COLUMN phone SET DEFAULT '(24) 99999-9999';

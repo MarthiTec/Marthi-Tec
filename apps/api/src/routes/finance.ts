@@ -259,8 +259,9 @@ financeRouter.post('/api/v1/finance/payables', requireAuth, async (req, res, nex
         `INSERT INTO payables (
           id, store_id, description, supplier_id, supplier_name, category, amount,
           paid_amount, due_date, status, account_id, notes, document_number,
-          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14)`,
+          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14, now(), now())`,
         [
           id,
           storeId,
@@ -606,8 +607,9 @@ financeRouter.post('/api/v1/finance/receivables', requireAuth, async (req, res, 
         `INSERT INTO receivables (
           id, store_id, description, customer_id, customer_name, category, amount,
           received_amount, due_date, status, account_id, notes, document_number,
-          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14)`,
+          interest_amount, fine_amount, discount_amount, invoice_id, invoice_number, invoice_type,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'open', $9, $10, $11, 0, 0, 0, $12, $13, $14, now(), now())`,
         [
           id,
           storeId,
