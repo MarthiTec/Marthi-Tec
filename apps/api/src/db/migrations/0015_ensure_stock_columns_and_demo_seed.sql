@@ -53,8 +53,10 @@ ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
-CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
-CREATE INDEX IF NOT EXISTS idx_stock_items_active ON stock_items(store_id, active);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
+  CREATE INDEX IF NOT EXISTS idx_stock_items_active ON stock_items(store_id, active);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 3. Garante associação de teste@marthi.com.br e marthi.tecnologia@gmail.com com STR-DEMO-01
 INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)

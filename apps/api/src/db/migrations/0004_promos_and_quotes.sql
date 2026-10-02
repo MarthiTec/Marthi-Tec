@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS promo_campaigns (
   store_id         TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   name             TEXT NOT NULL,
   active           BOOLEAN NOT NULL DEFAULT true,
-  kind             promo_kind NOT NULL DEFAULT 'percent',
+  kind             TEXT NOT NULL DEFAULT 'percent',
   criteria         JSONB NOT NULL DEFAULT '{}'::jsonb,
   discount_percent NUMERIC(5,2),
   discount_amount  NUMERIC(12,2),
@@ -37,7 +37,14 @@ CREATE TABLE IF NOT EXISTS promo_campaigns (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_promos_store ON promo_campaigns(store_id, active);
+DO $$ BEGIN
+  ALTER TABLE promo_campaigns ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE promo_campaigns ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_promos_store ON promo_campaigns(store_id, active);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 2. FAIXAS POR QUANTIDADE (TIERS)
 CREATE TABLE IF NOT EXISTS promo_campaign_tiers (
@@ -48,7 +55,9 @@ CREATE TABLE IF NOT EXISTS promo_campaign_tiers (
   CONSTRAINT uq_tier_camp_qty UNIQUE (campaign_id, qty)
 );
 
-CREATE INDEX IF NOT EXISTS idx_promo_tiers_camp ON promo_campaign_tiers(campaign_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_promo_tiers_camp ON promo_campaign_tiers(campaign_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 3. ORÇAMENTOS COMERCIAIS (POS QUOTES)
 CREATE TABLE IF NOT EXISTS pos_quotes (
@@ -71,7 +80,7 @@ CREATE TABLE IF NOT EXISTS pos_quotes (
   surcharge          NUMERIC(12,2) NOT NULL DEFAULT 0,
   surcharge_mode     discount_mode NOT NULL DEFAULT 'money',
   total              NUMERIC(12,2) NOT NULL DEFAULT 0,
-  status             quote_status NOT NULL DEFAULT 'open',
+  status             TEXT NOT NULL DEFAULT 'open',
   valid_until        TIMESTAMPTZ NOT NULL,
   validity_days      INT NOT NULL DEFAULT 7,
   delivery_term      TEXT NOT NULL DEFAULT '',
@@ -82,8 +91,19 @@ CREATE TABLE IF NOT EXISTS pos_quotes (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_quotes_store ON pos_quotes(store_id, status);
-CREATE INDEX IF NOT EXISTS idx_quotes_customer ON pos_quotes(customer_id);
+DO $$ BEGIN
+  ALTER TABLE pos_quotes ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE pos_quotes ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
+  ALTER TABLE pos_quotes ADD COLUMN IF NOT EXISTS customer_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_quotes_store ON pos_quotes(store_id, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_quotes_customer ON pos_quotes(customer_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. ITENS DO ORÇAMENTO (COM PREÇOS E CONDIÇÕES CONGELADAS)
 CREATE TABLE IF NOT EXISTS pos_quote_lines (
@@ -107,4 +127,6 @@ CREATE TABLE IF NOT EXISTS pos_quote_lines (
   is_frozen_price     BOOLEAN NOT NULL DEFAULT true
 );
 
-CREATE INDEX IF NOT EXISTS idx_quote_lines_quote ON pos_quote_lines(quote_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_quote_lines_quote ON pos_quote_lines(quote_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

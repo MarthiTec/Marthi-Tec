@@ -35,9 +35,11 @@ CREATE TABLE IF NOT EXISTS partner_signups (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_partner_signups_doc ON partner_signups(document);
-CREATE INDEX IF NOT EXISTS idx_partner_signups_email ON partner_signups(email);
-CREATE INDEX IF NOT EXISTS idx_partner_signups_status ON partner_signups(status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_partner_signups_doc ON partner_signups(document);
+  CREATE INDEX IF NOT EXISTS idx_partner_signups_email ON partner_signups(email);
+  CREATE INDEX IF NOT EXISTS idx_partner_signups_status ON partner_signups(status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 2. Contas de Clientes (Tenant Root)
 CREATE TABLE IF NOT EXISTS client_accounts (
@@ -98,8 +100,10 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_stores_account ON stores(client_account_id);
-CREATE INDEX IF NOT EXISTS idx_stores_document ON stores(document);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_stores_account ON stores(client_account_id);
+  CREATE INDEX IF NOT EXISTS idx_stores_document ON stores(document);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. Licenciamento por Loja / Plano Contratado
 CREATE TABLE IF NOT EXISTS store_licenses (
@@ -120,8 +124,10 @@ CREATE TABLE IF NOT EXISTS store_licenses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_licenses_store ON store_licenses(store_id);
-CREATE INDEX IF NOT EXISTS idx_licenses_account ON store_licenses(client_account_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_licenses_store ON store_licenses(store_id);
+  CREATE INDEX IF NOT EXISTS idx_licenses_account ON store_licenses(client_account_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 5. Usuários do Sistema
 CREATE TABLE IF NOT EXISTS users (
@@ -138,8 +144,10 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_account ON users(client_account_id);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_users_account ON users(client_account_id);
+  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6. Associação Usuário-Loja (Permissões e Acesso)
 CREATE TABLE IF NOT EXISTS user_stores (
@@ -153,8 +161,10 @@ CREATE TABLE IF NOT EXISTS user_stores (
   CONSTRAINT uq_user_store UNIQUE (user_id, store_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_stores_user ON user_stores(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_stores_store ON user_stores(store_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_user_stores_user ON user_stores(user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_stores_store ON user_stores(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 7. Colaboradores e Funcionários da Loja
 CREATE TABLE IF NOT EXISTS employees (
@@ -175,8 +185,10 @@ CREATE TABLE IF NOT EXISTS employees (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_id);
-CREATE INDEX IF NOT EXISTS idx_employees_user_email ON employees(user_email);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_id);
+  CREATE INDEX IF NOT EXISTS idx_employees_user_email ON employees(user_email);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 8. Atributos de Produtos e Variações
 CREATE TABLE IF NOT EXISTS product_attributes (
@@ -190,7 +202,9 @@ CREATE TABLE IF NOT EXISTS product_attributes (
   active BOOLEAN NOT NULL DEFAULT true
 );
 
-CREATE INDEX IF NOT EXISTS idx_attributes_store ON product_attributes(store_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attributes_store ON product_attributes(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS product_attribute_values (
   id TEXT PRIMARY KEY,
@@ -200,7 +214,9 @@ CREATE TABLE IF NOT EXISTS product_attribute_values (
   sort INT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_attr_values_attr ON product_attribute_values(attribute_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attr_values_attr ON product_attribute_values(attribute_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 9. Financeiro: Contas Bancárias, Contas a Pagar e Contas a Receber
 CREATE TABLE IF NOT EXISTS bank_accounts (
@@ -218,7 +234,9 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bank_accounts_store ON bank_accounts(store_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_bank_accounts_store ON bank_accounts(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS payables (
   id TEXT PRIMARY KEY,
@@ -245,8 +263,10 @@ CREATE TABLE IF NOT EXISTS payables (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_payables_store ON payables(store_id);
-CREATE INDEX IF NOT EXISTS idx_payables_status ON payables(store_id, status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payables_store ON payables(store_id);
+  CREATE INDEX IF NOT EXISTS idx_payables_status ON payables(store_id, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS receivables (
   id TEXT PRIMARY KEY,
@@ -273,8 +293,10 @@ CREATE TABLE IF NOT EXISTS receivables (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_receivables_store ON receivables(store_id);
-CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(store_id, status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_receivables_store ON receivables(store_id);
+  CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(store_id, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS finance_entries (
   id TEXT PRIMARY KEY,
@@ -290,7 +312,9 @@ CREATE TABLE IF NOT EXISTS finance_entries (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_finance_entries_store ON finance_entries(store_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_finance_entries_store ON finance_entries(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 10. Tokens de Segurança e Auditoria de E-mails
 CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -305,8 +329,10 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_hash ON auth_tokens(token_hash);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_email ON auth_tokens(email);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_auth_tokens_hash ON auth_tokens(token_hash);
+  CREATE INDEX IF NOT EXISTS idx_auth_tokens_email ON auth_tokens(email);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS audit_email_logs (
   id TEXT PRIMARY KEY,
@@ -319,4 +345,6 @@ CREATE TABLE IF NOT EXISTS audit_email_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON audit_email_logs(recipient);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON audit_email_logs(recipient);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

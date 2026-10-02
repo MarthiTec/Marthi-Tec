@@ -35,7 +35,10 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bank_accounts_store ON bank_accounts(store_id);
+DO $$ BEGIN
+  ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS store_id TEXT;
+  CREATE INDEX IF NOT EXISTS idx_bank_accounts_store ON bank_accounts(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 2. CONTAS A PAGAR (PAYABLES)
 CREATE TABLE IF NOT EXISTS payables (
@@ -56,7 +59,12 @@ CREATE TABLE IF NOT EXISTS payables (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_payables_store_due ON payables(store_id, due_date, status);
+DO $$ BEGIN
+  ALTER TABLE payables ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE payables ADD COLUMN IF NOT EXISTS due_date DATE;
+  ALTER TABLE payables ADD COLUMN IF NOT EXISTS status bill_status NOT NULL DEFAULT 'open';
+  CREATE INDEX IF NOT EXISTS idx_payables_store_due ON payables(store_id, due_date, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 3. CONTAS A RECEBER (RECEIVABLES)
 CREATE TABLE IF NOT EXISTS receivables (
@@ -80,7 +88,12 @@ CREATE TABLE IF NOT EXISTS receivables (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_receivables_store_due ON receivables(store_id, due_date, status);
+DO $$ BEGIN
+  ALTER TABLE receivables ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE receivables ADD COLUMN IF NOT EXISTS due_date DATE;
+  ALTER TABLE receivables ADD COLUMN IF NOT EXISTS status bill_status NOT NULL DEFAULT 'open';
+  CREATE INDEX IF NOT EXISTS idx_receivables_store_due ON receivables(store_id, due_date, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. LIVRO CAIXA E FLUXO GERAL (FINANCE ENTRIES)
 CREATE TABLE IF NOT EXISTS finance_entries (
@@ -97,7 +110,11 @@ CREATE TABLE IF NOT EXISTS finance_entries (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_finance_entries_store ON finance_entries(store_id, created_at DESC);
+DO $$ BEGIN
+  ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+  CREATE INDEX IF NOT EXISTS idx_finance_entries_store ON finance_entries(store_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 5. MOVIMENTAÇÕES DE TESOURARIA (TRANSFERÊNCIAS ENTRE CONTAS)
 CREATE TABLE IF NOT EXISTS treasury_moves (

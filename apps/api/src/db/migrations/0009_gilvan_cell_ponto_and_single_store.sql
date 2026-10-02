@@ -63,6 +63,10 @@ ON CONFLICT (client_account_id, document) DO UPDATE SET
   is_matrix = true;
 
 -- 3. Desativar/remover lojas mockadas secundárias para a conta Cell Ponto (para exibir apenas 1 loja)
+DO $$ BEGIN
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 UPDATE stores
 SET active = false
 WHERE client_account_id = 'ACC-MARTHI-DEMO' AND id != 'STR-DEMO-01';

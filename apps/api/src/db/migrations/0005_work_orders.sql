@@ -102,9 +102,11 @@ DO $$ BEGIN
   ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_work_orders_store ON work_orders(store_id, status);
-CREATE INDEX IF NOT EXISTS idx_work_orders_customer ON work_orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_work_orders_created ON work_orders(store_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_work_orders_store ON work_orders(store_id, status);
+  CREATE INDEX IF NOT EXISTS idx_work_orders_customer ON work_orders(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_work_orders_created ON work_orders(store_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 2. LINHAS DA ORDEM DE SERVIÇO (PEÇAS E SERVIÇOS)
 CREATE TABLE IF NOT EXISTS work_order_lines (
@@ -127,8 +129,10 @@ DO $$ BEGIN
   ALTER TABLE work_order_lines ADD COLUMN IF NOT EXISTS stock_id TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_wo_lines_wo ON work_order_lines(work_order_id);
-CREATE INDEX IF NOT EXISTS idx_wo_lines_stock ON work_order_lines(stock_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_wo_lines_wo ON work_order_lines(work_order_id);
+  CREATE INDEX IF NOT EXISTS idx_wo_lines_stock ON work_order_lines(stock_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 3. HISTÓRICO DE ATIVIDADES E AUDITORIA DA OS
 CREATE TABLE IF NOT EXISTS work_order_activities (
@@ -146,4 +150,6 @@ DO $$ BEGIN
   ALTER TABLE work_order_activities ADD COLUMN IF NOT EXISTS work_order_id TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_wo_activities_wo ON work_order_activities(work_order_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_wo_activities_wo ON work_order_activities(work_order_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

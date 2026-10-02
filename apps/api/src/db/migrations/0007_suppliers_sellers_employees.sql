@@ -14,9 +14,13 @@ CREATE TABLE IF NOT EXISTS suppliers (
   active     BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+DO $$ BEGIN
+  ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS store_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_suppliers_store ON suppliers(store_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_suppliers_store ON suppliers(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS sellers (
   id                 TEXT PRIMARY KEY,
@@ -32,7 +36,13 @@ CREATE TABLE IF NOT EXISTS sellers (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sellers_store ON sellers(store_id);
+DO $$ BEGIN
+  ALTER TABLE sellers ADD COLUMN IF NOT EXISTS store_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sellers_store ON sellers(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS employees (
   id             TEXT PRIMARY KEY,
@@ -52,5 +62,15 @@ CREATE TABLE IF NOT EXISTS employees (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_id);
-CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(store_id, active);
+DO $$ BEGIN
+  ALTER TABLE employees ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE employees ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(store_id, active);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

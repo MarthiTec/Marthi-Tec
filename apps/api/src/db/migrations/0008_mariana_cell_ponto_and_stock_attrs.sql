@@ -12,7 +12,9 @@ ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS card_rate NUMERIC(6,2) NOT NULL
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS show_on_totem BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
 
-CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_stock_items_totem ON stock_items(store_id, show_on_totem);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 2. Garantir conta cliente demo Cell Ponto
 INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status)
