@@ -43,10 +43,10 @@ export const INITIAL_PAYOUT_SETTINGS: PayoutSettings = {
     accountNumber: '1234567-8',
     accountType: 'corrente',
     holderName: 'MARTHI TECNOLOGIA LTDA',
-    holderDocument: '45.123.456/0001-89',
+    holderDocument: '61.506.270/0001-63',
     validationStatus: 'validado',
     updatedAt: new Date().toISOString(),
-    updatedBy: 'admin@marthi.com.br',
+    updatedBy: 'marthi.tecnologia@gmail.com',
   },
   pix: {
     keyType: 'email',
@@ -57,7 +57,7 @@ export const INITIAL_PAYOUT_SETTINGS: PayoutSettings = {
     receiverInstitution: 'BANCO INTER S.A.',
     receiverType: 'E-mail (PJ)',
     updatedAt: new Date().toISOString(),
-    updatedBy: 'admin@marthi.com.br',
+    updatedBy: 'marthi.tecnologia@gmail.com',
   },
 };
 

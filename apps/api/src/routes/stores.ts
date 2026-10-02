@@ -638,17 +638,55 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
     const body = adminClientSchema.partial().parse(req.body);
 
     if (pool && clientId) {
-      if (body.tradeName || body.document || body.email || body.status || body.accessToken) {
+      if (body.tradeName || body.legalName || body.document || body.email || body.phone || body.status || body.accessToken) {
         await pool.query(
           `UPDATE client_accounts
            SET trade_name = COALESCE($1, trade_name),
-               document = COALESCE($2, document),
-               email = COALESCE($3, email),
-               status = COALESCE($4, status),
-               access_token = COALESCE($5, access_token),
+               legal_name = COALESCE($2, legal_name),
+               document = COALESCE($3, document),
+               email = COALESCE($4, email),
+               phone = COALESCE($5, phone),
+               status = COALESCE($6, status),
+               access_token = COALESCE($7, access_token),
                updated_at = now()
-           WHERE id = $6`,
-          [body.tradeName, body.document, body.email, body.status, body.accessToken, clientId],
+           WHERE id = $8`,
+          [body.tradeName, body.legalName, body.document, body.email, body.phone, body.status, body.accessToken, clientId],
+        );
+
+        await pool.query(
+          `UPDATE stores
+           SET trade_name = COALESCE($1, trade_name),
+               legal_name = COALESCE($2, legal_name),
+               document = COALESCE($3, document),
+               email = COALESCE($4, email),
+               phone = COALESCE($5, phone),
+               access_token = COALESCE($6, access_token),
+               active = CASE WHEN $7 = 'blocked' OR $7 = 'inactive' THEN false ELSE true END,
+               updated_at = now()
+           WHERE client_account_id = $8`,
+          [body.tradeName, body.legalName, body.document, body.email, body.phone, body.accessToken, body.status, clientId],
+        );
+      }
+
+      if (body.planId || body.modules) {
+        let dbPlan: string | undefined = undefined;
+        if (body.planId) {
+          dbPlan = 'scale';
+          if (body.planId === 'bronze' || body.planId === 'start') dbPlan = 'start';
+          else if (body.planId === 'silver' || body.planId === 'growth') dbPlan = 'growth';
+        }
+
+        const validModules = body.modules
+          ? body.modules.filter((m: string) => ['totem', 'os', 'erp', 'fiscal', 'ecommerce'].includes(m))
+          : undefined;
+
+        await pool.query(
+          `UPDATE store_licenses
+           SET plan_id = COALESCE($1::plan_id, plan_id),
+               modules = COALESCE($2::module_id[], modules),
+               updated_at = now()
+           WHERE client_account_id = $3`,
+          [dbPlan, validModules, clientId],
         );
       }
     }

@@ -548,6 +548,16 @@ export function setMarthiClientStatus(
     client.contractingStatus = client.passwordConfigured ? 'acesso_ativado' : 'acesso_pendente';
   }
   save(state);
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
   return client;
 }
 
@@ -568,6 +578,16 @@ export function setMarthiClientPaymentOk(
       : 'acesso_pendente'
     : 'aguardando_pagamento';
   save(state);
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentOk, status: client.status }),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
   return client;
 }
 
