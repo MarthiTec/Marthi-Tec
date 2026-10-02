@@ -258,9 +258,11 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
     console.warn('[partners] DB/Memory pre-register account fallback:', err);
   }
 
+  let activationToken: string | undefined = undefined;
   // Se o pagamento já foi aprovado na chamada (ex: confirmação imediata no checkout)
   if (record.status === 'pagamento_aprovado') {
-    await executePaymentActivation(record, data.paymentMethod || 'pix', data.transactionRef, undefined, frontendUrl);
+    const act = await executePaymentActivation(record, data.paymentMethod || 'pix', data.transactionRef, undefined, frontendUrl);
+    activationToken = act.rawToken;
   }
 
   console.log('[partners] Contratação registrada', {
@@ -275,6 +277,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
     data: {
       id,
       status: record.status,
+      activationToken,
       monthlyAmount: record.monthlyAmount,
       planName: planDisplayName(record.planId),
       message:
@@ -392,13 +395,14 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
     processedTransactions.add(txKey);
 
     // 3. Executa a ativação completa
-    await executePaymentActivation(record, body.paymentMethod, body.transactionRef, body.notes, frontendUrl);
+    const act = await executePaymentActivation(record, body.paymentMethod, body.transactionRef, body.notes, frontendUrl);
 
     res.json({
       success: true,
       data: {
         id: record.id,
         status: record.status,
+        activationToken: act.rawToken,
         message: 'Pagamento confirmado com sucesso! E-mails de boas-vindas e notificação interna enviados.',
       },
     });
@@ -572,7 +576,7 @@ async function executePaymentActivation(
   transactionRef?: string,
   notes?: string,
   frontendUrl?: string,
-) {
+): Promise<{ rawToken: string }> {
   const now = new Date().toISOString();
   record.status = 'pagamento_aprovado';
   record.paymentMethod = paymentMethod;
@@ -761,4 +765,6 @@ async function executePaymentActivation(
   } catch (err) {
     console.error('[partners] Erro ao enviar e-mail interno para a equipe Marhi:', err);
   }
+
+  return { rawToken };
 }

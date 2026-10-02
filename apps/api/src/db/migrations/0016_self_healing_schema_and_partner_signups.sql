@@ -85,6 +85,19 @@ CREATE TABLE IF NOT EXISTS stores (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_matrix BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_exit_password TEXT DEFAULT '1234';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_settings JSONB DEFAULT '{}'::jsonb;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS communication_settings JSONB DEFAULT '{}'::jsonb;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS access_token TEXT;
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS tax_regime TEXT NOT NULL DEFAULT 'simples_nacional';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS state_registration TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS municipal_registration TEXT NOT NULL DEFAULT '';
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_stores_account ON stores(client_account_id);
 CREATE INDEX IF NOT EXISTS idx_stores_document ON stores(document);
 

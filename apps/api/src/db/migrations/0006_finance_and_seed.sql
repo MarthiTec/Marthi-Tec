@@ -201,6 +201,11 @@ ON CONFLICT (client_account_id, document) DO UPDATE SET
   active = EXCLUDED.active;
 
 -- 6.4 Licenças por CNPJ (com cálculo de desconto multi-loja)
+DO $$ BEGIN
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE store_licenses ALTER COLUMN plan_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 INSERT INTO store_licenses (
   id, store_id, client_account_id, plan_id, modules, base_price,
   discount_percent, discount_amount, final_price, status
