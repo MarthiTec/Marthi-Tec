@@ -78,7 +78,7 @@ if (serveWeb && webDist) {
       next();
       return;
     }
-    if (req.path.startsWith('/api') || req.path === '/health') {
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
       next();
       return;
     }
