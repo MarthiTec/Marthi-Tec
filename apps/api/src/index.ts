@@ -163,6 +163,12 @@ async function bootstrapDatabase() {
 
         ALTER TABLE stores ALTER COLUMN email SET DEFAULT 'contato@marthi.com.br';
         ALTER TABLE stores ALTER COLUMN phone SET DEFAULT '(24) 99999-9999';
+
+        ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS account_id TEXT;
+        ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS operator_name TEXT DEFAULT '';
+        ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Operacional';
+        ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS ref_id TEXT;
+        ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual';
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 
