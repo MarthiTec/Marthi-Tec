@@ -65,7 +65,7 @@ export async function runMigrations(customPool?: Pool) {
       }
 
       console.log(`[migrate] Aplicando migration: ${file}...`);
-      const filePath = path.join(MIGRATIONS_DIR, file);
+      const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
       await client.query('BEGIN');

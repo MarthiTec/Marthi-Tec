@@ -179,19 +179,23 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
     const storeId = await resolveStoreId(req);
 
     if (pool) {
-      const sql = `
-        SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-               attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
-        FROM stock_items
-        WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
-          AND active = true
-          AND (show_on_totem = true OR show_on_totem IS NULL)
-        ORDER BY name ASC
-      `;
-      const result = await pool.query(sql, [storeId]);
-      res.json({ success: true, data: result.rows.map(formatStockRow) });
-      return;
+      try {
+        const sql = `
+          SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+                 kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+          FROM stock_items
+          WHERE (store_id = $1 OR store_id = 'STR-DEMO-01')
+            AND active = true
+            AND (show_on_totem = true OR show_on_totem IS NULL)
+          ORDER BY name ASC
+        `;
+        const result = await pool.query(sql, [storeId]);
+        res.json({ success: true, data: result.rows.map(formatStockRow) });
+        return;
+      } catch (dbErr) {
+        console.warn('[totem] Falha ao consultar catálogo no banco, usando fallback:', dbErr);
+      }
     }
 
     const items = Array.from(memoryStock.values())

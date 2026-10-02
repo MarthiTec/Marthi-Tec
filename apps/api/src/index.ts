@@ -129,7 +129,23 @@ async function bootstrapDatabase() {
     console.log('[marthi-api] PostgreSQL conectado! Executando migrations...');
     await runMigrations();
 
-    // Garante que teste@marthi.com.br e marthi.tecnologia@gmail.com existam no banco com senha 123 e permissão admin
+    // 1. Garante que as colunas essenciais na tabela stock_items existam no PostgreSQL
+    await pool.query(`
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS unit TEXT NOT NULL DEFAULT 'UN';
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Geral';
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS brand TEXT NOT NULL DEFAULT '';
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}'::jsonb;
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS capacity TEXT NOT NULL DEFAULT '';
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS card_rate NUMERIC(6,2) NOT NULL DEFAULT 0;
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS show_on_totem BOOLEAN NOT NULL DEFAULT true;
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb;
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+      ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+    `);
+
+    // 2. Garante que teste@marthi.com.br e marthi.tecnologia@gmail.com existam no banco com senha 123 e permissão admin
     const testEmail = 'teste@marthi.com.br';
     const testPass = '123';
     const salt = randomBytes(16).toString('hex');
@@ -159,7 +175,7 @@ async function bootstrapDatabase() {
       [marthiAdminEmail, `${marthiSalt}:${marthiHash}`],
     );
 
-    // Garante conta Cell Ponto com CNPJ e Token de Acesso
+    // 3. Garante conta Cell Ponto com CNPJ e Token de Acesso
     await pool.query(
       `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
        VALUES ('ACC-MARTHI-DEMO', 'Cell Ponto', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', 'contato@cellponto.com.br', '(24) 98124-4253', 'Administrador', 'active', 'TK-001-000163-CPTR-88A1')
@@ -170,7 +186,7 @@ async function bootstrapDatabase() {
          status = 'active'`,
     );
 
-    // Garante loja matriz Cell Ponto com Token de Acesso
+    // 4. Garante loja matriz Cell Ponto com Token de Acesso
     await pool.query(
       `INSERT INTO stores (
         id, client_account_id, trade_name, legal_name, document_type, document,
@@ -192,27 +208,71 @@ async function bootstrapDatabase() {
         is_matrix = true`,
     );
 
-    // Vínculo user_stores para marthi admin
+    // 5. Vínculo user_stores para AMBOS os administradores
     await pool.query(
       `INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-       VALUES ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
-       ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin'`,
+       VALUES
+         ('UST-TEST-01', 'USR-TEST-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+         ('UST-MARTHI-01', 'usr-marthi-admin', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb)
+       ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true`,
     );
 
-    // Garante colaborador Marthi Tecnologia na tabela employees com role admin e todas as áreas de acesso
+    // 6. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
     await pool.query(
       `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active)
-       VALUES ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
+       VALUES
+         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true),
+         ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true)
        ON CONFLICT (id) DO UPDATE SET
-         name = 'Marthi Tecnologia',
-         user_email = 'marthi.tecnologia@gmail.com',
          role = 'admin',
          is_system_user = true,
          access_areas = '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb,
          active = true`,
     );
 
-    console.log('[marthi-api] ✓ Usuários, Tokens de Acesso, Lojas e Permissões sincronizados no banco de dados!');
+    // 7. Garante licença ativa com todos os módulos para STR-DEMO-01
+    try {
+      await pool.query(
+        `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
+         VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[], 'active')
+         ON CONFLICT (store_id) DO UPDATE SET
+           plan_id = 'scale',
+           status = 'active',
+           modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::module_id[]`,
+      );
+    } catch (licErr) {
+      console.warn('[marthi-api] Aviso ao sincronizar store_licenses:', licErr);
+    }
+
+    // 8. Garante produtos no catálogo do Totem e estoque Cell Ponto se não houver nenhum
+    const stockCountRes = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM stock_items WHERE store_id = 'STR-DEMO-01' AND (show_on_totem = true OR show_on_totem IS NULL)`,
+    );
+    if ((stockCountRes.rows[0]?.total || 0) === 0) {
+      await pool.query(`
+        INSERT INTO stock_items (
+          id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+          kind, condition, category, brand, active, attrs, color, capacity, card_rate, show_on_totem, images
+        )
+        SELECT
+          p.id, 'STR-DEMO-01', p.name, p.sku, p.barcode, '', 'UN', p.qty, 1, p.cost, p.price,
+          p.kind::stock_kind, 'new'::stock_condition, p.category, p.brand, true,
+          p.attrs::jsonb, p.color, p.capacity, 12.0, true, p.images::jsonb
+        FROM (
+          VALUES
+            ('STK-IPHONE15-128', 'iPhone 15 128GB Preto', 'APL-15-128-BLK', '789123456001', 5, 3800.00, 4799.00, 'device', 'Smartphones', 'Apple', '{"Cor": "Preto", "Capacidade": "128 GB"}', 'Preto', '128 GB', '["https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80"]'),
+            ('STK-IPHONE16P-128', 'iPhone 16 Pro 128GB Titânio', 'APL-16P-128-TIT', '789123456002', 3, 6500.00, 7999.00, 'device', 'Smartphones', 'Apple', '{"Cor": "Titânio Natural", "Capacidade": "128 GB"}', 'Titânio Natural', '128 GB', '["https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80"]'),
+            ('STK-REDMI-NOTE13', 'Xiaomi Redmi Note 13 256GB Azul', 'XIA-RN13-256-BLU', '789123456003', 8, 1050.00, 1499.00, 'device', 'Smartphones', 'Xiaomi', '{"Cor": "Azul", "Capacidade": "256 GB"}', 'Azul', '256 GB', '["https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&auto=format&fit=crop&q=80"]'),
+            ('STK-PELICULA-3D', 'Película de Vidro 3D Privacidade', 'ACC-PEL-3D-PRIV', '789123456004', 30, 8.00, 49.90, 'part', 'Acessórios', 'Premium', '{}', '', '', '["https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=600&auto=format&fit=crop&q=80"]'),
+            ('STK-CABO-USBC', 'Cabo USB-C Turbo 20W Reforçado', 'ACC-CAB-USBC-20W', '789123456005', 25, 15.00, 79.90, 'part', 'Acessórios', 'Geonav', '{}', '', '', '["https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop&q=80"]'),
+            ('STK-CARREGADOR-25W', 'Carregador Rápido 25W Homologado Anatel', 'ACC-CAR-25W-FAST', '789123456006', 15, 28.00, 129.90, 'part', 'Acessórios', 'Anker', '{}', '', '', '["https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=600&auto=format&fit=crop&q=80"]')
+        ) AS p(id, name, sku, barcode, qty, cost, price, kind, category, brand, attrs, color, capacity, images)
+        ON CONFLICT (id) DO UPDATE SET show_on_totem = true, active = true;
+      `);
+      console.log('[marthi-api] ✓ Catálogo inicial de produtos para o Totem inserido com sucesso!');
+    }
+
+    console.log('[marthi-api] ✓ Usuários, Tokens de Acesso, Lojas, Licenças e Catálogo sincronizados no banco de dados!');
   } catch (err) {
     console.error('[marthi-api] Erro ao inicializar banco de dados:', err);
   }
