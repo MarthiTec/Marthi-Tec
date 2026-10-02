@@ -70,10 +70,16 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- 3. Inserir / atualizar usuária Mariana Veiga (senha 1234)
-INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+DO $$ BEGIN
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'STR-DEMO-01';
+  ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+INSERT INTO users (id, client_account_id, store_id, email, name, provider, password_hash, global_role, active)
 VALUES (
   'usr-mariana-cellponto',
   'ACC-MARTHI-DEMO',
+  'STR-DEMO-01',
   'marianaveigatav@gmail.com',
   'Mariana Veiga',
   'password',

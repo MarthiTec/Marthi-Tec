@@ -78,10 +78,16 @@ WHERE client_account_id = 'ACC-MARTHI-DEMO' AND id != 'STR-DEMO-01';
 -- 4. Credenciais do usuário Gilvan Teodoro (senha: 1234)
 -- Salt: c1d2e3f4a5b6
 -- Hash: sha256(1234 + c1d2e3f4a5b6) = a64dc386ee38db5d8529323c28b52f1e63a8a30364f9faad864ae12e4dfa62cf
-INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+DO $$ BEGIN
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'STR-DEMO-01';
+  ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+INSERT INTO users (id, client_account_id, store_id, email, name, provider, password_hash, global_role, active)
 VALUES (
   'usr-gilvan-cellponto',
   'ACC-MARTHI-DEMO',
+  'STR-DEMO-01',
   'gilvanteodo@gmail.com',
   'Gilvan Teodoro',
   'password',

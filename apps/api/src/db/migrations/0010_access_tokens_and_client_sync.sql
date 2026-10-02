@@ -80,10 +80,16 @@ ON CONFLICT (id) DO UPDATE SET
 -- 4. Usuários: Gilvan Teodoro (senha Marthi123 e 1234 aceitas)
 -- Salt: c1d2e3f4a5b6
 -- Hash sha256(c1d2e3f4a5b6:Marthi123) = 9818fbdbcdf0913b56b269d78e2193be3472e9842f100e5d71dd917829f6160f
-INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+DO $$ BEGIN
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'STR-DEMO-01';
+  ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+INSERT INTO users (id, client_account_id, store_id, email, name, provider, password_hash, global_role, active)
 VALUES (
   'usr-gilvan-cellponto',
   'ACC-MARTHI-DEMO',
+  'STR-DEMO-01',
   'gilvanteodo@gmail.com',
   'Gilvan Teodoro',
   'password',
@@ -101,10 +107,11 @@ SET password_hash = 'c1d2e3f4a5b6:9818fbdbcdf0913b56b269d78e2193be3472e9842f100e
 -- Usuária Mariana Veiga (senha 1234 e Marthi123 aceitas)
 -- Salt: f7e8d9c0b1a2
 -- Hash sha256(f7e8d9c0b1a2:1234) = 3f64ddcfb96733390a335a7c1eac2e88753947bc637537abb78ad7f7e364aabf
-INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+INSERT INTO users (id, client_account_id, store_id, email, name, provider, password_hash, global_role, active)
 VALUES (
   'usr-mariana-cellponto',
   'ACC-MARTHI-DEMO',
+  'STR-DEMO-01',
   'marianaveigatav@gmail.com',
   'Mariana Veiga',
   'password',
