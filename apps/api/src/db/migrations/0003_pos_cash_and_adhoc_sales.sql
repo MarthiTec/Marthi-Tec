@@ -87,8 +87,13 @@ DO $$ BEGIN
   ALTER TABLE cash_session_events ADD COLUMN IF NOT EXISTS store_id TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_cash_events_session ON cash_session_events(session_id);
-CREATE INDEX IF NOT EXISTS idx_cash_events_store ON cash_session_events(store_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_cash_events_session ON cash_session_events(session_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_cash_events_store ON cash_session_events(store_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 4. VENDAS (SALES ORDERS)
 CREATE TABLE IF NOT EXISTS sales_orders (
@@ -129,8 +134,13 @@ DO $$ BEGIN
   ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_sales_orders_store ON sales_orders(store_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sales_orders_session ON sales_orders(session_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sales_orders_store ON sales_orders(store_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sales_orders_session ON sales_orders(session_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 5. ITENS DA VENDA (COM SUPORTE NATIVO À VENDA AVULSA)
 CREATE TABLE IF NOT EXISTS sales_order_lines (
@@ -161,8 +171,13 @@ DO $$ BEGIN
   ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS stock_id TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sales_order_lines(sale_id);
-CREATE INDEX IF NOT EXISTS idx_sale_lines_stock ON sales_order_lines(stock_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sales_order_lines(sale_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sale_lines_stock ON sales_order_lines(stock_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6. FORMAS DE PAGAMENTO DA VENDA (MÚLTIPLOS MEIOS / SPLIT)
 CREATE TABLE IF NOT EXISTS sale_payments (
@@ -182,7 +197,9 @@ DO $$ BEGIN
   ALTER TABLE sale_payments ADD COLUMN IF NOT EXISTS sale_id TEXT;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 7. PERSISTÊNCIA DE VENDAS EM ANDAMENTO (RECUPERAÇÃO PÓS-QUEDA)
 CREATE TABLE IF NOT EXISTS pos_draft_sales (
@@ -204,4 +221,6 @@ DO $$ BEGIN
   ALTER TABLE pos_draft_sales ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'in_progress';
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE INDEX IF NOT EXISTS idx_pos_draft_store ON pos_draft_sales(store_id, status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_pos_draft_store ON pos_draft_sales(store_id, status);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
