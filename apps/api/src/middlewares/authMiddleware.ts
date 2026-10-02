@@ -177,12 +177,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
       if (!resolvedStoreId) {
         // 1.1 Verificar loja padrão do usuário em user_stores
-        const userStoreRes = await pool.query(
-          `SELECT store_id FROM user_stores WHERE user_id = $1 ORDER BY is_default DESC LIMIT 1`,
-          [user.id],
-        );
-        if (userStoreRes.rows.length > 0 && userStoreRes.rows[0].store_id) {
-          resolvedStoreId = userStoreRes.rows[0].store_id;
+        try {
+          const userStoreRes = await pool.query(
+            `SELECT store_id FROM user_stores WHERE user_id = $1 ORDER BY is_default DESC LIMIT 1`,
+            [user.id],
+          );
+          if (userStoreRes.rows.length > 0 && userStoreRes.rows[0].store_id) {
+            resolvedStoreId = userStoreRes.rows[0].store_id;
+          }
+        } catch {
+          // ignora se user_stores ainda não foi criada ou está em migração
         }
       }
 
