@@ -39,7 +39,8 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO stores (
   id, client_account_id, trade_name, legal_name, document_type, document,
   state_registration, municipal_registration, email, phone, zip_code, street,
-  number, complement, district, city, state, tax_regime, is_matrix, active, access_token
+  number, complement, district, city, state, tax_regime, is_matrix, active, access_token,
+  created_at, updated_at
 )
 VALUES (
   'STR-DEMO-01',
@@ -62,7 +63,9 @@ VALUES (
   'simples_nacional',
   true,
   true,
-  'TK-001-000163-CPTR-88A1'
+  'TK-001-000163-CPTR-88A1',
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE SET
   trade_name = 'Cell Ponto Matriz',
@@ -71,7 +74,8 @@ ON CONFLICT (id) DO UPDATE SET
   email = 'matriz@cellponto.com.br',
   access_token = 'TK-001-000163-CPTR-88A1',
   active = true,
-  is_matrix = true;
+  is_matrix = true,
+  updated_at = now();
 
 -- 4. Usuários: Gilvan Teodoro (senha Marthi123 e 1234 aceitas)
 -- Salt: c1d2e3f4a5b6

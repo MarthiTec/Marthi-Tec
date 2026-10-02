@@ -30,7 +30,8 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO stores (
   id, client_account_id, trade_name, legal_name, document_type, document,
   state_registration, municipal_registration, email, phone, zip_code, street,
-  number, complement, district, city, state, tax_regime, is_matrix, active
+  number, complement, district, city, state, tax_regime, is_matrix, active,
+  created_at, updated_at
 )
 VALUES (
   'STR-DEMO-01',
@@ -52,7 +53,9 @@ VALUES (
   'RJ',
   'simples_nacional',
   true,
-  true
+  true,
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE SET
   trade_name = 'Cell Ponto Matriz',
@@ -60,7 +63,8 @@ ON CONFLICT (id) DO UPDATE SET
   phone = '(24) 98124-4253',
   email = 'matriz@cellponto.com.br',
   active = true,
-  is_matrix = true;
+  is_matrix = true,
+  updated_at = now();
 
 -- 3. Desativar/remover lojas mockadas secundárias para a conta Cell Ponto (para exibir apenas 1 loja)
 DO $$ BEGIN

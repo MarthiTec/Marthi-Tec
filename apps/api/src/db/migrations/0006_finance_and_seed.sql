@@ -182,13 +182,16 @@ DO $$ BEGIN
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS tax_regime TEXT NOT NULL DEFAULT 'simples_nacional';
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_matrix BOOLEAN NOT NULL DEFAULT true;
   ALTER TABLE stores ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE stores ALTER COLUMN created_at SET DEFAULT now();
+  ALTER TABLE stores ALTER COLUMN updated_at SET DEFAULT now();
   ALTER TABLE stores ADD CONSTRAINT uq_stores_account_document UNIQUE (client_account_id, document);
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 INSERT INTO stores (
   id, client_account_id, trade_name, legal_name, document_type, document,
   state_registration, municipal_registration, email, phone, zip_code, street,
-  number, complement, district, city, state, tax_regime, is_matrix, active
+  number, complement, district, city, state, tax_regime, is_matrix, active,
+  created_at, updated_at
 )
 VALUES
 (
@@ -211,7 +214,9 @@ VALUES
   'RJ',
   'simples_nacional',
   true,
-  true
+  true,
+  now(),
+  now()
 ),
 (
   'STR-DEMO-02',
@@ -233,11 +238,14 @@ VALUES
   'RJ',
   'simples_nacional',
   false,
-  true
+  true,
+  now(),
+  now()
 )
 ON CONFLICT (id) DO UPDATE SET
   trade_name = EXCLUDED.trade_name,
-  active = EXCLUDED.active;
+  active = EXCLUDED.active,
+  updated_at = now();
 
 -- 6.4 Licenças por CNPJ (com cálculo de desconto multi-loja)
 DO $$ BEGIN
