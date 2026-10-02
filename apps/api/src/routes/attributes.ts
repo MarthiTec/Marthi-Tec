@@ -126,12 +126,15 @@ attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, 
           await client.query('BEGIN');
 
           // Garante a loja em stores para não quebrar a FK
-          await client.query(
-            `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, active)
-             VALUES ($1, 'ACC-MARTHI-DEMO', 'Cell Ponto Matriz', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', true)
-             ON CONFLICT (id) DO NOTHING`,
-            [storeId],
-          );
+          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
+          if (storeExists.rowCount === 0) {
+            await client.query(
+              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
+               VALUES ($1, 'ACC-MARTHI-DEMO', 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 99999-9999', true)
+               ON CONFLICT (id) DO NOTHING`,
+              [storeId],
+            );
+          }
 
           await client.query(
             `INSERT INTO product_attributes (id, store_id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active)
@@ -228,12 +231,15 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
 
           // Garante a loja em stores para não quebrar a FK
           const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
-          await client.query(
-            `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, active)
-             VALUES ($1, $2, 'Minha Loja', 'Minha Empresa LTDA', 'cnpj', '00.000.000/0001-91', true)
-             ON CONFLICT (id) DO NOTHING`,
-            [storeId, clientAccountId],
-          );
+          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
+          if (storeExists.rowCount === 0) {
+            await client.query(
+              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
+               VALUES ($1, $2, 'Minha Loja', 'Minha Empresa LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(24) 99999-9999', true)
+               ON CONFLICT (id) DO NOTHING`,
+              [storeId, clientAccountId],
+            );
+          }
 
           const existing = await client.query(
             `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active

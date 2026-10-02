@@ -147,6 +147,18 @@ async function bootstrapDatabase() {
       DO $$ BEGIN
         ALTER TABLE user_stores ALTER COLUMN role TYPE TEXT USING role::text;
         ALTER TABLE employees ALTER COLUMN role TYPE TEXT USING role::text;
+        ALTER TABLE payables ALTER COLUMN account_id DROP NOT NULL;
+        ALTER TABLE payables ADD COLUMN IF NOT EXISTS supplier_id TEXT;
+        ALTER TABLE payables ADD COLUMN IF NOT EXISTS supplier_name TEXT DEFAULT '';
+        ALTER TABLE payables ADD COLUMN IF NOT EXISTS document_number TEXT DEFAULT '';
+
+        ALTER TABLE receivables ALTER COLUMN account_id DROP NOT NULL;
+        ALTER TABLE receivables ADD COLUMN IF NOT EXISTS customer_id TEXT;
+        ALTER TABLE receivables ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
+        ALTER TABLE receivables ADD COLUMN IF NOT EXISTS document_number TEXT DEFAULT '';
+
+        ALTER TABLE stores ALTER COLUMN email SET DEFAULT 'contato@marthi.com.br';
+        ALTER TABLE stores ALTER COLUMN phone SET DEFAULT '(24) 99999-9999';
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 

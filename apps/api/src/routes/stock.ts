@@ -16,7 +16,7 @@ const stockItemSchema = z.object({
   minQty: z.coerce.number().default(0),
   cost: z.coerce.number().default(0),
   price: z.coerce.number().default(0),
-  kind: z.enum(['part', 'device', 'supply']).default('part'),
+  kind: z.enum(['part', 'device', 'supply', 'product', 'service']).default('part').transform(val => (val === 'product' || val === 'service') ? 'part' : val),
   condition: z.enum(['new', 'used', 'refurbished']).default('new'),
   category: z.string().default('Geral'),
   brand: z.string().default(''),
@@ -220,12 +220,15 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           await client.query('BEGIN');
 
           // Garante a loja em stores para não quebrar a FK
-          await client.query(
-            `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, active)
-             VALUES ($1, 'ACC-MARTHI-DEMO', 'Cell Ponto Matriz', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', true)
-             ON CONFLICT (id) DO NOTHING`,
-            [storeId],
-          );
+          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
+          if (storeExists.rowCount === 0) {
+            await client.query(
+              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
+               VALUES ($1, 'ACC-MARTHI-DEMO', 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 99999-9999', true)
+               ON CONFLICT (id) DO NOTHING`,
+              [storeId],
+            );
+          }
 
           await client.query(
             `INSERT INTO stock_items (
