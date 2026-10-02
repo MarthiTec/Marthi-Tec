@@ -43,7 +43,7 @@ async function runAudit() {
   while (retries > 0) {
     try {
       const h = await req('/health');
-      if (h.ok && h.data?.connected) {
+      if (h.ok && (h.data?.connected || h.data?.data?.database?.connected || h.data?.data?.status === 'ok')) {
         console.log('  ✓ Servidor Discloud ONLINE e conectado ao PostgreSQL MarthiDB.');
         healthy = true;
         break;

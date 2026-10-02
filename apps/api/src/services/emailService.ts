@@ -312,6 +312,11 @@ export async function sendInternalNotificationEmail(payload: InternalNotificatio
     `Nova contratação: ${payload.companyName} adquiriu o plano ${payload.planName}.`
   );
 
+  if (isTestEmail(payload.email)) {
+    console.log(`[emailService] [SANDBOX] Notificação interna ignorada para cadastro sintético de teste (${payload.email})`);
+    return { success: true, messageId: 'simulated-internal-test' };
+  }
+
   const recipient = env.INTERNAL_NOTIFICATION_EMAIL || 'marthi.tecnologia@gmail.com';
 
   return sendMail({
@@ -409,6 +414,14 @@ async function recordEmailAudit(data: {
   }
 }
 
+export function isTestEmail(email: string): boolean {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  const testSuffixes = ['.teste', '.test', '.invalid', '.localhost', '.local', '.example'];
+  const testDomains = ['@example.com', '@example.org', '@example.net', '@marthi.teste'];
+  return testSuffixes.some((s) => normalized.endsWith(s)) || testDomains.some((d) => normalized.includes(d));
+}
+
 /**
  * Função de envio com suporte a Nodemailer SMTP ou graceful logger sandbox
  */
@@ -418,6 +431,24 @@ export async function sendMail(options: {
   html: string;
   text: string;
 }): Promise<{ success: boolean; messageId?: string }> {
+  // Se for endereço de teste/dummy (ex: .teste, @example.com), simula em sandbox para evitar bounce DNS no Gmail
+  if (isTestEmail(options.to)) {
+    const simulatedId = `test-sandbox-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    console.log(`[emailService] [SANDBOX] Destinatário em domínio de teste (${options.to}) detectado. Envio real ignorado para evitar bounce DNS:`, {
+      id: simulatedId,
+      to: options.to,
+      subject: options.subject,
+    });
+    await recordEmailAudit({
+      recipient: options.to,
+      subject: options.subject,
+      sender: env.SMTP_FROM,
+      status: 'simulated',
+      messageId: simulatedId,
+    });
+    return { success: true, messageId: simulatedId };
+  }
+
   const transporter = getMailTransporter();
 
   if (transporter) {
