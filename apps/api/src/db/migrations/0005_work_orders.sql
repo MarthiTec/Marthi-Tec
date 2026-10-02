@@ -95,6 +95,13 @@ CREATE TABLE IF NOT EXISTS work_orders (
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS customer_id TEXT;
+  ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS status os_status NOT NULL DEFAULT 'open';
+  ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_work_orders_store ON work_orders(store_id, status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_customer ON work_orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_created ON work_orders(store_id, created_at DESC);
@@ -115,6 +122,11 @@ CREATE TABLE IF NOT EXISTS work_order_lines (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TABLE work_order_lines ADD COLUMN IF NOT EXISTS work_order_id TEXT;
+  ALTER TABLE work_order_lines ADD COLUMN IF NOT EXISTS stock_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_wo_lines_wo ON work_order_lines(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_wo_lines_stock ON work_order_lines(stock_id);
 
@@ -129,5 +141,9 @@ CREATE TABLE IF NOT EXISTS work_order_activities (
   notes         TEXT NOT NULL DEFAULT '',
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+DO $$ BEGIN
+  ALTER TABLE work_order_activities ADD COLUMN IF NOT EXISTS work_order_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE INDEX IF NOT EXISTS idx_wo_activities_wo ON work_order_activities(work_order_id, created_at DESC);

@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS cash_session_events (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TABLE cash_session_events ADD COLUMN IF NOT EXISTS session_id TEXT;
+  ALTER TABLE cash_session_events ADD COLUMN IF NOT EXISTS store_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_cash_events_session ON cash_session_events(session_id);
 CREATE INDEX IF NOT EXISTS idx_cash_events_store ON cash_session_events(store_id, created_at DESC);
 
@@ -117,6 +122,13 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   CONSTRAINT uq_sale_store_local UNIQUE (store_id, local_id)
 );
 
+DO $$ BEGIN
+  ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS session_id TEXT;
+  ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS terminal_id TEXT;
+  ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_sales_orders_store ON sales_orders(store_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sales_orders_session ON sales_orders(session_id);
 
@@ -144,6 +156,11 @@ CREATE TABLE IF NOT EXISTS sales_order_lines (
   CONSTRAINT chk_ad_hoc_stock CHECK (item_type <> 'ad_hoc' OR stock_id IS NULL)
 );
 
+DO $$ BEGIN
+  ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS sale_id TEXT;
+  ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS stock_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sales_order_lines(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sale_lines_stock ON sales_order_lines(stock_id);
 
@@ -161,6 +178,10 @@ CREATE TABLE IF NOT EXISTS sale_payments (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+DO $$ BEGIN
+  ALTER TABLE sale_payments ADD COLUMN IF NOT EXISTS sale_id TEXT;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
 
 -- 7. PERSISTÊNCIA DE VENDAS EM ANDAMENTO (RECUPERAÇÃO PÓS-QUEDA)
@@ -177,5 +198,10 @@ CREATE TABLE IF NOT EXISTS pos_draft_sales (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+DO $$ BEGIN
+  ALTER TABLE pos_draft_sales ADD COLUMN IF NOT EXISTS store_id TEXT;
+  ALTER TABLE pos_draft_sales ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'in_progress';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE INDEX IF NOT EXISTS idx_pos_draft_store ON pos_draft_sales(store_id, status);
