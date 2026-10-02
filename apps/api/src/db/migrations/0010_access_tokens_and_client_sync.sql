@@ -127,29 +127,25 @@ SET password_hash = 'f7e8d9c0b1a2:3f64ddcfb96733390a335a7c1eac2e88753947bc637537
     global_role = 'admin';
 
 -- 5. Vínculos em user_stores
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES (
-  'UST-GILVAN-01',
-  'usr-gilvan-cellponto',
-  'STR-DEMO-01',
-  'admin',
-  true,
-  '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
-)
-ON CONFLICT (user_id, store_id) DO UPDATE
-SET role = 'admin', is_default = true, permissions = '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT
+    'UST-GILVAN-01', u.id, 'STR-DEMO-01', 'admin', true,
+    '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
+  FROM users u WHERE u.email = 'gilvanteodo@gmail.com'
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'admin', is_default = true, permissions = '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES (
-  'UST-MARIANA-01',
-  'usr-mariana-cellponto',
-  'STR-DEMO-01',
-  'admin',
-  true,
-  '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
-)
-ON CONFLICT (user_id, store_id) DO UPDATE
-SET role = 'admin', is_default = true, permissions = '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT
+    'UST-MARIANA-01', u.id, 'STR-DEMO-01', 'admin', true,
+    '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
+  FROM users u WHERE u.email = 'marianaveigatav@gmail.com'
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'admin', is_default = true, permissions = '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- 6. Colaboradores na tabela employees
 INSERT INTO employees (

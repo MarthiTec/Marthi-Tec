@@ -336,10 +336,17 @@ VALUES
   ('USR-OPERADOR', 'ACC-MARTHI-DEMO', 'STR-DEMO-01', 'password', 'teste@marthi.com.br', 'Operador Caixa', 'operator', true)
 ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES
-  ('UST-ADM-01', 'USR-ADMIN', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
-  ('UST-ADM-02', 'USR-ADMIN', 'STR-DEMO-02', 'admin', false, '{"all": true}'::jsonb),
-  ('UST-OP-01',  'USR-OPERADOR', 'STR-DEMO-01', 'operator', true, '{"pos": true, "ad_hoc": true}'::jsonb),
-  ('UST-OP-02',  'USR-OPERADOR', 'STR-DEMO-02', 'operator', false, '{"pos": true, "ad_hoc": true}'::jsonb)
-ON CONFLICT (id) DO NOTHING;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT
+    s.id, u.id, s.store_id, s.role, s.is_default, s.permissions
+  FROM (
+    VALUES
+      ('UST-ADM-01', 'marthi.tecnologia@gmail.com', 'STR-DEMO-01', 'admin', true, '{"all": true}'::jsonb),
+      ('UST-ADM-02', 'marthi.tecnologia@gmail.com', 'STR-DEMO-02', 'admin', false, '{"all": true}'::jsonb),
+      ('UST-OP-01',  'teste@marthi.com.br',        'STR-DEMO-01', 'operator', true, '{"pos": true, "ad_hoc": true}'::jsonb),
+      ('UST-OP-02',  'teste@marthi.com.br',        'STR-DEMO-02', 'operator', false, '{"pos": true, "ad_hoc": true}'::jsonb)
+  ) AS s(id, email, store_id, role, is_default, permissions)
+  JOIN users u ON u.email = s.email
+  ON CONFLICT (id) DO NOTHING;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

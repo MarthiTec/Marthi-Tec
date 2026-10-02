@@ -95,17 +95,15 @@ SET password_hash = EXCLUDED.password_hash,
     global_role = EXCLUDED.global_role;
 
 -- Vínculo da usuária Mariana com a loja Cell Ponto
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES (
-  'UST-MARIANA-01',
-  'usr-mariana-cellponto',
-  'STR-DEMO-01',
-  'operator',
-  true,
-  '{"all": true, "pos": true, "os": true, "erp": true, "painel": true}'::jsonb
-)
-ON CONFLICT (user_id, store_id) DO UPDATE
-SET role = EXCLUDED.role, permissions = EXCLUDED.permissions;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT
+    'UST-MARIANA-01', u.id, 'STR-DEMO-01', 'operator', true,
+    '{"all": true, "pos": true, "os": true, "erp": true, "painel": true}'::jsonb
+  FROM users u WHERE u.email = 'marianaveigatav@gmail.com'
+  ON CONFLICT (id) DO UPDATE
+  SET role = EXCLUDED.role, permissions = EXCLUDED.permissions;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- Cadastro da colaboradora na equipe da loja Cell Ponto
 INSERT INTO employees (

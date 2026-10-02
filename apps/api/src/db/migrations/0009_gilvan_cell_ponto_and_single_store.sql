@@ -103,17 +103,15 @@ SET password_hash = EXCLUDED.password_hash,
     global_role = 'admin';
 
 -- 5. Vínculo exclusivo do usuário Gilvan com a loja matriz Cell Ponto
-INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
-VALUES (
-  'UST-GILVAN-01',
-  'usr-gilvan-cellponto',
-  'STR-DEMO-01',
-  'admin',
-  true,
-  '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
-)
-ON CONFLICT (user_id, store_id) DO UPDATE
-SET role = 'admin', is_default = true, permissions = EXCLUDED.permissions;
+DO $$ BEGIN
+  INSERT INTO user_stores (id, user_id, store_id, role, is_default, permissions)
+  SELECT
+    'UST-GILVAN-01', u.id, 'STR-DEMO-01', 'admin', true,
+    '{"all": true, "pos": true, "os": true, "erp": true, "painel": true, "stores": true}'::jsonb
+  FROM users u WHERE u.email = 'gilvanteodo@gmail.com'
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'admin', is_default = true, permissions = EXCLUDED.permissions;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- Remove qualquer vínculo de Gilvan a outras lojas
 DELETE FROM user_stores
