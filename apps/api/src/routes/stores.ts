@@ -668,25 +668,24 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
         );
       }
 
-      if (body.planId || body.modules) {
-        let dbPlan: string | undefined = undefined;
-        if (body.planId) {
-          dbPlan = 'scale';
-          if (body.planId === 'bronze' || body.planId === 'start') dbPlan = 'start';
-          else if (body.planId === 'silver' || body.planId === 'growth') dbPlan = 'growth';
-        }
-
-        const validModules = body.modules
-          ? body.modules.filter((m: string) => ['totem', 'os', 'erp', 'fiscal', 'ecommerce'].includes(m))
-          : undefined;
+      if (body.planId) {
+        let dbPlan = 'scale';
+        if (body.planId === 'bronze' || body.planId === 'start') dbPlan = 'start';
+        else if (body.planId === 'silver' || body.planId === 'growth') dbPlan = 'growth';
 
         await pool.query(
-          `UPDATE store_licenses
-           SET plan_id = COALESCE($1::plan_id, plan_id),
-               modules = COALESCE($2::module_id[], modules),
-               updated_at = now()
-           WHERE client_account_id = $3`,
-          [dbPlan, validModules, clientId],
+          `UPDATE store_licenses SET plan_id = $1::plan_id, updated_at = now() WHERE client_account_id = $2`,
+          [dbPlan, clientId],
+        );
+      }
+
+      if (body.modules && Array.isArray(body.modules)) {
+        const validModules = body.modules.filter((m: string) =>
+          ['totem', 'os', 'erp', 'fiscal', 'ecommerce'].includes(m),
+        );
+        await pool.query(
+          `UPDATE store_licenses SET modules = $1::module_id[], updated_at = now() WHERE client_account_id = $2`,
+          [validModules, clientId],
         );
       }
     }
