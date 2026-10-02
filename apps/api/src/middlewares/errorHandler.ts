@@ -30,15 +30,26 @@ export function errorHandler(
       ? (err as { details: unknown }).details
       : {};
 
+  const isDbConnError =
+    message.includes('getaddrinfo') ||
+    message.includes('ECONNREFUSED') ||
+    message.includes('ETIMEDOUT') ||
+    message.includes('connection timeout') ||
+    message.includes('Connection terminated');
+
   if (status >= 500) {
     console.error('[marthi-api] unhandled error:', err);
   }
 
+  const userFacingMessage = isDbConnError
+    ? `Falha de conexão com o banco de dados PostgreSQL (${message}). Verifique as variáveis de conexão e a rede da Discloud.`
+    : message || 'Erro interno do servidor.';
+
   res.status(status).json({
     success: false,
     error: {
-      code: status === 401 ? 'UNAUTHORIZED' : status === 501 ? 'NOT_IMPLEMENTED' : 'INTERNAL_ERROR',
-      message: status >= 500 && status !== 502 ? 'Erro interno do servidor.' : message,
+      code: status === 401 ? 'UNAUTHORIZED' : isDbConnError ? 'DATABASE_UNAVAILABLE' : status === 501 ? 'NOT_IMPLEMENTED' : 'INTERNAL_ERROR',
+      message: userFacingMessage,
       details: details ?? {},
     },
   });

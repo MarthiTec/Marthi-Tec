@@ -98,39 +98,43 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
     const { kind, condition, q, low } = req.query;
 
     if (pool) {
-      const conditions: string[] = ['store_id = $1'];
-      const values: any[] = [storeId];
-      let pIdx = 2;
+      try {
+        const conditions: string[] = ['store_id = $1'];
+        const values: any[] = [storeId];
+        let pIdx = 2;
 
-      if (kind && typeof kind === 'string') {
-        conditions.push(`kind = $${pIdx++}`);
-        values.push(kind);
-      }
-      if (condition && typeof condition === 'string') {
-        conditions.push(`condition = $${pIdx++}`);
-        values.push(condition);
-      }
-      if (q && typeof q === 'string' && q.trim()) {
-        conditions.push(`(name ILIKE $${pIdx} OR sku ILIKE $${pIdx} OR barcode ILIKE $${pIdx} OR imei ILIKE $${pIdx})`);
-        values.push(`%${q.trim()}%`);
-        pIdx++;
-      }
-      if (low === '1' || low === 'true') {
-        conditions.push(`qty <= min_qty`);
-      }
+        if (kind && typeof kind === 'string') {
+          conditions.push(`kind = $${pIdx++}`);
+          values.push(kind);
+        }
+        if (condition && typeof condition === 'string') {
+          conditions.push(`condition = $${pIdx++}`);
+          values.push(condition);
+        }
+        if (q && typeof q === 'string' && q.trim()) {
+          conditions.push(`(name ILIKE $${pIdx} OR sku ILIKE $${pIdx} OR barcode ILIKE $${pIdx} OR imei ILIKE $${pIdx})`);
+          values.push(`%${q.trim()}%`);
+          pIdx++;
+        }
+        if (low === '1' || low === 'true') {
+          conditions.push(`qty <= min_qty`);
+        }
 
-      const sql = `
-        SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-               attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
-        FROM stock_items
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY name ASC
-      `;
+        const sql = `
+          SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+                 kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+          FROM stock_items
+          WHERE ${conditions.join(' AND ')}
+          ORDER BY name ASC
+        `;
 
-      const result = await pool.query(sql, values);
-      res.json({ success: true, data: result.rows.map(formatStockRow) });
-      return;
+        const result = await pool.query(sql, values);
+        res.json({ success: true, data: result.rows.map(formatStockRow) });
+        return;
+      } catch (dbErr) {
+        console.warn('[stock] Falha ao consultar banco, usando fallback:', dbErr);
+      }
     }
 
     // Memory fallback
@@ -164,21 +168,25 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
     }
 
     if (pool) {
-      const sql = `
-        SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-               attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
-        FROM stock_items
-        WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
-        LIMIT 1
-      `;
-      const resQuery = await pool.query(sql, [storeId, code]);
-      if (resQuery.rows.length === 0) {
-        res.json({ success: true, data: null });
+      try {
+        const sql = `
+          SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+                 kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+          FROM stock_items
+          WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
+          LIMIT 1
+        `;
+        const resQuery = await pool.query(sql, [storeId, code]);
+        if (resQuery.rows.length === 0) {
+          res.json({ success: true, data: null });
+          return;
+        }
+        res.json({ success: true, data: formatStockRow(resQuery.rows[0]) });
         return;
+      } catch (dbErr) {
+        console.warn('[stock] Falha no lookup do banco, usando fallback:', dbErr);
       }
-      res.json({ success: true, data: formatStockRow(resQuery.rows[0]) });
-      return;
     }
 
     const item = Array.from(memoryStock.values()).find(
@@ -200,66 +208,83 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
     const id = body.id || `STK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     if (pool) {
-      const client = await pool.connect();
+      let client: any = null;
       try {
-        await client.query('BEGIN');
+        client = await pool.connect();
+      } catch (connErr) {
+        console.warn('[stock] Falha ao conectar ao PostgreSQL, recorrendo à memória:', connErr);
+      }
 
-        await client.query(
-          `INSERT INTO stock_items (
-            id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-            kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-            attrs, color, capacity, card_rate, show_on_totem, images
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
-          [
-            id,
-            storeId,
-            body.name.trim(),
-            body.sku.trim(),
-            body.barcode.trim(),
-            body.imei.trim(),
-            body.unit.trim(),
-            body.qty,
-            body.minQty,
-            body.cost,
-            body.price,
-            body.kind,
-            body.condition,
-            body.category.trim(),
-            body.brand.trim(),
-            body.supplierId || null,
-            body.trackLot,
-            body.isKit,
-            body.active,
-            JSON.stringify(body.attrs || {}),
-            body.color || '',
-            body.capacity || '',
-            body.cardRate || 0,
-            body.showOnTotem !== undefined ? body.showOnTotem : true,
-            JSON.stringify(body.images || []),
-          ],
-        );
+      if (client) {
+        try {
+          await client.query('BEGIN');
 
-        // Se qty inicial > 0, registra kardex
-        if (body.qty > 0) {
-          const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          // Garante a loja em stores para não quebrar a FK
           await client.query(
-            `INSERT INTO stock_movements (
-              id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes
-            ) VALUES ($1, $2, $3, 'in', $4, 0, $4, $5, 'manual', $6, 'Saldo inicial no cadastro')`,
-            [movId, storeId, id, body.qty, body.cost, req.user?.name || 'Operador'],
+            `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, active)
+             VALUES ($1, 'ACC-MARTHI-DEMO', 'Cell Ponto Matriz', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', true)
+             ON CONFLICT (id) DO NOTHING`,
+            [storeId],
           );
+
+          await client.query(
+            `INSERT INTO stock_items (
+              id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+              kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+              attrs, color, capacity, card_rate, show_on_totem, images
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+            [
+              id,
+              storeId,
+              body.name.trim(),
+              body.sku.trim(),
+              body.barcode.trim(),
+              body.imei.trim(),
+              body.unit.trim(),
+              body.qty,
+              body.minQty,
+              body.cost,
+              body.price,
+              body.kind,
+              body.condition,
+              body.category.trim(),
+              body.brand.trim(),
+              body.supplierId || null,
+              body.trackLot,
+              body.isKit,
+              body.active,
+              JSON.stringify(body.attrs || {}),
+              body.color || '',
+              body.capacity || '',
+              body.cardRate || 0,
+              body.showOnTotem !== undefined ? body.showOnTotem : true,
+              JSON.stringify(body.images || []),
+            ],
+          );
+
+          // Se qty inicial > 0, registra kardex
+          if (body.qty > 0) {
+            const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+            await client.query(
+              `INSERT INTO stock_movements (
+                id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes
+              ) VALUES ($1, $2, $3, 'in', $4, 0, $4, $5, 'manual', $6, 'Saldo inicial no cadastro')`,
+              [movId, storeId, id, body.qty, body.cost, req.user?.name || 'Operador'],
+            );
+          }
+
+          await client.query('COMMIT');
+
+          const createdRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
+          res.status(201).json({ success: true, data: formatStockRow(createdRes.rows[0]) });
+          return;
+        } catch (err) {
+          await client.query('ROLLBACK');
+          console.error('[stock] Erro na transação do banco:', err);
+          throw err;
+        } finally {
+          client.release();
         }
-
-        await client.query('COMMIT');
-
-        const createdRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-        res.status(201).json({ success: true, data: formatStockRow(createdRes.rows[0]) });
-        return;
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      } finally {
-        client.release();
       }
     }
 
@@ -288,102 +313,111 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
     const body = stockItemSchema.partial().parse(req.body);
 
     if (pool) {
-      const client = await pool.connect();
+      let client: any = null;
       try {
-        await client.query('BEGIN');
+        client = await pool.connect();
+      } catch (connErr) {
+        console.warn('[stock] Falha ao conectar ao PostgreSQL no PATCH, usando memória:', connErr);
+      }
 
-        const currentRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
-        if (currentRes.rows.length === 0) {
-          await client.query('ROLLBACK');
-          res.status(404).json({ success: false, error: { message: 'Item de estoque não encontrado.' } });
-          return;
-        }
+      if (client) {
+        try {
+          await client.query('BEGIN');
 
-        const curr = currentRes.rows[0];
-        const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
+          const currentRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
+          if (currentRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            res.status(404).json({ success: false, error: { message: 'Item de estoque não encontrado.' } });
+            return;
+          }
 
-        // Se qty mudou, registra movimentação no kardex
-        if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
-          const delta = body.qty - Number(curr.qty);
-          const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          const curr = currentRes.rows[0];
+          const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
+
+          // Se qty mudou, registra movimentação no kardex
+          if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
+            const delta = body.qty - Number(curr.qty);
+            const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+            await client.query(
+              `INSERT INTO stock_movements (
+                id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'adjustment', $9, 'Ajuste manual de estoque')`,
+              [
+                movId,
+                storeId,
+                id,
+                delta > 0 ? 'in' : 'out',
+                Math.abs(delta),
+                Number(curr.qty),
+                nextQty,
+                body.cost !== undefined ? body.cost : Number(curr.cost),
+                req.user?.name || 'Operador',
+              ],
+            );
+          }
+
           await client.query(
-            `INSERT INTO stock_movements (
-              id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'adjustment', $9, 'Ajuste manual de estoque')`,
+            `UPDATE stock_items
+             SET name = COALESCE($1, name),
+                 sku = COALESCE($2, sku),
+                 barcode = COALESCE($3, barcode),
+                 imei = COALESCE($4, imei),
+                 unit = COALESCE($5, unit),
+                 qty = COALESCE($6, qty),
+                 min_qty = COALESCE($7, min_qty),
+                 cost = COALESCE($8, cost),
+                 price = COALESCE($9, price),
+                 kind = COALESCE($10, kind),
+                 condition = COALESCE($11, condition),
+                 category = COALESCE($12, category),
+                 brand = COALESCE($13, brand),
+                 active = COALESCE($14, active),
+                 attrs = COALESCE($15, attrs),
+                 color = COALESCE($16, color),
+                 capacity = COALESCE($17, capacity),
+                 card_rate = COALESCE($18, card_rate),
+                 show_on_totem = COALESCE($19, show_on_totem),
+                 images = COALESCE($20, images),
+                 updated_at = now()
+             WHERE id = $21 AND store_id = $22`,
             [
-              movId,
-              storeId,
+              body.name,
+              body.sku,
+              body.barcode,
+              body.imei,
+              body.unit,
+              body.qty,
+              body.minQty,
+              body.cost,
+              body.price,
+              body.kind,
+              body.condition,
+              body.category,
+              body.brand,
+              body.active,
+              body.attrs !== undefined ? JSON.stringify(body.attrs) : null,
+              body.color,
+              body.capacity,
+              body.cardRate,
+              body.showOnTotem,
+              body.images !== undefined ? JSON.stringify(body.images) : null,
               id,
-              delta > 0 ? 'in' : 'out',
-              Math.abs(delta),
-              Number(curr.qty),
-              nextQty,
-              body.cost !== undefined ? body.cost : Number(curr.cost),
-              req.user?.name || 'Operador',
+              storeId,
             ],
           );
+
+          await client.query('COMMIT');
+
+          const updatedRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
+          res.json({ success: true, data: formatStockRow(updatedRes.rows[0]) });
+          return;
+        } catch (err) {
+          await client.query('ROLLBACK');
+          console.error('[stock] Erro na atualização do item no banco:', err);
+          throw err;
+        } finally {
+          client.release();
         }
-
-        await client.query(
-          `UPDATE stock_items
-           SET name = COALESCE($1, name),
-               sku = COALESCE($2, sku),
-               barcode = COALESCE($3, barcode),
-               imei = COALESCE($4, imei),
-               unit = COALESCE($5, unit),
-               qty = COALESCE($6, qty),
-               min_qty = COALESCE($7, min_qty),
-               cost = COALESCE($8, cost),
-               price = COALESCE($9, price),
-               kind = COALESCE($10, kind),
-               condition = COALESCE($11, condition),
-               category = COALESCE($12, category),
-               brand = COALESCE($13, brand),
-               active = COALESCE($14, active),
-               attrs = COALESCE($15, attrs),
-               color = COALESCE($16, color),
-               capacity = COALESCE($17, capacity),
-               card_rate = COALESCE($18, card_rate),
-               show_on_totem = COALESCE($19, show_on_totem),
-               images = COALESCE($20, images),
-               updated_at = now()
-           WHERE id = $21 AND store_id = $22`,
-          [
-            body.name,
-            body.sku,
-            body.barcode,
-            body.imei,
-            body.unit,
-            body.qty,
-            body.minQty,
-            body.cost,
-            body.price,
-            body.kind,
-            body.condition,
-            body.category,
-            body.brand,
-            body.active,
-            body.attrs !== undefined ? JSON.stringify(body.attrs) : null,
-            body.color,
-            body.capacity,
-            body.cardRate,
-            body.showOnTotem,
-            body.images !== undefined ? JSON.stringify(body.images) : null,
-            id,
-            storeId,
-          ],
-        );
-
-        await client.query('COMMIT');
-
-        const updatedRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-        res.json({ success: true, data: formatStockRow(updatedRes.rows[0]) });
-        return;
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      } finally {
-        client.release();
       }
     }
 
@@ -410,9 +444,13 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
     const id = req.params.id;
 
     if (pool) {
-      await pool.query(`DELETE FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
-      res.json({ success: true, data: { ok: true } });
-      return;
+      try {
+        await pool.query(`DELETE FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: { ok: true } });
+        return;
+      } catch (dbErr) {
+        console.warn('[stock] Falha ao deletar do banco, usando memória:', dbErr);
+      }
     }
 
     memoryStock.delete(id);
@@ -430,17 +468,21 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
     const storeId = req.storeId || 'STR-DEMO-01';
 
     if (pool) {
-      const itemsRes = await pool.query(
-        `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
-                kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
-         FROM stock_items
-         WHERE store_id = $1 AND active = true
-         ORDER BY name ASC`,
-        [storeId],
-      );
-      res.json({ success: true, data: itemsRes.rows.map(formatStockRow) });
-      return;
+      try {
+        const itemsRes = await pool.query(
+          `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+                  attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+           FROM stock_items
+           WHERE store_id = $1 AND active = true
+           ORDER BY name ASC`,
+          [storeId],
+        );
+        res.json({ success: true, data: itemsRes.rows.map(formatStockRow) });
+        return;
+      } catch (dbErr) {
+        console.warn('[stock] Falha ao consultar catálogo de produtos no banco, usando memória:', dbErr);
+      }
     }
 
     const items = Array.from(memoryStock.values()).filter((i) => i.storeId === storeId && i.active !== false);
