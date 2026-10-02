@@ -550,37 +550,11 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
         }
       }
 
-      if (map.size > 0) {
-        res.json({ success: true, data: Array.from(map.values()) });
-        return;
-      }
+      res.json({ success: true, data: Array.from(map.values()) });
+      return;
     }
 
-    // Fallback padrão se banco ainda não populado
-    res.json({
-      success: true,
-      data: [
-        {
-          clientId: 'CLI-DEMO-01',
-          tradeName: 'Cell Ponto',
-          legalName: 'Cell Ponto Telecomunicações LTDA',
-          document: '61.506.270/0001-63',
-          phone: '(24) 98124-4253',
-          email: 'contato@cellponto.com.br',
-          planId: 'golden',
-          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
-          status: 'active',
-          contractingStatus: 'acesso_ativado',
-          paymentOk: true,
-          monthlyAmount: 597,
-          contractedAt: '2026-01-01T00:00:00.000Z',
-          passwordConfigured: true,
-          phoneVerified: true,
-          notes: 'Empresa Matriz Cell Ponto',
-          accessToken: 'TK-001-000163-CPTR-88A1',
-        },
-      ],
-    });
+    res.json({ success: true, data: [] });
   } catch (error) {
     next(error);
   }
@@ -686,6 +660,21 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
         ...body,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+storesRouter.delete('/api/v1/admin/clients/:id', async (req, res, next) => {
+  try {
+    const clientId = req.params.id;
+    if (pool && clientId) {
+      await pool.query('DELETE FROM store_licenses WHERE client_account_id = $1', [clientId]);
+      await pool.query('DELETE FROM stores WHERE client_account_id = $1', [clientId]);
+      await pool.query('DELETE FROM users WHERE client_account_id = $1', [clientId]);
+      await pool.query('DELETE FROM client_accounts WHERE id = $1', [clientId]);
+    }
+    res.json({ success: true, message: 'Cliente removido com sucesso do banco de dados.' });
   } catch (error) {
     next(error);
   }

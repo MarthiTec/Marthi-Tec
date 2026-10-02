@@ -203,7 +203,77 @@ async function bootstrapDatabase() {
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 
-    // 2. Garante que teste@marthi.com.br e marthi.tecnologia@gmail.com existam no banco com senha 123 e permissão admin
+    // 2. Limpeza rigorosa de registros temporários de testes e dados sintéticos
+    try {
+      await pool.query(`
+        DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%';
+        DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
+        DELETE FROM payables WHERE store_id NOT IN ('STR-DEMO-01');
+        DELETE FROM receivables WHERE store_id NOT IN ('STR-DEMO-01');
+        DELETE FROM product_attributes WHERE store_id NOT IN ('STR-DEMO-01');
+        DELETE FROM products WHERE store_id NOT IN ('STR-DEMO-01');
+        DELETE FROM stock_items WHERE store_id NOT IN ('STR-DEMO-01');
+        DELETE FROM user_stores WHERE store_id NOT IN ('STR-DEMO-01') OR user_id IN (SELECT id FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%');
+        DELETE FROM employees WHERE store_id NOT IN ('STR-DEMO-01') OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%';
+        DELETE FROM stores WHERE id NOT IN ('STR-DEMO-01');
+        DELETE FROM store_licenses WHERE client_account_id NOT IN ('ACC-MARTHI-DEMO');
+        DELETE FROM users WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
+        DELETE FROM client_accounts WHERE id NOT IN ('ACC-MARTHI-DEMO');
+      `);
+    } catch (cleanErr) {
+      console.warn('[marthi-api] Aviso ao executar limpeza de dados de teste:', cleanErr);
+    }
+
+    // 3. Garante conta da Loja Demonstração Marthi com Plano Gold Ativo
+    await pool.query(
+      `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token, plan)
+       VALUES ('ACC-MARTHI-DEMO', 'Marthi Demonstração', 'Marthi Tecnologia e Demonstração LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 98124-4253', 'Administrador Marthi', 'active', 'TK-001-000163-CPTR-88A1', 'golden')
+       ON CONFLICT (id) DO UPDATE SET
+         trade_name = 'Marthi Demonstração',
+         legal_name = 'Marthi Tecnologia e Demonstração LTDA',
+         email = 'contato@marthi.com.br',
+         access_token = 'TK-001-000163-CPTR-88A1',
+         status = 'active',
+         plan = 'golden'`,
+    );
+
+    // 4. Garante loja matriz Demonstração com Token de Acesso
+    await pool.query(
+      `INSERT INTO stores (
+        id, client_account_id, trade_name, legal_name, document_type, document,
+        state_registration, municipal_registration, email, phone, zip_code, street,
+        number, complement, district, city, state, tax_regime, is_matrix, active, access_token
+      ) VALUES (
+        'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'Loja Demonstração Marthi', 'Marthi Tecnologia e Demonstração LTDA',
+        'cnpj', '61.506.270/0001-63', 'ISENTO', '12345', 'loja@marthi.com.br', '(24) 98124-4253',
+        '25800-000', 'Rua Prefeito Walter Franklin', '120', 'Loja 01', 'Centro', 'Três Rios', 'RJ',
+        'simples_nacional', true, true, 'TK-001-000163-CPTR-88A1'
+      ) ON CONFLICT (id) DO UPDATE SET
+        client_account_id = 'ACC-MARTHI-DEMO',
+        trade_name = 'Loja Demonstração Marthi',
+        legal_name = 'Marthi Tecnologia e Demonstração LTDA',
+        document = '61.506.270/0001-63',
+        email = 'loja@marthi.com.br',
+        access_token = 'TK-001-000163-CPTR-88A1',
+        active = true,
+        is_matrix = true`,
+    );
+
+    // 5. Garante licença Gold ativa com todos os módulos para STR-DEMO-01
+    try {
+      await pool.query(
+        `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
+         VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[], 'active')
+         ON CONFLICT (id) DO UPDATE SET
+           plan_id = 'scale',
+           status = 'active',
+           modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[]`,
+      );
+    } catch (licErr) {
+      console.warn('[marthi-api] Aviso ao sincronizar store_licenses:', licErr);
+    }
+
+    // 6. Garante usuário teste@marthi.com.br como Administrador
     const testEmail = 'teste@marthi.com.br';
     const testPass = '123';
     const salt = randomBytes(16).toString('hex');
@@ -211,62 +281,30 @@ async function bootstrapDatabase() {
 
     await pool.query(
       `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
-       VALUES ('USR-TEST-ADMIN', 'ACC-MARTHI-DEMO', $1, 'Marthi Teste Admin', 'password', $2, 'admin', true)
+       VALUES ('USR-TEST-ADMIN', 'ACC-MARTHI-DEMO', $1, 'Administrador Marthi', 'password', $2, 'admin', true)
        ON CONFLICT (email) DO UPDATE
-       SET global_role = 'admin', active = true, password_hash = $2`,
+       SET client_account_id = 'ACC-MARTHI-DEMO', global_role = 'admin', active = true, password_hash = $2`,
       [testEmail, `${salt}:${pHash}`],
     );
 
+    // 7. Garante usuário marthi.tecnologia@gmail.com como Superadmin (para abertura do /admin)
     const marthiAdminEmail = 'marthi.tecnologia@gmail.com';
     const marthiSalt = randomBytes(16).toString('hex');
     const marthiHash = hashPassword('123', marthiSalt);
 
     await pool.query(
       `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
-       VALUES ('usr-marthi-admin', 'ACC-MARTHI-DEMO', $1, 'Marthi Tecnologia', 'password', $2, 'admin', true)
+       VALUES ('usr-marthi-admin', 'ACC-MARTHI-DEMO', $1, 'Marthi Tecnologia', 'password', $2, 'superadmin', true)
        ON CONFLICT (email) DO UPDATE SET
          password_hash = $2,
          name = 'Marthi Tecnologia',
          client_account_id = 'ACC-MARTHI-DEMO',
          active = true,
-         global_role = 'admin'`,
+         global_role = 'superadmin'`,
       [marthiAdminEmail, `${marthiSalt}:${marthiHash}`],
     );
 
-    // 3. Garante conta Cell Ponto com CNPJ e Token de Acesso
-    await pool.query(
-      `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
-       VALUES ('ACC-MARTHI-DEMO', 'Cell Ponto', 'Cell Ponto Telecomunicações LTDA', 'cnpj', '61.506.270/0001-63', 'contato@cellponto.com.br', '(24) 98124-4253', 'Administrador', 'active', 'TK-001-000163-CPTR-88A1')
-       ON CONFLICT (document) DO UPDATE SET
-         trade_name = 'Cell Ponto',
-         email = 'contato@cellponto.com.br',
-         access_token = 'TK-001-000163-CPTR-88A1',
-         status = 'active'`,
-    );
-
-    // 4. Garante loja matriz Cell Ponto com Token de Acesso
-    await pool.query(
-      `INSERT INTO stores (
-        id, client_account_id, trade_name, legal_name, document_type, document,
-        state_registration, municipal_registration, email, phone, zip_code, street,
-        number, complement, district, city, state, tax_regime, is_matrix, active, access_token
-      ) VALUES (
-        'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'Cell Ponto Matriz', 'Cell Ponto Telecomunicações LTDA',
-        'cnpj', '61.506.270/0001-63', 'ISENTO', '12345', 'matriz@cellponto.com.br', '(24) 98124-4253',
-        '25800-000', 'Rua Prefeito Walter Franklin', '120', 'Loja 01', 'Centro', 'Três Rios', 'RJ',
-        'simples_nacional', true, true, 'TK-001-000163-CPTR-88A1'
-      ) ON CONFLICT (id) DO UPDATE SET
-        client_account_id = 'ACC-MARTHI-DEMO',
-        trade_name = 'Cell Ponto Matriz',
-        legal_name = 'Cell Ponto Telecomunicações LTDA',
-        document = '61.506.270/0001-63',
-        email = 'matriz@cellponto.com.br',
-        access_token = 'TK-001-000163-CPTR-88A1',
-        active = true,
-        is_matrix = true`,
-    );
-
-    // 5. Vínculo user_stores para AMBOS os administradores
+    // 8. Vínculo user_stores para AMBOS os administradores
     await pool.query(
       `DO $$ BEGIN
          ALTER TABLE user_stores ALTER COLUMN role TYPE TEXT USING role::text;
@@ -283,11 +321,11 @@ async function bootstrapDatabase() {
        ON CONFLICT (user_id, store_id) DO UPDATE SET role = EXCLUDED.role, is_default = true`,
     );
 
-    // 6. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
+    // 9. Garante colaboradores teste e marthi na tabela employees com role admin e todas as áreas de acesso
     await pool.query(
       `INSERT INTO employees (id, store_id, name, phone, email, document, role, is_system_user, user_email, access_areas, active, created_at, updated_at)
        VALUES
-         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Marthi Teste Admin', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
+         ('EMP-TESTE-ADMIN', 'STR-DEMO-01', 'Administrador Marthi', '(24) 98124-4253', 'teste@marthi.com.br', '', 'admin', true, 'teste@marthi.com.br', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now()),
          ('EMP-MARTHI-ADMIN', 'STR-DEMO-01', 'Marthi Tecnologia', '(24) 98124-4253', 'marthi.tecnologia@gmail.com', '', 'admin', true, 'marthi.tecnologia@gmail.com', '["painel","totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, true, now(), now())
        ON CONFLICT (id) DO UPDATE SET
          role = 'admin',
@@ -297,21 +335,7 @@ async function bootstrapDatabase() {
          updated_at = now()`,
     );
 
-    // 7. Garante licença ativa com todos os módulos para STR-DEMO-01
-    try {
-      await pool.query(
-        `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-         VALUES ('LIC-DEMO-01', 'STR-DEMO-01', 'ACC-MARTHI-DEMO', 'scale', ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[], 'active')
-         ON CONFLICT (id) DO UPDATE SET
-           plan_id = 'scale',
-           status = 'active',
-           modules = ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[]`,
-      );
-    } catch (licErr) {
-      console.warn('[marthi-api] Aviso ao sincronizar store_licenses:', licErr);
-    }
-
-    // 8. Garante produtos no catálogo do Totem e estoque Cell Ponto se não houver nenhum
+    // 10. Garante produtos no catálogo do Totem e estoque da Loja Demonstração
     const stockCountRes = await pool.query(
       `SELECT COUNT(*)::int AS total FROM stock_items WHERE store_id = 'STR-DEMO-01' AND (show_on_totem = true OR show_on_totem IS NULL)`,
     );
@@ -338,13 +362,6 @@ async function bootstrapDatabase() {
       `);
       console.log('[marthi-api] ✓ Catálogo inicial de produtos para o Totem inserido com sucesso!');
     }
-
-    // 9. Limpeza definitiva de contas legadas de teste/mock
-    await pool.query(`
-      DELETE FROM user_stores WHERE user_id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto');
-      DELETE FROM employees WHERE user_email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
-      DELETE FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
-    `);
 
     console.log('[marthi-api] ✓ Usuários, Tokens de Acesso, Lojas, Licenças e Catálogo sincronizados no banco de dados!');
   } catch (err) {
