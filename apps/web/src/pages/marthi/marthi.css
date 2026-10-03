@@ -1,3 +1,41 @@
+.marthi-ops {
+  --card: #ffffff;
+  --card-2: #f8fafc;
+  --surface: #eef1f4;
+  --ink: #0f172a;
+  --mute: #64748b;
+  --line: #d8dde3;
+}
+
+.marthi-ops.is-theme-dark,
+.marthi-ops.admin--dark,
+.is-theme-dark .marthi-ops {
+  --card: #171e27;
+  --card-2: #1c2430;
+  --surface: #0f141a;
+  --ink: #e8eef4;
+  --mute: #94a3b8;
+  --line: rgba(148, 163, 184, 0.22);
+}
+
+.marthi-summary-box {
+  background: var(--card-2, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  color: var(--ink, #0f172a);
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  display: grid;
+  gap: 4px;
+}
+
+.admin.admin--dark .marthi-summary-box,
+.is-theme-dark .marthi-summary-box {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #f1f5f9);
+}
+
 .marthi-toolbar {
   display: flex;
   flex-wrap: wrap;

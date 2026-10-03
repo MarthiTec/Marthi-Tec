@@ -1,7 +1,10 @@
 .admin {
   --ink: #12151a;
-  --mute: #6b7280;
+  --mute: #64748b;
   --line: #d8dde3;
+  --card: #ffffff;
+  --card-2: #f8fafc;
+  --surface: #eef1f4;
   --red: #d70015;
   --teal: #0f766e;
   --teal-soft: rgba(45, 212, 191, 0.16);

@@ -1359,8 +1359,8 @@ export function MarthiClientsPage() {
               {/* Estrutura Corporativa: Filial ou Loja Independente */}
               <div
                 style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.08))',
+                  background: 'var(--card-2, #f8fafc)',
+                  border: '1px solid var(--line, #e2e8f0)',
                   borderRadius: '8px',
                   padding: '12px 14px',
                   marginTop: '4px',
@@ -1456,17 +1456,7 @@ export function MarthiClientsPage() {
             </header>
 
             <div className="marthi-modal-form">
-              <div
-                style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.08))',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  display: 'grid',
-                  gap: '4px',
-                }}
-              >
+              <div className="marthi-summary-box">
                 <div>
                   <strong>Cliente:</strong> {paymentModalClient.tradeName} ({paymentModalClient.email})
                 </div>
@@ -1514,9 +1504,10 @@ export function MarthiClientsPage() {
               <div
                 style={{
                   fontSize: '0.82rem',
-                  color: 'var(--mute, #94a3b8)',
-                  lineHeight: 1.4,
-                  background: 'rgba(148, 163, 184, 0.08)',
+                  color: 'var(--ink, #0f172a)',
+                  lineHeight: 1.45,
+                  background: 'rgba(15, 118, 110, 0.08)',
+                  border: '1px solid rgba(15, 118, 110, 0.25)',
                   padding: '10px 12px',
                   borderRadius: '8px',
                 }}
@@ -1913,17 +1904,7 @@ export function MarthiClientsPage() {
                 O e-mail oficial com o <strong>link seguro para criação de senha</strong> foi despachado para o responsável:
               </p>
 
-              <div
-                style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.1))',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  display: 'grid',
-                  gap: '8px',
-                  fontSize: '0.88rem',
-                }}
-              >
+              <div className="marthi-summary-box" style={{ borderRadius: '12px', padding: '16px', gap: '8px', fontSize: '0.88rem' }}>
                 <div><strong>Empresa:</strong> {activatedNotice.client.tradeName}</div>
                 <div><strong>E-mail:</strong> {activatedNotice.client.email}</div>
                 <div><strong>Plano:</strong> {planLabel(activatedNotice.client.planId)} ({money(activatedNotice.client.monthlyAmount)}/mês)</div>

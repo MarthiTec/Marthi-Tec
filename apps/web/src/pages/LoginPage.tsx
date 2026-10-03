@@ -8,7 +8,7 @@ import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
 import { isMarthiStaffEmail } from '../data/marthiStaff';
 import { nestApiUrl } from '../services/config';
 
-type AuthView = 'login' | 'forgot' | 'signup';
+type AuthView = 'login' | 'forgot' | 'signup' | 'first-access';
 
 function safeNext(value: string | null, email: string | null | undefined) {
   /** Conta Marthi sempre entra no painel administrativo interno. */
@@ -36,9 +36,13 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const { user, loading, providers, loginWithPassword, loginWithGoogle } = useAuth();
   const nextParam = params.get('next');
-  const [view, setView] = useState<AuthView>(() =>
-    params.get('view') === 'signup' ? 'signup' : params.get('view') === 'forgot' ? 'forgot' : 'login',
-  );
+  const [view, setView] = useState<AuthView>(() => {
+    const v = params.get('view');
+    if (v === 'signup') return 'signup';
+    if (v === 'forgot') return 'forgot';
+    if (v === 'first-access' || v === 'primeiro-acesso') return 'first-access';
+    return 'login';
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -128,6 +132,44 @@ export function LoginPage() {
     }
   }
 
+  async function handleFirstAccess(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setFeedback(null);
+    const mail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      setError('Informe um e-mail válido.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const apiUrl = nestApiUrl();
+      const res = await fetch(`${apiUrl}/api/v1/auth/first-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail }),
+      });
+      const json = await res.json().catch(() => null);
+      if (json?.data?.activationUrl) {
+        setFeedback(
+          'Link de ativação gerado com sucesso! Você pode usar o link enviado por e-mail ou prosseguir diretamente para criar sua senha.',
+        );
+      } else {
+        setFeedback(
+          json?.data?.message ||
+            'Se o e-mail informado estiver cadastrado, enviamos as instruções e o link seguro para você definir sua senha de primeiro acesso.',
+        );
+      }
+    } catch {
+      setFeedback(
+        'Se o e-mail informado estiver cadastrado, enviamos as instruções e o link seguro para você definir sua senha de primeiro acesso.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -190,16 +232,57 @@ export function LoginPage() {
             </p>
           </>
         ) : null}
+        {view === 'first-access' ? (
+          <>
+            <h1>Primeiro Acesso</h1>
+            <p className="auth__lead">
+              Seu cadastro foi realizado pelo gestor da loja ou pela equipe Marthi?
+              Informe seu e-mail para receber o link seguro de ativação e cadastrar sua senha.
+            </p>
+          </>
+        ) : null}
 
         {error ? (
-          <p className="auth__error" role="alert">
-            {error}
-          </p>
+          <div className="auth__error" role="alert">
+            <div>{error}</div>
+            {view === 'login' && (
+              <div style={{ marginTop: '6px', fontSize: '0.82rem', opacity: 0.9 }}>
+                É seu primeiro acesso?{' '}
+                <button
+                  type="button"
+                  style={{
+                    textDecoration: 'underline',
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    font: 'inherit',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontWeight: 700,
+                  }}
+                  onClick={() => goView('first-access')}
+                >
+                  Clique aqui para ativar sua conta
+                </button>
+              </div>
+            )}
+          </div>
         ) : null}
         {feedback ? (
-          <p className="auth__ok" role="status">
-            {feedback}
-          </p>
+          <div className="auth__ok" role="status">
+            <div>{feedback}</div>
+            {view === 'first-access' && (
+              <div style={{ marginTop: '10px' }}>
+                <Link
+                  to={email ? `/criar-senha?email=${encodeURIComponent(email)}` : '/criar-senha'}
+                  className="btn btn--secondary btn--block"
+                  style={{ fontSize: '0.86rem', textAlign: 'center' }}
+                >
+                  Ir para Criação de Senha →
+                </Link>
+              </div>
+            )}
+          </div>
         ) : null}
 
         {view === 'login' ? (
@@ -328,10 +411,44 @@ export function LoginPage() {
             </p>
           </form>
         ) : null}
+        {view === 'first-access' ? (
+          <form className="auth__form" onSubmit={handleFirstAccess}>
+            <label>
+              E-mail cadastrado
+              <input
+                type="email"
+                name="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="voce@empresa.com.br"
+                autoComplete="username"
+                required
+                disabled={submitting}
+              />
+            </label>
+            <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+              {submitting ? 'Verificando…' : 'Enviar Link de Primeiro Acesso'}
+            </button>
+
+            <div style={{ marginTop: '12px', textAlign: 'center' }}>
+              <Link to="/criar-senha" className="auth__link" style={{ fontSize: '0.84rem' }}>
+                🔑 Já possui um token de ativação? Clique aqui
+              </Link>
+            </div>
+          </form>
+        ) : null}
 
         {view === 'login' ? (
           <>
-            <div className="auth__links">
+            <div className="auth__links" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                className="auth__link"
+                style={{ fontWeight: 700, color: 'var(--teal, #0f766e)' }}
+                onClick={() => goView('first-access')}
+              >
+                Primeiro acesso?
+              </button>
               <button type="button" className="auth__link" onClick={() => goView('forgot')}>
                 Esqueci minha senha
               </button>

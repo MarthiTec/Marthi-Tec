@@ -553,6 +553,68 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
 }
 
 /**
+ * Solicitação de Primeiro Acesso (Link de ativação e criação de senha inicial)
+ */
+export async function requestFirstAccess(email: string): Promise<{ success: boolean; message: string; activationUrl?: string }> {
+  const normEmail = email.trim().toLowerCase();
+  const genericMessage =
+    'Se o e-mail informado estiver cadastrado, enviamos as instruções e o link seguro para você definir sua senha de primeiro acesso.';
+
+  let userName = '';
+  let exists = false;
+  const companyName = 'Loja';
+  const planName = 'Plano Marthi';
+
+  // 1. Verifica no store em memória
+  const inMem = clientUsersStore.get(normEmail);
+  if (inMem) {
+    exists = true;
+    userName = inMem.name;
+  }
+
+  // 2. Verifica no PostgreSQL
+  if (pool) {
+    try {
+      const uRes = await pool.query('SELECT name, active FROM users WHERE lower(email) = $1', [normEmail]);
+      if (uRes.rows.length > 0) {
+        exists = true;
+        userName = uRes.rows[0].name || userName;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  let rawToken = '';
+  try {
+    const tokenResult = await createSecureToken({
+      type: 'activation',
+      email: normEmail,
+      name: userName || 'Cliente Marthi',
+      ttlHours: 48,
+    });
+    rawToken = tokenResult.rawToken;
+
+    await sendWelcomeEmail({
+      toEmail: normEmail,
+      contactName: userName || 'Responsável',
+      companyName: companyName,
+      planName: planName,
+      activationToken: rawToken,
+    });
+    console.log(`[authService] E-mail de primeiro acesso enviado para ${normEmail}`);
+  } catch (err) {
+    console.error(`[authService] Erro ao enviar e-mail de primeiro acesso:`, err);
+  }
+
+  return {
+    success: true,
+    message: genericMessage,
+    activationUrl: rawToken ? `/criar-senha?token=${rawToken}` : undefined,
+  };
+}
+
+/**
  * Redefine a senha com o token seguro de redefinição
  */
 export async function resetPasswordWithToken(

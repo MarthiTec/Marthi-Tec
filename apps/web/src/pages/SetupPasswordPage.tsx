@@ -204,17 +204,44 @@ export function SetupPasswordPage() {
           </div>
         ) : error && !tokenInfo ? (
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{ color: '#f87171' }}>Link Inválido ou Expirado</h1>
-            <p className="auth__lead" style={{ margin: '16px 0 24px' }}>
+            <h1 style={{ fontSize: '1.4rem', color: 'var(--ink, #12151a)', margin: '0 0 12px' }}>Ativação de Primeiro Acesso</h1>
+            <p className="auth__lead" style={{ margin: '0 0 20px', fontSize: '0.88rem' }}>
               {error}
             </p>
-            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '24px' }}>
-              Por segurança, links de criação de senha possuem uso único e prazo de expiração.
-              Solicite um novo link ao administrador ou equipe de suporte.
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const t = (e.currentTarget.elements.namedItem('manualToken') as HTMLInputElement)?.value.trim();
+                if (t) navigate(`/criar-senha?token=${encodeURIComponent(t)}`);
+              }}
+              style={{ marginBottom: '20px', textAlign: 'left' }}
+            >
+              <label>
+                <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>Possui o Token / Código de Ativação?</span>
+                <input
+                  type="text"
+                  name="manualToken"
+                  placeholder="Cole aqui o token recebido no e-mail ou WhatsApp"
+                  style={{ width: '100%', marginTop: '6px' }}
+                />
+              </label>
+              <button type="submit" className="btn btn--primary" style={{ width: '100%', marginTop: '10px' }}>
+                Validar Token de Ativação →
+              </button>
+            </form>
+
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+              Não recebeu o link ou ele expirou? Solicite o envio imediato para seu e-mail:
             </p>
-            <Link to="/login" className="btn btn--primary" style={{ width: '100%', display: 'inline-block' }}>
-              Voltar ao Login
-            </Link>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Link to="/login?view=first-access" className="btn btn--secondary" style={{ width: '100%' }}>
+                ✉️ Solicitar Link de Primeiro Acesso por E-mail
+              </Link>
+              <Link to="/login" className="auth__link" style={{ fontSize: '0.84rem' }}>
+                ← Voltar à tela de login
+              </Link>
+            </div>
           </div>
         ) : (
           <>

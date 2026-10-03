@@ -9,6 +9,7 @@ import {
   loginWithGoogleIdToken,
   loginWithPassword,
   registerClientUser,
+  requestFirstAccess,
   requestPasswordReset,
   resetPasswordWithToken,
   setupPasswordWithToken,
@@ -176,6 +177,23 @@ authRouter.post('/api/v1/auth/setup-password', async (req, res, next) => {
   try {
     const body = setupPasswordSchema.parse(req.body);
     const result = await setupPasswordWithToken(body.token, body.password);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const firstAccessSchema = z.object({
+  email: z.string().email(),
+});
+
+/**
+ * Primeiro Acesso — Solicitação de link seguro de ativação e criação de senha inicial
+ */
+authRouter.post('/api/v1/auth/first-access', async (req, res, next) => {
+  try {
+    const body = firstAccessSchema.parse(req.body);
+    const result = await requestFirstAccess(body.email);
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);
