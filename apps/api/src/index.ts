@@ -17,6 +17,9 @@ import { profileRouter } from './routes/profile.js';
 import { totemRouter } from './routes/totem.js';
 import { whatsappRouter } from './routes/whatsapp.js';
 import { communicationRouter } from './routes/communication.js';
+import { salesRouter } from './routes/sales.js';
+import { goalsRouter } from './routes/goals.js';
+import { reportsRouter } from './routes/reports.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
@@ -63,6 +66,9 @@ app.use(registryRouter);
 app.use(storesRouter);
 app.use(financeRouter);
 app.use(posRouter);
+app.use(salesRouter);
+app.use(goalsRouter);
+app.use(reportsRouter);
 app.use(profileRouter);
 app.use(totemRouter);
 app.use(whatsappRouter);
@@ -208,6 +214,67 @@ async function bootstrapDatabase() {
         ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
         ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS sale_type TEXT NOT NULL DEFAULT 'pos';
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS cost_total NUMERIC(12,2) NOT NULL DEFAULT 0;
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS gross_profit NUMERIC(12,2) NOT NULL DEFAULT 0;
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS margin_percent NUMERIC(6,2) NOT NULL DEFAULT 0;
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS trade_in_value NUMERIC(12,2) NOT NULL DEFAULT 0;
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS trade_in_notes TEXT NOT NULL DEFAULT '';
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS external_cash_status TEXT NOT NULL DEFAULT 'not_applicable';
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS warranty_terms TEXT NOT NULL DEFAULT '';
+        ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS warranty_months INT NOT NULL DEFAULT 3;
+
+        ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS unit_cost NUMERIC(12,2) NOT NULL DEFAULT 0;
+        ALTER TABLE sales_order_lines ADD COLUMN IF NOT EXISTS total_cost NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+        CREATE TABLE IF NOT EXISTS sales_goals (
+          id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          goal_type TEXT NOT NULL DEFAULT 'revenue',
+          target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          seller_id TEXT,
+          active BOOLEAN NOT NULL DEFAULT true,
+          progressive_tiers JSONB NOT NULL DEFAULT '[]'::jsonb,
+          commission_rules JSONB NOT NULL DEFAULT '{"enabled": true, "percent": 10, "type": "percent_revenue", "requires_goal_reached": true}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        CREATE TABLE IF NOT EXISTS sale_trade_ins (
+          id TEXT PRIMARY KEY,
+          sale_id TEXT NOT NULL,
+          store_id TEXT NOT NULL,
+          device_name TEXT NOT NULL,
+          imei TEXT NOT NULL DEFAULT '',
+          capacity TEXT NOT NULL DEFAULT '',
+          color TEXT NOT NULL DEFAULT '',
+          condition_state TEXT NOT NULL DEFAULT 'used',
+          notes TEXT NOT NULL DEFAULT '',
+          trade_value NUMERIC(12,2) NOT NULL DEFAULT 0,
+          stock_item_id TEXT,
+          status TEXT NOT NULL DEFAULT 'received',
+          received_by_seller_id TEXT,
+          customer_id TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        CREATE TABLE IF NOT EXISTS cash_pickups (
+          id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          responsible_name TEXT NOT NULL,
+          amount NUMERIC(12,2) NOT NULL,
+          origin TEXT NOT NULL DEFAULT 'vendas_externas',
+          payment_method TEXT NOT NULL DEFAULT 'dinheiro',
+          pickup_date DATE NOT NULL DEFAULT CURRENT_DATE,
+          notes TEXT NOT NULL DEFAULT '',
+          finance_entry_id TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 

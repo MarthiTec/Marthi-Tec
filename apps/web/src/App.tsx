@@ -93,6 +93,9 @@ import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
 import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
 import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 import { PainelUsersPage } from './pages/admin/PainelUsersPage';
+import { ExternalSalePage } from './pages/admin/ExternalSalePage';
+import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
+import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
 function LegacyMarthiRedirect() {
   const location = useLocation();
@@ -122,6 +125,9 @@ export function App() {
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />
         <Route path="/totem" element={<TotemPage />} />
         <Route path="/caixa" element={<CaixaPage />} />
+        <Route path="/venda-externa" element={<Navigate to="/painel/venda-externa" replace />} />
+        <Route path="/metas" element={<Navigate to="/painel/metas" replace />} />
+        <Route path="/relatorio-vendas" element={<Navigate to="/painel/relatorio-vendas" replace />} />
         <Route path="/mesa" element={<MesaPage />} />
         <Route path="/cozinha" element={<CozinhaPage />} />
         <Route path="/cardapio" element={<CardapioPublicPage />} />
@@ -215,6 +221,9 @@ export function App() {
           <Route path="operacoes/whatsapp" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
+          <Route path="venda-externa" element={<ExternalSalePage />} />
+          <Route path="metas" element={<GoalsManagementPage />} />
+          <Route path="relatorio-vendas" element={<SalesGoalsReportPage />} />
           <Route path="totem" element={<TotemInsightsPage />} />
           <Route path="totem/produtos" element={<StockPage />} />
           <Route path="totem/atributos" element={<AttributesPage />} />

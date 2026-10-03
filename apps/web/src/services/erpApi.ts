@@ -2016,4 +2016,143 @@ export function apiSaveCardMachines(machines: any[]) {
   return nestPut<{ ok: true; count: number }>('/card-machines', { machines });
 }
 
+/* ── External Sales (Venda sem Caixa), Trade-in & Goals ──── */
+
+export type ExternalSaleLine = {
+  stockId?: string | null;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  unitCost?: number;
+  discount?: number;
+  surcharge?: number;
+  imei?: string;
+  isAdHoc?: boolean;
+  itemType?: string;
+};
+
+export type TradeInPayload = {
+  deviceName: string;
+  imei?: string;
+  capacity?: string;
+  color?: string;
+  conditionState?: 'used' | 'refurbished' | 'damaged';
+  notes?: string;
+  tradeValue: number;
+};
+
+export type ExternalSalePayload = {
+  customerId?: string | null;
+  customerName?: string;
+  customerPhone?: string;
+  customerDocument?: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  paymentMethod: string;
+  installments?: number;
+  discount?: number;
+  surcharge?: number;
+  notes?: string;
+  warrantyMonths?: number;
+  warrantyTerms?: string;
+  lines: ExternalSaleLine[];
+  tradeIn?: TradeInPayload | null;
+};
+
+export type GoalRow = {
+  id: string;
+  name: string;
+  goalType: 'revenue' | 'profit' | 'sales_count' | 'products_count';
+  targetValue: number;
+  startDate: string;
+  endDate: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  active: boolean;
+  realized: number;
+  percent: number;
+  remaining: number;
+  salesCount: number;
+  accumulatedProfit: number;
+  averageTicket: number;
+  isReached: boolean;
+  currentTierName?: string;
+  commissionAmount: number;
+  progressiveTiers?: Array<{ name: string; value: number }>;
+  commissionRules?: {
+    enabled?: boolean;
+    percent?: number;
+    type?: 'percent_revenue' | 'percent_profit' | 'fixed_value';
+    requiresGoalReached?: boolean;
+    fixedValue?: number;
+  };
+};
+
+export function apiCreateExternalSale(body: ExternalSalePayload) {
+  return nestPost<any>('/sales/external', body);
+}
+
+export function apiGetSaleReceipt(saleId: string) {
+  return nestGet<any>(`/sales/${saleId}/receipt`);
+}
+
+export function apiSendWarrantyWhatsApp(saleId: string, body: { phone: string; customNote?: string }) {
+  return nestPost<any>(`/sales/${saleId}/send-warranty-whatsapp`, body);
+}
+
+export function apiGetDailyPendingTasks() {
+  return nestGet<{
+    pendingCashSalesCount: number;
+    pendingCashTotal: number;
+    pendingTradeInsCount: number;
+    pendingTradeInsTotal: number;
+    payablesDueCount: number;
+    payablesDueAmount: number;
+    receivablesDueCount: number;
+    receivablesDueAmount: number;
+  }>('/sales/external/daily-tasks');
+}
+
+export function apiCancelSale(saleId: string, reason?: string) {
+  return nestPost<any>(`/sales/${saleId}/cancel`, { reason });
+}
+
+export function apiListGoals() {
+  return nestGet<GoalRow[]>('/goals');
+}
+
+export function apiCreateGoal(body: Partial<GoalRow>) {
+  return nestPost<GoalRow>('/goals', body);
+}
+
+export function apiUpdateGoal(id: string, body: Partial<GoalRow>) {
+  return nestPatch<GoalRow>(`/goals/${id}`, body);
+}
+
+export function apiDeleteGoal(id: string) {
+  return nestDelete<{ ok: true }>(`/goals/${id}`);
+}
+
+export function apiGetGoalsDashboard() {
+  return nestGet<any>('/goals/dashboard');
+}
+
+export function apiGetSalesGoalsReport(params: Record<string, string | undefined>) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) qs.set(k, v);
+  }
+  const query = qs.toString();
+  return nestGet<any>(`/reports/sales-goals${query ? `?${query}` : ''}`);
+}
+
+export function apiListPickups() {
+  return nestGet<{ pendingCashBalance: number; pickups: any[] }>('/finance/pickups');
+}
+
+export function apiCreatePickup(body: { responsibleName: string; amount: number; notes?: string; pickupDate?: string }) {
+  return nestPost<any>('/finance/pickups', body);
+}
+
+
 

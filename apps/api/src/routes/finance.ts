@@ -984,3 +984,156 @@ financeRouter.post('/api/v1/finance', requireAuth, async (req, res, next) => {
     next(error);
   }
 });
+
+/* ── 5. Recolhimento de Valores em Espécie (Gilvan Teodo) ──── */
+
+const pickupSchema = z.object({
+  responsibleName: z.string().min(1, 'Nome do responsável é obrigatório.').default('Gilvan Teodo'),
+  amount: z.coerce.number().min(0.01, 'Valor de recolhimento deve ser positivo.'),
+  origin: z.string().default('vendas_externas'),
+  paymentMethod: z.string().default('dinheiro'),
+  pickupDate: z.string().default(() => new Date().toISOString().slice(0, 10)),
+  notes: z.string().default(''),
+});
+
+financeRouter.get('/api/v1/finance/pickups', requireAuth, async (req, res, next) => {
+  try {
+    const storeId = req.storeId!;
+    if (!pool) {
+      res.json({ success: true, data: { pendingCashBalance: 0, pickups: [] } });
+      return;
+    }
+
+    // 1. Saldo físico de vendas em dinheiro ainda não recolhidas
+    const pendingRes = await pool.query(
+      `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+       FROM sales_orders
+       WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
+      [storeId],
+    );
+
+    // 2. Histórico de recolhimentos efetuados
+    const pickupsRes = await pool.query(
+      `SELECT * FROM cash_pickups WHERE store_id = $1 ORDER BY pickup_date DESC, created_at DESC LIMIT 100`,
+      [storeId],
+    );
+
+    res.json({
+      success: true,
+      data: {
+        pendingCashBalance: Number(pendingRes.rows[0]?.pending_total) || 0,
+        pickups: pickupsRes.rows.map((r) => ({
+          id: r.id,
+          responsibleName: r.responsible_name,
+          amount: Number(r.amount),
+          origin: r.origin,
+          paymentMethod: r.payment_method,
+          pickupDate: r.pickup_date,
+          notes: r.notes || '',
+          createdAt: r.created_at,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+financeRouter.post('/api/v1/finance/pickups', requireAuth, async (req, res, next) => {
+  try {
+    const storeId = req.storeId!;
+    const body = pickupSchema.parse(req.body);
+    const pickupId = `PCK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    if (!pool) {
+      res.status(503).json({ success: false, error: { message: 'Banco indisponível.' } });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Lança saída de tesouraria / recolhimento no livro caixa
+      const entryId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      await client.query(
+        `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, category, operator_name)
+         VALUES ($1, $2, 'out', $3, $4, 'manual', $5, 'Recolhimento / Retirada', $6)`,
+        [
+          entryId,
+          storeId,
+          `Recolhimento de dinheiro em espécie - Responsável: ${body.responsibleName}`,
+          body.amount,
+          pickupId,
+          req.user?.name || 'Gilvan Teodo',
+        ],
+      );
+
+      // 2. Insere registro formal na tabela cash_pickups
+      await client.query(
+        `INSERT INTO cash_pickups (
+          id, store_id, responsible_name, amount, origin, payment_method, pickup_date, notes, finance_entry_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          pickupId,
+          storeId,
+          body.responsibleName.trim(),
+          body.amount,
+          body.origin,
+          body.paymentMethod,
+          body.pickupDate,
+          body.notes.trim(),
+          entryId,
+        ],
+      );
+
+      // 3. Atualiza status de vendas em dinheiro pendentes até o montante recolhido
+      let remainingToClear = body.amount;
+      const pendingSales = await client.query(
+        `SELECT id, total_amount FROM sales_orders
+         WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'
+         ORDER BY created_at ASC`,
+        [storeId],
+      );
+
+      for (const s of pendingSales.rows) {
+        if (remainingToClear <= 0) break;
+        const sAmount = Number(s.total_amount);
+        await client.query(
+          `UPDATE sales_orders SET external_cash_status = 'collected', updated_at = now() WHERE id = $1`,
+          [s.id],
+        );
+        remainingToClear -= sAmount;
+      }
+
+      await client.query('COMMIT');
+
+      const updatedPending = await pool.query(
+        `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+         FROM sales_orders
+         WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
+        [storeId],
+      );
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: pickupId,
+          responsibleName: body.responsibleName,
+          amount: body.amount,
+          pickupDate: body.pickupDate,
+          notes: body.notes,
+          remainingPendingCash: Number(updatedPending.rows[0]?.pending_total) || 0,
+        },
+      });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, error: { message: err.message || 'Erro ao registrar recolhimento.' } });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
