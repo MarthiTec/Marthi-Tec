@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { SignJWT, jwtVerify } from 'jose';
 import { env } from '../config/env.js';
@@ -34,7 +34,6 @@ type StoredUser = {
   createdAt: string;
 };
 
-const clientUsersStore = new Map<string, StoredUser>();
 
 const textEncoder = new TextEncoder();
 
@@ -43,90 +42,54 @@ function getJwtSecret() {
 }
 
 export function hashPassword(password: string, salt: string): string {
-  return createHash('sha256').update(`${salt}:${password}`).digest('hex');
+  return 'scrypt$' + scryptSync(password, salt, 64).toString('hex');
 }
 
-const defaultTestSalt = 'a1b2c3d4e5f6';
-clientUsersStore.set('teste@marthi.com.br', {
-  id: 'usr-teste-admin',
-  email: 'teste@marthi.com.br',
-  name: 'Administrador Marthi',
-  passwordHash: hashPassword('123', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'acc-matrix-demo',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-clientUsersStore.set('marthi.tecnologia@gmail.com', {
-  id: 'usr-marthi-admin',
-  email: 'marthi.tecnologia@gmail.com',
-  name: 'Marthi Tecnologia',
-  passwordHash: hashPassword('123', defaultTestSalt),
-  salt: defaultTestSalt,
-  role: 'admin',
-  clientAccountId: 'acc-matrix-demo',
-  active: true,
-  createdAt: new Date().toISOString(),
-});
-
-export function upsertClientUserInMemory(
-  email: string,
-  name: string,
-  password: string,
-  role = 'operator',
-  clientAccountId?: string,
-) {
-  const norm = email.trim().toLowerCase();
-  const salt = randomBytes(16).toString('hex');
-  const passwordHash = hashPassword(password.trim(), salt);
-  const existing = clientUsersStore.get(norm);
-  clientUsersStore.set(norm, {
-    id: existing?.id || `usr-${Date.now().toString(36)}`,
-    email: norm,
-    name: name.trim(),
-    passwordHash,
-    salt,
-    role,
-    clientAccountId: clientAccountId || existing?.clientAccountId || 'ACC-MARTHI-DEMO',
-    active: true,
-    createdAt: existing?.createdAt || new Date().toISOString(),
-  });
-}
+export function upsertClientUserInMemory(..._args: unknown[]): never {
+      throw new Error('Gravação em memória desativada. Salve o usuário no MarthiDB.');
+    }
 
 export async function createSessionToken(user: AuthUser): Promise<string> {
+  const state = await pool.query('SELECT session_version FROM users WHERE id = $1 AND active = true', [user.id]);
+  if (!state.rows[0]) throw Object.assign(new Error('Conta não autorizada.'), { status: 401 });
   return new SignJWT({
+    sessionVersion: state.rows[0].session_version ?? 0,
     email: user.email,
     name: user.name,
     picture: user.picture,
     provider: user.provider,
-    role: user.role ?? 'admin',
+    role: user.role ?? 'operator',
     clientAccountId: user.clientAccountId ?? null,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
+    .setIssuer('marthi-api')
+    .setAudience('marthi-web')
     .setIssuedAt()
     .setExpirationTime('7d')
     .sign(getJwtSecret());
 }
 
 export async function verifySessionToken(token: string): Promise<AuthUser> {
-  const { payload } = await jwtVerify(token, getJwtSecret());
+  const { payload } = await jwtVerify(token, getJwtSecret(), {
+    algorithms: ['HS256'], issuer: 'marthi-api', audience: 'marthi-web', requiredClaims: ['sub', 'exp', 'iat'],
+  });
 
   if (!payload.sub || typeof payload.email !== 'string') {
     throw new Error('Token inválido.');
   }
 
-  return {
-    id: payload.sub,
-    email: payload.email,
-    name: typeof payload.name === 'string' ? payload.name : payload.email,
-    picture: typeof payload.picture === 'string' ? payload.picture : null,
-    provider: payload.provider === 'google' ? 'google' : 'password',
-    role: typeof payload.role === 'string' ? payload.role : 'operator',
-    clientAccountId: typeof payload.clientAccountId === 'string' ? payload.clientAccountId : undefined,
-  };
+  if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  let result;
+  try {
+    result = await pool.query('SELECT id, email, name, provider, global_role, client_account_id, active, session_version FROM users WHERE id = $1', [payload.sub]);
+  } catch { throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 }); }
+  const row = result.rows[0];
+  if (!row?.active || payload.sessionVersion !== (row.session_version ?? 0)) throw Object.assign(new Error('Sessão inválida.'), { status: 401 });
+  return { id: row.id, email: row.email, name: row.name, picture: null,
+    provider: row.provider === 'google' ? 'google' : 'password',
+    role: row.global_role, clientAccountId: row.client_account_id };
+
 }
 
 export async function registerClientUser(input: {
@@ -138,6 +101,8 @@ export async function registerClientUser(input: {
   role?: string;
 }): Promise<AuthSession> {
   const email = input.email.trim().toLowerCase();
+  const strength = validatePasswordStrength(input.password);
+  if (!strength.valid) throw Object.assign(new Error(strength.reason), { status: 400 });
   const salt = randomBytes(16).toString('hex');
   const passwordHash = hashPassword(input.password, salt);
   const role = input.role || 'admin';
@@ -149,8 +114,7 @@ export async function registerClientUser(input: {
       await pool.query(
         `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
          VALUES ($1, $2, $3, $4, 'password', $5, $6, true)
-         ON CONFLICT (email) DO UPDATE
-         SET password_hash = $5, name = $4, active = true`,
+`,
         [
           id,
           input.clientAccountId || `acc-${Date.now().toString(36)}`,
@@ -161,22 +125,9 @@ export async function registerClientUser(input: {
         ],
       );
     } catch (err) {
-      console.warn('[authService] DB user upsert fallback to memory store:', err);
+      throw err;
     }
   }
-
-  // Always keep in persistent in-memory map
-  clientUsersStore.set(email, {
-    id,
-    email,
-    name: input.name.trim(),
-    passwordHash,
-    salt,
-    role,
-    clientAccountId: input.clientAccountId,
-    active: true,
-    createdAt: new Date().toISOString(),
-  });
 
   const user: AuthUser = {
     id,
@@ -192,18 +143,15 @@ export async function registerClientUser(input: {
   return { token, user };
 }
 
-export function activateStoredClientUser(email: string): boolean {
-  const norm = email.trim().toLowerCase();
-  const stored = clientUsersStore.get(norm);
-  if (stored) {
-    stored.active = true;
-    return true;
-  }
-  return false;
-}
+export async function activateStoredClientUser(email: string): Promise<boolean> {
+      if (!pool) throw new Error('MarthiDB indisponível.');
+      const result = await pool.query('UPDATE users SET active = true WHERE lower(email) = $1 RETURNING id', [email.trim().toLowerCase()]);
+      return Boolean(result.rowCount);
+    }
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthSession> {
   const normEmail = email.trim().toLowerCase();
+  if (password.length < 6 || password === 'Marthi170926') throw Object.assign(new Error('E-mail ou senha inválidos. Redefina sua senha.'), { status: 401 });
 
   // 1. Check in PostgreSQL database if pool is active
   if (pool) {
@@ -224,14 +172,18 @@ export async function loginWithPassword(email: string, password: string): Promis
         let match = false;
         if (storedHash.includes(':')) {
           const [salt, hash] = storedHash.split(':');
-          match = hashPassword(password, salt) === hash;
+          const calculated = hash.startsWith('scrypt$')
+            ? hashPassword(password, salt)
+            : createHash('sha256').update(salt + ':' + password).digest('hex');
+          const actual = Buffer.from(calculated);
+          const expected = Buffer.from(hash);
+          match = actual.length === expected.length && timingSafeEqual(actual, expected);
+          if (match && !hash.startsWith('scrypt$')) {
+            const newSalt = randomBytes(16).toString('hex');
+            await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newSalt + ':' + hashPassword(password, newSalt), row.id]);
+          }
         } else {
-          match = storedHash === password;
-        }
-
-
-        if (!match && normEmail === 'marthi.tecnologia@gmail.com' && (password === 'Marthi170926' || password === '123')) {
-          match = true;
+          match = false;
         }
 
         if (match) {
@@ -251,36 +203,7 @@ export async function loginWithPassword(email: string, password: string): Promis
         }
       }
     } catch (err) {
-      console.warn('[authService] DB user lookup failed, checking client memory store:', err);
-    }
-  }
-
-  // 2. Check registered client users store
-  const stored = clientUsersStore.get(normEmail);
-  if (stored) {
-    if (!stored.active) {
-      const error = new Error('Conta de cliente inativa ou aguardando identificação de pagamento.');
-      (error as Error & { status: number }).status = 403;
-      throw error;
-    }
-    let match = hashPassword(password, stored.salt) === stored.passwordHash;
-    if (!match && normEmail === 'marthi.tecnologia@gmail.com' && (password === 'Marthi170926' || password === '123')) {
-      match = true;
-    }
-    if (match) {
-      const user: AuthUser = {
-        id: stored.id,
-        email: stored.email,
-        name: stored.name,
-        picture: null,
-        provider: 'password',
-        role: stored.role,
-        clientAccountId: stored.clientAccountId,
-      };
-      return {
-        token: await createSessionToken(user),
-        user,
-      };
+      throw err;
     }
   }
 
@@ -309,19 +232,18 @@ export async function loginWithGoogleIdToken(idToken: string): Promise<AuthSessi
     throw error;
   }
 
-  if (payload.email_verified === false) {
+  if (payload.email_verified !== true) {
     const error = new Error('E-mail Google não verificado.');
     (error as Error & { status: number }).status = 401;
     throw error;
   }
 
-  const user: AuthUser = {
-    id: `google:${payload.sub}`,
-    email: payload.email.toLowerCase(),
-    name: payload.name ?? payload.email,
-    picture: payload.picture ?? null,
-    provider: 'google',
-  };
+  if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  const account = await pool.query('SELECT id, email, name, global_role, client_account_id FROM users WHERE lower(email) = $1 AND active = true AND provider = $2', [payload.email.toLowerCase(), 'google']);
+  const row = account.rows[0];
+  if (!row) throw Object.assign(new Error('Conta Google não autorizada.'), { status: 403 });
+  const user: AuthUser = { id: row.id, email: row.email, name: row.name, picture: payload.picture || null,
+    provider: 'google', role: row.global_role, clientAccountId: row.client_account_id };
 
   return {
     token: await createSessionToken(user),
@@ -378,15 +300,14 @@ export async function preRegisterClientAccount(input: {
     createdAt: new Date().toISOString(),
   };
 
-  clientUsersStore.set(email, userRecord);
+
 
   if (pool) {
     try {
       await pool.query(
         `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
          VALUES ($1, $2, $3, $4, 'password', $5, $6, false)
-         ON CONFLICT (email) DO UPDATE
-         SET name = $4, active = false`,
+         ON CONFLICT (email) DO NOTHING`,
         [
           id,
           input.clientAccountId || `acc-${Date.now().toString(36)}`,
@@ -397,7 +318,7 @@ export async function preRegisterClientAccount(input: {
         ],
       );
     } catch (err) {
-      console.warn('[authService] DB pre-register fallback to memory store:', err);
+      throw err;
     }
   }
 
@@ -407,109 +328,10 @@ export async function preRegisterClientAccount(input: {
 /**
  * Define a senha inicial do cliente usando o token de ativação seguro recebido por e-mail
  */
-export async function setupPasswordWithToken(
-  token: string,
-  newPassword: string,
-): Promise<{ success: boolean; session?: AuthSession; message: string }> {
-  const strength = validatePasswordStrength(newPassword);
-  if (!strength.valid) {
-    throw new Error(strength.reason || 'Senha fraca.');
-  }
-
-  const consumption = await consumeSecureToken(token, 'activation');
-  if (!consumption.success || !consumption.record) {
-    throw new Error(consumption.reason || 'Token de ativação inválido ou expirado.');
-  }
-
-  const email = consumption.record.email.trim().toLowerCase();
-  const salt = randomBytes(16).toString('hex');
-  const passwordHash = hashPassword(newPassword, salt);
-
-  // Update in memory
-  let user = clientUsersStore.get(email);
-  if (user) {
-    user.passwordHash = passwordHash;
-    user.salt = salt;
-    user.active = true;
-  } else {
-    user = {
-      id: `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      email,
-      name: consumption.record.name || 'Cliente Marthi',
-      passwordHash,
-      salt,
-      role: 'admin',
-      clientAccountId: consumption.record.clientId,
-      active: true,
-      createdAt: new Date().toISOString(),
-    };
-    clientUsersStore.set(email, user);
-  }
-
-  // Update in DB
-  if (pool) {
-    try {
-      await pool.query(
-        `UPDATE users
-         SET password_hash = $1, active = true, updated_at = now()
-         WHERE lower(email) = lower($2)`,
-        [`${salt}:${passwordHash}`, email],
-      );
-
-      const userRes = await pool.query(
-        `SELECT id, client_account_id, name, global_role FROM users WHERE lower(email) = lower($1)`,
-        [email],
-      );
-      if (userRes.rows.length > 0) {
-        user.id = userRes.rows[0].id;
-        user.clientAccountId = userRes.rows[0].client_account_id;
-        user.name = userRes.rows[0].name;
-        user.role = userRes.rows[0].global_role;
-      } else {
-        await pool.query(
-          `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
-           VALUES ($1, $2, $3, $4, 'password', $5, 'admin', true)
-           ON CONFLICT (email) DO UPDATE
-           SET password_hash = $5, active = true, updated_at = now()`,
-          [user.id, user.clientAccountId || 'ACC-MARTHI-DEMO', email, user.name, `${salt}:${passwordHash}`],
-        );
-      }
-
-      await pool.query(
-        `UPDATE client_accounts
-         SET status = 'active', updated_at = now()
-         WHERE lower(email) = lower($1) OR id = $2`,
-        [email, consumption.record.clientId || ''],
-      );
-
-      await pool.query(
-        `UPDATE partner_signups
-         SET status = 'acesso_ativado', updated_at = now()
-         WHERE lower(email) = lower($1) OR id = $2`,
-        [email, consumption.record.clientId || ''],
-      );
-    } catch (err) {
-      console.warn('[authService] DB password setup update fallback:', err);
+export async function setupPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; session?: AuthSession; message: string }> {
+      await updatePasswordUsingToken(token, newPassword, 'activation');
+      return { success: true, message: 'Senha configurada. Entre com seu e-mail e senha.' };
     }
-  }
-
-  const authUser: AuthUser = {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    picture: null,
-    provider: 'password',
-    role: user.role,
-    clientAccountId: user.clientAccountId,
-  };
-
-  const sessionToken = await createSessionToken(authUser);
-  return {
-    success: true,
-    session: { token: sessionToken, user: authUser },
-    message: 'Senha configurada com sucesso! Bem-vindo ao sistema.',
-  };
-}
 
 /**
  * Solicitação segura de recuperação de senha com proteção contra enumeração de contas
@@ -522,20 +344,14 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
   let userName = '';
   let exists = false;
 
-  const inMem = clientUsersStore.get(normEmail);
-  if (inMem) {
-    exists = true;
-    userName = inMem.name;
-  } else if (pool) {
+  if (pool) {
     try {
       const res = await pool.query('SELECT name, active FROM users WHERE lower(email) = $1', [normEmail]);
       if (res.rows.length > 0) {
         exists = true;
         userName = res.rows[0].name;
       }
-    } catch {
-      // ignore
-    }
+    } catch (error) { throw error; }
   }
 
   // Se o usuário existir, gera token e envia e-mail em background
@@ -580,26 +396,18 @@ export async function requestFirstAccess(email: string): Promise<{ success: bool
   const companyName = 'Loja';
   const planName = 'Plano Marthi';
 
-  // 1. Verifica no store em memória
-  const inMem = clientUsersStore.get(normEmail);
-  if (inMem) {
-    exists = true;
-    userName = inMem.name;
-  }
-
   // 2. Verifica no PostgreSQL
   if (pool) {
     try {
-      const uRes = await pool.query('SELECT name, active FROM users WHERE lower(email) = $1', [normEmail]);
+      const uRes = await pool.query("SELECT u.name FROM users u JOIN client_accounts c ON c.id = u.client_account_id WHERE lower(u.email) = $1 AND c.status = 'active' AND (u.password_hash IS NULL OR u.password_hash LIKE '%LOCKED_PENDING_ACTIVATION%')", [normEmail]);
       if (uRes.rows.length > 0) {
         exists = true;
         userName = uRes.rows[0].name || userName;
       }
-    } catch {
-      // ignore
-    }
+    } catch (error) { throw error; }
   }
 
+  if (!exists) return { success: true, message: genericMessage };
   let rawToken = '';
   try {
     const tokenResult = await createSecureToken({
@@ -625,55 +433,17 @@ export async function requestFirstAccess(email: string): Promise<{ success: bool
   return {
     success: true,
     message: genericMessage,
-    activationUrl: rawToken ? `/criar-senha?token=${rawToken}` : undefined,
+
   };
 }
 
 /**
  * Redefine a senha com o token seguro de redefinição
  */
-export async function resetPasswordWithToken(
-  token: string,
-  newPassword: string,
-): Promise<{ success: boolean; message: string }> {
-  const strength = validatePasswordStrength(newPassword);
-  if (!strength.valid) {
-    throw new Error(strength.reason || 'Senha fraca.');
-  }
-
-  const consumption = await consumeSecureToken(token, 'password_reset');
-  if (!consumption.success || !consumption.record) {
-    throw new Error(consumption.reason || 'Token de recuperação inválido ou expirado.');
-  }
-
-  const email = consumption.record.email.trim().toLowerCase();
-  const salt = randomBytes(16).toString('hex');
-  const passwordHash = hashPassword(newPassword, salt);
-
-  const inMem = clientUsersStore.get(email);
-  if (inMem) {
-    inMem.passwordHash = passwordHash;
-    inMem.salt = salt;
-  }
-
-  if (pool) {
-    try {
-      await pool.query(
-        `UPDATE users
-         SET password_hash = $1
-         WHERE lower(email) = lower($2)`,
-        [`${salt}:${passwordHash}`, email],
-      );
-    } catch (err) {
-      console.warn('[authService] DB password reset update fallback:', err);
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+      await updatePasswordUsingToken(token, newPassword, 'password_reset');
+      return { success: true, message: 'Senha redefinida com sucesso.' };
     }
-  }
-
-  return {
-    success: true,
-    message: 'Sua senha foi redefinida com sucesso! Você já pode realizar o login.',
-  };
-}
 
 /**
  * Ações Administrativas de Segurança (Painel /admin)
@@ -733,45 +503,20 @@ export async function adminForcePasswordReset(
   };
 }
 
-export async function adminToggleUserAccess(
-  email: string,
-  active: boolean,
-  actorName: string,
-): Promise<{ success: boolean; message: string }> {
-  const normEmail = email.trim().toLowerCase();
-  const user = clientUsersStore.get(normEmail);
-  if (user) {
-    user.active = active;
-  }
-
-  if (pool) {
-    try {
-      await pool.query('UPDATE users SET active = $1 WHERE lower(email) = lower($2)', [active, normEmail]);
-    } catch {
-      // fallback
+export async function adminToggleUserAccess(email: string, active: boolean, actorName: string) {
+      if (!pool) throw new Error('MarthiDB indisponível.');
+      const result = await pool.query('UPDATE users SET active = $1, session_version = session_version + 1 WHERE lower(email) = $2 RETURNING id', [active, email.trim().toLowerCase()]);
+      if (!result.rowCount) throw Object.assign(new Error('Usuário não encontrado.'), { status: 404 });
+      return { success: true, message: active ? 'Acesso ativado.' : 'Acesso bloqueado.' };
     }
-  }
 
-  console.log(`[auditLog] [${actorName}] Alterou status de acesso do usuário ${normEmail} para ${active ? 'ATIVO' : 'BLOQUEADO'}`);
-  return {
-    success: true,
-    message: `Acesso do usuário ${active ? 'ativado' : 'bloqueado'} com sucesso.`,
-  };
-}
-
-export function getUserSecurityStatus(email: string, phone?: string): {
-  configured: boolean;
-  active: boolean;
-  phoneVerified: boolean;
-} {
-  const normEmail = email.trim().toLowerCase();
-  const user = clientUsersStore.get(normEmail);
-  const configured = Boolean(user && user.passwordHash && user.passwordHash !== 'LOCKED_PENDING_ACTIVATION');
-  const active = Boolean(user ? user.active : false);
-  const phoneVerified = phone ? isPhoneVerified(phone) : false;
-
-  return { configured, active, phoneVerified };
-}
+export async function getUserSecurityStatus(email: string, phone?: string) {
+      if (!pool) throw new Error('MarthiDB indisponível.');
+      const result = await pool.query('SELECT password_hash, active FROM users WHERE lower(email) = $1', [email.trim().toLowerCase()]);
+      const row = result.rows[0];
+      return { configured: Boolean(row?.password_hash && !row.password_hash.includes('LOCKED_PENDING_ACTIVATION')),
+        active: Boolean(row?.active), phoneVerified: phone ? await isPhoneVerified(phone) : false };
+    }
 
 export type UserIdentificationResult = {
   identified: boolean;
@@ -786,19 +531,6 @@ export type UserIdentificationResult = {
 
 export async function identifyUserAccess(email: string): Promise<UserIdentificationResult> {
   const normEmail = email.trim().toLowerCase();
-
-  // 1. Staff Marthi / Dev accounts
-  if (normEmail === 'teste@marthi.com.br' || normEmail === 'marthi.tecnologia@gmail.com') {
-    return {
-      identified: true,
-      hasPassword: true,
-      needsFirstAccess: false,
-      name: normEmail === 'teste@marthi.com.br' ? 'Administrador Marthi' : 'Equipe Marthi Tecnologia',
-      storeName: 'Marthi Tecnologia',
-      role: 'admin',
-      email: normEmail,
-    };
-  }
 
   // 2. Query PostgreSQL users and stores
   if (pool) {
@@ -900,25 +632,8 @@ export async function identifyUserAccess(email: string): Promise<UserIdentificat
         };
       }
     } catch (err) {
-      console.warn('[authService] DB lookup error during identifyUserAccess:', err);
+      throw err;
     }
-  }
-
-  // 3. In-memory check
-  const memoryUser = clientUsersStore.get(normEmail);
-  if (memoryUser) {
-    const hasPwd = Boolean(
-      memoryUser.passwordHash &&
-      memoryUser.passwordHash !== 'LOCKED_PENDING_ACTIVATION',
-    );
-    return {
-      identified: true,
-      hasPassword: hasPwd,
-      needsFirstAccess: !hasPwd,
-      name: memoryUser.name,
-      role: memoryUser.role,
-      email: normEmail,
-    };
   }
 
   return {
@@ -929,3 +644,24 @@ export async function identifyUserAccess(email: string): Promise<UserIdentificat
   };
 }
 
+
+async function updatePasswordUsingToken(token: string, password: string, type: 'activation' | 'password_reset') {
+    const strength = validatePasswordStrength(password);
+    if (!strength.valid) throw Object.assign(new Error(strength.reason), { status: 400 });
+    if (!/^[a-f0-9]{64}$/.test(token)) throw Object.assign(new Error('Token inválido.'), { status: 400 });
+    if (!pool) throw new Error('MarthiDB indisponível.');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const consumed = await client.query(`UPDATE auth_tokens SET used_at = now()
+        WHERE token_hash = $1 AND type = $2 AND used_at IS NULL AND expires_at > now()
+        RETURNING email`, [createHash('sha256').update(token).digest('hex'), type]);
+      if (!consumed.rows[0]) throw Object.assign(new Error('Token inválido, expirado ou já usado.'), { status: 400 });
+      const salt = randomBytes(16).toString('hex');
+      const updated = await client.query('UPDATE users SET password_hash = $1, active = true, session_version = session_version + 1, updated_at = now() WHERE lower(email) = $2 RETURNING id',
+        [salt + ':' + hashPassword(password, salt), consumed.rows[0].email]);
+      if (!updated.rowCount) throw Object.assign(new Error('Conta não cadastrada.'), { status: 400 });
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+  }

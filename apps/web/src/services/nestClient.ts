@@ -6,14 +6,14 @@ const AUTH_TOKEN_KEY = 'marthi.auth.token';
 export function getAuthToken(): string | null {
   try {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    return token ? token : 'marthi-demo-token';
+    return token || null;
   } catch {
-    return 'marthi-demo-token';
+    return null;
   }
 }
 
 export function isNestAuthed(): boolean {
-  return true;
+  return Boolean(getAuthToken());
 }
 
 type ApiErrorBody = {
@@ -51,8 +51,8 @@ export async function nestRequest<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   try {
-    const activeStoreId = localStorage.getItem('marthi.activeStoreId') || 'STR-DEMO-01';
-    if (!headers.has('x-store-id')) {
+    const activeStoreId = localStorage.getItem('marthi.activeStoreId');
+    if (activeStoreId && !headers.has('x-store-id')) {
       headers.set('x-store-id', activeStoreId);
     }
   } catch {

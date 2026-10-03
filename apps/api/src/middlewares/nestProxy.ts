@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 
 function nestOrigin() {
-  return (process.env.NEST_API_URL || 'https://marthi-backend.discloud.app').replace(/\/$/, '');
+  return (process.env.NEST_API_URL || '').replace(/\/$/, '');
 }
 
 /**
@@ -14,6 +14,7 @@ export async function proxyUnmatchedApi(req: Request, res: Response, next: NextF
     return;
   }
 
+  if (!nestOrigin()) return next();
   const target = `${nestOrigin()}${req.originalUrl}`;
   try {
     const headers = new Headers();

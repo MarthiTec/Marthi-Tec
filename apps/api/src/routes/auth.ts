@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { z } from 'zod';
 import {
   activateStoredClientUser,
@@ -21,6 +22,7 @@ import { sendPhoneOtp, verifyPhoneOtp } from '../services/otpService.js';
 import { env } from '../config/env.js';
 
 export const authRouter = Router();
+authRouter.use('/api/v1/admin', requireSession, requirePlatformAdmin);
 
 const passwordSchema = z.object({
   email: z.string().email(),
@@ -123,7 +125,7 @@ authRouter.post('/api/v1/auth/login', async (req, res, next) => {
   }
 });
 
-authRouter.post('/api/v1/auth/register', async (req, res, next) => {
+authRouter.post('/api/v1/auth/register', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
     const session = await registerClientUser(body);
@@ -133,10 +135,10 @@ authRouter.post('/api/v1/auth/register', async (req, res, next) => {
   }
 });
 
-authRouter.post('/api/v1/auth/activate', (req, res, next) => {
+authRouter.post('/api/v1/auth/activate', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = activateSchema.parse(req.body);
-    const ok = activateStoredClientUser(body.email);
+    const ok = await activateStoredClientUser(body.email);
     res.json({
       success: true,
       data: {
@@ -163,7 +165,8 @@ authRouter.post('/api/v1/auth/google', async (req, res, next) => {
 /**
  * Inspeciona token seguro (para criação de senha ou redefinição) antes do usuário preencher o formulário
  */
-authRouter.get('/api/v1/auth/token/inspect', async (req, res) => {
+authRouter.get('/api/v1/auth/token/inspect', async (req, res, next) => {
+  try {
   const token = typeof req.query.token === 'string' ? req.query.token : '';
   const expectedType = req.query.type === 'password_reset' ? 'password_reset' : 'activation';
 
@@ -194,6 +197,7 @@ authRouter.get('/api/v1/auth/token/inspect', async (req, res) => {
       expiresAt: result.record.expiresAt,
     },
   });
+  } catch (error) { next(error); }
 });
 
 /**
@@ -268,10 +272,10 @@ authRouter.post('/api/v1/auth/otp/send', async (req, res, next) => {
 /**
  * Validação do código OTP informado
  */
-authRouter.post('/api/v1/auth/otp/verify', (req, res, next) => {
+authRouter.post('/api/v1/auth/otp/verify', async (req, res, next) => {
   try {
     const body = verifyOtpSchema.parse(req.body);
-    const result = verifyPhoneOtp(body.phone, body.code);
+    const result = await verifyPhoneOtp(body.phone, body.code);
     if (!result.success) {
       res.status(400).json({ success: false, error: { message: result.message } });
       return;
@@ -288,7 +292,7 @@ authRouter.post('/api/v1/auth/otp/verify', (req, res, next) => {
 authRouter.post('/api/v1/admin/clients/resend-activation', async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
-    const actor = req.header('x-actor-name') || 'Administrador Marthi';
+    const actor = req.user!.name;
     const result = await adminResendActivationLink(
       body.email,
       body.clientName || 'Cliente',
@@ -324,11 +328,13 @@ authRouter.post('/api/v1/admin/clients/toggle-access', async (req, res, next) =>
   }
 });
 
-authRouter.get('/api/v1/admin/clients/security-status', (req, res) => {
+authRouter.get('/api/v1/admin/clients/security-status', async (req, res, next) => {
+  try {
   const email = typeof req.query.email === 'string' ? req.query.email : '';
   const phone = typeof req.query.phone === 'string' ? req.query.phone : undefined;
-  const status = getUserSecurityStatus(email, phone);
+  const status = await getUserSecurityStatus(email, phone);
   res.json({ success: true, data: status });
+  } catch (error) { next(error); }
 });
 
 authRouter.get('/api/v1/auth/me', async (req, res, next) => {
@@ -352,4 +358,3 @@ authRouter.get('/api/v1/auth/me', async (req, res, next) => {
     next(error);
   }
 });
-

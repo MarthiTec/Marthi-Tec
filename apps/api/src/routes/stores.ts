@@ -618,7 +618,7 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
           }
         }
       } catch (signupsErr) {
-        console.warn('[stores] Erro ao buscar signups pendentes para admin/clients:', signupsErr);
+        throw signupsErr;
       }
 
       res.json({ success: true, data: Array.from(map.values()) });
@@ -741,7 +741,7 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
                updated_at = now()
            WHERE client_account_id = $6 OR id = $6`,
           [body.tradeName, body.email, body.phone, body.accessToken, body.status, clientId],
-        ).catch(() => {});
+        );
       }
 
       if (body.paymentOk !== undefined || body.tradeName || body.email) {
@@ -754,7 +754,7 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
                updated_at = now()
            WHERE id = $4 OR lower(email) = lower($2) OR (length($5) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $5)`,
           [body.tradeName, body.email, body.paymentOk, clientId, cleanDoc],
-        ).catch(() => {});
+        );
       }
     }
 

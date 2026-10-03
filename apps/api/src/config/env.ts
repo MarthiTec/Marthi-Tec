@@ -19,9 +19,7 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().optional(),
   DB_SSLMODE: z.string().default('prefer'),
   GOOGLE_CLIENT_ID: z.string().optional(),
-  JWT_SECRET: z.string().min(16).default('marthi-dev-secret-change-me'),
-  AUTH_DEV_EMAIL: z.string().email().default('teste@marthi.com.br'),
-  AUTH_DEV_PASSWORD: z.string().default('123'),
+  JWT_SECRET: z.string().min(32),
   EVOLUTION_BASE_URL: z.string().url().optional(),
   EVOLUTION_INSTANCE: z.string().optional(),
   EVOLUTION_API_KEY: z.string().optional(),
@@ -54,3 +52,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+if (!env.DATABASE_URL && !(env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD)) {
+  throw new Error('Configure DATABASE_URL ou todas as credenciais DB_* do MarthiDB.');
+}

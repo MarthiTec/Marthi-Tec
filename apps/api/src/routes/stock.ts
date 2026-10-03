@@ -133,7 +133,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         res.json({ success: true, data: result.rows.map(formatStockRow) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao consultar banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -185,7 +185,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         res.json({ success: true, data: formatStockRow(resQuery.rows[0]) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha no lookup do banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -212,7 +212,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[stock] Falha ao conectar ao PostgreSQL, recorrendo à memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
@@ -284,7 +284,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[stock] Erro na transação do banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -321,7 +321,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[stock] Falha ao conectar ao PostgreSQL no PATCH, usando memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
@@ -417,7 +417,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[stock] Erro na atualização do item no banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -453,7 +453,7 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
         res.json({ success: true, data: { ok: true } });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao deletar do banco, usando memória:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -485,7 +485,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         res.json({ success: true, data: itemsRes.rows.map(formatStockRow) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao consultar catálogo de produtos no banco, usando memória:', dbErr);
+        throw dbErr;
       }
     }
 

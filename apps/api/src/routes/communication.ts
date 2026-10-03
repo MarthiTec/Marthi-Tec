@@ -55,7 +55,7 @@ export async function getStoreSmtpConfig(storeId: string): Promise<StoreSmtpConf
         };
       }
     } catch (err) {
-      console.warn('[communication] Falha ao ler smtp_settings do banco:', err);
+      throw err;
     }
   }
 
@@ -106,7 +106,7 @@ communicationRouter.put('/api/v1/store/smtp-settings', requireOrDemoAuth, async 
           [JSON.stringify(merged), storeId],
         );
       } catch (err) {
-        console.error('[communication] Erro ao gravar smtp_settings no banco:', err);
+        throw err;
       }
     }
 

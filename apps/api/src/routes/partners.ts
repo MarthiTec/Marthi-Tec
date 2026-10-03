@@ -1,3 +1,4 @@
+import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { preRegisterClientAccount } from '../services/authService.js';
@@ -136,7 +137,8 @@ const processedTransactions = new Set<string>();
  * 1. Conclusão da Contratação
  * Registra o pedido de contratação, previne duplicidades e aguarda confirmação de pagamento.
  */
-partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
+partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
+  try {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -170,7 +172,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
         existingId = existingRes.rows[0].id;
       }
     } catch (err) {
-      console.warn('[partners] DB lookup existing signup warning:', err);
+      throw err;
     }
   }
 
@@ -190,7 +192,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
   const now = new Date().toISOString();
   const monthlyAmount = calculatePlanAmount(data.planId);
 
-  const initialStatus: ContractingStatus = data.payNow ? 'pagamento_aprovado' : 'aguardando_pagamento';
+  const initialStatus: ContractingStatus = 'aguardando_pagamento';
 
   const record: PartnerSignupRecord = {
     ...data,
@@ -246,21 +248,8 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
         ],
       );
     } catch (err) {
-      console.warn('[partners] DB partner_signups save error:', err);
+      throw err;
     }
-  }
-
-  // Pré-registra a conta com segurança (sem senha em texto puro!)
-  try {
-    await preRegisterClientAccount({
-      email: data.email,
-      name: data.contactName || data.tradeName,
-      tradeName: data.tradeName,
-      clientAccountId: id,
-      role: 'admin',
-    });
-  } catch (err) {
-    console.warn('[partners] DB/Memory pre-register account fallback:', err);
   }
 
   let activationToken: string | undefined = undefined;
@@ -327,13 +316,14 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
           : 'Contratação registrada com sucesso. Aguardando confirmação do pagamento para ativação.',
     },
   });
+  } catch (error) { next(error); }
 });
 
 /**
  * 2. Confirmação de Pagamento com Idempotência Estrita
  * Acionado por Webhook de Gateway ou Confirmação Manual pelo Administrador.
  */
-partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) => {
+partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = paymentConfirmSchema.parse(req.body);
     const protocol = body.protocol.trim();
@@ -391,7 +381,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
           };
         }
       } catch (err) {
-        console.warn('[partners] DB payment-confirm lookup warning:', err);
+        throw err;
       }
     }
 
@@ -445,7 +435,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
           };
         }
       } catch (clientLookupErr) {
-        console.warn('[partners] DB fallback client_accounts lookup warning:', clientLookupErr);
+        throw clientLookupErr;
       }
     }
 
@@ -546,7 +536,8 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
 /**
  * Consulta de status do ciclo de vida da contratação
  */
-partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
+partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) => {
+  try {
   const protocol = req.params.protocol.trim();
   let record: PartnerSignupRecord | null = null;
 
@@ -594,7 +585,7 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
         };
       }
     } catch (err) {
-      console.warn('[partners] DB status lookup warning:', err);
+      throw err;
     }
   }
 
@@ -628,9 +619,11 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
       auditTrail: record.auditTrail,
     },
   });
+  } catch (error) { next(error); }
 });
 
-partnersRouter.get('/api/v1/partners/signup/pending', async (_req, res) => {
+partnersRouter.get('/api/v1/partners/signup/pending', requireSession, requirePlatformAdmin, async (_req, res, next) => {
+  try {
   if (pool) {
     try {
       const dbRes = await pool.query(
@@ -662,7 +655,7 @@ partnersRouter.get('/api/v1/partners/signup/pending', async (_req, res) => {
       });
       return;
     } catch (err) {
-      console.warn('[partners] DB pending lookup fallback to memory:', err);
+      throw err;
     }
   }
 
@@ -691,6 +684,7 @@ partnersRouter.get('/api/v1/partners/signup/pending', async (_req, res) => {
       })),
     },
   });
+  } catch (error) { next(error); }
 });
 
 /**
@@ -808,8 +802,7 @@ async function executePaymentActivation(
           id, client_account_id, email, name, provider, password_hash, global_role, active, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, 'password', 'LOCKED_PENDING_ACTIVATION', 'admin', false, now(), now()
-        ) ON CONFLICT (email) DO UPDATE
-        SET client_account_id = $2, name = $4, updated_at = now()`,
+        ) ON CONFLICT (email) DO NOTHING`,
         [
           userId,
           actualAccountId,
@@ -820,13 +813,13 @@ async function executePaymentActivation(
 
       // 1.5 Vínculo do Usuário com a Loja Matriz em user_stores
       await pool.query(
-        `INSERT INTO user_stores (user_id, store_id, role, is_default, created_at)
-         VALUES ($1, $2, 'admin', true, now())
+        `INSERT INTO user_stores (id, user_id, store_id, role, is_default, created_at)
+         VALUES ('UST-' || $1 || '-' || $2, $1, $2, 'admin', true, now())
          ON CONFLICT (user_id, store_id) DO NOTHING`,
         [userId, storeId],
       );
     } catch (err) {
-      console.warn('[partners] DB tenant activation records creation error:', err);
+      throw err;
     }
   }
 
@@ -875,7 +868,7 @@ async function executePaymentActivation(
         ],
       );
     } catch (err) {
-      console.warn('[partners] DB partner_signups update error:', err);
+      throw err;
     }
   }
 

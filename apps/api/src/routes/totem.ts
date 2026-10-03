@@ -118,7 +118,7 @@ async function getStoreTotemSettings(storeId: string) {
         };
       }
     } catch (err) {
-      console.warn('[totem] Falha ao ler totem_settings do banco:', err);
+      throw err;
     }
   }
 
@@ -194,7 +194,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
         res.json({ success: true, data: result.rows.map(formatStockRow) });
         return;
       } catch (dbErr) {
-        console.warn('[totem] Falha ao consultar catálogo no banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
