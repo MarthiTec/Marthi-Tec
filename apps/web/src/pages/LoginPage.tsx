@@ -5,10 +5,23 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
 import { ingestContractInterestToCrm } from '../data/crmStore';
 import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
+import { listMarthiClients } from '../data/marthiClientsStore';
 import { isMarthiStaffEmail } from '../data/marthiStaff';
 import { nestApiUrl } from '../services/config';
 
 type AuthView = 'login' | 'forgot' | 'signup' | 'first-access';
+type LoginStep = 'email' | 'password';
+
+type IdentifiedUser = {
+  identified: boolean;
+  hasPassword: boolean;
+  needsFirstAccess: boolean;
+  name?: string;
+  storeName?: string;
+  role?: string;
+  email: string;
+  message?: string;
+};
 
 function safeNext(value: string | null, email: string | null | undefined) {
   /** Conta Marthi sempre entra no painel administrativo interno. */
@@ -36,6 +49,7 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const { user, loading, providers, loginWithPassword, loginWithGoogle } = useAuth();
   const nextParam = params.get('next');
+
   const [view, setView] = useState<AuthView>(() => {
     const v = params.get('view');
     if (v === 'signup') return 'signup';
@@ -43,6 +57,10 @@ export function LoginPage() {
     if (v === 'first-access' || v === 'primeiro-acesso') return 'first-access';
     return 'login';
   });
+
+  const [loginStep, setLoginStep] = useState<LoginStep>('email');
+  const [identifiedUser, setIdentifiedUser] = useState<IdentifiedUser | null>(null);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -68,8 +86,106 @@ export function LoginPage() {
     setView(nextView);
     setError(null);
     setFeedback(null);
+    if (nextView === 'login') {
+      setLoginStep('email');
+      setIdentifiedUser(null);
+      setPassword('');
+    }
   }
 
+  /** Etapa 1: Validação e identificação do e-mail (a senha fica invisível nesta etapa) */
+  async function handleEmailContinue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setFeedback(null);
+    const sessionEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sessionEmail)) {
+      setError('Informe um e-mail válido para continuar.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const apiUrl = nestApiUrl();
+      let identifyData: IdentifiedUser | null = null;
+
+      // 1. Consulta o endpoint de identificação no backend
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/auth/identify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: sessionEmail }),
+        });
+        const json = await res.json().catch(() => null);
+        if (res.ok && json?.success && json?.data) {
+          identifyData = json.data;
+        }
+      } catch (netErr) {
+        console.warn('[LoginPage] Backend identify offline, checking local registry:', netErr);
+      }
+
+      // 2. Fallback local para contingência rápida
+      if (!identifyData) {
+        if (isMarthiStaffEmail(sessionEmail)) {
+          identifyData = {
+            identified: true,
+            hasPassword: true,
+            needsFirstAccess: false,
+            email: sessionEmail,
+            name: 'Equipe Marthi',
+            storeName: 'Marthi Tecnologia (Admin Central)',
+            role: 'superadmin',
+          };
+        } else {
+          const clients = listMarthiClients();
+          const cli = clients.find((c) => c.email.toLowerCase() === sessionEmail);
+          if (cli) {
+            const hasPwd = Boolean(cli.passwordConfigured);
+            identifyData = {
+              identified: true,
+              hasPassword: hasPwd,
+              needsFirstAccess: !hasPwd,
+              email: sessionEmail,
+              name: cli.tradeName,
+              storeName: cli.tradeName,
+              role: 'admin',
+              message: hasPwd
+                ? undefined
+                : `Identificamos o cadastro de ${cli.tradeName}! Esta conta ainda precisa configurar a senha de primeiro acesso.`,
+            };
+          }
+        }
+      }
+
+      // 3. Avalia o resultado da identificação
+      if (identifyData && identifyData.identified && identifyData.hasPassword) {
+        // Usuário cadastrado e com senha pronta -> solicita a senha
+        setIdentifiedUser(identifyData);
+        setLoginStep('password');
+        setError(null);
+      } else if (identifyData && (identifyData.needsFirstAccess || !identifyData.hasPassword)) {
+        // Usuário cadastrado mas sem senha configurada -> abre tela de primeiro acesso com e-mail preenchido
+        setIdentifiedUser(identifyData);
+        setView('first-access');
+        setFeedback(
+          identifyData.message ||
+            `Identificamos o cadastro de ${identifyData.name || 'sua loja'}! Esta conta ainda precisa configurar a senha de primeiro acesso.`,
+        );
+      } else {
+        // Usuário não cadastrado -> abre automaticamente a tela de primeiro acesso com o e-mail preenchido
+        setView('first-access');
+        setFeedback(
+          `O e-mail ${sessionEmail} não foi localizado na base de usuários ativos. Se sua empresa contratou recentemente, confirme seu primeiro acesso abaixo ou solicite o cadastro.`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao identificar e-mail.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** Etapa 2: Autenticação com senha e redirecionamento conforme a loja e permissão */
   async function handlePasswordLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -80,7 +196,7 @@ export function LoginPage() {
       const sessionUser = await loginWithPassword(sessionEmail, password);
       navigate(safeNext(nextParam, sessionUser.email || sessionEmail), { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
+      setError(err instanceof Error ? err.message : 'Não foi possível entrar. Verifique sua senha.');
     } finally {
       setSubmitting(false);
     }
@@ -207,37 +323,40 @@ export function LoginPage() {
 
         {view === 'login' ? (
           <>
-            <h1>Entrar</h1>
+            <h1>Entrar no Sistema</h1>
             <p className="auth__lead">
-              Use o e-mail e a senha que o <strong>gestor da loja</strong> cadastrou para você. A
-              função do operador abre o app certo (painel, caixa, OS, fiscal…).
+              {loginStep === 'email'
+                ? 'Informe seu e-mail para identificar sua loja e operador.'
+                : 'Identificação confirmada. Digite sua senha para entrar na loja.'}
             </p>
           </>
         ) : null}
+
         {view === 'forgot' ? (
           <>
             <h1>Esqueci a senha</h1>
             <p className="auth__lead">
-              Informe o e-mail de acesso. A redefinição passa pelo administrador da loja — operadores
-              não alteram senha sem permissão.
+              Informe o e-mail cadastrado. A redefinição passa pelo administrador da loja para sua segurança.
             </p>
           </>
         ) : null}
+
         {view === 'signup' ? (
           <>
             <h1>Quero contratar</h1>
             <p className="auth__lead">
               Ainda não é cliente? Deixe seus dados — viramos lead no CRM e a equipe Marthi apresenta
-              o plano. Operadores da loja são cadastrados depois pelo gestor.
+              o plano sob medida.
             </p>
           </>
         ) : null}
+
         {view === 'first-access' ? (
           <>
-            <h1>Primeiro Acesso</h1>
+            <h1>Ativação de Primeiro Acesso</h1>
             <p className="auth__lead">
-              Seu cadastro foi realizado pelo gestor da loja ou pela equipe Marthi?
-              Informe seu e-mail para receber o link seguro de ativação e cadastrar sua senha.
+              Sua conta foi criada pelo gestor ou pela equipe Marthi? Confirme seu e-mail para ativar
+              o acesso e cadastrar sua senha.
             </p>
           </>
         ) : null}
@@ -245,9 +364,9 @@ export function LoginPage() {
         {error ? (
           <div className="auth__error" role="alert">
             <div>{error}</div>
-            {view === 'login' && (
-              <div style={{ marginTop: '6px', fontSize: '0.82rem', opacity: 0.9 }}>
-                É seu primeiro acesso?{' '}
+            {view === 'login' && loginStep === 'password' && (
+              <div style={{ marginTop: '8px', fontSize: '0.82rem', opacity: 0.95 }}>
+                Esqueceu a senha?{' '}
                 <button
                   type="button"
                   style={{
@@ -260,35 +379,38 @@ export function LoginPage() {
                     padding: 0,
                     fontWeight: 700,
                   }}
-                  onClick={() => goView('first-access')}
+                  onClick={() => goView('forgot')}
                 >
-                  Clique aqui para ativar sua conta
+                  Clique aqui para redefinir
                 </button>
               </div>
             )}
           </div>
         ) : null}
+
         {feedback ? (
           <div className="auth__ok" role="status">
             <div>{feedback}</div>
             {view === 'first-access' && (
-              <div style={{ marginTop: '10px' }}>
+              <div style={{ marginTop: '12px' }}>
                 <Link
                   to={email ? `/criar-senha?email=${encodeURIComponent(email)}` : '/criar-senha'}
                   className="btn btn--secondary btn--block"
                   style={{ fontSize: '0.86rem', textAlign: 'center' }}
                 >
-                  Ir para Criação de Senha →
+                  🔑 Possui o Token de Ativação? Criar Senha Agora →
                 </Link>
               </div>
             )}
           </div>
         ) : null}
 
-        {view === 'login' ? (
-          <form className="auth__form" onSubmit={handlePasswordLogin}>
+        {/* FLUXO DE LOGIN PROGRESSIVO */}
+        {view === 'login' && loginStep === 'email' ? (
+          /* ETAPA 1: APENAS E-MAIL (A SENHA FICA TOTALMENTE INVISÍVEL) */
+          <form className="auth__form" onSubmit={handleEmailContinue}>
             <label>
-              E-mail
+              E-mail de acesso
               <input
                 type="email"
                 name="email"
@@ -296,10 +418,77 @@ export function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="voce@loja.com.br"
                 autoComplete="username"
+                autoFocus
                 required
                 disabled={submitting}
               />
             </label>
+            <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+              {submitting ? 'Identificando acesso…' : 'Continuar →'}
+            </button>
+          </form>
+        ) : null}
+
+        {view === 'login' && loginStep === 'password' ? (
+          /* ETAPA 2: USUÁRIO IDENTIFICADO -> PEDE A SENHA E VALIDA A LOJA */
+          <form className="auth__form" onSubmit={handlePasswordLogin}>
+            {/* Card com a Identificação do Usuário e da Loja */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                background: 'rgba(15, 118, 110, 0.08)',
+                border: '1px solid rgba(15, 118, 110, 0.25)',
+                borderRadius: '10px',
+                marginBottom: '16px',
+                textAlign: 'left',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.74rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    color: 'var(--teal, #0f766e)',
+                    fontWeight: 700,
+                  }}
+                >
+                  {identifiedUser?.storeName ? `🏬 ${identifiedUser.storeName}` : 'Marthi Tecnologia'}
+                </div>
+                <div style={{ fontWeight: 650, fontSize: '0.94rem', color: 'var(--ink, #12151a)', marginTop: '2px' }}>
+                  {identifiedUser?.name || email}
+                </div>
+                <div style={{ fontSize: '0.80rem', opacity: 0.75 }}>
+                  {email}
+                </div>
+              </div>
+              <button
+                type="button"
+                style={{
+                  background: 'none',
+                  border: '1px solid currentColor',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: 'var(--teal, #0f766e)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={() => {
+                  setLoginStep('email');
+                  setPassword('');
+                  setError(null);
+                }}
+                title="Digitar outro e-mail"
+              >
+                Alterar
+              </button>
+            </div>
+
             <label>
               Senha
               <div className="auth__password-field">
@@ -310,6 +499,7 @@ export function LoginPage() {
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  autoFocus
                   required
                   disabled={submitting}
                 />
@@ -335,7 +525,7 @@ export function LoginPage() {
               </div>
             </label>
             <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
-              {submitting ? 'Entrando…' : 'Entrar'}
+              {submitting ? 'Entrando…' : 'Entrar no Sistema →'}
             </button>
           </form>
         ) : null}
@@ -351,11 +541,12 @@ export function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="voce@loja.com.br"
                 autoComplete="username"
+                autoFocus
                 required
               />
             </label>
-            <button type="submit" className="btn btn--primary btn--block">
-              Enviar pedido
+            <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
+              {submitting ? 'Enviando…' : 'Enviar pedido de redefinição'}
             </button>
           </form>
         ) : null}
@@ -407,10 +598,11 @@ export function LoginPage() {
             </button>
             <p className="auth__hint">
               Para cadastro completo com CNPJ e plano, use{' '}
-              <Link to="/parceiro">Solicitar demo</Link>.
+              <Link to="/parceiro">Solicitar contratação</Link>.
             </p>
           </form>
         ) : null}
+
         {view === 'first-access' ? (
           <form className="auth__form" onSubmit={handleFirstAccess}>
             <label>
@@ -422,17 +614,22 @@ export function LoginPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="voce@empresa.com.br"
                 autoComplete="username"
+                autoFocus
                 required
                 disabled={submitting}
               />
             </label>
             <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
-              {submitting ? 'Verificando…' : 'Enviar Link de Primeiro Acesso'}
+              {submitting ? 'Verificando…' : 'Enviar Link de Primeiro Acesso por E-mail'}
             </button>
 
-            <div style={{ marginTop: '12px', textAlign: 'center' }}>
-              <Link to="/criar-senha" className="auth__link" style={{ fontSize: '0.84rem' }}>
-                🔑 Já possui um token de ativação? Clique aqui
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center' }}>
+              <Link
+                to={email ? `/criar-senha?email=${encodeURIComponent(email)}` : '/criar-senha'}
+                className="btn btn--secondary btn--block"
+                style={{ fontSize: '0.86rem', textAlign: 'center' }}
+              >
+                🔑 Já possui o Token de Ativação? Criar Senha
               </Link>
             </div>
           </form>
@@ -441,42 +638,67 @@ export function LoginPage() {
         {view === 'login' ? (
           <>
             <div className="auth__links" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-              <button
-                type="button"
-                className="auth__link"
-                style={{ fontWeight: 700, color: 'var(--teal, #0f766e)' }}
-                onClick={() => goView('first-access')}
-              >
-                Primeiro acesso?
-              </button>
-              <button type="button" className="auth__link" onClick={() => goView('forgot')}>
-                Esqueci minha senha
-              </button>
-              <button type="button" className="auth__link" onClick={() => goView('signup')}>
-                Quero me cadastrar
-              </button>
+              {loginStep === 'email' ? (
+                <>
+                  <button
+                    type="button"
+                    className="auth__link"
+                    style={{ fontWeight: 700, color: 'var(--teal, #0f766e)' }}
+                    onClick={() => goView('first-access')}
+                  >
+                    Primeiro acesso?
+                  </button>
+                  <button type="button" className="auth__link" onClick={() => goView('forgot')}>
+                    Esqueci minha senha
+                  </button>
+                  <button type="button" className="auth__link" onClick={() => goView('signup')}>
+                    Quero me cadastrar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="auth__link" onClick={() => goView('forgot')}>
+                    Esqueci minha senha
+                  </button>
+                  <button
+                    type="button"
+                    className="auth__link"
+                    onClick={() => {
+                      setLoginStep('email');
+                      setPassword('');
+                      setError(null);
+                    }}
+                  >
+                    ← Usar outro e-mail
+                  </button>
+                </>
+              )}
             </div>
 
-            <div className="auth__divider" role="separator">
-              <span>ou</span>
-            </div>
+            {loginStep === 'email' && (
+              <>
+                <div className="auth__divider" role="separator">
+                  <span>ou</span>
+                </div>
 
-            {googleClientId ? (
-              <GoogleSignInButton
-                clientId={googleClientId}
-                disabled={submitting}
-                onSuccess={handleGoogle}
-                onError={setError}
-              />
-            ) : (
-              <div className="auth__google-hint">
-                <button type="button" className="btn btn--google btn--block" disabled>
-                  Continuar com Google
-                </button>
-                <p>
-                  Configure <code>GOOGLE_CLIENT_ID</code> no backend para habilitar o Google.
-                </p>
-              </div>
+                {googleClientId ? (
+                  <GoogleSignInButton
+                    clientId={googleClientId}
+                    disabled={submitting}
+                    onSuccess={handleGoogle}
+                    onError={setError}
+                  />
+                ) : (
+                  <div className="auth__google-hint">
+                    <button type="button" className="btn btn--google btn--block" disabled>
+                      Continuar com Google
+                    </button>
+                    <p>
+                      Configure <code>GOOGLE_CLIENT_ID</code> no backend para habilitar o Google.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (

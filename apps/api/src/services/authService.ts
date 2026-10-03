@@ -465,7 +465,22 @@ export async function setupPasswordWithToken(
         user.clientAccountId = userRes.rows[0].client_account_id;
         user.name = userRes.rows[0].name;
         user.role = userRes.rows[0].global_role;
+      } else {
+        await pool.query(
+          `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
+           VALUES ($1, $2, $3, $4, 'password', $5, 'admin', true)
+           ON CONFLICT (email) DO UPDATE
+           SET password_hash = $5, active = true, updated_at = now()`,
+          [user.id, user.clientAccountId || 'ACC-MARTHI-DEMO', email, user.name, `${salt}:${passwordHash}`],
+        );
       }
+
+      await pool.query(
+        `UPDATE client_accounts
+         SET status = 'active', updated_at = now()
+         WHERE lower(email) = lower($1) OR id = $2`,
+        [email, consumption.record.clientId || ''],
+      );
 
       await pool.query(
         `UPDATE partner_signups
@@ -757,3 +772,160 @@ export function getUserSecurityStatus(email: string, phone?: string): {
 
   return { configured, active, phoneVerified };
 }
+
+export type UserIdentificationResult = {
+  identified: boolean;
+  hasPassword: boolean;
+  needsFirstAccess: boolean;
+  name?: string;
+  storeName?: string;
+  role?: string;
+  email: string;
+  message?: string;
+};
+
+export async function identifyUserAccess(email: string): Promise<UserIdentificationResult> {
+  const normEmail = email.trim().toLowerCase();
+
+  // 1. Staff Marthi / Dev accounts
+  if (normEmail === 'teste@marthi.com.br' || normEmail === 'marthi.tecnologia@gmail.com') {
+    return {
+      identified: true,
+      hasPassword: true,
+      needsFirstAccess: false,
+      name: normEmail === 'teste@marthi.com.br' ? 'Administrador Marthi' : 'Equipe Marthi Tecnologia',
+      storeName: 'Marthi Tecnologia',
+      role: 'admin',
+      email: normEmail,
+    };
+  }
+
+  // 2. Query PostgreSQL users and stores
+  if (pool) {
+    try {
+      const userRes = await pool.query(
+        `SELECT u.id, u.email, u.name, u.global_role, u.password_hash, u.active, u.client_account_id,
+                s.id as store_id, s.trade_name as store_name
+         FROM users u
+         LEFT JOIN user_stores us ON us.user_id = u.id AND us.is_default = true
+         LEFT JOIN stores s ON (s.id = us.store_id OR s.client_account_id = u.client_account_id)
+         WHERE lower(u.email) = $1
+         LIMIT 1`,
+        [normEmail],
+      );
+
+      if (userRes.rows.length > 0) {
+        const row = userRes.rows[0];
+        const hasPwd = Boolean(
+          row.password_hash &&
+          row.password_hash !== 'LOCKED_PENDING_ACTIVATION' &&
+          row.password_hash.length >= 4,
+        );
+
+        return {
+          identified: true,
+          hasPassword: hasPwd,
+          needsFirstAccess: !hasPwd,
+          name: row.name,
+          storeName: row.store_name || 'Minha Loja',
+          role: row.global_role,
+          email: normEmail,
+        };
+      }
+
+      // Check employees
+      const empRes = await pool.query(
+        `SELECT e.id, e.email, e.name, e.role, s.trade_name as store_name
+         FROM employees e
+         LEFT JOIN stores s ON s.id = e.store_id
+         WHERE lower(e.email) = $1 OR lower(e.user_email) = $1
+         LIMIT 1`,
+        [normEmail],
+      );
+
+      if (empRes.rows.length > 0) {
+        const emp = empRes.rows[0];
+        return {
+          identified: true,
+          hasPassword: true,
+          needsFirstAccess: false,
+          name: emp.name,
+          storeName: emp.store_name || 'Minha Loja',
+          role: emp.role,
+          email: normEmail,
+        };
+      }
+
+      // Check client_accounts or partner_signups
+      const clientRes = await pool.query(
+        `SELECT c.id, c.email, c.contact_name, c.trade_name, ps.status as partner_status
+         FROM client_accounts c
+         LEFT JOIN partner_signups ps ON ps.id = c.id OR lower(ps.email) = lower(c.email)
+         WHERE lower(c.email) = $1
+         LIMIT 1`,
+        [normEmail],
+      );
+
+      if (clientRes.rows.length > 0) {
+        const cli = clientRes.rows[0];
+        return {
+          identified: true,
+          hasPassword: false,
+          needsFirstAccess: true,
+          name: cli.contact_name || cli.trade_name,
+          storeName: cli.trade_name,
+          email: normEmail,
+          message: 'Cadastro localizado! Defina sua senha inicial para acessar.',
+        };
+      }
+
+      const psRes = await pool.query(
+        `SELECT id, email, contact_name, trade_name, status
+         FROM partner_signups
+         WHERE lower(email) = $1
+         LIMIT 1`,
+        [normEmail],
+      );
+
+      if (psRes.rows.length > 0) {
+        const ps = psRes.rows[0];
+        return {
+          identified: true,
+          hasPassword: false,
+          needsFirstAccess: true,
+          name: ps.contact_name || ps.trade_name,
+          storeName: ps.trade_name,
+          email: normEmail,
+          message: 'Cadastro localizado! Ative seu acesso para definir a senha inicial.',
+        };
+      }
+    } catch (err) {
+      console.warn('[authService] DB lookup error during identifyUserAccess:', err);
+    }
+  }
+
+  // 3. In-memory check
+  const memoryUser = clientUsersStore.get(normEmail);
+  if (memoryUser) {
+    const hasPwd = Boolean(
+      memoryUser.passwordHash &&
+      memoryUser.passwordHash !== 'LOCKED_PENDING_ACTIVATION',
+    );
+    return {
+      identified: true,
+      hasPassword: hasPwd,
+      needsFirstAccess: !hasPwd,
+      name: memoryUser.name,
+      role: memoryUser.role,
+      email: normEmail,
+    };
+  }
+
+  return {
+    identified: false,
+    hasPassword: false,
+    needsFirstAccess: true,
+    email: normEmail,
+  };
+}
+

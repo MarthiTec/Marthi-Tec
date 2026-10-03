@@ -6,6 +6,7 @@ import {
   adminResendActivationLink,
   adminToggleUserAccess,
   getUserSecurityStatus,
+  identifyUserAccess,
   loginWithGoogleIdToken,
   loginWithPassword,
   registerClientUser,
@@ -85,6 +86,31 @@ authRouter.get('/api/v1/auth/providers', (_req, res) => {
       googleClientId: env.GOOGLE_CLIENT_ID ?? null,
     },
   });
+});
+
+const identifySchema = z.object({
+  email: z.string().email('Informe um e-mail válido.'),
+});
+
+authRouter.post('/api/v1/auth/identify', async (req, res, next) => {
+  try {
+    const body = identifySchema.parse(req.body);
+    const result = await identifyUserAccess(body.email);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get('/api/v1/auth/identify', async (req, res, next) => {
+  try {
+    const emailParam = typeof req.query.email === 'string' ? req.query.email : '';
+    const body = identifySchema.parse({ email: emailParam });
+    const result = await identifyUserAccess(body.email);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
 });
 
 authRouter.post('/api/v1/auth/login', async (req, res, next) => {

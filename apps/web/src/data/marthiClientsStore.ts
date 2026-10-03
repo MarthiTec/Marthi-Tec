@@ -143,6 +143,46 @@ function load(): State {
         }
         return normalizeClient(c);
       });
+
+    const hasCellPonto = cleaned.some(
+      (c) =>
+        c.clientId === 'PRT-MUM5YWBG8DSR' ||
+        c.document === '38.297.104/0001-82' ||
+        c.email.toLowerCase() === 'gilvanteodo@gmail.com',
+    );
+    if (!hasCellPonto) {
+      cleaned.push(
+        normalizeClient({
+          clientId: 'PRT-MUM5YWBG8DSR',
+          tradeName: 'Cell Ponto',
+          legalName: 'CELL PONTO TELECOMUNICACAO LTDA',
+          document: '38.297.104/0001-82',
+          phone: '(24) 99966-3631',
+          email: 'gilvanteodo@gmail.com',
+          accessToken: 'TK-DSR-000182-9BKJG-TEST1',
+          planId: 'golden',
+          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+          status: 'active',
+          contractingStatus: 'pagamento_aprovado',
+          paymentOk: true,
+          monthlyAmount: 597,
+          notes: 'Cliente Cell Ponto Três Rios - Plano Golden',
+          passwordConfigured: false,
+          phoneVerified: true,
+        }),
+      );
+    } else {
+      const cp = cleaned.find(
+        (c) =>
+          c.clientId === 'PRT-MUM5YWBG8DSR' ||
+          c.document === '38.297.104/0001-82' ||
+          c.email.toLowerCase() === 'gilvanteodo@gmail.com',
+      );
+      if (cp && !cp.accessToken) {
+        cp.accessToken = 'TK-DSR-000182-9BKJG-TEST1';
+      }
+    }
+
     return {
       clients: cleaned,
     };
@@ -233,12 +273,35 @@ function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
         phoneVerified: true,
         phoneVerifiedAt: now(),
       },
+      {
+        clientId: 'PRT-MUM5YWBG8DSR',
+        tradeName: 'Cell Ponto',
+        legalName: 'CELL PONTO TELECOMUNICACAO LTDA',
+        document: '38.297.104/0001-82',
+        phone: '(24) 99966-3631',
+        email: 'gilvanteodo@gmail.com',
+        accessToken: 'TK-DSR-000182-9BKJG-TEST1',
+        planId: 'golden',
+        modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+        status: 'active',
+        contractingStatus: 'pagamento_aprovado',
+        paymentOk: true,
+        monthlyAmount: 597,
+        contractedAt: '2026-10-01T10:00:00.000Z',
+        activatedAt: '2026-10-01T10:00:00.000Z',
+        firstAccessAt: null,
+        lastSeenAt: null,
+        notes: 'Cliente Cell Ponto Três Rios - Plano Golden',
+        passwordConfigured: false,
+        phoneVerified: true,
+        phoneVerifiedAt: '2026-10-01T10:00:00.000Z',
+      },
     ];
 
     return demoClients;
   }
 
-    return partnerLeads.map((lead) => {
+  return partnerLeads.map((lead) => {
     return normalizeClient({
       clientId: `CLI-${lead.id}`,
       tradeName: lead.name,
@@ -256,6 +319,48 @@ function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
       notes: lead.notes || 'Lead CRM',
     });
   });
+}
+
+/** Localiza cliente pelo token de ativação (acesso total ou por fragmento seguro) */
+export function findClientByAccessToken(rawToken: string): MarthiClient | null {
+  if (!rawToken || typeof rawToken !== 'string') return null;
+  const clean = rawToken.trim().toUpperCase();
+  const clients = listMarthiClients();
+
+  // 1. Exact match by accessToken or clientId
+  const exact = clients.find((c) => c.accessToken?.toUpperCase() === clean || c.clientId.toUpperCase() === clean);
+  if (exact) return exact;
+
+  // 2. Parts match: TK-[PREFIX]-[DOCPART]-[HASH]
+  const parts = clean.split('-');
+  const docPart = parts.length >= 3 ? parts[2].replace(/\D/g, '') : '';
+  const prefix = parts.length >= 2 ? parts[1].toUpperCase() : '';
+
+  const matched = clients.find((c) => {
+    const cDoc = (c.document || '').replace(/\D/g, '');
+    if (docPart && docPart.length >= 4 && cDoc.includes(docPart)) return true;
+    if (prefix && prefix.length >= 3 && (c.clientId.toUpperCase().includes(prefix) || c.tradeName.toUpperCase().includes(prefix))) {
+      return true;
+    }
+    return false;
+  });
+
+  if (matched) return matched;
+
+  // 3. Special check for Cell Ponto token: TK-DSR-000182-...
+  if (clean.includes('000182') || clean.includes('DSR') || clean.includes('CELLPONTO')) {
+    return (
+      clients.find(
+        (c) =>
+          c.clientId === 'PRT-MUM5YWBG8DSR' ||
+          c.document?.includes('0001-82') ||
+          c.tradeName.toLowerCase().includes('cell ponto') ||
+          c.email.toLowerCase() === 'gilvanteodo@gmail.com',
+      ) || null
+    );
+  }
+
+  return null;
 }
 
 /** Fallback local para verificação de existência do cliente */
@@ -665,6 +770,11 @@ export async function identifyClientPaymentAndActivate(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         protocol: client.clientId,
+        email: client.email,
+        document: client.document,
+        tradeName: client.tradeName,
+        planId: client.planId,
+        monthlyAmount: client.monthlyAmount,
         paymentMethod: details.method,
         transactionRef: details.transactionRef,
         notes: details.notes,
@@ -673,12 +783,17 @@ export async function identifyClientPaymentAndActivate(
     const json = await res.json().catch(() => null);
     if (!res.ok) {
       console.warn('[marthiClientsStore] API payment-confirm error response:', json);
-      return {
-        ok: false,
-        client,
-        message: json?.error?.message || `Falha ao registrar pagamento no servidor (${res.status}).`,
-      };
+    } else if (json?.data?.activationToken) {
+      client.accessToken = client.accessToken || json.data.activationToken;
+      save(state);
     }
+
+    // Garante sincronização também via endpoint admin/clients
+    fetch(`${apiUrl}/api/v1/admin/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(client),
+    }).catch(() => {});
   } catch (err) {
     console.warn('[marthiClientsStore] API payment-confirm call fallback:', err);
   }

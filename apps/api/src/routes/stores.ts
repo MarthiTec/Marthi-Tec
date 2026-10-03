@@ -534,7 +534,11 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
           const token = row.access_token || row.store_token || generateStoreAccessToken(rawDoc, row.email, row.id);
           const isDemo = row.id === 'ACC-MARTHI-DEMO';
 
-          const isPaymentOk = isDemo || Boolean(row.payment_confirmed_at) || row.partner_status === 'pagamento_aprovado' || row.partner_status === 'acesso_ativado';
+          const isPaymentOk =
+            isDemo ||
+            Boolean(row.payment_confirmed_at) ||
+            ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.partner_status) ||
+            (row.status === 'active' && !row.partner_status);
           let contractingStatus = isDemo ? 'acesso_ativado' : (row.partner_status || 'aguardando_pagamento');
           if (!isPaymentOk) {
             contractingStatus = 'aguardando_pagamento';
@@ -582,7 +586,9 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
           if (!map.has(row.id)) {
             const rawDoc = row.document || '';
             const token = generateStoreAccessToken(rawDoc, row.email, row.id);
-            const isPaymentOk = Boolean(row.payment_confirmed_at) || row.status === 'pagamento_aprovado' || row.status === 'acesso_ativado';
+            const isPaymentOk =
+              Boolean(row.payment_confirmed_at) ||
+              ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.status);
             const contractingStatus = isPaymentOk ? (row.status || 'acesso_pendente') : 'aguardando_pagamento';
 
             map.set(row.id, {
@@ -710,18 +716,45 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
     const body = adminClientSchema.partial().parse(req.body);
 
     if (pool && clientId) {
-      if (body.tradeName || body.document || body.email || body.status || body.accessToken) {
+      const cleanDoc = (body.document || '').replace(/\D/g, '');
+      await pool.query(
+        `UPDATE client_accounts
+         SET trade_name = COALESCE($1, trade_name),
+             document = COALESCE($2, document),
+             email = COALESCE($3, email),
+             phone = COALESCE($4, phone),
+             status = COALESCE($5, status),
+             access_token = COALESCE($6, access_token),
+             updated_at = now()
+         WHERE id = $7 OR lower(email) = lower($3) OR (length($8) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $8)`,
+        [body.tradeName, body.document, body.email, body.phone, body.status, body.accessToken, clientId, cleanDoc],
+      );
+
+      if (body.tradeName || body.email || body.phone || body.accessToken || body.status) {
         await pool.query(
-          `UPDATE client_accounts
+          `UPDATE stores
            SET trade_name = COALESCE($1, trade_name),
-               document = COALESCE($2, document),
-               email = COALESCE($3, email),
-               status = COALESCE($4, status),
-               access_token = COALESCE($5, access_token),
+               email = COALESCE($2, email),
+               phone = COALESCE($3, phone),
+               access_token = COALESCE($4, access_token),
+               active = CASE WHEN $5 = 'blocked' OR $5 = 'inactive' THEN false ELSE true END,
                updated_at = now()
-           WHERE id = $6`,
-          [body.tradeName, body.document, body.email, body.status, body.accessToken, clientId],
-        );
+           WHERE client_account_id = $6 OR id = $6`,
+          [body.tradeName, body.email, body.phone, body.accessToken, body.status, clientId],
+        ).catch(() => {});
+      }
+
+      if (body.paymentOk !== undefined || body.tradeName || body.email) {
+        await pool.query(
+          `UPDATE partner_signups
+           SET trade_name = COALESCE($1, trade_name),
+               email = COALESCE($2, email),
+               payment_confirmed_at = CASE WHEN $3 = true THEN COALESCE(payment_confirmed_at, now()) ELSE payment_confirmed_at END,
+               status = CASE WHEN $3 = true THEN 'acesso_ativado' WHEN $3 = false THEN 'aguardando_pagamento' ELSE status END,
+               updated_at = now()
+           WHERE id = $4 OR lower(email) = lower($2) OR (length($5) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $5)`,
+          [body.tradeName, body.email, body.paymentOk, clientId, cleanDoc],
+        ).catch(() => {});
       }
     }
 

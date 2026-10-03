@@ -78,7 +78,12 @@ const signupSchema = z
   });
 
 const paymentConfirmSchema = z.object({
-  protocol: z.string().min(3),
+  protocol: z.string().min(1),
+  email: z.string().optional(),
+  document: z.string().optional(),
+  tradeName: z.string().optional(),
+  planId: z.string().optional(),
+  monthlyAmount: z.coerce.number().optional(),
   paymentMethod: z.string().default('pix'),
   transactionRef: z.string().optional(),
   notes: z.string().optional(),
@@ -334,6 +339,9 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
     const protocol = body.protocol.trim();
     const frontendUrl = resolveRequestFrontendUrl(req);
 
+    const lookupEmail = (body.email || (protocol.includes('@') ? protocol : '')).trim().toLowerCase();
+    const lookupDoc = (body.document || protocol).replace(/\D/g, '');
+
     // 1. Busca registro no DB ou em memória
     let record: PartnerSignupRecord | null = null;
 
@@ -341,9 +349,11 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
       try {
         const dbRes = await pool.query(
           `SELECT * FROM partner_signups
-           WHERE id = $1 OR lower(email) = lower($1) OR regexp_replace(document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+           WHERE id = $1
+              OR (lower(email) = lower($2) AND $2 != '')
+              OR (regexp_replace(document, '\\D', '', 'g') = $3 AND $3 != '')
            LIMIT 1`,
-          [protocol],
+          [protocol, lookupEmail, lookupDoc],
         );
         if (dbRes.rows.length > 0) {
           const row = dbRes.rows[0];
@@ -392,9 +402,11 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
            FROM client_accounts c
            LEFT JOIN store_licenses l ON l.client_account_id = c.id
            LEFT JOIN stores s ON s.client_account_id = c.id
-           WHERE c.id = $1 OR lower(c.email) = lower($1) OR regexp_replace(c.document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+           WHERE c.id = $1
+              OR (lower(c.email) = lower($2) AND $2 != '')
+              OR (regexp_replace(c.document, '\\D', '', 'g') = $3 AND $3 != '')
            LIMIT 1`,
-          [protocol],
+          [protocol, lookupEmail, lookupDoc],
         );
         if (clientRes.rows.length > 0) {
           const row = clientRes.rows[0];
@@ -442,8 +454,9 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
       if (!record) {
         for (const item of signupsStore.values()) {
           if (
-            item.email.toLowerCase() === protocol.toLowerCase() ||
-            item.document.replace(/\D/g, '') === protocol.replace(/\D/g, '')
+            (lookupEmail && item.email.toLowerCase() === lookupEmail) ||
+            (lookupDoc && item.document.replace(/\D/g, '') === lookupDoc) ||
+            item.id === protocol
           ) {
             record = item;
             break;
@@ -453,11 +466,46 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
     }
 
     if (!record) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Contratação não encontrada para o protocolo/cliente informado.' },
-      });
-      return;
+      if (lookupEmail || lookupDoc || body.tradeName) {
+        const generatedId = protocol.startsWith('CLI-') || protocol.startsWith('PRT-') ? protocol : `PRT-${Date.now().toString(36).toUpperCase()}`;
+        record = {
+          id: generatedId,
+          payNow: true,
+          planId: (body.planId as any) || 'golden',
+          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+          documentType: 'cnpj',
+          document: body.document || '',
+          legalName: body.tradeName || 'Empresa Cliente',
+          tradeName: body.tradeName || 'Empresa Cliente',
+          email: lookupEmail || `${generatedId.toLowerCase()}@cliente.marthi.com.br`,
+          phone: '(24) 99966-3631',
+          zipCode: '25800-000',
+          street: 'Rua Principal',
+          number: '100',
+          complement: '',
+          district: 'Centro',
+          city: 'Três Rios',
+          state: 'RJ',
+          segment: 'geral',
+          contactName: body.tradeName || 'Administrador',
+          contactRole: 'Responsável',
+          notes: body.notes || 'Ativação manual pelo painel administrativo',
+          status: 'aguardando_pagamento',
+          monthlyAmount: body.monthlyAmount || 597,
+          paymentMethod: body.paymentMethod,
+          transactionRef: body.transactionRef,
+          auditTrail: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        signupsStore.set(record.id, record);
+      } else {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Contratação não encontrada para o protocolo/cliente informado.' },
+        });
+        return;
+      }
     }
 
     // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
@@ -680,11 +728,12 @@ async function executePaymentActivation(
   if (pool) {
     try {
       // 1.1 Contas de Clientes (Tenant Root)
-      await pool.query(
+      const caRes = await pool.query(
         `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), now())
          ON CONFLICT (document) DO UPDATE
-         SET status = 'active', email = $6, phone = $7, trade_name = $2, legal_name = $3, updated_at = now()`,
+         SET status = 'active', email = $6, phone = $7, trade_name = $2, legal_name = $3, updated_at = now()
+         RETURNING id`,
         [
           record.id,
           record.tradeName,
@@ -696,6 +745,7 @@ async function executePaymentActivation(
           record.contactName,
         ],
       );
+      const actualAccountId = caRes.rows[0]?.id || record.id;
 
       // 1.2 Loja Matriz do Lojista
       await pool.query(
@@ -711,7 +761,7 @@ async function executePaymentActivation(
         SET trade_name = $3, legal_name = $4, email = $7, phone = $8, active = true, updated_at = now()`,
         [
           storeId,
-          record.id,
+          actualAccountId,
           record.tradeName,
           record.legalName,
           record.documentType,
@@ -744,7 +794,7 @@ async function executePaymentActivation(
         SET plan_id = $4, modules = $5::TEXT[], status = 'active', updated_at = now()`,
         [
           `LIC-${record.id}`,
-          record.id,
+          actualAccountId,
           storeId,
           record.planId || 'golden',
           licenseModules,
@@ -762,7 +812,7 @@ async function executePaymentActivation(
         SET client_account_id = $2, name = $4, updated_at = now()`,
         [
           userId,
-          record.id,
+          actualAccountId,
           record.email.trim().toLowerCase(),
           record.contactName || record.tradeName,
         ],
@@ -811,8 +861,18 @@ async function executePaymentActivation(
         `UPDATE partner_signups
          SET status = $1, payment_confirmed_at = now(), payment_method = $2,
              transaction_ref = $3, activation_token_sent_at = now(), audit_trail = $4::jsonb, updated_at = now()
-         WHERE id = $5`,
-        [record.status, record.paymentMethod, record.transactionRef, JSON.stringify(record.auditTrail), record.id],
+         WHERE id = $5
+            OR lower(email) = lower($6)
+            OR (regexp_replace(document, '\\D', '', 'g') = regexp_replace($7, '\\D', '', 'g') AND regexp_replace($7, '\\D', '', 'g') != '')`,
+        [
+          record.status,
+          record.paymentMethod,
+          record.transactionRef,
+          JSON.stringify(record.auditTrail),
+          record.id,
+          record.email,
+          record.document,
+        ],
       );
     } catch (err) {
       console.warn('[partners] DB partner_signups update error:', err);

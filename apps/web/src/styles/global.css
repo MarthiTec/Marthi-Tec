@@ -465,6 +465,68 @@ input {
   background: #f5f5f7;
 }
 
+/* Suporte completo a tema escuro (.is-theme-dark) nas telas de autenticação */
+.is-theme-dark .auth__card {
+  background: #0f172a;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.65);
+}
+
+.is-theme-dark .auth__tenant {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+}
+
+.is-theme-dark .auth__lead {
+  color: #94a3b8;
+}
+
+.is-theme-dark .auth__lead strong {
+  color: #f8fafc;
+}
+
+.is-theme-dark .auth__card h1 {
+  color: #f8fafc;
+}
+
+.is-theme-dark .auth__link {
+  color: #2dd4bf;
+}
+
+.is-theme-dark .auth__hint {
+  color: #94a3b8;
+}
+
+.is-theme-dark .auth__hint a {
+  color: #2dd4bf;
+}
+
+.is-theme-dark .auth__form label {
+  color: #cbd5e1;
+}
+
+.is-theme-dark .auth__form input {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+}
+
+.is-theme-dark .auth__password-toggle {
+  color: #94a3b8;
+}
+
+.is-theme-dark .btn--google {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+}
+
+.is-theme-dark .btn--google:hover {
+  background: #334155;
+}
+
 .google-btn {
   display: flex;
   justify-content: center;

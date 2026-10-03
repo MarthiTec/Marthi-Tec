@@ -35,6 +35,7 @@ import {
 import { PRESENCE_EVENT } from '../../data/presenceStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { lookupCnpjData } from '../../services/cnpj';
+import { nestApiUrl } from '../../services/config';
 
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -239,7 +240,6 @@ export function MarthiClientsPage() {
   function openEdit(client: MarthiClient) {
     setFormError(null);
     setEditing(toEditForm(client));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleOpenCreate() {
@@ -371,6 +371,22 @@ export function MarthiClientsPage() {
       action: 'marthi.cliente.editar',
       detail: `${saved.tradeName} (${saved.clientId}) · ${planLabel(saved.planId)}${parentClientId ? ' [Filial Unificada]' : ''}`,
     });
+
+    try {
+      const apiUrl = nestApiUrl();
+      fetch(`${apiUrl}/api/v1/admin/clients/${saved.clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saved),
+      }).catch(() => {});
+      fetch(`${apiUrl}/api/v1/admin/clients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saved),
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
 
     setFlash(`Registro de ${saved.tradeName} atualizado.`);
     setEditing(null);
@@ -650,10 +666,31 @@ export function MarthiClientsPage() {
         </p>
       ) : null}
 
-      {/* Drawer Edição */}
+      {/* Modal Edição de Cliente */}
       {editing ? (
-        <article className="admin-card marthi-edit" style={{ marginTop: '20px' }}>
-          <h2>Editar empresa · {editing.tradeName || editing.clientId}</h2>
+        <div className="marthi-modal-backdrop" onClick={() => { setEditing(null); setFormError(null); }}>
+          <div
+            className="marthi-modal-card marthi-modal-card--lg"
+            style={{ maxWidth: 760 }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header className="marthi-modal-head">
+              <div>
+                <span className="marthi-modal-kicker">Edição de Cadastro</span>
+                <h2>Editar Empresa · {editing.tradeName || editing.clientId}</h2>
+              </div>
+              <button
+                type="button"
+                className="marthi-modal-close"
+                onClick={() => { setEditing(null); setFormError(null); }}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </header>
+            <div className="marthi-modal-form">
           {formError ? <p className="qty-low">{formError}</p> : null}
           <div className="admin-form">
             <label>
@@ -884,8 +921,10 @@ export function MarthiClientsPage() {
               </div>
             </div>
           </div>
-        </article>
-      ) : null}
+        </div>
+      </div>
+    </div>
+  ) : null}
 
       {/* Toolbar & Filtros */}
       <div className="admin-toolbar marthi-toolbar" style={{ marginTop: '20px' }}>
