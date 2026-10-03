@@ -512,13 +512,17 @@ const adminClientSchema = z.object({
 storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
   try {
     if (pool) {
+      // 1. Busca contas de clientes existentes cruzadas com partner_signups para dados reais de pagamento/ativação
       const sql = `
         SELECT c.*, 
                s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
-               l.plan_id, l.modules
+               l.plan_id, l.modules,
+               ps.status as partner_status, ps.payment_confirmed_at, ps.payment_method as partner_pay_method,
+               ps.transaction_ref as partner_tx_ref, ps.notes as partner_notes, ps.monthly_amount as partner_amount
         FROM client_accounts c
         LEFT JOIN stores s ON s.client_account_id = c.id
         LEFT JOIN store_licenses l ON l.client_account_id = c.id
+        LEFT JOIN partner_signups ps ON (ps.id = c.id OR (ps.document = c.document AND ps.document != ''))
         ORDER BY c.created_at ASC
       `;
       const result = await pool.query(sql);
@@ -528,6 +532,14 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
         if (!map.has(row.id)) {
           const rawDoc = row.document || '';
           const token = row.access_token || row.store_token || generateStoreAccessToken(rawDoc, row.email, row.id);
+          const isDemo = row.id === 'ACC-MARTHI-DEMO';
+
+          const isPaymentOk = isDemo || Boolean(row.payment_confirmed_at) || row.partner_status === 'pagamento_aprovado' || row.partner_status === 'acesso_ativado';
+          let contractingStatus = isDemo ? 'acesso_ativado' : (row.partner_status || 'aguardando_pagamento');
+          if (!isPaymentOk) {
+            contractingStatus = 'aguardando_pagamento';
+          }
+
           map.set(row.id, {
             clientId: row.id,
             tradeName: row.trade_name,
@@ -538,16 +550,69 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
             planId: row.plan_id || 'golden',
             modules: row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
             status: row.status || 'active',
-            contractingStatus: 'acesso_ativado',
-            paymentOk: true,
-            monthlyAmount: row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597,
+            contractingStatus,
+            paymentOk: isPaymentOk,
+            monthlyAmount: row.partner_amount ? Number(row.partner_amount) : (row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597),
             contractedAt: row.created_at,
-            passwordConfigured: true,
-            phoneVerified: true,
-            notes: '',
+            passwordConfigured: isDemo || contractingStatus === 'acesso_ativado',
+            phoneVerified: isDemo,
+            notes: row.partner_notes || '',
             accessToken: token,
+            paymentDetails: row.partner_pay_method ? {
+              method: row.partner_pay_method,
+              identifiedAt: row.payment_confirmed_at || row.created_at,
+              transactionRef: row.partner_tx_ref || undefined,
+            } : undefined,
           });
         }
+      }
+
+      // 2. Busca também cadastros em partner_signups pendentes que ainda não estejam em client_accounts
+      try {
+        const signupsSql = `
+          SELECT ps.*
+          FROM partner_signups ps
+          WHERE NOT EXISTS (
+            SELECT 1 FROM client_accounts c WHERE c.id = ps.id OR (c.document = ps.document AND ps.document != '')
+          )
+          ORDER BY ps.created_at DESC
+        `;
+        const signupsRes = await pool.query(signupsSql);
+        for (const row of signupsRes.rows) {
+          if (!map.has(row.id)) {
+            const rawDoc = row.document || '';
+            const token = generateStoreAccessToken(rawDoc, row.email, row.id);
+            const isPaymentOk = Boolean(row.payment_confirmed_at) || row.status === 'pagamento_aprovado' || row.status === 'acesso_ativado';
+            const contractingStatus = isPaymentOk ? (row.status || 'acesso_pendente') : 'aguardando_pagamento';
+
+            map.set(row.id, {
+              clientId: row.id,
+              tradeName: row.trade_name,
+              legalName: row.legal_name || row.trade_name,
+              document: rawDoc,
+              email: row.email,
+              phone: row.phone || '',
+              planId: row.plan_id || 'golden',
+              modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+              status: 'active',
+              contractingStatus,
+              paymentOk: isPaymentOk,
+              monthlyAmount: Number(row.monthly_amount) || (row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597),
+              contractedAt: row.created_at,
+              passwordConfigured: false,
+              phoneVerified: false,
+              notes: row.notes || '',
+              accessToken: token,
+              paymentDetails: row.payment_method ? {
+                method: row.payment_method,
+                identifiedAt: row.payment_confirmed_at || row.created_at,
+                transactionRef: row.transaction_ref || undefined,
+              } : undefined,
+            });
+          }
+        }
+      } catch (signupsErr) {
+        console.warn('[stores] Erro ao buscar signups pendentes para admin/clients:', signupsErr);
       }
 
       res.json({ success: true, data: Array.from(map.values()) });

@@ -82,6 +82,17 @@ export type InternalNotificationPayload = {
   frontendUrl?: string;
 };
 
+export type SignupReceivedEmailPayload = {
+  toEmail: string;
+  contactName: string;
+  companyName: string;
+  planName: string;
+  monthlyAmount?: number;
+  paymentMethod: string;
+  protocol: string;
+  frontendUrl?: string;
+};
+
 export type ResetPasswordEmailPayload = {
   toEmail: string;
   userName: string;
@@ -583,4 +594,78 @@ export async function verifySmtpConfig(testRecipient?: string): Promise<{
     };
   }
 }
+
+/**
+ * 5. E-mail de Recebimento de Contratação (Aguardando Confirmação do Pagamento Pix)
+ */
+export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayload): Promise<{ success: boolean; messageId?: string }> {
+  const contentHtml = `
+    <tr>
+      <td>
+        <div style="display:inline-block; background:rgba(45, 212, 191, 0.15); color:#2dd4bf; font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+          Contratação Registrada
+        </div>
+        <h1 style="color:#ffffff; font-size:22px; margin:0 0 16px; font-weight:700;">
+          Recebemos sua contratação! 🎯
+        </h1>
+        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 16px;">
+          Olá, <strong style="color:#ffffff;">${payload.contactName}</strong>!
+        </p>
+        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
+          Seu pedido de contratação do plano <strong style="color:#2dd4bf;">${payload.planName}</strong> para a empresa <strong style="color:#ffffff;">${payload.companyName}</strong> foi registrado com sucesso em nossa plataforma.
+        </p>
+        
+        <!-- Detalhes do Pedido -->
+        <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="background:#1a232f; border:1px solid rgba(45, 212, 191, 0.2); border-radius:8px; font-size:14px; margin-bottom:24px;">
+          <tr>
+            <td style="color:#94a3b8; width:40%;">Empresa:</td>
+            <td style="color:#ffffff; font-weight:600;">${payload.companyName}</td>
+          </tr>
+          <tr>
+            <td style="color:#94a3b8;">Plano Escolhido:</td>
+            <td style="color:#2dd4bf; font-weight:700;">${payload.planName}</td>
+          </tr>
+          ${payload.monthlyAmount ? `<tr><td style="color:#94a3b8;">Valor Mensal:</td><td style="color:#ffffff;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
+          <tr>
+            <td style="color:#94a3b8;">Forma de Pagamento:</td>
+            <td style="color:#ffffff;">${payload.paymentMethod.toUpperCase()}</td>
+          </tr>
+          <tr>
+            <td style="color:#94a3b8;">Status Atual:</td>
+            <td style="color:#f59e0b; font-weight:600;">Aguardando Confirmação do Pagamento</td>
+          </tr>
+          <tr>
+            <td style="color:#94a3b8;">Protocolo:</td>
+            <td style="color:#ffffff; font-family:monospace;">${payload.protocol}</td>
+          </tr>
+        </table>
+
+        <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); border-radius:8px; padding:16px; margin-bottom:24px;">
+          <p style="font-size:14px; line-height:1.6; color:#fde68a; margin:0;">
+            ⏳ <strong>Próximo Passo — Liberação de Acesso:</strong><br>
+            Assim que nosso time confirmar o recebimento do pagamento Pix, seu acesso será liberado no sistema e você receberá um novo e-mail contendo o link exclusivo e seguro para criar sua senha de acesso.
+          </p>
+        </div>
+
+        <p style="font-size:13px; color:#94a3b8; margin:0;">
+          Dúvidas? Entre em contato pelo WhatsApp de suporte ou responda a este e-mail.<br>
+          <strong>Equipe Marthi Tecnologia</strong>
+        </p>
+      </td>
+    </tr>
+  `;
+
+  const html = wrapEmailTemplate(
+    contentHtml,
+    `Recebemos seu pedido de contratação do plano ${payload.planName} para ${payload.companyName}.`
+  );
+
+  return sendMail({
+    to: payload.toEmail,
+    subject: `Recebemos sua contratação — ${payload.companyName} (${payload.planName})`,
+    html,
+    text: `Olá ${payload.contactName},\n\nRecebemos seu pedido de contratação do plano ${payload.planName} para a empresa ${payload.companyName}.\nProtocolo: ${payload.protocol}\nStatus: Aguardando confirmação do pagamento Pix.\n\nAssim que o pagamento for confirmado pela equipe, você receberá seu link exclusivo de ativação para criar sua senha.\n\nMarthi Tecnologia`,
+  });
+}
+
 

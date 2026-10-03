@@ -232,7 +232,6 @@ export function cleanLegacyMocks() {
             val.includes('Loja Matriz Centro') ||
             val.includes('00.000.000/0001-00') ||
             val.includes('61.506.270/0001-63') ||
-            val.includes('Cell Ponto') ||
             val.includes('CPTR-88A1') ||
             val.includes('varejobrasil.com.br')),
       );

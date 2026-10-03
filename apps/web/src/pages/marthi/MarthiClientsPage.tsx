@@ -1037,13 +1037,38 @@ export function MarthiClientsPage() {
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={
-                            client.paymentOk ? 'marthi-pill marthi-pill--ok' : 'marthi-pill marthi-pill--late'
-                          }
-                        >
-                          {client.paymentOk ? '✓ Em dia' : '⏳ Pendente'}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                          <span
+                            className={
+                              client.paymentOk ? 'marthi-pill marthi-pill--ok' : 'marthi-pill marthi-pill--late'
+                            }
+                          >
+                            {client.paymentOk ? '✓ Em dia' : '⏳ Pendente'}
+                          </span>
+                          {!client.paymentOk ? (
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '0.72rem',
+                                color: '#059669',
+                                borderColor: '#059669',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPaymentModal(client);
+                              }}
+                              title="Confirmar pagamento e liberar acesso do cliente"
+                            >
+                              ✓ Liberar Acesso
+                            </button>
+                          ) : null}
+                        </div>
                         {client.paymentDetails?.method ? (
                           <div style={{ fontSize: '0.72rem', color: 'var(--mute)', marginTop: '2px' }}>
                             via {client.paymentDetails.method.toUpperCase()}
@@ -1572,7 +1597,7 @@ export function MarthiClientsPage() {
                       onClick={() => handleOpenPaymentModal(auditClient)}
                       title="Identificar pagamento manual e disparar ativação"
                     >
-                      💰 Ativar Pagamento (Manual)
+                      💰 Confirmar Pagamento &amp; Liberar Acesso
                     </button>
                   ) : (
                     <button

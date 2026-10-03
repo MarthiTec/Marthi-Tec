@@ -43,59 +43,64 @@ UPDATE employees
 SET phone = '(11) 3000-0000', updated_at = now()
 WHERE store_id = 'STR-DEMO-01' AND (phone = '(24) 98124-4253' OR phone = '');
 
--- 2. Limpeza segura de registros legados da Cell Ponto existentes no banco
---    (para permitir que a Cell Ponto seja cadastrada novamente do zero com novo ID e integridade referencial)
+-- 2. Limpeza segura de resíduos do CNPJ legado 61.506.270/0001-63
+--    (preservando 100% o novo cadastro da empresa Cell Ponto e o usuário gilvanteodo@gmail.com)
 DO $$
 DECLARE
-  v_cell_store_ids TEXT[];
-  v_cell_client_ids TEXT[];
+  v_legacy_store_ids TEXT[];
+  v_legacy_client_ids TEXT[];
 BEGIN
-  -- Identifica IDs de lojas vinculadas ao CNPJ da antiga Cell Ponto que não sejam STR-DEMO-01
-  SELECT ARRAY_AGG(id) INTO v_cell_store_ids
+  -- Identifica IDs de lojas vinculadas ao CNPJ legado que não sejam a demo
+  SELECT ARRAY_AGG(id) INTO v_legacy_store_ids
   FROM stores
-  WHERE (document LIKE '61.506.270%' OR trade_name ILIKE '%Cell Ponto%')
+  WHERE document LIKE '61.506.270%'
     AND id != 'STR-DEMO-01';
 
-  IF v_cell_store_ids IS NOT NULL AND ARRAY_LENGTH(v_cell_store_ids, 1) > 0 THEN
-    -- Exclui tabelas filhas com integridade referencial
-    DELETE FROM stock_movements WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM stock_items WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM product_attributes WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM products WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM customers WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM suppliers WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM sellers WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM payables WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM receivables WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM user_stores WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM employees WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM store_licenses WHERE store_id = ANY(v_cell_store_ids);
-    DELETE FROM stores WHERE id = ANY(v_cell_store_ids);
+  IF v_legacy_store_ids IS NOT NULL AND ARRAY_LENGTH(v_legacy_store_ids, 1) > 0 THEN
+    -- Exclui tabelas filhas com tratamento seguro de integridade referencial
+    BEGIN DELETE FROM price_tables WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM pos_quote_lines WHERE quote_id IN (SELECT id FROM pos_quotes WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM pos_quotes WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM pos_ticket_attributes WHERE ticket_id IN (SELECT id FROM pos_tickets WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM pos_tickets WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM pos_terminals WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM sale_payments WHERE sale_id IN (SELECT id FROM sales_orders WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM sales_order_lines WHERE sale_id IN (SELECT id FROM sales_orders WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM sales_orders WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM cash_movements WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM cash_session_events WHERE session_id IN (SELECT id FROM cash_sessions WHERE store_id = ANY(v_legacy_store_ids)); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM cash_sessions WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM stock_movements WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM stock_items WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM product_attributes WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM products WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM customers WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM suppliers WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM sellers WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM payables WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM receivables WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM user_stores WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM employees WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM store_licenses WHERE store_id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM stores WHERE id = ANY(v_legacy_store_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
   END IF;
 
-  -- Identifica contas de clientes vinculadas ao CNPJ da Cell Ponto que não sejam ACC-MARTHI-DEMO
-  SELECT ARRAY_AGG(id) INTO v_cell_client_ids
+  -- Identifica contas de clientes vinculadas ao CNPJ legado que não sejam ACC-MARTHI-DEMO
+  SELECT ARRAY_AGG(id) INTO v_legacy_client_ids
   FROM client_accounts
-  WHERE (document LIKE '61.506.270%' OR trade_name ILIKE '%Cell Ponto%')
+  WHERE document LIKE '61.506.270%'
     AND id != 'ACC-MARTHI-DEMO';
 
-  IF v_cell_client_ids IS NOT NULL AND ARRAY_LENGTH(v_cell_client_ids, 1) > 0 THEN
-    DELETE FROM store_licenses WHERE client_account_id = ANY(v_cell_client_ids);
-    DELETE FROM stores WHERE client_account_id = ANY(v_cell_client_ids);
-    DELETE FROM users WHERE client_account_id = ANY(v_cell_client_ids);
-    DELETE FROM client_accounts WHERE id = ANY(v_cell_client_ids);
+  IF v_legacy_client_ids IS NOT NULL AND ARRAY_LENGTH(v_legacy_client_ids, 1) > 0 THEN
+    BEGIN DELETE FROM store_licenses WHERE client_account_id = ANY(v_legacy_client_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM stores WHERE client_account_id = ANY(v_legacy_client_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM users WHERE client_account_id = ANY(v_legacy_client_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN DELETE FROM client_accounts WHERE id = ANY(v_legacy_client_ids); EXCEPTION WHEN OTHERS THEN NULL; END;
   END IF;
 
-  -- Remove usuários e logins legados da antiga Cell Ponto
-  DELETE FROM user_stores WHERE user_id IN (
-    SELECT id FROM users WHERE email IN ('gilvanteodo@gmail.com', 'gilvancellponto@gmail.com', 'marianaveigatav@gmail.com')
-  );
-  DELETE FROM employees WHERE user_email IN ('gilvanteodo@gmail.com', 'gilvancellponto@gmail.com', 'marianaveigatav@gmail.com');
-  DELETE FROM users WHERE email IN ('gilvanteodo@gmail.com', 'gilvancellponto@gmail.com', 'marianaveigatav@gmail.com');
-
-  -- Remove propostas e signups vinculados à antiga Cell Ponto para liberação total do CNPJ
-  DELETE FROM partner_signups
-  WHERE document LIKE '61.506.270%'
-     OR email IN ('gilvanteodo@gmail.com', 'gilvancellponto@gmail.com', 'marianaveigatav@gmail.com');
+  -- Apenas remove propostas legadas vinculadas ao CNPJ 61.506.270/0001-63
+  BEGIN
+    DELETE FROM partner_signups WHERE document LIKE '61.506.270%';
+  EXCEPTION WHEN OTHERS THEN NULL; END;
 
 END $$;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { preRegisterClientAccount } from '../services/authService.js';
 import { createSecureToken } from '../services/tokenService.js';
-import { sendInternalNotificationEmail, sendWelcomeEmail } from '../services/emailService.js';
+import { sendInternalNotificationEmail, sendSignupReceivedEmail, sendWelcomeEmail } from '../services/emailService.js';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
 
@@ -263,6 +263,42 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
   if (record.status === 'pagamento_aprovado') {
     const act = await executePaymentActivation(record, data.paymentMethod || 'pix', data.transactionRef, undefined, frontendUrl);
     activationToken = act.rawToken;
+  } else {
+    // 1. Notifica a equipe Marthi que uma nova contratação foi realizada e aguarda conferência do pagamento
+    try {
+      await sendInternalNotificationEmail({
+        companyName: record.tradeName,
+        contactName: record.contactName || record.tradeName,
+        email: record.email,
+        phone: record.phone,
+        planName: planDisplayName(record.planId),
+        monthlyAmount: record.monthlyAmount,
+        paymentMethod: record.paymentMethod || 'pix',
+        paymentStatus: 'Aguardando Pagamento Pix (Pendente de Liberação no /admin)',
+        contractedAt: record.createdAt,
+        transactionRef: record.transactionRef,
+        clientId: record.id,
+        frontendUrl,
+      });
+    } catch (err) {
+      console.error('[partners] Erro ao enviar notificação interna de nova contratação:', err);
+    }
+
+    // 2. Envia e-mail ao cliente confirmando o registro do pedido e instruções de aguardar a liberação
+    try {
+      await sendSignupReceivedEmail({
+        toEmail: record.email,
+        contactName: record.contactName || record.tradeName,
+        companyName: record.tradeName,
+        planName: planDisplayName(record.planId),
+        monthlyAmount: record.monthlyAmount,
+        paymentMethod: record.paymentMethod || 'pix',
+        protocol: record.id,
+        frontendUrl,
+      });
+    } catch (err) {
+      console.error('[partners] Erro ao enviar e-mail de recebimento de pedido para o cliente:', err);
+    }
   }
 
   console.log('[partners] Contratação registrada', {
@@ -372,13 +408,9 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
       return;
     }
 
-    // 2. Idempotência: se pagamento já confirmado com a mesma transação, retorna sucesso sem duplicar e-mails
+    // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
     const txKey = body.transactionRef ? `${record.id}:${body.transactionRef}` : `${record.id}:paid`;
-    if (
-      record.status === 'acesso_ativado' ||
-      record.status === 'acesso_pendente' ||
-      processedTransactions.has(txKey)
-    ) {
+    if (record.status === 'acesso_ativado' && processedTransactions.has(txKey)) {
       console.log(`[partners] Pagamento já processado para protocolo ${record.id} (idempotência preservada)`);
       res.json({
         success: true,

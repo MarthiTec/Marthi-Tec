@@ -126,7 +126,8 @@ function load(): State {
     const rawClients = Array.isArray(parsed.clients) ? parsed.clients : [];
     const cleaned = rawClients
       .filter((c) => {
-        if (c.clientId !== 'ACC-MARTHI-DEMO' && (c.document === '61.506.270/0001-63' || c.tradeName?.includes('Cell Ponto'))) {
+        // Apenas descarta se for um registro corrompido antigo onde a demo usava o CNPJ legado
+        if (c.clientId === 'ACC-MARTHI-DEMO' && c.document === '61.506.270/0001-63') {
           return false;
         }
         return true;
@@ -787,7 +788,7 @@ export function ingestPartnerSignupToMarthiClients(input: {
   paymentOk?: boolean;
 }) {
   const client = upsertMarthiClient({
-    clientId: `CLI-${input.protocol}`,
+    clientId: input.protocol.startsWith('PRT-') || input.protocol.startsWith('CLI-') ? input.protocol : `CLI-${input.protocol}`,
     tradeName: input.tradeName,
     legalName: input.legalName,
     document: input.document,

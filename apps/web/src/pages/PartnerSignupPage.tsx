@@ -396,7 +396,7 @@ export function PartnerSignupPage() {
         contactName: form.contactName.trim(),
         contactRole: form.contactRole.trim(),
         notes: notesMerged,
-        payNow: true,
+        payNow: false,
         paymentMethod: payMethod,
         transactionRef: txRef,
       });
@@ -447,7 +447,7 @@ export function PartnerSignupPage() {
           email: form.email.trim(),
           planId: form.planId,
           modules: form.modules,
-          paymentOk: true,
+          paymentOk: false,
           notes: notesMerged || `Cadastro parceiro · ${selectedPlan.name}`,
         });
       });
@@ -463,11 +463,28 @@ export function PartnerSignupPage() {
       <div className="partner">
         <div className="partner__shell partner__shell--success" style={{ maxWidth: '620px', textAlign: 'center' }}>
           <BrandLogo variant="lockup" className="partner__lockup" />
-          <h1 style={{ color: '#4ade80', margin: '20px 0 12px' }}>Contratação Confirmada com Sucesso! 🚀</h1>
+          <h1 style={{ color: '#38bdf8', margin: '20px 0 12px' }}>Solicitação de Contratação Registrada! 🚀</h1>
           <p style={{ fontSize: '16px', lineHeight: 1.6, color: '#e2e8f0' }}>
-            Parabéns! O investimento para o plano <strong>{selectedPlan.name}</strong> foi aprovado.
-            A conta da empresa <strong>{form.tradeName}</strong> já foi criada no sistema.
+            Parabéns! O pedido de contratação para o plano <strong>{selectedPlan.name}</strong> da empresa <strong>{form.tradeName}</strong> foi registrado com sucesso.
           </p>
+
+          <div
+            style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              padding: '16px',
+              margin: '20px 0',
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#fde68a', fontWeight: 600 }}>
+              ⏳ Status: Aguardando Confirmação do Pagamento Pix &amp; Liberação de Acesso
+            </p>
+            <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1', lineHeight: 1.5 }}>
+              O cadastro da sua empresa já consta em nosso painel administrativo (/admin). Assim que o pagamento via Pix for identificado pela nossa equipe, seu acesso será liberado imediatamente e você receberá no e-mail <strong style={{ color: '#38bdf8' }}>{form.email}</strong> o link oficial e seguro para definir sua senha de acesso.
+            </p>
+          </div>
 
           {/* Card do Token de Acesso da Empresa */}
           {companyAccessToken && (
@@ -519,26 +536,6 @@ export function PartnerSignupPage() {
               </p>
             </div>
           )}
-
-          <div
-            style={{
-              background: 'rgba(45, 212, 191, 0.08)',
-              border: '1px solid rgba(45, 212, 191, 0.25)',
-              borderRadius: '8px',
-              padding: '16px',
-              margin: '20px 0',
-              textAlign: 'left',
-            }}
-          >
-            <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#cbd5e1' }}>
-              📧 <strong>E-mail de ativação enviado para:</strong>{' '}
-              <span style={{ color: '#2dd4bf', fontWeight: 600 }}>{form.email}</span>
-            </p>
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', lineHeight: 1.5 }}>
-              Por segurança, não criamos senhas automáticas em texto puro. Enviamos um link seguro
-              de uso único para você definir sua própria senha de acesso.
-            </p>
-          </div>
           <p className="partner__protocol" style={{ margin: '16px 0' }}>
             Protocolo da Contratação: <strong>{protocol}</strong>
           </p>
