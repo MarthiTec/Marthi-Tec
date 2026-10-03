@@ -48,10 +48,18 @@ function stableId(name: string) {
   return hash || 1;
 }
 
+function resolveTotemBrand(rawBrand: string | undefined, name: string): TotemBrand {
+  const b = (rawBrand || '').trim().toLowerCase();
+  if (b === 'apple' || b === 'iphone') return 'apple';
+  if (b === 'xiaomi' || b === 'redmi' || b === 'poco') return 'xiaomi';
+  if (b) return 'other';
+  return guessBrand(name);
+}
+
 function guessBrand(name: string): TotemBrand {
   const slug = name.toLowerCase();
-  if (slug.includes('xiaomi') || slug.includes('redmi')) return 'xiaomi';
-  if (slug.includes('iphone') || slug.includes('apple')) return 'apple';
+  if (slug.includes('xiaomi') || slug.includes('redmi') || slug.includes('poco')) return 'xiaomi';
+  if (slug.includes('iphone') || slug.includes('apple') || slug.includes('ipad')) return 'apple';
   return 'other';
 }
 
@@ -109,7 +117,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     return {
       id: stableId(name),
       name,
-      brand: guessBrand(name),
+      brand: resolveTotemBrand(primary.brand, name),
       storages,
       colors,
       cashPrice: primary.price,

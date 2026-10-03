@@ -47,6 +47,10 @@ export type StockUnit = 'UN' | 'KG';
 export type StockItem = {
   id: string;
   name: string;
+  /** Marca do produto (ex: Apple, Xiaomi, Samsung...). */
+  brand?: string;
+  /** Categoria do produto (ex: Smartphones, Acessórios, Peças...). */
+  category?: string;
   sku: string;
   barcode: string;
   imei: string;
@@ -278,6 +282,8 @@ function normalizeStock(item: StockItem): StockItem {
   const avgCost = Number(item.avgCost);
   return {
     ...item,
+    brand: item.brand ?? '',
+    category: item.category ?? 'Geral',
     barcode: item.barcode ?? '',
     imei: item.imei ?? '',
     attrs,
@@ -538,6 +544,8 @@ function apiErrorMessage(error: unknown, fallback: string) {
 function toNestStockBody(item: StockItem) {
   return {
     name: item.name,
+    brand: item.brand || undefined,
+    category: item.category || undefined,
     kind: item.kind,
     sku: item.sku || undefined,
     barcode: item.barcode || undefined,

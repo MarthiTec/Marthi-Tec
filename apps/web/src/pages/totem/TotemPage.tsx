@@ -276,6 +276,14 @@ export function TotemPage() {
     });
   }
 
+  const totemBrandTabs = useMemo(() => {
+    const hasOther = catalog.some((item) => item.brand === 'other');
+    if (hasOther) {
+      return [...TOTEM_BRANDS, { id: 'other' as const, label: 'Outros' }];
+    }
+    return TOTEM_BRANDS;
+  }, [catalog]);
+
   const brandProducts = useMemo(() => {
     return catalog.filter((item) => brand === 'all' || item.brand === brand);
   }, [brand, catalog]);
@@ -951,7 +959,7 @@ export function TotemPage() {
               {copy.showBrandFilters ? (
                 <div className="totem__toolbar totem__toolbar--quiet">
                   <div className="totem__brands" role="tablist" aria-label="Marcas">
-                    {TOTEM_BRANDS.map((item) => (
+                    {totemBrandTabs.map((item) => (
                       <button
                         key={item.id}
                         type="button"
