@@ -406,11 +406,17 @@ export function MarthiClientsPage() {
 
       setPaymentModalClient(null);
       refresh();
+      if (auditClient && auditClient.clientId === client.clientId) {
+        setAuditClient(res.client);
+      }
       setFlash(res.message);
       setActivatedNotice({
         client: res.client,
         isNew: false,
       });
+    } else {
+      setFlash(res.message || 'Falha ao confirmar pagamento.');
+      alert(res.message || 'Falha ao confirmar pagamento. Verifique os dados ou tente novamente.');
     }
   }
 

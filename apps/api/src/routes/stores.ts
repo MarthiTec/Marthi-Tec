@@ -651,9 +651,16 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
       // 2. stores
       const storeId = `STR-${clientId.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`;
       await pool.query(
-        `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, is_matrix, active, access_token)
-         VALUES ($1, $2, $3, $4, 'cnpj', $5, $6, $7, true, true, $8)
-         ON CONFLICT (client_account_id, document) DO UPDATE SET
+        `INSERT INTO stores (
+           id, client_account_id, trade_name, legal_name, document_type, document,
+           email, phone, zip_code, street, number, complement, district, city, state,
+           tax_regime, is_matrix, active, access_token
+         ) VALUES (
+           $1, $2, $3, $4, 'cnpj', $5, $6, $7,
+           '25800-000', 'Endereço Comercial', '100', '', 'Centro', 'Três Rios', 'RJ',
+           'simples_nacional', true, true, $8
+         )
+         ON CONFLICT (id) DO UPDATE SET
            trade_name = EXCLUDED.trade_name,
            email = EXCLUDED.email,
            phone = EXCLUDED.phone,
@@ -669,9 +676,9 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
 
       await pool.query(
         `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-         VALUES ($1, $2, $3, $4::plan_id, $5::module_id[], 'active')
+         VALUES ($1, $2, $3, $4, $5::TEXT[], 'active')
          ON CONFLICT (store_id) DO UPDATE
-         SET plan_id = $4::plan_id, modules = $5::module_id[], updated_at = now()`,
+         SET plan_id = $4, modules = $5::TEXT[], updated_at = now()`,
         [`LIC-${storeId}`, storeId, clientId, dbPlan, ['totem', 'os', 'erp', 'fiscal']],
       );
 

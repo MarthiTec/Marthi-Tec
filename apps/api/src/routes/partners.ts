@@ -385,6 +385,58 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
       }
     }
 
+    if (!record && pool) {
+      try {
+        const clientRes = await pool.query(
+          `SELECT c.*, l.plan_id, l.modules, s.phone as store_phone
+           FROM client_accounts c
+           LEFT JOIN store_licenses l ON l.client_account_id = c.id
+           LEFT JOIN stores s ON s.client_account_id = c.id
+           WHERE c.id = $1 OR lower(c.email) = lower($1) OR regexp_replace(c.document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+           LIMIT 1`,
+          [protocol],
+        );
+        if (clientRes.rows.length > 0) {
+          const row = clientRes.rows[0];
+          const rawDoc = row.document || '';
+          record = {
+            id: row.id,
+            payNow: false,
+            planId: row.plan_id || 'golden',
+            modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+            documentType: row.document_type || 'cnpj',
+            document: rawDoc,
+            legalName: row.legal_name || row.trade_name,
+            tradeName: row.trade_name,
+            email: row.email,
+            phone: row.phone || row.store_phone || '(24) 99966-3631',
+            zipCode: '25800-000',
+            street: 'Rua Principal',
+            number: '100',
+            complement: '',
+            district: 'Centro',
+            city: 'Três Rios',
+            state: 'RJ',
+            segment: 'telecom',
+            contactName: row.contact_name || row.trade_name,
+            contactRole: 'Administrador',
+            notes: body.notes || 'Ativação confirmada via painel administrativo',
+            status: 'aguardando_pagamento',
+            monthlyAmount: row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597,
+            paymentMethod: body.paymentMethod || 'pix',
+            transactionRef: body.transactionRef || `MANUAL-${Date.now()}`,
+            paymentConfirmedAt: undefined,
+            activationTokenSentAt: undefined,
+            auditTrail: [],
+            createdAt: row.created_at || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      } catch (clientLookupErr) {
+        console.warn('[partners] DB fallback client_accounts lookup warning:', clientLookupErr);
+      }
+    }
+
     if (!record) {
       record = signupsStore.get(protocol) || null;
       if (!record) {
@@ -665,33 +717,38 @@ async function executePaymentActivation(
           record.documentType,
           record.document,
           record.email,
-          record.zipCode || '',
-          record.street || 'Endereço Principal',
+          record.phone || '(24) 99966-3631',
+          record.zipCode || '25800-000',
+          record.street || 'Rua Principal',
           record.number || '100',
           record.complement || '',
-          record.district || '',
-          record.city || '',
-          record.state || 'SP',
+          record.district || 'Centro',
+          record.city || 'Três Rios',
+          record.state || 'RJ',
         ],
       );
 
       // 1.3 Licença do Plano e Módulos
+      const licenseModules = Array.isArray(record.modules) && record.modules.length > 0
+        ? record.modules
+        : ['totem', 'os', 'erp', 'fiscal', 'ecommerce'];
+
       await pool.query(
         `INSERT INTO store_licenses (
           id, client_account_id, store_id, plan_id, status, starts_at, expires_at,
           modules, final_price, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, 'active', now(), now() + interval '30 days',
-          $5::jsonb, $6, now(), now()
-        ) ON CONFLICT (id) DO UPDATE
-        SET plan_id = $4, modules = $5::jsonb, status = 'active', updated_at = now()`,
+          $5::TEXT[], $6, now(), now()
+        ) ON CONFLICT (store_id) DO UPDATE
+        SET plan_id = $4, modules = $5::TEXT[], status = 'active', updated_at = now()`,
         [
           `LIC-${record.id}`,
           record.id,
           storeId,
-          record.planId,
-          JSON.stringify(record.modules),
-          record.monthlyAmount,
+          record.planId || 'golden',
+          licenseModules,
+          record.monthlyAmount || 597,
         ],
       );
 

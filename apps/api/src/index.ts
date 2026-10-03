@@ -163,6 +163,14 @@ async function bootstrapDatabase() {
 
         ALTER TABLE stores ALTER COLUMN email SET DEFAULT 'contato@marthi.com.br';
         ALTER TABLE stores ALTER COLUMN phone SET DEFAULT '(24) 99999-9999';
+        ALTER TABLE stores ALTER COLUMN zip_code SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN street SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN number SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN complement SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN district SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN city SET DEFAULT '';
+        ALTER TABLE stores ALTER COLUMN state SET DEFAULT 'RJ';
+        ALTER TABLE stores ALTER COLUMN tax_regime SET DEFAULT 'simples_nacional';
 
         ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS account_id TEXT;
         ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS operator_name TEXT DEFAULT '';
@@ -203,17 +211,58 @@ async function bootstrapDatabase() {
       EXCEPTION WHEN OTHERS THEN NULL; END $$;
     `);
 
-    // 2. Limpeza rigorosa de registros temporários de testes, dados legados e usuários manuais
+    // 2. Limpeza rigorosa de registros temporários de testes e desvinculação da conta Demo
     try {
       await pool.query(`
         DELETE FROM partner_signups WHERE email LIKE '%@marthi.teste' OR email LIKE '%teste@%' OR company_name LIKE '%Alpha%' OR company_name LIKE '%Beta%' OR id LIKE 'PRT-MURC%';
-        DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%' OR email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com');
-        DELETE FROM user_stores WHERE user_id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto') OR user_id IN (SELECT id FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%');
-        DELETE FROM employees WHERE user_email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%';
-        DELETE FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
+        DELETE FROM auth_tokens WHERE email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
+        DELETE FROM user_stores WHERE user_id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto') OR (store_id = 'STR-DEMO-01' AND user_id IN (SELECT id FROM users WHERE email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com')));
+        DELETE FROM employees WHERE store_id = 'STR-DEMO-01' AND (user_email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com') OR user_email LIKE '%@marthi.teste' OR user_email LIKE 'admin.alpha%' OR user_email LIKE 'admin.beta%');
+        DELETE FROM users WHERE id IN ('usr-mariana-cellponto', 'usr-gilvan-cellponto') OR (client_account_id = 'ACC-MARTHI-DEMO' AND email IN ('marianaveigatav@gmail.com', 'gilvanteodo@gmail.com', 'gilvancellponto@gmail.com')) OR email LIKE '%@marthi.teste' OR email LIKE 'admin.alpha%' OR email LIKE 'admin.beta%';
       `);
     } catch (cleanErr) {
       console.warn('[marthi-api] Aviso ao executar limpeza de dados de teste:', cleanErr);
+    }
+
+    // 2.1 Garante integridade da conta Cell Ponto em client_accounts e partner_signups
+    try {
+      await pool.query(`
+        UPDATE client_accounts
+        SET
+          phone = '(24) 99966-3631',
+          contact_name = 'Gilvan Teodo',
+          trade_name = 'Cell Ponto',
+          legal_name = 'CELL PONTO TELECOMUNICACAO LTDA',
+          access_token = COALESCE(NULLIF(access_token, ''), 'TK-DSR-000182-9BKJG-YOFB'),
+          status = 'active',
+          updated_at = now()
+        WHERE id = 'PRT-MUM5YWBG8DSR' OR document = '38.297.104/0001-82' OR email = 'gilvanteodo@gmail.com';
+
+        INSERT INTO partner_signups (
+          id, plan_id, modules, document_type, document, legal_name, trade_name,
+          email, phone, zip_code, street, number, complement, district, city,
+          state, segment, contact_name, contact_role, notes, status, monthly_amount,
+          payment_method, transaction_ref, audit_trail, created_at, updated_at
+        ) VALUES (
+          'PRT-MUM5YWBG8DSR', 'golden', '["totem","os","erp","fiscal","ecommerce"]'::jsonb,
+          'cnpj', '38.297.104/0001-82', 'CELL PONTO TELECOMUNICACAO LTDA', 'Cell Ponto',
+          'gilvanteodo@gmail.com', '(24) 99966-3631', '25800-000', 'Rua Principal', '100', 'Loja',
+          'Centro', 'Três Rios', 'RJ', 'telecom', 'Gilvan Teodo', 'Sócio Administrador',
+          'Contratação do Plano Golden (Completo)', 'aguardando_pagamento', 597.00,
+          'pix', 'PAY-MURQGY7I', '[]'::jsonb, now(), now()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          trade_name = EXCLUDED.trade_name,
+          legal_name = EXCLUDED.legal_name,
+          document = EXCLUDED.document,
+          email = EXCLUDED.email,
+          phone = EXCLUDED.phone,
+          contact_name = EXCLUDED.contact_name,
+          monthly_amount = EXCLUDED.monthly_amount,
+          updated_at = now();
+      `);
+    } catch (cpErr) {
+      console.warn('[marthi-api] Aviso ao sincronizar dados da Cell Ponto:', cpErr);
     }
 
     // 3. Garante conta da Loja Demonstração Marthi com Plano Gold Ativo e identidade neutra

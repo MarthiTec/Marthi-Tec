@@ -568,6 +568,22 @@ export function setMarthiClientStatus(
     client.contractingStatus = client.passwordConfigured ? 'acesso_ativado' : 'acesso_pendente';
   }
   save(state);
+
+  // Sincroniza com a API no backend
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients/toggle-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: client.email,
+        active: status === 'active',
+      }),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
   return client;
 }
 
@@ -588,6 +604,19 @@ export function setMarthiClientPaymentOk(
       : 'acesso_pendente'
     : 'aguardando_pagamento';
   save(state);
+
+  // Sincroniza com a API no backend
+  try {
+    const apiUrl = nestApiUrl();
+    fetch(`${apiUrl}/api/v1/admin/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(client),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
   return client;
 }
 
@@ -631,7 +660,7 @@ export async function identifyClientPaymentAndActivate(
   // Aciona a API de confirmação de pagamento para idempotência, geração de token seguro e disparo de e-mails
   try {
     const apiUrl = nestApiUrl();
-    await fetch(`${apiUrl}/api/v1/partners/payment-confirm`, {
+    const res = await fetch(`${apiUrl}/api/v1/partners/payment-confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -641,6 +670,15 @@ export async function identifyClientPaymentAndActivate(
         notes: details.notes,
       }),
     });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.warn('[marthiClientsStore] API payment-confirm error response:', json);
+      return {
+        ok: false,
+        client,
+        message: json?.error?.message || `Falha ao registrar pagamento no servidor (${res.status}).`,
+      };
+    }
   } catch (err) {
     console.warn('[marthiClientsStore] API payment-confirm call fallback:', err);
   }
