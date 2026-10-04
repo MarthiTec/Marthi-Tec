@@ -87,4 +87,3 @@ export function CompanyUserSummary() {
     </article>
   );
 }
-
