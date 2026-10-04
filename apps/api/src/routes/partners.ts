@@ -6,6 +6,7 @@ import { createSecureToken } from '../services/tokenService.js';
 import { sendInternalNotificationEmail, sendSignupReceivedEmail, sendWelcomeEmail } from '../services/emailService.js';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
+import { confirmExistingClientPayment } from '../services/clientPaymentActivation.js';
 
 /**
  * Cadastro público de parceiro, ciclo de contratação e ativação comercial.
@@ -329,6 +330,28 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
     const protocol = body.protocol.trim();
     const frontendUrl = resolveRequestFrontendUrl(req);
 
+    const existing = await confirmExistingClientPayment({ protocol, paymentMethod: body.paymentMethod,
+      transactionRef: body.transactionRef, notes: body.notes, actorId: req.user!.id });
+    if (existing) {
+      let activationEmailSent = false;
+      if (existing.rawToken) {
+        try {
+          const sent = await sendWelcomeEmail({ toEmail: existing.account.email,
+            contactName: existing.account.contact_name || existing.account.trade_name,
+            companyName: existing.account.trade_name, planName: planDisplayName(existing.planId),
+            monthlyAmount: existing.monthlyAmount, activationToken: existing.rawToken, frontendUrl });
+          activationEmailSent = sent.success;
+        } catch { activationEmailSent = false; }
+      }
+      res.json({ success: true, data: { id: existing.account.id, status: existing.status,
+        alreadyProcessed: existing.alreadyProcessed, activationEmailSent,
+        message: existing.alreadyProcessed ? 'Pagamento já confirmado no MarthiDB.' :
+          existing.status === 'acesso_ativado' ? 'Pagamento confirmado no MarthiDB. Acesso liberado com a senha existente.' :
+          activationEmailSent ? 'Pagamento confirmado no MarthiDB. Link de criação de senha enviado.' :
+          'Pagamento confirmado no MarthiDB. O e-mail de ativação não foi enviado; use Reenviar ativação.' } });
+      return;
+    }
+
     const lookupEmail = (body.email || (protocol.includes('@') ? protocol : '')).trim().toLowerCase();
     const lookupDoc = (body.document || protocol).replace(/\D/g, '');
 
@@ -385,117 +408,9 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
       }
     }
 
-    if (!record && pool) {
-      try {
-        const clientRes = await pool.query(
-          `SELECT c.*, l.plan_id, l.modules, s.phone as store_phone
-           FROM client_accounts c
-           LEFT JOIN store_licenses l ON l.client_account_id = c.id
-           LEFT JOIN stores s ON s.client_account_id = c.id
-           WHERE c.id = $1
-              OR (lower(c.email) = lower($2) AND $2 != '')
-              OR (regexp_replace(c.document, '\\D', '', 'g') = $3 AND $3 != '')
-           LIMIT 1`,
-          [protocol, lookupEmail, lookupDoc],
-        );
-        if (clientRes.rows.length > 0) {
-          const row = clientRes.rows[0];
-          const rawDoc = row.document || '';
-          record = {
-            id: row.id,
-            payNow: false,
-            planId: row.plan_id || 'golden',
-            modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
-            documentType: row.document_type || 'cnpj',
-            document: rawDoc,
-            legalName: row.legal_name || row.trade_name,
-            tradeName: row.trade_name,
-            email: row.email,
-            phone: row.phone || row.store_phone || '(24) 99966-3631',
-            zipCode: '25800-000',
-            street: 'Rua Principal',
-            number: '100',
-            complement: '',
-            district: 'Centro',
-            city: 'Três Rios',
-            state: 'RJ',
-            segment: 'telecom',
-            contactName: row.contact_name || row.trade_name,
-            contactRole: 'Administrador',
-            notes: body.notes || 'Ativação confirmada via painel administrativo',
-            status: 'aguardando_pagamento',
-            monthlyAmount: row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597,
-            paymentMethod: body.paymentMethod || 'pix',
-            transactionRef: body.transactionRef || `MANUAL-${Date.now()}`,
-            paymentConfirmedAt: undefined,
-            activationTokenSentAt: undefined,
-            auditTrail: [],
-            createdAt: row.created_at || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-      } catch (clientLookupErr) {
-        throw clientLookupErr;
-      }
-    }
-
     if (!record) {
-      record = signupsStore.get(protocol) || null;
-      if (!record) {
-        for (const item of signupsStore.values()) {
-          if (
-            (lookupEmail && item.email.toLowerCase() === lookupEmail) ||
-            (lookupDoc && item.document.replace(/\D/g, '') === lookupDoc) ||
-            item.id === protocol
-          ) {
-            record = item;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!record) {
-      if (lookupEmail || lookupDoc || body.tradeName) {
-        const generatedId = protocol.startsWith('CLI-') || protocol.startsWith('PRT-') ? protocol : `PRT-${Date.now().toString(36).toUpperCase()}`;
-        record = {
-          id: generatedId,
-          payNow: true,
-          planId: (body.planId as any) || 'golden',
-          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
-          documentType: 'cnpj',
-          document: body.document || '',
-          legalName: body.tradeName || 'Empresa Cliente',
-          tradeName: body.tradeName || 'Empresa Cliente',
-          email: lookupEmail || `${generatedId.toLowerCase()}@cliente.marthi.com.br`,
-          phone: '(24) 99966-3631',
-          zipCode: '25800-000',
-          street: 'Rua Principal',
-          number: '100',
-          complement: '',
-          district: 'Centro',
-          city: 'Três Rios',
-          state: 'RJ',
-          segment: 'geral',
-          contactName: body.tradeName || 'Administrador',
-          contactRole: 'Responsável',
-          notes: body.notes || 'Ativação manual pelo painel administrativo',
-          status: 'aguardando_pagamento',
-          monthlyAmount: body.monthlyAmount || 597,
-          paymentMethod: body.paymentMethod,
-          transactionRef: body.transactionRef,
-          auditTrail: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        signupsStore.set(record.id, record);
-      } else {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Contratação não encontrada para o protocolo/cliente informado.' },
-        });
-        return;
-      }
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Contratação não encontrada no MarthiDB. Complete o cadastro antes de liberar o acesso.' } });
+      return;
     }
 
     // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
