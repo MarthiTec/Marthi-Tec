@@ -1,3 +1,4 @@
+import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { nestRequest } from '../../services/nestClient';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
@@ -131,7 +132,7 @@ export function StockPage() {
       replaceAttributes(data.attributes);
       setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
       setAutomationState(data);
-      if(enabled&&mode==='new') {setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
+      if(enabled&&mode==='new') {generatedModel.current='';setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível salvar a automação.');}
     finally{setAutomationBusy(false);}
   }
@@ -139,8 +140,9 @@ export function StockPage() {
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
+  const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
-  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible ? form.name : '');
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '');
   const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
   useEffect(() => {
     if (!device || readOnly) return;
@@ -148,13 +150,24 @@ export function StockPage() {
     if (brand) setForm(current => current.brand ? current : { ...current, brand: brand.slug });
   }, [device, brands, mode]);
 
+  useEffect(() => {
+    if (!formVisible || mode !== 'new' || !automationState.enabled || !automationState.eligible || !device) return;
+    const defs=attrDefs.filter(a=>a.active && a.useOnStock && (attributeKind(a.name) || /retir/i.test(a.name)));
+    if(!defs.some(a=>attributeKind(a.name)==='color') || !defs.some(a=>attributeKind(a.name)==='capacity') || !defs.some(a=>/retir/i.test(a.name)))return;
+    const signature=JSON.stringify([automationStoreId,device.model,defs.map(a=>[a.id,referenceValues(a)])]);
+    if(generatedModel.current===signature)return;
+    try {
+      const combos=buildVariationCombinations(defs.map(a=>({id:a.id,values:referenceValues(a)})));
+      setSelectedAttrIds(defs.map(a=>a.id));
+      setUseVariations(true);
+      setVariations(combos.map((attrs,index)=>({tempKey:`help_${Date.now()}_${index}`,sku:form.sku ? `${form.sku}-${index+1}` : '',barcode:'',imei:'',attrs,price:form.price||0,cardRate:form.cardRate,qty:0,minQty:0,cost:form.cost||0,condition:form.condition||'new'})));
+      generatedModel.current=signature;
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível gerar as variações.');}
+  },[device,attrDefs,automationState.enabled,automationState.eligible,formVisible,mode,automationStoreId]);
+
   function referenceValues(attr: { name: string; values: string[] } | undefined) {
     const kind = attr ? attributeKind(attr.name) : null;
     return device && kind ? (kind === 'color' ? device.colors : device.capacities) : (attr?.values ?? []);
-  }
-  function pickReference(kind: 'color' | 'capacity', value: string) {
-    const def = attrDefs.find(a => attributeKind(a.name) === kind);
-    setForm(current => ({ ...current, [kind]: value, attrs: def ? { ...current.attrs, [def.id]: value } : current.attrs }));
   }
 
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
@@ -244,6 +257,7 @@ export function StockPage() {
   }
 
   function resetForm() {
+    generatedModel.current='';
     setForm(emptyForm(attrDefs.map((item) => item.id), totemSurface));
     setSelectedId(null);
     setMode('new');
@@ -1173,15 +1187,15 @@ export function StockPage() {
                 </p>
               </div>
 
+          {automationState.eligible && <label className="stock-automation-toggle">
+            <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
+            Receber ajuda para criar todas as variações do produto
+          </label>}
               {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
               {deviceError && <p role="status" className="empty">{deviceError}</p>}
               {device && <div className="device-reference">
                 <strong>{device.model}</strong>
-                <p>Escolha a cor e a capacidade do produto. Informe o preço de venda nos campos abaixo.</p>
-                <div className="admin-form">
-                  <AdminPicker label="Cor do modelo" value={form.color} options={device.colors} disabled={readOnly} onChange={value => pickReference('color', value)} />
-                  <AdminPicker label="Capacidade do modelo" value={form.capacity} options={device.capacities} disabled={readOnly} onChange={value => pickReference('capacity', value)} />
-                </div>
+                <p>As combinações de cor, capacidade e retirada estão na grade abaixo. Exclua as que não vende e informe preço e estoque antes de salvar.</p>
                 <a href={device.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a>
               </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
@@ -1277,10 +1291,7 @@ export function StockPage() {
             </div>
           </article>
 
-          {automationState.eligible && <label className="stock-automation-toggle">
-            <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
-            Automatizar atributos e grade de variações nesta loja
-          </label>}
+
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -1313,7 +1324,7 @@ export function StockPage() {
                 <div>
                   <h3 style={{ margin: 0 }}>Grade de Itens e Variações</h3>
                   <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>
-                    Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 12x para o Totem. As taxas de cartão são centralizadas em{' '}
+                    Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 18x para o Totem. As taxas de cartão são centralizadas em{' '}
                     <Link to="/painel/taxas-cartao" style={{ color: 'var(--accent, #2dd4bf)', textDecoration: 'underline' }}>
                       Taxas de Cartão & Maquininhas ({getTotemCardRate(12).brandName}: {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}%)
                     </Link>.
@@ -1379,7 +1390,7 @@ export function StockPage() {
                       })}
                       <th>SKU</th>
                       <th>Preço à vista</th>
-                      <th>Parcelado (12x)</th>
+                      <th>Parcelado (18x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
                       <th>Custo</th>
@@ -1395,7 +1406,7 @@ export function StockPage() {
                       </tr>
                     ) : (
                       variations.map((row, index) => {
-                        const installmentText = formatInstallment(row.price, 12);
+                        const installmentText = formatInstallment(row.price, 18);
 
                         return (
                           <tr key={row.tempKey}>
@@ -1462,7 +1473,7 @@ export function StockPage() {
                             <td>
                               <span
                                 className="stock-installment-badge"
-                                title="Cálculo automático de 12x para totem"
+                                title="Simulação de 18x com as taxas cadastradas"
                               >
                                 {installmentText}
                               </span>
