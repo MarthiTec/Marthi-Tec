@@ -42,7 +42,7 @@ export function StoreSegmentSettings({
     void commercialRequest<{settings: StoreCustomization|null; segmentId: string|null}>('/segment','GET',undefined,controller.signal).then(data => {
       if (controller.signal.aborted) return;
       const preset = SEGMENT_PRESETS.find(p => p.id === data.segmentId) || SEGMENT_PRESETS[0];
-      setConfig(data.settings || {segmentId:preset.id,segmentName:preset.name,...preset.config,updatedAt:''});
+      setConfig({segmentId:preset.id,segmentName:preset.name,...preset.config,updatedAt:'',...data.settings});
       setLoaded(true);
     }).catch(e => {if (!controller.signal.aborted) setToast(e.message);});
     return () => controller.abort();
@@ -902,6 +902,10 @@ export function StoreSegmentSettings({
         </div>
       </section>
 
+      <article className="admin-card"><label style={{display:'flex',gap:10,alignItems:'center'}}>
+        <input type="checkbox" checked={config.showCardRates} onChange={()=>handleToggle('showCardRates')} />
+        Taxas de cartão e maquininhas
+      </label><p className="empty">Configure as taxas específicas da loja. Ativo por padrão no ramo oficina; opcional nos demais.</p></article>
       {(showSaveButton || loaded) ? (
         <footer
           style={{

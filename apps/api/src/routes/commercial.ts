@@ -59,6 +59,7 @@ const segmentSchema = z
       "personalizado",
     ]),
     segmentName: z.string().max(150),
+    showCardRates: z.boolean().optional(),
     showImei: z.boolean(),
     showDevicePassword: z.boolean(),
     showTablesAndKitchen: z.boolean(),

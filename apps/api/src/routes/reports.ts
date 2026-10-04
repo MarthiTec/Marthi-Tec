@@ -200,9 +200,9 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
         const isReached = goalRealized >= goalTarget;
         if (!commRules.requiresGoalReached || isReached) {
           if (commRules.type === 'percent_revenue') {
-            commissionAmount = Math.round(totalSales * (Number(commRules.percent || 10) / 100) * 100) / 100;
+            commissionAmount = Math.round(totalSales * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
           } else if (commRules.type === 'percent_profit') {
-            commissionAmount = Math.round(grossProfit * (Number(commRules.percent || 10) / 100) * 100) / 100;
+            commissionAmount = Math.round(grossProfit * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
           } else if (commRules.type === 'fixed_value') {
             commissionAmount = Number(commRules.fixedValue || 0);
           }

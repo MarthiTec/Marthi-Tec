@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import './goalsPages.css';
+import { getActiveStore } from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
 import { apiGetSalesGoalsReport, apiListCustomers, apiListGoals, type GoalRow } from '../../services/erpApi';
 import { jsPDF } from 'jspdf';
@@ -69,7 +71,7 @@ export function SalesGoalsReportPage() {
     const canViewProfit = data.canViewProfit;
 
     doc.setFontSize(16);
-    doc.text('Cell Ponto — Relatório Gerencial de Vendas e Metas', 14, 16);
+    doc.text(`${getActiveStore()?.tradeName || 'Loja'} — Relatório de Vendas e Metas`, 14, 16);
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(
@@ -94,7 +96,7 @@ export function SalesGoalsReportPage() {
       canViewProfit ? `Margem Média: ${s.marginPercent}%` : null,
       `Vendas: ${s.salesCount}`,
       `Ticket Médio: R$ ${s.averageTicket?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    ].filter(Boolean).join('   |   ');
+    ].filter((name): name is string => Boolean(name)).join('   |   ');
     doc.text(summaryLine1, 14, y);
 
     if (s.goalTarget) {
@@ -160,7 +162,7 @@ export function SalesGoalsReportPage() {
   const canViewProfit = data?.canViewProfit;
 
   return (
-    <div className="admin-page" style={{ padding: '16px 20px', maxWidth: '1280px', margin: '0 auto' }}>
+    <div className="admin-page goals-page" style={{ padding: '16px 20px', maxWidth: '1280px', margin: '0 auto' }}>
       {/* Cabeçalho */}
       <div
         style={{
@@ -179,11 +181,11 @@ export function SalesGoalsReportPage() {
               Relatório de Vendas & Metas
             </h1>
             <span className="admin-badge admin-badge--active" style={{ fontSize: '0.75rem' }}>
-              Gestão Executiva · Cell Ponto
+              {getActiveStore()?.tradeName || 'Loja atual'}
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--mute)' }}>
-            Visão gerencial completa para Gilvan Teodo e fechamento mensal da vendedora Mariana Marçal.
+            Acompanhe vendas, metas e comissões da loja no período selecionado.
           </p>
         </div>
 
@@ -244,7 +246,7 @@ export function SalesGoalsReportPage() {
               value={sellerName}
               options={[
                 { value: 'all', label: 'Todos os Vendedores' },
-                { value: 'Mariana Marçal', label: 'Mariana Marçal' },
+                ...Array.from(new Set(goals.map(g => g.sellerName).filter((name): name is string => Boolean(name)))).map(name => ({ value: name, label: name })),
               ]}
               onChange={(val) => setSellerName(val)}
             />
@@ -344,7 +346,7 @@ export function SalesGoalsReportPage() {
                   <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
                     Total de Custo
                   </span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--goals-danger)', marginTop: '2px' }}>
                     R$ {(s.totalCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -360,7 +362,7 @@ export function SalesGoalsReportPage() {
                   <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
                     Lucro Bruto
                   </span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--goals-success)', marginTop: '2px' }}>
                     R$ {(s.grossProfit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -376,7 +378,7 @@ export function SalesGoalsReportPage() {
                   <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
                     Margem Média
                   </span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--goals-success)', marginTop: '2px' }}>
                     {s.marginPercent}%
                   </div>
                 </div>
@@ -428,7 +430,7 @@ export function SalesGoalsReportPage() {
                   <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
                     Meta / Atingimento
                   </span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: s.goalPercent >= 100 ? '#4ade80' : 'var(--accent, #2dd4bf)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: s.goalPercent >= 100 ? 'var(--goals-success)' : 'var(--accent, #2dd4bf)', marginTop: '2px' }}>
                     {s.goalPercent}%
                   </div>
                   <small style={{ color: 'var(--mute)' }}>
@@ -445,9 +447,9 @@ export function SalesGoalsReportPage() {
                   }}
                 >
                   <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
-                    Comissão Mariana
+                    Comissão
                   </span>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#eab308', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--goals-warning)', marginTop: '2px' }}>
                     R$ {(s.commissionAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                   <small style={{ color: 'var(--mute)' }}>
@@ -472,7 +474,7 @@ export function SalesGoalsReportPage() {
           }}
         >
           <h3 style={{ margin: '0 0 10px 0', fontSize: '0.96rem', fontWeight: 700, color: 'var(--ink)' }}>
-            📋 Resumo de Fechamento da Vendedora Mariana Marçal
+            📋 Resumo de fechamento da equipe
           </h3>
           <div
             style={{
@@ -494,7 +496,7 @@ export function SalesGoalsReportPage() {
                 </div>
                 <div>
                   <span style={{ color: 'var(--mute)' }}>Lucro:</span>{' '}
-                  <strong style={{ color: '#4ade80' }}>
+                  <strong style={{ color: 'var(--goals-success)' }}>
                     R$ {s.grossProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </strong>
                 </div>
@@ -514,7 +516,7 @@ export function SalesGoalsReportPage() {
             </div>
             <div>
               <span style={{ color: 'var(--mute)' }}>Meta Atingida:</span>{' '}
-              <strong style={{ color: s.goalPercent >= 100 ? '#4ade80' : '#f87171' }}>
+              <strong style={{ color: s.goalPercent >= 100 ? 'var(--goals-success)' : 'var(--goals-danger)' }}>
                 {s.goalPercent >= 100 ? 'SIM' : 'NÃO'} ({s.goalPercent}%)
               </strong>
             </div>
@@ -581,7 +583,7 @@ export function SalesGoalsReportPage() {
                         <td style={{ textAlign: 'right', color: 'var(--mute)' }}>
                           R$ {row.costTotal?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
-                        <td style={{ textAlign: 'right', color: '#4ade80', fontWeight: 600 }}>
+                        <td style={{ textAlign: 'right', color: 'var(--goals-success)', fontWeight: 600 }}>
                           R$ {row.grossProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
                         <td style={{ textAlign: 'center' }}>

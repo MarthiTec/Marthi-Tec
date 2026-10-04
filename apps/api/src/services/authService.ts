@@ -555,19 +555,6 @@ export type UserIdentificationResult = {
 export async function identifyUserAccess(email: string): Promise<UserIdentificationResult> {
   const normEmail = email.trim().toLowerCase();
 
-  // 1. Contas de Administrador da Marthi / Dev
-  if (normEmail === 'teste@marthi.com.br' || normEmail === 'marthi.tecnologia@gmail.com') {
-    return {
-      identified: true,
-      hasPassword: true,
-      needsFirstAccess: false,
-      name: normEmail === 'teste@marthi.com.br' ? 'Administrador Marthi' : 'Equipe Marthi Tecnologia',
-      storeName: 'Marthi Tecnologia',
-      role: 'admin',
-      email: normEmail,
-    };
-  }
-
   // 2. Query PostgreSQL users and stores
   if (pool) {
     try {
@@ -668,7 +655,7 @@ export async function identifyUserAccess(email: string): Promise<UserIdentificat
         };
       }
     } catch (err) {
-      console.warn('[authService] Aviso ao consultar banco em identifyUserAccess:', err);
+      throw Object.assign(new Error('Não foi possível consultar seu cadastro. Tente novamente.'), {status:503});
     }
   }
 
@@ -697,6 +684,7 @@ async function updatePasswordUsingToken(token: string, password: string, type: '
       const updated = await client.query('UPDATE users SET password_hash = $1, active = true, session_version = session_version + 1, updated_at = now() WHERE lower(email) = $2 RETURNING id',
         [salt + ':' + hashPassword(password, salt), consumed.rows[0].email]);
       if (!updated.rowCount) throw Object.assign(new Error('Conta não cadastrada.'), { status: 400 });
+      await client.query(`UPDATE employees SET active=true,updated_at=now() WHERE is_system_user=true AND lower(user_email)=$1 AND store_id IN (SELECT store_id FROM user_stores WHERE user_id=$2)`, [consumed.rows[0].email,updated.rows[0].id]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }

@@ -1,6 +1,6 @@
 import { nestGet, nestPut } from '../services/nestClient';
 import { getActiveStoreId } from './multiStoreStore';
-export type ModuleStateKey = 'cash-settings' | 'pos-quotes' | 'stock-inventory' | 'os-print-settings' | 'bank-files' | 'operations';
+export type ModuleStateKey = 'card-rates' | 'cash-settings' | 'pos-quotes' | 'stock-inventory' | 'os-print-settings' | 'bank-files' | 'operations';
 type Snapshot<T> = { data: T | null; revision: number };
 const snapshots = new Map<string, Snapshot<unknown>>();
 const cacheKey = (key: ModuleStateKey) => `${getActiveStoreId()}:${key}`;

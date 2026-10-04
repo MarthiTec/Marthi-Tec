@@ -1,3 +1,4 @@
+import { ensureOwnerTeamMember } from '../services/ownerTeam.js';
 import { randomUUID } from 'node:crypto';
 import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { Router } from 'express';
@@ -678,6 +679,7 @@ async function executePaymentActivation(
          ON CONFLICT (user_id, store_id) DO NOTHING`,
         [userId, storeId],
       );
+      await ensureOwnerTeamMember(db,userId,storeId);
       await db.query('COMMIT');
     } catch (err) {
       await db.query('ROLLBACK');

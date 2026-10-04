@@ -1,3 +1,4 @@
+import {hydrateCardMachinesFromApi} from './cardRatesStore';
 import { hydrateStockInventoryFromApi } from './stockInventoryStore';
 import { hydratePosQuotesFromApi } from './posQuotesStore';
 import { hydrateCashSettingsFromApi } from './cashSettings';
@@ -121,6 +122,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       hydrateCashSettingsFromApi(),
       hydratePosQuotesFromApi(),
       hydrateStockInventoryFromApi(),
+      hydrateCardMachinesFromApi(),
     ]);
     // 1. Aplica o estado central da retaguarda e plano imediatamente
     replaceAdminState({

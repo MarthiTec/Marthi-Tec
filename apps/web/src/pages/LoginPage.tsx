@@ -5,7 +5,7 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
 import { ingestContractInterestToCrm } from '../data/crmStore';
 import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
-import { listMarthiClients } from '../data/marthiClientsStore';
+import './loginPage.css';
 import { isMarthiStaffEmail } from '../data/marthiStaff';
 import { nestApiUrl } from '../services/config';
 
@@ -109,52 +109,23 @@ export function LoginPage() {
       const apiUrl = nestApiUrl();
       let identifyData: IdentifiedUser | null = null;
 
-      // 1. Consulta o endpoint de identificação no backend
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/auth/identify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: sessionEmail }),
-        });
-        const json = await res.json().catch(() => null);
-        if (res.ok && json?.success && json?.data) {
-          identifyData = json.data;
-        }
-      } catch (netErr) {
-        console.warn('[LoginPage] Backend identify offline, checking local registry:', netErr);
+      const res = await fetch(`${apiUrl}/api/v1/auth/identify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: sessionEmail }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success || !json.data) {
+        throw new Error(json?.error?.message || 'Não foi possível consultar seu cadastro. Tente novamente.');
       }
-
-      // 2. Fallback local para contingência rápida
-      if (!identifyData) {
-        if (isMarthiStaffEmail(sessionEmail)) {
-          identifyData = {
-            identified: true,
-            hasPassword: true,
-            needsFirstAccess: false,
-            email: sessionEmail,
-            name: 'Equipe Marthi',
-            storeName: 'Marthi Tecnologia (Admin Central)',
-            role: 'superadmin',
-          };
-        } else {
-          const clients = listMarthiClients();
-          const cli = clients.find((c) => c.email.toLowerCase() === sessionEmail);
-          if (cli) {
-            const hasPwd = Boolean(cli.passwordConfigured);
-            identifyData = {
-              identified: true,
-              hasPassword: hasPwd,
-              needsFirstAccess: !hasPwd,
-              email: sessionEmail,
-              name: cli.tradeName,
-              storeName: cli.tradeName,
-              role: 'admin',
-              message: hasPwd
-                ? undefined
-                : `Identificamos o cadastro de ${cli.tradeName}! Esta conta ainda precisa configurar a senha de primeiro acesso.`,
-            };
-          }
-        }
+      identifyData = json.data;
+      setEmail(sessionEmail);
+      if (!identifyData?.identified) {
+        setView('first-access');
+        setFeedback(
+          'E-mail não localizado diretamente na base ativa. Se você está realizando seu primeiro acesso, solicite seu link abaixo:',
+        );
+        return;
       }
 
       // 3. Avalia o resultado da identificação
@@ -235,14 +206,13 @@ export function LoginPage() {
         body: JSON.stringify({ email: mail }),
       });
       const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) throw new Error(json?.error?.message || 'Não foi possível enviar a solicitação. Tente novamente.');
       setFeedback(
         json?.data?.message ||
           'Caso o e-mail informado esteja cadastrado no sistema, enviamos as instruções e o link seguro para redefinição de senha.',
       );
-    } catch {
-      setFeedback(
-        'Caso o e-mail informado esteja cadastrado no sistema, enviamos as instruções e o link seguro para redefinição de senha.',
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar a solicitação. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -267,6 +237,7 @@ export function LoginPage() {
         body: JSON.stringify({ email: mail }),
       });
       const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) throw new Error(json?.error?.message || 'Não foi possível solicitar o acesso. Tente novamente.');
       if (json?.data?.activationUrl) {
         setFeedback(
           'Link de ativação gerado com sucesso! Você pode usar o link enviado por e-mail ou prosseguir diretamente para criar sua senha.',
@@ -277,10 +248,8 @@ export function LoginPage() {
             'Se o e-mail informado estiver cadastrado, enviamos as instruções e o link seguro para você definir sua senha de primeiro acesso.',
         );
       }
-    } catch {
-      setFeedback(
-        'Se o e-mail informado estiver cadastrado, enviamos as instruções e o link seguro para você definir sua senha de primeiro acesso.',
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar a solicitação. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -311,7 +280,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth auth--modern">
+    <div className="auth auth--modern auth--login">
       <div className="auth__bg" aria-hidden="true" />
       <Link to="/" className="auth__back">
         ← Voltar ao site
@@ -323,10 +292,10 @@ export function LoginPage() {
 
         {view === 'login' ? (
           <>
-            <h1>Entrar no Sistema</h1>
+            <h1>Entre na sua conta</h1>
             <p className="auth__lead">
               {loginStep === 'email'
-                ? 'Informe seu e-mail para identificar sua loja e operador.'
+                ? 'Informe seu e-mail. Identificamos automaticamente como você deve acessar.'
                 : 'Identificação confirmada. Digite sua senha para entrar na loja.'}
             </p>
           </>
@@ -525,7 +494,7 @@ export function LoginPage() {
               </div>
             </label>
             <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
-              {submitting ? 'Entrando…' : 'Entrar no Sistema →'}
+              {submitting ? 'Entrando…' : 'Entre na sua conta →'}
             </button>
           </form>
         ) : null}
@@ -620,7 +589,7 @@ export function LoginPage() {
               />
             </label>
             <button type="submit" className="btn btn--primary btn--block" disabled={submitting}>
-              {submitting ? 'Verificando…' : 'Enviar Link de Primeiro Acesso por E-mail'}
+              {submitting ? 'Verificando…' : 'Enviar link para criar senha'}
             </button>
 
             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center' }}>
@@ -643,7 +612,7 @@ export function LoginPage() {
                   <button
                     type="button"
                     className="auth__link"
-                    style={{ fontWeight: 700, color: 'var(--teal, #0f766e)' }}
+                    style={{ fontWeight: 700, color: 'var(--accent, #0f766e)' }}
                     onClick={() => goView('first-access')}
                   >
                     Primeiro acesso?
@@ -675,7 +644,7 @@ export function LoginPage() {
               )}
             </div>
 
-            {loginStep === 'email' && (
+            {loginStep === 'email' && googleClientId && (
               <>
                 <div className="auth__divider" role="separator">
                   <span>ou</span>
@@ -688,16 +657,7 @@ export function LoginPage() {
                     onSuccess={handleGoogle}
                     onError={setError}
                   />
-                ) : (
-                  <div className="auth__google-hint">
-                    <button type="button" className="btn btn--google btn--block" disabled>
-                      Continuar com Google
-                    </button>
-                    <p>
-                      Configure <code>GOOGLE_CLIENT_ID</code> no backend para habilitar o Google.
-                    </p>
-                  </div>
-                )}
+                ) : null}
               </>
             )}
           </>

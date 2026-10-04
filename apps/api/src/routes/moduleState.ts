@@ -5,7 +5,7 @@ import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 
 export const moduleStateRouter = Router();
-const keys = z.enum(['cash-settings', 'pos-quotes', 'stock-inventory', 'os-print-settings', 'bank-files', 'operations']);
+const keys = z.enum(['card-rates', 'cash-settings', 'pos-quotes', 'stock-inventory', 'os-print-settings', 'bank-files', 'operations']);
 const publicData = (key: string, data: any) => {
   if (key !== 'cash-settings' || !data) return data;
   const { deletePasswordHash: _hash, ...settings } = data;
@@ -24,9 +24,16 @@ moduleStateRouter.put('/api/v1/module-state/:key', requireAuth, async (req, res,
   try {
     const key = keys.parse(req.params.key);
     const body = schema.parse(req.body);
-    if (['cardapio', 'cash-settings', 'os-print-settings', 'bank-files', 'operations'].includes(key)
+    if (['cardapio', 'card-rates', 'cash-settings', 'os-print-settings', 'bank-files', 'operations'].includes(key)
       && !['admin', 'manager', 'superadmin'].includes(req.user!.role ?? '')) {
       res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para alterar configurações da loja.' } }); return;
+    }
+    if (key === 'card-rates') {
+      const rate = z.number().finite().min(0).max(100);
+      const brand = z.object({id:z.string().min(1),name:z.string().min(1),active:z.boolean(),debitRate:rate,
+        installments:z.array(z.object({installment:z.number().int().min(1).max(36),rate})).min(1).max(36)});
+      body.data=z.array(z.object({id:z.string().min(1),name:z.string().min(1),model:z.string().optional(),serialNumber:z.string().optional(),
+        isDefaultTotem:z.boolean(),defaultBrandId:z.string().min(1),active:z.boolean(),brands:z.array(brand).min(1),createdAt:z.string(),updatedAt:z.string()})).max(100).parse(body.data);
     }
     if (key === 'cash-settings') {
       const settings = z.object({ deleteItemPassword: z.string().max(128).optional(), requirePasswordToDeleteItem: z.boolean().optional() }).passthrough().parse(body.data);

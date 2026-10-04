@@ -112,3 +112,28 @@ test('cadastro público rejeita módulos acima do catálogo antes de registrar c
  assert.equal((await request('/partners/signup','POST',payload,null)).status,400);
  assert.equal((await query('SELECT id FROM partner_signups')).rows.length,0);
 });
+
+test('admin lista contas reais vinculadas às lojas e rejeita acesso de lojista', async()=>{
+ const rows=await good('/admin/company-users');
+ const customer=rows.find(row=>row.storeId==='store-customer');
+ assert.ok(customer.users.some(user=>user.email==='customer@example.com' && user.active && user.role==='admin'));
+ const forbidden=await request('/admin/company-users','GET',undefined,ordinary);assert.equal(forbidden.status,403);
+});
+test('reparo de responsáveis cria vínculo e equipe sem duplicar ao repetir', async()=>{
+ await query("DELETE FROM user_stores WHERE user_id='user-customer'");
+ const repair=fs.readFileSync('apps/api/src/db/migrations/0032_login_team_memberships.sql','utf8');
+ await db.exec(repair);await db.exec(repair);
+ const rows=await query("SELECT e.id,us.role FROM users u JOIN user_stores us ON us.user_id=u.id JOIN employees e ON e.store_id=us.store_id AND lower(e.user_email)=lower(u.email) WHERE u.id='user-customer'");
+ assert.equal(rows.rows.length,1);assert.equal(rows.rows[0].role,'admin');
+});
+test('taxas persistem no banco com taxa zero e rejeitam percentuais inválidos', async()=>{
+ const initial=await good('/module-state/card-rates','GET',undefined,ordinary);
+ const machines=[{id:'machine-test',name:'Maquininha negociada',active:true,isDefaultTotem:true,defaultBrandId:'visa',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),brands:[{id:'visa',name:'Visa',active:true,debitRate:0,installments:[{installment:1,rate:0}]}]}];
+ const saved=await good('/module-state/card-rates','PUT',{revision:initial.revision,data:machines},ordinary);
+ const reread=await good('/module-state/card-rates','GET',undefined,ordinary);assert.deepEqual(reread.data,machines);
+ machines[0].brands[0].debitRate=-1;
+ const invalid=await request('/module-state/card-rates','PUT',{revision:saved.revision,data:machines},ordinary);assert.equal(invalid.status,400);
+});
+test('identificação não inventa acesso para e-mails administrativos ausentes',async()=>{
+ const result=await auth.identifyUserAccess('teste@marthi.com.br');assert.equal(result.identified,false);
+});

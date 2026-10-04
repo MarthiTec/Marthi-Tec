@@ -52,13 +52,14 @@ const FAQ_ITEMS = [
 
 export function PlansPublicPage() {
   const [commercialPlans, setCommercialPlans] = useState<CommercialPlan[]>(() => getCommercialPlans());
+  const [catalogError, setCatalogError] = useState('');
   const [selectedModules, setSelectedModules] = useState<PartnerModuleId[]>(['erp', 'os']);
 
   useEffect(() => {
     function refresh() {
       setCommercialPlans(getCommercialPlans());
     }
-    void hydrateCommercialPlans().catch(() => { /* O catálogo permanece indisponível; não substituímos por preços inventados. */ });
+    void hydrateCommercialPlans().catch(error => setCatalogError(error instanceof Error ? error.message : 'Não foi possível consultar os planos.'));
     window.addEventListener(PLANS_UPDATED_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
@@ -79,25 +80,19 @@ export function PlansPublicPage() {
   const silver = commercialPlans.find((p) => p.id === 'silver');
   const golden = commercialPlans.find((p) => p.id === 'golden');
 
-  let recommendedPlan = 'silver';
-  let recommendedText = `Plano ${silver?.name || 'Silver'} (Até ${silver?.maxModules || 2} módulos)`;
-  let recommendedPrice = `${silver?.promotionalPrice || silver?.price || 'R$ 497'}${silver?.period || '/mês'}`;
-
-  if (moduleCount <= 1) {
-    recommendedPlan = 'bronze';
-    recommendedText = `Plano ${bronze?.name || 'Bronze'} (${bronze?.maxModules || 1} módulo)`;
-    recommendedPrice = `${bronze?.promotionalPrice || bronze?.price || 'R$ 197'}${bronze?.period || '/mês'}`;
-  } else if (moduleCount >= 3) {
-    recommendedPlan = 'golden';
-    recommendedText = `Plano ${golden?.name || 'Golden'} (Todos os módulos liberados)`;
-    recommendedPrice = `${golden?.promotionalPrice || golden?.price || 'R$ 597'}${golden?.period || '/mês'}`;
-  }
+  const recommended = commercialPlans.filter(plan => plan.active && (plan.allModules || moduleCount <= plan.maxModules)).sort((a,b)=>a.priceNumeric-b.priceNumeric || a.displayOrder-b.displayOrder)[0];
+  const recommendedPlan = recommended?.id;
+  const planPrice = (plan?: CommercialPlan) => plan ? new Intl.NumberFormat('pt-BR', {style:'currency',currency:'BRL'}).format(plan.priceNumeric) : 'Indisponível';
+  const moduleLimit = (plan?: CommercialPlan) => plan ? (plan.allModules ? 'Todos os módulos liberados' : `Até ${plan.maxModules} módulo(s)`) : 'Plano indisponível';
+  const recommendedText = recommended ? `Plano ${recommended.name} (${moduleLimit(recommended)})` : 'Nenhum plano disponível para esta seleção';
+  const recommendedPrice = recommended ? `${planPrice(recommended)}${recommended.period}` : '';
 
   return (
     <div className="public-page">
       <PublicHeader />
 
       <main className="public-page__main">
+        {catalogError && <p role="alert">{catalogError}</p>}
         {/* Hero */}
         <section className="public-hero">
           <span className="public-hero__badge">Planos transparentes & escaláveis</span>
@@ -217,7 +212,7 @@ export function PlansPublicPage() {
               </span>
             </div>
 
-            <Link to={`/parceiro?plano=${recommendedPlan}`} className="plan-card__cta plan-card__cta--primary">
+            <Link to={recommendedPlan ? `/parceiro?plano=${recommendedPlan}` : '/planos'} className="plan-card__cta plan-card__cta--primary">
               Contratar com este perfil →
             </Link>
           </div>
@@ -227,22 +222,22 @@ export function PlansPublicPage() {
         <section className="comparison-section">
           <h2>Comparativo completo de recursos</h2>
 
-          <div className="comparison-table-wrap">
+          <div className="comparison-table-wrap admin-table-container">
             <table className="comparison-table">
               <thead>
                 <tr>
                   <th>Recursos e Funcionalidades</th>
-                  <th>Bronze (R$ 197)</th>
-                  <th>Silver (R$ 497)</th>
-                  <th>Golden (R$ 597)</th>
+                  <th>{bronze?.name || 'Bronze'} ({planPrice(bronze)})</th>
+                  <th>{silver?.name || 'Silver'} ({planPrice(silver)})</th>
+                  <th>{golden?.name || 'Golden'} ({planPrice(golden)})</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td><strong>Módulos ativos permitidos</strong></td>
-                  <td>1 módulo</td>
-                  <td>Até 2 módulos</td>
-                  <td><strong>Todos os módulos liberados</strong></td>
+                  <td>{moduleLimit(bronze)}</td>
+                  <td>{moduleLimit(silver)}</td>
+                  <td><strong>{moduleLimit(golden)}</strong></td>
                 </tr>
                 <tr>
                   <td>Painel da Loja & Perfil Operacional</td>

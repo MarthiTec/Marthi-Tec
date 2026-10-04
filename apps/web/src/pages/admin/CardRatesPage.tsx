@@ -1,3 +1,6 @@
+import './cardRatesPage.css';
+import {useStoreCustomization,saveStoreCustomization} from '../../data/storeSegment';
+import {commercialRequest} from '../../services/commercialApi';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -7,9 +10,7 @@ import {
   type CardMachine,
   DEFAULT_CARD_BRANDS,
   DEFAULT_CARD_MACHINES,
-  deleteCardMachine,
   listCardMachines,
-  saveCardMachine,
   saveAllCardMachines,
   CARD_RATES_CHANGED_EVENT,
   hydrateCardMachinesFromApi,
@@ -17,6 +18,12 @@ import {
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 export function CardRatesPage() {
+  const customization = useStoreCustomization();
+  const [error,setError] = useState('');
+  const [saving,setSaving] = useState(false);
+  const [loaded,setLoaded] = useState(false);
+  const [enabled,setEnabled] = useState(false);
+  useEffect(()=>setEnabled(customization.showCardRates),[customization.showCardRates]);
   const { confirm, dialog } = useConfirmDialog();
   const [machines, setMachines] = useState<CardMachine[]>(() => listCardMachines());
   const [selectedMachineId, setSelectedMachineId] = useState<string>(() => {
@@ -37,14 +44,14 @@ export function CardRatesPage() {
     window.addEventListener(CARD_RATES_CHANGED_EVENT, onRatesChanged);
     void hydrateCardMachinesFromApi().then((updated) => {
       if (updated) setMachines(listCardMachines());
-    });
+    }).catch(err=>setError(err instanceof Error ? err.message : 'Falha ao consultar taxas.')).finally(()=>setLoaded(true));
     return () => {
       window.removeEventListener(CARD_RATES_CHANGED_EVENT, onRatesChanged);
     };
   }, []);
 
   const activeMachine = useMemo(() => {
-    return machines.find((m) => m.id === selectedMachineId) ?? machines[0] ?? DEFAULT_CARD_MACHINES[0];
+    return machines.find((m) => m.id === selectedMachineId) ?? machines[0] ?? {...DEFAULT_CARD_MACHINES[0], id:'', name:'', model:'', brands:DEFAULT_CARD_BRANDS.map(b=>({...b,debitRate:0,installments:b.installments.map(i=>({...i,rate:0}))}))};
   }, [machines, selectedMachineId]);
 
   const activeBrand = useMemo(() => {
@@ -73,9 +80,8 @@ export function CardRatesPage() {
       ...partial,
       updatedAt: new Date().toISOString(),
     };
-    saveCardMachine(updated);
-    setMachines(listCardMachines());
-    flashSuccess();
+    setMachines(current=>current.some(m=>m.id===updated.id) ? current.map(m=>m.id===updated.id ? updated : m) : [...current,{...updated,id:crypto.randomUUID()}]);
+    setSaveSuccess(false);
   }
 
   // Atualiza bandeira ativa na máquina ativa
@@ -105,8 +111,7 @@ export function CardRatesPage() {
     const maxInst = activeBrand.installments.reduce((max, it) => Math.max(max, it.installment), 0);
     if (maxInst >= 36) return;
     const nextNum = maxInst + 1;
-    const lastRate = activeBrand.installments[activeBrand.installments.length - 1]?.rate ?? 16.80;
-    const nextRate = Number((lastRate + 1.15).toFixed(2));
+    const nextRate = 0;
     const nextList: CardBrandInstallment[] = [
       ...activeBrand.installments,
       { installment: nextNum, rate: nextRate },
@@ -130,15 +135,14 @@ export function CardRatesPage() {
       model: 'Smart POS',
       isDefaultTotem: false,
       defaultBrandId: 'master',
-      brands: JSON.parse(JSON.stringify(DEFAULT_CARD_BRANDS)),
+      brands: DEFAULT_CARD_BRANDS.map(b=>({...b,debitRate:0,installments:b.installments.map(i=>({...i,rate:0}))})),
       active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveCardMachine(newMachine);
-    setMachines(listCardMachines());
+    setMachines([...machines,newMachine]);
     setSelectedMachineId(id);
-    flashSuccess();
+    setSaveSuccess(false);
   }
 
   // Exclui maquininha
@@ -154,11 +158,10 @@ export function CardRatesPage() {
       danger: true,
     });
     if (!ok) return;
-    deleteCardMachine(machine.id);
-    const updated = listCardMachines();
+    const updated = machines.filter(m=>m.id!==machine.id);
     setMachines(updated);
     setSelectedMachineId(updated[0].id);
-    flashSuccess();
+    setSaveSuccess(false);
   }
 
   // Define maquininha ativa como padrão do Totem
@@ -167,9 +170,8 @@ export function CardRatesPage() {
       ...m,
       isDefaultTotem: m.id === activeMachine.id,
     }));
-    saveAllCardMachines(next);
-    setMachines(listCardMachines());
-    flashSuccess();
+    setMachines(next);
+    setSaveSuccess(false);
   }
 
   // Adiciona nova bandeira personalizada
@@ -184,23 +186,30 @@ export function CardRatesPage() {
     const newBrand: CardBrand = {
       id,
       name: name.trim(),
-      debitRate: 2.0,
+      debitRate: 0,
       active: true,
       installments: Array.from({ length: 12 }, (_, i) => ({
         installment: i + 1,
-        rate: Number((3.5 + i * 1.2).toFixed(2)),
+        rate: 0,
       })),
     };
     updateActiveMachine({
       brands: [...activeMachine.brands, newBrand],
     });
     setSelectedBrandId(id);
-    flashSuccess();
+    setSaveSuccess(false);
   }
 
-  function flashSuccess() {
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+  async function handleSave() {
+    setSaving(true); setError(''); setSaveSuccess(false);
+    try {
+      await saveAllCardMachines(machines);
+      const settings = {...customization, showCardRates:enabled};
+      await commercialRequest('/segment','PUT',settings);
+      saveStoreCustomization(settings);
+      setSaveSuccess(true);
+    } catch(err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar.'); }
+    finally { setSaving(false); }
   }
 
   // Simulação de cálculo no financeiro / totem
@@ -223,7 +232,7 @@ export function CardRatesPage() {
   }, [activeBrand, simGross, simParcels]);
 
   return (
-    <div className="admin-page" style={{ paddingBottom: 60 }}>
+    <div className="admin-page card-rates-page" style={{ paddingBottom: 60 }}>
       {dialog}
 
       <div className="admin-page__head" style={{ marginBottom: 18 }}>
@@ -268,6 +277,11 @@ export function CardRatesPage() {
         </div>
       </div>
 
+      {error ? <p role="alert" className="qty-low">{error}</p> : null}
+      <article className="admin-card"><label><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)} /> Usar taxas de cartão nesta loja</label>
+      <p className="empty">Recurso opcional do ramo. Oficinas iniciam com o recurso ativo. As taxas são definidas por cada loja.</p>
+      <button className="btn btn--primary" type="button" disabled={!loaded || saving} onClick={()=>void handleSave()}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></article>
+      <fieldset disabled={!enabled || !loaded || saving} className="card-rates-fields">
       {/* Banner de Referência para o Totem */}
       <article
         className="admin-card"
@@ -307,7 +321,7 @@ export function CardRatesPage() {
               <strong style={{ color: 'var(--accent, #2dd4bf)' }}>{defaultTotemBrand?.name}</strong>{' '}
               (Taxa 12x:{' '}
               <strong>
-                {defaultTotemBrand?.installments.find((it) => it.installment === 12)?.rate ?? 16.8}%
+                {defaultTotemBrand?.installments.find((it) => it.installment === 12)?.rate ?? 0}%
               </strong>
               )
             </p>
@@ -818,6 +832,7 @@ export function CardRatesPage() {
           </div>
         </div>
       </article>
+      </fieldset>
     </div>
   );
 }

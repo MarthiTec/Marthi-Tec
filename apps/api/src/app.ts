@@ -29,6 +29,8 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
 
+import { companyUsersRouter } from './routes/companyUsers.js';
+
 const app = express();
 
 /** /home/node/dist → /home/node */
@@ -64,6 +66,7 @@ app.use(partnersRouter);
 app.use(attributesRouter);
 app.use(stockRouter);
 app.use(registryRouter);
+app.use(companyUsersRouter);
 app.use(storesRouter);
 app.use(financeRouter);
 app.use(posRouter);

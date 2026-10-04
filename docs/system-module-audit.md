@@ -38,3 +38,12 @@ Esta revisão cobre o inventário estático de 131 páginas e os pontos de persi
 ## Publicação
 
 O repositório continua sendo `MarthiTec/Marthi-Tec`, conforme solicitado. O commit deste lote deve usar autoria Marcalinfo. O lote principal foi integrado no PR #7. Publicação e aplicação das migrações em produção são verificações separadas; a compilação local não comprova publicação. No Discloud, os logs confirmaram a aplicação de 0026–0031 com sucesso e a conexão com MarthiDB após o rebuild do lote principal.
+
+## Revisão de login, PDV e usuários — 04/10/2026
+
+- Login simplificado: identificação por e-mail consultada no servidor, sem opção inicial redundante de primeiro acesso e sem identificação administrativa fabricada. Falhas no envio de recuperação/ativação deixam de ser apresentadas como sucesso. Layout ajustado para celular e teclado virtual.
+- Gilvan foi confirmado ativo em users no MarthiDB, porém sem user_stores e sem registro de equipe. Vínculo com a Cell Ponto e registro como administrador foram corrigidos em transação e consultados novamente. Mariana permanece ativa. A migração 0032 repara o mesmo caso em contas existentes e o fluxo de ativação registra o responsável na equipe.
+- Consulta /admin/company-users implementada no servidor principal, restrita à administração da plataforma, incluindo nome, e-mail, função e situação de contas vinculadas.
+- Metas e relatório deixam de impor nomes, loja e valores da Cell Ponto. Seleção de vendedor passa a gravar sellerId. Comissão zero é respeitada; valor fixo e base de cálculo editáveis. Formulário, modal, campos e contraste recebem padrões do sistema.
+- Taxas de cartão: gravação explícita e confirmada no MarthiDB, com controle de revisão e validação de percentuais. A migração 0033 conserva o cadastro previamente exibido somente na Cell Ponto. Novas lojas informam suas taxas; opção por ramo, ativa por padrão para oficina e ajustável na personalização. A simulação exibida não representa recebimento bancário confirmado.
+- Validação: build completo e 70 testes automatizados aprovados antes da conferência visual final. Testes incluem reparo idempotente, consulta administrativa restrita e persistência de taxas zero/valores inválidos.

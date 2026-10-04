@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import './goalsPages.css';
+import { getActiveStore } from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
 import {
+  apiListSellers,
   apiCreateGoal,
   apiDeleteGoal,
   apiListGoals,
@@ -12,6 +15,7 @@ import {
 export function GoalsManagementPage() {
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [readOnly,setReadOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -19,7 +23,7 @@ export function GoalsManagementPage() {
   const [goalId, setGoalId] = useState('');
   const [name, setName] = useState('');
   const [goalType, setGoalType] = useState<'revenue' | 'profit' | 'sales_count' | 'products_count'>('revenue');
-  const [targetValue, setTargetValue] = useState<number>(70000);
+  const [targetValue, setTargetValue] = useState<number>(0);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -28,19 +32,16 @@ export function GoalsManagementPage() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
   });
-  const [sellerName, setSellerName] = useState('Mariana Marçal');
+  const [sellerId, setSellerId] = useState('');
+  const [sellers, setSellers] = useState<Array<{id: string; name: string}>>([]);
   const [active, setActive] = useState(true);
 
   // Níveis Progressivos
-  const [progressiveTiers, setProgressiveTiers] = useState<Array<{ name: string; value: number }>>([
-    { name: 'Meta Base', value: 50000 },
-    { name: 'Meta Principal', value: 70000 },
-    { name: 'Alta Performance', value: 90000 },
-    { name: 'Excepcional', value: 120000 },
-  ]);
+  const [progressiveTiers, setProgressiveTiers] = useState<Array<{ name: string; value: number }>>([]);
 
   // Comissão
-  const [commPercent, setCommPercent] = useState<number>(10);
+  const [commPercent, setCommPercent] = useState<number>(0);
+  const [fixedValue, setFixedValue] = useState(0);
   const [commType, setCommType] = useState<'percent_revenue' | 'percent_profit' | 'fixed_value'>('percent_revenue');
   const [requiresGoal, setRequiresGoal] = useState<boolean>(true);
 
@@ -54,7 +55,7 @@ export function GoalsManagementPage() {
       const res = await apiListGoals();
       setGoals(Array.isArray(res) ? res : []);
     } catch (err) {
-      console.warn('Falha ao listar metas:', err);
+      setError(err instanceof Error ? err.message : 'Falha ao listar metas.');
     } finally {
       setLoading(false);
     }
@@ -62,26 +63,24 @@ export function GoalsManagementPage() {
 
   useEffect(() => {
     loadGoals();
+    apiListSellers().then(setSellers).catch(() => setError('Não foi possível carregar os vendedores.'));
   }, []);
 
   function handleOpenCreate() {
+    setReadOnly(false);
     setIsEditing(false);
     setGoalId('');
-    setName('Outubro 2026');
+    setName(new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
     setGoalType('revenue');
-    setTargetValue(70000);
+    setTargetValue(0);
     const d = new Date();
     setStartDate(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10));
     setEndDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10));
-    setSellerName('Mariana Marçal');
+    setSellerId('');
     setActive(true);
-    setProgressiveTiers([
-      { name: 'Meta Base', value: 50000 },
-      { name: 'Meta Principal', value: 70000 },
-      { name: 'Alta Performance', value: 90000 },
-      { name: 'Excepcional', value: 120000 },
-    ]);
-    setCommPercent(10);
+    setProgressiveTiers([]);
+    setCommPercent(0);
+    setFixedValue(0);
     setCommType('percent_revenue');
     setRequiresGoal(true);
     setError('');
@@ -89,6 +88,7 @@ export function GoalsManagementPage() {
   }
 
   function handleOpenEdit(g: GoalRow) {
+    setReadOnly(false);
     setIsEditing(true);
     setGoalId(g.id);
     setName(g.name);
@@ -96,7 +96,7 @@ export function GoalsManagementPage() {
     setTargetValue(g.targetValue);
     setStartDate(g.startDate?.slice(0, 10) || '');
     setEndDate(g.endDate?.slice(0, 10) || '');
-    setSellerName(g.sellerName || 'Mariana Marçal');
+    setSellerId(g.sellerId || '');
     setActive(g.active);
     setProgressiveTiers(
       Array.isArray(g.progressiveTiers) && g.progressiveTiers.length > 0
@@ -108,7 +108,8 @@ export function GoalsManagementPage() {
             { name: 'Excepcional', value: 120000 },
           ],
     );
-    setCommPercent(g.commissionRules?.percent ?? 10);
+    setCommPercent(g.commissionRules?.percent ?? 0);
+    setFixedValue(g.commissionRules?.fixedValue ?? 0);
     setCommType(g.commissionRules?.type ?? 'percent_revenue');
     setRequiresGoal(g.commissionRules?.requiresGoalReached ?? true);
     setError('');
@@ -116,6 +117,7 @@ export function GoalsManagementPage() {
   }
 
   function handleDuplicate(g: GoalRow) {
+    setReadOnly(false);
     setIsEditing(false);
     setGoalId('');
     setName(`${g.name} (Cópia)`);
@@ -123,10 +125,11 @@ export function GoalsManagementPage() {
     setTargetValue(g.targetValue);
     setStartDate(g.startDate?.slice(0, 10) || '');
     setEndDate(g.endDate?.slice(0, 10) || '');
-    setSellerName(g.sellerName || 'Mariana Marçal');
+    setSellerId(g.sellerId || '');
     setActive(true);
     setProgressiveTiers(g.progressiveTiers || []);
-    setCommPercent(g.commissionRules?.percent ?? 10);
+    setCommPercent(g.commissionRules?.percent ?? 0);
+    setFixedValue(g.commissionRules?.fixedValue ?? 0);
     setCommType(g.commissionRules?.type ?? 'percent_revenue');
     setRequiresGoal(g.commissionRules?.requiresGoalReached ?? true);
     setError('');
@@ -156,13 +159,14 @@ export function GoalsManagementPage() {
         targetValue: Number(targetValue) || 0,
         startDate,
         endDate,
-        sellerId: null,
+        sellerId: sellerId || null,
         active,
         progressiveTiers,
         commissionRules: {
           enabled: true,
           percent: Number(commPercent) || 0,
           type: commType,
+          fixedValue,
           requiresGoalReached: requiresGoal,
         },
       };
@@ -186,7 +190,7 @@ export function GoalsManagementPage() {
   const mainGoal = goals.find((g) => g.active) || goals[0];
 
   return (
-    <div className="admin-page" style={{ padding: '16px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="admin-page goals-page" style={{ padding: '16px 20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Cabeçalho */}
       <div
         style={{
@@ -205,7 +209,7 @@ export function GoalsManagementPage() {
               Módulo de Metas & Comissões
             </h1>
             <span className="admin-badge admin-badge--active" style={{ fontSize: '0.75rem' }}>
-              Cell Ponto Matriz
+              {getActiveStore()?.tradeName || 'Loja atual'}
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--mute)' }}>
@@ -223,6 +227,7 @@ export function GoalsManagementPage() {
         </button>
       </div>
 
+      {error && !modalOpen ? <p role="alert" className="qty-low">{error}</p> : null}
       {/* DASHBOARD DE METAS RESPONSIVO */}
       {mainGoal && (
         <div
@@ -313,7 +318,7 @@ export function GoalsManagementPage() {
               }}
             >
               <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Atingimento</span>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: mainGoal.percent >= 100 ? '#4ade80' : 'var(--accent, #2dd4bf)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: mainGoal.percent >= 100 ? 'var(--goals-success)' : 'var(--accent, #2dd4bf)' }}>
                 {mainGoal.percent}%
               </div>
             </div>
@@ -327,7 +332,7 @@ export function GoalsManagementPage() {
               }}
             >
               <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Falta para a Meta</span>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: mainGoal.remaining > 0 ? '#f87171' : '#4ade80' }}>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: mainGoal.remaining > 0 ? 'var(--goals-danger)' : 'var(--goals-success)' }}>
                 {mainGoal.remaining > 0
                   ? `R$ ${mainGoal.remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                   : 'Meta Batida! 🎉'}
@@ -371,7 +376,7 @@ export function GoalsManagementPage() {
               }}
             >
               <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Comissão Mariana</span>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#eab308' }}>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--goals-warning)' }}>
                 R$ {mainGoal.commissionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -436,7 +441,7 @@ export function GoalsManagementPage() {
                         className="admin-badge"
                         style={{
                           background: g.percent >= 100 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(45, 212, 191, 0.15)',
-                          color: g.percent >= 100 ? '#4ade80' : 'var(--accent, #2dd4bf)',
+                          color: g.percent >= 100 ? 'var(--goals-success)' : 'var(--accent, #2dd4bf)',
                         }}
                       >
                         {g.percent}%
@@ -454,7 +459,7 @@ export function GoalsManagementPage() {
                     </td>
                     <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
                       <CrudRowActions
-                        onView={() => handleOpenEdit(g)}
+                        onView={() => {handleOpenEdit(g);setReadOnly(true);}}
                         onEdit={() => handleOpenEdit(g)}
                         onDuplicate={() => handleDuplicate(g)}
                         onDelete={() => handleDelete(g)}
@@ -472,13 +477,13 @@ export function GoalsManagementPage() {
       {modalOpen && (
         <div className="admin-modal-backdrop" onClick={() => setModalOpen(false)}>
           <div
-            className="admin-modal admin-modal--lg"
+            className="admin-modal admin-modal--lg" role="dialog" aria-modal="true" aria-label={readOnly ? 'Consultar meta' : 'Configurar meta'}
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: '640px', width: '95vw' }}
           >
             <div className="admin-modal__head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 700 }}>
-                {isEditing ? 'Editar Configuração de Meta' : 'Nova Configuração de Meta'}
+                {readOnly ? 'Consultar meta' : isEditing ? 'Editar Configuração de Meta' : 'Nova Configuração de Meta'}
               </h3>
               <button className="admin-btn admin-btn--icon" onClick={() => setModalOpen(false)} title="Fechar">
                 ✕
@@ -486,12 +491,13 @@ export function GoalsManagementPage() {
             </div>
 
             <form onSubmit={handleSave}>
+              <fieldset disabled={readOnly || saving} style={{border:0,padding:0,margin:0,minWidth:0}}>
               <div className="admin-modal__body" style={{ padding: '16px', maxHeight: '76vh', overflowY: 'auto' }}>
                 {error && (
                   <div
                     style={{
                       background: 'rgba(239, 68, 68, 0.15)',
-                      color: '#f87171',
+                      color: 'var(--goals-danger)',
                       border: '1px solid #ef4444',
                       padding: '8px 12px',
                       borderRadius: '6px',
@@ -567,14 +573,9 @@ export function GoalsManagementPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                   <div>
                     <label className="admin-label">Vendedor ou Equipe</label>
-                    <input
-                      type="text"
-                      className="admin-input"
-                      value={sellerName}
-                      onChange={(e) => setSellerName(e.target.value)}
-                      placeholder="Mariana Marçal"
-                      required
-                    />
+                    <AdminPicker label="Vendedor" value={sellerId}
+                      options={[{value: '', label: 'Toda a equipe'}, ...sellers.map(s => ({value: s.id, label: s.name}))]}
+                      onChange={setSellerId} />
                   </div>
                   <div>
                     <AdminPicker
@@ -603,6 +604,7 @@ export function GoalsManagementPage() {
                     📈 Níveis de Meta Progressiva
                   </strong>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                    <button type="button" className="admin-btn" onClick={() => setProgressiveTiers([...progressiveTiers,{name:'',value:0}])}>Adicionar nível</button>
                     {progressiveTiers.map((tier, idx) => (
                       <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <input
@@ -646,15 +648,20 @@ export function GoalsManagementPage() {
                   </strong>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
                     <div>
-                      <label className="admin-label">Taxa de Comissão (%)</label>
+                      <AdminPicker label="Base da comissão" value={commType} options={[
+                       {value:'percent_revenue',label:'Percentual do faturamento'},
+                       {value:'percent_profit',label:'Percentual do lucro'},
+                       {value:'fixed_value',label:'Valor fixo'}]}
+                       onChange={value => setCommType(value as typeof commType)} />
+                      <label className="admin-label">{commType === 'fixed_value' ? 'Valor da comissão (R$)' : 'Taxa de comissão (%)'}</label>
                       <input
                         type="number"
                         step="0.1"
                         min="0"
-                        max="100"
+                        max={commType === 'fixed_value' ? undefined : 100}
                         className="admin-input"
-                        value={commPercent}
-                        onChange={(e) => setCommPercent(Number(e.target.value))}
+                        value={commType === 'fixed_value' ? fixedValue : commPercent}
+                        onChange={(e) => commType === 'fixed_value' ? setFixedValue(Number(e.target.value)) : setCommPercent(Number(e.target.value))}
                       />
                     </div>
                     <div>
@@ -672,6 +679,7 @@ export function GoalsManagementPage() {
                 </div>
               </div>
 
+              </fieldset>
               <div
                 className="admin-modal__foot"
                 style={{
@@ -685,7 +693,7 @@ export function GoalsManagementPage() {
                 <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setModalOpen(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
+                <button type="submit" className="admin-btn admin-btn--primary" disabled={saving || readOnly}>
                   {saving ? 'Gravando...' : 'Salvar Meta'}
                 </button>
               </div>

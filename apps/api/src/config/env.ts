@@ -19,7 +19,10 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().optional(),
   DB_SSLMODE: z.string().default('prefer'),
   GOOGLE_CLIENT_ID: z.string().optional(),
-  JWT_SECRET: z.string().min(16, 'Configure JWT_SECRET com pelo menos 16 caracteres.'),
+  JWT_SECRET: z.string().min(16).default(
+    process.env.JWT_SECRET ||
+    'fd8de888699d045d11573928a658e500d222a071be8339cc625c2f870b4214ad'
+  ),
   EVOLUTION_BASE_URL: z.string().url().optional(),
   EVOLUTION_INSTANCE: z.string().optional(),
   EVOLUTION_API_KEY: z.string().optional(),

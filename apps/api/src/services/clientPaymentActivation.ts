@@ -1,3 +1,4 @@
+import { ensureOwnerTeamMember } from './ownerTeam.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { pool } from '../db/pool.js';
 
@@ -48,6 +49,7 @@ export async function confirmExistingClientPayment(input: {
     }
     await db.query(`INSERT INTO user_stores(id,user_id,store_id,role,is_default,created_at)
       VALUES($1,$2,$3,'admin',true,now()) ON CONFLICT(user_id,store_id) DO NOTHING`, [randomUUID(), owner.id, store.id]);
+    await ensureOwnerTeamMember(db,owner.id,store.id);
     await db.query("UPDATE client_accounts SET status='active',updated_at=now() WHERE id=$1", [account.id]);
     await db.query('UPDATE stores SET active=true,updated_at=now() WHERE id=$1', [store.id]);
     await db.query("UPDATE store_licenses SET status='active',updated_at=now() WHERE id=$1", [license.id]);

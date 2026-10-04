@@ -118,9 +118,9 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
     const canPay = !commRules.requiresGoalReached || isReached;
     if (canPay) {
       if (commRules.type === 'percent_revenue') {
-        commissionAmount = Math.round(totalRevenue * (Number(commRules.percent || 10) / 100) * 100) / 100;
+        commissionAmount = Math.round(totalRevenue * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
       } else if (commRules.type === 'percent_profit') {
-        commissionAmount = Math.round(totalProfit * (Number(commRules.percent || 10) / 100) * 100) / 100;
+        commissionAmount = Math.round(totalProfit * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
       } else if (commRules.type === 'fixed_value') {
         commissionAmount = Number(commRules.fixedValue || 0);
       }
@@ -245,7 +245,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
            target_value = COALESCE($3, target_value),
            start_date = COALESCE($4, start_date),
            end_date = COALESCE($5, end_date),
-           seller_id = COALESCE($6, seller_id),
+           seller_id = CASE WHEN $12 THEN $6 ELSE seller_id END,
            active = COALESCE($7, active),
            progressive_tiers = COALESCE($8, progressive_tiers),
            commission_rules = COALESCE($9, commission_rules),
@@ -263,6 +263,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
         body.commissionRules ? JSON.stringify(body.commissionRules) : null,
         id,
         storeId,
+        Object.prototype.hasOwnProperty.call(body, 'sellerId'),
       ],
     );
 

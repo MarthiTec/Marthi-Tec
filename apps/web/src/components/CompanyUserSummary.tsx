@@ -4,6 +4,7 @@ import { isNestAuthed, nestRequest } from '../services/nestClient';
 
 type Summary = {
   storeId: string; tradeName: string; activeUsers: number; inactiveUsers: number;
+  users: Array<{id:string; name:string; email:string; active:boolean; role:string}>;
   totalUsers: number; missingEmail: number; duplicateLogins: number;
   conflictingStatuses: number; withoutAccount: number;
 };
@@ -56,7 +57,7 @@ export function CompanyUserSummary() {
         <button type="button" className="btn btn--ghost" disabled={loading}
           onClick={() => setRevision((value) => value + 1)}>Atualizar</button>
       </div>
-      <p className="empty">Cadastros marcados como usuários do sistema, por e-mail de login.
+      <p className="empty">Contas de acesso vinculadas às lojas, incluindo responsáveis e funcionários.
         Ativo/inativo é a situação do cadastro, independente de estar online.
         Empresas e contagens consultadas no banco; atualização a cada minuto.</p>
       {loading ? <p role="status">Consultando usuários…</p> : null}
@@ -64,19 +65,23 @@ export function CompanyUserSummary() {
       {rows ? (
         <div className="admin-table-container">
           <table className="admin-table">
-            <thead><tr><th>Empresa</th><th>Ativos</th><th>Inativos</th><th>Total</th><th>Conferência</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Ativos</th><th>Inativos</th><th>Total</th><th>Usuários vinculados</th><th>Conferência</th></tr></thead>
             <tbody>
-              {rows.length === 0 ? <tr><td colSpan={5}>Nenhuma empresa cadastrada no banco.</td></tr> : null}
+              {rows.length === 0 ? <tr><td colSpan={6}>Nenhuma empresa cadastrada no banco.</td></tr> : null}
               {rows.map((row) => (
                 <tr key={row.storeId}>
                   <td><strong>{row.tradeName}</strong><br /><span className="empty">{row.storeId}</span></td>
                   <td>{row.activeUsers}</td><td>{row.inactiveUsers}</td><td>{row.totalUsers}</td>
+                  <td>{row.users?.map(member => <div key={member.id} style={{marginBottom:8}}>
+                    <strong>{member.name}</strong><br />{member.email}<br />
+                    <span className="empty">{member.role === 'admin' ? 'Administrador' : member.role} · {member.active ? 'Ativo' : 'Inativo'}</span>
+                  </div>)}</td>
                   <td>
                     {row.missingEmail > 0 ? <div>{row.missingEmail} cadastro(s) sem e-mail, fora do total.</div> : null}
                     {row.duplicateLogins > 0 ? <div>{row.duplicateLogins} login(s) duplicados, contados uma vez.</div> : null}
-                    {row.conflictingStatuses > 0 ? <div>{row.conflictingStatuses} status conflitante(s); cadastro ativo prevalece.</div> : null}
+                    {row.conflictingStatuses > 0 ? <div>{row.conflictingStatuses} status conflitante(s) entre equipe e conta de acesso.</div> : null}
                     {row.withoutAccount > 0 ? <div>{row.withoutAccount} login(s) sem conta vinculada nesta empresa.</div> : null}
-                    {row.missingEmail + row.duplicateLogins + row.withoutAccount === 0 ? 'Sem pendências' : null}
+                    {row.missingEmail + row.duplicateLogins + row.conflictingStatuses + row.withoutAccount === 0 ? 'Sem pendências' : null}
                   </td>
                 </tr>
               ))}

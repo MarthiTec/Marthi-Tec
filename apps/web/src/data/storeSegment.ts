@@ -21,6 +21,7 @@ export type StoreSegmentId =
 export type StoreCustomization = {
   segmentId: StoreSegmentId;
   segmentName: string;
+  showCardRates: boolean;
   showImei: boolean;
   showDevicePassword: boolean;
   showTablesAndKitchen: boolean;
@@ -50,6 +51,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Smartphones, computadores e eletrônicos. Ativa IMEI/Série obrigatório, senhas de desbloqueio para teste e bancada técnica.',
     recommendedModules: ['os', 'erp'],
     config: {
+      showCardRates: true,
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: false,
@@ -62,7 +64,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
     id: 'comercio_eletronicos', name: 'Celulares & Eletrônicos', icon: '📱', badge: 'Venda & Upgrade',
     description: 'Lojas de celulares e eletrônicos, com regras comerciais e encomendas opcionais.',
     recommendedModules: ['erp', 'fiscal'],
-    config: {showImei:true,showDevicePassword:false,showTablesAndKitchen:false,showCardapioDigital:false,showTechnicalBench:false,showSizeColorGrid:false},
+    config: {showCardRates:false,showImei:true,showDevicePassword:false,showTablesAndKitchen:false,showCardapioDigital:false,showTechnicalBench:false,showSizeColorGrid:false},
   },
   {
     id: 'vestuario_moda',
@@ -73,6 +75,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Lojas de roupas, calçados e acessórios. Ativa grade de tamanhos e cores no catálogo e PDV. Oculta IMEI, senhas e mesas/cozinha.',
     recommendedModules: ['erp', 'ecommerce'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -90,6 +93,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Bares, lanchonetes, restaurantes e cafeterias. Ativa mesas, pedidos por comanda, tela de cozinha e cardápio digital. Oculta IMEI e senhas de aparelhos.',
     recommendedModules: ['totem', 'erp'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: true,
@@ -107,6 +111,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Comércio de prateleira, mercados, papelarias e utilidades. Foco em frente de caixa ágil. Oculta mesas e IMEI.',
     recommendedModules: ['erp', 'fiscal'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -124,6 +129,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Empresas de serviços, montagens, marcenarias e orçamentos comerciais. Oculta mesas/cozinha e IMEI de eletrônicos.',
     recommendedModules: ['os', 'erp'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -141,6 +147,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Defina você mesmo quais campos e módulos ficam visíveis na sua loja conforme a sua necessidade específica.',
     recommendedModules: ['totem', 'erp', 'os'],
     config: {
+      showCardRates: false,
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: true,
