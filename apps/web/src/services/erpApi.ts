@@ -2033,6 +2033,7 @@ export type ExternalSaleLine = {
 };
 
 export type TradeInPayload = {
+  brand?: string;
   deviceName: string;
   imei?: string;
   capacity?: string;

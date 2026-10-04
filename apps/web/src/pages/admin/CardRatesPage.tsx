@@ -461,14 +461,7 @@ export function CardRatesPage() {
         </div>
 
         {/* Configurações básicas da Maquininha */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 12,
-            marginBottom: 20,
-          }}
-        >
+        <div className="card-rates-machine-fields">
           <label>
             <span className="admin-field-label">Nome da Maquininha / Ponto</span>
             <input

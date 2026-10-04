@@ -53,6 +53,7 @@ import { ErpPanelPage } from './pages/admin/ErpPanelPage';
 import { CustomersPage } from './pages/admin/CustomersPage';
 import { StockPage } from './pages/admin/StockPage';
 import { CommercialPage } from './pages/admin/CommercialPage';
+import { BrandsPage } from './pages/admin/BrandsPage';
 import { AttributesPage } from './pages/admin/AttributesPage';
 import { OrdersPage } from './pages/admin/OrdersPage';
 import { FinancePage } from './pages/admin/FinancePage';
@@ -192,6 +193,7 @@ export function App() {
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
           <Route path="atributos" element={<AttributesPage />} />
+          <Route path="marcas" element={<BrandsPage />} />
           <Route path="kits" element={<KitsPage />} />
           <Route path="lotes" element={<LotsPage />} />
           <Route path="almoxarifado" element={<WarehousePage />} />
@@ -229,6 +231,7 @@ export function App() {
           <Route path="totem" element={<TotemInsightsPage />} />
           <Route path="totem/produtos" element={<StockPage />} />
           <Route path="totem/atributos" element={<AttributesPage />} />
+          <Route path="totem/marcas" element={<BrandsPage />} />
           <Route path="totem/config" element={<TotemSettingsPage />} />
           <Route path="pedidos" element={<OrdersPage />} />
           <Route path="crm" element={<CrmPanelPage />} />
