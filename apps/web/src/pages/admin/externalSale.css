@@ -1,0 +1,20 @@
+.external-sale-page { color: var(--ink); }
+.external-sale-page .admin-label { display:block; margin:0 0 7px; font-size:.82rem; font-weight:650; color:var(--ink); }
+.external-sale-page .admin-input { display:block; box-sizing:border-box; width:100%; min-width:0; min-height:42px; padding:10px 12px; border:1px solid var(--line,#cbd5e1); border-radius:10px; background:var(--card,#fff); color:var(--ink,#17343d); font:inherit; font-size:.88rem; outline:none; }
+.external-sale-page textarea.admin-input { min-height:82px; resize:vertical; }
+.external-sale-page .admin-input:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.12); }
+.external-sale-page .admin-input:disabled { opacity:.7; cursor:not-allowed; }
+.external-sale-page .admin-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:10px 15px; border:1px solid var(--line,#cbd5e1); border-radius:10px; background:var(--card,#fff); color:var(--ink,#17343d); font:inherit; font-size:.84rem; font-weight:650; cursor:pointer; transition:background .15s; }
+.external-sale-page .admin-btn:hover { background:rgba(15,118,110,.08); }
+.external-sale-page .admin-btn--primary { background:#0f766e; border-color:#0f766e; color:#fff; }
+.external-sale-page .admin-btn--primary:hover { background:#115e59; }
+.external-sale-page .admin-btn:disabled { opacity:.5; cursor:not-allowed; }
+.external-sale-page .admin-badge { white-space:nowrap; flex-shrink:0; display:inline-flex; padding:6px 10px; border-radius:7px; background:rgba(15,118,110,.09); color:var(--ink); font-weight:600; }
+.external-sale-page h3 { letter-spacing:-.02em; }
+.external-sale-page input[type=checkbox] { accent-color:#0f766e; width:17px; height:17px; }
+@media(max-width:640px) {
+  .external-sale-page { padding:14px 12px !important; }
+  .external-sale-page form > div { min-width:0; }
+  .external-sale-page .admin-btn { white-space:normal; }
+  .external-sale-page form [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns:1fr !important; }
+}

@@ -61,7 +61,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     const requestedStore = req.header('x-store-id')?.trim();
     const stores = await pool.query(
-      `SELECT s.id FROM stores s JOIN user_stores us ON us.store_id = s.id
+      `SELECT s.id, us.role FROM stores s JOIN user_stores us ON us.store_id = s.id
        WHERE us.user_id = $1 AND s.client_account_id = $2 AND s.active = true
        AND ($3::text IS NULL OR s.id = $3)
        ORDER BY us.is_default DESC, s.created_at ASC LIMIT 1`,
@@ -76,7 +76,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       [stores.rows[0].id, user.clientAccountId, 'active'],
     );
     const rawPlan = license.rows[0]?.plan_id;
-    req.user = user;
+    req.user = { ...user, role: user.role === 'superadmin' ? 'superadmin' : stores.rows[0].role || 'operator' };
     req.clientAccountId = user.clientAccountId;
     req.storeId = stores.rows[0].id;
     req.planId = rawPlan === 'golden' || rawPlan === 'scale' ? 'golden' : rawPlan === 'silver' || rawPlan === 'growth' ? 'silver' : 'bronze';

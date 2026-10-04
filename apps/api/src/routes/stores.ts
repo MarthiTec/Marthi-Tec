@@ -154,7 +154,7 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
       `;
       const params: any[] = [clientAccountId];
 
-      if (hasRestrictedStores && req.user?.role !== 'admin') {
+      if (hasRestrictedStores) {
         sql += ` AND s.id IN (SELECT store_id FROM user_stores WHERE user_id = $2)`;
         params.push(userId);
       }

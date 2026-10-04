@@ -21,7 +21,7 @@ const tradeInSchema = z.object({
 const saleLineSchema = z.object({
   stockId: z.string().optional().nullable(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
-  qty: z.coerce.number().min(0.001, 'Quantidade inválida.'),
+  qty: z.coerce.number().int().min(1, 'Quantidade inválida.'),
   unitPrice: z.coerce.number().min(0, 'Preço unitário inválido.'),
   unitCost: z.coerce.number().min(0).optional(),
   discount: z.coerce.number().min(0).default(0),
@@ -32,12 +32,13 @@ const saleLineSchema = z.object({
 });
 
 const externalSaleSchema = z.object({
+  requestId: z.string().min(16).max(80).optional(),
   customerId: z.string().optional().nullable(),
   customerName: z.string().default('Consumidor Final'),
   customerPhone: z.string().default(''),
   customerDocument: z.string().default(''),
   sellerId: z.string().optional().nullable(),
-  sellerName: z.string().default('Mariana Marçal'),
+  sellerName: z.string().default(''),
   paymentMethod: z.string().default('Cartão de Crédito'), // 'dinheiro', 'cartao_credito', 'cartao_debito', 'pix', etc.
   installments: z.coerce.number().int().min(1).max(36).default(1),
   discount: z.coerce.number().min(0).default(0),
@@ -71,7 +72,36 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-
+      if (body.requestId) {
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [storeId + ':' + body.requestId]);
+        const existing = await client.query('SELECT id FROM sales_orders WHERE store_id = $1 AND request_key = $2', [storeId, body.requestId]);
+        if (existing.rows.length) {
+          await client.query('COMMIT');
+          res.status(200).json({success: true, data: {id: existing.rows[0].id}});
+          return;
+        }
+      }
+      body.sellerName = req.user!.name;
+      for (const [table, id] of [['customers', body.customerId], ['sellers', body.sellerId]] as const) {
+        if (!id) continue;
+        const related = await client.query(`SELECT * FROM ${table} WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        if (!related.rows.length) throw Object.assign(new Error('Cliente ou vendedor não pertence à loja selecionada.'), {status: 400});
+        if (table === 'customers') {
+          body.customerName = related.rows[0].name;
+          body.customerPhone = related.rows[0].phone || '';
+          body.customerDocument = related.rows[0].document || '';
+        } else body.sellerName = related.rows[0].name;
+      }
+      const requested = new Map<string, number>();
+      for (const line of body.lines) {
+        if (!line.stockId) throw Object.assign(new Error('Selecione um produto cadastrado no estoque da loja.'), {status: 400});
+        requested.set(line.stockId, (requested.get(line.stockId) || 0) + line.qty);
+      }
+      // Lock in a stable order and check aggregate quantity, including repeated items.
+      for (const [id, qty] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
+        const stock = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 AND active = true FOR UPDATE', [id, storeId]);
+        if (!stock.rows.length || Number(stock.rows[0].qty) < qty) throw Object.assign(new Error('Produto indisponível ou estoque insuficiente na loja selecionada.'), {status: 400});
+      }
       // 1. Obter custos e calcular totais
       let subtotal = 0;
       let totalCost = 0;
@@ -90,6 +120,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           }
 
           const stockRow = stockCheck.rows[0];
+          line.name = stockRow.name;
+          line.imei = stockRow.imei || "";
           const currentQty = Number(stockRow.qty);
           if (currentQty < line.qty) {
             throw new Error(`Estoque insuficiente para o produto "${stockRow.name}". Disponível: ${currentQty}, Solicitado: ${line.qty}`);
@@ -101,7 +133,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           lineCost = Number(line.unitCost) || 0;
         }
 
-        const lineTotal = line.qty * line.unitPrice;
+        const lineTotal = Math.round((line.qty * line.unitPrice - line.discount + line.surcharge) * 100) / 100;
+        if (lineTotal < 0) throw Object.assign(new Error('Desconto superior ao valor do produto.'), {status: 400});
         subtotal += lineTotal;
         totalCost += lineCost * line.qty;
 
@@ -116,7 +149,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       // Cálculo financeiro da venda
       const grossAmount = subtotal - body.discount + body.surcharge;
       const tradeInCredit = body.tradeIn?.tradeValue || 0;
-      const netAmountToPay = Math.max(0, Math.round((grossAmount - tradeInCredit) * 100) / 100);
+      if (grossAmount < 0 || tradeInCredit > grossAmount) throw Object.assign(new Error('Desconto ou crédito de troca superior ao valor da venda.'), {status: 400});
+      const netAmountToPay = Math.round((grossAmount - tradeInCredit) * 100) / 100;
 
       const grossProfit = Math.round((grossAmount - totalCost) * 100) / 100;
       const marginPercent = grossAmount > 0 ? Math.round((grossProfit / grossAmount) * 10000) / 100 : 0;
@@ -128,12 +162,12 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       await client.query(
         `INSERT INTO sales_orders (
           id, local_id, store_id, session_id, customer_id, customer_name, customer_document, customer_phone,
-          seller_id, seller_name, operator_name, subtotal, discount, surcharge, total_amount, payment_name,
+          seller_id, seller_name, operator_name, subtotal, discount, surcharge, total_amount, payment_name, notes,
           status, sale_type, cost_total, gross_profit, margin_percent, trade_in_value, trade_in_notes,
           external_cash_status, warranty_terms, warranty_months, created_at, updated_at
         ) VALUES (
           $1, $1, $2, NULL, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11, $12, $13, $14,
+          $7, $8, $9, $10, $11, $12, $13, $14, $23,
           'completed', 'external', $15, $16, $17, $18, $19,
           $20, $21, $22, now(), now()
         )`,
@@ -146,7 +180,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           body.customerPhone,
           body.sellerId || null,
           body.sellerName,
-          req.user?.name || 'Mariana Marçal',
+          req.user?.name || 'Operador',
           subtotal,
           body.discount,
           body.surcharge,
@@ -160,6 +194,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           externalCashStatus,
           body.warrantyTerms,
           body.warrantyMonths,
+          body.notes,
         ],
       );
 
@@ -236,7 +271,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
             `TI-${Date.now().toString(36).toUpperCase()}`,
             body.tradeIn.imei,
             body.tradeIn.tradeValue, // Custo de aquisição = valor atribuído na troca
-            Math.round(body.tradeIn.tradeValue * 1.25), // Preço sugerido base (+25%)
+            0, // Preço sugerido base (+25%)
             body.tradeIn.color,
             body.tradeIn.capacity,
             JSON.stringify({
@@ -355,6 +390,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         );
       }
 
+      if (body.installments === 1) {
       // 7. Lançamento no Livro Caixa (finance_entries)
       const entId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       await client.query(
@@ -366,10 +402,12 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           `Venda Externa #${orderId} - ${body.customerName} (${body.paymentMethod})`,
           netAmountToPay,
           orderId,
-          body.sellerName || req.user?.name || 'Mariana Marçal',
+          body.sellerName || req.user?.name || 'Operador',
         ],
       );
 
+      }
+      if (body.requestId) await client.query('UPDATE sales_orders SET request_key = $1 WHERE id = $2 AND store_id = $3', [body.requestId, orderId, storeId]);
       await client.query('COMMIT');
 
       res.status(201).json({
@@ -399,10 +437,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     } catch (err: any) {
       await client.query('ROLLBACK');
       console.error('[sales/external] Erro na transação de venda externa:', err);
-      res.status(400).json({
-        success: false,
-        error: { code: 'SALE_FAILED', message: err.message || 'Falha ao processar venda externa.' },
-      });
+      next(err);
     } finally {
       client.release();
     }
@@ -451,15 +486,16 @@ salesRouter.get('/api/v1/sales/:id/receipt', requireOrDemoAuth, async (req, res,
     // DADOS PURIFICADOS: NUNCA EXIBE CUSTO, LUCRO OU MARGEM
     const receiptData = {
       store: {
-        name: s.store_name || 'Cell Ponto',
-        phone: s.store_phone || '(24) 99966-3631',
-        email: s.store_email || 'contato@marthi.com.br',
-        city: s.store_city || 'Três Rios - RJ',
+        id: storeId,
+        name: s.store_name || '',
+        phone: s.store_phone || '',
+        email: s.store_email || '',
+        city: s.store_city || '',
       },
       sale: {
         id: s.id,
         date: s.created_at,
-        seller: s.seller_name || 'Mariana Marçal',
+        seller: s.seller_name || 'Operador',
         customer: {
           name: s.customer_name || 'Consumidor Final',
           document: s.customer_document || '',
@@ -488,7 +524,7 @@ salesRouter.get('/api/v1/sales/:id/receipt', requireOrDemoAuth, async (req, res,
           paymentMethod: s.payment_name || 'Cartão de Crédito',
         },
         warranty: {
-          months: s.warranty_months || 3,
+          months: s.warranty_months ?? 3,
           terms: s.warranty_terms || 'Garantia legal de 90 dias balcão cobrindo exclusivamente defeitos de fabricação.',
         },
       },
@@ -549,13 +585,13 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
     }
 
     const messageText = [
-      `📱 *COMPROVANTE DE VENDA & GARANTIA — ${s.store_name?.toUpperCase() || 'CELL PONTO'}*`,
+      `📱 *COMPROVANTE DE VENDA & GARANTIA — ${s.store_name?.toUpperCase() || ''}*`,
       `───────────────────────────────`,
       `Olá, *${s.customer_name || 'Cliente'}*! Agradecemos pela sua preferência.`,
       ``,
       `📄 *Pedido:* #${s.id}`,
       `📅 *Data:* ${new Date(s.created_at).toLocaleDateString('pt-BR')}`,
-      `👤 *Atendimento:* ${s.seller_name || 'Mariana Marçal'}`,
+      `👤 *Atendimento:* ${s.seller_name || 'Operador'}`,
       ``,
       `🛒 *PRODUTOS ADQUIRIDOS:*`,
       itemsSummary,
@@ -570,7 +606,7 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
       ``,
       `───────────────────────────────`,
       `Qualquer dúvida, estamos à disposição pelo WhatsApp ${s.store_phone || ''}.`,
-      `*${s.store_name || 'Cell Ponto'}*`,
+      `*${s.store_name || ''}*`,
     ].join('\n');
 
     // Tenta envio direto via Evolution API se configurado
@@ -580,9 +616,9 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
     try {
       const cfgRes = await pool.query(`SELECT whatsapp_settings FROM stores WHERE id = $1`, [storeId]);
       const cfg = cfgRes.rows[0]?.whatsapp_settings || {};
-      const baseUrl = cfg.baseUrl || 'https://marthi-tec.discloud.app';
-      const instance = cfg.instance || 'marthi';
-      const apiKey = cfg.apiKey || '5E280C9D-239A-4D8B-A765-63D00C291331';
+      const baseUrl = cfg.baseUrl || '';
+      const instance = cfg.instance || '';
+      const apiKey = cfg.apiKey || '';
 
       if (baseUrl && instance && apiKey) {
         const evoRes = await sendEvolutionText(body.phone, messageText, {
@@ -694,6 +730,7 @@ salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, r
 
 salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next) => {
   try {
+    if (!['admin', 'superadmin', 'manager'].includes(req.user!.role || '')) throw Object.assign(new Error('Sem permissão para cancelar vendas.'), {status: 403});
     const storeId = req.storeId!;
     const saleId = req.params.id;
     const body = z.object({ reason: z.string().default('Cancelamento solicitado pelo cliente') }).parse(req.body);
@@ -712,12 +749,12 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         [saleId, storeId],
       );
       if (saleRes.rows.length === 0) {
-        throw new Error('Venda não encontrada.');
+        throw Object.assign(new Error('Venda não encontrada.'), {status: 404});
       }
 
       const sale = saleRes.rows[0];
       if (sale.status === 'cancelled') {
-        throw new Error('Esta venda já foi cancelada anteriormente.');
+        throw Object.assign(new Error('Esta venda já foi cancelada anteriormente.'), {status: 409});
       }
 
       // 1. Marca venda como cancelada
@@ -735,7 +772,7 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
       );
       for (const line of linesRes.rows) {
         if (line.stock_id) {
-          const sRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`, [line.stock_id, storeId]);
+          const sRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE`, [line.stock_id, storeId]);
           if (sRes.rows.length > 0) {
             const prev = Number(sRes.rows[0].qty);
             const nextQty = prev + Number(line.qty);
@@ -759,6 +796,8 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
       );
       for (const trade of tradeRes.rows) {
         if (trade.stock_item_id) {
+          const item = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [trade.stock_item_id, storeId]);
+          if (!item.rows.length || Number(item.rows[0].qty) !== 1 || trade.status === 'resold') throw Object.assign(new Error('Aparelho da troca já movimentado; cancelamento exige conferência do estoque.'), {status: 409});
           // Remove ou inativa o item usado cadastrado
           await client.query(`UPDATE stock_items SET active = false, qty = 0, updated_at = now() WHERE id = $1 AND store_id = $2`, [trade.stock_item_id, storeId]);
           await client.query(`UPDATE sale_trade_ins SET status = 'cancelled', updated_at = now() WHERE id = $1`, [trade.id]);
@@ -771,6 +810,9 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         [saleId, storeId],
       );
 
+      const received = await client.query("SELECT COALESCE(SUM(CASE WHEN type = 'in' THEN amount ELSE -amount END), 0) AS amount FROM finance_entries WHERE ref_id = $1 AND store_id = $2", [saleId, storeId]);
+      const receivedAmount = Number(received.rows[0].amount);
+      if (receivedAmount > 0) {
       // 5. Registra estorno no livro caixa (finance_entries)
       const entId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
       await client.query(
@@ -780,17 +822,18 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
           entId,
           storeId,
           `Estorno de Venda #${saleId} (${body.reason})`,
-          Number(sale.total_amount),
+          receivedAmount,
           saleId,
           req.user?.name || 'Operador',
         ],
       );
 
+      }
       await client.query('COMMIT');
       res.json({ success: true, data: { ok: true, saleId, status: 'cancelled' } });
     } catch (err: any) {
       await client.query('ROLLBACK');
-      res.status(400).json({ success: false, error: { message: err.message || 'Erro ao cancelar venda.' } });
+      next(err);
     } finally {
       client.release();
     }

@@ -1,31 +1,5 @@
 import nodemailer from 'nodemailer';
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { env } from '../config/env.js';
-
-let cachedLogoBase64: string | null = null;
-
-function getLogoBase64(): string {
-  if (cachedLogoBase64) return cachedLogoBase64;
-  const possiblePaths = [
-    resolve(process.cwd(), 'assets/logo-marthi-horizontal.png'),
-    resolve(process.cwd(), '../web/public/brand/logo-marthi-horizontal.png'),
-    resolve(process.cwd(), 'apps/web/public/brand/logo-marthi-horizontal.png'),
-    resolve(process.cwd(), '../../apps/web/public/brand/logo-marthi-horizontal.png'),
-  ];
-  for (const p of possiblePaths) {
-    if (existsSync(p)) {
-      try {
-        const buf = readFileSync(p);
-        cachedLogoBase64 = `data:image/png;base64,${buf.toString('base64')}`;
-        return cachedLogoBase64;
-      } catch {
-        // continue
-      }
-    }
-  }
-  return '';
-}
 
 function getMailTransporter() {
   const user = env.SMTP_USER || '';
@@ -49,9 +23,7 @@ function getMailTransporter() {
         user,
         pass,
       },
-      tls: {
-        rejectUnauthorized: false,
-      },
+      tls: { rejectUnauthorized: true },
     });
   }
   return null;
@@ -103,104 +75,57 @@ export type ResetPasswordEmailPayload = {
 /**
  * Template base responsivo com identidade visual elegante da Marthi Tecnologia
  */
-function wrapEmailTemplate(contentHtml: string, previewText: string): string {
-  const logoSrc = getLogoBase64();
-  const logoHtml = logoSrc
-    ? `<img src="${logoSrc}" alt="Marthi Tecnologia" width="220" style="display:block; border:0; outline:none; max-width:220px; height:auto; margin:0 auto;" />`
-    : `<div style="font-size:24px; font-weight:800; letter-spacing:1px; color:#ffffff;">MARTHI <span style="color:#2dd4bf; font-weight:400;">TECNOLOGIA</span></div>`;
-
+export function wrapEmailTemplate(contentHtml: string, previewText: string): string {
   return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Marthi Tecnologia</title>
-  <style>
-    body { margin:0; padding:0; background-color:#0b0f14; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased; color:#e2e8f0; }
-    table { border-collapse:collapse; }
-    a { color:#2dd4bf; text-decoration:none; }
-    @media only screen and (max-width: 600px) {
-      .container { width:100% !important; padding:12px !important; }
-      .card { padding:24px 16px !important; }
-    }
-  </style>
-</head>
-<body style="margin:0; padding:0; background-color:#0b0f14;">
-  <!-- Preview Text -->
-  <div style="display:none; font-size:1px; color:#0b0f14; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
-    ${previewText}
-  </div>
-
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#0b0f14; min-height:100vh; padding:32px 0;">
-    <tr>
-      <td align="center">
-        <table class="container" width="580" cellpadding="0" cellspacing="0" role="presentation" style="width:580px; max-width:580px; margin:0 auto;">
-          <!-- Header com Logo -->
-          <tr>
-            <td align="center" style="padding-bottom:28px;">
-              ${logoHtml}
-            </td>
-          </tr>
-
-          <!-- Card Principal -->
-          <tr>
-            <td>
-              <table class="card" width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#131b24; border:1px solid rgba(148, 163, 184, 0.16); border-radius:12px; padding:36px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-                ${contentHtml}
-              </table>
-            </td>
-          </tr>
-
-          <!-- Rodapé -->
-          <tr>
-            <td align="center" style="padding-top:28px; font-size:12px; color:#64748b; line-height:1.6;">
-              <p style="margin:0 0 8px;">Marthi Tecnologia · Soluções Inteligentes em Autoatendimento &amp; Gestão</p>
-              <p style="margin:0;">Este é um e-mail automático do sistema. Não responda a este remetente.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>Marthi Tecnologia</title></head>
+<body bgcolor="#f1f5f9" style="margin:0;padding:0;background-color:#f1f5f9;color:#20333d;font-family:Arial,Helvetica,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(previewText)}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;"><tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="580" cellspacing="0" cellpadding="0" style="width:100%;max-width:580px;">
+<tr><td bgcolor="#ffffff" style="padding:24px 28px;border:1px solid #dbe4e9;border-bottom:3px solid #0f766e;color:#14343d;font-size:22px;font-weight:bold;">MARTHI <span style="color:#0f766e;">TECNOLOGIA</span></td></tr>
+<tr><td bgcolor="#ffffff" style="padding:28px;border:1px solid #dbe4e9;border-top:0;background-color:#ffffff;color:#20333d;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="color:#20333d;font-size:15px;line-height:1.6;">${contentHtml}</table>
+</td></tr>
+<tr><td align="center" style="padding:20px 12px;color:#526775;font-size:12px;line-height:1.6;">Marthi Tecnologia · Autoatendimento e gestão<br>Mensagem automática. Para atendimento, use os canais de suporte da sua empresa.</td></tr>
+</table></td></tr></table></body></html>`;
 }
+
 
 /**
  * 1. E-mail de Boas-Vindas para o Cliente com Criação de Senha
  */
 export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<{ success: boolean; messageId?: string }> {
-  const baseUrl = payload.frontendUrl || env.FRONTEND_URL || 'http://localhost:5173';
+  const baseUrl = env.FRONTEND_URL;
   const setupUrl = `${baseUrl.replace(/\/$/, '')}/criar-senha?token=${encodeURIComponent(payload.activationToken)}`;
   const loginUrl = `${baseUrl.replace(/\/$/, '')}/login`;
 
   const contentHtml = `
     <tr>
       <td>
-        <h1 style="color:#ffffff; font-size:22px; margin:0 0 16px; font-weight:700;">
+        <h1 style="color:#20333d; font-size:22px; margin:0 0 16px; font-weight:700;">
           Seja muito bem-vindo à Marthi Tecnologia! 🚀
         </h1>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 16px;">
-          Olá, <strong style="color:#ffffff;">${payload.contactName}</strong>!
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 16px;">
+          Olá, <strong style="color:#20333d;">${escapeHtml(payload.contactName)}</strong>!
         </p>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
-          Parabéns pelo seu investimento e obrigado por confiar em nossa tecnologia para impulsionar a operação de <strong style="color:#2dd4bf;">${payload.companyName}</strong>.
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 20px;">
+          Parabéns pelo seu investimento e obrigado por confiar em nossa tecnologia para impulsionar a operação de <strong style="color:#0f766e;">${escapeHtml(payload.companyName)}</strong>.
         </p>
         
         <!-- Detalhes do Plano -->
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#1a232f; border:1px solid rgba(45, 212, 191, 0.2); border-radius:8px; padding:16px; margin-bottom:24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f0f7f6; border:1px solid rgba(45, 212, 191, 0.2); border-radius:8px; padding:16px; margin-bottom:24px;">
           <tr>
             <td>
-              <p style="margin:0 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; color:#94a3b8;">Plano Contratado</p>
-              <p style="margin:0 0 12px; font-size:18px; font-weight:700; color:#2dd4bf;">${payload.planName}</p>
-              <p style="margin:0; font-size:13px; color:#cbd5e1;">
-                Status do Pagamento: <strong style="color:#4ade80;">✓ Confirmado com Sucesso</strong>
+              <p style="margin:0 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px; color:#526775;">Plano Contratado</p>
+              <p style="margin:0 0 12px; font-size:18px; font-weight:700; color:#0f766e;">${escapeHtml(payload.planName)}</p>
+              <p style="margin:0; font-size:13px; color:#465c68;">
+                Status do Pagamento: <strong style="color:#15803d;">✓ Confirmado com Sucesso</strong>
               </p>
             </td>
           </tr>
         </table>
 
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 20px;">
           Sua conta já foi criada e seu ambiente está preparado. Por motivos de segurança, não geramos senhas automáticas em texto puro. Para começar, basta definir sua senha pessoal clicando no botão abaixo:
         </p>
 
@@ -208,23 +133,23 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<{ 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0;">
           <tr>
             <td align="center">
-              <a href="${setupUrl}" target="_blank" style="display:inline-block; background-color:#2dd4bf; color:#0b0f14; font-weight:700; font-size:16px; padding:14px 32px; border-radius:8px; text-align:center; text-decoration:none; box-shadow:0 4px 14px rgba(45, 212, 191, 0.4);">
+              <a href="${setupUrl}" target="_blank" style="display:inline-block; background-color:#0f766e; color:#ffffff; font-weight:700; font-size:16px; padding:14px 32px; border-radius:8px; text-align:center; text-decoration:none; box-shadow:0 4px 14px rgba(45, 212, 191, 0.4);">
                 Criar Minha Senha de Acesso →
               </a>
             </td>
           </tr>
         </table>
 
-        <p style="font-size:13px; color:#94a3b8; line-height:1.5; margin:0 0 16px;">
+        <p style="font-size:13px; color:#526775; line-height:1.5; margin:0 0 16px;">
           Este link é de uso único e possui validade por questões de segurança. Caso o botão não funcione, copie e cole o link a seguir no seu navegador:<br>
-          <a href="${setupUrl}" style="color:#2dd4bf; word-break:break-all; font-size:12px;">${setupUrl}</a>
+          <a href="${setupUrl}" style="color:#0f766e; word-break:break-all; font-size:12px;">${setupUrl}</a>
         </p>
 
         <hr style="border:0; border-top:1px solid rgba(148, 163, 184, 0.15); margin:24px 0;">
 
-        <p style="font-size:13px; color:#94a3b8; margin:0;">
+        <p style="font-size:13px; color:#526775; margin:0;">
           Após definir sua senha, seu login poderá ser feito diretamente em:<br>
-          <a href="${loginUrl}" target="_blank" style="color:#2dd4bf; font-weight:600;">${loginUrl}</a>
+          <a href="${loginUrl}" target="_blank" style="color:#0f766e; font-weight:600;">${loginUrl}</a>
         </p>
       </td>
     </tr>
@@ -232,7 +157,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<{ 
 
   const html = wrapEmailTemplate(
     contentHtml,
-    `Seja bem-vindo à Marthi Tecnologia! Seu plano ${payload.planName} foi ativado. Crie sua senha de acesso.`
+    `Seja bem-vindo à Marthi Tecnologia! Seu plano ${escapeHtml(payload.planName)} foi ativado. Crie sua senha de acesso.`
   );
 
   return sendMail({
@@ -247,60 +172,60 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<{ 
  * 2. E-mail Interno para a Equipe Marthi Tecnologia (marthi.tecnologia@gmail.com)
  */
 export async function sendInternalNotificationEmail(payload: InternalNotificationPayload): Promise<{ success: boolean; messageId?: string }> {
-  const baseUrl = payload.frontendUrl || env.FRONTEND_URL || 'http://localhost:5173';
+  const baseUrl = env.FRONTEND_URL;
   const adminUrl = `${baseUrl.replace(/\/$/, '')}/admin/clientes`;
 
   const contentHtml = `
     <tr>
       <td>
-        <div style="display:inline-block; background:rgba(45, 212, 191, 0.15); color:#2dd4bf; font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+        <div style="display:inline-block; background:rgba(45, 212, 191, 0.15); color:#0f766e; font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
           Novo Cliente Confirmado
         </div>
-        <h1 style="color:#ffffff; font-size:20px; margin:0 0 16px; font-weight:700;">
+        <h1 style="color:#20333d; font-size:20px; margin:0 0 16px; font-weight:700;">
           Nova Contratação Concluída! 🎯
         </h1>
-        <p style="font-size:14px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
+        <p style="font-size:14px; line-height:1.6; color:#465c68; margin:0 0 20px;">
           Um novo parceiro concluiu a contratação de plano no sistema Marthi Tecnologia.
         </p>
 
         <!-- Ficha do Cliente -->
-        <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="background:#1a232f; border:1px solid rgba(148, 163, 184, 0.2); border-radius:8px; font-size:14px; margin-bottom:24px;">
+        <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="background:#f0f7f6; border:1px solid rgba(148, 163, 184, 0.2); border-radius:8px; font-size:14px; margin-bottom:24px;">
           <tr>
-            <td style="color:#94a3b8; width:40%;">Cliente / Empresa:</td>
-            <td style="color:#ffffff; font-weight:600;">${payload.companyName}</td>
+            <td style="color:#526775; width:40%;">Cliente / Empresa:</td>
+            <td style="color:#20333d; font-weight:600;">${escapeHtml(payload.companyName)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Responsável:</td>
-            <td style="color:#ffffff;">${payload.contactName}</td>
+            <td style="color:#526775;">Responsável:</td>
+            <td style="color:#20333d;">${escapeHtml(payload.contactName)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">E-mail:</td>
-            <td style="color:#2dd4bf;">${payload.email}</td>
+            <td style="color:#526775;">E-mail:</td>
+            <td style="color:#0f766e;">${escapeHtml(payload.email)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Telefone / WhatsApp:</td>
-            <td style="color:#ffffff;">${payload.phone}</td>
+            <td style="color:#526775;">Telefone / WhatsApp:</td>
+            <td style="color:#20333d;">${escapeHtml(payload.phone)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Plano Adquirido:</td>
-            <td style="color:#2dd4bf; font-weight:700;">${payload.planName}</td>
+            <td style="color:#526775;">Plano Adquirido:</td>
+            <td style="color:#0f766e; font-weight:700;">${escapeHtml(payload.planName)}</td>
           </tr>
-          ${payload.monthlyAmount ? `<tr><td style="color:#94a3b8;">Valor Mensal:</td><td style="color:#ffffff;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
+          ${payload.monthlyAmount ? `<tr><td style="color:#526775;">Valor Mensal:</td><td style="color:#20333d;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
           <tr>
-            <td style="color:#94a3b8;">Forma de Pagamento:</td>
-            <td style="color:#ffffff;">${payload.paymentMethod}</td>
-          </tr>
-          <tr>
-            <td style="color:#94a3b8;">Status do Pagamento:</td>
-            <td style="color:#4ade80; font-weight:600;">${payload.paymentStatus}</td>
+            <td style="color:#526775;">Forma de Pagamento:</td>
+            <td style="color:#20333d;">${escapeHtml(payload.paymentMethod)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Data / Hora:</td>
-            <td style="color:#ffffff;">${new Date(payload.contractedAt).toLocaleString('pt-BR')}</td>
+            <td style="color:#526775;">Status do Pagamento:</td>
+            <td style="color:#15803d; font-weight:600;">${escapeHtml(payload.paymentStatus)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">ID Cliente / Protocolo:</td>
-            <td style="color:#ffffff; font-family:monospace;">${payload.clientId}${payload.transactionRef ? ` · Transação: ${payload.transactionRef}` : ''}</td>
+            <td style="color:#526775;">Data / Hora:</td>
+            <td style="color:#20333d;">${new Date(payload.contractedAt).toLocaleString('pt-BR')}</td>
+          </tr>
+          <tr>
+            <td style="color:#526775;">ID Cliente / Protocolo:</td>
+            <td style="color:#20333d; font-family:monospace;">${escapeHtml(payload.clientId)}${payload.transactionRef ? ` · Transação: ${escapeHtml(payload.transactionRef)}` : ''}</td>
           </tr>
         </table>
 
@@ -308,7 +233,7 @@ export async function sendInternalNotificationEmail(payload: InternalNotificatio
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:20px 0;">
           <tr>
             <td align="center">
-              <a href="${adminUrl}" target="_blank" style="display:inline-block; background-color:#334155; color:#ffffff; font-weight:600; font-size:15px; padding:12px 28px; border-radius:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.15);">
+              <a href="${adminUrl}" target="_blank" style="display:inline-block; background-color:#0f766e; color:#ffffff; font-weight:600; font-size:15px; padding:12px 28px; border-radius:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.15);">
                 Acessar Cadastro no /admin →
               </a>
             </td>
@@ -320,15 +245,11 @@ export async function sendInternalNotificationEmail(payload: InternalNotificatio
 
   const html = wrapEmailTemplate(
     contentHtml,
-    `Nova contratação: ${payload.companyName} adquiriu o plano ${payload.planName}.`
+    `Nova contratação: ${escapeHtml(payload.companyName)} adquiriu o plano ${escapeHtml(payload.planName)}.`
   );
 
-  if (isTestEmail(payload.email)) {
-    console.log(`[emailService] [SANDBOX] Notificação interna ignorada para cadastro sintético de teste (${payload.email})`);
-    return { success: true, messageId: 'simulated-internal-test' };
-  }
-
-  const recipient = env.INTERNAL_NOTIFICATION_EMAIL || 'marthi.tecnologia@gmail.com';
+  const recipient = env.INTERNAL_NOTIFICATION_EMAIL;
+  if (!recipient) throw Object.assign(new Error('Destinatário das notificações internas não configurado.'), {status: 503});
 
   return sendMail({
     to: recipient,
@@ -342,19 +263,19 @@ export async function sendInternalNotificationEmail(payload: InternalNotificatio
  * 3. E-mail de Recuperação de Senha ("Esqueci minha senha")
  */
 export async function sendPasswordResetEmail(payload: ResetPasswordEmailPayload): Promise<{ success: boolean; messageId?: string }> {
-  const baseUrl = payload.frontendUrl || env.FRONTEND_URL || 'http://localhost:5173';
+  const baseUrl = env.FRONTEND_URL;
   const resetUrl = `${baseUrl.replace(/\/$/, '')}/redefinir-senha?token=${encodeURIComponent(payload.resetToken)}`;
 
   const contentHtml = `
     <tr>
       <td>
-        <h1 style="color:#ffffff; font-size:22px; margin:0 0 16px; font-weight:700;">
+        <h1 style="color:#20333d; font-size:22px; margin:0 0 16px; font-weight:700;">
           Recuperação de Senha 🔒
         </h1>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 16px;">
-          Olá, <strong style="color:#ffffff;">${payload.userName}</strong>!
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 16px;">
+          Olá, <strong style="color:#20333d;">${escapeHtml(payload.userName)}</strong>!
         </p>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 20px;">
           Recebemos uma solicitação para redefinir a senha da sua conta na Marthi Tecnologia. Se você fez essa solicitação, clique no botão abaixo para criar uma nova senha:
         </p>
 
@@ -362,14 +283,14 @@ export async function sendPasswordResetEmail(payload: ResetPasswordEmailPayload)
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0;">
           <tr>
             <td align="center">
-              <a href="${resetUrl}" target="_blank" style="display:inline-block; background-color:#2dd4bf; color:#0b0f14; font-weight:700; font-size:16px; padding:14px 32px; border-radius:8px; text-align:center; text-decoration:none;">
+              <a href="${resetUrl}" target="_blank" style="display:inline-block; background-color:#0f766e; color:#ffffff; font-weight:700; font-size:16px; padding:14px 32px; border-radius:8px; text-align:center; text-decoration:none;">
                 Redefinir Minha Senha →
               </a>
             </td>
           </tr>
         </table>
 
-        <p style="font-size:13px; color:#94a3b8; line-height:1.5; margin:0 0 16px;">
+        <p style="font-size:13px; color:#526775; line-height:1.5; margin:0 0 16px;">
           Este link é de uso único e expira em 2 horas. Se você não solicitou a redefinição de senha, nenhuma ação é necessária e sua senha atual permanecerá segura.
         </p>
       </td>
@@ -434,7 +355,7 @@ export function isTestEmail(email: string): boolean {
 }
 
 /**
- * Função de envio com suporte a Nodemailer SMTP ou graceful logger sandbox
+ * Função de envio com suporte a Nodemailer SMTP com confirmação real do envio
  */
 export async function sendMail(options: {
   to: string;
@@ -442,24 +363,6 @@ export async function sendMail(options: {
   html: string;
   text: string;
 }): Promise<{ success: boolean; messageId?: string }> {
-  // Se for endereço de teste/dummy (ex: .teste, @example.com), simula em sandbox para evitar bounce DNS no Gmail
-  if (isTestEmail(options.to)) {
-    const simulatedId = `test-sandbox-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    console.log(`[emailService] [SANDBOX] Destinatário em domínio de teste (${options.to}) detectado. Envio real ignorado para evitar bounce DNS:`, {
-      id: simulatedId,
-      to: options.to,
-      subject: options.subject,
-    });
-    await recordEmailAudit({
-      recipient: options.to,
-      subject: options.subject,
-      sender: env.SMTP_FROM,
-      status: 'simulated',
-      messageId: simulatedId,
-    });
-    return { success: true, messageId: simulatedId };
-  }
-
   const transporter = getMailTransporter();
 
   if (transporter) {
@@ -493,24 +396,8 @@ export async function sendMail(options: {
     }
   }
 
-  // Graceful simulation / dev mode logger
-  const simulatedId = `msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  console.log(`[emailService] [DEV/SANDBOX SIMULATION] E-mail despachado:`, {
-    id: simulatedId,
-    to: options.to,
-    subject: options.subject,
-    date: new Date().toISOString(),
-  });
+  throw Object.assign(new Error('Envio de e-mail indisponível. Verifique a configuração SMTP.'), { status: 503 });
 
-  await recordEmailAudit({
-    recipient: options.to,
-    subject: options.subject,
-    sender: env.SMTP_FROM,
-    status: 'simulated',
-    messageId: simulatedId,
-  });
-
-  return { success: true, messageId: simulatedId };
 }
 
 /**
@@ -602,41 +489,41 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
   const contentHtml = `
     <tr>
       <td>
-        <div style="display:inline-block; background:rgba(45, 212, 191, 0.15); color:#2dd4bf; font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+        <div style="display:inline-block; background:rgba(45, 212, 191, 0.15); color:#0f766e; font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
           Contratação Registrada
         </div>
-        <h1 style="color:#ffffff; font-size:22px; margin:0 0 16px; font-weight:700;">
+        <h1 style="color:#20333d; font-size:22px; margin:0 0 16px; font-weight:700;">
           Recebemos sua contratação! 🎯
         </h1>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 16px;">
-          Olá, <strong style="color:#ffffff;">${payload.contactName}</strong>!
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 16px;">
+          Olá, <strong style="color:#20333d;">${escapeHtml(payload.contactName)}</strong>!
         </p>
-        <p style="font-size:15px; line-height:1.6; color:#cbd5e1; margin:0 0 20px;">
-          Seu pedido de contratação do plano <strong style="color:#2dd4bf;">${payload.planName}</strong> para a empresa <strong style="color:#ffffff;">${payload.companyName}</strong> foi registrado com sucesso em nossa plataforma.
+        <p style="font-size:15px; line-height:1.6; color:#465c68; margin:0 0 20px;">
+          Seu pedido de contratação do plano <strong style="color:#0f766e;">${escapeHtml(payload.planName)}</strong> para a empresa <strong style="color:#20333d;">${escapeHtml(payload.companyName)}</strong> foi registrado com sucesso em nossa plataforma.
         </p>
         
         <!-- Detalhes do Pedido -->
-        <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="background:#1a232f; border:1px solid rgba(45, 212, 191, 0.2); border-radius:8px; font-size:14px; margin-bottom:24px;">
+        <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="background:#f0f7f6; border:1px solid rgba(45, 212, 191, 0.2); border-radius:8px; font-size:14px; margin-bottom:24px;">
           <tr>
-            <td style="color:#94a3b8; width:40%;">Empresa:</td>
-            <td style="color:#ffffff; font-weight:600;">${payload.companyName}</td>
+            <td style="color:#526775; width:40%;">Empresa:</td>
+            <td style="color:#20333d; font-weight:600;">${escapeHtml(payload.companyName)}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Plano Escolhido:</td>
-            <td style="color:#2dd4bf; font-weight:700;">${payload.planName}</td>
+            <td style="color:#526775;">Plano Escolhido:</td>
+            <td style="color:#0f766e; font-weight:700;">${escapeHtml(payload.planName)}</td>
           </tr>
-          ${payload.monthlyAmount ? `<tr><td style="color:#94a3b8;">Valor Mensal:</td><td style="color:#ffffff;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
+          ${payload.monthlyAmount ? `<tr><td style="color:#526775;">Valor Mensal:</td><td style="color:#20333d;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
           <tr>
-            <td style="color:#94a3b8;">Forma de Pagamento:</td>
-            <td style="color:#ffffff;">${payload.paymentMethod.toUpperCase()}</td>
+            <td style="color:#526775;">Forma de Pagamento:</td>
+            <td style="color:#20333d;">${payload.paymentMethod.toUpperCase()}</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Status Atual:</td>
+            <td style="color:#526775;">Status Atual:</td>
             <td style="color:#f59e0b; font-weight:600;">Aguardando Confirmação do Pagamento</td>
           </tr>
           <tr>
-            <td style="color:#94a3b8;">Protocolo:</td>
-            <td style="color:#ffffff; font-family:monospace;">${payload.protocol}</td>
+            <td style="color:#526775;">Protocolo:</td>
+            <td style="color:#20333d; font-family:monospace;">${escapeHtml(payload.protocol)}</td>
           </tr>
         </table>
 
@@ -647,7 +534,7 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
           </p>
         </div>
 
-        <p style="font-size:13px; color:#94a3b8; margin:0;">
+        <p style="font-size:13px; color:#526775; margin:0;">
           Dúvidas? Entre em contato pelo WhatsApp de suporte ou responda a este e-mail.<br>
           <strong>Equipe Marthi Tecnologia</strong>
         </p>
@@ -657,7 +544,7 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
 
   const html = wrapEmailTemplate(
     contentHtml,
-    `Recebemos seu pedido de contratação do plano ${payload.planName} para ${payload.companyName}.`
+    `Recebemos seu pedido de contratação do plano ${escapeHtml(payload.planName)} para ${escapeHtml(payload.companyName)}.`
   );
 
   return sendMail({
@@ -669,3 +556,7 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
 }
 
 
+
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}

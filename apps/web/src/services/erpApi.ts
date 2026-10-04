@@ -22,6 +22,7 @@ import type {
   WorkOrderStatus,
 } from '../data/osStore';
 import {
+  nestRequest,
   nestDelete,
   nestGet,
   nestPatch,
@@ -1987,11 +1988,11 @@ export type ApiClientAccountRow = {
 };
 
 export function apiListStores() {
-  return nestGet<ApiStoreRow[]>('/stores');
+  return nestRequest<ApiStoreRow[]>('/stores', { headers: { 'x-store-id': '' } });
 }
 
 export function apiGetClientAccount() {
-  return nestGet<ApiClientAccountRow>('/account');
+  return nestRequest<ApiClientAccountRow>('/account', { headers: { 'x-store-id': '' } });
 }
 
 export function apiCreateStore(body: Partial<ApiStoreRow> & { tradeName: string; document: string }) {
@@ -2042,6 +2043,7 @@ export type TradeInPayload = {
 };
 
 export type ExternalSalePayload = {
+  requestId?: string;
   customerId?: string | null;
   customerName?: string;
   customerPhone?: string;
@@ -2088,16 +2090,16 @@ export type GoalRow = {
   };
 };
 
-export function apiCreateExternalSale(body: ExternalSalePayload) {
-  return nestPost<any>('/sales/external', body);
+export function apiCreateExternalSale(body: ExternalSalePayload, storeId?: string) {
+  return nestRequest<any>('/sales/external', { method: 'POST', body: JSON.stringify(body), headers: storeId ? { 'x-store-id': storeId } : undefined });
 }
 
-export function apiGetSaleReceipt(saleId: string) {
-  return nestGet<any>(`/sales/${saleId}/receipt`);
+export function apiGetSaleReceipt(saleId: string, storeId?: string) {
+  return nestRequest<any>(`/sales/${saleId}/receipt`, { headers: storeId ? { 'x-store-id': storeId } : undefined });
 }
 
-export function apiSendWarrantyWhatsApp(saleId: string, body: { phone: string; customNote?: string }) {
-  return nestPost<any>(`/sales/${saleId}/send-warranty-whatsapp`, body);
+export function apiSendWarrantyWhatsApp(saleId: string, body: { phone: string; customNote?: string }, storeId?: string) {
+  return nestRequest<any>(`/sales/${saleId}/send-warranty-whatsapp`, {method: 'POST', body: JSON.stringify(body), headers: storeId ? {'x-store-id': storeId} : undefined});
 }
 
 export function apiGetDailyPendingTasks() {
@@ -2153,6 +2155,5 @@ export function apiListPickups() {
 export function apiCreatePickup(body: { responsibleName: string; amount: number; notes?: string; pickupDate?: string }) {
   return nestPost<any>('/finance/pickups', body);
 }
-
 
 

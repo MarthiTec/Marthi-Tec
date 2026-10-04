@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import './externalSale.css';
+import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   apiCreateExternalSale,
+  apiGetSaleReceipt,
   apiListCustomers,
   apiListStock,
   type ExternalSaleLine,
@@ -24,7 +27,17 @@ type StockOption = {
 
 export function ExternalSalePage() {
   const { user } = useAuth();
-  const isPrivileged = user?.role === 'admin' || user?.email === 'gilvanteodo@gmail.com';
+  const isPrivileged = user?.role === 'admin' || user?.role === 'superadmin';
+
+  const [storeId, setStoreId] = useState(getActiveStoreId);
+  const storeRef = useRef(storeId);
+  storeRef.current = storeId;
+  const activeStore = getActiveStore();
+  useEffect(() => {
+    const changed = () => { setStoreId(getActiveStoreId()); setCreatedReceipt(null); setShowPickupModal(false); setShowPendingModal(false); setSavedSaleId(null); requestId.current = crypto.randomUUID(); };
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, changed);
+    return () => window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, changed);
+  }, []);
 
   // Estados Base
   const [customers, setCustomers] = useState<any[]>([]);
@@ -34,7 +47,7 @@ export function ExternalSalePage() {
   const [error, setError] = useState('');
 
   // Vendedor
-  const [sellerName, setSellerName] = useState('Mariana Marçal');
+  const sellerName = user?.name || '';
 
   // Cliente
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -65,8 +78,8 @@ export function ExternalSalePage() {
   const [tradeIn, setTradeIn] = useState<TradeInPayload>({
     deviceName: '',
     imei: '',
-    capacity: '256GB',
-    color: 'Titânio Natural',
+    capacity: '',
+    color: '',
     conditionState: 'used',
     notes: '',
     tradeValue: 0,
@@ -82,6 +95,8 @@ export function ExternalSalePage() {
   const [saleNotes, setSaleNotes] = useState('');
 
   // Modais de Sucesso, Recolhimento e Pendências
+  const requestId = useRef(crypto.randomUUID());
+  const [savedSaleId, setSavedSaleId] = useState<string | null>(null);
   const [createdReceipt, setCreatedReceipt] = useState<any>(null);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -89,12 +104,21 @@ export function ExternalSalePage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      setError('');
+      setCustomers([]);
+      setStockItems([]);
+      setSelectedCustomerId('');
+      setCustomerName('Consumidor Final');
+      setCustomerPhone('');
+      setCustomerDocument('');
+      setLines([{ name: '', qty: 1, unitPrice: 0, stockId: '' }]);
       try {
         const [custRes, stkRes] = await Promise.all([
-          apiListCustomers().catch(() => []),
-          apiListStock().catch(() => []),
+          apiListCustomers(),
+          apiListStock(),
         ]);
 
+        if (storeRef.current !== storeId) return;
         setCustomers(Array.isArray(custRes) ? custRes : []);
 
         const mappedStock: StockOption[] = (Array.isArray(stkRes) ? stkRes : []).map((it: any) => ({
@@ -126,13 +150,13 @@ export function ExternalSalePage() {
           ]);
         }
       } catch (err) {
-        console.warn('Falha ao carregar dados da venda externa:', err);
+        if (storeRef.current === storeId) setError(err instanceof Error ? err.message : 'Não foi possível carregar os dados da loja.');
       } finally {
-        setLoading(false);
+        if (storeRef.current === storeId) setLoading(false);
       }
     }
-    loadData();
-  }, []);
+    void loadData();
+  }, [storeId, user?.id]);
 
   function handleSelectCustomer(val: string) {
     setSelectedCustomerId(val);
@@ -217,7 +241,8 @@ export function ExternalSalePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (lines.length === 0 || !lines[0].name) {
+    if (submitting || loading || storeRef.current !== getActiveStoreId()) { setError('Aguarde o carregamento da loja ativa.'); return; }
+    if (lines.length === 0 || lines.some(line => !line.stockId || !line.name || Number(line.qty) <= 0)) {
       setError('Adicione ao menos um produto válido na venda.');
       return;
     }
@@ -238,7 +263,7 @@ export function ExternalSalePage() {
         discount: Number(generalDiscount) || 0,
         surcharge: Number(generalSurcharge) || 0,
         notes: saleNotes.trim(),
-        warrantyMonths: Number(warrantyMonths) || 3,
+        warrantyMonths: Number(warrantyMonths),
         warrantyTerms: warrantyTerms.trim(),
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
@@ -251,53 +276,18 @@ export function ExternalSalePage() {
         tradeIn: hasTradeIn && tradeIn.tradeValue > 0 ? tradeIn : null,
       };
 
-      const res = await apiCreateExternalSale(payload);
-      if (res.success && res.data) {
-        // Monta recibo para exibição imediata
-        setCreatedReceipt({
-          store: {
-            name: 'Cell Ponto',
-            phone: '(24) 99966-3631',
-            city: 'Três Rios - RJ',
-          },
-          sale: {
-            id: res.data.id,
-            date: res.data.createdAt,
-            seller: res.data.sellerName,
-            customer: {
-              name: res.data.customerName,
-              phone: customerPhone,
-              document: customerDocument,
-            },
-            items: lines.map((l) => ({
-              name: l.name,
-              qty: l.qty,
-              unitPrice: l.unitPrice,
-              totalPrice: l.qty * l.unitPrice,
-              imei: l.imei,
-            })),
-            tradeIn: hasTradeIn && tradeIn.tradeValue > 0 ? {
-              device: tradeIn.deviceName,
-              imei: tradeIn.imei,
-              capacity: tradeIn.capacity,
-              color: tradeIn.color,
-              creditValue: tradeIn.tradeValue,
-            } : null,
-            financial: {
-              subtotal,
-              discount: generalDiscount,
-              surcharge: generalSurcharge,
-              tradeInCredit,
-              totalPaid: res.data.totalPaid,
-              paymentMethod: res.data.paymentMethod,
-            },
-            warranty: {
-              months: warrantyMonths,
-              terms: warrantyTerms,
-            },
-          },
-        });
+      const result = await apiCreateExternalSale({...payload, requestId: requestId.current}, storeId);
+      if (!result?.id) throw new Error('A API não confirmou a gravação da venda.');
+      if (storeRef.current === storeId) setSavedSaleId(result.id);
+      // Never reconstruct the receipt from browser caches or fixed company data.
+      try {
+        const receipt = await apiGetSaleReceipt(result.id, storeId);
+        if (storeRef.current === storeId) setCreatedReceipt(receipt);
+      } catch {
+        if (storeRef.current === storeId) setError('Venda ' + result.id + ' salva. O comprovante não carregou; consulte a venda antes de tentar novamente.');
       }
+      const refreshed = await apiListStock().catch(() => null);
+      if (refreshed && storeRef.current === storeId) setStockItems(refreshed.map((it: any) => ({ ...it, qty: Number(it.qty), price: Number(it.price), cost: Number(it.cost) })));
     } catch (err: any) {
       setError(err.message || 'Falha ao processar venda externa.');
     } finally {
@@ -306,6 +296,8 @@ export function ExternalSalePage() {
   }
 
   function handleResetForm() {
+    requestId.current = crypto.randomUUID();
+    setSavedSaleId(null);
     setLines([
       {
         stockId: stockItems[0]?.id || '',
@@ -328,8 +320,8 @@ export function ExternalSalePage() {
     setTradeIn({
       deviceName: '',
       imei: '',
-      capacity: '256GB',
-      color: 'Titânio Natural',
+      capacity: '',
+      color: '',
       conditionState: 'used',
       notes: '',
       tradeValue: 0,
@@ -340,7 +332,7 @@ export function ExternalSalePage() {
   }
 
   return (
-    <div className="admin-page" style={{ padding: '16px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="admin-page external-sale-page" style={{ padding: '16px 20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Cabeçalho da Página */}
       <div
         style={{
@@ -359,7 +351,7 @@ export function ExternalSalePage() {
               Venda Externa / Venda sem Caixa
             </h1>
             <span className="admin-badge admin-badge--active" style={{ fontSize: '0.75rem' }}>
-              Cell Ponto Matriz
+              {activeStore?.tradeName || 'Loja ativa'}
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--mute)' }}>
@@ -382,7 +374,7 @@ export function ExternalSalePage() {
             style={{ fontSize: '0.84rem' }}
             onClick={() => setShowPickupModal(true)}
           >
-            💰 Recolhimento (Gilvan)
+            💰 Recolhimento de valores
           </button>
         </div>
       </div>
@@ -410,7 +402,7 @@ export function ExternalSalePage() {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '16px', marginBottom: '16px' }}>
           {/* Card 1: Identificação da Operação (Vendedora & Cliente) */}
           <div
             style={{
@@ -425,13 +417,13 @@ export function ExternalSalePage() {
             </h3>
 
             <div style={{ marginBottom: '12px' }}>
-              <label className="admin-label">Vendedora Responsável</label>
+              <label className="admin-label">Vendedor responsável</label>
               <input
                 type="text"
                 className="admin-input"
                 value={sellerName}
-                onChange={(e) => setSellerName(e.target.value)}
-                placeholder="Mariana Marçal"
+                readOnly
+                placeholder="Nome do responsável pela venda"
                 required
               />
             </div>
@@ -470,7 +462,7 @@ export function ExternalSalePage() {
                   className="admin-input"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="(24) 99999-9999"
+                  placeholder="DDD e número de telefone"
                 />
               </div>
             </div>
@@ -548,7 +540,7 @@ export function ExternalSalePage() {
                   marginBottom: '12px',
                 }}
               >
-                ⚠️ <strong>Recebimento sem caixa:</strong> Esta venda será registrada no sistema e o dinheiro ficará fisicamente na loja até o recolhimento pelo responsável Gilvan.
+                ⚠️ <strong>Recebimento sem caixa:</strong> Esta venda será registrada no sistema e o dinheiro ficará fisicamente na loja até o recolhimento pelo responsável pelo recolhimento.
               </div>
             )}
 
@@ -781,7 +773,7 @@ export function ExternalSalePage() {
                 <div>
                   <AdminPicker
                     label="Capacidade"
-                    value={tradeIn.capacity || '256GB'}
+                    value={tradeIn.capacity || ''}
                     options={[
                       { value: '64GB', label: '64 GB' },
                       { value: '128GB', label: '128 GB' },
@@ -798,7 +790,7 @@ export function ExternalSalePage() {
                   <input
                     type="text"
                     className="admin-input"
-                    placeholder="Titânio Natural"
+                    placeholder="Cor do aparelho recebido"
                     value={tradeIn.color}
                     onChange={(e) => setTradeIn({ ...tradeIn, color: e.target.value })}
                   />
@@ -943,7 +935,7 @@ export function ExternalSalePage() {
                   width: '100%',
                   maxWidth: '280px',
                 }}
-                disabled={submitting}
+                disabled={submitting || loading || !storeId || Boolean(savedSaleId)}
               >
                 {submitting ? 'Gravando Venda...' : '✓ Concluir Venda Externa'}
               </button>
@@ -952,6 +944,12 @@ export function ExternalSalePage() {
         </div>
       </form>
 
+      {savedSaleId && !createdReceipt && (
+        <div className="admin-card" style={{padding: '16px', marginTop: '16px'}}>
+          <p>Venda {savedSaleId} já gravada.</p>
+          <button type="button" className="admin-btn admin-btn--primary" onClick={handleResetForm}>Iniciar nova venda</button>
+        </div>
+      )}
       {/* Modais */}
       {createdReceipt && (
         <WarrantyReceiptModal

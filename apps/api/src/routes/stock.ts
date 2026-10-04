@@ -94,7 +94,7 @@ export function reduceStockQtyInMemory(stockId: string, qty: number): boolean {
  */
 stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const { kind, condition, q, low } = req.query;
 
     if (pool) {
@@ -160,7 +160,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
  */
 stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const code = String(req.query.code || '').trim();
     if (!code) {
       res.json({ success: true, data: null });
@@ -203,7 +203,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
  */
 stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const body = stockItemSchema.parse(req.body);
     const id = body.id || `STK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -218,18 +218,6 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
       if (client) {
         try {
           await client.query('BEGIN');
-
-          // Garante a loja em stores para não quebrar a FK
-          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
-          if (storeExists.rowCount === 0) {
-            const fallbackAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
-            await client.query(
-              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
-               VALUES ($1, $2, 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(11) 3000-0000', true)
-               ON CONFLICT (id) DO NOTHING`,
-              [storeId, fallbackAccountId],
-            );
-          }
 
           await client.query(
             `INSERT INTO stock_items (
@@ -312,7 +300,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
  */
 stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const id = req.params.id;
     const body = stockItemSchema.partial().parse(req.body);
 
@@ -444,7 +432,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
  */
 stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const id = req.params.id;
 
     if (pool) {
@@ -469,7 +457,7 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
  */
 stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
 
     if (pool) {
       try {

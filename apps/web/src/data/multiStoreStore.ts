@@ -425,7 +425,7 @@ export function saveClientAccount(account: ClientAccount): ClientAccount {
 export function listStores(): Store[] {
   cleanLegacyMocks();
   const key = tenantScopedKey(STORAGE_KEY_STORES);
-  const fallback = resolveDefaultStores();
+  const fallback = isNestAuthed() ? [] : resolveDefaultStores();
   const stores = readJson<Store[]>(key, fallback);
 
   // Filtragem definitiva para evitar que qualquer mock residual seja exibido
@@ -443,7 +443,7 @@ export function listStores(): Store[] {
   let hasUpdated = false;
   const withTokens = list.map((s) => {
     let currentStore = s;
-    if (!currentStore.accessToken) {
+    if (!isNestAuthed() && !currentStore.accessToken) {
       hasUpdated = true;
       return {
         ...currentStore,
@@ -856,10 +856,11 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
   if (!isNestAuthed()) return false;
   try {
     const [accountRow, storesRows] = await Promise.all([
-      apiGetClientAccount().catch(() => null),
-      apiListStores().catch(() => null),
+      apiGetClientAccount(),
+      apiListStores(),
     ]);
 
+    if (!accountRow?.id || !Array.isArray(storesRows) || storesRows.length === 0) throw new Error('Conta sem lojas autorizadas.');
     let changed = false;
 
     if (accountRow && accountRow.id) {
@@ -906,6 +907,7 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
 
       const key = tenantScopedKey(STORAGE_KEY_STORES);
       writeJson(key, mappedStores);
+      getActiveStoreId();
       recalculateAllStoreLicenses();
       changed = true;
     }

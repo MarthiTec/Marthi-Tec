@@ -103,8 +103,8 @@ function onlyDigits(v: string) {
 
 registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
+    const storeId = req.storeId!;
+    const clientAccountId = req.clientAccountId!;
     const activeOnly = req.query.active === 'true';
 
     if (pool) {
@@ -155,8 +155,9 @@ registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next
 
 registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
+    if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
+    const storeId = req.storeId!;
+    const clientAccountId = req.clientAccountId!;
     const body = employeeSchema.parse(req.body);
 
     const userLimit = req.userLimit || 10;
@@ -205,24 +206,28 @@ registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, nex
 
         // Se for usuário do sistema, cria credencial na tabela users
         if (body.isSystemUser && cleanUserEmail) {
-          const pass = (body.accessPassword || '123456').trim();
+          const pass = (body.accessPassword || '').trim();
+          if (pass.length < 8) throw Object.assign(new Error('Informe uma senha de pelo menos 8 caracteres.'), {status: 400});
           const salt = randomBytes(16).toString('hex');
           const passHash = hashPassword(pass, salt);
 
           const userId = `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-          await client.query(
+          const savedUser = await client.query(
             `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
              VALUES ($1, $2, $3, $4, 'password', $5, $6, true)
              ON CONFLICT (email) DO UPDATE
-             SET password_hash = $5, name = $4, active = true`,
+             SET name = EXCLUDED.name
+             WHERE users.client_account_id = EXCLUDED.client_account_id AND users.global_role <> 'superadmin'
+             RETURNING id`,
             [userId, clientAccountId, cleanUserEmail, body.name.trim(), `${salt}:${passHash}`, body.role],
           );
 
+          if (!savedUser.rows.length) throw Object.assign(new Error('E-mail já vinculado a outro acesso.'), {status: 409});
           await client.query(
             `INSERT INTO user_stores (id, user_id, store_id, role, permissions)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (user_id, store_id) DO UPDATE SET role = $4, permissions = $5`,
-            [`UST-${Date.now().toString(36)}`, userId, storeId, body.role, JSON.stringify(body.permissions)],
+            [`UST-${Date.now().toString(36)}`, savedUser.rows[0].id, storeId, body.role, JSON.stringify(body.permissions)],
           );
         }
 
@@ -300,8 +305,9 @@ registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, nex
 
 registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
+    if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
+    const storeId = req.storeId!;
+    const clientAccountId = req.clientAccountId!;
     const id = req.params.id;
     const body = employeeSchema.partial().parse(req.body);
 
@@ -343,14 +349,18 @@ registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res
 
         // Atualiza senha se informada
         if (body.accessPassword && cleanEmail) {
+          if (body.accessPassword.trim().length < 8) throw Object.assign(new Error('Informe uma senha de pelo menos 8 caracteres.'), {status: 400});
           const salt = randomBytes(16).toString('hex');
           const passHash = hashPassword(body.accessPassword.trim(), salt);
           const userId = `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-          await client.query(
+          const savedUser = await client.query(
             `INSERT INTO users (id, client_account_id, email, name, provider, password_hash, global_role, active)
              VALUES ($1, $2, $3, $4, 'password', $5, $6, true)
              ON CONFLICT (email) DO UPDATE
-             SET password_hash = $5, name = $4, active = true, global_role = $6`,
+             SET password_hash = EXCLUDED.password_hash, name = EXCLUDED.name, session_version = users.session_version + 1
+             WHERE users.client_account_id = EXCLUDED.client_account_id AND users.global_role <> 'superadmin'
+             AND EXISTS (SELECT 1 FROM user_stores us WHERE us.user_id = users.id AND us.store_id = $7)
+             RETURNING id`,
             [
               userId,
               clientAccountId,
@@ -358,23 +368,35 @@ registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res
               (body.name || curr.name).trim(),
               `${salt}:${passHash}`,
               body.role || curr.role,
+              storeId,
             ],
           );
+          if (!savedUser.rows.length) throw Object.assign(new Error('E-mail já vinculado a outro acesso.'), {status: 409});
           await client.query(
             `INSERT INTO user_stores (id, user_id, store_id, role, permissions)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (user_id, store_id) DO UPDATE SET role = $4, permissions = $5`,
             [
               `UST-${Date.now().toString(36)}`,
-              userId,
+              savedUser.rows[0].id,
               storeId,
               body.role || curr.role,
               JSON.stringify(body.permissions || curr.permissions || {}),
             ],
           );
-          upsertClientUserInMemory(cleanEmail, body.name || curr.name, body.accessPassword, body.role || curr.role, clientAccountId);
+
         }
 
+        const systemAccess = body.isSystemUser ?? curr.is_system_user;
+        const accessActive = body.active ?? curr.active;
+        if (systemAccess && accessActive && cleanEmail) {
+          const access = await client.query('SELECT u.id FROM users u JOIN user_stores us ON us.user_id = u.id WHERE lower(u.email) = lower($1) AND u.client_account_id = $2 AND us.store_id = $3', [cleanEmail, clientAccountId, storeId]);
+          if (!access.rows.length) throw Object.assign(new Error('Usuário de acesso não pertence à loja selecionada.'), {status: 400});
+          await client.query('UPDATE user_stores SET role = $1, permissions = $2 WHERE user_id = $3 AND store_id = $4', [body.role || curr.role, JSON.stringify(body.permissions || curr.permissions || {}), access.rows[0].id, storeId]);
+        }
+        if (!systemAccess || !accessActive || cleanEmail !== curr.user_email) {
+          await client.query('DELETE FROM user_stores WHERE store_id = $1 AND user_id IN (SELECT id FROM users WHERE lower(email) = lower($2) AND client_account_id = $3)', [storeId, curr.user_email, clientAccountId]);
+        }
         await client.query(
           `UPDATE employees
            SET name = COALESCE($1, name),
@@ -458,14 +480,19 @@ registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res
 
 registryRouter.delete('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
+    const storeId = req.storeId!;
     const id = req.params.id;
 
     if (pool) {
-      await pool.query(
-        `DELETE FROM employees WHERE id = $1 AND store_id = $2`,
-        [id, storeId],
-      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM user_stores WHERE store_id = $1 AND user_id IN (SELECT u.id FROM users u JOIN employees e ON lower(u.email) = lower(e.user_email) WHERE e.id = $2 AND e.store_id = $1 AND u.client_account_id = $3)', [storeId, id, req.clientAccountId]);
+        await client.query('DELETE FROM employees WHERE id = $1 AND store_id = $2', [id, storeId]);
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
       res.json({ success: true, data: { ok: true } });
       return;
     }

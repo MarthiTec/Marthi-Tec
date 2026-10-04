@@ -853,7 +853,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
     try {
       await apiDeleteStock(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -870,7 +870,7 @@ export async function removePriceTable(id: string): Promise<AdminState> {
     try {
       await apiDeletePriceTable(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover tabela no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -884,7 +884,7 @@ export async function removePayment(id: string): Promise<AdminState> {
     try {
       await apiDeletePayment(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover pagamento no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();

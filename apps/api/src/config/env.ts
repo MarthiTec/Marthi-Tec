@@ -33,7 +33,7 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: z.preprocess((value) => value === true || value === 'true', z.boolean()).default(false),
   SMTP_FROM: z.string().default('Marthi Tecnologia <marthi.tecnologia@gmail.com>'),
   INTERNAL_NOTIFICATION_EMAIL: z.string().email().default('marthi.tecnologia@gmail.com'),
   FRONTEND_URL: z.string().default(

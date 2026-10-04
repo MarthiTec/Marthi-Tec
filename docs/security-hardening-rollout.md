@@ -28,7 +28,7 @@ Esta alteração fecha os atalhos de autenticação do Express. Ainda não é um
 
 ## Validação local
 
-- `npm run test:security`: 15 testes passam com banco simulado, sem usar credenciais de produção.
+- `npm run test:security`: 28 testes passam; autenticação usa adaptador isolado e vendas usam PostgreSQL PGlite real, sem usar credenciais de produção.
 - Compilação TypeScript da API passou.
 - Compilação TypeScript e Vite do frontend passou. Neste ambiente Windows, o bundle foi gerado com `vite build --configLoader native` para contornar restrição de leitura do sandbox ao carregar a configuração.
 - O teste de falha de banco produz um erro esperado no log do servidor.
@@ -39,6 +39,16 @@ Não foi realizado teste contra o MarthiDB real, nem execução das migrations n
 
 O frontend ainda possui módulos com gravação local (por exemplo, ordens de serviço, fiscal, e-commerce e operações auxiliares). Várias dessas rotas dependem do backend Nest externo e não estão implementadas neste repositório. O caminho obrigatório é mapear cada mutação para uma API persistente, migrar os dados locais existentes com identificação do tenant e remover respostas de sucesso quando a API não gravar.
 
-O fluxo de ativação de pagamento existente também precisa de teste PostgreSQL e transação única para cliente, loja, licença e vínculo de usuário. Há diferenças entre nomes de colunas esperados por rotas antigas e o schema inicial. Os testes com banco simulado não verificam essas diferenças.
+O fluxo de ativação de pagamento existente também precisa de teste PostgreSQL e transação única para cliente, loja, licença e vínculo de usuário. Há diferenças entre nomes de colunas esperados por rotas antigas e o schema inicial. A migração 0021 e os testes PGlite verificam as diferenças do fluxo de venda externa. Outros módulos ainda exigem análise.
 
 Não habilite esta proposta diretamente em produção sem essas verificações. A validação de assinatura segue [as opções oficiais do jose](https://github.com/panva/jose/blob/main/docs/jwt/verify/interfaces/JWTVerifyOptions.md).
+
+## Venda externa, e-mails e proteção da empresa
+
+A migração 0021 adiciona os campos ausentes no catálogo e nas vendas, compatibiliza as referências de estoque e venda, impede troca de proprietário de registros e valida referências de clientes, vendedores, fornecedores e financeiro contra a loja. Não corrige dados históricos nem reatribui empresas automaticamente.
+
+A venda é transacional, usa o usuário da sessão, valida os vínculos, agrega quantidades repetidas e suporta requestId para repetição segura. Parcelas são recebíveis pendentes, sem entrada no livro caixa antes do recebimento. Cancelamento estorna somente a receita registrada e recusa troca já movimentada.
+
+O formulário usa a loja ativa e os dados da API; o comprovante é consultado após a gravação. Foram removidos nomes fixos de empresa, vendedor e recolhedor e a chave fixa de WhatsApp. E-mails usam tabelas HTML válidas, fundo claro, cores explícitas e dados escapados. Falha SMTP não é sucesso simulado.
+
+Verificação do Discloud em 03/10/2026: aplicação marthi-totem e MarthiDB online; banco PostgreSQL 17 privado, porta 5432, cluster NOVA. A aplicação tem DATABASE_URL e configuração SMTP. JWT_SECRET não apareceu nas variáveis da aplicação; o responsável confirmou que está no arquivo .env. O valor não foi acessado. O console encerrou a sessão com “Erro ao verificar o status do container”; não foi possível concluir a auditoria SQL dos registros reais. Nenhuma migração ou implantação foi executada na produção.

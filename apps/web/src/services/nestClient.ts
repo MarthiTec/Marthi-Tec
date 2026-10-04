@@ -1,3 +1,4 @@
+import { tenantScopedKey } from '../data/tenantContext';
 import { nestApiUrl } from './config';
 import { readJson } from './http';
 
@@ -51,7 +52,7 @@ export async function nestRequest<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   try {
-    const activeStoreId = localStorage.getItem('marthi.activeStoreId');
+    const activeStoreId = localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1'));
     if (activeStoreId && !headers.has('x-store-id')) {
       headers.set('x-store-id', activeStoreId);
     }
