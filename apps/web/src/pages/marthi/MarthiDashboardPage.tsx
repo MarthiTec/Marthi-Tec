@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CompanyUserSummary } from '../../components/CompanyUserSummary';
 import { DonutChart, DualBarChart, LineAreaChart } from '../../components/MiniCharts';
 import { money } from '../../data/financeBook';
 import {
@@ -93,6 +94,7 @@ export function MarthiDashboardPage() {
 
   return (
     <section className="admin-page">
+      <CompanyUserSummary />
       <div className="dash-hero">
         <div>
           <p className="empty" style={{ margin: 0 }}>
@@ -193,3 +195,4 @@ export function MarthiDashboardPage() {
     </section>
   );
 }
+
