@@ -11,6 +11,7 @@ for (const file of fs
   .readdirSync("apps/api/src/db/migrations")
   .filter((x) => x.endsWith(".sql"))
   .sort()) {
+  if(file.startsWith("0021")) await db.exec("CREATE VIEW commercial_view_regression AS SELECT id,store_id FROM stock_items;");
   if (file.startsWith("0021") && process.env.MARTHI_TEST_PRISMA_SCHEMA === "1")
     await db.exec(`
    CREATE TYPE ticket_status AS ENUM ('open','sold','cancelled');

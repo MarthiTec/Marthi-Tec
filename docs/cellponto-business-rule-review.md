@@ -30,7 +30,7 @@ As telas novas usam a API autenticada e a conexão PostgreSQL existente. Não h�
 
 ## Banco e compatibilidade
 
-O Studio do Discloud foi consultado após a ativação do plano Ruby. A estrutura real diverge da instalação criada pelas migrações: vendas utilizam status `sold`, campos canônicos `amount/payment/product_name`, pagamentos possuem `method_name/type`, e faltavam colunas de compatibilidade e saldo de conta. A migração 0024 preserva essas colunas, reconstrói saldo apenas quando a coluna não existe e acrescenta tabelas comerciais e restrições por loja. As migrações 0021 a 0023 também precisam estar aplicadas; o processo de inicialização executa as pendentes.
+O Studio do Discloud foi consultado após a ativação do plano Ruby. A estrutura real diverge da instalação criada pelas migrações: vendas utilizam status `sold`, campos canônicos `amount/payment/product_name`, pagamentos possuem `method_name/type`, e faltavam colunas de compatibilidade e saldo de conta. A migração 0024 preserva essas colunas, reconstrói saldo apenas quando a coluna não existe e acrescenta tabelas comerciais e restrições por loja. A migração 0021 foi corrigida para criar proteções somente em tabelas reais, pois `products` é uma view no banco de produção. A inicialização deixou de executar limpezas e preenchimentos fixos de clientes e estoque de demonstração. As migrações 0021 a 0023 também precisam estar aplicadas; o processo de inicialização executa as pendentes.
 
 Não inserir dados comerciais de teste em produção nem ativar o perfil de uma loja sem revisão de suas próprias regras.
 
