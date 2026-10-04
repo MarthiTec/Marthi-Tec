@@ -33,8 +33,8 @@ Esta revisão cobre o inventário estático de 131 páginas e os pontos de persi
 | Cardápio, mesas e cozinha | Ainda usam armazenamento local e mesas/configurações iniciais de protótipo. O cardápio público não resolve corretamente um catálogo por loja/slug. Migrar isso com pedidos públicos, preços calculados no servidor, reservas e fila compartilhada exige uma alteração maior que o escopo de preservar a lógica atual. Não estão certificados como operacionais entre dispositivos. |
 | Hardware do caixa | Balança/gaveta exigem conexão real. Ausência de leitura não cria peso; mensagem da gaveta não afirma acionamento. |
 | Rascunhos offline | Contagem ativa e carrinho continuam locais para operação offline; relatórios finalizados, ajustes e vendas são fluxos distintos. A sincronização de rascunhos entre dispositivos não foi implementada neste lote. |
-| Ambiente e credenciais legadas | Existem defaults sensíveis de configuração no backend legado. Removê-los requer confirmar e configurar variáveis do ambiente de hospedagem para não interromper o serviço. Credenciais não são incluídas neste relatório. |
+| Ambiente e credenciais legadas | A presença de DATABASE_URL e JWT_SECRET foi conferida nas variáveis do Discloud. Defaults sensíveis foram retirados do código: a conexão usa variáveis do ambiente e JWT_SECRET é obrigatório. Credenciais não são incluídas neste relatório. |
 
 ## Publicação
 
-O repositório continua sendo `MarthiTec/Marthi-Tec`, conforme solicitado. O commit deste lote deve usar autoria Marcalinfo. Merge e aplicação das novas migrações em produção devem ser confirmados separadamente; a compilação local não comprova publicação.
+O repositório continua sendo `MarthiTec/Marthi-Tec`, conforme solicitado. O commit deste lote deve usar autoria Marcalinfo. O lote principal foi integrado no PR #7. Publicação e aplicação das migrações em produção são verificações separadas; a compilação local não comprova publicação. No Discloud, os logs confirmaram a aplicação de 0026–0031 com sucesso e a conexão com MarthiDB após o rebuild do lote principal.

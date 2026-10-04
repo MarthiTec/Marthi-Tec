@@ -35,12 +35,6 @@ function buildPoolConfig(): PoolConfig {
     };
   }
 
-  if (!env.DB_HOST || !env.DB_DATABASE) {
-    return {
-      connectionString: 'postgresql://MarthiTec:Marthi170926@marthitec216:5432/MarthiDB',
-      connectionTimeoutMillis: 8000,
-    };
-  }
 
   return {
     host: env.DB_HOST,
@@ -60,7 +54,7 @@ function buildPoolConfig(): PoolConfig {
 
 const poolConfig = buildPoolConfig();
 
-export const dbConfigured = true;
+export const dbConfigured = Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD));
 export const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
@@ -78,7 +72,7 @@ export async function checkDatabaseConnection(): Promise<{
   connected: boolean;
   error: string | null;
 }> {
-  if (!pool) {
+  if (!dbConfigured) {
     return {
       configured: false,
       connected: false,
@@ -89,13 +83,13 @@ export async function checkDatabaseConnection(): Promise<{
   try {
     await pool.query('SELECT 1');
     return {
-      configured: true,
+      configured: dbConfigured,
       connected: true,
       error: null,
     };
   } catch (error) {
     return {
-      configured: true,
+      configured: dbConfigured,
       connected: false,
       error: publicDbError(error),
     };
