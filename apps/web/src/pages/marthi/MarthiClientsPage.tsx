@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CompanyUserSummary } from '../../components/CompanyUserSummary';
 import { CrudNameButton, CrudRowActions } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
@@ -667,6 +668,8 @@ export function MarthiClientsPage() {
       ) : null}
 
       {/* Modal Edição de Cliente */}
+      <CompanyUserSummary />
+
       {editing ? (
         <div className="marthi-modal-backdrop" onClick={() => { setEditing(null); setFormError(null); }}>
           <div
