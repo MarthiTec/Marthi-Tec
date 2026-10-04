@@ -335,7 +335,7 @@ export function MultiStoreManagementPage() {
             </button>
           </div>
 
-          <div className="multi-store-table-container">
+          <div className="multi-store-table-container admin-table-container">
             <table className="multi-store-table">
               <thead>
                 <tr>
@@ -519,7 +519,7 @@ export function MultiStoreManagementPage() {
               <p>Cada CNPJ/filial possui sua própria licença com garantia de isolamento operacional.</p>
             </div>
 
-            <div className="multi-store-table-container">
+            <div className="multi-store-table-container admin-table-container">
               <table className="multi-store-table">
                 <thead>
                   <tr>
@@ -789,7 +789,7 @@ export function MultiStoreManagementPage() {
                 <h4 style={{ margin: '0 0 10px', fontSize: '0.9rem', color: 'var(--admin-text)' }}>
                   Auditoria de Replicações Realizadas:
                 </h4>
-                <div className="multi-store-table-container">
+                <div className="multi-store-table-container admin-table-container">
                   <table className="multi-store-table" style={{ fontSize: '0.82rem' }}>
                     <thead>
                       <tr>

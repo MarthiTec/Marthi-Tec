@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -91,17 +92,14 @@ const paymentConfirmSchema = z.object({
   notes: z.string().optional(),
 });
 
-function calculatePlanAmount(planId: string): number {
-  switch (planId) {
-    case 'golden':
-    case 'scale':
-      return 597;
-    case 'silver':
-    case 'growth':
-      return 497;
-    default:
-      return 197;
-  }
+async function calculatePlanAmount(planId: string, modules: string[]): Promise<number> {
+  const id = planId === 'scale' ? 'golden' : planId === 'growth' ? 'silver' : planId === 'start' ? 'bronze' : planId;
+  const result = await pool.query('SELECT settings FROM platform_commercial_plans WHERE id=$1', [id]);
+  const plan = result.rows[0]?.settings;
+  if (!plan || plan.active === false) throw Object.assign(new Error('Plano indisponível para contratação.'), { status: 409 });
+  if (!Number.isFinite(plan.priceNumeric) || plan.priceNumeric < 0) throw Object.assign(new Error('Preço do plano inválido no catálogo.'), { status: 409 });
+  if (plan.allModules !== true && modules.length > plan.maxModules) throw Object.assign(new Error('Quantidade de módulos excede o limite do plano contratado.'), { status: 400 });
+  return plan.priceNumeric;
 }
 
 function planDisplayName(planId: string): string {
@@ -130,9 +128,6 @@ function resolveRequestFrontendUrl(req: any): string {
   return env.FRONTEND_URL || 'https://marthi-totem.discloud.dev';
 }
 
-// In-memory store de fallback para contratações
-const signupsStore = new Map<string, PartnerSignupRecord>();
-const processedTransactions = new Set<string>();
 
 /**
  * 1. Conclusão da Contratação
@@ -177,21 +172,13 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
     }
   }
 
-  if (!existingId) {
-    for (const [id, item] of signupsStore.entries()) {
-      if (
-        item.email.toLowerCase() === normEmail ||
-        item.document.replace(/\D/g, '') === cleanDoc
-      ) {
-        existingId = id;
-        break;
-      }
-    }
+  if (existingId) {
+    res.status(409).json({ success:false, error:{ code:'SIGNUP_EXISTS', message:'Já existe uma contratação para esses dados. Consulte a equipe Marthi para acompanhar ou alterar o cadastro.' } });
+    return;
   }
-
-  const id = existingId || `PRT-${Date.now().toString(36).toUpperCase()}`;
+  const id = `PRT-${randomUUID()}`;
   const now = new Date().toISOString();
-  const monthlyAmount = calculatePlanAmount(data.planId);
+  const monthlyAmount = await calculatePlanAmount(data.planId, data.modules);
 
   const initialStatus: ContractingStatus = 'aguardando_pagamento';
 
@@ -200,10 +187,9 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
     id,
     status: initialStatus,
     monthlyAmount,
-    createdAt: signupsStore.get(id)?.createdAt || now,
+    createdAt: now,
     updatedAt: now,
     auditTrail: [
-      ...(signupsStore.get(id)?.auditTrail || []),
       {
         status: 'contratacao_iniciada',
         timestamp: now,
@@ -212,14 +198,11 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
       {
         status: initialStatus,
         timestamp: now,
-        detail: data.payNow
-          ? `Pagamento processado imediatamente via ${data.paymentMethod}`
-          : 'Aguardando confirmação de pagamento pelo gateway/PIX',
+        detail: 'Aguardando confirmação de pagamento; a preferência informada não confirma a cobrança.',
       },
     ],
   };
 
-  signupsStore.set(id, record);
 
   // Persiste no PostgreSQL partner_signups
   if (pool) {
@@ -355,7 +338,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
     const lookupEmail = (body.email || (protocol.includes('@') ? protocol : '')).trim().toLowerCase();
     const lookupDoc = (body.document || protocol).replace(/\D/g, '');
 
-    // 1. Busca registro no DB ou em memória
+    // 1. Busca a contratação no MarthiDB
     let record: PartnerSignupRecord | null = null;
 
     if (pool) {
@@ -414,23 +397,6 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
     }
 
     // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
-    const txKey = body.transactionRef ? `${record.id}:${body.transactionRef}` : `${record.id}:paid`;
-    if (record.status === 'acesso_ativado' && processedTransactions.has(txKey)) {
-      console.log(`[partners] Pagamento já processado para protocolo ${record.id} (idempotência preservada)`);
-      res.json({
-        success: true,
-        data: {
-          id: record.id,
-          status: record.status,
-          alreadyProcessed: true,
-          message: 'Pagamento já havia sido confirmado anteriormente. Nenhuma ação duplicada realizada.',
-        },
-      });
-      return;
-    }
-
-    processedTransactions.add(txKey);
-
     // 3. Executa a ativação completa
     const act = await executePaymentActivation(record, body.paymentMethod, body.transactionRef, body.notes, frontendUrl);
 
@@ -440,7 +406,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
         id: record.id,
         status: record.status,
         activationToken: act.rawToken,
-        message: 'Pagamento confirmado com sucesso! E-mails de boas-vindas e notificação interna enviados.',
+        message: 'Pagamento confirmado no MarthiDB. O envio do acesso depende da configuração de e-mail.',
       },
     });
   } catch (error) {
@@ -460,7 +426,7 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) =
     try {
       const dbRes = await pool.query(
         `SELECT * FROM partner_signups
-         WHERE id = $1 OR lower(email) = lower($1) OR regexp_replace(document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+         WHERE id = $1
          LIMIT 1`,
         [protocol],
       );
@@ -504,9 +470,6 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) =
     }
   }
 
-  if (!record) {
-    record = signupsStore.get(protocol) || null;
-  }
 
   if (!record) {
     res.status(404).json({
@@ -574,31 +537,7 @@ partnersRouter.get('/api/v1/partners/signup/pending', requireSession, requirePla
     }
   }
 
-  const items = Array.from(signupsStore.values())
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 100);
-
-  res.json({
-    success: true,
-    data: {
-      count: items.length,
-      items: items.map((item) => ({
-        id: item.id,
-        createdAt: item.createdAt,
-        planId: item.planId,
-        planName: planDisplayName(item.planId),
-        modules: item.modules,
-        tradeName: item.tradeName,
-        legalName: item.legalName,
-        email: item.email,
-        phone: item.phone,
-        status: item.status,
-        monthlyAmount: item.monthlyAmount,
-        city: item.city,
-        state: item.state,
-      })),
-    },
-  });
+  throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
   } catch (error) { next(error); }
 });
 
@@ -631,13 +570,15 @@ async function executePaymentActivation(
   });
 
   const storeId = `STR-${record.id}`;
-  const userId = `usr-${record.id}`;
+  let userId = `usr-${record.id}`;
 
   // 1. Vincula cliente, loja, licença e usuário no PostgreSQL
   if (pool) {
+    const db = await pool.connect();
     try {
+      await db.query('BEGIN');
       // 1.1 Contas de Clientes (Tenant Root)
-      const caRes = await pool.query(
+      const caRes = await db.query(
         `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), now())
          ON CONFLICT (document) DO UPDATE
@@ -657,7 +598,7 @@ async function executePaymentActivation(
       const actualAccountId = caRes.rows[0]?.id || record.id;
 
       // 1.2 Loja Matriz do Lojista
-      await pool.query(
+      await db.query(
         `INSERT INTO stores (
           id, client_account_id, trade_name, legal_name, document_type, document,
           email, phone, zip_code, street, number, complement, district, city, state,
@@ -676,43 +617,44 @@ async function executePaymentActivation(
           record.documentType,
           record.document,
           record.email,
-          record.phone || '(24) 99966-3631',
-          record.zipCode || '25800-000',
-          record.street || 'Rua Principal',
-          record.number || '100',
+          record.phone || '',
+          record.zipCode || '',
+          record.street || '',
+          record.number || '',
           record.complement || '',
-          record.district || 'Centro',
-          record.city || 'Três Rios',
-          record.state || 'RJ',
+          record.district || '',
+          record.city || '',
+          record.state || '',
         ],
       );
 
       // 1.3 Licença do Plano e Módulos
       const licenseModules = Array.isArray(record.modules) && record.modules.length > 0
         ? record.modules
-        : ['totem', 'os', 'erp', 'fiscal', 'ecommerce'];
+        : [];
+      if (!licenseModules.length || !record.planId) throw Object.assign(new Error('Contratação sem plano ou módulos definidos.'), { status: 409 });
 
-      await pool.query(
+      await db.query(
         `INSERT INTO store_licenses (
           id, client_account_id, store_id, plan_id, status, starts_at, expires_at,
           modules, final_price, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, 'active', now(), now() + interval '30 days',
-          $5::TEXT[], $6, now(), now()
+          (jsonb_populate_record(NULL::store_licenses, jsonb_build_object('modules', $5::jsonb))).modules, $6, now(), now()
         ) ON CONFLICT (store_id) DO UPDATE
-        SET plan_id = $4, modules = $5::TEXT[], status = 'active', updated_at = now()`,
+        SET plan_id = $4, modules = EXCLUDED.modules, status = 'active', updated_at = now()`,
         [
           `LIC-${record.id}`,
           actualAccountId,
           storeId,
-          record.planId || 'golden',
-          licenseModules,
-          record.monthlyAmount || 597,
+          record.planId,
+          JSON.stringify(licenseModules),
+          record.monthlyAmount,
         ],
       );
 
       // 1.4 Usuário Admin da Conta (Aguardando criação de senha segura)
-      await pool.query(
+      await db.query(
         `INSERT INTO users (
           id, client_account_id, email, name, provider, password_hash, global_role, active, created_at, updated_at
         ) VALUES (
@@ -726,16 +668,21 @@ async function executePaymentActivation(
         ],
       );
 
+      const actualOwner = await db.query('SELECT id,client_account_id FROM users WHERE lower(email)=lower($1) FOR UPDATE', [record.email]);
+      if (!actualOwner.rows[0] || actualOwner.rows[0].client_account_id !== actualAccountId) throw Object.assign(new Error('E-mail vinculado a outra conta.'), { status: 409 });
+      userId = actualOwner.rows[0].id;
       // 1.5 Vínculo do Usuário com a Loja Matriz em user_stores
-      await pool.query(
+      await db.query(
         `INSERT INTO user_stores (id, user_id, store_id, role, is_default, created_at)
          VALUES ('UST-' || $1 || '-' || $2, $1, $2, 'admin', true, now())
          ON CONFLICT (user_id, store_id) DO NOTHING`,
         [userId, storeId],
       );
+      await db.query('COMMIT');
     } catch (err) {
+      await db.query('ROLLBACK');
       throw err;
-    }
+    } finally { db.release(); }
   }
 
   record.status = 'cliente_criado';

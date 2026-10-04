@@ -1,0 +1,2702 @@
+{
+  "date": "2026-10-04",
+  "notice": "Inventário estático; flags são candidatos à revisão, não certificação visual nem evidência isolada de mock.",
+  "pages": [
+    {
+      "file": "apps/web/src/pages/AboutPage.tsx",
+      "module": "AboutPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 3,
+      "dataImports": [
+        "../data/companyContact"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AccessDeniedPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 3,
+      "dataImports": [
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AdminHomePage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpBootstrap",
+        "../../data/dashboardStats",
+        "../../data/financeBook",
+        "../../data/erpRegistry",
+        "../../data/operatorProfile",
+        "../../data/posQueueStore",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AdminLayout.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/erpRegistry",
+        "../../data/storePlan",
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AgendaPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AttributesPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 1,
+      "dataImports": [
+        "../../data/attributeStore",
+        "../../data/moduleCapabilities"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/AuditPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/auditLog",
+        "../../data/erpBootstrap"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/CardRatesPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 32,
+      "dataImports": [
+        "../../data/cardRatesStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/CfopPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalCatalog"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/CommercialPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 4,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/multiStoreStore",
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/CrmPanelPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/CustomersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 6,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/posQuotesStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/EcommercePanelPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/EmployeesPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/ErpPanelPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/boletoStore",
+        "../../data/erpUserPasswords",
+        "../../data/erpRegistry",
+        "../../data/financeBook"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/ExternalSalePage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 15,
+      "dataImports": [
+        "../../data/multiStoreStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/FinancePage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 7,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/auditLog",
+        "../../data/financeBook",
+        "../../data/erpRegistry",
+        "../../data/boletoStore",
+        "../../data/bankFinanceFiles"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/FiscalClassPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalCatalog"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/FiscalCstPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalTaxTables"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/FiscalIssuerPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalIssuerStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/FiscalPanelPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/GoalsManagementPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 24,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/HelpPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/companyContact",
+        "../../data/erpRegistry",
+        "../../data/operatorProfile"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/InvoicesPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/auditLog",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry",
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore",
+        "../../data/invoiceStore",
+        "../../data/fiscalTaxTables",
+        "../../data/fiscalCatalog",
+        "../../data/multiStoreStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/KitsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpBootstrap",
+        "../../data/fiscalCatalog"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/LotsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry",
+        "../../data/fiscalCatalog"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/ModuleLockedPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/catalog",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/OperationsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 1,
+      "dataImports": [
+        "../../data/operationsStore",
+        "../../data/multiStoreStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/OrdersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 5,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry",
+        "../../data/fiscalDocuments",
+        "../../data/storePlan",
+        "../../data/posQueueStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/PainelUsersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/PaymentsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/PermissionsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry",
+        "../../data/erpUserPasswords"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/PlanPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/catalog",
+        "../../data/erpRegistry",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/PosPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/posQueueStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/PriceTablesPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/ProfilePage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/QuotesManagementPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 3,
+      "dataImports": [
+        "../../data/posQuotesStore",
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/SalesGoalsReportPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 23,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/SellersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/StockPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 4,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/attributeStore",
+        "../../data/erpRegistry",
+        "../../data/fiscalCatalog",
+        "../../data/ecommerceStore",
+        "../../data/erpBootstrap",
+        "../../data/moduleCapabilities",
+        "../../data/operatorProfile",
+        "../../data/variantQuote",
+        "../../data/cardRatesStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/StoreSegmentPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/admin/SuppliersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/TotemInsightsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpBootstrap",
+        "../../data/posQueueStore",
+        "../../data/totemAnalyticsStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/TotemRigPreview.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 24,
+      "dataImports": [
+        "../../data/totemSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/TotemSettingsPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 8,
+      "dataImports": [
+        "../../data/multiStoreStore",
+        "../../data/totemSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/WarehousePage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpBootstrap",
+        "../../data/fiscalCatalog"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/WorkOrderDetailPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpRegistry",
+        "../../data/osStore",
+        "../../data/workshopLedger",
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/WorkOrderNewPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpRegistry",
+        "../../data/operatorProfile",
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/WorkOrderReportPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 4,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/admin/WorkOrdersPage.tsx",
+      "module": "admin",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 11,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/caixa/CaixaPage.tsx",
+      "module": "caixa",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 21,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/adminStore",
+        "../../data/posQueueStore",
+        "../../data/cashRegisterStore",
+        "../../data/cashSettings",
+        "../../data/erpRegistry",
+        "../../data/auditLog",
+        "../../data/promoCampaignStore",
+        "../../data/posQuotesStore",
+        "../../data/posDraftStore",
+        "../../data/fiscalDocuments",
+        "../../data/demoLeadStore",
+        "../../data/storePlan",
+        "../../data/totemSettings",
+        "../../data/kitchenOrderStore",
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/caixa/CaixaPanels.tsx",
+      "module": "caixa",
+      "nativeSelect": false,
+      "tables": 6,
+      "tableContainer": true,
+      "fixedColor": 18,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/posQueueStore",
+        "../../data/posQuotesStore",
+        "../../data/adminStore",
+        "../../data/canceledSalesStore",
+        "../../data/cashRegisterStore",
+        "../../data/cashSettings",
+        "../../data/erpRegistry",
+        "../../data/posDraftStore",
+        "../../data/fiscalDocuments",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/caixa/CaixaPaymentSplit.tsx",
+      "module": "caixa",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/cardapio/CardapioAdminPage.tsx",
+      "module": "cardapio",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 6,
+      "dataImports": [
+        "../../data/cardapioStore",
+        "../../data/adminStore",
+        "../../data/kitchenOrderStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/cardapio/CardapioPrintDisplay.tsx",
+      "module": "cardapio",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 3,
+      "dataImports": [
+        "../../data/cardapioStore",
+        "../../data/kitchenOrderStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/cardapio/CardapioPublicPage.tsx",
+      "module": "cardapio",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 14,
+      "dataImports": [
+        "../../data/cardapioStore",
+        "../../data/kitchenOrderStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ContactPage.tsx",
+      "module": "ContactPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 2,
+      "dataImports": [
+        "../data/companyContact",
+        "../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/cozinha/CozinhaPage.tsx",
+      "module": "cozinha",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/kitchenOrderStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmBoardPage.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmDealPage.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmInboxPage.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore",
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmLayout.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpRegistry",
+        "../../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmNetworkPage.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/crm/CrmProfilePage.tsx",
+      "module": "crm",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/crmStore",
+        "../../data/operatorProfile"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceChannelPage.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceConnectionsPage.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceHomePage.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceLayout.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceListingsPage.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ecommerce/EcommerceOrdersPage.tsx",
+      "module": "ecommerce",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/ecommerceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/ErpBoletosPage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/erp/ErpHomePage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/boletoStore",
+        "../../data/erpBootstrap",
+        "../../data/erpRegistry",
+        "../../data/dashboardStats",
+        "../../data/financeBook",
+        "../../data/stockLedger"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/ErpLayout.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpRegistry",
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/ErpReportsPage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpRegistry",
+        "../../data/financeBook",
+        "../../data/stockLedger"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/finance/FinanceHubPanels.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 5,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../../data/adminStore",
+        "../../../data/boletoStore",
+        "../../../data/bankFinanceFiles",
+        "../../../data/financeBook"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/MultiStoreManagementPage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 3,
+      "tableContainer": true,
+      "fixedColor": 16,
+      "dataImports": [
+        "../../data/multiStoreStore",
+        "../../data/storeSegment",
+        "../../data/storeReplicationStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/PromoCampaignsPage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 4,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpRegistry",
+        "../../data/promoCampaignStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockBalancePage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/fiscalCatalog",
+        "../../data/financeBook",
+        "../../data/operatorProfile",
+        "../../data/stockInventoryStore",
+        "../../data/stockLedger"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockExcelImportModal.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 4,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockFinalizeModal.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockInventoryActiveView.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 14,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockInventoryHistoryView.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 25,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockItemHistoryModal.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 11,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockManualSearchModal.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 7,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockMovementsPage.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/financeBook",
+        "../../data/stockLedger"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/erp/StockTxtImportModal.tsx",
+      "module": "erp",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 5,
+      "dataImports": [
+        "../../data/stockInventoryStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/fiscal/FiscalCtePage.tsx",
+      "module": "fiscal",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/fiscal/FiscalHomePage.tsx",
+      "module": "fiscal",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalIssuerStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/fiscal/FiscalLayout.tsx",
+      "module": "fiscal",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpRegistry"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/fiscal/FiscalMdfePage.tsx",
+      "module": "fiscal",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/fiscal/FiscalNfsePage.tsx",
+      "module": "fiscal",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/fiscalDocuments",
+        "../../data/fiscalIssuerStore",
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/HomePage.tsx",
+      "module": "HomePage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../data/catalog",
+        "../data/plansStore",
+        "../data/marthiProducts",
+        "../data/demoLeadStore",
+        "../data/companyContact",
+        "../data/crmStore",
+        "../data/storePlan",
+        "../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/LoginPage.tsx",
+      "module": "LoginPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 4,
+      "dataImports": [
+        "../data/crmStore",
+        "../data/erpRegistry",
+        "../data/marthiClientsStore",
+        "../data/marthiStaff"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiClientsPage.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 2,
+      "tableContainer": true,
+      "fixedColor": 21,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/catalog",
+        "../../data/financeBook",
+        "../../data/marthiClientsStore",
+        "../../data/presenceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiDashboardPage.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 3,
+      "dataImports": [
+        "../../data/financeBook",
+        "../../data/marthiClientsStore",
+        "../../data/presenceStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiDiscountsPage.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 7,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/multiStoreStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiLayout.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/marthiStaff"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiPayoutSettingsPage.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/paymentSettingsStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/marthi/MarthiPlansPage.tsx",
+      "module": "marthi",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 2,
+      "dataImports": [
+        "../../data/auditLog",
+        "../../data/plansStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/mesa/MesaPage.tsx",
+      "module": "mesa",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 4,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/kitchenOrderStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsBacklogView.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 6,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsCommercialPrintView.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/osPrintSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsCreatedShareModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 1,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/adminStore",
+        "../../data/companyContact"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsDashboardView.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 20,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsDetailModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": true,
+      "fixedColor": 37,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/storeSegment",
+        "../../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsEcosystemMenu.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 9,
+      "dataImports": [
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsLayout.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/erpRegistry",
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsNewModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 2,
+      "dataImports": [
+        "../../data/adminStore",
+        "../../data/erpRegistry",
+        "../../data/osStore",
+        "../../data/storeSegment"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsPanels.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsPrintModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": false,
+      "fixedColor": 7,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/storeSegment",
+        "../../data/osPrintSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsPrintSettingsDrawer.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 1,
+      "dataImports": [
+        "../../data/osPrintSettings",
+        "../../data/totemSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsProductQuickModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 12,
+      "dataImports": [
+        "../../data/adminStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsQuickDrawer.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 2,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsSimplifiedCheckoutModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 57,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/companyContact"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsSprintModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsTechnicianRoadmap.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 7,
+      "dataImports": [
+        "../../data/osStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/OsWarrantyModal.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": false,
+      "fixedColor": 6,
+      "dataImports": [
+        "../../data/osStore",
+        "../../data/osPrintSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/os/PainelOsRedirect.tsx",
+      "module": "os",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/PanelPage.tsx",
+      "module": "PanelPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/PartnerSignupPage.tsx",
+      "module": "PartnerSignupPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 8,
+      "dataImports": [
+        "../data/catalog",
+        "../data/demoLeadStore",
+        "../data/storePlan",
+        "../data/storeSegment",
+        "../data/multiStoreStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/PlansPublicPage.tsx",
+      "module": "PlansPublicPage.tsx",
+      "nativeSelect": false,
+      "tables": 1,
+      "tableContainer": false,
+      "fixedColor": 5,
+      "dataImports": [
+        "../data/catalog",
+        "../data/plansStore",
+        "../data/companyContact"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ProductsPage.tsx",
+      "module": "ProductsPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 1,
+      "dataImports": [
+        "../data/marthiProducts",
+        "../data/demoLeadStore",
+        "../data/companyContact",
+        "../data/crmStore",
+        "../data/storePlan"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/ResetPasswordPage.tsx",
+      "module": "ResetPasswordPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 14,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/SetupPasswordPage.tsx",
+      "module": "SetupPasswordPage.tsx",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 16,
+      "dataImports": [
+        "../data/marthiClientsStore"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/shared/OperatorAccountPage.tsx",
+      "module": "shared",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/totem/ProductCarousel.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/totem/TotemAttractScene.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/totemSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/totem/TotemFooter.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": [
+        "../../data/companyContact"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/totem/TotemKeyboard.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    },
+    {
+      "file": "apps/web/src/pages/totem/TotemPage.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 5,
+      "dataImports": [
+        "../../data/attributeStore",
+        "../../data/totemLiveSync",
+        "../../data/totemSpeech",
+        "../../data/totemSettings",
+        "../../data/totemTicketPrint",
+        "../../data/totemAnalyticsStore",
+        "../../data/variantQuote"
+      ]
+    },
+    {
+      "file": "apps/web/src/pages/totem/TotemPicker.tsx",
+      "module": "totem",
+      "nativeSelect": false,
+      "tables": 0,
+      "tableContainer": false,
+      "fixedColor": 0,
+      "dataImports": []
+    }
+  ],
+  "stores": [
+    {
+      "file": "apps/web/src/data/adminStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "isWeighedUnit",
+        "normalizeSaleQty",
+        "stockItemImages",
+        "clearStockMocks",
+        "defaultCardRate",
+        "replaceAdminState",
+        "getAdminState",
+        "invalidateAdminMemory",
+        "applyPriceTable",
+        "findStockByCode",
+        "adjustStockQty",
+        "searchOrders",
+        "getOrderById",
+        "attachOrderCashSession",
+        "updatePosSaleOrder",
+        "cancelPosSaleOrder",
+        "restorePosSaleOrder",
+        "upsertCustomer",
+        "removeCustomer",
+        "removeStockItem",
+        "removePriceTable",
+        "removePayment",
+        "saveStock",
+        "upsertStockItem",
+        "savePriceTables",
+        "savePayments",
+        "closeSale",
+        "closePosSale",
+        "cancelSalesOrder",
+        "addFinance",
+        "findStockMatches",
+        "getStockItem",
+        "parsePriceLabel"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/attributeStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "seedAttributes",
+        "clearAttributes",
+        "replaceAttributes",
+        "hydrateAttributesFromApi",
+        "getAttributes",
+        "createAttribute",
+        "updateAttribute",
+        "saveAttributes",
+        "removeAttribute",
+        "totemAttributes",
+        "totemFilterAttributes",
+        "stockAttributes",
+        "productAttrValues",
+        "resolveTotemAttrOptions",
+        "totemCardAttributes",
+        "toLegacyFields",
+        "formatPicked"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/auditLog.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceAuditLog",
+        "hydrateAuditFromApi",
+        "listAuditEntries",
+        "logAudit",
+        "logAccess",
+        "logAction",
+        "clearAuditLog"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/bankFinanceFiles.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "getBankFileConfig",
+        "saveBankFileConfig",
+        "listRemessas",
+        "listRetornos",
+        "listConciliation",
+        "conciliationSnapshot",
+        "createRemessaBatch",
+        "markRemessaSent",
+        "cancelRemessa",
+        "importRetornoBatch",
+        "markRetornoProcessed",
+        "addConciliationRow",
+        "matchConciliationRow",
+        "downloadTextFile"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/boletoStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "listBoletos",
+        "boletoSnapshot",
+        "createBoleto",
+        "attachBoletoToRemessa",
+        "listOpenBankBoletos",
+        "findBoletoByNossoNumero",
+        "markBoletoPaid",
+        "cancelBoleto"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/canceledSalesStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "purgeExpiredCanceledSales",
+        "registerCanceledSale",
+        "listCanceledSalesWithinWindow",
+        "getCanceledSale",
+        "removeCanceledSaleEntry",
+        "markCanceledSaleRestored",
+        "hoursLeftLabel"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/cardapioStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "getCardapioConfig",
+        "saveCardapioConfig",
+        "listCardapioItems",
+        "saveCardapioItems",
+        "addCardapioItem",
+        "updateCardapioItem",
+        "removeCardapioItem",
+        "reorderCardapioItems",
+        "importFromStock",
+        "listCardapioCategories",
+        "addCardapioCategory",
+        "listReservations",
+        "createReservation",
+        "cancelReservation",
+        "listClientOrders",
+        "getClientOrder",
+        "submitCardapioOrder"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/cardRatesStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "listCardMachines",
+        "getCardMachineById",
+        "getDefaultTotemMachine",
+        "saveCardMachine",
+        "saveAllCardMachines",
+        "deleteCardMachine",
+        "getTotemCardRate",
+        "calculateCardInstallment",
+        "calculateCardNetReceived",
+        "hydrateCardMachinesFromApi"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/cashRegisterStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getCashStorageKey",
+        "cashBeneficiaryLabel",
+        "replaceCashRegister",
+        "hydrateCashFromApi",
+        "refreshOpenCashSessionFromApi",
+        "getOpenCashSession",
+        "listCashSessions",
+        "getCashSession",
+        "listStoreCredits",
+        "listExchanges",
+        "openCashDrawer",
+        "openCashSession",
+        "addCashAporte",
+        "addCashSangria",
+        "deleteCashMovement",
+        "updateCashMovement",
+        "listCashMovements",
+        "registerCashSale",
+        "findCashSessionForOrder",
+        "issueStoreCredit",
+        "redeemStoreCredit",
+        "cancelStoreCredit",
+        "registerExchange",
+        "summarizeCashSession",
+        "closeCashSession",
+        "reopenCashSession"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/cashSettings.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getCashSettings",
+        "updateCashSettings",
+        "verifyDeleteItemPassword",
+        "getLastScaleKg",
+        "setLastScaleKg",
+        "readScaleKg",
+        "isAdHocEnabledForTerminal",
+        "setAdHocEnabledForTerminal",
+        "listTerminalAdHocConfigs"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/catalog.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "normalizePlanId",
+        "normalizeModuleId",
+        "isPlanId",
+        "getPlanById",
+        "getPlanModuleLimit",
+        "planIncludesAllModules"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/companyContact.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "marthiWhatsAppHref"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/crmStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceCrmState",
+        "hydrateCrmFromApi",
+        "refreshCrmLeadThreadFromApi",
+        "refreshCrmSellerMessagesFromApi",
+        "resetCrmMockLeads",
+        "listCrmLeads",
+        "getCrmLead",
+        "listCrmLeadsByStage",
+        "crmStageTotals",
+        "resolveCrmSeller",
+        "createCrmLead",
+        "ingestDemoLeadToCrm",
+        "ingestPartnerLeadToCrm",
+        "ingestContactLeadToCrm",
+        "ingestSellerApplicantToCrm",
+        "ingestContractInterestToCrm",
+        "claimCrmLead",
+        "canSellerAccessLeadChat",
+        "moveCrmLead",
+        "confirmCrmLeadPaidAsCustomer",
+        "closeCrmLeadAsCustomer",
+        "listCrmConvertedCustomers",
+        "getCrmSellerProfile",
+        "ensureCrmSellerProfile",
+        "saveCrmSellerProfile",
+        "listCrmPublicProfiles",
+        "listCrmWonLeads",
+        "updateCrmLeadValue",
+        "updateCrmLeadDetails",
+        "listCrmActivities",
+        "addCrmActivity",
+        "addCrmLeadNote",
+        "sellerPairKey",
+        "listLeadMessages",
+        "listSellerMessages",
+        "sendLeadMessage",
+        "postHomepageCrmChat",
+        "listCrmInboxThreads",
+        "crmInboxUnansweredCount",
+        "sendSellerMessage",
+        "whatsappHref"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/dashboardStats.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "getCachedDashboardSnapshot",
+        "replaceDashboardSnapshot",
+        "getDashboardSnapshot",
+        "hydrateDashboardFromApi"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/demoLeadStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "markStoreContracted",
+        "isStoreContracted",
+        "listDemoLeads",
+        "saveDemoLead",
+        "grantDemoAccess",
+        "enableLivePresentation",
+        "hasDemoAccess"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/ecommerceStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceEcommerceState",
+        "hydrateEcommerceFromApi",
+        "listEcommerceChannels",
+        "getEcommerceChannel",
+        "listEcommerceOrders",
+        "listEcommerceListings",
+        "ecommerceSnapshot",
+        "saveChannelCredentials",
+        "connectEcommerceChannel",
+        "disconnectEcommerceChannel",
+        "publishStockToChannel",
+        "pauseListing",
+        "removeListing",
+        "syncEcommerceChannel",
+        "syncStockItemToChannels",
+        "onStockChanged"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/erpBootstrap.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "getErpBootstrapState",
+        "bootstrapErpFromApi",
+        "refreshAdminSlices",
+        "refreshWorkOrders"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/erpRegistry.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "normalizeEmail",
+        "replaceErpRegistry",
+        "hydrateErpRegistryFromApi",
+        "getErpRegistry",
+        "listSellers",
+        "listSuppliers",
+        "listEmployees",
+        "getSeller",
+        "getSupplier",
+        "getEmployee",
+        "upsertSeller",
+        "upsertSupplier",
+        "removeSeller",
+        "removeSupplier",
+        "removeEmployee",
+        "upsertEmployee",
+        "findEmployeeByUserEmail",
+        "employeeHasArea",
+        "pathToAccessArea",
+        "userCanAccessArea",
+        "canAccessPath",
+        "moduleAreas",
+        "resolveAppHome",
+        "userIsStoreAdmin",
+        "userCanCancelSale",
+        "userCanCancelItem",
+        "userCanEdit",
+        "userCanDelete",
+        "userCanConfigureAdHoc",
+        "userCanLaunchAdHoc",
+        "navPathToAccessArea"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/erpUserPasswords.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "getErpUserPasswordHint",
+        "setErpUserPassword",
+        "clearErpUserPassword",
+        "verifyErpUserPassword"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/financeBook.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceFinanceBook",
+        "hydrateFinanceBookFromApi",
+        "getFinanceBook",
+        "listBankAccounts",
+        "listPayables",
+        "listReceivables",
+        "listTreasury",
+        "listAdvances",
+        "accountBalance",
+        "totalTreasury",
+        "payablesOpenTotal",
+        "receivablesOpenTotal",
+        "advancesOpenTotal",
+        "upsertBankAccount",
+        "upsertPayable",
+        "upsertReceivable",
+        "settlePayableDetailed",
+        "settlePayable",
+        "settleReceivableDetailed",
+        "settleReceivable",
+        "cancelBill",
+        "createTreasuryMove",
+        "createAdvance",
+        "applyAdvance",
+        "refundAdvance",
+        "buildDre",
+        "money",
+        "isOverdue"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/fiscalCatalog.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "listCfopsForKind",
+        "replaceWarehouseCatalog",
+        "replaceFiscalCatalogPartial",
+        "hydrateWarehouseCatalogFromApi",
+        "hydrateFiscalCatalogFromApi",
+        "listFiscalClassifications",
+        "getFiscalClassification",
+        "listCfops",
+        "listFecps",
+        "listWarehouses",
+        "listLots",
+        "listKits",
+        "listWarehouseMoves",
+        "upsertFiscalClassification",
+        "upsertCfop",
+        "upsertFecp",
+        "upsertWarehouse",
+        "createLot",
+        "upsertKit",
+        "createWarehouseMove"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/fiscalDocuments.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "listFiscalDocuments",
+        "getFiscalDocument",
+        "getFiscalDocumentForRef",
+        "getLatestFiscalDocumentForRef",
+        "cancelFiscalDocumentForSale",
+        "reprintFiscalDocument",
+        "emitNfeFromSale",
+        "emitSaleCheckoutDocument",
+        "emitNfseFromOs",
+        "formatNfsePortalSummary",
+        "transmitNfeForInvoice",
+        "consultNfeStatus",
+        "cancelNfeDocument",
+        "buildDanfeHtml",
+        "buildNfeXmlStub",
+        "buildNfseXmlStub",
+        "openDanfePreview",
+        "emitNfseStandalone",
+        "emitCteDocument",
+        "emitMdfeDocument"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/fiscalIssuerStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceFiscalIssuerSettings",
+        "replaceFiscalLogs",
+        "hydrateFiscalIssuerFromApi",
+        "getFiscalIssuerSettings",
+        "resolveFiscalPaths",
+        "saveFiscalIssuerSettings",
+        "applyRootPathCascade",
+        "clearCertificate",
+        "issuerIsReady",
+        "issuerIsReadyForNfe",
+        "issuerIsReadyForNfce",
+        "issuerIsReadyForNfse",
+        "issuerIsReadyForCte",
+        "issuerIsReadyForMdfe",
+        "readCertificateFile",
+        "listFiscalLogs",
+        "appendFiscalLog",
+        "downloadFiscalArtifact",
+        "archiveFiscalXml"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/fiscalTaxTables.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getPurposeLabel",
+        "getPurposeHint",
+        "defaultCfopForPurpose",
+        "replaceTaxTables",
+        "hydrateTaxTablesFromApi",
+        "getTaxTablesMeta",
+        "listFiscalCsts",
+        "listFiscalCClassTribs",
+        "upsertFiscalCst",
+        "upsertFiscalCClassTrib",
+        "syncTaxTablesFromGovApi",
+        "resetTaxTablesToSeed"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/invoiceStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceInvoices",
+        "hydrateInvoicesFromApi",
+        "listInvoices",
+        "getInvoice",
+        "invoiceItemsTotal",
+        "invoiceTotal",
+        "createInvoice",
+        "updateInvoiceDraft",
+        "addInvoiceLine",
+        "removeInvoiceLine",
+        "postInvoice",
+        "cancelInvoice",
+        "newInvoiceLineId"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/kitchenOrderStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "getKitchenState",
+        "listRestaurantTables",
+        "listKitchenOrders",
+        "getKitchenOrder",
+        "getTable",
+        "enqueueKitchenOrder",
+        "updateKitchenStatus",
+        "seatTable",
+        "reserveTable",
+        "unreserveTable",
+        "clearTable",
+        "resetKitchenDemo",
+        "kitchenOrderElapsed",
+        "formatElapsed"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/marthiClientsStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "generateClientAccessToken",
+        "planMonthlyAmount",
+        "findClientByAccessToken",
+        "verifyClientLogin",
+        "listMarthiClients",
+        "hydrateMarthiClientsFromApi",
+        "regenerateClientAccessToken",
+        "getMarthiClient",
+        "upsertMarthiClient",
+        "deleteMarthiClient",
+        "listPotentialMatrixClients",
+        "getClientBranches",
+        "getClientMatrix",
+        "createMarthiClientWithSecureActivation",
+        "setMarthiClientStatus",
+        "setMarthiClientPaymentOk",
+        "identifyClientPaymentAndActivate",
+        "resendClientActivationEmail",
+        "forceClientPasswordReset",
+        "sendClientPhoneVerification",
+        "ingestPartnerSignupToMarthiClients",
+        "getMarthiDashboardMetrics",
+        "clientPresenceLabel",
+        "planLabel"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/marthiProducts.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "getMarthiProduct"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/marthiStaff.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "normalizeStaffEmail",
+        "isMarthiStaffEmail"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/moduleCapabilities.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "hasCapability",
+        "isTotemCatalogPath"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/multiStoreStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "generateStoreAccessToken",
+        "cleanLegacyMocks",
+        "resolveDefaultClientAccount",
+        "resolveDefaultStores",
+        "getClientAccount",
+        "saveClientAccount",
+        "listStores",
+        "getStoreById",
+        "getStoreAccessToken",
+        "regenerateStoreAccessToken",
+        "saveStore",
+        "deleteStore",
+        "getActiveStoreId",
+        "getActiveStore",
+        "setActiveStoreId",
+        "listDiscountRules",
+        "saveDiscountRules",
+        "deleteDiscountRule",
+        "resetDiscountRulesToDefault",
+        "getApplicableDiscountRule",
+        "calculateLicensingSummary",
+        "listStoreLicenses",
+        "recalculateAllStoreLicenses",
+        "syncBranchToMultiStore",
+        "removeBranchFromMultiStore",
+        "hydrateMultiStoreFromApi"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/operationsStore.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "listOperationShortcuts",
+        "operationStatusColor",
+        "upsertOperationShortcut",
+        "setOperationActive",
+        "deleteOperationShortcut",
+        "resetOperationShortcuts"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/operatorProfile.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getOperatorProfile",
+        "replaceOperatorProfileCache",
+        "patchOperatorProfileTheme",
+        "saveOperatorProfile",
+        "notifyProfileUpdated",
+        "profileInitials",
+        "resolveProfilePhoto",
+        "fileToProfilePhoto",
+        "fileToProductImage"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/osPrintSettings.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "getDefaultCompanyData",
+        "defaultOsPrintSettings",
+        "getOsPrintSettings",
+        "saveOsPrintSettings",
+        "useOsPrintSettings"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/osStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getOsStorageKey",
+        "listTechnicianInfos",
+        "getTechnicianByName",
+        "createDefaultOperation",
+        "listOperations",
+        "saveOperations",
+        "getActiveOperation",
+        "finishActiveOperation",
+        "buildDefaultChecklist",
+        "normalizeItemRefKey",
+        "normalizePhoneKey",
+        "partsTotalFromLines",
+        "replaceWorkOrders",
+        "listWorkOrders",
+        "getWorkOrder",
+        "createWorkOrder",
+        "updateWorkOrder",
+        "workOrderTotal",
+        "workOrderFinancialSummary",
+        "registerWorkOrderPayment",
+        "newWorkOrderLineId",
+        "draftQuote",
+        "sendQuote",
+        "approveQuote",
+        "rejectQuote",
+        "reopenQuote",
+        "fileToWorkOrderPhoto",
+        "addWorkOrderPhoto",
+        "removeWorkOrderPhoto",
+        "updateWorkOrderPhotoCaption",
+        "setChecklistItem",
+        "resetWorkOrderChecklist",
+        "checklistSummary",
+        "findWorkOrdersByItemRef",
+        "findWorkOrdersByCustomer",
+        "saveCustomerSignature",
+        "clearCustomerSignature",
+        "workOrderReadyDate",
+        "toDateKey",
+        "parseDateKey",
+        "startOfWeekMonday",
+        "addDays",
+        "listTechnicians",
+        "getAgendaWeek",
+        "listUnscheduledWorkOrders",
+        "listOverdueWorkOrders",
+        "setWorkOrderReadyDate",
+        "searchWorkOrders",
+        "workOrderPartsLines",
+        "workOrderLaborLines",
+        "workOrderShopDurationMs",
+        "formatDuration",
+        "workOrderExitAt",
+        "addWorkOrderComment",
+        "addWorkOrderAttachment",
+        "addWorkOrderWorklog",
+        "removeWorkOrderAttachment",
+        "toggleWorkOrderTimer",
+        "logWorkOrderActivity"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/panelThemeStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getPanelTheme",
+        "setPanelTheme",
+        "syncThemeForProfile",
+        "togglePanelTheme"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/paymentSettingsStore.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "getPayoutSettings",
+        "hydratePayoutSettings",
+        "updateBankAccount",
+        "validatePixKey",
+        "updatePixConfig"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/plansStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "getCommercialPlans",
+        "getCommercialPlanById",
+        "updateCommercialPlan",
+        "resetCommercialPlansToDefault"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/posDraftStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "generateSaleLocalId",
+        "getPosTerminalId",
+        "setPosTerminalId",
+        "saveDraftSale",
+        "getDraftSale",
+        "listActiveDraftSales",
+        "getLatestActiveDraftSale",
+        "deleteDraftSale",
+        "clearCompletedDraftSale",
+        "cleanupOldDraftSales",
+        "enqueueOfflineOrder",
+        "listOfflineOrderQueue",
+        "dequeueOfflineOrder"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/posQueueStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "listQueueTickets",
+        "replaceQueueTickets",
+        "enqueueTotemLead",
+        "updateQueueTicket",
+        "ticketVariation",
+        "mergeQueueTickets",
+        "listOpenCashierTickets",
+        "markTicketImported"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/posQuotesStore.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "saveQuoteSettings",
+        "getQuoteSettings",
+        "isQuoteExpired",
+        "autoSyncExpiredQuotes",
+        "listPosQuotes",
+        "getPosQuote",
+        "createPosQuote",
+        "updatePosQuote",
+        "changeQuoteStatus",
+        "duplicatePosQuote",
+        "registerQuotePrint",
+        "markQuoteConverted",
+        "deletePosQuote",
+        "listQuotesForCustomer",
+        "getQuotesDashboardKpis"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/presenceStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "resolvePresenceUserKey",
+        "getPresence",
+        "listPresenceEntries",
+        "listTeamPresenceBoard",
+        "presenceStatusLabel",
+        "presenceDetailLabel",
+        "heartbeatPresence",
+        "setPresenceAvailability",
+        "markPresenceOffline",
+        "pruneStalePresence"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/promoCampaignStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "listPromoCampaigns",
+        "getPromoCampaign",
+        "upsertPromoCampaign",
+        "removePromoCampaign",
+        "findCampaignsForStock",
+        "applyTierTotal",
+        "evaluateCampaignForLine",
+        "hydratePromoCampaigns"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/stockInventoryStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "playInventoryBeep",
+        "recalculateBalanceMetrics",
+        "listStockBalances",
+        "getActiveStockBalance",
+        "getStockBalance",
+        "createStockBalance",
+        "findItemInBalance",
+        "recordCount",
+        "recordBatchCounts",
+        "setDirectCount",
+        "finalizeStockBalance",
+        "cancelStockBalance",
+        "reopenStockBalance",
+        "applyStockAdjustment",
+        "deleteStockBalance",
+        "duplicateStockBalance",
+        "updateStockBalanceMetadata",
+        "parseTxtContent",
+        "parseExcelBuffer",
+        "validateImportRows",
+        "formatDuration"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/stockLedger.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "listStockMovements",
+        "roundMoney",
+        "roundPct",
+        "stockMarkup",
+        "stockMargin",
+        "stockCostBase",
+        "stockBalanceStatus",
+        "stockInventoryValue",
+        "stockRetailValue",
+        "applyStockMovement",
+        "setStockQtyAbsolute",
+        "logStockMovements",
+        "stockBalanceSnapshot"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/storeCache.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "storeScopedKey"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/storePlan.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "clampModulesForPlan",
+        "defaultEntitlement",
+        "getStoreEntitlement",
+        "replaceStoreEntitlement",
+        "saveStoreEntitlement",
+        "hasModule",
+        "hasRetaguardaModule",
+        "hasPdvModule",
+        "hasOsModule",
+        "getWorkshopCheckoutMode",
+        "moduleForPath",
+        "planLabel"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/storeReplicationStore.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "getReplicationMetrics",
+        "getReplicationLogs",
+        "executeStoreReplication"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/storeSegment.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "defaultStoreCustomization",
+        "getStoreCustomization",
+        "saveStoreCustomization",
+        "applySegmentPreset",
+        "useStoreCustomization"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/tenantContext.ts",
+      "browserStorage": true,
+      "api": false,
+      "exports": [
+        "getActiveTenantKey",
+        "tenantScopedKey",
+        "isRealClientTenant"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/totemAnalyticsStore.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "replaceTotemAnalyticsSummary",
+        "hydrateTotemAnalyticsFromApi",
+        "trackTotemProductClick",
+        "listTotemClicks",
+        "getTotemClickRanking",
+        "getTotemBuyersToday",
+        "getTotemDayStats"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/totemLiveSync.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "notifyTotemLive",
+        "subscribeTotemLive"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/totemSettings.ts",
+      "browserStorage": true,
+      "api": true,
+      "exports": [
+        "defaultTotemSettings",
+        "verticalPreset",
+        "totemCopy",
+        "normalizeAttractLayout",
+        "normalizeKeyboardPlacement",
+        "normalizeColumns",
+        "normalizeVertical",
+        "normalizeHexColor",
+        "hexToRgbChannel",
+        "normalizeTotemSettings",
+        "getTotemSettings",
+        "getTotemExitPassword",
+        "effectiveGreeting",
+        "hydrateTotemSettingsFromApi",
+        "replaceTotemSettings",
+        "saveTotemSettings",
+        "invalidateTotemSettingsMemory",
+        "storeGreeting",
+        "fileToStoreLogo",
+        "fileToAttractBackground"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/totemSpeech.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "stopTotemSpeech",
+        "speakTotem"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/totemTicketPrint.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "ticketSenha",
+        "printWaitTicket"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/variantQuote.ts",
+      "browserStorage": false,
+      "api": false,
+      "exports": [
+        "formatInstallment",
+        "findStockVariant",
+        "quoteTotemVariant",
+        "quoteFromPicked"
+      ]
+    },
+    {
+      "file": "apps/web/src/data/workshopLedger.ts",
+      "browserStorage": false,
+      "api": true,
+      "exports": [
+        "consumeStockOnWorkOrder",
+        "removeWorkOrderLine",
+        "purchaseAssetFromWorkOrder",
+        "setAssetDisposition",
+        "deliverWorkOrder",
+        "cancelWorkOrderWithReversal"
+      ]
+    }
+  ]
+}

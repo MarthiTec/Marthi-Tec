@@ -163,7 +163,7 @@ export function HelpPage() {
       {tickets.length > 0 ? (
         <article className="admin-card">
           <h2>Pedidos recentes</h2>
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
             <thead>
               <tr>
                 <th>Quando</th>
@@ -180,7 +180,7 @@ export function HelpPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </article>
       ) : null}
 

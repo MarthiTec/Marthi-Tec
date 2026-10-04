@@ -113,8 +113,9 @@ export function QuotesManagementPage() {
     });
   }
 
-  function handleDuplicate(quote: PosQuote) {
-    const res = duplicatePosQuote(quote.id, operatorName);
+  async function handleDuplicate(quote: PosQuote) {
+    try {
+    const res = await duplicatePosQuote(quote.id, operatorName);
     if (res.ok) {
       setQuotes(listPosQuotes());
       setMessage(`Orçamento duplicado com sucesso! Nova proposta nº ${res.quote.quoteNumber}`);
@@ -123,10 +124,12 @@ export function QuotesManagementPage() {
       setError(res.error);
       setMessage('');
     }
+    } catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
-  function handleStatusChange(quote: PosQuote, newStatus: PosQuoteStatus) {
-    const res = changeQuoteStatus(quote.id, newStatus, operatorName);
+  async function handleStatusChange(quote: PosQuote, newStatus: PosQuoteStatus) {
+    try {
+    const res = await changeQuoteStatus(quote.id, newStatus, operatorName);
     if (res.ok) {
       setQuotes(listPosQuotes());
       setMessage(`Status do orçamento nº ${quote.quoteNumber} alterado para "${QUOTE_STATUS_LABEL[newStatus]}".`);
@@ -135,11 +138,13 @@ export function QuotesManagementPage() {
       setError(res.error);
       setMessage('');
     }
+    } catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
-  function handleDelete(quote: PosQuote) {
+  async function handleDelete(quote: PosQuote) {
     if (!window.confirm(`Tem certeza que deseja excluir o orçamento nº ${quote.quoteNumber}?`)) return;
-    const res = deletePosQuote(quote.id);
+    try {
+    const res = await deletePosQuote(quote.id);
     if (res.ok) {
       setQuotes(listPosQuotes());
       setMessage(`Orçamento nº ${quote.quoteNumber} excluído com sucesso.`);
@@ -148,13 +153,16 @@ export function QuotesManagementPage() {
       setError(res.error);
       setMessage('');
     }
+    } catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
-  function handleSaveSettings(e: React.FormEvent) {
+  async function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
-    saveQuoteSettings(settingsForm);
+    try {
+    await saveQuoteSettings(settingsForm);
     setSettingsOpen(false);
     setMessage('Configurações padrão de orçamentos salvas com sucesso.');
+    } catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
   return (

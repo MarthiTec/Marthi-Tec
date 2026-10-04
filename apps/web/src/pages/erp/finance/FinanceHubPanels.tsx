@@ -16,7 +16,6 @@ import {
   BOLETO_STATUS_LABEL,
   cancelBoleto,
   createBoleto,
-  findBoletoByNossoNumero,
   listBoletos,
   listOpenBankBoletos,
   markBoletoPaid,
@@ -32,12 +31,10 @@ import {
   createRemessaBatch,
   downloadTextFile,
   getBankFileConfig,
-  importRetornoBatch,
   listConciliation,
   listRemessas,
   listRetornos,
   markRemessaSent,
-  markRetornoProcessed,
   matchConciliationRow,
   addConciliationRow,
   REMESSA_STATUS_LABEL,
@@ -132,16 +129,7 @@ export function FinanceBoletosPanel({
 
   const detail = items.find((item) => item.id === detailId) ?? null;
 
-  function resetForm() {
-    setCustomerName('');
-    setCustomerDocument('');
-    setDescription('');
-    setAmount('');
-    setDueDate(defaultDue());
-    setReceivableId('');
-    setKind('bank');
-    setBankAccountId(config.defaultBankAccountId);
-  }
+
 
   function onCreate(event: FormEvent) {
     event.preventDefault();
@@ -158,20 +146,10 @@ export function FinanceBoletosPanel({
       onError('Selecione a conta bancária para o boleto.');
       return;
     }
-    const boleto = createBoleto({
-      kind,
-      customerName,
-      customerDocument,
-      description: description || BOLETO_KIND_LABEL[kind],
-      amount: value,
-      dueDate,
-      bankAccountId: bankAccountId || undefined,
-      receivableId: receivableId || undefined,
-    });
-    onMessage(`${BOLETO_KIND_LABEL[boleto.kind]} ${boleto.id} emitido.`);
-    resetForm();
-    setShowForm(false);
-    setDetailId(boleto.id);
+    try {
+      createBoleto({ kind, customerName, customerDocument, description, amount: value, dueDate,
+        bankAccountId: bankAccountId || undefined, receivableId: receivableId || undefined });
+    } catch (error) { onError(error instanceof Error ? error.message : 'Não foi possível emitir a cobrança.'); }
   }
 
   async function onPay(item: Boleto) {
@@ -327,7 +305,7 @@ export function FinanceBoletosPanel({
         {filtered.length === 0 ? (
           <p className="empty">Nenhum boleto encontrado.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -472,14 +450,15 @@ export function FinanceConciliacaoPanel({
 
   const visible = rows.filter((row) => (filter === 'all' ? true : row.status === filter));
 
-  function addRow(event: FormEvent) {
+  async function addRow(event: FormEvent) {
     event.preventDefault();
     const value = parseMoney(amount);
     if (!description.trim() || value <= 0) {
       onError('Informe descrição e valor do movimento bancário.');
       return;
     }
-    addConciliationRow({
+    try {
+    await addConciliationRow({
       bankAccountId: accountId,
       statementDate,
       description,
@@ -489,6 +468,7 @@ export function FinanceConciliacaoPanel({
     setDescription('');
     setAmount('');
     onMessage('Movimento do extrato bancário adicionado à conciliação.');
+    } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar conciliação.'); }
   }
 
   return (
@@ -574,7 +554,7 @@ export function FinanceConciliacaoPanel({
         {visible.length === 0 ? (
           <p className="empty">Nada nesta fila.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -610,12 +590,13 @@ export function FinanceConciliacaoPanel({
                               value: item.id,
                               label: `${item.type === 'in' ? '+' : '-'} ${money(item.amount)} · ${item.label.slice(0, 28)}`,
                             }))}
-                            onChange={(value) => {
-                              matchConciliationRow(row.id, {
+                            onChange={async (value) => { try {
+                              await matchConciliationRow(row.id, {
                                 status: 'matched',
                                 matchedFinanceId: value,
                               });
                               onMessage('Conciliado com lançamento do extrato.');
+ } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar.'); }
                             }}
                           />
                           <AdminPicker
@@ -627,20 +608,22 @@ export function FinanceConciliacaoPanel({
                               value: item.id,
                               label: `${item.id} · ${money(item.amount)}`,
                             }))}
-                            onChange={(value) => {
-                              matchConciliationRow(row.id, {
+                            onChange={async (value) => { try {
+                              await matchConciliationRow(row.id, {
                                 status: 'matched',
                                 matchedBoletoId: value,
                               });
                               onMessage('Conciliado com boleto.');
+ } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar.'); }
                             }}
                           />
                           <button
                             type="button"
                             className="btn btn--ghost"
-                            onClick={() => {
-                              matchConciliationRow(row.id, { status: 'ignored' });
+                            onClick={async () => { try {
+                              await matchConciliationRow(row.id, { status: 'ignored' });
                               onMessage('Movimento ignorado.');
+ } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar.'); }
                             }}
                           >
                             Ignorar
@@ -687,10 +670,10 @@ export function FinanceRemessaRetornoPanel({
     );
   }
 
-  function generateRemessa() {
+  async function generateRemessa() {
     try {
       const boletos = openBank.filter((item) => selected.includes(item.id));
-      const { batch, nossoNumeros } = createRemessaBatch({
+      const { batch, nossoNumeros } = await createRemessaBatch({
         bankAccountId: accountId,
         boletos: boletos.map((item) => ({
           id: item.id,
@@ -713,76 +696,11 @@ export function FinanceRemessaRetornoPanel({
 
   function onImportRetorno(event: FormEvent) {
     event.preventDefault();
-    const open = listOpenBankBoletos();
-    const suggested =
-      open.length > 0
-        ? open.slice(0, Math.min(5, open.length)).map((item) => ({
-            nossoNumero: item.nossoNumero || item.id.replace(/\D/g, '').slice(-8) || '00000001',
-            boletoId: item.id,
-            amount: item.amount,
-            occurrence: '06-Liquidação',
-          }))
-        : [
-            {
-              nossoNumero: '00000001',
-              amount: 100,
-              occurrence: '06-Liquidação (sem match)',
-            },
-          ];
-
-    // Se o texto tiver nosso número, tenta casar
-    const fromText = retornoText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const digits = line.replace(/\D/g, '');
-        const nn = digits.slice(-8) || digits;
-        const found = findBoletoByNossoNumero(nn);
-        return {
-          nossoNumero: nn || '00000000',
-          boletoId: found?.id,
-          amount: found?.amount ?? (parseMoney(line) || 0),
-          occurrence: '06-Liquidação',
-        };
-      })
-      .filter((item) => item.nossoNumero !== '00000000');
-
-    const batch = importRetornoBatch({
-      bankAccountId: accountId,
-      fileName: retornoName,
-      rawText: retornoText,
-      suggested: fromText.length ? fromText : suggested,
-    });
-    setRetornoName('');
-    setRetornoText('');
-    onMessage(
-      `Retorno ${batch.fileName} importado · ${batch.paidCount} liquidados · ${batch.unmatchedCount} sem match.`,
-    );
+    onError('A importação e baixa automática exigem um adaptador homologado para o banco. Nenhum pagamento foi registrado.');
   }
 
-  async function processRetorno(id: string) {
-    const batch = listRetornos().find((item) => item.id === id);
-    if (!batch) return;
-    let paid = 0;
-    for (const item of batch.items) {
-      if (!item.boletoId) continue;
-      const boleto = listBoletos().find((row) => row.id === item.boletoId);
-      if (!boleto || boleto.status !== 'open') continue;
-      markBoletoPaid(boleto.id);
-      if (boleto.receivableId) await settleReceivable(boleto.receivableId, boleto.amount);
-      void addFinance({
-        type: 'in',
-        amount: boleto.amount,
-        label: `Retorno ${batch.fileName} · ${boleto.id}`,
-        source: 'manual',
-      }).catch(() => {
-        /* ignore */
-      });
-      paid += 1;
-    }
-    markRetornoProcessed(id);
-    onMessage(`Retorno processado: ${paid} boleto(s) baixado(s).`);
+  async function processRetorno(_id: string) {
+    onError('Configure o adaptador bancário antes de processar retornos. Nenhum pagamento foi registrado.');
   }
 
   return (
@@ -812,7 +730,7 @@ export function FinanceRemessaRetornoPanel({
           {openBank.length === 0 ? (
             <p className="empty">Nenhum boleto bancário/híbrido em aberto.</p>
           ) : (
-            <div className="table-wrap" style={{ marginTop: 12 }}>
+            <div className="table-wrap admin-table-container" style={{ marginTop: 12 }}>
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -905,7 +823,7 @@ export function FinanceRemessaRetornoPanel({
         {remessas.length === 0 ? (
           <p className="empty">Nenhuma remessa gerada.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -942,9 +860,10 @@ export function FinanceRemessaRetornoPanel({
                           <button
                             type="button"
                             className="btn btn--ghost"
-                            onClick={() => {
-                              markRemessaSent(item.id);
+                            onClick={async () => { try {
+                              await markRemessaSent(item.id);
                               onMessage('Remessa marcada como enviada ao banco.');
+ } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar.'); }
                             }}
                           >
                             Enviada
@@ -954,9 +873,10 @@ export function FinanceRemessaRetornoPanel({
                           <button
                             type="button"
                             className="btn btn--ghost"
-                            onClick={() => {
-                              cancelRemessa(item.id);
+                            onClick={async () => { try {
+                              await cancelRemessa(item.id);
                               onMessage('Remessa cancelada.');
+ } catch (error) { onError(error instanceof Error ? error.message : 'Falha ao salvar.'); }
                             }}
                           >
                             Cancelar
@@ -977,7 +897,7 @@ export function FinanceRemessaRetornoPanel({
         {retornos.length === 0 ? (
           <p className="empty">Nenhum retorno importado.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1041,10 +961,12 @@ export function FinanceConfigPanel({
     setForm(saved);
   }, [saved.updatedAt]);
 
-  function onSave(event: FormEvent) {
+  async function onSave(event: FormEvent) {
     event.preventDefault();
-    saveBankFileConfig(form);
-    onMessage('Configurações de arquivos bancários salvas.');
+    try {
+      await saveBankFileConfig(form);
+      onMessage('Configurações de arquivos bancários salvas.');
+    } catch (error) { onMessage(error instanceof Error ? error.message : 'Falha ao salvar configurações.'); }
   }
 
   return (

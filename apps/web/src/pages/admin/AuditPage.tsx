@@ -87,7 +87,7 @@ export function AuditPage() {
       </article>
 
       <article className="admin-card">
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Quando</th>
@@ -121,7 +121,7 @@ export function AuditPage() {
               ))
             )}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </section>
   );

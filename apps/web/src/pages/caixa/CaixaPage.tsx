@@ -423,7 +423,10 @@ export function CaixaPage() {
 
   async function confirmCancelSale(event: FormEvent) {
     event.preventDefault();
-    if (!verifyDeleteItemPassword(cancelSalePassword)) {
+    let authorized = false;
+    try { authorized = await verifyDeleteItemPassword(cancelSalePassword); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível conferir autorização.'); return; }
+    if (!authorized) {
       setError('Senha administrativa / autorização incorreta.');
       return;
     }
@@ -1019,7 +1022,7 @@ export function CaixaPage() {
     let qtyAdd = qtyOverride ?? pendingQty ?? null;
     if (qtyAdd == null) {
       if (isWeighedUnit(unit) && getCashSettings().scaleEnabled) {
-        qtyAdd = readScaleKg() ?? 1;
+        qtyAdd = readScaleKg();
       } else {
         qtyAdd = 1;
       }
@@ -1035,6 +1038,10 @@ export function CaixaPage() {
       return;
     }
     const qtyAddRaw = resolveAddQty(item, qtyOverride);
+    if (qtyAddRaw == null || !Number.isFinite(qtyAddRaw) || qtyAddRaw <= 0) {
+      setError('Não há leitura válida da balança. Informe o peso medido para adicionar o produto.');
+      return;
+    }
     if (!isWeighedUnit(unit) && Math.abs(qtyAddRaw % 1) > 1e-9) {
       setError(`${item.name} é UN — quantidade deve ser inteira (ex.: 12*).`);
       return;
@@ -1166,10 +1173,13 @@ export function CaixaPage() {
     focusCode();
   }
 
-  function confirmDeleteLine(event: FormEvent) {
+  async function confirmDeleteLine(event: FormEvent) {
     event.preventDefault();
     if (!deletePrompt) return;
-    if (!verifyDeleteItemPassword(deletePassword)) {
+    let authorized = false;
+    try { authorized = await verifyDeleteItemPassword(deletePassword); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível conferir autorização.'); return; }
+    if (!authorized) {
       setError('Senha administrativa / autorização incorreta.');
       return;
     }
@@ -1340,7 +1350,8 @@ export function CaixaPage() {
         setLinkedOsId(null);
       }
       if (linkedQuoteId) {
-        void markQuoteConverted(linkedQuoteId, order?.id || '', user?.name || operatorName);
+        try { await markQuoteConverted(linkedQuoteId, order?.id || '', user?.name || operatorName); }
+        catch (error) { setError('Venda registrada, mas o vínculo com o orçamento não foi atualizado: ' + (error instanceof Error ? error.message : 'Atualize e confira o orçamento.')); }
         setLinkedQuoteId(null);
       }
       setLastOrderId(order?.id ?? null);
@@ -2315,7 +2326,7 @@ export function CaixaPage() {
               {pricedLines.length === 0 ? (
                 <p className="empty">Nenhum item. Escaneie ou use o estoque rápido.</p>
               ) : (
-                <table className="admin-table pdv__cart-table">
+                <div className="admin-table-container"><table className="admin-table pdv__cart-table">
                   <thead>
                     <tr>
                       <th>Produto</th>
@@ -2549,7 +2560,7 @@ export function CaixaPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </div>
           </article>

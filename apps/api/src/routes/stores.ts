@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, getPlanUserLimit } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireSession, requirePlatformAdmin, getPlanUserLimit } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const storesRouter = Router();
@@ -275,14 +275,19 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
           ],
         );
 
-        // Cria licença da filial com o desconto
-        const licId = `LIC-${id}`;
+        // A filial herda o plano e os módulos realmente contratados pela conta.
+        const license = await client.query(
+          `SELECT l.* FROM store_licenses l JOIN stores s ON s.id=l.store_id
+           WHERE l.client_account_id=$1 AND l.status='active' ORDER BY s.is_matrix DESC,l.created_at ASC LIMIT 1`, [clientAccountId],
+        );
+        if (!license.rows[0]) throw Object.assign(new Error('Conta sem licença ativa para cadastrar uma filial.'), { status: 409 });
+        const source = license.rows[0];
         await client.query(
-          `INSERT INTO store_licenses (
-            id, store_id, client_account_id, plan_id, modules, base_price, discount_percent, status
-          ) VALUES ($1, $2, $3, 'scale', ARRAY['totem', 'os', 'erp', 'fiscal']::module_id[], 597.00, $4, 'active')
-          ON CONFLICT (store_id) DO UPDATE SET discount_percent = $4, status = 'active'`,
-          [licId, id, clientAccountId, discount],
+          `INSERT INTO store_licenses(id,store_id,client_account_id,plan_id,modules,base_price,discount_percent,final_price,status)
+           SELECT $1,$2,$3,plan_id,modules,final_price,$4,round(final_price*(1-$4::numeric/100),2),'active'
+           FROM store_licenses WHERE id=$5
+           ON CONFLICT (store_id) DO UPDATE SET discount_percent=EXCLUDED.discount_percent, status='active'`,
+          [`LIC-${id}`,id,clientAccountId,discount,source.id],
         );
 
         await client.query('COMMIT');
@@ -502,19 +507,19 @@ const adminClientSchema = z.object({
   modules: z.array(z.string()).default(['totem', 'os', 'erp', 'fiscal', 'ecommerce']),
   status: z.enum(['active', 'blocked', 'inactive']).default('active'),
   paymentOk: z.boolean().default(true),
-  monthlyAmount: z.coerce.number().default(597),
+  monthlyAmount: z.coerce.number().nonnegative(),
   notes: z.string().optional().default(''),
   accessToken: z.string().optional(),
   parentClientId: z.string().optional().nullable(),
   branchName: z.string().optional(),
 });
 
-storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
+storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
     if (pool) {
       // 1. Busca contas de clientes existentes cruzadas com partner_signups para dados reais de pagamento/ativação
       const sql = `
-        SELECT c.*, 
+        SELECT c.*,
                s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
                l.plan_id, l.modules::text[] as modules, l.final_price,
                pc.confirmed_at as manual_confirmed_at, pc.contracting_status as manual_status,
@@ -635,7 +640,7 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
 
 });
 
-storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
+storesRouter.post('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminClientSchema.parse(req.body);
     const clientId = body.clientId || `CLI-${Date.now().toString(36).toUpperCase()}`;
@@ -714,7 +719,7 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
   }
 });
 
-storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
+storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const clientId = req.params.id;
     const body = adminClientSchema.partial().parse(req.body);
@@ -774,7 +779,7 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
   }
 });
 
-storesRouter.delete('/api/v1/admin/clients/:id', async (req, res, next) => {
+storesRouter.delete('/api/v1/admin/clients/:id', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const clientId = req.params.id;
     if (pool && clientId) {

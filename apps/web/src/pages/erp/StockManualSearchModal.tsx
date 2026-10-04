@@ -120,7 +120,7 @@ export function StockManualSearchModal({ balance, isOpen, onClose, onCountSaved 
                 />
               </label>
 
-              <div className="stock-inv-modal-table-box" style={{ maxHeight: '340px' }}>
+              <div className="stock-inv-modal-table-box admin-table-container" style={{ maxHeight: '340px' }}>
                 <table className="stock-inv-modal-table">
                   <thead>
                     <tr>

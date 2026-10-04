@@ -19,7 +19,6 @@ import {
   listSellerMessages,
   moveCrmLead,
   refreshCrmLeadThreadFromApi,
-  resetCrmMockLeads,
   sendLeadMessage,
   sendSellerMessage,
   updateCrmLeadValue,
@@ -327,15 +326,7 @@ export function CrmBoardPage() {
     }
   }
 
-  function reloadMocks() {
-    const result = resetCrmMockLeads();
-    flashOk(
-      result.added > 0
-        ? `${result.added} leads de demonstração adicionados ao funil.`
-        : 'Leads de demonstração já estavam no board.',
-    );
-    setTick((value) => value + 1);
-  }
+
 
   const boardStats = useMemo(() => {
     const pool = leads.filter((item) => !item.ownerSellerId).length;
@@ -446,9 +437,6 @@ export function CrmBoardPage() {
           <Link to="/crm/conversas" className="btn btn--ghost">
             Conversas{boardStats.inbox ? ` (${boardStats.inbox})` : ''}
           </Link>
-          <button type="button" className="btn btn--ghost" onClick={reloadMocks}>
-            Popular demos
-          </button>
         </div>
       </div>
 

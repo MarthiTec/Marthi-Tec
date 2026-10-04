@@ -229,7 +229,7 @@ export function FiscalCstPage() {
 
               <article className="admin-card">
                 <h2>cClassTrib deste CST</h2>
-                <table className="admin-table">
+                <div className="admin-table-container"><table className="admin-table">
                   <thead>
                     <tr>
                       <th>Código</th>
@@ -258,7 +258,7 @@ export function FiscalCstPage() {
                       ))
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </article>
 
               <article className="admin-card">

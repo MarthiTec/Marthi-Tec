@@ -145,7 +145,7 @@ export function WorkOrderReportPage() {
             <Row label="Peças" value={money(partsTotal)} />
             <Row label="Total" value={money(workOrderTotal(order))} />
             {partsLines.length > 0 ? (
-              <table className="admin-table os-report__parts">
+              <div className="admin-table-container"><table className="admin-table os-report__parts">
                 <thead>
                   <tr>
                     <th>Peça</th>
@@ -162,7 +162,7 @@ export function WorkOrderReportPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             ) : null}
           </section>
 
@@ -173,7 +173,7 @@ export function WorkOrderReportPage() {
 
           <section className="os-report__span">
             <h2>Checklist de inspeção</h2>
-            <table className="admin-table os-report__checklist">
+            <div className="admin-table-container"><table className="admin-table os-report__checklist">
               <thead>
                 <tr>
                   <th>Item</th>
@@ -190,7 +190,7 @@ export function WorkOrderReportPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
 
           {order.photos.length > 0 ? (

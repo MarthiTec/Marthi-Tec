@@ -849,7 +849,7 @@ export function WorkOrdersPage() {
       ) : viewMode === 'list' ? (
         <article className="admin-card os-table-wrap">
           <div className="os-table-scroll-container">
-            <table className="admin-table os-admin-table">
+            <div className="admin-table-container"><table className="admin-table os-admin-table">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -995,7 +995,7 @@ export function WorkOrdersPage() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </article>
       ) : quoteFilter === 'sent' ? (

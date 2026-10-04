@@ -5,7 +5,7 @@ import { PublicFooter } from '../components/public/PublicFooter';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import { PLANS, type PlanId } from '../data/catalog';
-import { getCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
+import { getCommercialPlans, hydrateCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
 import { MARTHI_PRODUCTS } from '../data/marthiProducts';
 import {
   enableLivePresentation,
@@ -131,6 +131,7 @@ export function HomePage() {
       setCommercialPlans(getCommercialPlans());
     }
     window.addEventListener('marthi-plan-updated', refresh);
+    void hydrateCommercialPlans().catch(() => { /* O catálogo permanece indisponível; não substituímos por preços inventados. */ });
     window.addEventListener(PLANS_UPDATED_EVENT, refreshPlans);
     window.addEventListener('storage', refresh);
     window.addEventListener('storage', refreshPlans);

@@ -1,6 +1,8 @@
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
+import { nestPost } from '../services/nestClient';
+import { getPosTerminalId } from './posDraftStore';
 /** Configurações locais do PDV / caixa. */
 
-const STORAGE_KEY = 'marthi.cash.settings.v1';
 const SCALE_LAST_KEY = 'marthi.cash.scale.lastKg';
 export const CASH_SETTINGS_EVENT = 'marthi-cash-settings';
 
@@ -21,6 +23,7 @@ export type CashSettings = {
   requirePasswordToDeleteItem: boolean;
   /** Senha usada na exclusão (somente admin configura). */
   deleteItemPassword: string;
+  deletePasswordConfigured?: boolean;
   /** Permite editar preço unitário no grid do PDV. */
   allowEditUnitPrice: boolean;
   /** Habilita módulo e ações de Orçamento na venda / PDV. */
@@ -40,62 +43,31 @@ const DEFAULTS: CashSettings = {
   printerEnabled: true,
   printerName: '',
   requirePasswordToDeleteItem: false,
-  deleteItemPassword: '1234',
+  deleteItemPassword: '',
   allowEditUnitPrice: false,
   enableQuotes: true,
   enableAdHocSales: true,
-  terminalAdHocSales: {
-    'CAIXA-01': true,
-    'CAIXA-02': false,
-    'CAIXA-03': true,
-  },
+  terminalAdHocSales: {},
 };
 
-let memory: CashSettings | null = null;
-
-function load(): CashSettings {
-  if (memory) return { ...memory };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<CashSettings>;
-      memory = { ...DEFAULTS, ...parsed };
-      return { ...memory };
-    }
-  } catch {
-    /* ignore */
-  }
-  memory = { ...DEFAULTS };
-  return { ...memory };
-}
-
-function save(next: CashSettings) {
-  memory = { ...next };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new Event(CASH_SETTINGS_EVENT));
-}
+function load(): CashSettings { return readModuleState('cash-settings', DEFAULTS); }
+async function save(next: CashSettings) { const saved = await saveModuleState('cash-settings', next); window.dispatchEvent(new Event(CASH_SETTINGS_EVENT)); return saved; }
 
 export function getCashSettings() {
   return load();
 }
 
-export function updateCashSettings(patch: Partial<CashSettings>) {
+export async function updateCashSettings(patch: Partial<CashSettings>) {
   const next = { ...load(), ...patch };
-  save(next);
-  return next;
+  return await save(next);
 }
 
-export function verifyDeleteItemPassword(password: string) {
-  const settings = load();
-  if (!settings.requirePasswordToDeleteItem) return true;
-  return password.trim() === settings.deleteItemPassword;
+export async function verifyDeleteItemPassword(password: string) {
+  const result = await nestPost<{ valid: boolean }>('/module-state/cash-settings/verify-password', { password });
+  return result.valid;
 }
 
-/** Última leitura da balança (kg) — mock / hardware via porta. */
+/** Última leitura informada pelo dispositivo (kg). */
 export function getLastScaleKg(): number | null {
   try {
     const raw = localStorage.getItem(SCALE_LAST_KEY);
@@ -119,17 +91,17 @@ export function setLastScaleKg(kg: number) {
 
 /**
  * Lê peso da balança quando habilitada.
- * Sem hardware: devolve a última leitura ou 0,250 kg de demo.
+ * Sem leitura real disponível: devolve null.
  */
 export function readScaleKg(): number | null {
   if (!load().scaleEnabled) return null;
-  return getLastScaleKg() ?? setLastScaleKg(0.25);
+  return getLastScaleKg();
 }
 
 /** Verifica se a Venda Avulsa está habilitada para o terminal/caixa informado */
 export function isAdHocEnabledForTerminal(terminalId?: string): boolean {
   const settings = load();
-  const tid = (terminalId || 'CAIXA-01').trim();
+  const tid = (terminalId || getPosTerminalId()).trim();
   if (settings.terminalAdHocSales && typeof settings.terminalAdHocSales[tid] === 'boolean') {
     return settings.terminalAdHocSales[tid];
   }
@@ -137,18 +109,18 @@ export function isAdHocEnabledForTerminal(terminalId?: string): boolean {
 }
 
 /** Altera a configuração de Venda Avulsa de um terminal e registra na auditoria */
-export function setAdHocEnabledForTerminal(
+export async function setAdHocEnabledForTerminal(
   terminalId: string,
   enabled: boolean,
   actor?: { name: string; email: string },
 ) {
-  const tid = terminalId.trim() || 'CAIXA-01';
+  const tid = terminalId.trim() || getPosTerminalId();
   const settings = load();
   const prevMap = settings.terminalAdHocSales || {};
   const prevStatus = isAdHocEnabledForTerminal(tid);
   const nextMap = { ...prevMap, [tid]: enabled };
 
-  updateCashSettings({
+  await updateCashSettings({
     terminalAdHocSales: nextMap,
   });
 
@@ -168,7 +140,7 @@ export function setAdHocEnabledForTerminal(
 /** Lista todos os terminais conhecidos e seus status de Venda Avulsa */
 export function listTerminalAdHocConfigs(): Array<{ terminalId: string; enabled: boolean }> {
   const settings = load();
-  const knownTerminals = ['CAIXA-01', 'CAIXA-02', 'CAIXA-03'];
+  const knownTerminals = [getPosTerminalId()];
   const map = settings.terminalAdHocSales || {};
   for (const tid of Object.keys(map)) {
     if (!knownTerminals.includes(tid)) {
@@ -181,3 +153,5 @@ export function listTerminalAdHocConfigs(): Array<{ terminalId: string; enabled:
   }));
 }
 
+
+export async function hydrateCashSettingsFromApi() { await loadModuleState('cash-settings', DEFAULTS); window.dispatchEvent(new Event(CASH_SETTINGS_EVENT)); }

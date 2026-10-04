@@ -397,7 +397,7 @@ export function FiscalIssuerPage() {
         {logs.length === 0 ? (
           <p className="empty">Nenhum evento ainda.</p>
         ) : (
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
             <thead>
               <tr>
                 <th>Quando</th>
@@ -416,7 +416,7 @@ export function FiscalIssuerPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </article>
 

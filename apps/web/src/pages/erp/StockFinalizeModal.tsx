@@ -18,14 +18,16 @@ export function StockFinalizeModal({ balance, isOpen, onClose, onFinalized }: Pr
 
   if (!isOpen) return null;
 
-  function handleConfirm() {
+  async function handleConfirm() {
     setIsSubmitting(true);
-    const result = finalizeStockBalance(balance.id, notes.trim());
+    try {
+    const result = await finalizeStockBalance(balance.id, notes.trim());
     if (result) {
       onFinalized(result);
       onClose();
     }
-    setIsSubmitting(false);
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'Não foi possível salvar a conferência.'); }
+    finally { setIsSubmitting(false); }
   }
 
   const hasPending = balance.pendingItems > 0;

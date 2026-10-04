@@ -383,7 +383,7 @@ export function ExternalSalePage() {
         <div
           style={{
             background: 'rgba(239, 68, 68, 0.15)',
-            color: '#f87171',
+            color: 'var(--external-danger)' ,
             border: '1px solid #ef4444',
             padding: '12px 16px',
             borderRadius: '8px',
@@ -535,7 +535,7 @@ export function ExternalSalePage() {
                   borderRadius: '6px',
                   padding: '10px 12px',
                   fontSize: '0.82rem',
-                  color: '#eab308',
+                  color: 'var(--external-warning)' ,
                   lineHeight: 1.45,
                   marginBottom: '12px',
                 }}
@@ -632,18 +632,18 @@ export function ExternalSalePage() {
             {lines.map((line, idx) => (
               <div
                 key={idx}
+                className="external-sale-line"
                 style={{
                   background: 'var(--card-2, #1c2430)',
                   border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
                   borderRadius: '8px',
                   padding: '12px',
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr)) 40px',
                   gap: '10px',
                   alignItems: 'end',
                 }}
               >
-                <div style={{ gridColumn: 'span 2' }}>
+                <div className="external-sale-wide-field">
                   <AdminPicker
                     label={`Produto #${idx + 1}`}
                     value={line.stockId || ''}
@@ -698,7 +698,7 @@ export function ExternalSalePage() {
                     className="admin-btn admin-btn--icon"
                     onClick={() => handleRemoveLine(idx)}
                     title="Remover Item"
-                    style={{ height: '38px', color: '#f87171' }}
+                    style={{ height: '38px', color: 'var(--external-danger)'  }}
                   >
                     🗑️
                   </button>
@@ -747,8 +747,8 @@ export function ExternalSalePage() {
 
           {hasTradeIn && (
             <div style={{ marginTop: '16px', borderTop: '1px solid var(--line, rgba(148, 163, 184, 0.22))', paddingTop: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                <div style={{ gridColumn: 'span 2' }}>
+              <div className="external-sale-trade-fields">
+                <div className="external-sale-wide-field">
                   <label className="admin-label">Aparelho Entregue pelo Cliente</label>
                   <input
                     type="text"
@@ -903,24 +903,24 @@ export function ExternalSalePage() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <span style={{ fontSize: '0.9rem' }}>🔒</span>
-                  <strong style={{ fontSize: '0.82rem', color: '#eab308' }}>
+                  <strong style={{ fontSize: '0.82rem', color: 'var(--external-warning)'  }}>
                     Informações Internas (Confidencial)
                   </strong>
                 </div>
-                <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '0.85rem' }}>
                   <div>
                     <span style={{ color: 'var(--mute)' }}>Custo:</span>{' '}
                     <strong>R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                   </div>
                   <div>
                     <span style={{ color: 'var(--mute)' }}>Lucro:</span>{' '}
-                    <strong style={{ color: '#4ade80' }}>
+                    <strong style={{ color: 'var(--external-success)'  }}>
                       R$ {grossProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </strong>
                   </div>
                   <div>
                     <span style={{ color: 'var(--mute)' }}>Margem:</span>{' '}
-                    <strong style={{ color: '#4ade80' }}>{marginPercent}%</strong>
+                    <strong style={{ color: 'var(--external-success)'  }}>{marginPercent}%</strong>
                   </div>
                 </div>
                 <small style={{ color: 'var(--mute)', display: 'block', marginTop: '2px', fontSize: '0.72rem' }}>
@@ -938,7 +938,7 @@ export function ExternalSalePage() {
                   fontSize: '1.05rem',
                   fontWeight: 700,
                   width: '100%',
-                  maxWidth: '280px',
+
                 }}
                 disabled={submitting || loading || !storeId || Boolean(savedSaleId)}
               >

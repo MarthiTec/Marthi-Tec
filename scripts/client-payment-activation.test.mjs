@@ -33,7 +33,7 @@ test('manual confirmation requires authenticated platform administrator',async()
 });
 test('confirmation survives re-reading and preserves store, plan, zero price and existing password',async()=>{
  const r=await confirm(input);assert.equal(r.status,200);assert.equal((await r.json()).data.status,'acesso_ativado');
- for(let i=0;i<2;i++){const all=await (await fetch(base+'/admin/clients')).json();const customer=all.data.find(x=>x.clientId==='customer');assert.equal(customer.paymentOk,true);assert.equal(customer.monthlyAmount,0);assert.equal(customer.passwordConfigured,true);}
+ for(let i=0;i<2;i++){const response=await fetch(base+'/admin/clients',{headers:{authorization:'Bearer '+admin}});assert.equal(response.status,200);const all=await response.json();const customer=all.data.find(x=>x.clientId==='customer');assert.equal(customer.paymentOk,true);assert.equal(customer.monthlyAmount,0);assert.equal(customer.passwordConfigured,true);}
  assert.equal((await query("SELECT count(*)::int n FROM stores WHERE client_account_id='customer'")).rows[0].n,1);
  const l=(await query("SELECT *,modules::text[] as modules FROM store_licenses WHERE client_account_id='customer'")).rows[0];assert.equal(l.plan_id,'bronze');assert.deepEqual(l.modules,['erp']);
  assert.equal((await query("SELECT password_hash FROM users WHERE id='user-customer'")).rows[0].password_hash,'salt:existing-hash');

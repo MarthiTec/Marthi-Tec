@@ -1,11 +1,11 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { hydrateCommercialPlans, getCommercialPlans } from '../data/plansStore';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { AdminPicker } from '../components/AdminPicker';
 import {
   BRAZIL_UFS,
   PARTNER_MODULES,
-  PLANS,
   getPlanById,
   getPlanModuleLimit,
   normalizePlanId,
@@ -16,19 +16,12 @@ import {
 import { submitPartnerSignup } from '../services/partners';
 import { lookupCnpjData } from '../services/cnpj';
 import { isValidCnpj, isValidCpf } from '../utils/documentUtils';
-import { markStoreContracted } from '../data/demoLeadStore';
-import { saveStoreEntitlement } from '../data/storePlan';
 import {
   SEGMENT_PRESETS,
   STORE_SEGMENT_OPTIONS,
-  applySegmentPreset,
   type SegmentPreset,
   type StoreSegmentId,
 } from '../data/storeSegment';
-import {
-  generateStoreAccessToken,
-  saveStore,
-} from '../data/multiStoreStore';
 import './partner-signup.css';
 
 type Step = 1 | 2 | 3 | 4;
@@ -135,6 +128,16 @@ function initialForm(planFromQuery: string | null): FormState {
 }
 
 export function PartnerSignupPage() {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { void hydrateCommercialPlans().then(rows => {
+    if (!rows.length) throw new Error('Não há planos disponíveis para contratação.');
+    setReady(true);
+  }).catch(error => setError(error instanceof Error ? error.message : 'Não foi possível carregar os planos.')); }, []);
+  if (!ready) return <div className="partner"><p role={error ? 'alert' : 'status'}>{error || 'Carregando planos disponíveis…'}</p><Link to="/">Voltar ao site</Link></div>;
+  return <PartnerSignupForm />;
+}
+function PartnerSignupForm() {
   const [params] = useSearchParams();
   const planFromQuery = params.get('plano');
   const goPayment = params.get('passo') === 'pagamento' || Boolean(normalizePlanId(planFromQuery));
@@ -144,10 +147,6 @@ export function PartnerSignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [protocol, setProtocol] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<'pix' | 'card'>('pix');
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
   const [cepStatus, setCepStatus] = useState<string | null>(null);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cnpjStatus, setCnpjStatus] = useState<{
@@ -155,8 +154,6 @@ export function PartnerSignupPage() {
     message: string;
   } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<StoreSegmentId>('assistencia_tecnica');
-  const [companyAccessToken, setCompanyAccessToken] = useState<string | null>(null);
-  const [tokenCopied, setTokenCopied] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
@@ -330,12 +327,7 @@ export function PartnerSignupPage() {
       }
       if (!form.contactName.trim()) return 'Informe o responsável pelo contato.';
     }
-    if (current === 4 && payMethod === 'card') {
-      if (!cardName.trim()) return 'Informe o nome no cartão.';
-      if (onlyDigits(cardNumber).length < 13) return 'Informe o número do cartão.';
-      if (onlyDigits(cardExpiry).length < 4) return 'Informe a validade (MM/AA).';
-      if (onlyDigits(cardCvv).length < 3) return 'Informe o CVV.';
-    }
+
     return null;
   }
 
@@ -369,11 +361,6 @@ export function PartnerSignupPage() {
     const imInfo = form.municipalRegistration.trim() ? `IM: ${form.municipalRegistration.trim()}` : '';
     const notesMerged = [form.notes.trim(), ieInfo, imInfo].filter(Boolean).join(' · ');
 
-    const txRef = `PAY-${Date.now().toString(36).toUpperCase()}`;
-
-    // Gera o Token de Acesso exclusivo para a empresa contratante
-    const generatedToken = generateStoreAccessToken(form.document, form.email);
-    setCompanyAccessToken(generatedToken);
 
     try {
       const result = await submitPartnerSignup({
@@ -398,59 +385,9 @@ export function PartnerSignupPage() {
         notes: notesMerged,
         payNow: false,
         paymentMethod: payMethod,
-        transactionRef: txRef,
       });
 
-      // Salva ou atualiza a loja matriz com seu Token de Acesso e Ramo configurados
-      saveStore({
-        code: '001',
-        name: form.legalName.trim(),
-        tradeName: form.tradeName.trim(),
-        cnpj: form.document.trim(),
-        stateRegistration: form.stateRegistration.trim(),
-        municipalRegistration: form.municipalRegistration.trim(),
-        accessToken: generatedToken,
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        zipCode: form.zipCode.trim(),
-        street: form.street.trim(),
-        number: form.number.trim(),
-        complement: form.complement.trim(),
-        neighborhood: form.district.trim(),
-        city: form.city.trim(),
-        state: form.state,
-        isMatrix: true,
-        segmentId: selectedSegment,
-      });
-
-      await saveStoreEntitlement({ planId: form.planId, modules: form.modules });
-      applySegmentPreset(selectedSegment);
-      markStoreContracted();
       setProtocol(result.id);
-      void import('../data/crmStore').then(({ ingestPartnerLeadToCrm }) => {
-        ingestPartnerLeadToCrm({
-          protocol: result.id,
-          tradeName: form.tradeName.trim() || form.legalName.trim(),
-          contactName: form.contactName.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-          planName: selectedPlan.name,
-        });
-      });
-      void import('../data/marthiClientsStore').then(({ ingestPartnerSignupToMarthiClients }) => {
-        ingestPartnerSignupToMarthiClients({
-          protocol: result.id,
-          tradeName: form.tradeName.trim() || form.legalName.trim(),
-          legalName: form.legalName.trim(),
-          document: form.document.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim(),
-          planId: form.planId,
-          modules: form.modules,
-          paymentOk: false,
-          notes: notesMerged || `Cadastro parceiro · ${selectedPlan.name}`,
-        });
-      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao processar contratação.');
     } finally {
@@ -487,55 +424,7 @@ export function PartnerSignupPage() {
           </div>
 
           {/* Card do Token de Acesso da Empresa */}
-          {companyAccessToken && (
-            <div
-              style={{
-                background: 'rgba(15, 23, 42, 0.75)',
-                border: '1px solid rgba(56, 189, 248, 0.4)',
-                borderRadius: '8px',
-                padding: '16px',
-                margin: '16px 0',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong style={{ color: '#38bdf8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  🔑 Token de Acesso da Empresa (CNPJ / E-mail)
-                </strong>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(companyAccessToken);
-                    setTokenCopied(true);
-                    setTimeout(() => setTokenCopied(false), 3000);
-                  }}
-                  className="btn btn--secondary"
-                  style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
-                >
-                  {tokenCopied ? '✓ Copiado!' : 'Copiar Token'}
-                </button>
-              </div>
-              <code
-                style={{
-                  display: 'block',
-                  background: '#090d16',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  color: '#4ade80',
-                  fontFamily: 'monospace',
-                  fontSize: '13px',
-                  letterSpacing: '0.5px',
-                  wordBreak: 'break-all',
-                }}
-              >
-                {companyAccessToken}
-              </code>
-              <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
-                Este token vincula os lançamentos dos módulos (Totem, Retaguarda, OS, PDV, Emissor Fiscal, E-commerce e Usuários)
-                às credenciais exclusivas da sua empresa.
-              </p>
-            </div>
-          )}
+          <p>O acesso será enviado ao e-mail cadastrado após a confirmação do pagamento.</p>
           <p className="partner__protocol" style={{ margin: '16px 0' }}>
             Protocolo da Contratação: <strong>{protocol}</strong>
           </p>
@@ -596,7 +485,7 @@ export function PartnerSignupPage() {
               já vem incluso em todos.
             </p>
             <div className="partner__plans">
-              {PLANS.map((plan) => (
+              {getCommercialPlans().map((plan) => (
                 <button
                   key={plan.id}
                   type="button"
@@ -992,8 +881,7 @@ export function PartnerSignupPage() {
           <section className="partner__section">
             <h1>Pagamento</h1>
             <p className="partner__lead">
-              Finalize a contratação do plano {selectedPlan.name}. Na demo o pagamento é simulado —
-              em produção cai no gateway.
+              Registre a contratação do plano {selectedPlan.name}. O acesso será liberado após a confirmação do pagamento.
             </p>
 
             <div className="partner__review">
@@ -1187,44 +1075,10 @@ export function PartnerSignupPage() {
                   Cartão
                 </button>
               </div>
-              {payMethod === 'pix' ? (
-                <p className="partner__lead" style={{ marginTop: 12, marginBottom: 0 }}>
-                  Ao confirmar, geramos um PIX (simulado nesta etapa) e liberamos o onboarding da
-                  loja. Em produção o valor cai no gateway.
-                </p>
-              ) : (
-                <div className="partner__grid" style={{ marginTop: 12 }}>
-                  <label className="partner__span-2">
-                    Nome no cartão
-                    <input value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                  </label>
-                  <label className="partner__span-2">
-                    Número
-                    <input
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      inputMode="numeric"
-                      placeholder="0000 0000 0000 0000"
-                    />
-                  </label>
-                  <label>
-                    Validade
-                    <input
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      placeholder="MM/AA"
-                    />
-                  </label>
-                  <label>
-                    CVV
-                    <input
-                      value={cardCvv}
-                      onChange={(e) => setCardCvv(e.target.value)}
-                      inputMode="numeric"
-                    />
-                  </label>
-                </div>
-              )}
+              <p className="partner__lead" style={{ marginTop: 12, marginBottom: 0 }}>
+                A solicitação ficará aguardando pagamento. Esta etapa não emite cobrança nem confirma o recebimento.
+                O pagamento com cartão dependerá do checkout seguro do provedor configurado.
+              </p>
             </div>
           </section>
         )}

@@ -780,7 +780,7 @@ function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
         </p>
       </div>
       <div className="caixa-panel__table">
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Pedido</th>
@@ -819,7 +819,7 @@ function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
               ))
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
       <div className="pdv__modal-actions">
         <button type="button" className="btn btn--primary" onClick={onClose}>
@@ -839,7 +839,7 @@ function OpenPanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
 
   async function openDrawer() {
     await openCashDrawer(name || operatorName, 'Contagem antes da abertura');
-    setDrawerMsg('Sinal enviado à gaveta (simulado). Conte o dinheiro e informe o valor.');
+    setDrawerMsg('Não há integração com a gaveta configurada. Abra-a manualmente, conte o dinheiro e informe o valor.');
   }
 
   async function submit(event: FormEvent) {
@@ -1139,7 +1139,7 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
         <p className="empty">Nenhuma sangria ou aporte neste caixa.</p>
       ) : (
         <div className="caixa-panel__table">
-          <table className="admin-table caixa-mov-table">
+          <div className="admin-table-container"><table className="admin-table caixa-mov-table">
             <thead>
               <tr>
                 <th>Tipo</th>
@@ -1291,7 +1291,7 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
       <div className="pdv__modal-actions">
@@ -1720,7 +1720,7 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
           <p className="empty">Nenhum vale emitido.</p>
         ) : (
           <div className="caixa-panel__table">
-            <table className="admin-table">
+            <div className="admin-table-container"><table className="admin-table">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -1751,7 +1751,7 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )
       ) : null}
@@ -2107,7 +2107,7 @@ function ClosePanel({
           <details className="caixa-close__details">
             <summary>Extrato ({movements.length})</summary>
             <div className="caixa-panel__table caixa-panel__table--compact">
-              <table className="admin-table">
+              <div className="admin-table-container"><table className="admin-table">
                 <thead>
                   <tr>
                     <th>Movimento</th>
@@ -2138,7 +2138,7 @@ function ClosePanel({
                     ))
                   )}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </details>
 
@@ -2230,9 +2230,10 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function save(event: FormEvent) {
+  async function save(event: FormEvent) {
     event.preventDefault();
-    const next = updateCashSettings(
+    try {
+    const next = await updateCashSettings(
       isAdmin || canConfigureAdHoc
         ? form
         : {
@@ -2247,6 +2248,7 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
     setForm(next);
     onDone('Configurações do caixa salvas.');
     onClose();
+    } catch (error) { onDone(error instanceof Error ? error.message : 'Não foi possível salvar as configurações.'); }
   }
 
   return (
@@ -2374,7 +2376,7 @@ function CashSettingsPanel({ onClose, onDone }: PanelProps) {
                   Senha de exclusão
                   <input
                     type="password"
-                    value={form.deleteItemPassword}
+                    placeholder={form.deletePasswordConfigured ? 'Senha definida; deixe vazio para manter' : 'Defina a senha'} value={form.deleteItemPassword}
                     onChange={(e) => patch('deleteItemPassword', e.target.value)}
                     disabled={!form.requirePasswordToDeleteItem}
                     autoComplete="new-password"
@@ -2856,7 +2858,7 @@ function PricePanel({ onClose }: PanelProps) {
         {hits.length === 0 ? (
           <p className="empty">{query ? 'Nenhum produto.' : 'Comece a digitar.'}</p>
         ) : (
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
             <thead>
               <tr>
                 <th>Produto</th>
@@ -2883,7 +2885,7 @@ function PricePanel({ onClose }: PanelProps) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
       <div className="pdv__modal-actions">
@@ -3186,35 +3188,41 @@ function QuotesListPanel(props: PanelProps) {
     onClose();
   }
 
-  function handleDuplicate(q: PosQuote) {
-    const res = duplicatePosQuote(q.id, operatorName);
+  async function handleDuplicate(q: PosQuote) {
+    try {
+    const res = await duplicatePosQuote(q.id, operatorName);
     if (res.ok) {
       setQuotes(listPosQuotes());
       onDone(`Orçamento duplicado com sucesso! Nova proposta nº ${res.quote.quoteNumber}`);
     } else {
       onError(res.error);
     }
+    } catch (error) { onError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
-  function handleStatusChange(q: PosQuote, nextStatus: PosQuoteStatus) {
-    const res = changeQuoteStatus(q.id, nextStatus, operatorName);
+  async function handleStatusChange(q: PosQuote, nextStatus: PosQuoteStatus) {
+    try {
+    const res = await changeQuoteStatus(q.id, nextStatus, operatorName);
     if (res.ok) {
       setQuotes(listPosQuotes());
       onDone(`Orçamento nº ${q.quoteNumber} alterado para "${QUOTE_STATUS_LABEL[nextStatus]}".`);
     } else {
       onError(res.error);
     }
+    } catch (error) { onError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
-  function handleDelete(q: PosQuote) {
+  async function handleDelete(q: PosQuote) {
     if (!window.confirm(`Tem certeza que deseja excluir o orçamento nº ${q.quoteNumber}?`)) return;
-    const res = deletePosQuote(q.id);
+    try {
+    const res = await deletePosQuote(q.id);
     if (res.ok) {
       setQuotes(listPosQuotes());
       onDone(`Orçamento nº ${q.quoteNumber} excluído.`);
     } else {
       onError(res.error);
     }
+    } catch (error) { onError(error instanceof Error ? error.message : 'Não foi possível salvar o orçamento.'); }
   }
 
   return (
@@ -3492,13 +3500,13 @@ function SaveQuotePanel(props: PanelProps) {
   const calculatedExpiresDate = new Date();
   calculatedExpiresDate.setDate(calculatedExpiresDate.getDate() + Number(validityDays || 7));
 
-  function handleSave(e: FormEvent) {
+  async function handleSave(e: FormEvent) {
     e.preventDefault();
     if (saving) return;
     setSaving(true);
 
     try {
-      const created = createPosQuote({
+      const created = await createPosQuote({
         customerId: activeQuoteDraft?.customerId,
         customerName: customerName.trim() || 'Consumidor Final',
         customerDocument: customerDocument.trim(),

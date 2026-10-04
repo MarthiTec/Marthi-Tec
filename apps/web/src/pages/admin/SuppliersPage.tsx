@@ -342,7 +342,7 @@ export function SuppliersPage() {
 
           />
 
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
 
             <thead>
 
@@ -422,7 +422,7 @@ export function SuppliersPage() {
 
             </tbody>
 
-          </table>
+          </table></div>
 
         </article>
 

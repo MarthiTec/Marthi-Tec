@@ -117,9 +117,11 @@ export function OsPrintModal({ order, open, onClose }: Props) {
 
   const total = workOrderTotal(order);
 
-  function handleSelectModel(model: OsPrintModel) {
+  async function handleSelectModel(model: OsPrintModel) {
     setActiveModel(model);
-    saveSettings({ model });
+    try {
+    await saveSettings({ model });
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'); }
   }
 
   const generateWhatsAppMessage = () => {

@@ -72,7 +72,7 @@ export function FiscalPanelPage() {
         {recent.length === 0 ? (
           <p className="empty">Nenhuma nota ainda. Abra o emissor para lançar.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
