@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { apiCreatePickup, apiListPickups } from '../services/erpApi';
 
@@ -7,7 +8,8 @@ type Props = {
 };
 
 export function CashPickupModal({ onClose, onSuccess }: Props) {
-  const [responsibleName, setResponsibleName] = useState('Gilvan Teodo');
+  const { user } = useAuth();
+  const [responsibleName, setResponsibleName] = useState(user?.name || '');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [pickupDate, setPickupDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -23,7 +25,7 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
           setAmount(String(res.pendingCashBalance));
         }
       })
-      .catch((err) => console.warn('Erro ao carregar saldo pendente:', err));
+      .catch(() => setError('Não foi possível consultar o saldo pendente no banco.'));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -130,7 +132,7 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
                   className="admin-input"
                   value={responsibleName}
                   onChange={(e) => setResponsibleName(e.target.value)}
-                  placeholder="Gilvan Teodo"
+                  placeholder="Responsável pelo recolhimento"
                   required
                 />
               </div>
@@ -168,7 +170,7 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex: Retirada semanal do dinheiro de vendas sem caixa da loja Cell Ponto."
+                placeholder="Ex: Retirada semanal do dinheiro de vendas sem caixa da loja."
               />
             </div>
           </div>

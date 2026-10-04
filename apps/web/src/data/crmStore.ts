@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * CRM Marthi — leads (homepage/parceiro/contato), kanban, claim exclusivo e chat.
  */
@@ -57,7 +58,7 @@ function emitCrmSellerAlert(input: {
     createdAt: now(),
   };
   try {
-    localStorage.setItem(CRM_ALERT_STORAGE_KEY, JSON.stringify(alert));
+    localStorage.setItem(storeScopedKey(CRM_ALERT_STORAGE_KEY), JSON.stringify(alert));
   } catch {
     /* quota */
   }
@@ -416,7 +417,7 @@ export async function refreshCrmSellerMessagesFromApi(sellerA: string, sellerB: 
 
 function load(): State {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem('marthi.crm.v1');
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY)) ?? localStorage.getItem(storeScopedKey('marthi.crm.v1'));
     if (!raw) {
       const initial = empty();
       initial.seededMocks = true;
@@ -453,7 +454,7 @@ function load(): State {
 }
 
 function save(state: State) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event(CRM_EVENT));
 }
 

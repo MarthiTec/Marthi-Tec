@@ -13,7 +13,7 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
     const userRole = req.user?.role || 'operator';
 
     // Permissão para visualizar custo e lucro: apenas admin ou operador expressamente autorizado
-    const canViewProfit = userRole === 'admin' || req.user?.email === 'gilvanteodo@gmail.com';
+    const canViewProfit = userRole === 'admin' || userRole === 'superadmin';
 
     const {
       startDate,
@@ -241,7 +241,7 @@ reportsRouter.get('/api/v1/reports/sales-goals/export', requireAuth, async (req,
   try {
     const storeId = req.storeId!;
     const userRole = req.user?.role || 'operator';
-    const canViewProfit = userRole === 'admin' || req.user?.email === 'gilvanteodo@gmail.com';
+    const canViewProfit = userRole === 'admin' || userRole === 'superadmin';
 
     if (!pool) {
       res.status(503).send('Banco indisponível');

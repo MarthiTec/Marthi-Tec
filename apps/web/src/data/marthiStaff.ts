@@ -24,22 +24,3 @@ export function isMarthiStaffEmail(email: string | null | undefined) {
   if (!normalized) return false;
   return MARTHI_STAFF_EMAILS.includes(normalized);
 }
-
-/** Credenciais locais (fallback quando a API Nest não está disponível). */
-export function getMarthiStaffDemoCredentials() {
-  return {
-    email: (
-      (import.meta.env.VITE_AUTH_MARTHI_EMAIL as string | undefined)?.trim() || DEFAULT_STAFF_EMAIL
-    ).toLowerCase(),
-    password:
-      (import.meta.env.VITE_AUTH_MARTHI_PASSWORD as string | undefined)?.trim() || 'Marthi170926',
-    name: 'Marthi Tecnologia',
-  };
-}
-
-export function matchesMarthiStaffLogin(email: string, password: string) {
-  const creds = getMarthiStaffDemoCredentials();
-  return (
-    normalizeStaffEmail(email) === creds.email && password.trim() === creds.password
-  );
-}

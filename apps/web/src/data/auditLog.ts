@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { apiCreateAudit, apiListAudit, type ApiAuditEntry } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
 
@@ -41,7 +42,7 @@ function mapEntry(row: ApiAuditEntry): AuditEntry {
 
 function load(): AuditState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return { entries: [] };
     const parsed = JSON.parse(raw) as Partial<AuditState>;
     return { entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
@@ -51,7 +52,7 @@ function load(): AuditState {
 }
 
 function save(state: AuditState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(AUDIT_EVENT));
   }

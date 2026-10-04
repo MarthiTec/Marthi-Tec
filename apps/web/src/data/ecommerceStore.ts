@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * E-commerce: canais, credenciais por plataforma, anúncios ligados ao estoque.
  * Sync MVP local (qty/preço/imagens). OAuth real fica no Nest.
@@ -370,7 +371,7 @@ function seed(): State {
 
 function load(): State {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) {
       const initial = seed();
       save(initial);
@@ -413,7 +414,7 @@ function mergeChannels(raw: EcommerceChannel[] | undefined): EcommerceChannel[] 
 }
 
 function save(state: State) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-ecommerce-updated'));
 }
 

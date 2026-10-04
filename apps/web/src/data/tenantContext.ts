@@ -35,7 +35,7 @@ export function getActiveTenantKey(): string {
     if (dotIdx > 0) {
       const parts = token.split('.');
       if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1])) as { clientAccountId?: string; email?: string };
+        const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0)))) as { clientAccountId?: string; email?: string };
         if (payload.clientAccountId) return `acc_${payload.clientAccountId}`;
         if (payload.email) return `user_${payload.email.replace(/[^a-z0-9]/g, '_')}`;
       }

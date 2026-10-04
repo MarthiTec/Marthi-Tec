@@ -1,176 +1,68 @@
-import { randomInt } from 'node:crypto';
-import { normalizeBrazilPhone, sendEvolutionText } from './evolutionWhatsApp.js';
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { pool } from '../db/pool.js';
+import { env } from '../config/env.js';
+import { sendEvolutionText } from './evolutionWhatsApp.js';
 
-export type OtpRecord = {
-  phone: string;
-  code: string;
-  attempts: number;
-  maxAttempts: number;
-  expiresAt: number;
-  verified: boolean;
-  verifiedAt?: string;
-  createdAt: number;
-  lastSentAt: number;
-  sendCount: number;
-};
-
-// Store OTPs in-memory (and can be backed by DB)
-const otpStore = new Map<string, OtpRecord>();
-const verifiedPhones = new Set<string>();
-
-const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_ATTEMPTS = 5;
-const MAX_RESENDS_PER_WINDOW = 4;
-const RESEND_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-function cleanPhone(raw: string): string {
-  return raw.replace(/\D/g, '');
+function phoneDigits(phone: string) { return phone.replace(/\D/g, ''); }
+function codeHash(phone: string, code: string) {
+  return createHmac('sha256', env.JWT_SECRET).update(`${phone}:${code}`).digest('hex');
+}
+function database() {
+  if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  return pool;
 }
 
-/**
- * Gera e envia um código OTP de 6 dígitos para o celular via WhatsApp (Evolution) ou fallback.
- */
-export async function sendPhoneOtp(
-  phone: string,
-  customerName?: string
-): Promise<{ success: boolean; message: string; channel: 'whatsapp' | 'simulation' }> {
-  const digits = cleanPhone(phone);
-  if (digits.length < 10 || digits.length > 13) {
-    throw new Error('Número de telefone inválido para envio do código de verificação.');
-  }
-
-  const now = Date.now();
-  let existing = otpStore.get(digits);
-
-  // Rate limiting check
-  if (existing) {
-    if (now - existing.createdAt < RESEND_WINDOW_MS) {
-      if (existing.sendCount >= MAX_RESENDS_PER_WINDOW) {
-        throw new Error('Limite de tentativas de envio de código atingido para este número. Tente novamente mais tarde.');
-      }
-      if (now - existing.lastSentAt < 30 * 1000) {
-        throw new Error('Aguarde 30 segundos antes de solicitar um novo código.');
-      }
-    } else {
-      // Reset window
-      existing = undefined;
-    }
-  }
-
-  // Generate 6-digit code (e.g. 100000 - 999999)
-  const code = String(randomInt(100000, 999999));
-  const record: OtpRecord = {
-    phone: digits,
-    code,
-    attempts: 0,
-    maxAttempts: MAX_ATTEMPTS,
-    expiresAt: now + OTP_TTL_MS,
-    verified: false,
-    createdAt: existing ? existing.createdAt : now,
-    lastSentAt: now,
-    sendCount: (existing ? existing.sendCount : 0) + 1,
-  };
-
-  otpStore.set(digits, record);
-
-  const formattedName = customerName ? customerName.trim() : 'cliente Marthi';
-  const textMessage = [
-    `🔐 *Código de Segurança Marthi Tecnologia*`,
-    ``,
-    `Olá, ${formattedName}!`,
-    `Seu código de confirmação para ativação da sua conta é:`,
-    ``,
-    `*${code}*`,
-    ``,
-    `Ele é válido por 10 minutos. Nunca compartilhe este código com terceiros.`,
-  ].join('\n');
-
-  let channel: 'whatsapp' | 'simulation' = 'simulation';
-
+export async function sendPhoneOtp(phone: string, customerName?: string): Promise<{ success: boolean; message: string; channel: 'whatsapp' }> {
+  const digits = phoneDigits(phone);
+  if (digits.length < 10 || digits.length > 13) throw Object.assign(new Error('Telefone inválido.'), { status: 400 });
+  const client = await database().connect();
+  const code = String(randomInt(100000, 1000000));
   try {
-    const res = await sendEvolutionText(digits, textMessage);
-    if (res.ok) {
-      channel = 'whatsapp';
-      console.log(`[otpService] OTP WhatsApp enviado com sucesso para ${digits}`);
-    } else {
-      console.warn(`[otpService] Evolution WhatsApp falhou (${res.status}), código gerado em sandbox: ${code}`);
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`otp:${digits}`]);
+    const previous = await client.query('SELECT * FROM phone_otps WHERE phone = $1 FOR UPDATE', [digits]);
+    const row = previous.rows[0];
+    const now = Date.now();
+    const sameWindow = row && now - new Date(row.window_started_at).getTime() < 3600000;
+    if (sameWindow && (row.send_count >= 4 || now - new Date(row.last_sent_at).getTime() < 30000)) {
+      throw Object.assign(new Error('Aguarde antes de solicitar outro código.'), { status: 429 });
     }
-  } catch (err) {
-    console.info(`[otpService] Evolution não configurado ou indisponível (${(err as Error).message}). Código de sandbox para testes: ${code}`);
-  }
-
-  return {
-    success: true,
-    message: channel === 'whatsapp' 
-      ? 'Código de confirmação enviado para seu WhatsApp!' 
-      : 'Código de verificação gerado com sucesso.',
-    channel,
-  };
+    await client.query(`INSERT INTO phone_otps (phone, code_hash, attempts, expires_at, send_count, window_started_at, last_sent_at, verified_at)
+      VALUES ($1,$2,0,now() + interval '10 minutes',$3,$4,now(),NULL)
+      ON CONFLICT (phone) DO UPDATE SET code_hash = $2, attempts = 0, expires_at = now() + interval '10 minutes',
+      send_count = $3, window_started_at = $4, last_sent_at = now(), verified_at = NULL`,
+      [digits, codeHash(digits, code), sameWindow ? row.send_count + 1 : 1, sameWindow ? row.window_started_at : new Date()]);
+    const sent = await sendEvolutionText(digits, `Olá, ${customerName?.trim() || 'cliente Marthi'}. Seu código de confirmação é ${code}. Válido por 10 minutos.`);
+    if (!sent.ok) throw Object.assign(new Error('Não foi possível enviar o código pelo WhatsApp.'), { status: 503 });
+    await client.query('COMMIT');
+    return { success: true, message: 'Código enviado pelo WhatsApp.', channel: 'whatsapp' };
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
-/**
- * Valida o código OTP informado pelo usuário.
- */
-export function verifyPhoneOtp(
-  phone: string,
-  code: string
-): { success: boolean; message: string; verifiedAt?: string } {
-  const digits = cleanPhone(phone);
-  const record = otpStore.get(digits);
-
-  if (!record) {
-    return {
-      success: false,
-      message: 'Nenhum código foi solicitado para este número ou ele já expirou.',
-    };
-  }
-
-  if (Date.now() > record.expiresAt) {
-    otpStore.delete(digits);
-    return {
-      success: false,
-      message: 'O código informado expirou (validade de 10 minutos). Solicite um novo código.',
-    };
-  }
-
-  if (record.attempts >= record.maxAttempts) {
-    otpStore.delete(digits);
-    return {
-      success: false,
-      message: 'Limite de tentativas incorretas excedido. Solicite um novo código por segurança.',
-    };
-  }
-
-  record.attempts += 1;
-
-  if (record.code.trim() !== code.trim()) {
-    const remaining = record.maxAttempts - record.attempts;
-    return {
-      success: false,
-      message: `Código incorreto. Você tem mais ${remaining} tentativa(s).`,
-    };
-  }
-
-  // Success
-  const verifiedAt = new Date().toISOString();
-  record.verified = true;
-  record.verifiedAt = verifiedAt;
-  verifiedPhones.add(digits);
-  // Remove consumed OTP to prevent replay
-  otpStore.delete(digits);
-
-  console.log(`[otpService] Celular ${digits} verificado com sucesso em ${verifiedAt}`);
-  return {
-    success: true,
-    message: 'Número de celular confirmado com sucesso!',
-    verifiedAt,
-  };
+export async function verifyPhoneOtp(phone: string, code: string): Promise<{ success: boolean; message: string; verifiedAt?: string }> {
+  const digits = phoneDigits(phone);
+  const client = await database().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query('SELECT * FROM phone_otps WHERE phone = $1 FOR UPDATE', [digits]);
+    const row = result.rows[0];
+    if (!row || row.verified_at || row.attempts >= 5 || new Date(row.expires_at).getTime() <= Date.now()) {
+      await client.query('COMMIT');
+      return { success: false, message: 'Código inválido ou expirado.' };
+    }
+    const expected = Buffer.from(row.code_hash, 'hex');
+    const actual = Buffer.from(codeHash(digits, code.trim()), 'hex');
+    const valid = expected.length === actual.length && timingSafeEqual(expected, actual);
+    const verifiedAt = valid ? new Date().toISOString() : undefined;
+    await client.query('UPDATE phone_otps SET attempts = attempts + 1, verified_at = $2 WHERE phone = $1', [digits, verifiedAt || null]);
+    await client.query('COMMIT');
+    return { success: valid, message: valid ? 'Celular confirmado.' : 'Código incorreto.', verifiedAt };
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
-export function isPhoneVerified(phone: string): boolean {
-  return verifiedPhones.has(cleanPhone(phone));
-}
-
-export function markPhoneVerified(phone: string): void {
-  verifiedPhones.add(cleanPhone(phone));
+export async function isPhoneVerified(phone: string): Promise<boolean> {
+  const result = await database().query('SELECT verified_at FROM phone_otps WHERE phone = $1', [phoneDigits(phone)]);
+  return Boolean(result.rows[0]?.verified_at);
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { nestRequest } from '../services/nestClient';
 import { apiSendWarrantyWhatsApp } from '../services/erpApi';
 
 type Props = {
@@ -8,12 +9,13 @@ type Props = {
 };
 
 export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState(receipt?.sale?.customer?.phone || '');
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const sale = receipt?.sale;
-  const store = receipt?.store || { name: 'Cell Ponto' };
+  const store = receipt?.store || { name: '' };
 
   async function handleSendWhatsApp() {
     if (!phone.trim()) {
@@ -23,14 +25,14 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
     setSending(true);
     setFeedback(null);
     try {
-      const res = await apiSendWarrantyWhatsApp(sale.id, { phone });
-      if (res.data?.sentViaEvolution) {
+      const res = await apiSendWarrantyWhatsApp(sale.id, { phone }, store.id);
+      if (res?.sentViaEvolution) {
         setFeedback({ ok: true, msg: 'Comprovante e termo de garantia enviados com sucesso via WhatsApp!' });
-      } else if (res.data?.directUrl) {
-        window.open(res.data.directUrl, '_blank');
-        setFeedback({ ok: true, msg: 'Janela do WhatsApp aberta para envio da garantia.' });
+      } else if (res?.directUrl) {
+        window.open(res.directUrl, '_blank');
+        setFeedback({ ok: false, msg: 'Envio automático não confirmado. Janela do WhatsApp aberta para envio da garantia.' });
       } else {
-        setFeedback({ ok: true, msg: 'Garantia gerada com sucesso.' });
+        setFeedback({ ok: false, msg: 'A API não confirmou o envio. Confira a configuração de WhatsApp da loja.' });
       }
     } catch (err: any) {
       setFeedback({ ok: false, msg: err.message || 'Falha ao disparar WhatsApp.' });
@@ -39,6 +41,14 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
     }
   }
 
+  async function handleSendEmail() {
+    setSending(true);setFeedback(null);
+    try {
+      await nestRequest('/sales/'+encodeURIComponent(sale.id)+'/send-receipt-email', {method:'POST',headers:{'x-store-id':store.id},body:JSON.stringify({recipient:email.trim()})});
+      setFeedback({ok:true,msg:'Comprovante aceito pelo servidor de e-mail da loja.'});
+    } catch(error) {setFeedback({ok:false,msg:error instanceof Error ? error.message : 'Falha no envio do e-mail.'});}
+    finally {setSending(false);}
+  }
   function handlePrint() {
     window.print();
   }
@@ -58,7 +68,7 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
                 Venda Finalizada com Sucesso!
               </h3>
             </div>
-            <small style={{ color: 'var(--mute, #94a3b8)', marginLeft: '32px' }}>{store?.name || 'Cell Ponto'}</small>
+            <small style={{ color: 'var(--mute, #94a3b8)', marginLeft: '32px' }}>{store?.name || ''}</small>
           </div>
           <button className="admin-btn admin-btn--icon" onClick={onClose} title="Fechar">
             ✕
@@ -66,6 +76,10 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
         </div>
 
         <div className="admin-modal__body" style={{ maxHeight: '78vh', overflowY: 'auto', padding: '16px' }}>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+            <input aria-label="E-mail do cliente" className="admin-input" type="email" placeholder="E-mail do cliente" value={email} onChange={event=>setEmail(event.target.value)} />
+            <button type="button" className="btn btn--ghost" disabled={sending || !email.trim()} onClick={()=>void handleSendEmail()}>Enviar comprovante por e-mail</button>
+          </div>
           {/* Cartão de Identificação da Venda */}
           <div
             style={{

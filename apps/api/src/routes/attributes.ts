@@ -81,7 +81,7 @@ attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, n
           return;
         }
       } catch (dbErr) {
-        console.warn('[attributes] Falha ao consultar banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -118,7 +118,7 @@ attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, 
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[attributes] Falha ao conectar ao PostgreSQL no POST, usando memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
@@ -188,7 +188,7 @@ attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, 
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[attributes] Erro ao criar atributo no banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -223,7 +223,7 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[attributes] Falha ao conectar ao PostgreSQL no UPDATE, usando memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
@@ -317,7 +317,7 @@ async function handleUpdateAttribute(req: any, res: any, next: any) {
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[attributes] Erro ao atualizar atributo no banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -364,7 +364,7 @@ attributesRouter.delete('/api/v1/attributes/:id', requireOrDemoAuth, async (req,
         res.json({ success: true, data: { ok: true } });
         return;
       } catch (dbErr) {
-        console.warn('[attributes] Falha ao deletar atributo do banco, usando memória:', dbErr);
+        throw dbErr;
       }
     }
 

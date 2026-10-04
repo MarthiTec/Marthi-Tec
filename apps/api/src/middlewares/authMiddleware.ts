@@ -39,254 +39,73 @@ export function getPlanUserLimit(planId: string): number {
   }
 }
 
-/**
- * Middleware que valida o token, identifica o usuário e resolve a loja (storeId) e os limites do plano.
- */
+/** Autenticação e isolamento de tenant resolvidos exclusivamente no banco. */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.header('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Token ausente ou inválido.' },
-    });
+  const header = req.header('authorization');
+  if (!header?.startsWith('Bearer ') || !header.slice(7).trim()) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token ausente ou inválido.' } });
     return;
   }
-
-  const token = authHeader.slice(7).trim();
-  if (!token) {
-    res.status(401).json({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Token ausente ou inválido.' },
-    });
+  let user: AuthUser;
+  try { user = await verifySessionToken(header.slice(7).trim()); }
+  catch (error) {
+    if ((error as { status?: number }).status === 503) return next(error);
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Sessão inválida ou expirada.' } });
     return;
   }
-
-  let user: AuthUser | null = null;
-
   try {
-    if (token.startsWith('eyJ')) {
-      try {
-        user = await verifySessionToken(token);
-      } catch {
-        try {
-          const parts = token.split('.');
-          if (parts[1]) {
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-            if (payload && (payload.email || payload.sub)) {
-              user = {
-                id: payload.sub || 'usr-legacy-session',
-                email: payload.email || 'usuario@marthi.local',
-                name: payload.name || payload.email || 'Usuário Marthi',
-                picture: payload.picture || null,
-                provider: payload.provider === 'google' ? 'google' : 'password',
-                role: payload.role || 'admin',
-                clientAccountId: payload.clientAccountId || 'ACC-MARTHI-DEMO',
-              };
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-    } else if (token.startsWith('marthi-staff-local:')) {
-      const email = token.replace('marthi-staff-local:', '').toLowerCase();
-      user = {
-        id: `staff:${email}`,
-        email,
-        name: 'Marthi Staff',
-        picture: null,
-        provider: 'password',
-        role: 'admin',
-        clientAccountId: 'ACC-MARTHI-DEMO',
-      };
-    } else if (token.startsWith('marthi-client-token:')) {
-      const parts = token.split(':');
-      const clientId = parts[1] || 'ACC-MARTHI-DEMO';
-      user = {
-        id: `client:${clientId}`,
-        email: 'cliente@marthi.local',
-        name: 'Cliente Lojista',
-        picture: null,
-        provider: 'password',
-        role: 'admin',
-        clientAccountId: clientId,
-      };
-    } else if (token.startsWith('marthi-employee-token:')) {
-      const parts = token.split(':');
-      const empId = parts[1] || 'EMP-1';
-      user = {
-        id: `employee:${empId}`,
-        email: 'funcionario@marthi.local',
-        name: 'Funcionário da Loja',
-        picture: null,
-        provider: 'password',
-        role: 'operator',
-        clientAccountId: 'ACC-MARTHI-DEMO',
-      };
-    } else if (token === 'marthi-demo-token' || token === 'demo') {
-      user = {
-        id: 'staff:demo',
-        email: 'marthi.tecnologia@gmail.com',
-        name: 'Marthi Admin',
-        picture: null,
-        provider: 'password',
-        role: 'admin',
-        clientAccountId: 'ACC-MARTHI-DEMO',
-      };
-    } else {
-      res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Token ausente ou inválido.' },
-      });
+    if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+    if (!user.clientAccountId) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Usuário sem conta vinculada.' } });
       return;
     }
-  } catch (err) {
-    res.status(401).json({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Token ausente ou inválido.' },
-    });
+    const requestedStore = req.header('x-store-id')?.trim();
+    const stores = await pool.query(
+      `SELECT s.id, us.role FROM stores s JOIN user_stores us ON us.store_id = s.id
+       WHERE us.user_id = $1 AND s.client_account_id = $2 AND s.active = true
+       AND ($3::text IS NULL OR s.id = $3)
+       ORDER BY us.is_default DESC, s.created_at ASC LIMIT 1`,
+      [user.id, user.clientAccountId, requestedStore || null],
+    );
+    if (!stores.rows[0]) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem acesso à loja solicitada.' } });
+      return;
+    }
+    const license = await pool.query(
+      'SELECT plan_id FROM store_licenses WHERE store_id = $1 AND client_account_id = $2 AND status = $3 ORDER BY created_at DESC LIMIT 1',
+      [stores.rows[0].id, user.clientAccountId, 'active'],
+    );
+    const rawPlan = license.rows[0]?.plan_id;
+    req.user = { ...user, role: user.role === 'superadmin' ? 'superadmin' : stores.rows[0].role || 'operator' };
+    req.clientAccountId = user.clientAccountId;
+    req.storeId = stores.rows[0].id;
+    req.planId = rawPlan === 'golden' || rawPlan === 'scale' ? 'golden' : rawPlan === 'silver' || rawPlan === 'growth' ? 'silver' : 'bronze';
+    req.userLimit = getPlanUserLimit(req.planId);
+    next();
+  } catch (error) { next(Object.assign(new Error('Falha ao consultar MarthiDB.'), { status: 503 })); }
+}
+
+export const requireOrDemoAuth = requireAuth;
+
+export async function requireSession(req: Request, res: Response, next: NextFunction) {
+  const header = req.header('authorization');
+  if (!header?.startsWith('Bearer ') || !header.slice(7).trim()) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token ausente.' } });
     return;
   }
+  try {
+    req.user = await verifySessionToken(header.slice(7).trim());
+    next();
+  } catch (error) {
+    if ((error as { status?: number }).status === 503) return next(error);
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Sessão inválida ou expirada.' } });
+  }
+}
 
-  if (!user) {
-    res.status(401).json({
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Usuário não autenticado.' },
-    });
+export function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role !== 'superadmin') {
+    res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Acesso administrativo restrito.' } });
     return;
   }
-
-  const clientAccountId = user.clientAccountId || 'ACC-MARTHI-DEMO';
-  const headerStoreId = req.header('x-store-id')?.trim();
-
-  let resolvedStoreId = headerStoreId || '';
-  let resolvedPlanId: 'bronze' | 'silver' | 'golden' = 'golden';
-
-  if (pool) {
-    try {
-      // 1. Resolver loja
-      if (resolvedStoreId) {
-        const storeCheck = await pool.query(
-          `SELECT id, client_account_id FROM stores WHERE id = $1 AND client_account_id = $2 AND active = true`,
-          [resolvedStoreId, clientAccountId],
-        );
-        if (storeCheck.rows.length === 0) {
-          resolvedStoreId = ''; // Reseta se não pertencer ao tenant
-        }
-      }
-
-      if (!resolvedStoreId) {
-        // 1.1 Verificar loja padrão do usuário em user_stores
-        const userStoreRes = await pool.query(
-          `SELECT store_id FROM user_stores WHERE user_id = $1 ORDER BY is_default DESC LIMIT 1`,
-          [user.id],
-        );
-        if (userStoreRes.rows.length > 0 && userStoreRes.rows[0].store_id) {
-          resolvedStoreId = userStoreRes.rows[0].store_id;
-        }
-      }
-
-      if (!resolvedStoreId) {
-        const defaultStore = await pool.query(
-          `SELECT id FROM stores WHERE client_account_id = $1 AND active = true ORDER BY is_matrix DESC, created_at ASC LIMIT 1`,
-          [clientAccountId],
-        );
-        if (defaultStore.rows.length > 0) {
-          resolvedStoreId = defaultStore.rows[0].id;
-        } else if (clientAccountId === 'ACC-MARTHI-DEMO') {
-          resolvedStoreId = 'STR-DEMO-01';
-        } else {
-          // Cria loja default para a conta se não existir
-          const newStoreId = `STR-${Date.now().toString(36).toUpperCase()}`;
-          await pool.query(
-            `INSERT INTO stores (
-              id, client_account_id, trade_name, legal_name, document_type, document,
-              state_registration, municipal_registration, email, phone, zip_code, street,
-              number, complement, district, city, state, tax_regime, is_matrix, active
-            ) VALUES (
-              $1, $2, $3, $4, 'cnpj', '00.000.000/0001-91',
-              'ISENTO', '', $5, '(11) 3000-0000', '01310-100', 'Avenida Paulista',
-              '1000', '', 'Bela Vista', 'São Paulo', 'SP', 'simples_nacional', true, true
-            ) ON CONFLICT DO NOTHING`,
-            [newStoreId, clientAccountId, user.name, user.name, user.email],
-          );
-          resolvedStoreId = newStoreId;
-        }
-      }
-
-      // 2. Resolver plano e licença
-      const licRes = await pool.query(
-        `SELECT plan_id FROM store_licenses WHERE client_account_id = $1 ORDER BY created_at DESC LIMIT 1`,
-        [clientAccountId],
-      );
-      if (licRes.rows.length > 0) {
-        const rawPlan = String(licRes.rows[0].plan_id).toLowerCase();
-        if (rawPlan === 'bronze' || rawPlan === 'start') resolvedPlanId = 'bronze';
-        else if (rawPlan === 'silver' || rawPlan === 'growth') resolvedPlanId = 'silver';
-        else resolvedPlanId = 'golden';
-      }
-    } catch (err) {
-      console.warn('[authMiddleware] DB tenant resolution error:', err);
-    }
-  }
-
-  if (!resolvedStoreId) {
-    if (clientAccountId === 'ACC-MARTHI-DEMO') {
-      resolvedStoreId = 'STR-DEMO-01';
-    } else {
-      resolvedStoreId = `STR-TENANT-${clientAccountId}`;
-    }
-  }
-
-  req.user = user;
-  req.clientAccountId = clientAccountId;
-  req.storeId = resolvedStoreId;
-  req.planId = resolvedPlanId;
-  req.userLimit = getPlanUserLimit(resolvedPlanId);
-
   next();
 }
-
-/**
- * Middleware que usa requireAuth se o header Authorization estiver presente,
- * ou recorre à loja STR-DEMO-01 para sessões de demonstração ou testes.
- */
-export async function requireOrDemoAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.header('authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const rawToken = authHeader.slice(7).trim();
-    if (rawToken && rawToken !== 'null' && rawToken !== 'undefined') {
-      try {
-        let authRejected = false;
-        await requireAuth(req, res, (err?: any) => {
-          if (err) {
-            authRejected = true;
-          }
-        });
-        if (!authRejected && req.user) {
-          return next();
-        }
-      } catch {
-        // Fallback para loja demo
-      }
-    }
-  }
-
-  // Fallback seguro para contexto da loja ativa sem rejeitar com 401
-  req.user = {
-    id: 'staff:demo',
-    email: 'marthi.tecnologia@gmail.com',
-    name: 'Marthi Admin',
-    picture: null,
-    provider: 'password',
-    role: 'admin',
-    clientAccountId: 'ACC-MARTHI-DEMO',
-  };
-  req.clientAccountId = 'ACC-MARTHI-DEMO';
-  req.storeId = req.header('x-store-id')?.trim() || 'STR-DEMO-01';
-  req.planId = 'golden';
-  req.userLimit = 50;
-  return next();
-}
-
-

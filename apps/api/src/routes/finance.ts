@@ -1,3 +1,4 @@
+import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
@@ -130,7 +131,7 @@ financeRouter.post('/api/v1/finance/accounts', requireAuth, async (req, res, nex
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)`,
         [id, storeId, body.name.trim(), body.bank.trim(), body.agency.trim(), body.number.trim(), body.type, body.initialBalance, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1`, [id]);
+      const resQuery = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
       const r = resQuery.rows[0];
       res.status(201).json({
         success: true,
@@ -178,8 +179,8 @@ financeRouter.patch('/api/v1/finance/accounts/:id', requireAuth, async (req, res
          WHERE id = $7 AND store_id = $8`,
         [body.name, body.bank, body.agency, body.number, body.type, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -279,8 +280,8 @@ financeRouter.post('/api/v1/finance/payables', requireAuth, async (req, res, nex
           body.invoiceType || '',
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -334,8 +335,8 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
           storeId,
         ],
       );
-      const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -367,7 +368,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a pagar não encontrada.' } });
@@ -375,6 +376,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
         }
 
         const curr = currentRes.rows[0];
+        if (curr.status === 'paid' || curr.status === 'cancelled') throw Object.assign(new Error('Conta já liquidada ou cancelada.'), { status: 409 });
         const totalAmount = Number(curr.amount) || 0;
         const currentPaid = Number(curr.paid_amount) || 0;
         const remaining = Math.max(0, totalAmount - currentPaid);
@@ -383,7 +385,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
         const interest = Number(body.interestAmount) || 0;
         const fine = Number(body.fineAmount) || 0;
         const discount = Number(body.discountAmount) || 0;
-        const netAmount = Math.max(0, payAmount + interest + fine - discount);
+        if (discount > payAmount + interest + fine) throw Object.assign(new Error('Desconto superior ao pagamento.'), { status: 400 });
+        const netAmount = Math.round((payAmount + interest + fine - discount) * 100) / 100;
 
         const newPaidAmount = currentPaid + payAmount;
         const isFullyPaid = newPaidAmount >= totalAmount - 0.001;
@@ -435,8 +438,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -477,7 +480,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a pagar não encontrada.' } });
@@ -485,20 +488,16 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const entries = await client.query('SELECT account_id, amount, type FROM finance_entries WHERE ref_id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+        if (!entries.rows.length && Number(curr.paid_amount) === 0) throw Object.assign(new Error('Conta sem pagamento para estornar.'), { status: 409 });
 
         await client.query(
-          `UPDATE payables SET status = 'open', paid_amount = 0, paid_at = null, updated_at = now() WHERE id = $1`,
+          `UPDATE payables SET status = 'open', paid_amount = 0, paid_at = null, interest_amount = 0, fine_amount = 0, discount_amount = 0, updated_at = now() WHERE id = $1`,
           [id],
         );
 
-        // Estorno na conta bancária se vinculada
-        if (accountId) {
-          await client.query(
-            `UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
-          );
+        for (const entry of entries.rows) {
+          if (entry.account_id) await client.query('UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3', [entry.type === 'out' ? Number(entry.amount) : -Number(entry.amount), entry.account_id, storeId]);
         }
 
         // Remove ou estorna lançamento
@@ -506,8 +505,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -627,8 +626,8 @@ financeRouter.post('/api/v1/finance/receivables', requireAuth, async (req, res, 
           body.invoiceType || '',
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -682,8 +681,8 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
           storeId,
         ],
       );
-      const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -715,7 +714,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a receber não encontrada.' } });
@@ -723,6 +722,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
         }
 
         const curr = currentRes.rows[0];
+        if (curr.status === 'paid' || curr.status === 'cancelled') throw Object.assign(new Error('Conta já liquidada ou cancelada.'), { status: 409 });
         const totalAmount = Number(curr.amount) || 0;
         const currentReceived = Number(curr.received_amount) || 0;
         const remaining = Math.max(0, totalAmount - currentReceived);
@@ -783,8 +783,8 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -822,7 +822,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/revert', '/api/v1/finance/r
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a receber não encontrada.' } });
@@ -830,27 +830,24 @@ financeRouter.post(['/api/v1/finance/receivables/:id/revert', '/api/v1/finance/r
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const entries = await client.query('SELECT account_id, amount, type FROM finance_entries WHERE ref_id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+        if (!entries.rows.length && Number(curr.received_amount) === 0) throw Object.assign(new Error('Conta sem pagamento para estornar.'), { status: 409 });
 
         await client.query(
-          `UPDATE receivables SET status = 'open', received_amount = 0, received_at = null, updated_at = now() WHERE id = $1`,
+          `UPDATE receivables SET status = 'open', received_amount = 0, received_at = null, interest_amount = 0, fine_amount = 0, discount_amount = 0, updated_at = now() WHERE id = $1`,
           [id],
         );
 
-        if (accountId) {
-          await client.query(
-            `UPDATE bank_accounts SET current_balance = current_balance - $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
-          );
+        for (const entry of entries.rows) {
+          if (entry.account_id) await client.query('UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3', [entry.type === 'out' ? Number(entry.amount) : -Number(entry.amount), entry.account_id, storeId]);
         }
 
         await client.query(`DELETE FROM finance_entries WHERE ref_id = $1 AND store_id = $2`, [id, storeId]);
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -966,8 +963,8 @@ financeRouter.post('/api/v1/finance', requireAuth, async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        const createdRes = await pool.query(`SELECT * FROM finance_entries WHERE id = $1`, [id]);
-        res.status(201).json({ success: true, data: createdRes.rows[0] });
+        const createdRes = await pool.query(`SELECT * FROM finance_entries WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.status(201).json({ success: true, data: rowToClient(createdRes.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
