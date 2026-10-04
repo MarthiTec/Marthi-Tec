@@ -1,3 +1,6 @@
+import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { apiListStores } from '../../services/erpApi';
+import { nestPost } from '../../services/nestClient';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -39,6 +42,8 @@ function emptyForm(preferTotem = false): Omit<ProductAttribute, 'id'> {
     useOnTotem: true,
     filterOnTotem: true,
     useOnStock: !preferTotem,
+    useOnPdv: true,
+    useOnExternalSale: true,
     sort: 10,
     active: true,
   };
@@ -80,6 +85,16 @@ export function AttributesPage() {
   const [status, setStatus] = useState<CrudStatusFilter>('all');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [branches,setBranches]=useState<{value:string;label:string}[]>([]);
+  const [targetBranch,setTargetBranch]=useState('');
+  const [copyNotice,setCopyNotice]=useState('');
+  useEffect(()=>{ void apiListStores().then(stores=>setBranches(stores.filter(s=>!s.isMatrix && s.id!==getActiveStoreId()).map(s=>({value:s.id,label:s.tradeName || s.id})))).catch(()=>setBranches([])); },[]);
+  async function copyToBranch() {
+    setSaving(true);setError('');setCopyNotice('');
+    try { const result=await nestPost<{copied:number;preserved:number}>('/attributes/replicate',{targetStoreId:targetBranch}); setCopyNotice(`${result.copied} atributo(s) copiado(s). ${result.preserved} cadastro(s) existente(s) preservado(s).`); }
+    catch(e) {setError(e instanceof Error ? e.message : 'Não foi possível copiar os atributos.');}
+    finally {setSaving(false);}
+  }
 
   useEffect(() => {
     let active = true;
@@ -91,6 +106,8 @@ export function AttributesPage() {
         /* ignore */
       }
     }
+    const reload=()=>{setItems([]);setForm(emptyForm(totemSurface));setFormVisible(false);setSelectedId(null);setTargetBranch('');setCopyNotice('');void hydrateAttributesFromApi().then(refresh).catch(()=>setError('Não foi possível carregar os atributos desta loja.'));};
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);
     void hydrateAttributesFromApi()
       .then((res) => {
         if (active && Array.isArray(res)) {
@@ -103,6 +120,7 @@ export function AttributesPage() {
     window.addEventListener(ATTRIBUTES_EVENT, refresh);
     return () => {
       active = false;
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);
       for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
       window.removeEventListener(ATTRIBUTES_EVENT, refresh);
     };
@@ -209,6 +227,8 @@ export function AttributesPage() {
       useOnTotem: totemSurface ? true : form.useOnTotem,
       filterOnTotem: totemSurface ? form.filterOnTotem || form.useOnTotem : form.filterOnTotem,
       useOnStock: form.useOnStock,
+      useOnPdv: form.useOnPdv !== false,
+      useOnExternalSale: form.useOnExternalSale !== false,
       sort: form.sort,
       active: form.active,
     };
@@ -244,6 +264,8 @@ export function AttributesPage() {
       useOnTotem: Boolean(item.useOnTotem),
       filterOnTotem: Boolean(item.filterOnTotem),
       useOnStock: Boolean(item.useOnStock),
+      useOnPdv: item.useOnPdv !== false,
+      useOnExternalSale: item.useOnExternalSale !== false,
       sort: typeof item.sort === 'number' ? item.sort : 10,
       active: item.active !== false,
     });
@@ -266,6 +288,8 @@ export function AttributesPage() {
       useOnTotem: Boolean(item.useOnTotem),
       filterOnTotem: Boolean(item.filterOnTotem),
       useOnStock: Boolean(item.useOnStock),
+      useOnPdv: item.useOnPdv !== false,
+      useOnExternalSale: item.useOnExternalSale !== false,
       sort: safeItems.length + 1,
       active: item.active !== false,
     });
@@ -326,6 +350,8 @@ export function AttributesPage() {
 
   return (
     <section className="admin-page">
+      {branches.length>0 && <div className="admin-card admin-toolbar"><AdminPicker label="Copiar atributos para filial" value={targetBranch} options={[{value:'',label:'Escolha uma filial'},...branches]} onChange={setTargetBranch}/><button type="button" className="btn btn--ghost" disabled={!targetBranch || saving} onClick={()=>void copyToBranch()}>Copiar atributos</button><p className="admin-help">Os cadastros existentes na filial serão preservados. Cada loja poderá editar seus atributos separadamente.</p>{copyNotice && <p role="status">{copyNotice}</p>}</div>}
+
       {headingActions}
       {!formVisible ? (
         <article className="admin-card">
@@ -613,6 +639,8 @@ export function AttributesPage() {
               />
               Filtro no totem
             </label>
+            <label><input type="checkbox" checked={form.useOnPdv !== false} disabled={atLimit || readOnly || saving} onChange={e=>setForm({...form,useOnPdv:e.target.checked})}/>Usar no PDV</label>
+            <label><input type="checkbox" checked={form.useOnExternalSale !== false} disabled={atLimit || readOnly || saving} onChange={e=>setForm({...form,useOnExternalSale:e.target.checked})}/>Usar na venda externa</label>
             {!totemSurface || catalogFull ? (
               <label>
                 <input

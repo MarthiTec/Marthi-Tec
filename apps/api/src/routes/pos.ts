@@ -1,3 +1,4 @@
+import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
@@ -36,6 +37,7 @@ const closeSessionSchema = z.object({
 });
 
 const saleLineSchema = z.object({
+  attributes: pickedAttributeSchema,
   stockId: z.string().optional().nullable(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
   qty: z.coerce.number().int().min(1, 'Quantidade inválida.'),
@@ -373,6 +375,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        await validateSaleAttributes(client,storeId,body.lines,'pdv');
 
         // 1. Idempotência: se já existir venda com mesma idempotencyKey, retorna a existente
         if (body.idempotencyKey || body.localId) {
@@ -434,8 +437,8 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
         for (const line of body.lines) {
           const lineId = `LIN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           await client.query(
-            `INSERT INTO sales_order_lines (id, order_id, stock_id, name, qty, unit_price, total_price, imei, is_ad_hoc, item_type)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `INSERT INTO sales_order_lines (id, order_id, stock_id, name, qty, unit_price, total_price, imei, is_ad_hoc, item_type, attributes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
               lineId,
               orderId,
@@ -447,6 +450,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
               line.imei,
               line.isAdHoc,
               line.itemType,
+              JSON.stringify(line.attributes),
             ],
           );
 

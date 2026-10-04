@@ -192,6 +192,7 @@ export function apiClosePosSale(body: {
   sellerId?: string;
   sellerName?: string;
   lines: Array<{
+    attributes?: Array<{id:string;name:string;value:string}>;
     stockId: string;
     name: string;
     qty: number;
@@ -2020,6 +2021,7 @@ export function apiSaveCardMachines(machines: any[]) {
 /* ── External Sales (Venda sem Caixa), Trade-in & Goals ──── */
 
 export type ExternalSaleLine = {
+  attributes?: Array<{id:string;name:string;value:string}>;
   stockId?: string | null;
   name: string;
   qty: number;

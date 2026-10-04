@@ -168,6 +168,7 @@ export type FinanceEntry = {
 };
 
 export type PosLineInput = {
+  attributes?: Array<{id:string;name:string;value:string}>;
   stockId: string;
   name: string;
   qty: number;
