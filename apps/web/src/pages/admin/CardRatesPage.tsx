@@ -265,6 +265,14 @@ export function CardRatesPage() {
           ) : null}
           <button
             type="button"
+            className="btn btn--primary btn--sm"
+            disabled={!loaded || saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Salvando…' : 'Salvar Taxas'}
+          </button>
+          <button
+            type="button"
             className="btn btn--outline btn--sm"
             onClick={handleCreateMachine}
             title="Adicionar mais uma maquininha POS para a loja"
@@ -278,9 +286,25 @@ export function CardRatesPage() {
       </div>
 
       {error ? <p role="alert" className="qty-low">{error}</p> : null}
-      <article className="admin-card"><label><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)} /> Usar taxas de cartão nesta loja</label>
-      <p className="empty">Recurso opcional do ramo. Oficinas iniciam com o recurso ativo. As taxas são definidas por cada loja.</p>
-      <button className="btn btn--primary" type="button" disabled={!loaded || saving} onClick={()=>void handleSave()}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></article>
+      <article className="admin-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0, cursor: 'pointer', fontWeight: 600 }}>
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+            <span>Usar taxas de cartão nesta loja</span>
+          </label>
+          <button
+            className="btn btn--primary btn--sm"
+            type="button"
+            disabled={!loaded || saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Salvando…' : 'Salvar alterações'}
+          </button>
+        </div>
+        <p className="empty" style={{ margin: '8px 0 0', fontSize: '0.84rem' }}>
+          Recurso opcional do ramo. Oficinas iniciam com o recurso ativo. As taxas são definidas por cada loja.
+        </p>
+      </article>
       <fieldset disabled={!enabled || !loaded || saving} className="card-rates-fields">
       {/* Banner de Referência para o Totem */}
       <article
@@ -465,17 +489,14 @@ export function CardRatesPage() {
             />
           </label>
 
-          <div>
-            <span className="admin-field-label">Bandeira Referência p/ Totem</span>
-            <AdminPicker
-              label="Bandeira Referência p/ Totem"
-              value={activeMachine.defaultBrandId}
-              options={activeMachine.brands
-                .filter((b) => b.active)
-                .map((b) => ({ value: b.id, label: b.name }))}
-              onChange={(val) => updateActiveMachine({ defaultBrandId: val })}
-            />
-          </div>
+          <AdminPicker
+            label="Bandeira Referência p/ Totem"
+            value={activeMachine.defaultBrandId}
+            options={activeMachine.brands
+              .filter((b) => b.active)
+              .map((b) => ({ value: b.id, label: b.name }))}
+            onChange={(val) => updateActiveMachine({ defaultBrandId: val })}
+          />
         </div>
 
         {/* Abas das Bandeiras */}
@@ -743,31 +764,25 @@ export function CardRatesPage() {
             />
           </label>
 
-          <div>
-            <span className="admin-field-label">Bandeira Simulada</span>
-            <AdminPicker
-              label="Bandeira Simulada"
-              value={activeBrand.id}
-              options={activeMachine.brands.map((b) => ({ value: b.id, label: b.name }))}
-              onChange={(val) => setSelectedBrandId(val)}
-            />
-          </div>
+          <AdminPicker
+            label="Bandeira Simulada"
+            value={activeBrand.id}
+            options={activeMachine.brands.map((b) => ({ value: b.id, label: b.name }))}
+            onChange={(val) => setSelectedBrandId(val)}
+          />
 
-          <div>
-            <span className="admin-field-label">Parcelamento</span>
-            <AdminPicker
-              label="Parcelamento"
-              value={String(simParcels)}
-              options={[
-                { value: '0', label: `Débito (${activeBrand.debitRate}%)` },
-                ...activeBrand.installments.map((it) => ({
-                  value: String(it.installment),
-                  label: `${it.installment}x (${it.rate}%)`,
-                })),
-              ]}
-              onChange={(val) => setSimParcels(Number(val))}
-            />
-          </div>
+          <AdminPicker
+            label="Parcelamento"
+            value={String(simParcels)}
+            options={[
+              { value: '0', label: `Débito (${activeBrand.debitRate}%)` },
+              ...activeBrand.installments.map((it) => ({
+                value: String(it.installment),
+                label: `${it.installment}x (${it.rate}%)`,
+              })),
+            ]}
+            onChange={(val) => setSimParcels(Number(val))}
+          />
         </div>
 
         {/* Painel de Resultados do Simulador */}
@@ -830,6 +845,32 @@ export function CardRatesPage() {
               Crédito real no caixa da loja
             </span>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
+          {saveSuccess ? (
+            <span
+              style={{
+                background: 'rgba(45, 212, 191, 0.15)',
+                color: 'var(--accent, #2dd4bf)',
+                padding: '6px 14px',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                border: '1px solid rgba(45, 212, 191, 0.3)',
+              }}
+            >
+              ✓ Configuração salva com sucesso
+            </span>
+          ) : null}
+          <button
+            className="btn btn--primary"
+            type="button"
+            disabled={!loaded || saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Salvando…' : 'Salvar Alterações'}
+          </button>
         </div>
       </article>
       </fieldset>

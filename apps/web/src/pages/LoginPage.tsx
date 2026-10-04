@@ -609,14 +609,6 @@ export function LoginPage() {
             <div className="auth__links" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               {loginStep === 'email' ? (
                 <>
-                  <button
-                    type="button"
-                    className="auth__link"
-                    style={{ fontWeight: 700, color: 'var(--accent, #0f766e)' }}
-                    onClick={() => goView('first-access')}
-                  >
-                    Primeiro acesso?
-                  </button>
                   <button type="button" className="auth__link" onClick={() => goView('forgot')}>
                     Esqueci minha senha
                   </button>
