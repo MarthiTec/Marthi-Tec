@@ -1,3 +1,4 @@
+import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
@@ -130,6 +131,7 @@ function isValidCpf(value: string) {
 type MoneyMode = 'money' | 'percent';
 
 type CartLine = {
+  attributes?: Array<{id:string;name:string;value:string}>;
   key: string;
   stockId: string;
   name: string;
@@ -1312,6 +1314,7 @@ export function CaixaPage() {
         lines: pricedLines.map((line) => ({
           stockId: line.stockId,
           name: line.name,
+          attributes: line.attributes,
           qty: line.qty,
           unitPrice: line.unitPrice,
           imei: line.imei,
@@ -2352,6 +2355,7 @@ export function CaixaPage() {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <strong className="pdv__item">{line.name}</strong>
+                                <SaleAttributeFields surface="pdv" product={stock.find(item=>item.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map(entry=>entry.key===line.key ? {...entry,attributes} : entry))}/>
                                 {line.isAdHoc ? (
                                   <span
                                     style={{

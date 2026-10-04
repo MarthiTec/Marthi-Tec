@@ -200,7 +200,7 @@ async function handleGetAttributes(req: Request, res: Response, next: NextFuncti
 
     if (pool) {
       const attrsRes = await pool.query(
-        `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
+        `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, use_on_pdv, use_on_external_sale, sort, active
          FROM product_attributes
          WHERE store_id = $1
            AND active = true
@@ -232,6 +232,8 @@ async function handleGetAttributes(req: Request, res: Response, next: NextFuncti
             useOnTotem: Boolean(row.use_on_totem),
             filterOnTotem: Boolean(row.filter_on_totem),
             useOnStock: Boolean(row.use_on_stock),
+            useOnPdv: Boolean(row.use_on_pdv),
+            useOnExternalSale: Boolean(row.use_on_external_sale),
             sort: Number(row.sort) || 0,
             active: Boolean(row.active),
           });

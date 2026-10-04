@@ -1,3 +1,4 @@
+import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
@@ -41,6 +42,7 @@ const tradeInSchema = z.object({
 });
 
 const saleLineSchema = z.object({
+  attributes: pickedAttributeSchema,
   stockId: z.string().optional().nullable(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
   qty: z.coerce.number().int().min(1, 'Quantidade inválida.'),
@@ -94,6 +96,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+        await validateSaleAttributes(client,storeId,body.lines,'external');
       if (body.requestId) {
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [storeId + ':' + body.requestId]);
         const existing = await client.query('SELECT id FROM sales_orders WHERE store_id = $1 AND request_key = $2', [storeId, body.requestId]);
@@ -225,8 +228,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         const lineId = `LIN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
         await client.query(
           `INSERT INTO sales_order_lines (
-            id, sale_id, order_id, stock_id, name, qty, unit_price, total_price, unit_cost, total_cost, imei, is_ad_hoc, item_type
-          ) VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            id, sale_id, order_id, stock_id, name, qty, unit_price, total_price, unit_cost, total_cost, imei, is_ad_hoc, item_type, attributes
+          ) VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [
             lineId,
             orderId,
@@ -240,6 +243,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
             line.imei,
             line.isAdHoc,
             line.itemType,
+            JSON.stringify(line.attributes),
           ],
         );
 

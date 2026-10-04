@@ -1,3 +1,4 @@
+import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
 import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -20,6 +21,7 @@ import { CashPickupModal } from '../../components/CashPickupModal';
 import { DailyPendingModal } from '../../components/DailyPendingModal';
 
 type StockOption = {
+  attrs?: Record<string,unknown>; color?: string; capacity?: string;
   brand: string;
   id: string;
   name: string;
@@ -28,7 +30,6 @@ type StockOption = {
   qty: number;
   imei: string;
   category: string;
-  attrs?: Record<string,string>;
 };
 
 export function ExternalSalePage() {
@@ -148,6 +149,7 @@ export function ExternalSalePage() {
           imei: it.imei || '',
           category: it.category || 'Geral',
           brand: it.brand || '',
+          attrs: it.attrs, color: it.color, capacity: it.capacity,
         }));
 
         setStockItems(mappedStock);
@@ -219,10 +221,11 @@ export function ExternalSalePage() {
     setLines((prev) =>
       prev.map((l, idx) => {
         if (idx !== index) return l;
-        if (!prod) return { ...l, stockId: '', name: '', unitPrice: 0, unitCost: 0, imei: '' };
+        if (!prod) return { ...l, attributes: [], stockId: '', name: '', unitPrice: 0, unitCost: 0, imei: '' };
         return {
           ...l,
           stockId: prod.id,
+          attributes: [],
           name: prod.name,
           unitPrice: prod.price,
           unitCost: prod.cost,
@@ -286,6 +289,7 @@ export function ExternalSalePage() {
         warrantyTerms: warrantyTerms.trim(),
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
+          attributes: l.attributes ?? [],
           name: l.name.trim(),
           qty: Number(l.qty) || 1,
           unitPrice: Number(l.unitPrice) || 0,
@@ -682,6 +686,7 @@ export function ExternalSalePage() {
                   />
                 </div>
 
+                <SaleAttributeFields surface="external" product={stockItems.find(p=>p.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map((entry,i)=>i===idx ? {...entry,attributes} : entry))}/>
                 <div>
                   <label className="admin-label">Quantidade</label>
                   <input
