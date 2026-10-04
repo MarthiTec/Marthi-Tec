@@ -183,11 +183,13 @@ export function MarthiClientsPage() {
   const [paymentMethod, setPaymentMethod] = useState('pix');
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   // Activation / Credentials Success Dialog
   const [activatedNotice, setActivatedNotice] = useState<{
     client: MarthiClient;
     isNew?: boolean;
+    message?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -197,7 +199,9 @@ export function MarthiClientsPage() {
 
   useEffect(() => {
     refresh();
-    hydrateMarthiClientsFromApi().then(() => refresh()).catch(() => {});
+    hydrateMarthiClientsFromApi().then(() => refresh()).catch((error) => {
+      setFlash(error instanceof Error ? error.message : 'Não foi possível atualizar os clientes do MarthiDB.');
+    });
     window.addEventListener(MARTHI_CLIENTS_EVENT, refresh);
     window.addEventListener(PRESENCE_EVENT, refresh);
     window.addEventListener('storage', refresh);
@@ -403,9 +407,10 @@ export function MarthiClientsPage() {
   }
 
   async function handleConfirmManualPayment() {
-    if (!paymentModalClient) return;
+    if (!paymentModalClient || paymentSaving) return;
     const client = paymentModalClient;
-
+    setPaymentSaving(true);
+    try {
     const res = await identifyClientPaymentAndActivate(client.clientId, {
       method: paymentMethod,
       transactionRef: paymentRef,
@@ -418,7 +423,7 @@ export function MarthiClientsPage() {
         actorName: user?.name ?? 'Admin Marthi',
         actorEmail: user?.email ?? 'admin@marthi.com.br',
         action: 'marthi.cliente.pagamento_identificado_ativado',
-        detail: `Pagamento identificado manualmente para ${client.tradeName} via ${paymentMethod} (${paymentRef || 'Sem comprovante'}). Token seguro gerado e e-mail de ativação enviado.`,
+        detail: `Pagamento confirmado no MarthiDB para ${client.tradeName} via ${paymentMethod} (${paymentRef || 'Sem referência'}).`,
       });
 
       setPaymentModalClient(null);
@@ -430,11 +435,13 @@ export function MarthiClientsPage() {
       setActivatedNotice({
         client: res.client,
         isNew: false,
+        message: res.message,
       });
     } else {
       setFlash(res.message || 'Falha ao confirmar pagamento.');
       alert(res.message || 'Falha ao confirmar pagamento. Verifique os dados ou tente novamente.');
     }
+    } finally { setPaymentSaving(false); }
   }
 
   async function runAction(action: PendingAction) {
@@ -1554,20 +1561,20 @@ export function MarthiClientsPage() {
                   borderRadius: '8px',
                 }}
               >
-                ℹ️ Ao confirmar, o sistema marca o pagamento como <strong>Confirmado</strong>, gera um <strong>token seguro de uso único</strong> e envia automaticamente o e-mail oficial com as instruções para o responsável criar sua senha.
+                ℹ️ Ao confirmar, o sistema registra o pagamento no <strong>MarthiDB</strong> e libera a loja cadastrada. Se o responsável precisar criar a senha, será gerado um link seguro de ativação. O resultado informa se o e-mail foi enviado.
               </div>
 
               <div className="marthi-modal-foot">
-                <button type="button" className="btn btn--ghost" onClick={() => setPaymentModalClient(null)}>
+                <button type="button" className="btn btn--ghost" disabled={paymentSaving} onClick={() => setPaymentModalClient(null)}>
                   Cancelar
                 </button>
                 <button
                   type="button"
                   className="btn btn--primary"
-                  style={{ background: '#059669', borderColor: '#059669' }}
+                  disabled={paymentSaving}
                   onClick={handleConfirmManualPayment}
                 >
-                  Confirmar Pagamento &amp; Ativar Acesso
+                  {paymentSaving ? 'Salvando no MarthiDB…' : 'Confirmar Pagamento & Ativar Acesso'}
                 </button>
               </div>
             </div>
@@ -1925,10 +1932,10 @@ export function MarthiClientsPage() {
             <header className="marthi-modal-head" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
               <div>
                 <span className="marthi-modal-kicker" style={{ color: '#10b981' }}>
-                  Ativação Segura Concluída
+                  Resultado da operação
                 </span>
                 <h2 style={{ color: '#34d399' }}>
-                  {activatedNotice.isNew ? 'Cliente Cadastrado com Sucesso!' : 'Pagamento Confirmado & Acesso Ativado!'}
+                  {activatedNotice.isNew ? 'Cliente Cadastrado com Sucesso!' : 'Pagamento confirmado no MarthiDB'}
                 </h2>
               </div>
               <button
@@ -1943,7 +1950,7 @@ export function MarthiClientsPage() {
 
             <div className="marthi-modal-form">
               <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--ink)' }}>
-                O e-mail oficial com o <strong>link seguro para criação de senha</strong> foi despachado para o responsável:
+                Confira os dados do cliente e o resultado da operação:
               </p>
 
               <div className="marthi-summary-box" style={{ borderRadius: '12px', padding: '16px', gap: '8px', fontSize: '0.88rem' }}>
@@ -1959,7 +1966,7 @@ export function MarthiClientsPage() {
                   </div>
                 ) : null}
                 <div style={{ color: '#10b981', fontWeight: 600 }}>
-                  ✓ Link de ativação de uso único enviado para o e-mail do cliente
+                  {activatedNotice.message || 'Consulte a situação do acesso e o envio da ativação nos detalhes do cliente.'}
                 </div>
               </div>
 

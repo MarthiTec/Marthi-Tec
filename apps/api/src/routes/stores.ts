@@ -516,14 +516,19 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
       const sql = `
         SELECT c.*, 
                s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
-               l.plan_id, l.modules,
+               l.plan_id, l.modules::text[] as modules, l.final_price,
+               pc.confirmed_at as manual_confirmed_at, pc.contracting_status as manual_status,
+               pc.payment_method as manual_method, pc.transaction_ref as manual_ref,
+               ((u.provider <> 'password' AND u.active=true) OR (u.password_hash IS NOT NULL AND u.password_hash <> 'LOCKED_PENDING_ACTIVATION')) as owner_password_configured,
                ps.status as partner_status, ps.payment_confirmed_at, ps.payment_method as partner_pay_method,
                ps.transaction_ref as partner_tx_ref, ps.notes as partner_notes, ps.monthly_amount as partner_amount
         FROM client_accounts c
         LEFT JOIN stores s ON s.client_account_id = c.id
-        LEFT JOIN store_licenses l ON l.client_account_id = c.id
+        LEFT JOIN store_licenses l ON l.client_account_id = c.id AND l.store_id=s.id
         LEFT JOIN partner_signups ps ON (ps.id = c.id OR (ps.document = c.document AND ps.document != ''))
-        ORDER BY c.created_at ASC
+        LEFT JOIN client_payment_confirmations pc ON pc.client_account_id=c.id
+        LEFT JOIN users u ON u.client_account_id=c.id AND lower(u.email)=lower(c.email)
+        ORDER BY c.created_at ASC, s.is_matrix DESC, s.created_at ASC, s.id ASC
       `;
       const result = await pool.query(sql);
       const map = new Map<string, any>();
@@ -531,15 +536,15 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
       for (const row of result.rows) {
         if (!map.has(row.id)) {
           const rawDoc = row.document || '';
-          const token = row.access_token || row.store_token || generateStoreAccessToken(rawDoc, row.email, row.id);
-          const isDemo = row.id === 'ACC-MARTHI-DEMO';
+          const token = row.access_token || row.store_token || '';
 
           const isPaymentOk =
-            isDemo ||
+            Boolean(row.manual_confirmed_at) ||
             Boolean(row.payment_confirmed_at) ||
             ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.partner_status) ||
             (row.status === 'active' && !row.partner_status);
-          let contractingStatus = isDemo ? 'acesso_ativado' : (row.partner_status || 'aguardando_pagamento');
+          let contractingStatus = row.manual_status || (row.partner_status || 'aguardando_pagamento');
+          if (row.manual_confirmed_at && row.owner_password_configured) contractingStatus = 'acesso_ativado';
           if (!isPaymentOk) {
             contractingStatus = 'aguardando_pagamento';
           }
@@ -552,20 +557,20 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
             email: row.email,
             phone: row.phone || '',
             planId: row.plan_id || 'golden',
-            modules: row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+            modules: row.modules || [],
             status: row.status || 'active',
             contractingStatus,
             paymentOk: isPaymentOk,
-            monthlyAmount: row.partner_amount ? Number(row.partner_amount) : (row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597),
+            monthlyAmount: Number(row.partner_amount ?? row.final_price ?? 0),
             contractedAt: row.created_at,
-            passwordConfigured: isDemo || contractingStatus === 'acesso_ativado',
-            phoneVerified: isDemo,
+            passwordConfigured: Boolean(row.owner_password_configured),
+            phoneVerified: false,
             notes: row.partner_notes || '',
             accessToken: token,
-            paymentDetails: row.partner_pay_method ? {
-              method: row.partner_pay_method,
-              identifiedAt: row.payment_confirmed_at || row.created_at,
-              transactionRef: row.partner_tx_ref || undefined,
+            paymentDetails: (row.manual_method || row.partner_pay_method) ? {
+              method: row.manual_method || row.partner_pay_method,
+              identifiedAt: row.manual_confirmed_at || row.payment_confirmed_at || row.created_at,
+              transactionRef: row.manual_ref || row.partner_tx_ref || undefined,
             } : undefined,
           });
         }
@@ -585,7 +590,7 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
         for (const row of signupsRes.rows) {
           if (!map.has(row.id)) {
             const rawDoc = row.document || '';
-            const token = generateStoreAccessToken(rawDoc, row.email, row.id);
+            const token = '';
             const isPaymentOk =
               Boolean(row.payment_confirmed_at) ||
               ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.status);
@@ -599,11 +604,11 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
               email: row.email,
               phone: row.phone || '',
               planId: row.plan_id || 'golden',
-              modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+              modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || [],
               status: 'active',
               contractingStatus,
               paymentOk: isPaymentOk,
-              monthlyAmount: Number(row.monthly_amount) || (row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597),
+              monthlyAmount: Number(row.monthly_amount ?? 0),
               contractedAt: row.created_at,
               passwordConfigured: false,
               phoneVerified: false,
@@ -625,33 +630,9 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
       return;
     }
 
-    res.json({ success: true, data: [] });
-  } catch (error) {
-    console.warn('[storesRouter] Falha ao consultar client_accounts no DB, retornando contingência:', error);
-    res.json({
-      success: true,
-      data: [
-        {
-          clientId: 'ACC-MARTHI-DEMO',
-          tradeName: 'Loja Demonstração Marthi',
-          legalName: 'Marthi Tecnologia e Demonstração LTDA',
-          document: '00.000.000/0001-91',
-          email: 'contato@marthi.com.br',
-          phone: '(11) 3000-0000',
-          planId: 'golden',
-          modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
-          status: 'active',
-          contractingStatus: 'acesso_ativado',
-          paymentOk: true,
-          monthlyAmount: 597,
-          contractedAt: new Date().toISOString(),
-          passwordConfigured: true,
-          phoneVerified: true,
-          accessToken: 'TK-DEMO-000191-MDEM-01',
-        },
-      ],
-    });
-  }
+    throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  } catch (error) { next(error); }
+
 });
 
 storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
