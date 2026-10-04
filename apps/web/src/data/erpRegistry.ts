@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import type { PartnerModuleId } from './catalog';
 import { isMarthiStaffEmail } from './marthiStaff';
 import {
@@ -18,7 +19,7 @@ import {
   type ApiSupplier,
 } from '../services/erpApi';
 import { isNestAuthed } from '../services/nestClient';
-import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
+import { getActiveTenantKey, isRealClientTenant } from './tenantContext';
 import { listMarthiClients } from './marthiClientsStore';
 import { setErpUserPassword } from './erpUserPasswords';
 
@@ -171,11 +172,11 @@ let memoryRegistryState: RegistryState | null = null;
 
 function load(): RegistryState {
   const activeTenant = getActiveTenantKey();
-  if (memoryRegistryState && memoryRegistryTenant === activeTenant) {
+  if (memoryRegistryState && memoryRegistryTenant === storeScopedKey(STORAGE_KEY)) {
     return memoryRegistryState;
   }
-  memoryRegistryTenant = activeTenant;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  memoryRegistryTenant = storeScopedKey(STORAGE_KEY);
+  const key = storeScopedKey(STORAGE_KEY);
 
   try {
     const raw = localStorage.getItem(key);
@@ -253,10 +254,9 @@ function load(): RegistryState {
 }
 
 function save(state: RegistryState) {
-  const activeTenant = getActiveTenantKey();
-  memoryRegistryTenant = activeTenant;
+  memoryRegistryTenant = storeScopedKey(STORAGE_KEY);
   memoryRegistryState = state;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  const key = storeScopedKey(STORAGE_KEY);
   localStorage.setItem(key, JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-erp-registry-updated'));
 }

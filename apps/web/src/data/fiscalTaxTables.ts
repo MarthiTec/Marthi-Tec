@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * Tabelas CST e cClassTrib (reforma IBS/CBS).
  * Fonte oficial: API Conformidade Fácil SVRS
@@ -234,10 +235,10 @@ function seed(): TaxTablesState {
 
 function load(): TaxTablesState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) {
       const initial = seed();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+      localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(initial));
       return initial;
     }
     const parsed = JSON.parse(raw) as Partial<TaxTablesState>;
@@ -256,7 +257,7 @@ function load(): TaxTablesState {
 }
 
 function save(state: TaxTablesState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-fiscal-tax-tables-updated'));
 }
 

@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
+import {requireAuth} from './authMiddleware.js';
 
 function nestOrigin() {
-  return (process.env.NEST_API_URL || 'https://marthi-backend.discloud.app').replace(/\/$/, '');
+  return (process.env.NEST_API_URL || '').replace(/\/$/, '');
 }
 
 /**
@@ -14,11 +15,16 @@ export async function proxyUnmatchedApi(req: Request, res: Response, next: NextF
     return;
   }
 
+  if (!nestOrigin()) return next();
+  if (!req.user) {
+    return requireAuth(req,res, (error?:unknown) => { if(error) return next(error); void proxyUnmatchedApi(req,res,next); });
+  }
   const target = `${nestOrigin()}${req.originalUrl}`;
   try {
     const headers = new Headers();
     const authorization = req.header('authorization');
     if (authorization) headers.set('authorization', authorization);
+    if(req.storeId) headers.set('x-store-id',req.storeId);
     const accept = req.header('accept');
     if (accept) headers.set('accept', accept);
 
@@ -31,7 +37,7 @@ export async function proxyUnmatchedApi(req: Request, res: Response, next: NextF
       }
     }
 
-    const upstream = await fetch(target, { method: req.method, headers, body });
+    const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(15000) });
     const text = await upstream.text();
     const type = upstream.headers.get('content-type');
     if (type) res.setHeader('content-type', type);

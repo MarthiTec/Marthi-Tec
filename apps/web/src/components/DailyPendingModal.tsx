@@ -18,15 +18,17 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
     receivablesDueCount: number;
     receivablesDueAmount: number;
   } | null>(null);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiGetDailyPendingTasks()
       .then((res) => setTasks(res))
-      .catch((err) => console.warn('Erro ao carregar pendências:', err))
+      .catch(() => setError('Não foi possível consultar as pendências no banco.'))
       .finally(() => setLoading(false));
   }, []);
 
+  if (error) return <div className="admin-modal-backdrop"><div className="admin-modal"><p role="alert">{error}</p><button onClick={onClose}>Fechar</button></div></div>;
   return (
     <div className="admin-modal-backdrop" onClick={onClose}>
       <div
@@ -38,7 +40,7 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.3rem' }}>📋</span>
             <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 700 }}>
-              Painel de Pendências do Dia — Mariana
+              Pendências do Dia
             </h3>
           </div>
           <button className="admin-btn admin-btn--icon" onClick={onClose} title="Fechar">
@@ -77,7 +79,7 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
                     <strong style={{ fontSize: '0.94rem' }}>Dinheiro em Espécie na Loja</strong>
                   </div>
                   <div style={{ fontSize: '0.82rem', color: 'var(--mute)', marginTop: '2px' }}>
-                    {tasks?.pendingCashSalesCount || 0} venda(s) externa(s) aguardando recolhimento por Gilvan
+                    {tasks?.pendingCashSalesCount || 0} venda(s) externa(s) aguardando recolhimento
                   </div>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#eab308', marginTop: '4px' }}>
                     R$ {(tasks?.pendingCashTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

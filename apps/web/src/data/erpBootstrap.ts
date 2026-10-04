@@ -80,6 +80,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
   setBootstrap({ loading: true, ready: false, error: null });
 
   try {
+    if (!await hydrateMultiStoreFromApi()) throw new Error("Não foi possível carregar as lojas autorizadas.");
     const [
       customers,
       stock,

@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { ATTR_CAP, ATTR_COR } from './attributeStore';
 import {
   apiClosePosSale,
@@ -16,7 +17,7 @@ import {
   apiUpdateStock,
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
-import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
+import { isRealClientTenant } from './tenantContext';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
@@ -370,8 +371,7 @@ let memoryState: AdminState | null = null;
 let memoryStateTenant: string | null = null;
 
 function load(): AdminState {
-  const activeTenant = getActiveTenantKey();
-  if (memoryState && memoryStateTenant === activeTenant) {
+  if (memoryState && memoryStateTenant === storeScopedKey(STORAGE_KEY)) {
     return {
       customers: memoryState.customers.map((item) => ({ ...item })),
       stock: memoryState.stock.map((item) => ({ ...item, attrs: { ...item.attrs }, images: [...item.images] })),
@@ -382,8 +382,8 @@ function load(): AdminState {
     };
   }
 
-  memoryStateTenant = activeTenant;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  memoryStateTenant = storeScopedKey(STORAGE_KEY);
+  const key = storeScopedKey(STORAGE_KEY);
 
   try {
     localStorage.removeItem('marthi.admin.v1');
@@ -395,8 +395,8 @@ function load(): AdminState {
           stock: [],
           orders: [],
           finance: [],
-          priceTables: seedPriceTables(),
-          payments: seedPayments(),
+          priceTables: [],
+          payments: [],
         };
         save(fresh);
         return fresh;
@@ -413,8 +413,8 @@ function load(): AdminState {
           stock: [],
           orders: [],
           finance: [],
-          priceTables: seedPriceTables(),
-          payments: seedPayments(),
+          priceTables: [],
+          payments: [],
         };
         save(fresh);
         return fresh;
@@ -485,10 +485,9 @@ export function defaultCardRate(): number {
 }
 
 function save(state: AdminState) {
-  const activeTenant = getActiveTenantKey();
-  memoryStateTenant = activeTenant;
+  memoryStateTenant = storeScopedKey(STORAGE_KEY);
   memoryState = state;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  const key = storeScopedKey(STORAGE_KEY);
   try {
     localStorage.setItem(key, JSON.stringify(state));
   } catch {
@@ -853,7 +852,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
     try {
       await apiDeleteStock(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -870,7 +869,7 @@ export async function removePriceTable(id: string): Promise<AdminState> {
     try {
       await apiDeletePriceTable(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover tabela no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -884,7 +883,7 @@ export async function removePayment(id: string): Promise<AdminState> {
     try {
       await apiDeletePayment(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover pagamento no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();

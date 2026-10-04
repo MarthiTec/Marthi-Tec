@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { addFinance, getAdminState, type FinanceEntry } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import {
@@ -211,7 +212,7 @@ function seed(): BookState {
 
 function load(): BookState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) {
       const seeded = seed();
       save(seeded);
@@ -244,7 +245,7 @@ function load(): BookState {
 }
 
 function save(state: BookState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-finance-book-updated'));
 }
 

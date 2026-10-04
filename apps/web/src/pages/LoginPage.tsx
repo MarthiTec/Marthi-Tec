@@ -5,7 +5,6 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useAuth } from '../contexts/AuthContext';
 import { ingestContractInterestToCrm } from '../data/crmStore';
 import { resolveAppHome, userIsStoreAdmin } from '../data/erpRegistry';
-import { listMarthiClients } from '../data/marthiClientsStore';
 import { isMarthiStaffEmail } from '../data/marthiStaff';
 import { nestApiUrl } from '../services/config';
 
@@ -124,38 +123,7 @@ export function LoginPage() {
         console.warn('[LoginPage] Backend identify offline, checking local registry:', netErr);
       }
 
-      // 2. Fallback local para contingência rápida
-      if (!identifyData) {
-        if (isMarthiStaffEmail(sessionEmail)) {
-          identifyData = {
-            identified: true,
-            hasPassword: true,
-            needsFirstAccess: false,
-            email: sessionEmail,
-            name: 'Equipe Marthi',
-            storeName: 'Marthi Tecnologia (Admin Central)',
-            role: 'superadmin',
-          };
-        } else {
-          const clients = listMarthiClients();
-          const cli = clients.find((c) => c.email.toLowerCase() === sessionEmail);
-          if (cli) {
-            const hasPwd = Boolean(cli.passwordConfigured);
-            identifyData = {
-              identified: true,
-              hasPassword: hasPwd,
-              needsFirstAccess: !hasPwd,
-              email: sessionEmail,
-              name: cli.tradeName,
-              storeName: cli.tradeName,
-              role: 'admin',
-              message: hasPwd
-                ? undefined
-                : `Identificamos o cadastro de ${cli.tradeName}! Esta conta ainda precisa configurar a senha de primeiro acesso.`,
-            };
-          }
-        }
-      }
+      if (!identifyData) throw new Error('Não foi possível consultar seu acesso no servidor. Tente novamente.');
 
       // 3. Avalia o resultado da identificação
       if (identifyData && identifyData.identified && identifyData.hasPassword) {

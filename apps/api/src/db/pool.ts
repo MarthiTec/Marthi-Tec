@@ -26,7 +26,7 @@ function sslFromUrl(connectionString: string): PoolConfig['ssl'] | undefined {
   return undefined;
 }
 
-function buildPoolConfig(): PoolConfig | null {
+function buildPoolConfig(): PoolConfig {
   if (env.DATABASE_URL) {
     return {
       connectionString: env.DATABASE_URL,
@@ -36,7 +36,7 @@ function buildPoolConfig(): PoolConfig | null {
   }
 
   if (!env.DB_HOST || !env.DB_DATABASE) {
-    return null;
+    throw new Error('MarthiDB não configurado.');
   }
 
   return {
@@ -57,8 +57,8 @@ function buildPoolConfig(): PoolConfig | null {
 
 const poolConfig = buildPoolConfig();
 
-export const dbConfigured = poolConfig !== null;
-export const pool = poolConfig ? new Pool(poolConfig) : null;
+export const dbConfigured = true;
+export const pool = new Pool(poolConfig);
 
 function publicDbError(error: unknown): string {
   if (!(error instanceof Error)) return 'Falha ao conectar no PostgreSQL.';

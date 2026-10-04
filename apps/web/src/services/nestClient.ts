@@ -1,3 +1,4 @@
+import { tenantScopedKey } from '../data/tenantContext';
 import { nestApiUrl } from './config';
 import { readJson } from './http';
 
@@ -6,14 +7,14 @@ const AUTH_TOKEN_KEY = 'marthi.auth.token';
 export function getAuthToken(): string | null {
   try {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    return token ? token : 'marthi-demo-token';
+    return token || null;
   } catch {
-    return 'marthi-demo-token';
+    return null;
   }
 }
 
 export function isNestAuthed(): boolean {
-  return true;
+  return Boolean(getAuthToken());
 }
 
 type ApiErrorBody = {
@@ -51,14 +52,16 @@ export async function nestRequest<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   try {
-    const activeStoreId = localStorage.getItem('marthi.activeStoreId') || 'STR-DEMO-01';
-    if (!headers.has('x-store-id')) {
+    const activeStoreId = localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1'));
+    if (activeStoreId && !headers.has('x-store-id')) {
       headers.set('x-store-id', activeStoreId);
     }
   } catch {
     // ignore
   }
 
+  const selectedAtStart = headers.get('x-store-id');
+  const hasExplicitStore = new Headers(init.headers).has('x-store-id');
   const response = await fetch(`${apiBase()}${path}`, { ...init, headers });
   const json = await readJson<ApiOkBody<T> | ApiErrorBody>(response);
 
@@ -71,6 +74,10 @@ export async function nestRequest<T>(
     );
   }
 
+  const selectedNow=localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1'));
+  if(getAuthToken() !== token || (!hasExplicitStore && selectedAtStart && selectedNow !== selectedAtStart)) {
+    throw new NestApiError('A sessão ou loja mudou durante a operação. Confira os registros da loja anterior antes de repetir.', 'STORE_CONTEXT_CHANGED', 409);
+  }
   return (json as ApiOkBody<T>).data;
 }
 

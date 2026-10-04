@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * Motor de Campanhas de Desconto e Promoções Comerciais (ERP → PDV & Orçamentos).
  *
@@ -216,7 +217,7 @@ function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
 function load(): Store {
   if (memory) return memory;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Store>;
       const rawCampaigns = Array.isArray(parsed.campaigns) ? parsed.campaigns.map(normalize) : [];
@@ -227,7 +228,7 @@ function load(): Store {
       memory = { campaigns: sanitized };
       if (JSON.stringify(sanitized) !== JSON.stringify(rawCampaigns)) {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+          localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(memory));
         } catch {
           /* ignore */
         }
@@ -244,7 +245,7 @@ function load(): Store {
 function save(next: Store) {
   memory = next;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(next));
   } catch {
     /* ignore */
   }

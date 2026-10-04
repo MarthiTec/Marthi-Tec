@@ -94,7 +94,7 @@ export function reduceStockQtyInMemory(stockId: string, qty: number): boolean {
  */
 stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const { kind, condition, q, low } = req.query;
 
     if (pool) {
@@ -133,7 +133,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         res.json({ success: true, data: result.rows.map(formatStockRow) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao consultar banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -160,7 +160,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
  */
 stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const code = String(req.query.code || '').trim();
     if (!code) {
       res.json({ success: true, data: null });
@@ -185,7 +185,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         res.json({ success: true, data: formatStockRow(resQuery.rows[0]) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha no lookup do banco, usando fallback:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -203,7 +203,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
  */
 stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const body = stockItemSchema.parse(req.body);
     const id = body.id || `STK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -212,24 +212,12 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[stock] Falha ao conectar ao PostgreSQL, recorrendo à memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
         try {
           await client.query('BEGIN');
-
-          // Garante a loja em stores para não quebrar a FK
-          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
-          if (storeExists.rowCount === 0) {
-            const fallbackAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
-            await client.query(
-              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
-               VALUES ($1, $2, 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(11) 3000-0000', true)
-               ON CONFLICT (id) DO NOTHING`,
-              [storeId, fallbackAccountId],
-            );
-          }
 
           await client.query(
             `INSERT INTO stock_items (
@@ -284,7 +272,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[stock] Erro na transação do banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -312,7 +300,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
  */
 stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const id = req.params.id;
     const body = stockItemSchema.partial().parse(req.body);
 
@@ -321,7 +309,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
       try {
         client = await pool.connect();
       } catch (connErr) {
-        console.warn('[stock] Falha ao conectar ao PostgreSQL no PATCH, usando memória:', connErr);
+        throw connErr;
       }
 
       if (client) {
@@ -417,7 +405,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          console.error('[stock] Erro na atualização do item no banco:', err);
+          throw err;
           throw err;
         } finally {
           client.release();
@@ -444,7 +432,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
  */
 stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const id = req.params.id;
 
     if (pool) {
@@ -453,7 +441,7 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
         res.json({ success: true, data: { ok: true } });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao deletar do banco, usando memória:', dbErr);
+        throw dbErr;
       }
     }
 
@@ -469,7 +457,7 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
  */
 stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
 
     if (pool) {
       try {
@@ -485,7 +473,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         res.json({ success: true, data: itemsRes.rows.map(formatStockRow) });
         return;
       } catch (dbErr) {
-        console.warn('[stock] Falha ao consultar catálogo de produtos no banco, usando memória:', dbErr);
+        throw dbErr;
       }
     }
 
