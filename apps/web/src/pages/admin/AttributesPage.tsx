@@ -427,12 +427,12 @@ export function AttributesPage() {
           ) : null}
           <p>
             {totemSurface
-              ? `Até ${MAX_ATTRIBUTES} atributos para filtros e opções do totem (cor, capacidade, etc.). O ajuste de preço entra na combinação na vitrine.`
-              : `Até ${MAX_ATTRIBUTES} atributos. Celular usa cor e capacidade; roupa/calçado, cor e tamanho (use os presets abaixo). Ótica: armação e lente. O estoque guarda o preço de cada combinação.`}
+              ? `Crie até ${MAX_ATTRIBUTES} atributos, como cor e capacidade, para organizar os produtos e os filtros do totem.`
+              : `Crie até ${MAX_ATTRIBUTES} atributos, como cor, capacidade ou tamanho. Adicione as opções e informe o ajuste de preço quando necessário.`}
           </p>
           {totemSurface && catalogFull ? (
             <p className="empty">
-              Mesmo cadastro da Retaguarda ·{' '}
+              Gerencie também na Retaguarda ·{' '}
               <Link to="/erp/atributos">Abrir atributos na Retaguarda</Link>
             </p>
           ) : null}
@@ -502,7 +502,7 @@ export function AttributesPage() {
           {!readOnly && !atLimit ? (
             <div className="admin-toolbar" style={{ marginTop: 10, flexWrap: 'wrap' }}>
               <span className="empty" style={{ marginRight: 4 }}>
-                Presets de tamanho:
+                Tamanhos prontos:
               </span>
               {SIZE_VALUE_PRESETS.map((preset) => (
                 <button

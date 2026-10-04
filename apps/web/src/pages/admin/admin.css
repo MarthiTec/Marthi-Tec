@@ -3504,6 +3504,18 @@
 
 .attr-value-row input {
   flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .attr-value-row {
+    flex-wrap: wrap;
+  }
+  .attr-value-row input,
+  .attr-value-row .btn {
+    width: 100%;
+    flex-basis: 100%;
+  }
 }
 
 .attr-flags {
@@ -6573,3 +6585,14 @@ select.caixa-mov-input {
   color: #2dd4bf;
 }
 
+
+.card-rates-machine-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; align-items: start; }
+.card-rates-machine-fields > label { display: grid; gap: 6px; min-width: 0; }
+.card-rates-machine-fields .admin-field-label, .card-rates-machine-fields .admin-picker__caption { margin: 0; font-size: 0.85rem; font-weight: 650; line-height: 1.4; }
+.card-rates-machine-fields .admin-picker { display: grid; gap: 6px; min-width: 0; }
+.card-rates-machine-fields input, .card-rates-machine-fields .admin-picker__trigger { min-height: 44px; width: 100%; box-sizing: border-box; margin: 0; }
+@media (max-width: 768px) { .card-rates-machine-fields { grid-template-columns: minmax(0, 1fr); } }
+.stock-brand-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; color: var(--ink); background: var(--card-2); border: 1px solid var(--line); }
+.device-reference { padding: 14px; margin: 12px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink); }
+.device-reference p { color: var(--mute); margin: 6px 0; }
+.device-reference a { color: var(--accent); }

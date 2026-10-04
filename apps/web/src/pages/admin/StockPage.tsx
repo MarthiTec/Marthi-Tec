@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
+import { useDeviceReference, attributeKind } from '../../data/deviceCatalog';
 import {
   CrudListBar,
   CrudNameButton,
@@ -63,27 +65,6 @@ export type StockVariationRow = {
   condition: StockCondition;
 };
 
-export const BRAND_PRESETS = [
-  { value: '', label: 'Sem marca definida' },
-  { value: 'apple', label: 'Apple (iPhone)' },
-  { value: 'xiaomi', label: 'Xiaomi (Redmi / Poco)' },
-  { value: 'samsung', label: 'Samsung (Galaxy)' },
-  { value: 'motorola', label: 'Motorola' },
-  { value: 'realme', label: 'Realme' },
-  { value: 'custom', label: 'Outra marca...' },
-] as const;
-
-export function resolveBrandPickerValue(brand: string | undefined): string {
-  if (!brand) return '';
-  const lower = brand.trim().toLowerCase();
-  if (lower === 'apple' || lower === 'iphone') return 'apple';
-  if (lower === 'xiaomi' || lower === 'redmi' || lower === 'poco') return 'xiaomi';
-  if (lower === 'samsung') return 'samsung';
-  if (lower === 'motorola') return 'motorola';
-  if (lower === 'realme') return 'realme';
-  return 'custom';
-}
-
 const REFRESH_EVENTS = [
   'marthi-admin-state',
   'marthi-os-state',
@@ -129,7 +110,23 @@ export function StockPage() {
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
-  const [customBrandMode, setCustomBrandMode] = useState(false);
+  const { brands, error: brandsError } = useBrands();
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible ? form.name : '');
+  const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
+  useEffect(() => {
+    if (!device || readOnly) return;
+    const brand = findBrand(brands.filter(b => b.active), device.brand);
+    if (brand) setForm(current => current.brand ? current : { ...current, brand: brand.slug });
+  }, [device, brands, mode]);
+
+  function referenceValues(attr: { name: string; values: string[] } | undefined) {
+    const kind = attr ? attributeKind(attr.name) : null;
+    return device && kind ? (kind === 'color' ? device.colors : device.capacities) : (attr?.values ?? []);
+  }
+  function pickReference(kind: 'color' | 'capacity', value: string) {
+    const def = attrDefs.find(a => attributeKind(a.name) === kind);
+    setForm(current => ({ ...current, [kind]: value, attrs: def ? { ...current.attrs, [def.id]: value } : current.attrs }));
+  }
 
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
@@ -190,18 +187,7 @@ export function StockPage() {
     return items.filter((item) => {
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
       if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
-      if (brandFilter !== 'all') {
-        const b = (item.brand || '').toLowerCase().trim();
-        if (brandFilter === 'apple') {
-          if (b !== 'apple' && b !== 'iphone') return false;
-        } else if (brandFilter === 'xiaomi') {
-          if (b !== 'xiaomi' && b !== 'redmi' && b !== 'poco') return false;
-        } else if (brandFilter === 'other') {
-          if (['apple', 'iphone', 'xiaomi', 'redmi', 'poco'].includes(b) || !b) return false;
-        } else {
-          if (b !== brandFilter) return false;
-        }
-      }
+      if (brandFilter !== 'all' && normalizeBrand(item.brand) !== normalizeBrand(brandFilter)) return false;
       if (totemFilter === 'totem' && !item.showOnTotem) return false;
       if (totemFilter === 'hidden' && item.showOnTotem) return false;
       if (attrFilterId !== 'all') {
@@ -233,7 +219,6 @@ export function StockPage() {
     setSelectedId(null);
     setMode('new');
     setError('');
-    setCustomBrandMode(false);
     setUseVariations(false);
     setVariations([]);
     setOriginalVariationIds([]);
@@ -408,7 +393,7 @@ export function StockPage() {
 
   function generateCombinations() {
     if (readOnly) return;
-    const activeDefs = attrDefs.filter((a) => selectedAttrIds.includes(a.id) && a.values.length > 0);
+    const activeDefs = attrDefs.filter((a) => selectedAttrIds.includes(a.id) && referenceValues(a).length > 0);
     if (activeDefs.length === 0) {
       setError('Selecione ao menos um atributo com valores cadastrados para gerar combinações.');
       return;
@@ -417,7 +402,7 @@ export function StockPage() {
     for (const def of activeDefs) {
       const nextCartesian: Record<string, string>[] = [];
       for (const item of cartesian) {
-        for (const val of def.values) {
+        for (const val of referenceValues(def)) {
           nextCartesian.push({ ...item, [def.id]: val });
         }
       }
@@ -522,8 +507,6 @@ export function StockPage() {
       setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
     }
 
-    const isCustom = Boolean(item.brand && resolveBrandPickerValue(item.brand) === 'custom');
-    setCustomBrandMode(isCustom);
 
     setForm({
       name: item.name,
@@ -894,12 +877,7 @@ export function StockPage() {
                       value={brandFilter}
                       options={[
                         { value: 'all', label: 'Todas marcas' },
-                        { value: 'apple', label: 'Apple (iPhone)' },
-                        { value: 'xiaomi', label: 'Xiaomi' },
-                        { value: 'samsung', label: 'Samsung' },
-                        { value: 'motorola', label: 'Motorola' },
-                        { value: 'realme', label: 'Realme' },
-                        { value: 'other', label: 'Outras marcas' },
+                        ...brands.map(b => ({ value: b.slug, label: b.name })),
                       ]}
                       onChange={setBrandFilter}
                     />
@@ -1017,30 +995,7 @@ export function StockPage() {
                       <CrudNameButton onClick={() => openForm(item, 'view')}>{item.name}</CrudNameButton>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
                         {item.brand ? (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              fontSize: '0.72rem',
-                              fontWeight: 600,
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                              background:
-                                item.brand.toLowerCase() === 'apple' || item.brand.toLowerCase() === 'iphone'
-                                  ? 'rgba(0, 113, 227, 0.12)'
-                                  : item.brand.toLowerCase() === 'xiaomi' || item.brand.toLowerCase() === 'redmi' || item.brand.toLowerCase() === 'poco'
-                                  ? 'rgba(255, 105, 0, 0.12)'
-                                  : 'rgba(128, 128, 128, 0.15)',
-                              color:
-                                item.brand.toLowerCase() === 'apple' || item.brand.toLowerCase() === 'iphone'
-                                  ? '#0071e3'
-                                  : item.brand.toLowerCase() === 'xiaomi' || item.brand.toLowerCase() === 'redmi' || item.brand.toLowerCase() === 'poco'
-                                  ? '#ff6900'
-                                  : 'inherit',
-                              textTransform: 'capitalize',
-                            }}
-                          >
-                            {item.brand.toLowerCase() === 'apple' ? 'Apple (iPhone)' : item.brand.toLowerCase() === 'xiaomi' ? 'Xiaomi' : item.brand}
-                          </span>
+                          <span className="stock-brand-badge">{findBrand(brands, item.brand)?.name ?? item.brand}</span>
                         ) : null}
                         {item.condition === 'refurbished' ? (
                           <span className="empty" style={{ fontSize: '0.75rem' }}>
@@ -1189,53 +1144,30 @@ export function StockPage() {
                 </p>
               </div>
 
+              {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
+              {deviceError && <p role="status" className="empty">{deviceError}</p>}
+              {device && <div className="device-reference">
+                <strong>{device.model}</strong>
+                <p>Escolha a cor e a capacidade do produto. Informe o preço de venda nos campos abaixo.</p>
+                <div className="admin-form">
+                  <AdminPicker label="Cor do modelo" value={form.color} options={device.colors} disabled={readOnly} onChange={value => pickReference('color', value)} />
+                  <AdminPicker label="Capacidade do modelo" value={form.capacity} options={device.capacities} disabled={readOnly} onChange={value => pickReference('capacity', value)} />
+                </div>
+                <a href={device.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a>
+              </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
                 <label className="span-2">
                   Produto
                   <input
                     ref={nameRef}
                     value={form.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      let newBrand = form.brand;
-                      if (!form.brand && !customBrandMode) {
-                        if (/iphone|apple|ipad|macbook|airpods/i.test(newName)) newBrand = 'apple';
-                        else if (/xiaomi|redmi|poco/i.test(newName)) newBrand = 'xiaomi';
-                        else if (/samsung|galaxy/i.test(newName)) newBrand = 'samsung';
-                        else if (/motorola|moto\s/i.test(newName)) newBrand = 'motorola';
-                        else if (/realme/i.test(newName)) newBrand = 'realme';
-                      }
-                      setForm({ ...form, name: newName, brand: newBrand });
-                    }}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
                     disabled={readOnly}
                     placeholder="Nome do produto"
                   />
                 </label>
-                <AdminPicker
-                  label="Marca do Produto"
-                  value={customBrandMode ? 'custom' : resolveBrandPickerValue(form.brand)}
-                  disabled={readOnly}
-                  options={BRAND_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
-                  onChange={(val) => {
-                    if (val === 'custom') {
-                      setCustomBrandMode(true);
-                    } else {
-                      setCustomBrandMode(false);
-                      setForm({ ...form, brand: val });
-                    }
-                  }}
-                />
-                {customBrandMode || resolveBrandPickerValue(form.brand) === 'custom' ? (
-                  <label>
-                    Outra Marca (digite)
-                    <input
-                      value={form.brand}
-                      onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                      placeholder="Ex: LG, Asus, JBL..."
-                      disabled={readOnly}
-                    />
-                  </label>
-                ) : null}
+                <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
+                <p className="empty"><Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Cadastrar ou gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
                 <label>
                   SKU
                   <input
@@ -1436,7 +1368,7 @@ export function StockPage() {
                           <tr key={row.tempKey}>
                             {selectedAttrIds.map((attrId) => {
                               const def = attrDefs.find((a) => a.id === attrId);
-                              const options = (def?.values ?? []).map((v) => ({
+                              const options = referenceValues(def).map((v) => ({
                                 value: v,
                                 label: v,
                               }));
@@ -1606,7 +1538,7 @@ export function StockPage() {
                         value={form.attrs[attr.id] ?? ''}
                         placeholder="Selecionar"
                         disabled={readOnly}
-                        options={attr.values.map((value) => ({ value, label: value }))}
+                        options={referenceValues(attr).map((value) => ({ value, label: value }))}
                         onChange={(value) =>
                           setForm({ ...form, attrs: { ...form.attrs, [attr.id]: value } })
                         }

@@ -155,6 +155,7 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
     pathname.startsWith('/painel/clientes') ||
     pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
+    pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/kits') ||
     pathname.startsWith('/painel/lotes') ||

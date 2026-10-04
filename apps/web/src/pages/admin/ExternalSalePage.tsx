@@ -2,6 +2,9 @@ import './externalSale.css';
 import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
+import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   apiCreateExternalSale,
@@ -16,6 +19,7 @@ import { CashPickupModal } from '../../components/CashPickupModal';
 import { DailyPendingModal } from '../../components/DailyPendingModal';
 
 type StockOption = {
+  brand: string;
   id: string;
   name: string;
   price: number;
@@ -69,6 +73,9 @@ export function ExternalSalePage() {
     },
   ]);
 
+  const { brands, error: brandsError } = useBrands();
+  const [brandFilter, setBrandFilter] = useState('all');
+
   // Desconto / Acréscimo Geral
   const [generalDiscount, setGeneralDiscount] = useState(0);
   const [generalSurcharge, setGeneralSurcharge] = useState(0);
@@ -84,6 +91,13 @@ export function ExternalSalePage() {
     notes: '',
     tradeValue: 0,
   });
+
+  const { device: tradeDevice, loading: tradeLoading, error: tradeError } = useDeviceReference(hasTradeIn ? tradeIn.deviceName : '');
+  useEffect(() => {
+    if (!tradeDevice) return;
+    const brand = findBrand(brands.filter(b => b.active), tradeDevice.brand);
+    if (brand) setTradeIn(current => current.brand ? current : { ...current, brand: brand.slug });
+  }, [tradeDevice, brands]);
 
   // Forma de Pagamento e Parcelas
   const [paymentMethod, setPaymentMethod] = useState('Cartão de Crédito');
@@ -129,6 +143,7 @@ export function ExternalSalePage() {
           qty: Number(it.qty) || 0,
           imei: it.imei || '',
           category: it.category || 'Geral',
+          brand: it.brand || '',
         }));
 
         setStockItems(mappedStock);
@@ -628,6 +643,11 @@ export function ExternalSalePage() {
             </button>
           </div>
 
+          <div className="admin-toolbar">
+            <AdminPicker label="Filtrar produtos por marca" value={brandFilter} options={[{ value: 'all', label: 'Todas as marcas' }, ...brands.map(b => ({ value: b.slug, label: b.name }))]} onChange={setBrandFilter} />
+            <Link to="/erp/marcas">Gerenciar marcas</Link>
+            {brandsError && <p role="alert">{brandsError}</p>}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {lines.map((line, idx) => (
               <div
@@ -649,7 +669,7 @@ export function ExternalSalePage() {
                     value={line.stockId || ''}
                     options={[
                       { value: '', label: 'Selecione um produto do estoque...' },
-                      ...stockItems.map((p) => ({
+                      ...stockItems.filter(p => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
                         value: p.id,
                         label: `${p.name} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
                       })),
@@ -760,6 +780,12 @@ export function ExternalSalePage() {
                   />
                 </div>
 
+                <div className="external-sale-wide-field">
+                  <AdminPicker label="Marca do aparelho recebido" value={tradeIn.brand || ''} options={[{ value: '', label: 'Selecionar marca' }, ...brands.filter(b => b.active).map(b => ({ value: b.slug, label: b.name }))]} onChange={brand => setTradeIn({ ...tradeIn, brand })} />
+                  {tradeLoading && <p role="status">Consultando modelo…</p>}
+                  {tradeError && <p role="status">{tradeError}</p>}
+                  {tradeDevice && <p>Modelo identificado: <strong>{tradeDevice.model}</strong> · <a href={tradeDevice.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a></p>}
+                </div>
                 <div>
                   <label className="admin-label">IMEI do Aparelho Entregue</label>
                   <input
@@ -772,29 +798,10 @@ export function ExternalSalePage() {
                 </div>
 
                 <div>
-                  <AdminPicker
-                    label="Capacidade"
-                    value={tradeIn.capacity || ''}
-                    options={[
-                      { value: '64GB', label: '64 GB' },
-                      { value: '128GB', label: '128 GB' },
-                      { value: '256GB', label: '256 GB' },
-                      { value: '512GB', label: '512 GB' },
-                      { value: '1TB', label: '1 TB' },
-                    ]}
-                    onChange={(val) => setTradeIn({ ...tradeIn, capacity: val })}
-                  />
+                  {tradeDevice ? <AdminPicker label="Capacidade" value={tradeIn.capacity || ''} options={tradeDevice.capacities} onChange={capacity => setTradeIn({ ...tradeIn, capacity })} /> : <label className="admin-label">Capacidade<input className="admin-input" placeholder="Capacidade do aparelho" value={tradeIn.capacity || ''} onChange={e => setTradeIn({ ...tradeIn, capacity: e.target.value })} /></label>}
                 </div>
-
                 <div>
-                  <label className="admin-label">Cor</label>
-                  <input
-                    type="text"
-                    className="admin-input"
-                    placeholder="Cor do aparelho recebido"
-                    value={tradeIn.color}
-                    onChange={(e) => setTradeIn({ ...tradeIn, color: e.target.value })}
-                  />
+                  {tradeDevice ? <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={color => setTradeIn({ ...tradeIn, color })} /> : <label className="admin-label">Cor<input className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={e => setTradeIn({ ...tradeIn, color: e.target.value })} /></label>}
                 </div>
 
                 <div>
@@ -904,7 +911,7 @@ export function ExternalSalePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <span style={{ fontSize: '0.9rem' }}>🔒</span>
                   <strong style={{ fontSize: '0.82rem', color: 'var(--external-warning)'  }}>
-                    Informações Internas (Confidencial)
+                    Resultado da venda
                   </strong>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '0.85rem' }}>
@@ -923,9 +930,6 @@ export function ExternalSalePage() {
                     <strong style={{ color: 'var(--external-success)'  }}>{marginPercent}%</strong>
                   </div>
                 </div>
-                <small style={{ color: 'var(--mute)', display: 'block', marginTop: '2px', fontSize: '0.72rem' }}>
-                  Nunca exibido no comprovante ou mensagem do cliente.
-                </small>
               </div>
             )}
 

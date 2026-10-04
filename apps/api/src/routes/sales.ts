@@ -30,6 +30,7 @@ salesRouter.post('/api/v1/sales/:id/send-receipt-email', requireAuth, async (req
 /* ── Schemas de Validação ───────────────────────────────── */
 
 const tradeInSchema = z.object({
+  brand: z.string().trim().max(80).default(''),
   deviceName: z.string().min(1, 'Nome do aparelho entregue é obrigatório.'),
   imei: z.string().default(''),
   capacity: z.string().default(''),
@@ -279,12 +280,17 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         const tradeInItemId = `STK-USED-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
         createdTradeInStockId = tradeInItemId;
 
+        if (body.tradeIn.brand) {
+          const brand = await client.query('SELECT 1 FROM store_brands WHERE store_id = $1 AND slug = $2 AND active = true', [storeId, body.tradeIn.brand]);
+          if (!brand.rows[0]) throw Object.assign(new Error('Selecione uma marca ativa cadastrada nesta loja.'), { status: 400 });
+        }
+
         // Cria o aparelho usado no estoque com custo = tradeValue e quantidade 1
         await client.query(
           `INSERT INTO stock_items (
             id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
             kind, condition, category, brand, active, color, capacity, attrs, images
-          ) VALUES ($1, $2, $3, $4, '', $5, 'UN', 1, 0, $6, $7, 'device', 'used', 'Smartphones Usados', '', true, $8, $9, $10, '[]'::jsonb)`,
+          ) VALUES ($1, $2, $3, $4, '', $5, 'UN', 1, 0, $6, $7, 'device', 'used', 'Smartphones Usados', $11, true, $8, $9, $10, '[]'::jsonb)`,
           [
             tradeInItemId,
             storeId,
@@ -302,6 +308,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
               estado: body.tradeIn.conditionState,
               observacoes: body.tradeIn.notes,
             }),
+            body.tradeIn.brand,
           ],
         );
 
