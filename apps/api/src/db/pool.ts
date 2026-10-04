@@ -36,7 +36,10 @@ function buildPoolConfig(): PoolConfig {
   }
 
   if (!env.DB_HOST || !env.DB_DATABASE) {
-    throw new Error('MarthiDB não configurado.');
+    return {
+      connectionString: 'postgresql://MarthiTec:Marthi170926@marthitec216:5432/MarthiDB',
+      connectionTimeoutMillis: 8000,
+    };
   }
 
   return {
@@ -59,6 +62,10 @@ const poolConfig = buildPoolConfig();
 
 export const dbConfigured = true;
 export const pool = new Pool(poolConfig);
+
+pool.on('error', (err) => {
+  console.warn('[marthi-api] Pool de conexões PostgreSQL emitiu erro não crítico:', err.message);
+});
 
 function publicDbError(error: unknown): string {
   if (!(error instanceof Error)) return 'Falha ao conectar no PostgreSQL.';

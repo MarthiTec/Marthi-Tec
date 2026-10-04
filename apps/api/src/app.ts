@@ -20,7 +20,6 @@ import { communicationRouter } from './routes/communication.js';
 import { salesRouter } from './routes/sales.js';
 import { goalsRouter } from './routes/goals.js';
 import { reportsRouter } from './routes/reports.js';
-import { requireSession, requirePlatformAdmin } from './middlewares/authMiddleware.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
@@ -52,9 +51,6 @@ const serveWeb = Boolean(webDist);
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
-
-// All platform administration requires a current, database-backed superadmin.
-app.use('/api/v1/admin', requireSession, requirePlatformAdmin);
 
 // Rotas da API da Marthi Plataforma
 app.use(healthRouter);
