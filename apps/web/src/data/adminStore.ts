@@ -46,6 +46,7 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 export type StockUnit = 'UN' | 'KG';
 
 export type StockItem = {
+  pickupPrices?: Record<string,number|null>;
   id: string;
   name: string;
   /** Marca do produto (ex: Apple, Xiaomi, Samsung...). */
@@ -286,6 +287,7 @@ function normalizeStock(item: StockItem): StockItem {
     ...item,
     brand: item.brand ?? '',
     category: item.category ?? 'Geral',
+    pickupPrices: item.pickupPrices ?? {},
     barcode: item.barcode ?? '',
     imei: item.imei ?? '',
     attrs,
@@ -543,6 +545,7 @@ function apiErrorMessage(error: unknown, fallback: string) {
 /** Payload Nest Create/UpdateStockDto — sem maxQty/avgCost/unit etc. (forbidNonWhitelisted). */
 function toNestStockBody(item: StockItem) {
   return {
+    pickupPrices: item.pickupPrices ?? {},
     name: item.name,
     brand: item.brand || undefined,
     category: item.category || undefined,

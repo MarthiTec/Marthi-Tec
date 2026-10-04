@@ -1,3 +1,4 @@
+import {pickupSelection,resolvePickup,recordPickup} from '../services/pickup.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
@@ -63,6 +64,9 @@ const totemSettingsSchema = z.object({
 });
 
 const leadSchema = z.object({
+  ...pickupSelection,
+  stockId:z.string().optional(),
+  payment:z.string().default('À vista'),installment:z.string().nullable().optional(),priceLabel:z.string().optional(),
   customerName: z.string().default('Cliente Totem'),
   customerPhone: z.string().default(''),
   productName: z.string().default('Produto'),
@@ -170,7 +174,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
           FROM stock_items
           WHERE store_id = $1
             AND active = true
@@ -259,16 +263,25 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
     const desc = `${body.productName} · ${body.color || ''} ${body.storage || ''} ${body.fulfillment || ''}`.trim();
 
     if (pool) {
-      await pool.query(
+      const client=await pool.connect();
+      try{await client.query('BEGIN');
+      let pickup:any;
+      if(body.stockId){if(!(await client.query('SELECT id FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',[body.stockId,storeId])).rows.length)throw Object.assign(new Error('Produto não disponível no Totem.'),{status:404});if(!body.pickupMethodId)throw Object.assign(new Error('Escolha o tipo de retirada.'),{status:400});pickup=await resolvePickup(client,storeId,body.stockId,body.pickupMethodId,body.deliveryAddress);if(pickup.kind==='order'&&!body.customerPhone.trim())throw Object.assign(new Error('Informe o telefone para acompanhar a encomenda.'),{status:400});}
+      await client.query(
         `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes)
          VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6)`,
         [ticketId, storeId, code, body.customerName, body.customerPhone, `${desc}\n${body.notes}`.trim()],
       );
+      if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
+      await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice}),storeId]);
+      await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
     }
 
     res.status(201).json({
       success: true,
       data: {
+        trackingToken:(body as any).trackingToken,
+        quotedPrice:(body as any).quotedPrice,
         id: ticketId,
         code,
         customerName: body.customerName,
@@ -303,3 +316,10 @@ totemRouter.get('/totem/attributes', handleGetAttributes);
 
 totemRouter.post('/api/v1/totem/leads', handleCreateLead);
 totemRouter.post('/totem/leads', handleCreateLead);
+
+totemRouter.get('/api/v1/totem/pickup-methods',async(req,res,next)=>{try{const storeId=await resolveStoreId(req);res.json({success:true,data:(await pool.query('SELECT id,name,kind,active,lead_days FROM pickup_methods WHERE store_id=$1 AND active=true ORDER BY kind,name',[storeId])).rows});}catch(e){next(e);}});
+
+totemRouter.get('/api/v1/totem/pickup-quote',async(req,res,next)=>{try{const storeId=await resolveStoreId(req);const q=z.object({stockId:z.string(),methodId:z.string()}).parse(req.query);if(!(await pool.query('SELECT id FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',[q.stockId,storeId])).rows.length)throw Object.assign(new Error('Produto não disponível no Totem.'),{status:404});const p=await resolvePickup(pool,storeId,q.stockId,q.methodId,undefined,true);res.json({success:true,data:{unitPrice:p.unitPrice,estimatedDate:p.estimatedDate}});}catch(e){next(e);}});
+
+totemRouter.get('/api/v1/pos/tickets',requireAuth,async(req,res,next)=>{try{const r=await pool.query('SELECT * FROM pos_tickets WHERE store_id=$1 ORDER BY created_at DESC LIMIT 300',[req.storeId]);res.json({success:true,data:{items:r.rows.map(t=>({...t.configuration,id:t.id,status:t.status,source:t.source,customerName:t.customer_name,customerPhone:t.customer_phone,productName:t.configuration.productName||t.notes,color:t.configuration.color||'',storage:t.configuration.storage||'',fulfillment:t.configuration.fulfillment||'',payment:t.configuration.payment||'À vista',installment:t.configuration.installment||null,priceLabel:t.configuration.priceLabel||'',createdAt:t.created_at,closedAt:null}))}});}catch(e){next(e);}});
+totemRouter.patch('/api/v1/pos/tickets/:id',requireAuth,async(req,res,next)=>{try{const {status}=z.object({status:z.enum(['open','sold','cancelled'])}).parse(req.body);await pool.query('UPDATE pos_tickets SET status=$3 WHERE id=$1 AND store_id=$2',[req.params.id,req.storeId,status]);res.json({success:true,data:{status}});}catch(e){next(e);}});

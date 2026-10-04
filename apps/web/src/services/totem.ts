@@ -1,3 +1,4 @@
+import type {DeliveryAddress} from '../data/pickup';
 import { enqueueKitchenOrder } from '../data/kitchenOrderStore';
 import type { PickedAttribute } from '../data/attributeStore';
 import { formatPicked } from '../data/attributeStore';
@@ -6,6 +7,7 @@ import { getTotemSettings } from '../data/totemSettings';
 import { apiSubmitTotemLead } from './erpApi';
 
 export type TotemLeadRequest = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -32,6 +34,7 @@ function shouldSendToKitchen() {
 
 export async function submitTotemLead(payload: TotemLeadRequest) {
   const result = await apiSubmitTotemLead({
+    stockId:payload.stockId,pickupMethodId:payload.pickupMethodId,deliveryAddress:payload.deliveryAddress,
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
     productName: payload.productName,
@@ -49,7 +52,7 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     ...payload,
     source: 'totem',
     id: ticketId,
-    cashPrice: payload.cashPrice,
+    cashPrice: result.quotedPrice ?? payload.cashPrice,
     ticketSenha: payload.ticketSenha,
     sentToCashier: payload.sentToCashier ?? true,
   });
@@ -75,5 +78,5 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     }
   }
 
-  return { ticketId, customerNotified };
+  return { ticketId, customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice };
 }

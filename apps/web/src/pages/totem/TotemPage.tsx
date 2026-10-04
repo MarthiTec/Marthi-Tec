@@ -1,3 +1,5 @@
+import {PickupFields} from '../../components/PickupFields';
+import type {DeliveryAddress} from '../../data/pickup';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -57,6 +59,7 @@ type BrandFilter = TotemBrand | 'all';
 type CardConfig = Record<string, string>;
 
 type Selection = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;pickupPrices?:Record<string,number|null>;baseCashPrice:number;
   product: TotemProduct;
   picked: PickedAttribute[];
   payment: string;
@@ -193,6 +196,7 @@ export function TotemPage() {
   const [sessionMode, setSessionMode] = useState<TotemMode | null>(null);
   const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
+  const [trackingToken,setTrackingToken]=useState<string>();
   const [catalog, setCatalog] = useState<(TotemProduct & { totalQty?: number })[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -624,6 +628,7 @@ export function TotemPage() {
         : undefined;
     const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
     setSelection({
+      stockId:quote.stock?.id,pickupPrices:quote.stock?.pickupPrices,baseCashPrice:quote.cashPrice,
       product,
       picked,
       payment: PAYMENT_OPTIONS[0],
@@ -723,6 +728,7 @@ export function TotemPage() {
     setSubmitting(true);
     setCheckoutKb(null);
 
+    if(!selection.stockId||!selection.pickupMethodId){setError('Escolha o tipo de retirada para continuar.');setSubmitting(false);return;}
     const priceLabel =
       !copy.showInstallments || selection.payment === 'À vista'
         ? formatBRL(selection.cashPrice)
@@ -735,6 +741,7 @@ export function TotemPage() {
 
     try {
       const result = await submitTotemLead({
+        stockId:selection.stockId,pickupMethodId:selection.pickupMethodId,deliveryAddress:selection.deliveryAddress,
         customerName: name.trim(),
         customerPhone: phone.trim(),
         productName: selection.product.name,
@@ -747,6 +754,7 @@ export function TotemPage() {
         cashPrice: selection.cashPrice,
         sentToCashier: isToCashier,
       });
+      setTrackingToken(result.trackingToken);
       setTicketId(result.ticketId);
       setSentToCashierDone(isToCashier);
       setStep('done');
@@ -1233,6 +1241,7 @@ export function TotemPage() {
 
             <div className="totem__checkout-form">
               <h1>{selection.product.name}</h1>
+              <PickupFields publicMode product={{id:selection.stockId,price:selection.baseCashPrice,pickupPrices:selection.pickupPrices}} methodId={selection.pickupMethodId} address={selection.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setSelection(current=>current?{...current,pickupMethodId,deliveryAddress,cashPrice:price??current.baseCashPrice}:current)}/>
               <div className="totem__summary">
                 {selection.picked.map((item) => (
                   <p key={item.id}>
@@ -1454,6 +1463,7 @@ export function TotemPage() {
             <strong>{selection.product.name}</strong>
             {formatPicked(selection.picked) ? ` (${formatPicked(selection.picked)})` : ''}.
           </p>
+          {trackingToken&&<p><a href={`/acompanhar-retirada/${trackingToken}`} target="_blank" rel="noreferrer">Acompanhar disponibilidade e entrega</a></p>}
           {sentToCashierDone ? (
             <div
               style={{

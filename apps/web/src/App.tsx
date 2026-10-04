@@ -1,3 +1,5 @@
+import {PickupMethodsPage} from './pages/admin/PickupMethodsPage';
+import {PickupTrackingPage} from './pages/PickupTrackingPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -110,6 +112,7 @@ export function App() {
     <AuthProvider>
       <ErrorBoundary fallbackTitle="Ocorreu um erro no sistema">
         <Routes>
+        <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
@@ -192,6 +195,7 @@ export function App() {
           <Route path="produtos" element={<StockPage />} />
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
+          <Route path="tipos-retirada" element={<PickupMethodsPage />} />
           <Route path="atributos" element={<AttributesPage />} />
           <Route path="marcas" element={<BrandsPage />} />
           <Route path="kits" element={<KitsPage />} />

@@ -1,3 +1,4 @@
+import { validatePickupPrices } from '../services/pickup.js';
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
@@ -9,6 +10,7 @@ import { pool } from '../db/pool.js';
 export const stockRouter = Router();
 
 const stockItemSchema = z.object({
+  pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
   sku: z.string().default(''),
@@ -69,6 +71,7 @@ export function formatStockRow(row: any) {
     trackLot: Boolean(row.track_lot ?? row.trackLot),
     isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
+    pickupPrices: row.pickup_prices || row.pickupPrices || {},
     attrs,
     color: row.color || '',
     capacity: row.capacity || '',
@@ -126,7 +129,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -175,7 +178,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
           FROM stock_items
           WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
           LIMIT 1
@@ -257,6 +260,8 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             ],
           );
 
+          await validatePickupPrices(client,storeId,body.pickupPrices);
+          await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);
           // Se qty inicial > 0, registra kardex
           if (body.qty > 0) {
             const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -333,6 +338,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           if(reserved>0 && (nextQty<reserved || body.active===false || ['name','brand','capacity','color','condition','attrs','cost'].some(k=>(body as any)[k]!==undefined && JSON.stringify((body as any)[k])!==JSON.stringify(curr[k])))) throw Object.assign(new Error('Produto reservado por encomenda. Libere a reserva antes de alterar sua variante, custo ou saldo.'),{status:409});
 
 
+          if(body.pickupPrices!==undefined){await validatePickupPrices(client,storeId,body.pickupPrices);await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);}
           // Se qty mudou, registra movimentação no kardex
           if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
             const delta = body.qty - Number(curr.qty);
@@ -473,7 +479,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,

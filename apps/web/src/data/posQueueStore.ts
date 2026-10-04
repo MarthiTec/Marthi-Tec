@@ -1,9 +1,11 @@
+import type {DeliveryAddress} from './pickup';
 import type { PickedAttribute } from './attributeStore';
 import { formatPicked } from './attributeStore';
 
 export type QueueTicketStatus = 'open' | 'sold' | 'cancelled';
 
 export type QueueTicket = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   id: string;
   source: 'totem' | 'manual';
   status: QueueTicketStatus;

@@ -1,3 +1,5 @@
+import {PickupFields} from '../../components/PickupFields';
+import type {DeliveryAddress} from '../../data/pickup';
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -131,6 +133,7 @@ function isValidCpf(value: string) {
 type MoneyMode = 'money' | 'percent';
 
 type CartLine = {
+  pickupMethodId?:string;deliveryAddress?:DeliveryAddress;sourceTicketId?:string;
   attributes?: Array<{id:string;name:string;value:string}>;
   key: string;
   stockId: string;
@@ -953,7 +956,7 @@ export function CaixaPage() {
     const lineKey = `totem:${ticket.id}:${Date.now()}`;
     const newLine: CartLine = {
       key: lineKey,
-      stockId: '',
+      stockId: ticket.stockId||'',sourceTicketId:ticket.id,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,attributes:ticket.attributes,
       name: itemFullName,
       sku: 'TOTEM',
       imei: '',
@@ -967,7 +970,7 @@ export function CaixaPage() {
       lineSurcharge: 0,
       lineSurchargeMode: 'money',
       isFrozenPrice: true,
-      isAdHoc: true,
+      isAdHoc: !ticket.stockId,
       itemType: 'product',
       promoLabel: `Totem ${ticket.ticketSenha || ticket.id}`,
     };
@@ -1314,6 +1317,7 @@ export function CaixaPage() {
         lines: pricedLines.map((line) => ({
           stockId: line.stockId,
           name: line.name,
+          pickupMethodId:line.pickupMethodId,deliveryAddress:line.deliveryAddress,sourceTicketId:line.sourceTicketId,
           attributes: line.attributes,
           qty: line.qty,
           unitPrice: line.unitPrice,
@@ -2355,6 +2359,7 @@ export function CaixaPage() {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <strong className="pdv__item">{line.name}</strong>
+                                <PickupFields product={stock.find(item=>item.id===line.stockId)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map(entry=>entry.key===line.key?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
                                 <SaleAttributeFields surface="pdv" product={stock.find(item=>item.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map(entry=>entry.key===line.key ? {...entry,attributes} : entry))}/>
                                 {line.isAdHoc ? (
                                   <span

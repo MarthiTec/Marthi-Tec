@@ -36,12 +36,11 @@ test('segment provisions independent persisted options once and preserves retail
  await query("UPDATE stores SET segment='assistencia_tecnica' WHERE id IN ('store-a','store-b')");
  const a=(await query("SELECT * FROM product_attributes WHERE store_id='store-a' ORDER BY sort")).rows;
  const b=(await query("SELECT * FROM product_attributes WHERE store_id='store-b' ORDER BY sort")).rows;
- assert.deepEqual(a.map(x=>x.name),['Cor','Capacidade','Tipo de Retirada']);
+ assert.deepEqual(a.map(x=>x.name),['Cor','Capacidade']);
  assert.equal(a.every(x=>x.active && x.use_on_stock && x.use_on_pdv && x.use_on_external_sale && x.use_on_totem),true);
  assert.equal(a.some(x=>b.some(y=>x.id===y.id)),false);
- assert.deepEqual((await query('SELECT value FROM product_attribute_values WHERE attribute_id=$1 ORDER BY sort',[a[2].id])).rows.map(x=>x.value),['Em mão','Por encomenda']);
  await query('UPDATE product_attributes SET active=false WHERE id=$1',[a[0].id]);
- await query('DELETE FROM product_attributes WHERE id=$1',[a[2].id]);
+
  await query("UPDATE stores SET segment='assistencia_tecnica' WHERE id='store-a'");
  assert.equal((await query("SELECT count(*)::int n FROM product_attributes WHERE store_id='store-a'")).rows[0].n,2);
  assert.equal((await query('SELECT active FROM product_attributes WHERE id=$1',[a[0].id])).rows[0].active,false);
@@ -90,10 +89,10 @@ test('disabled automation prevents provisioning on segment changes and can be en
  const disabled=await request('/attributes/automation','GET',undefined,'optional');
  assert.equal(disabled.status,200);assert.equal(disabled.json.data.enabled,false);assert.equal(disabled.json.data.attributes.length,0);
  const enabled=await request('/attributes/automation','PUT',{enabled:true},'optional');
- assert.equal(enabled.status,200);assert.equal(enabled.json.data.attributes.length,3);
+ assert.equal(enabled.status,200);assert.equal(enabled.json.data.attributes.length,2);
  const capacity=enabled.json.data.attributes.find(a=>a.name==='Capacidade');assert.ok(capacity.values.includes('256 GB'));
  await request('/attributes/automation','PUT',{enabled:false},'optional');
- assert.equal((await request('/attributes/automation','GET',undefined,'optional')).json.data.attributes.length,3);
+ assert.equal((await request('/attributes/automation','GET',undefined,'optional')).json.data.attributes.length,2);
 });
 
 after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));await db.close();});
