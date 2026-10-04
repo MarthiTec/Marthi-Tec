@@ -1,3 +1,5 @@
+import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { nestRequest } from '../../services/nestClient';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -32,7 +34,7 @@ import {
   type StockItem,
   type StockKind,
 } from '../../data/adminStore';
-import { ATTRIBUTES_EVENT, getAttributes, stockAttributes } from '../../data/attributeStore';
+import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes } from '../../data/attributeStore';
 import { listSuppliers } from '../../data/erpRegistry';
 import {
   getFiscalClassification,
@@ -107,6 +109,33 @@ export function StockPage() {
 
   // ── Estado da Grade de Variações de Produto ────────────────────────
   const [useVariations, setUseVariations] = useState(false);
+  const [automationStoreId,setAutomationStoreId]=useState(getActiveStoreId);
+  useEffect(()=>{const changed=()=>{setAutomationStoreId(getActiveStoreId());setFormVisible(false);setAttrDefs([]);setAutomationState({enabled:false,eligible:false});};window.addEventListener(STORE_CONTEXT_CHANGED_EVENT,changed);return()=>window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT,changed);},[]);
+  const [automationState, setAutomationState] = useState({enabled:false,eligible:false});
+  const [automationBusy, setAutomationBusy] = useState(false);
+  useEffect(() => {
+    if (!isNestAuthed()) return;
+    let disposed=false;
+    void nestRequest<{enabled:boolean;eligible:boolean;attributes:ReturnType<typeof getAttributes>}>('/attributes/automation').then(data=>{
+      if(disposed)return;
+      replaceAttributes(data.attributes);
+      setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
+      setAutomationState(data);
+    }).catch(e=>{if(!disposed)setError(e.message);});
+    return ()=>{disposed=true;};
+  }, [automationStoreId]);
+  async function toggleAutomation(enabled:boolean) {
+    setAutomationBusy(true);
+    try {
+      const data=await nestRequest<{enabled:boolean;eligible:boolean;attributes:ReturnType<typeof getAttributes>}>('/attributes/automation',{method:'PUT',body:JSON.stringify({enabled})});
+      replaceAttributes(data.attributes);
+      setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
+      setAutomationState(data);
+      if(enabled&&mode==='new') {setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível salvar a automação.');}
+    finally{setAutomationBusy(false);}
+  }
+
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
@@ -219,10 +248,10 @@ export function StockPage() {
     setSelectedId(null);
     setMode('new');
     setError('');
-    setUseVariations(false);
-    setVariations([]);
+    setUseVariations(automationState.eligible && automationState.enabled);
+    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,sku:'',barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:1,minQty:1,cost:0,condition:'new'}] : []);
     setOriginalVariationIds([]);
-    setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
+    setSelectedAttrIds((automationState.enabled ? attrDefs : attrDefs.slice(0, 2)).map((a) => a.id));
   }
 
   function closeForm() {
@@ -1248,6 +1277,10 @@ export function StockPage() {
             </div>
           </article>
 
+          {automationState.eligible && <label className="stock-automation-toggle">
+            <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
+            Automatizar atributos e grade de variações nesta loja
+          </label>}
           <div className="stock-variation-tabs">
             <button
               type="button"

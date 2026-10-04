@@ -83,4 +83,17 @@ test('sale selections are stored and foreign or invalid options are rejected tra
  assert.equal((await request('/sales/external','POST',body)).status,400);
  assert.equal(Number((await query("SELECT qty FROM stock_items WHERE id='device'")).rows[0].qty),4);
 });
+test('disabled automation prevents provisioning on segment changes and can be enabled later',async()=>{
+ await query("INSERT INTO stores(id,client_account_id,trade_name,legal_name,document,attribute_automation_enabled) VALUES('optional','a','Optional','Optional','optional',false)");
+ await query("INSERT INTO user_stores(id,user_id,store_id,role) VALUES('optional-member','user-a','optional','admin')");
+ await query("UPDATE stores SET segment='assistencia_tecnica' WHERE id='optional'");
+ const disabled=await request('/attributes/automation','GET',undefined,'optional');
+ assert.equal(disabled.status,200);assert.equal(disabled.json.data.enabled,false);assert.equal(disabled.json.data.attributes.length,0);
+ const enabled=await request('/attributes/automation','PUT',{enabled:true},'optional');
+ assert.equal(enabled.status,200);assert.equal(enabled.json.data.attributes.length,3);
+ const capacity=enabled.json.data.attributes.find(a=>a.name==='Capacidade');assert.ok(capacity.values.includes('256 GB'));
+ await request('/attributes/automation','PUT',{enabled:false},'optional');
+ assert.equal((await request('/attributes/automation','GET',undefined,'optional')).json.data.attributes.length,3);
+});
+
 after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));await db.close();});

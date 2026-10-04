@@ -706,4 +706,4 @@ export function AttributesPage() {
     </section>
   );
 }
-
+

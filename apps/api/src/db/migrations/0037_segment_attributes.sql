@@ -3,10 +3,8 @@ CREATE TABLE IF NOT EXISTS segment_attribute_templates (
  values JSONB NOT NULL, filter_on_totem BOOLEAN NOT NULL DEFAULT false,
  sort INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(segment,template_key)
 );
-INSERT INTO segment_attribute_templates(segment,template_key,name,values,filter_on_totem,sort) VALUES
- ('assistencia_tecnica','color','Cor','["Preto","Branco","Azul","Prateado","Cinza","Dourado","Rosa","Verde","Roxo","Titânio natural"]',true,1),
- ('assistencia_tecnica','capacity','Capacidade','["32GB","64GB","128GB","256GB","512GB","1TB","2TB"]',true,2),
- ('assistencia_tecnica','pickup','Tipo de Retirada','["Em mão","Por encomenda"]',false,3)
+INSERT INTO segment_attribute_templates(segment,template_key,name,values,filter_on_totem,sort)
+SELECT segment,CASE name WHEN 'Cor' THEN 'color' WHEN 'Capacidade' THEN 'capacity' ELSE 'pickup' END,name,values,name <> 'Tipo de Retirada',sort FROM product_attribute_templates
 ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS store_attribute_provisioning (
  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
@@ -22,6 +20,7 @@ RETURNS void LANGUAGE plpgsql AS $$
 DECLARE template RECORD; attr_id TEXT; claimed INTEGER;
 BEGIN
  PERFORM id FROM stores WHERE id=target_store FOR UPDATE;
+ IF NOT EXISTS(SELECT 1 FROM stores WHERE id=target_store AND attribute_automation_enabled=true) THEN RETURN; END IF;
  FOR template IN SELECT * FROM segment_attribute_templates WHERE segment=target_segment ORDER BY sort LOOP
   INSERT INTO store_attribute_provisioning(store_id,segment,template_key)
    VALUES(target_store,target_segment,template.template_key) ON CONFLICT DO NOTHING;

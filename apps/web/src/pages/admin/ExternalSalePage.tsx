@@ -1,4 +1,5 @@
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
+import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
 import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useEffect, useMemo, useState, useRef } from 'react';
@@ -48,6 +49,8 @@ export function ExternalSalePage() {
   // Estados Base
   const [customers, setCustomers] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<StockOption[]>([]);
+  const [attributeDefs,setAttributeDefs]=useState<ProductAttribute[]>([]);
+  useEffect(()=>{let disposed=false;setAttributeDefs([]);void hydrateAttributesFromApi().then(()=>{if(!disposed)setAttributeDefs(getAttributes().filter(a=>a.active&&a.useOnStock));});return()=>{disposed=true;};},[storeId]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -286,6 +289,7 @@ export function ExternalSalePage() {
         warrantyTerms: warrantyTerms.trim(),
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
+          attributes: l.attributes ?? [],
           name: l.name.trim(),
           qty: Number(l.qty) || 1,
           unitPrice: Number(l.unitPrice) || 0,
@@ -675,7 +679,7 @@ export function ExternalSalePage() {
                       { value: '', label: 'Selecione um produto do estoque...' },
                       ...stockItems.filter(p => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
                         value: p.id,
-                        label: `${p.name} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
+                        label: `${p.name}${p.attrs ? ' · '+Object.values(p.attrs).filter(Boolean).join(' · ') : ''} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
                       })),
                     ]}
                     onChange={(val) => handleLineProductChange(idx, val)}
@@ -803,7 +807,12 @@ export function ExternalSalePage() {
                 </div>
 
                 <div>
-                  {tradeDevice ? <AdminPicker label="Capacidade" value={tradeIn.capacity || ''} options={tradeDevice.capacities} onChange={capacity => setTradeIn({ ...tradeIn, capacity })} /> : <label className="admin-label">Capacidade<input className="admin-input" placeholder="Capacidade do aparelho" value={tradeIn.capacity || ''} onChange={e => setTradeIn({ ...tradeIn, capacity: e.target.value })} /></label>}
+                  <AdminPicker
+                    label="Capacidade"
+                    value={tradeIn.capacity || ''}
+                    options={tradeDevice ? tradeDevice.capacities : (attributeDefs.find(a=>/capac|armazen/i.test(a.name))?.values ?? []).map(value=>({value,label:value}))}
+                    onChange={(val) => setTradeIn({ ...tradeIn, capacity: val })}
+                  />
                 </div>
                 <div>
                   {tradeDevice ? <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={color => setTradeIn({ ...tradeIn, color })} /> : <label className="admin-label">Cor<input className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={e => setTradeIn({ ...tradeIn, color: e.target.value })} /></label>}

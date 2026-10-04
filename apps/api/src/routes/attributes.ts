@@ -35,8 +35,27 @@ function canEdit(req: any,res: any) {
  res.status(403).json({success:false,error:{code:'FORBIDDEN',message:'Sem permissão para alterar atributos.'}}); return false;
 }
 function missing(res: any) { return res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Atributo não encontrado nesta loja.'}}); }
+async function automation(storeId: string, enabled?: boolean) {
+ const db=await pool.connect();
+ try {
+  await db.query('BEGIN');
+  const r=await db.query('SELECT segment,attribute_automation_enabled FROM stores WHERE id=$1 FOR UPDATE',[storeId]);
+  if(!r.rows[0]) throw Object.assign(new Error('Loja não encontrada.'),{status:404});
+  if(enabled!==undefined) await db.query('UPDATE stores SET attribute_automation_enabled=$2 WHERE id=$1',[storeId,enabled]);
+  const eligible=(await db.query('SELECT 1 FROM segment_attribute_templates WHERE segment=$1 LIMIT 1',[r.rows[0].segment])).rows.length>0;
+  await db.query('SELECT provision_store_attributes($1,$2)',[storeId,r.rows[0].segment]);
+  const attributes=await read(db,storeId);
+  await db.query('COMMIT');
+  return {enabled:enabled??r.rows[0].attribute_automation_enabled,eligible,attributes};
+ }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
+}
+attributesRouter.get('/api/v1/attributes/automation',requireAuth,async(req,res,next)=>{try{res.json({success:true,data:await automation(req.storeId!)});}catch(e){next(e);}});
+attributesRouter.put('/api/v1/attributes/automation',requireAuth,async(req,res,next)=>{
+ if(!canEdit(req,res))return;
+ try{const {enabled}=z.object({enabled:z.boolean()}).parse(req.body);res.json({success:true,data:await automation(req.storeId!,enabled)});}catch(e){next(e);}
+});
 attributesRouter.get('/api/v1/attributes',requireAuth,async(req,res,next)=>{
- try { res.json({success:true,data:await read(pool,req.storeId!)}); } catch(e) { next(e); }
+ try { res.json({success:true,data:(await automation(req.storeId!)).attributes}); } catch(e) { next(e); }
 });
 attributesRouter.post('/api/v1/attributes/replicate',requireAuth,async(req,res,next)=>{
  if(!canEdit(req,res)) return;
