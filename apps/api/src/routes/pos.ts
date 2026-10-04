@@ -1,3 +1,4 @@
+import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -37,6 +38,8 @@ const closeSessionSchema = z.object({
 });
 
 const saleLineSchema = z.object({
+  ...pickupSelection,
+  pickupKind:z.string().optional(),
   attributes: pickedAttributeSchema,
   stockId: z.string().optional().nullable(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
@@ -366,9 +369,9 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
     const storeId = req.storeId!;
     const body = closeSaleSchema.parse(req.body);
 
-    const subtotal = body.lines.reduce((sum, line) => sum + line.qty * line.unitPrice, 0);
-    const total = Math.max(0, Math.round((subtotal - body.discount + body.surcharge) * 100) / 100);
-    if (body.discount > subtotal + body.surcharge) throw Object.assign(new Error("Desconto superior ao valor da venda."), { status: 400 });
+    let subtotal = body.lines.reduce((sum, line) => sum + line.qty * line.unitPrice, 0);
+    let total = Math.max(0, Math.round((subtotal - body.discount + body.surcharge) * 100) / 100);
+    for(const line of body.lines) line.pickupKind=undefined;
     const orderId = body.localId || `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     if (pool) {
@@ -391,10 +394,14 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           }
         }
 
+        await validatePickupLines(client,storeId,body.lines);
+        subtotal=body.lines.reduce((sum,line)=>sum+line.qty*line.unitPrice,0);
+        total=Math.max(0,Math.round((subtotal-body.discount+body.surcharge)*100)/100);
+        if(body.discount>subtotal+body.surcharge)throw Object.assign(new Error("Desconto superior ao valor da venda."),{status:400});
         const quantities = new Map<string, number>();
         for (const line of body.lines) {
           if (!line.stockId && line.itemType !== 'service') throw Object.assign(new Error('Produto sem vínculo com estoque.'), {status:400});
-          if (line.stockId) quantities.set(line.stockId, (quantities.get(line.stockId) || 0) + line.qty);
+          if (line.stockId && line.pickupKind!=='order') quantities.set(line.stockId, (quantities.get(line.stockId) || 0) + line.qty);
         }
         for (const [id, qty] of [...quantities.entries()].sort()) {
           const stock = await client.query('SELECT qty FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true FOR UPDATE',[id,storeId]);
@@ -454,8 +461,10 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
             ],
           );
 
+          await client.query('UPDATE sales_order_lines SET pickup_kind=$2 WHERE id=$1',[lineId,line.pickupKind||'']);
+          await recordPickup(client,storeId,orderId,body,line);
           // Se tem stockId cadastrado, debita estoque e gera kardex
-          if (line.stockId) {
+          if (line.stockId && line.pickupKind!=='order') {
             const stockCheck = await client.query(
               `SELECT qty, cost FROM stock_items WHERE id = $1 AND store_id = $2`,
               [line.stockId, storeId],

@@ -1,3 +1,4 @@
+import type {DeliveryAddress} from '../data/pickup';
 import type {
   Customer,
   FinanceEntry,
@@ -192,6 +193,7 @@ export function apiClosePosSale(body: {
   sellerId?: string;
   sellerName?: string;
   lines: Array<{
+    pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
     attributes?: Array<{id:string;name:string;value:string}>;
     stockId: string;
     name: string;
@@ -521,6 +523,7 @@ export type ApiMeAccess = {
 };
 
 export type ApiPosTicket = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;cashPrice?:number;
   id: string;
   source: 'totem' | 'manual';
   status: 'open' | 'sold' | 'cancelled';
@@ -617,6 +620,7 @@ export function apiGetTotemPublicAttributes() {
 }
 
 export function apiSubmitTotemLead(body: {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -628,7 +632,7 @@ export function apiSubmitTotemLead(body: {
   installment: string | null;
   priceLabel: string;
 }) {
-  return nestPost<{ id: string; customerNotified?: boolean }>('/totem/leads', body);
+  return nestPost<{ id: string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number }>('/totem/leads', body);
 }
 
 export function apiListPosTickets(status?: ApiPosTicket['status']) {
@@ -2021,6 +2025,7 @@ export function apiSaveCardMachines(machines: any[]) {
 /* ── External Sales (Venda sem Caixa), Trade-in & Goals ──── */
 
 export type ExternalSaleLine = {
+  pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   attributes?: Array<{id:string;name:string;value:string}>;
   stockId?: string | null;
   name: string;

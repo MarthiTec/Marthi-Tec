@@ -80,6 +80,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/atributos', label: 'Atributos & Variações' },
+      { to: '/erp/tipos-retirada', label: 'Tipos de retirada' },
       { to: '/painel/marcas', label: 'Marcas' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },

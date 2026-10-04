@@ -1,3 +1,5 @@
+import {ProductPickupPrices} from '../../components/PickupFields';
+import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { nestRequest } from '../../services/nestClient';
@@ -59,6 +61,8 @@ export type StockVariationRow = {
   sku: string;
   barcode: string;
   imei: string;
+  pickupMethodId?:string;
+  pickupPrices?:Record<string,number|null>;
   attrs: Record<string, string>;
   price: number;
   cardRate?: number;
@@ -140,6 +144,7 @@ export function StockPage() {
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
+  const {methods:pickupMethods}=usePickupMethods();
   const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
   const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '');
@@ -152,8 +157,8 @@ export function StockPage() {
 
   useEffect(() => {
     if (!formVisible || mode !== 'new' || !automationState.enabled || !automationState.eligible || !device) return;
-    const defs=attrDefs.filter(a=>a.active && a.useOnStock && (attributeKind(a.name) || /retir/i.test(a.name)));
-    if(!defs.some(a=>attributeKind(a.name)==='color') || !defs.some(a=>attributeKind(a.name)==='capacity') || !defs.some(a=>/retir/i.test(a.name)))return;
+    const defs=attrDefs.filter(a=>a.active && a.useOnStock && attributeKind(a.name));
+    if(!defs.some(a=>attributeKind(a.name)==='color') || !defs.some(a=>attributeKind(a.name)==='capacity'))return;
     const signature=JSON.stringify([automationStoreId,device.model,defs.map(a=>[a.id,referenceValues(a)])]);
     if(generatedModel.current===signature)return;
     try {
@@ -506,6 +511,7 @@ export function StockPage() {
           ...(sib.capacity && capId ? { [capId]: sib.capacity } : {}),
         },
         price: sib.price,
+        pickupPrices: sib.pickupPrices,
         cardRate: sib.cardRate,
         qty: sib.qty,
         minQty: sib.minQty,
@@ -538,6 +544,7 @@ export function StockPage() {
             ...(item.color && corId ? { [corId]: item.color } : {}),
             ...(item.capacity && capId ? { [capId]: item.capacity } : {}),
           },
+          pickupPrices: item.pickupPrices ?? {},
           price: item.price,
           cardRate: item.cardRate,
           qty: item.qty,
@@ -566,6 +573,7 @@ export function StockPage() {
       maxQty: item.maxQty,
       cost: item.cost,
       avgCost: item.avgCost,
+      pickupPrices: item.pickupPrices ?? {},
       price: item.price,
       cardRate: item.cardRate,
       lastPurchaseAt: item.lastPurchaseAt,
@@ -620,6 +628,7 @@ export function StockPage() {
             imei: row.imei.trim(),
             color: corVal,
             capacity: capVal,
+            pickupPrices: row.pickupPrices ?? form.pickupPrices ?? {},
             attrs: { ...row.attrs },
             qty: Number(row.qty) || 0,
             minQty: Number(row.minQty) || 0,
@@ -739,6 +748,7 @@ export function StockPage() {
       maxQty: item.maxQty,
       cost: item.cost,
       avgCost: item.avgCost,
+      pickupPrices: item.pickupPrices ?? {},
       price: item.price,
       lastPurchaseAt: '',
       lastPurchaseCost: item.lastPurchaseCost,
@@ -1187,6 +1197,7 @@ export function StockPage() {
                 </p>
               </div>
 
+              <div className="stock-id-content">
           {automationState.eligible && <label className="stock-automation-toggle">
             <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
             Receber ajuda para criar todas as variações do produto
@@ -1195,7 +1206,7 @@ export function StockPage() {
               {deviceError && <p role="status" className="empty">{deviceError}</p>}
               {device && <div className="device-reference">
                 <strong>{device.model}</strong>
-                <p>As combinações de cor, capacidade e retirada estão na grade abaixo. Exclua as que não vende e informe preço e estoque antes de salvar.</p>
+                <p>As combinações de cor e capacidade estão na grade abaixo. Exclua as que não vende e informe preço e estoque antes de salvar.</p>
                 <a href={device.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a>
               </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
@@ -1209,8 +1220,10 @@ export function StockPage() {
                     placeholder="Nome do produto"
                   />
                 </label>
+                <div className="stock-brand-field">
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
                 <p className="empty"><Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Cadastrar ou gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
+                </div>
                 <label>
                   SKU
                   <input
@@ -1263,6 +1276,7 @@ export function StockPage() {
                   </span>
                 </label>
               </div>
+              </div>
             </div>
           </article>
 
@@ -1292,6 +1306,8 @@ export function StockPage() {
           </article>
 
 
+          {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
+          <p><Link to="/erp/tipos-retirada">Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -1326,7 +1342,7 @@ export function StockPage() {
                   <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>
                     Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 18x para o Totem. As taxas de cartão são centralizadas em{' '}
                     <Link to="/painel/taxas-cartao" style={{ color: 'var(--accent, #2dd4bf)', textDecoration: 'underline' }}>
-                      Taxas de Cartão & Maquininhas ({getTotemCardRate(12).brandName}: {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}%)
+                      Taxas de Cartão & Maquininhas ({getTotemCardRate(18).brandName}: {getTotemCardRate(18).rate.toFixed(2).replace('.', ',')}%)
                     </Link>.
                   </p>
                 </div>
@@ -1388,6 +1404,7 @@ export function StockPage() {
                         const def = attrDefs.find((a) => a.id === attrId);
                         return <th key={attrId}>{def?.name || attrId}</th>;
                       })}
+                      <th>Tipo de retirada</th>
                       <th>SKU</th>
                       <th>Preço à vista</th>
                       <th>Parcelado (18x)</th>
@@ -1406,7 +1423,8 @@ export function StockPage() {
                       </tr>
                     ) : (
                       variations.map((row, index) => {
-                        const installmentText = formatInstallment(row.price, 18);
+                        const rowPrice=row.pickupMethodId ? row.pickupPrices?.[row.pickupMethodId]??row.price : row.price;
+                        const installmentText = formatInstallment(rowPrice, 18);
 
                         return (
                           <tr key={row.tempKey}>
@@ -1447,6 +1465,7 @@ export function StockPage() {
                                 </td>
                               );
                             })}
+                            <td><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
                             <td>
                               <input
                                 type="text"
@@ -1462,11 +1481,11 @@ export function StockPage() {
                                 type="number"
                                 min={0}
                                 step="0.01"
-                                value={row.price}
+                                value={rowPrice}
                                 disabled={readOnly}
                                 style={{ width: 95 }}
                                 onChange={(e) =>
-                                  updateVariationRow(index, 'price', Number(e.target.value))
+                                  row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:Number(e.target.value)}}:r)) : updateVariationRow(index, 'price', Number(e.target.value))
                                 }
                               />
                             </td>
@@ -1708,10 +1727,10 @@ export function StockPage() {
                   ) : null}
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
-                      <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12)}{' '}
+                      <strong>Simulação Totem (18×):</strong> {formatInstallment(form.price, 18)}{' '}
                       <span style={{ fontSize: '0.82rem' }}>
-                        (baseado na maquininha padrão: {getTotemCardRate(12).brandName} a{' '}
-                        {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}% — configure em{' '}
+                        (baseado na maquininha padrão: {getTotemCardRate(18).brandName} a{' '}
+                        {getTotemCardRate(18).rate.toFixed(2).replace('.', ',')}% — configure em{' '}
                         <Link to="/painel/taxas-cartao" style={{ textDecoration: 'underline' }}>
                           Taxas de Cartão
                         </Link>

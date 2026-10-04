@@ -1,3 +1,4 @@
+import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -42,6 +43,8 @@ const tradeInSchema = z.object({
 });
 
 const saleLineSchema = z.object({
+  ...pickupSelection,
+  pickupKind:z.string().optional(),
   attributes: pickedAttributeSchema,
   stockId: z.string().optional().nullable(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
@@ -81,6 +84,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     const storeId = req.storeId!;
     const body = externalSaleSchema.parse(req.body);
 
+    for(const line of body.lines) line.pickupKind=undefined;
     const orderId = `VND-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const today = new Date().toISOString().slice(0, 10);
     const nowIso = new Date().toISOString();
@@ -106,6 +110,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           return;
         }
       }
+      await validatePickupLines(client,storeId,body.lines);
       body.sellerName = req.user!.name;
       for (const [table, id] of [['customers', body.customerId], ['sellers', body.sellerId]] as const) {
         if (!id) continue;
@@ -120,7 +125,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       const requested = new Map<string, number>();
       for (const line of body.lines) {
         if (!line.stockId) throw Object.assign(new Error('Selecione um produto cadastrado no estoque da loja.'), {status: 400});
-        requested.set(line.stockId, (requested.get(line.stockId) || 0) + line.qty);
+        if(line.pickupKind!=='order') requested.set(line.stockId, (requested.get(line.stockId) || 0) + line.qty);
       }
       // Lock in a stable order and check aggregate quantity, including repeated items.
       for (const [id, qty] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
@@ -148,7 +153,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           line.name = stockRow.name;
           line.imei = stockRow.imei || "";
           const currentQty = Number(stockRow.qty);
-          if (currentQty < line.qty) {
+          if (currentQty < line.qty && line.pickupKind!=='order') {
             throw new Error(`Estoque insuficiente para o produto "${stockRow.name}". Disponível: ${currentQty}, Solicitado: ${line.qty}`);
           }
 
@@ -247,7 +252,9 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           ],
         );
 
-        if (line.stockId) {
+        await client.query('UPDATE sales_order_lines SET pickup_kind=$2 WHERE id=$1',[lineId,line.pickupKind||'']);
+        await recordPickup(client,storeId,orderId,body,line);
+        if (line.stockId && line.pickupKind!=='order') {
           const prevRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`, [line.stockId, storeId]);
           const prevQty = Number(prevRes.rows[0].qty);
           const newQty = prevQty - line.qty;
@@ -806,8 +813,11 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         `SELECT * FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1`,
         [saleId],
       );
+      const fulfilled=await client.query("SELECT 1 FROM pickup_requests WHERE store_id=$1 AND reference_id=$2 AND kind='order' AND status='completed' LIMIT 1",[storeId,saleId]);
+      if(fulfilled.rows.length)throw Object.assign(new Error('Encomenda já entregue: registre a devolução pelo estoque antes do cancelamento.'),{status:409});
+      await client.query("UPDATE pickup_requests SET status='cancelled',updated_at=now() WHERE store_id=$1 AND reference_id=$2",[storeId,saleId]);
       for (const line of linesRes.rows) {
-        if (line.stock_id) {
+        if (line.stock_id && line.pickup_kind!=='order') {
           const sRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE`, [line.stock_id, storeId]);
           if (sRes.rows.length > 0) {
             const prev = Number(sRes.rows[0].qty);

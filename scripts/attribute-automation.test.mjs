@@ -109,8 +109,8 @@ after(async()=>{await new Promise(resolve=>server.close(resolve));await pool.end
 test('attribute automation persists, is idempotent and isolates stores',async()=>{
  await query("UPDATE stores SET segment='assistencia_tecnica' WHERE id='store-a'");
  const first=await good('/attributes/automation');
- assert.equal(first.eligible,true);assert.equal(first.enabled,true);assert.equal(first.attributes.length,3);
- assert.deepEqual(first.attributes.find(a=>a.name==='Tipo de Retirada').values,['Em mão','Por encomenda']);
+ assert.equal(first.eligible,true);assert.equal(first.enabled,true);assert.equal(first.attributes.length,2);
+ assert.equal(first.attributes.some(a=>a.name==='Tipo de Retirada'),false);
  const second=await good('/attributes/automation');assert.deepEqual(second.attributes.map(a=>a.id),first.attributes.map(a=>a.id));
  await good('/attributes/automation','PUT',{enabled:false});
  assert.equal((await good('/attributes/automation')).enabled,false);
@@ -120,5 +120,5 @@ test('attribute automation persists, is idempotent and isolates stores',async()=
  assert.equal((await query('SELECT name FROM product_attributes WHERE id=$1',[foreign])).rows[0].name,first.attributes[0].name);
  assert.equal((await query("SELECT count(*)::int AS n FROM product_attributes WHERE store_id='store-b'")).rows[0].n,0);
  await good('/attributes/automation','PUT',{enabled:true});
- assert.equal((await good('/attributes')).length,3);
+ assert.equal((await good('/attributes')).length,2);
 });

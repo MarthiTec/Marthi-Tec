@@ -1,3 +1,4 @@
+import {PickupFields} from '../../components/PickupFields';
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
@@ -21,6 +22,7 @@ import { CashPickupModal } from '../../components/CashPickupModal';
 import { DailyPendingModal } from '../../components/DailyPendingModal';
 
 type StockOption = {
+  pickupPrices?:Record<string,number|null>;
   attrs?: Record<string,unknown>; color?: string; capacity?: string;
   brand: string;
   id: string;
@@ -149,6 +151,7 @@ export function ExternalSalePage() {
           imei: it.imei || '',
           category: it.category || 'Geral',
           brand: it.brand || '',
+          pickupPrices: it.pickupPrices,
           attrs: it.attrs, color: it.color, capacity: it.capacity,
         }));
 
@@ -221,11 +224,11 @@ export function ExternalSalePage() {
     setLines((prev) =>
       prev.map((l, idx) => {
         if (idx !== index) return l;
-        if (!prod) return { ...l, attributes: [], stockId: '', name: '', unitPrice: 0, unitCost: 0, imei: '' };
+        if (!prod) return { ...l, attributes: [],pickupMethodId:undefined,deliveryAddress:undefined, stockId: '', name: '', unitPrice: 0, unitCost: 0, imei: '' };
         return {
           ...l,
           stockId: prod.id,
-          attributes: [],
+          attributes: [],pickupMethodId:undefined,deliveryAddress:undefined,
           name: prod.name,
           unitPrice: prod.price,
           unitCost: prod.cost,
@@ -289,6 +292,7 @@ export function ExternalSalePage() {
         warrantyTerms: warrantyTerms.trim(),
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
+          pickupMethodId:l.pickupMethodId,deliveryAddress:l.deliveryAddress,
           attributes: l.attributes ?? [],
           name: l.name.trim(),
           qty: Number(l.qty) || 1,
@@ -686,6 +690,7 @@ export function ExternalSalePage() {
                   />
                 </div>
 
+                <PickupFields product={stockItems.find(p=>p.id===line.stockId)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map((entry,i)=>i===idx?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
                 <SaleAttributeFields surface="external" product={stockItems.find(p=>p.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map((entry,i)=>i===idx ? {...entry,attributes} : entry))}/>
                 <div>
                   <label className="admin-label">Quantidade</label>

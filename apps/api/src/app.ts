@@ -1,3 +1,4 @@
+import { pickupRouter } from './routes/pickup.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -66,6 +67,7 @@ app.use(healthRouter);
 app.use(authRouter);
 app.use(partnersRouter);
 app.use(attributesRouter);
+app.use(pickupRouter);
 app.use(brandsRouter);
 app.use(deviceReferenceRouter);
 app.use(stockRouter);
