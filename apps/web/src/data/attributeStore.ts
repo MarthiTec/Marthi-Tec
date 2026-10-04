@@ -1,3 +1,4 @@
+import { tenantScopedKey } from './tenantContext';
 export const ATTR_COR = 'ATTR-COR';
 export const ATTR_CAP = 'ATTR-CAP';
 export const ATTR_RET = 'ATTR-RET';
@@ -46,10 +47,16 @@ export type PickedAttribute = {
   value: string;
 };
 
-const STORAGE_KEY = 'marthi.attributes.v1';
 export const ATTRIBUTES_EVENT = 'marthi-attributes-updated';
 
 let memoryAttrs: ProductAttribute[] | null = null;
+let memoryScope = '';
+function storageKey() {
+ const tenant=tenantScopedKey('marthi.attributes.v2');
+ const store=localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1')) || localStorage.getItem('marthi.totem.store_id') || '';
+ return `${tenant}:${store}`;
+}
+
 
 export function seedAttributes(): ProductAttribute[] {
   return [];
@@ -58,7 +65,7 @@ export function seedAttributes(): ProductAttribute[] {
 export function clearAttributes(): ProductAttribute[] {
   memoryAttrs = [];
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey());
   } catch {
     /* ignore */
   }
@@ -88,6 +95,7 @@ function sortAttrs(items: ProductAttribute[]) {
 }
 
 function load(): ProductAttribute[] {
+  if(memoryScope !== storageKey()) {memoryAttrs=null;memoryScope=storageKey();}
   if (memoryAttrs) {
     return sortAttrs(
       memoryAttrs
@@ -100,7 +108,7 @@ function load(): ProductAttribute[] {
     );
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) {
       return [];
     }
@@ -130,7 +138,7 @@ function load(): ProductAttribute[] {
   } catch (err) {
     console.warn('[attributeStore] Erro ao carregar atributos locais, resetando:', err);
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey());
     } catch {
       /* ignore */
     }
@@ -141,9 +149,10 @@ function load(): ProductAttribute[] {
 function persist(items: ProductAttribute[]) {
   const safeItems = Array.isArray(items) ? items : [];
   const next = sortAttrs(safeItems);
+  memoryScope = storageKey();
   memoryAttrs = next;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(storageKey(), JSON.stringify(next));
   } catch {
     /* ignore */
   }
@@ -168,7 +177,7 @@ export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
       try {
         remote = await apiListAttributes();
       } catch {
-        remote = await apiGetTotemPublicAttributes().catch(() => null);
+        return replaceAttributes([]);
       }
     } else {
       remote = await apiGetTotemPublicAttributes().catch(() => null);
@@ -176,10 +185,10 @@ export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
     if (Array.isArray(remote)) {
       return replaceAttributes(remote as ProductAttribute[]);
     }
-    return load();
+    return replaceAttributes([]);
   } catch (err) {
     console.warn('[attributeStore] Falha ao hidratar atributos da API:', err);
-    return load();
+    return replaceAttributes([]);
   }
 }
 
@@ -276,7 +285,7 @@ export async function saveAttributes(items: ProductAttribute[]) {
       }
       return persist(merged);
     } catch (err) {
-      console.warn('[attributeStore] Falha ao sincronizar atributos com Nest, gravando localmente:', err);
+      throw err;
     }
   }
   return persist(items.slice(0, MAX_ATTRIBUTES));
@@ -289,7 +298,7 @@ export async function removeAttribute(id: string): Promise<ProductAttribute[]> {
     try {
       await apiDeleteAttribute(id);
     } catch (err: unknown) {
-      console.warn('[attributeStore] Aviso ao excluir atributo no backend:', err);
+      throw err;
     }
   }
   return persist(load().filter((item) => item && item.id !== id).slice(0, MAX_ATTRIBUTES));

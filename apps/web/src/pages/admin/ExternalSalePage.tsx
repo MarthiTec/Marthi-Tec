@@ -1,3 +1,4 @@
+import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
 import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useEffect, useMemo, useState, useRef } from 'react';
@@ -23,6 +24,7 @@ type StockOption = {
   qty: number;
   imei: string;
   category: string;
+  attrs?: Record<string,string>;
 };
 
 export function ExternalSalePage() {
@@ -42,6 +44,8 @@ export function ExternalSalePage() {
   // Estados Base
   const [customers, setCustomers] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<StockOption[]>([]);
+  const [attributeDefs,setAttributeDefs]=useState<ProductAttribute[]>([]);
+  useEffect(()=>{let disposed=false;setAttributeDefs([]);void hydrateAttributesFromApi().then(()=>{if(!disposed)setAttributeDefs(getAttributes().filter(a=>a.active&&a.useOnStock));});return()=>{disposed=true;};},[storeId]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -651,7 +655,7 @@ export function ExternalSalePage() {
                       { value: '', label: 'Selecione um produto do estoque...' },
                       ...stockItems.map((p) => ({
                         value: p.id,
-                        label: `${p.name} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
+                        label: `${p.name}${p.attrs ? ' · '+Object.values(p.attrs).filter(Boolean).join(' · ') : ''} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
                       })),
                     ]}
                     onChange={(val) => handleLineProductChange(idx, val)}
@@ -775,13 +779,7 @@ export function ExternalSalePage() {
                   <AdminPicker
                     label="Capacidade"
                     value={tradeIn.capacity || ''}
-                    options={[
-                      { value: '64GB', label: '64 GB' },
-                      { value: '128GB', label: '128 GB' },
-                      { value: '256GB', label: '256 GB' },
-                      { value: '512GB', label: '512 GB' },
-                      { value: '1TB', label: '1 TB' },
-                    ]}
+                    options={(attributeDefs.find(a=>/capac|armazen/i.test(a.name))?.values ?? []).map(value=>({value,label:value}))}
                     onChange={(val) => setTradeIn({ ...tradeIn, capacity: val })}
                   />
                 </div>

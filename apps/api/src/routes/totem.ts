@@ -241,11 +241,7 @@ async function handleGetAttributes(req: Request, res: Response, next: NextFuncti
       }
     }
 
-    const fallbackAttrs = [
-      { id: 'attr-cor', name: 'Cor', values: ['Preto', 'Branco', 'Azul', 'Desert', 'Titânio Natural'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 1, priceDeltas: {} },
-      { id: 'attr-cap', name: 'Capacidade', values: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 2, priceDeltas: {} },
-    ];
-    res.json({ success: true, data: fallbackAttrs });
+    res.json({ success: true, data: [] });
   } catch (error) {
     next(error);
   }
