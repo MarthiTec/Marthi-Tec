@@ -129,7 +129,7 @@ export function StockItemHistoryModal({ balance, item, isOpen, onClose, onUpdate
             Registros de Bipagem / Lançamentos ({item.entries.length}):
           </h4>
 
-          <div className="stock-inv-modal-table-box">
+          <div className="stock-inv-modal-table-box admin-table-container">
             <table className="stock-inv-modal-table">
               <thead>
                 <tr>

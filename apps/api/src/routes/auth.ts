@@ -304,7 +304,7 @@ authRouter.post('/api/v1/admin/clients/resend-activation', async (req, res, next
   }
 });
 
-authRouter.post('/api/v1/admin/clients/force-reset', async (req, res, next) => {
+authRouter.post('/api/v1/admin/clients/force-reset', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
     const actor = req.header('x-actor-name') || 'Administrador Marthi';
@@ -327,7 +327,7 @@ authRouter.post('/api/v1/admin/clients/toggle-access', async (req, res, next) =>
   }
 });
 
-authRouter.get('/api/v1/admin/clients/security-status', async (req, res, next) => {
+authRouter.get('/api/v1/admin/clients/security-status', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
   const email = typeof req.query.email === 'string' ? req.query.email : '';
   const phone = typeof req.query.phone === 'string' ? req.query.phone : undefined;

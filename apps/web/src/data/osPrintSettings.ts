@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getFiscalIssuerSettings } from './fiscalIssuerStore';
 import { getTotemSettings } from './totemSettings';
-import { MARTHI_COMPANY } from './companyContact';
+import { getActiveStore } from './multiStoreStore';
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
 
-const STORAGE_KEY = 'marthi.os.print_settings.v1';
 export const OS_PRINT_SETTINGS_EVENT = 'marthi-os-print-settings-updated';
 
 export type OsPrintModel = 'default' | 'commercial';
@@ -54,19 +54,20 @@ export const DEFAULT_WARRANTY_TERMS = `1. OBS: GARANTIA NÃO COBRE MAU USO, APAR
 export function getDefaultCompanyData(): CompanyPrintData {
   const fiscal = getFiscalIssuerSettings();
   const totem = getTotemSettings();
+  const store = getActiveStore();
 
-  const name = fiscal.emitenteName || totem.storeName || MARTHI_COMPANY.legalName;
-  const tradeName = totem.storeName || fiscal.emitenteName || MARTHI_COMPANY.legalName;
+  const name = fiscal.emitenteName || totem.storeName || store?.tradeName || store?.name || '';
+  const tradeName = totem.storeName || fiscal.emitenteName || store?.tradeName || store?.name || '';
   const document = fiscal.cnpj || '';
   const ie = fiscal.ie || '';
   const im = fiscal.im || '';
-  const address = totem.locationLabel || MARTHI_COMPANY.addressLine;
-  const neighborhood = MARTHI_COMPANY.district;
-  const city = fiscal.municipio || MARTHI_COMPANY.city;
-  const state = fiscal.uf || MARTHI_COMPANY.stateUf;
+  const address = totem.locationLabel || [store?.street, store?.number, store?.complement].filter(Boolean).join(', ');
+  const neighborhood = store?.neighborhood || '';
+  const city = fiscal.municipio || store?.city || '';
+  const state = fiscal.uf || store?.state || '';
   const zip = '';
-  const phone = totem.storeWhatsApp ? `(24) ${totem.storeWhatsApp}` : MARTHI_COMPANY.whatsappDisplay;
-  const email = MARTHI_COMPANY.email;
+  const phone = store?.phone || totem.storeWhatsApp || '';
+  const email = store?.email || '';
   const logoUrl = totem.storeLogo || '';
 
   return {
@@ -91,9 +92,9 @@ export function defaultOsPrintSettings(): OsPrintSettings {
     model: 'commercial',
     company: getDefaultCompanyData(),
     qrCode: {
-      enabled: true,
-      url: 'https://instagram.com/marthi.tecnologia',
-      label: 'Siga nosso Instagram / Avalie nosso atendimento',
+      enabled: false,
+      url: '',
+      label: '',
     },
     warranty: {
       defaultDays: 90,
@@ -105,46 +106,10 @@ export function defaultOsPrintSettings(): OsPrintSettings {
 }
 
 export function getOsPrintSettings(): OsPrintSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultOsPrintSettings();
-    const parsed = JSON.parse(raw) as Partial<OsPrintSettings>;
-    const defaults = defaultOsPrintSettings();
-
-    const company = {
-      ...defaults.company,
-      ...(parsed.company || {}),
-      logoUrl: parsed.company?.logoUrl || defaults.company.logoUrl,
-    };
-
-    // Remove legacy mock values if present in user storage
-    if (company.document === '61.506.270/0001-63') {
-      company.document = defaults.company.document;
-    }
-    if (company.zip === '25.812-461') {
-      company.zip = '';
-    }
-
-    return {
-      model: parsed.model === 'default' ? 'default' : 'commercial',
-      company,
-      qrCode: {
-        ...defaults.qrCode,
-        ...(parsed.qrCode || {}),
-      },
-      warranty: {
-        ...defaults.warranty,
-        ...(parsed.warranty || {}),
-      },
-      copies: parsed.copies || 'both',
-      updatedAt: parsed.updatedAt || new Date().toISOString(),
-    };
-  } catch {
-    return defaultOsPrintSettings();
-  }
+  return readModuleState('os-print-settings', defaultOsPrintSettings());
 }
 
-export function saveOsPrintSettings(patch: Partial<OsPrintSettings>): OsPrintSettings {
+export async function saveOsPrintSettings(patch: Partial<OsPrintSettings>): Promise<OsPrintSettings> {
   const current = getOsPrintSettings();
   const next: OsPrintSettings = {
     ...current,
@@ -164,12 +129,12 @@ export function saveOsPrintSettings(patch: Partial<OsPrintSettings>): OsPrintSet
     updatedAt: new Date().toISOString(),
   };
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  await saveModuleState('os-print-settings', next);
   window.dispatchEvent(new CustomEvent(OS_PRINT_SETTINGS_EVENT, { detail: next }));
   return next;
 }
 
-export function useOsPrintSettings(): [OsPrintSettings, (patch: Partial<OsPrintSettings>) => void] {
+export function useOsPrintSettings(): [OsPrintSettings, (patch: Partial<OsPrintSettings>) => Promise<OsPrintSettings>] {
   const [settings, setSettings] = useState<OsPrintSettings>(getOsPrintSettings);
 
   useEffect(() => {
@@ -182,3 +147,5 @@ export function useOsPrintSettings(): [OsPrintSettings, (patch: Partial<OsPrintS
 
   return [settings, saveOsPrintSettings];
 }
+
+export async function hydrateOsPrintSettingsFromApi() { await loadModuleState('os-print-settings', defaultOsPrintSettings()); window.dispatchEvent(new Event(OS_PRINT_SETTINGS_EVENT)); }

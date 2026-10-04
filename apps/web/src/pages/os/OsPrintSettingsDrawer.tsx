@@ -73,13 +73,14 @@ export function OsPrintSettingsDrawer({ open, onClose }: Props) {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     let qrUrl = form.qrCode.url.trim();
     if (qrUrl && !/^https?:\/\//i.test(qrUrl)) {
       qrUrl = `https://${qrUrl}`;
     }
 
-    saveSettings({
+    try {
+    await saveSettings({
       ...form,
       qrCode: {
         ...form.qrCode,
@@ -87,6 +88,7 @@ export function OsPrintSettingsDrawer({ open, onClose }: Props) {
       },
     });
     onClose();
+    } catch (error) { window.alert(error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'); }
   }
 
   return (

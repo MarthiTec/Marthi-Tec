@@ -137,7 +137,7 @@ export function TotemInsightsPage() {
             <p className="empty">Nenhuma venda do totem fechada hoje.</p>
           ) : (
             <div className="caixa-panel__table" style={{ border: 'none', borderRadius: 0 }}>
-              <table className="admin-table">
+              <div className="admin-table-container"><table className="admin-table">
                 <thead>
                   <tr>
                     <th>Cliente</th>
@@ -160,7 +160,7 @@ export function TotemInsightsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           )}
         </article>

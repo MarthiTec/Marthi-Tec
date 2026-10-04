@@ -1757,7 +1757,7 @@ export function MarthiClientsPage() {
                 </div>
               </div>
 
-              <table className="admin-table" style={{ fontSize: '0.85rem' }}>
+              <div className="admin-table-container"><table className="admin-table" style={{ fontSize: '0.85rem' }}>
                 <tbody>
                   <tr>
                     <td style={{ color: 'var(--mute)' }}>Identificador:</td>
@@ -1871,7 +1871,7 @@ export function MarthiClientsPage() {
                     </tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
 
               <div className="marthi-modal-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <button

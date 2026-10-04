@@ -116,7 +116,7 @@ export function OperationsPage() {
     setEditing(false);
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft) return;
     const label = draft.label.trim();
@@ -125,7 +125,8 @@ export function OperationsPage() {
       setMessage('Informe nome e link da operação.');
       return;
     }
-    upsertOperationShortcut({
+    try {
+    await upsertOperationShortcut({
       id: draft.id,
       label,
       href,
@@ -136,27 +137,34 @@ export function OperationsPage() {
     setItems(listOperationShortcuts());
     setMessage('Operação salva.');
     cancelEdit();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function toggleActive(item: OperationShortcut) {
-    setOperationActive(item.id, !item.active);
+  async function toggleActive(item: OperationShortcut) {
+    try {
+    await setOperationActive(item.id, !item.active);
     setItems(listOperationShortcuts());
     setMessage(item.active ? 'Operação desativada.' : 'Operação ativada.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function remove(item: OperationShortcut) {
+  async function remove(item: OperationShortcut) {
     if (!window.confirm(`Remover "${item.label}"?`)) return;
-    deleteOperationShortcut(item.id);
+    try {
+    await deleteOperationShortcut(item.id);
     setItems(listOperationShortcuts());
     setMessage('Operação removida.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function resetDefaults() {
+  async function resetDefaults() {
     if (!window.confirm('Restaurar atalhos padrão da loja?')) return;
-    resetOperationShortcuts();
+    try {
+    await resetOperationShortcuts();
     setItems(listOperationShortcuts());
     setMessage('Atalhos restaurados.');
     cancelEdit();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
   return (

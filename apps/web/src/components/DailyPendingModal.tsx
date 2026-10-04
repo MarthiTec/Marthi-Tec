@@ -1,3 +1,4 @@
+import '../pages/admin/externalSale.css';
 import { useEffect, useState } from 'react';
 import { apiGetDailyPendingTasks } from '../services/erpApi';
 import { Link } from 'react-router-dom';
@@ -28,11 +29,11 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (error) return <div className="admin-modal-backdrop"><div className="admin-modal"><p role="alert">{error}</p><button onClick={onClose}>Fechar</button></div></div>;
+  if (error) return <div className="admin-modal-backdrop external-sale-backdrop"><div role="dialog" aria-modal="true" aria-label="Pendências do dia" className="admin-modal external-sale-modal"><p role="alert">{error}</p><button onClick={onClose}>Fechar</button></div></div>;
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
+    <div className="admin-modal-backdrop external-sale-backdrop" onClick={onClose}>
       <div
-        className="admin-modal"
+        role="dialog" aria-modal="true" aria-label="Pendências do dia" className="admin-modal external-sale-modal"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '580px', width: '95vw' }}
       >
@@ -81,7 +82,7 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
                   <div style={{ fontSize: '0.82rem', color: 'var(--mute)', marginTop: '2px' }}>
                     {tasks?.pendingCashSalesCount || 0} venda(s) externa(s) aguardando recolhimento
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#eab308', marginTop: '4px' }}>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--external-warning)' , marginTop: '4px' }}>
                     R$ {(tasks?.pendingCashTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -156,7 +157,7 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
                   <div style={{ fontSize: '0.82rem', color: 'var(--mute)', marginTop: '2px' }}>
                     {tasks?.payablesDueCount || 0} lançamento(s) para conferência/pagamento hoje
                   </div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f87171', marginTop: '4px' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--external-danger)' , marginTop: '4px' }}>
                     R$ {(tasks?.payablesDueAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -192,7 +193,7 @@ export function DailyPendingModal({ onClose, onOpenPickupModal }: Props) {
                   <div style={{ fontSize: '0.82rem', color: 'var(--mute)', marginTop: '2px' }}>
                     {tasks?.receivablesDueCount || 0} título(s) com previsão de entrada
                   </div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#4ade80', marginTop: '4px' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--external-success)' , marginTop: '4px' }}>
                     R$ {(tasks?.receivablesDueAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>

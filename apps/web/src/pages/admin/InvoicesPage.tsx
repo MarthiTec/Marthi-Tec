@@ -351,7 +351,7 @@ export function InvoicesPage() {
     const draftDoc: FiscalDocument = fiscalDoc || {
       id: `XML-${selected.id}`,
       kind: 'nfe',
-      status: 'authorized',
+      status: 'pending',
       refType: 'invoice',
       refId: selected.id,
       customerName: partyName(selected),
@@ -360,7 +360,7 @@ export function InvoicesPage() {
       amount: invoiceTotal(selected),
       number: selected.number || '1',
       series: selected.series || '1',
-      accessKey: `332609${cleanDocument(issuer.cnpj || '00000000000100')}55001${String(selected.number).padStart(9, '0')}1000000018`,
+      accessKey: 'PREVIEW-SEM-TRANSMISSAO',
       provider: 'sefaz_mock',
       createdAt: new Date().toISOString(),
       message: selected.notes || 'Emissão regular de nota fiscal',
@@ -372,11 +372,11 @@ export function InvoicesPage() {
       })),
       nfe: {
         environment: issuer.environment,
-        protocol: '133260000000001',
-        receiptNumber: 'REC2026001',
-        statusCode: '100',
-        statusMessage: 'Autorizado o uso da NF-e',
-        xmlDigest: 'Wp6Z9v8h34+=',
+        protocol: '—',
+        receiptNumber: '—',
+        statusCode: '—',
+        statusMessage: 'Pré-visualização sem transmissão',
+        xmlDigest: '',
         documentPurpose: docPurpose,
       },
     };
@@ -429,9 +429,7 @@ export function InvoicesPage() {
     flash(`Status SEFAZ consultado: ${res.document.nfe?.statusMessage || 'Autorizado'}.`);
   }
 
-  function cleanDocument(doc: string) {
-    return doc.replace(/\D/g, '');
-  }
+
 
   // Cálculos de totais de impostos
   const itemsSum = selected ? invoiceItemsTotal(selected) : 0;

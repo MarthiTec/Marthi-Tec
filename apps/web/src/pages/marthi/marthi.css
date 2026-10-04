@@ -738,14 +738,16 @@
    ========================================================================== */
 .marthi-payout-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: 24px;
   margin-bottom: 24px;
 }
 
 .marthi-payout-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  min-width: 0;
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
@@ -797,11 +799,13 @@
 
 .marthi-input-action-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .marthi-input-action-row input {
-  flex: 1;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .marthi-pix-result {
@@ -1127,19 +1131,19 @@
   .marthi-kpi-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .marthi-page-head {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .marthi-page-head > div:last-child {
     display: flex;
     flex-direction: column;
     gap: 8px;
     width: 100%;
   }
-  
+
   .marthi-page-head > div:last-child .btn {
     width: 100%;
   }
@@ -1501,3 +1505,18 @@
 
 
 
+
+/* Recebimentos: contraste e largura consistentes com os tokens do painel. */
+.marthi-payout-card__head { border-color: var(--line); }
+.marthi-payout-card__head p, .marthi-payout-card__status-row,
+.marthi-security-notice, .marthi-security-notice__text strong { color: var(--ink); }
+.marthi-security-notice { background: var(--card-2); border-color: var(--line); }
+.marthi-pix-result { overflow-wrap: anywhere; }
+.is-theme-dark .marthi-pix-result, .admin--dark .marthi-pix-result {
+  background: var(--card-2); color: var(--ink); border-color: var(--line);
+}
+.is-theme-dark .marthi-pix-result__badge, .admin--dark .marthi-pix-result__badge { color: var(--accent); }
+@media (max-width: 768px) {
+  .marthi-payout-card { padding: 16px; }
+  .marthi-input-action-row .btn { width: 100%; }
+}

@@ -1,3 +1,4 @@
+import { nestGet, nestPut, nestPost } from '../services/nestClient';
 import { logAudit } from './auditLog';
 import { type PlanId } from './catalog';
 
@@ -23,80 +24,6 @@ export type CommercialPlan = {
 const STORAGE_KEY = 'marthi.commercial.plans.v2';
 export const PLANS_UPDATED_EVENT = 'marthi-plans-updated';
 
-export const INITIAL_COMMERCIAL_PLANS: CommercialPlan[] = [
-  {
-    id: 'bronze',
-    name: 'Bronze',
-    price: 'R$ 197',
-    priceNumeric: 197,
-    period: '/mês',
-    blurb: '1 módulo à escolha + painel da loja com orçamentos básicos. Ideal para começar enxuto.',
-    fullDescription: 'Plano inicial para empresas e lojas que precisam de uma operação ágil e focada em um módulo essencial (Totem & Cardápio Digital, OS, PDV + Retaguarda, Fiscal ou E-commerce), mantendo controle total no painel web.',
-    commercialCallout: 'Ideal para começar enxuto',
-    homeSummary: '1 módulo à sua escolha com painel completo da loja, orçamentos e perfil de operador.',
-    featured: false,
-    displayOrder: 1,
-    active: true,
-    maxModules: 1,
-    features: [
-      '1 módulo à escolha (Totem & Cardápio Digital, OS, PDV + Retaguarda, Fiscal ou E-commerce)',
-      'Painel web da loja com perfil de operador e gestão central',
-      'Orçamentos comerciais e emissão de propostas básicas',
-      'Central com casinha em cada app (mesma experiência integrada)',
-      '1 unidade / operação enxuta com retaguarda leve',
-      'Suporte em horário comercial e atualizações contínuas',
-    ],
-  },
-  {
-    id: 'silver',
-    name: 'Silver',
-    price: 'R$ 497',
-    priceNumeric: 497,
-    period: '/mês',
-    blurb: 'Até 2 módulos + Orçamentos em PDF, Campanhas Promocionais e PDV integrado à Retaguarda.',
-    fullDescription: 'O plano mais equilibrado para empresas em crescimento, combinando frente de caixa integrada à retaguarda ou ordem de serviço com gestão de estoque, orçamentos em PDF por WhatsApp/E-mail e motor de campanhas promocionais.',
-    commercialCallout: 'Mais escolhido por comércios e restaurantes',
-    homeSummary: 'Até 2 módulos liberados com motor de campanhas, orçamentos em PDF e equipe multi-usuário.',
-    featured: true,
-    displayOrder: 2,
-    active: true,
-    maxModules: 2,
-    features: [
-      'Até 2 módulos liberados (ex: PDV + Retaguarda com Campanhas + Emissor Fiscal, ou Totem + PDV + Retaguarda)',
-      'Motor de Campanhas Promocionais (Leve X Pague Y, Faixas de Preço por Volume, Brindes)',
-      'Orçamentos Comerciais em PDF com envio direto por WhatsApp e E-mail',
-      'PDV integrado à retaguarda com persistência blindada contra queda de energia e F5',
-      'Multi-usuário no painel com permissões detalhadas por funcionário',
-      'Personalização com a marca da sua loja e prioridade no suporte',
-    ],
-  },
-  {
-    id: 'golden',
-    name: 'Golden',
-    price: 'R$ 597',
-    priceNumeric: 597,
-    period: '/mês',
-    blurb: 'Ecossistema completo: Totem, Cardápio Digital & Food, OS, PDV + Retaguarda, Fiscal e E-commerce.',
-    fullDescription: 'Solução completa all-in-one para máxima eficiência operacional, unindo autoatendimento no totem, cardápio digital com QR code e KDS cozinha, retaguarda completa com PDV integrado, emissor fiscal e vendas online.',
-    commercialCallout: 'Ecossistema completo sem limitações',
-    homeSummary: 'Todos os módulos liberados: Cardápio Digital, Campanhas, Orçamentos, Fiscal e Suporte VIP.',
-    featured: false,
-    displayOrder: 3,
-    active: true,
-    maxModules: 5,
-    allModules: true,
-    features: [
-      'Todos os módulos liberados: Totem + Cardápio Digital & KDS + OS + PDV + Retaguarda + Fiscal + E-commerce',
-      'Cardápio digital via QR Code nas mesas, gestão de comandas e KDS na TV da cozinha',
-      'Motor avançado de Campanhas Promocionais com validação e proteção de margem de lucro',
-      'Orçamentos Comerciais em PDF com conversão em 1 clique para venda no caixa',
-      'PDV veloz com recuperação offline/queda de energia, estorno seguro e conciliação financeira',
-      'Emissor fiscal completo (NF-e, NFC-e, NFS-e, CT-e, MDF-e) e integração com marketplaces',
-      'Acompanhamento comercial dedicado e suporte VIP prioritário contínuo',
-    ],
-  },
-];
-
 let memoryPlans: CommercialPlan[] | null = null;
 
 function load(): CommercialPlan[] {
@@ -104,7 +31,7 @@ function load(): CommercialPlan[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      memoryPlans = [...INITIAL_COMMERCIAL_PLANS];
+      memoryPlans = [];
       return memoryPlans;
     }
     const parsed = JSON.parse(raw);
@@ -115,7 +42,7 @@ function load(): CommercialPlan[] {
   } catch {
     /* fallback */
   }
-  memoryPlans = [...INITIAL_COMMERCIAL_PLANS];
+  memoryPlans = [];
   return memoryPlans;
 }
 
@@ -143,12 +70,12 @@ export function getCommercialPlanById(id: PlanId): CommercialPlan | undefined {
   return all.find((p) => p.id === id);
 }
 
-export function updateCommercialPlan(
+export async function updateCommercialPlan(
   planId: PlanId,
   changes: Partial<CommercialPlan>,
   actor?: { name: string; email: string },
-): CommercialPlan {
-  const plans = load();
+): Promise<CommercialPlan> {
+  const plans = load().map(plan => ({ ...plan }));
   const index = plans.findIndex((p) => p.id === planId);
   if (index === -1) {
     throw new Error(`Plano "${planId}" não encontrado.`);
@@ -166,7 +93,8 @@ export function updateCommercialPlan(
     next.price = changes.priceNumeric.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
-  plans[index] = next;
+  const saved = await nestPut<CommercialPlan>('/admin/commercial-plans/' + encodeURIComponent(planId), next);
+  plans[index] = saved;
   persist(plans);
 
   // Registro de Auditoria detalhado
@@ -205,11 +133,12 @@ export function updateCommercialPlan(
     path: '/admin/planos',
   });
 
-  return next;
+  return saved;
 }
 
-export function resetCommercialPlansToDefault(actor?: { name: string; email: string }) {
-  persist(INITIAL_COMMERCIAL_PLANS);
+export async function resetCommercialPlansToDefault(actor?: { name: string; email: string }) {
+  const saved = await nestPost<CommercialPlan[]>('/admin/commercial-plans/reset');
+  persist(saved);
   logAudit({
     kind: 'action',
     actorName: actor?.name || 'Administrador Marthi',
@@ -218,5 +147,11 @@ export function resetCommercialPlansToDefault(actor?: { name: string; email: str
     detail: 'Todos os planos foram restaurados para os valores e descrições de fábrica.',
     path: '/admin/planos',
   });
-  return [...INITIAL_COMMERCIAL_PLANS];
+  return saved;
+}
+
+export async function hydrateCommercialPlans(all = false) {
+  const rows = await nestGet<CommercialPlan[]>(all ? '/admin/commercial-plans' : '/commercial-plans');
+  persist(rows);
+  return rows;
 }

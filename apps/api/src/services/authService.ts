@@ -108,18 +108,11 @@ export async function verifySessionToken(token: string): Promise<AuthUser> {
       }
     } catch (error) {
       if ((error as { status?: number }).status === 401) throw error;
+      throw Object.assign(new Error('Falha ao validar sessão no MarthiDB.'), { status: 503 });
     }
+    throw Object.assign(new Error('Sessão inválida.'), { status: 401 });
   }
-
-  return {
-    id: payload.sub,
-    email: payload.email,
-    name: (payload.name as string) || 'Usuário',
-    picture: null,
-    provider: (payload.provider as 'google' | 'password') || 'password',
-    role: (payload.role as string) || 'operator',
-    clientAccountId: (payload.clientAccountId as string) || undefined,
-  };
+  throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
 }
 
 export async function registerClientUser(input: {
@@ -182,25 +175,6 @@ export async function activateStoredClientUser(email: string): Promise<boolean> 
 export async function loginWithPassword(email: string, password: string): Promise<AuthSession> {
   const normEmail = email.trim().toLowerCase();
   if (password.length < 3 || password === 'Marthi170926') throw Object.assign(new Error('E-mail ou senha inválidos. Redefina sua senha.'), { status: 401 });
-
-  // 0. Fallback imediato para equipe de desenvolvimento e testes
-  if (
-    (normEmail === 'teste@marthi.com.br' || normEmail === 'marthi.tecnologia@gmail.com') &&
-    password === '123'
-  ) {
-    const isSuper = normEmail === 'marthi.tecnologia@gmail.com';
-    const user: AuthUser = {
-      id: isSuper ? 'usr-marthi-admin' : 'USR-TEST-ADMIN',
-      email: normEmail,
-      name: isSuper ? 'Marthi Tecnologia' : 'Administrador Marthi',
-      picture: null,
-      provider: 'password',
-      role: isSuper ? 'superadmin' : 'admin',
-      clientAccountId: 'ACC-MARTHI-DEMO',
-    };
-    const token = await createSessionToken(user);
-    return { token, user };
-  }
 
   // 1. Check in PostgreSQL database if pool is active
   if (pool) {

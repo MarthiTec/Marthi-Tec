@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { listAuditEntries, type AuditEntry } from '../../data/auditLog';
 import {
   getCommercialPlans,
+  hydrateCommercialPlans,
   updateCommercialPlan,
   resetCommercialPlansToDefault,
   PLANS_UPDATED_EVENT,
@@ -43,6 +44,7 @@ export function MarthiPlansPage() {
 
   useEffect(() => {
     refresh();
+    void hydrateCommercialPlans(true).catch(error => setFeedback(error instanceof Error ? error.message : 'Falha ao carregar planos.'));
     const handleUpdate = () => refresh();
     window.addEventListener(PLANS_UPDATED_EVENT, handleUpdate);
     window.addEventListener('marthi-audit-updated', handleUpdate);
@@ -79,12 +81,12 @@ export function MarthiPlansPage() {
     setEditFeatures((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleSavePlan(e: React.FormEvent) {
+  async function handleSavePlan(e: React.FormEvent) {
     e.preventDefault();
     if (!editingPlan) return;
 
     try {
-      updateCommercialPlan(
+      await updateCommercialPlan(
         editingPlan.id,
         {
           name: editName.trim() || editingPlan.name,
@@ -115,8 +117,8 @@ export function MarthiPlansPage() {
     }
   }
 
-  function handleConfirmReset() {
-    resetCommercialPlansToDefault({
+  async function handleConfirmReset() {
+    try { await resetCommercialPlansToDefault({
       name: user?.name || 'Administrador Marthi',
       email: user?.email || 'admin@marthi.com.br',
     });
@@ -124,6 +126,7 @@ export function MarthiPlansPage() {
     setFeedback('Planos comerciais restaurados com sucesso para os valores de fábrica.');
     setTimeout(() => setFeedback(null), 4000);
     refresh();
+    } catch (error) { setFeedback(error instanceof Error ? error.message : 'Falha ao restaurar planos no banco.'); }
   }
 
   return (
@@ -251,7 +254,7 @@ export function MarthiPlansPage() {
             <p>Nenhuma alteração registrada ainda. Todas as modificações em planos ficarão arquivadas aqui com data, autor e valores anteriores.</p>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>

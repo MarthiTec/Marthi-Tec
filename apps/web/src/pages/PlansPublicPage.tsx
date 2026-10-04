@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { PARTNER_MODULES, type PartnerModuleId } from '../data/catalog';
-import { getCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
+import { getCommercialPlans, hydrateCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
 import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
 import './publicPages.css';
 
@@ -58,6 +58,7 @@ export function PlansPublicPage() {
     function refresh() {
       setCommercialPlans(getCommercialPlans());
     }
+    void hydrateCommercialPlans().catch(() => { /* O catálogo permanece indisponível; não substituímos por preços inventados. */ });
     window.addEventListener(PLANS_UPDATED_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {

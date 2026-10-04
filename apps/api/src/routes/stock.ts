@@ -1,3 +1,5 @@
+import type { PoolClient } from 'pg';
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
@@ -489,4 +491,36 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
   } catch (error) {
     next(error);
   }
+});
+
+/** Aplica uma conferência física inteira ou desfaz todas as alterações. */
+stockRouter.post('/api/v1/stock/inventory-adjustments', requireAuth, async (req, res, next) => {
+  let db: PoolClient | undefined;
+  try {
+    db = await pool.connect();
+    if (!['admin','manager','superadmin'].includes(req.user!.role ?? '')) { res.status(403).json({ success:false,error:{code:'FORBIDDEN',message:'Somente a gestão pode aplicar ajustes de estoque.'} }); return; }
+    const body = z.object({ balanceId:z.string().min(1).max(160), items:z.array(z.object({ stockId:z.string().min(1), expectedQty:z.number().nonnegative(), countedQty:z.number().nonnegative() })).min(1).max(10000) }).parse(req.body);
+    if (new Set(body.items.map(item=>item.stockId)).size !== body.items.length) throw Object.assign(new Error('Produtos duplicados na conferência.'),{status:400});
+    await db.query('BEGIN');
+    await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`${req.storeId}:inventory:${body.balanceId}`]);
+    const previous=await db.query('SELECT result FROM stock_inventory_adjustments WHERE store_id=$1 AND balance_id=$2',[req.storeId,body.balanceId]);
+    if (previous.rows[0]) { await db.query('COMMIT'); res.json({success:true,data:{...previous.rows[0].result,alreadyApplied:true}});return; }
+    let totalUnitsDelta=0;
+    for (const item of [...body.items].sort((a,b)=>a.stockId.localeCompare(b.stockId))) {
+      const found=await db.query('SELECT * FROM stock_items WHERE id=$1 AND store_id=$2 FOR UPDATE',[item.stockId,req.storeId]);
+      const stock=found.rows[0];
+      if (!stock) throw Object.assign(new Error('Produto da conferência não encontrado nesta loja.'),{status:404});
+      if (Math.abs(Number(stock.qty)-item.expectedQty)>0.000001) throw Object.assign(new Error('O estoque mudou após a conferência. Revise os saldos antes de aplicar o ajuste.'),{status:409});
+      if (stock.unit !== 'KG' && !Number.isInteger(item.countedQty)) throw Object.assign(new Error('Produtos em unidade exigem quantidade inteira.'),{status:400});
+      if (await unreservedQuantity(db,req.storeId!,item.stockId,item.countedQty)<0) throw Object.assign(new Error('O saldo contado é menor que a quantidade reservada em encomendas.'),{status:409});
+      const delta=item.countedQty-Number(stock.qty);totalUnitsDelta+=delta;
+      await db.query('UPDATE stock_items SET qty=$1,updated_at=now() WHERE id=$2 AND store_id=$3',[item.countedQty,item.stockId,req.storeId]);
+      if (delta!==0) await db.query(`INSERT INTO stock_movements(id,store_id,stock_id,type,qty,previous_qty,new_qty,unit_cost,ref_type,operator_name,notes)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'adjustment',$9,$10)`,[randomUUID(),req.storeId,item.stockId,delta>0?'in':'out',Math.abs(delta),Number(stock.qty),item.countedQty,Number(stock.cost)||0,req.user!.name,`Conferência física ${body.balanceId}`]);
+    }
+    const result={ok:true,adjustedItemsCount:body.items.length,totalUnitsDelta,appliedAt:new Date().toISOString()};
+    await db.query('INSERT INTO stock_inventory_adjustments(store_id,balance_id,result,applied_by) VALUES($1,$2,$3::jsonb,$4)',[req.storeId,body.balanceId,JSON.stringify(result),req.user!.id]);
+    await db.query('COMMIT');res.json({success:true,data:result});
+  } catch(error) { if (db) await db.query('ROLLBACK');next(error); }
+  finally { db?.release(); }
 });

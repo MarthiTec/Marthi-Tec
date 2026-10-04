@@ -70,7 +70,7 @@ export function QuoteCommercialPrintModal({
 }: Props) {
   useEffect(() => {
     if (open && quote) {
-      registerQuotePrint(quote.id, operatorName);
+      void registerQuotePrint(quote.id, operatorName).catch(error => window.alert(error instanceof Error ? error.message : 'Não foi possível registrar a impressão.'));
       document.body.classList.add('is-printing-quote');
     }
     return () => {

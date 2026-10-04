@@ -222,7 +222,7 @@ export function StockTxtImportModal({ balance, isOpen, onClose, onImportComplete
                 </div>
               ) : null}
 
-              <div className="stock-inv-modal-table-box">
+              <div className="stock-inv-modal-table-box admin-table-container">
                 <table className="stock-inv-modal-table">
                   <thead>
                     <tr>

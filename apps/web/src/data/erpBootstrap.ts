@@ -1,3 +1,10 @@
+import { hydrateStockInventoryFromApi } from './stockInventoryStore';
+import { hydratePosQuotesFromApi } from './posQuotesStore';
+import { hydrateCashSettingsFromApi } from './cashSettings';
+import { hydrateOsPrintSettingsFromApi } from './osPrintSettings';
+import { hydrateBankFilesFromApi } from './bankFinanceFiles';
+import { hydrateOperationsFromApi } from './operationsStore';
+import { hydratePromoCampaigns } from './promoCampaignStore';
 import {
   replaceAdminState,
   type Customer,
@@ -107,6 +114,13 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       apiGetTotemSettings(),
       apiGetOperatorProfile(),
       apiListPosTickets(),
+      hydratePromoCampaigns(),
+      hydrateBankFilesFromApi(),
+      hydrateOperationsFromApi(),
+      hydrateOsPrintSettingsFromApi(),
+      hydrateCashSettingsFromApi(),
+      hydratePosQuotesFromApi(),
+      hydrateStockInventoryFromApi(),
     ]);
     // 1. Aplica o estado central da retaguarda e plano imediatamente
     replaceAdminState({

@@ -34,55 +34,33 @@ const paymentMethodSchema = z.object({
 
 /* ── 1. Perfil do Operador (/me/profile) ─────────────────── */
 
+function profileFromRow(row: any) {
+  return { id: row.id, displayName: row.name, email: row.email, role: row.global_role,
+    photo: row.picture, phone: row.profile_phone, address: row.profile_address, theme: row.panel_theme };
+}
+
 profileRouter.get('/api/v1/me/profile', requireAuth, async (req, res, next) => {
   try {
-    const user = req.user!;
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        displayName: user.name,
-        email: user.email,
-        role: user.role || 'admin',
-        photo: user.picture,
-        theme: 'dark',
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+    const result = await pool.query('SELECT * FROM users WHERE id = $1 AND active = true', [req.user!.id]);
+    if (!result.rows[0]) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Perfil não encontrado.' } }); return; }
+    res.json({ success: true, data: profileFromRow(result.rows[0]) });
+  } catch (error) { next(error); }
 });
 
 profileRouter.put('/api/v1/me/profile', requireAuth, async (req, res, next) => {
   try {
-    const user = req.user!;
     const body = profileSchema.parse(req.body);
-
-    if (pool && user.id.startsWith('usr-')) {
-      await pool.query(
-        `UPDATE users
-         SET name = COALESCE($1, name), picture = COALESCE($2, picture)
-         WHERE id = $3`,
-        [body.displayName, body.photo, user.id],
-      );
-    }
-
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        displayName: body.displayName || user.name,
-        email: body.email || user.email,
-        role: body.role || user.role || 'admin',
-        photo: body.photo !== undefined ? body.photo : user.picture,
-        phone: body.phone,
-        address: body.address,
-        theme: body.theme || 'dark',
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+    const result = await pool.query(
+      `UPDATE users SET name = COALESCE($1, name),
+       picture = CASE WHEN $2 THEN $3 ELSE picture END,
+       profile_phone = COALESCE($4, profile_phone), profile_address = COALESCE($5, profile_address),
+       panel_theme = COALESCE($6, panel_theme), updated_at = now()
+       WHERE id = $7 AND active = true RETURNING *`,
+      [body.displayName, body.photo !== undefined, body.photo ?? null, body.phone, body.address, body.theme, req.user!.id],
+    );
+    if (!result.rows[0]) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Perfil não encontrado.' } }); return; }
+    res.json({ success: true, data: profileFromRow(result.rows[0]) });
+  } catch (error) { next(error); }
 });
 
 /* ── 2. Tabelas de Preço (/price-tables) ─────────────────── */

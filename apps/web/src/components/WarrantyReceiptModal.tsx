@@ -1,3 +1,4 @@
+import '../pages/admin/externalSale.css';
 import { useState } from 'react';
 import { nestRequest } from '../services/nestClient';
 import { apiSendWarrantyWhatsApp } from '../services/erpApi';
@@ -54,9 +55,9 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
   }
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
+    <div className="admin-modal-backdrop external-sale-backdrop" onClick={onClose}>
       <div
-        className="admin-modal admin-modal--lg"
+        role="dialog" aria-modal="true" aria-label="Comprovante e garantia" className="admin-modal admin-modal--lg external-sale-modal"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '640px', width: '95vw' }}
       >

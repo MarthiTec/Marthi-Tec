@@ -4,6 +4,7 @@ import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   getPayoutSettings,
+  hydratePayoutSettings,
   updateBankAccount,
   updatePixConfig,
   validatePixKey,
@@ -80,15 +81,16 @@ export function MarthiPayoutSettingsPage() {
     }
 
     window.addEventListener(PAYOUT_UPDATED_EVENT, onUpdate);
+    void hydratePayoutSettings().catch((error) => setFeedback(error instanceof Error ? error.message : 'Falha ao consultar MarthiDB.'));
     return () => window.removeEventListener(PAYOUT_UPDATED_EVENT, onUpdate);
   }, []);
 
-  function handleSaveBank(e: React.FormEvent) {
+  async function handleSaveBank(e: React.FormEvent) {
     e.preventDefault();
     const bankFound = BRAZILIAN_BANKS.find((b) => b.value === bankCode);
     const bankName = bankFound ? bankFound.label.split(' - ')[1] : 'Banco Cadastrado';
 
-    updateBankAccount(
+    try { await updateBankAccount(
       {
         bankCode,
         bankName,
@@ -97,7 +99,7 @@ export function MarthiPayoutSettingsPage() {
         accountType: accountType as 'corrente' | 'poupanca',
         holderName: holderName.trim(),
         holderDocument: holderDocument.trim(),
-        validationStatus: 'validado',
+        validationStatus: 'pendente',
       },
       {
         name: user?.name || 'Administrador Marthi',
@@ -105,37 +107,21 @@ export function MarthiPayoutSettingsPage() {
       },
     );
 
-    setFeedback('Dados da conta bancária atualizados e salvos com sucesso.');
+    setFeedback('Dados bancários salvos no MarthiDB. Titularidade ainda não confirmada pelo banco.');
+    } catch (error) { setFeedback(error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'); }
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  function handleValidatePix() {
+  async function handleValidatePix() {
+    const result = validatePixKey(pixType, pixKey);
+    setPixValidationResult(result);
+    if (!result.success) return;
     setValidatingPix(true);
-    setPixValidationResult(null);
-
-    setTimeout(() => {
-      const res = validatePixKey(pixType, pixKey);
-      setValidatingPix(false);
-      setPixValidationResult(res);
-
-      if (res.success && res.data) {
-        updatePixConfig(
-          pixType,
-          pixKey,
-          {
-            receiverName: res.data.receiverName,
-            receiverInstitution: res.data.receiverInstitution,
-            receiverType: res.data.receiverType,
-          },
-          {
-            name: user?.name || 'Administrador Marthi',
-            email: user?.email || 'admin@marthi.com.br',
-          },
-        );
-        setFeedback('Chave Pix validada e configurada com sucesso para recebimento.');
-        setTimeout(() => setFeedback(null), 4000);
-      }
-    }, 600);
+    try {
+      await updatePixConfig(pixType, pixKey, undefined, user ? { name: user.name, email: user.email } : undefined);
+      setFeedback('Chave Pix salva no MarthiDB. Titularidade ainda não confirmada pelo banco.');
+    } catch (error) { setFeedback(error instanceof Error ? error.message : 'Falha ao salvar chave Pix.'); }
+    finally { setValidatingPix(false); }
   }
 
   return (
@@ -209,7 +195,7 @@ export function MarthiPayoutSettingsPage() {
                   onClick={handleValidatePix}
                   disabled={validatingPix || !pixKey.trim()}
                 >
-                  {validatingPix ? 'Consultando DICT…' : 'Validar chave'}
+                  {validatingPix ? 'Salvando…' : 'Salvar chave'}
                 </button>
               </div>
             </div>
@@ -224,7 +210,7 @@ export function MarthiPayoutSettingsPage() {
                 {pixValidationResult.success && pixValidationResult.data ? (
                   <>
                     <div className="marthi-pix-result__badge">
-                      <span>✓ Chave validada no DICT</span>
+                      <span>✓ Formato válido</span>
                     </div>
                     <div className="marthi-pix-result__info">
                       <div>
@@ -243,7 +229,7 @@ export function MarthiPayoutSettingsPage() {
                   </>
                 ) : (
                   <div className="marthi-pix-result__error">
-                    <strong>⚠️ Chave não validada:</strong> {pixValidationResult.message}
+                    <strong>Chave Pix:</strong> {pixValidationResult.message}
                   </div>
                 )}
               </div>

@@ -1,3 +1,4 @@
+import '../pages/admin/externalSale.css';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { apiCreatePickup, apiListPickups } from '../services/erpApi';
@@ -55,9 +56,9 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
+    <div className="admin-modal-backdrop external-sale-backdrop" onClick={onClose}>
       <div
-        className="admin-modal"
+        role="dialog" aria-modal="true" aria-label="Recolhimento de valores" className="admin-modal external-sale-modal"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '520px', width: '95vw' }}
       >
@@ -86,14 +87,14 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
               }}
             >
               <div>
-                <span style={{ fontSize: '0.78rem', color: '#eab308', textTransform: 'uppercase', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--external-warning)' , textTransform: 'uppercase', fontWeight: 700 }}>
                   Dinheiro Físico Pendente na Loja
                 </span>
                 <div style={{ fontSize: '0.84rem', color: 'var(--mute)' }}>
                   Acumulado de vendas sem caixa em espécie
                 </div>
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#eab308' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--external-warning)'  }}>
                 R$ {pendingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -102,7 +103,7 @@ export function CashPickupModal({ onClose, onSuccess }: Props) {
               <div
                 style={{
                   background: 'rgba(239, 68, 68, 0.15)',
-                  color: '#f87171',
+                  color: 'var(--external-danger)' ,
                   border: '1px solid #ef4444',
                   padding: '8px 12px',
                   borderRadius: '6px',
