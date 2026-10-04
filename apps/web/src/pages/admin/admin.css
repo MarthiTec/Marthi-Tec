@@ -6586,6 +6586,9 @@ select.caixa-mov-input {
 }
 
 
+.stock-automation-toggle { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px; margin-bottom:12px; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:10px; }
+.is-theme-dark .stock-automation-toggle,.admin--dark .stock-automation-toggle { background:var(--card); color:var(--ink); border-color:var(--line); }
+@media(max-width:768px) { .stock-automation-toggle { width:100%; box-sizing:border-box; } }
 .card-rates-machine-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; align-items: start; }
 .card-rates-machine-fields > label { display: grid; gap: 6px; min-width: 0; }
 .card-rates-machine-fields .admin-field-label, .card-rates-machine-fields .admin-picker__caption { margin: 0; font-size: 0.85rem; font-weight: 650; line-height: 1.4; }
