@@ -20,6 +20,7 @@ import {
   upsertOperationShortcut,
   type OperationShortcut,
 } from '../../data/operationsStore';
+import { getActiveStoreId, MULTI_STORE_CHANGED_EVENT } from '../../data/multiStoreStore';
 import './operations.css';
 
 type Draft = {
@@ -44,6 +45,12 @@ type OpsTab = 'ramo' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
 /** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
   const location = useLocation();
+  const [communicationStoreId, setCommunicationStoreId] = useState(() => getActiveStoreId());
+  useEffect(() => {
+    const refreshStore = () => setCommunicationStoreId(getActiveStoreId());
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+    return () => window.removeEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
@@ -423,7 +430,7 @@ export function OperationsPage() {
 
       {/* ABA 3: Comunicação & Mensageria (WhatsApp & E-mail) */}
       {tab === 'comunicacao' || tab === 'whatsapp' ? (
-        <CommunicationSettingsSection />
+        <CommunicationSettingsSection key={communicationStoreId} />
       ) : null}
 
       {/* ABA 4: Equipe & Usuários da Loja */}

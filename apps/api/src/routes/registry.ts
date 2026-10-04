@@ -1,3 +1,4 @@
+import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
@@ -598,7 +599,7 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
       );
 
       const createdRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: createdRes.rows[0] });
+      res.status(201).json({ success: true, data: rowToClient(createdRes.rows[0]) });
       return;
     }
 
@@ -655,7 +656,7 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
         ],
       );
       const updated = await pool.query(`SELECT * FROM customers WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -727,8 +728,8 @@ registryRouter.post('/api/v1/suppliers', requireAuth, async (req, res, next) => 
           body.active,
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM suppliers WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -755,8 +756,8 @@ registryRouter.patch('/api/v1/suppliers/:id', requireAuth, async (req, res, next
          WHERE id = $9 AND store_id = $10`,
         [body.name, body.tradeName, body.document, body.phone, body.email, body.city, body.notes, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM suppliers WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -827,8 +828,8 @@ registryRouter.post('/api/v1/sellers', requireAuth, async (req, res, next) => {
           body.employeeId || null,
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM sellers WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM sellers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -855,8 +856,8 @@ registryRouter.patch('/api/v1/sellers/:id', requireAuth, async (req, res, next) 
          WHERE id = $8 AND store_id = $9`,
         [body.name, body.phone, body.email, body.document, body.commissionPercent, body.active, body.employeeId, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM sellers WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM sellers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 

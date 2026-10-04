@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { getAdminState } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import { applyStockMovement } from './stockLedger';
@@ -83,7 +84,7 @@ function now() {
 
 function load(): InvoiceState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return { invoices: [] };
     const parsed = JSON.parse(raw) as Partial<InvoiceState>;
     const invoices = Array.isArray(parsed.invoices)
@@ -103,7 +104,7 @@ function load(): InvoiceState {
 }
 
 function save(state: InvoiceState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-invoices-updated'));
 }
 

@@ -2,9 +2,29 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
 import { sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
+import { sendMail, escapeHtml } from '../services/emailService.js';
 
 export const salesRouter = Router();
+
+salesRouter.post('/api/v1/sales/:id/send-receipt-email', requireAuth, async (req, res, next) => {
+  try {
+    const {recipient} = z.object({recipient:z.string().email()}).parse(req.body);
+    if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), {status:503});
+    const result = await pool.query(`SELECT s.*,st.trade_name AS store_name FROM sales_orders s JOIN stores st ON st.id=s.store_id WHERE s.id=$1 AND s.store_id=$2`, [req.params.id, req.storeId]);
+    const sale = result.rows[0];
+    if (!sale) throw Object.assign(new Error('Venda não encontrada nesta loja.'), {status:404});
+    const lines = await pool.query(`SELECT name,qty,unit_price,total_price FROM sales_order_lines WHERE sale_id=$1 OR order_id=$1`, [sale.id]);
+    const money=(value:unknown)=>Number(value || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+    const terms=sale.warranty_terms || 'Garantia legal conforme condições da venda.';
+    const items=lines.rows.map(item=>`<tr><td style="padding:8px;color:#20333d">${escapeHtml(item.name)}</td><td style="padding:8px;color:#20333d">${Number(item.qty)}</td><td style="padding:8px;color:#20333d">${money(item.total_price)}</td></tr>`).join('');
+    const sent = await sendMail({storeId:req.storeId,to:recipient,subject:`Comprovante de venda — ${sale.store_name}`,
+      text:`${sale.store_name}\nVenda: ${sale.id}\nCliente: ${sale.customer_name || 'Consumidor Final'}\n${lines.rows.map(item=>`${item.name} × ${item.qty}: ${money(item.total_price)}`).join('\n')}\nTotal: ${money(sale.total_amount)}\nGarantia: ${sale.warranty_months ?? 3} meses\n${terms}`,
+      html:`<!doctype html><html><body style="margin:0;background:#f4f7f9;color:#20333d"><table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="600" bgcolor="#ffffff" style="background:#ffffff;color:#20333d;font-family:Arial,sans-serif;padding:24px"><tr><td><h2 style="color:#0f766e">${escapeHtml(sale.store_name)}</h2><p style="color:#20333d">Venda ${escapeHtml(sale.id)} · ${escapeHtml(sale.customer_name || 'Consumidor Final')}</p><table width="100%"><tr><th align="left">Produto</th><th>Quantidade</th><th>Total</th></tr>${items}</table><p style="color:#20333d">Total: <strong>${money(sale.total_amount)}</strong></p><p style="color:#20333d">Garantia: ${Number(sale.warranty_months ?? 3)} meses</p><p style="color:#20333d">${escapeHtml(terms)}</p><p style="color:#64748b">Comprovante não fiscal.</p></td></tr></table></td></tr></table></body></html>`});
+    res.json({success:true,data:{accepted:sent.success,messageId:sent.messageId}});
+  } catch(error) {next(error);}
+});
 
 /* ── Schemas de Validação ───────────────────────────────── */
 
@@ -614,22 +634,23 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
     let evolutionError: string | null = null;
 
     try {
-      const cfgRes = await pool.query(`SELECT whatsapp_settings FROM stores WHERE id = $1`, [storeId]);
-      const cfg = cfgRes.rows[0]?.whatsapp_settings || {};
+      const cfg = await getStoreWhatsAppConfig(storeId);
+      if (!cfg.enabled) throw new Error('WhatsApp desativado nesta loja.');
       const baseUrl = cfg.baseUrl || '';
       const instance = cfg.instance || '';
       const apiKey = cfg.apiKey || '';
 
+      if (!baseUrl || !instance || !apiKey) throw new Error('Configure o Evolution nas Operações desta loja.');
       if (baseUrl && instance && apiKey) {
         const evoRes = await sendEvolutionText(body.phone, messageText, {
           baseUrl,
           instance,
-          apiKey,
+          apiKey, storeId,
         });
         if (evoRes.ok) {
           sentViaEvolution = true;
         } else {
-          evolutionError = typeof evoRes.body === 'string' ? evoRes.body : JSON.stringify(evoRes.body);
+          evolutionError = 'Evolution não confirmou a aceitação da mensagem. Consulte o histórico antes de repetir.';
         }
       }
     } catch (e: any) {

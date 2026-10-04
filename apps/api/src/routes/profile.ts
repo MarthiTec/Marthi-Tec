@@ -1,3 +1,4 @@
+import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
@@ -123,8 +124,8 @@ profileRouter.post('/api/v1/price-tables', requireAuth, async (req, res, next) =
         `INSERT INTO price_tables (id, store_id, name, percent, active) VALUES ($1, $2, $3, $4, $5)`,
         [id, storeId, body.name.trim(), body.percent, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM price_tables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM price_tables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
     res.status(201).json({ success: true, data: { id, storeId, ...body } });
@@ -146,8 +147,8 @@ profileRouter.patch('/api/v1/price-tables/:id', requireAuth, async (req, res, ne
          WHERE id = $4 AND store_id = $5`,
         [body.name, body.percent, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM price_tables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM price_tables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
     res.json({ success: true, data: { id, ...body } });
@@ -222,8 +223,8 @@ profileRouter.post('/api/v1/payments', requireAuth, async (req, res, next) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [id, storeId, body.name.trim(), body.type, pTableId, body.maxInstallments, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM payment_methods WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM payment_methods WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
     res.status(201).json({ success: true, data: { id, storeId, ...body } });
@@ -245,8 +246,8 @@ profileRouter.patch('/api/v1/payments/:id', requireAuth, async (req, res, next) 
          WHERE id = $5 AND store_id = $6`,
         [body.name, body.type, body.maxInstallments, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM payment_methods WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM payment_methods WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
     res.json({ success: true, data: { id, ...body } });

@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
+import { readStoreCommunication } from './storeCommunication.js';
+import { beginDelivery, finishDelivery } from './communicationAudit.js';
 
 function getMailTransporter() {
   const user = env.SMTP_USER || '';
@@ -24,6 +26,7 @@ function getMailTransporter() {
         pass,
       },
       tls: { rejectUnauthorized: true },
+      connectionTimeout:15000, greetingTimeout:15000, socketTimeout:20000,
     });
   }
   return null;
@@ -362,28 +365,36 @@ export async function sendMail(options: {
   subject: string;
   html: string;
   text: string;
+  storeId?: string;
 }): Promise<{ success: boolean; messageId?: string }> {
-  const transporter = getMailTransporter();
+  const config = options.storeId ? await readStoreCommunication(options.storeId, 'smtp_settings') : undefined;
+  if (config && (!config.enabled || !config.host || !config.user || !config.pass || !config.from)) throw Object.assign(new Error('Configure e habilite o SMTP desta loja nas Operações.'), {status:503});
+  const sender = config ? config.from : env.SMTP_FROM;
+  const transporter = config ? nodemailer.createTransport({host:config.host, port:config.port, secure:config.secure, auth:{user:config.user,pass:config.pass}, tls:{rejectUnauthorized:true}, connectionTimeout:15000, greetingTimeout:15000, socketTimeout:20000}) : getMailTransporter();
+  const deliveryId = await beginDelivery(options.storeId, 'email', options.to);
 
   if (transporter) {
     try {
       const info = await transporter.sendMail({
-        from: env.SMTP_FROM,
+        from: sender,
         to: options.to,
         subject: options.subject,
         html: options.html,
         text: options.text,
       });
+      if (info.rejected?.length || (Array.isArray(info.accepted) && !info.accepted.length)) throw new Error('SMTP recusou o destinatário.');
+      await finishDelivery(deliveryId, 'accepted', undefined, info.messageId);
       console.log(`[emailService] E-mail enviado com sucesso via SMTP para ${options.to} (ID: ${info.messageId})`);
       await recordEmailAudit({
         recipient: options.to,
         subject: options.subject,
-        sender: env.SMTP_FROM,
+        sender,
         status: 'sent',
         messageId: info.messageId,
       });
       return { success: true, messageId: info.messageId };
     } catch (err) {
+      await finishDelivery(deliveryId, 'unknown');
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[emailService] Falha ao enviar via SMTP para ${options.to}:`, msg);
       await recordEmailAudit({

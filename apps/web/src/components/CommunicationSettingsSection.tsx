@@ -13,7 +13,7 @@ import {
   type StoreWhatsAppSettings,
   type StoreSmtpSettings,
 } from '../services/erpApi';
-import { nestApiUrl } from '../services/config';
+import { nestPost, nestGet } from '../services/nestClient';
 
 type EvolutionStatus = {
   connected: boolean;
@@ -27,6 +27,12 @@ type EvolutionStatus = {
 type CommTab = 'whatsapp' | 'email';
 
 export function CommunicationSettingsSection() {
+  const [deliveryLogs, setDeliveryLogs] = useState<{id:string;channel:string;recipient:string;status:string;created_at:string}[] | null>(null);
+  const [deliveryError, setDeliveryError] = useState('');
+  async function loadDeliveryLogs() {
+    try {setDeliveryError('');setDeliveryLogs(await nestGet('/store/communication-deliveries'));}
+    catch(error){setDeliveryError(error instanceof Error ? error.message : 'Falha ao carregar o histórico.');}
+  }
   const [activeTab, setActiveTab] = useState<CommTab>('whatsapp');
 
   // ── Estados do WhatsApp ──────────────────────────────────────────────────
@@ -35,9 +41,9 @@ export function CommunicationSettingsSection() {
   const [whatsappStatus, setWhatsappStatus] = useState<EvolutionStatus | null>(null);
   const [whatsappSettings, setWhatsappSettings] = useState<StoreWhatsAppSettings>({
     enabled: true,
-    baseUrl: 'https://marthi-tec.discloud.app',
+    baseUrl: '',
     instance: 'marthi',
-    apiKey: '5E280C9D-239A-4D8B-A765-63D00C291331',
+    apiKey: '',
     storeNumber: '',
     notifyCustomer: true,
     locationLabel: 'Loja Principal',
@@ -114,8 +120,8 @@ export function CommunicationSettingsSection() {
           connected: false,
           state: 'offline',
           instance: whatsappSettings.instance || 'marthi',
-          baseUrl: whatsappSettings.baseUrl || 'https://marthi-tec.discloud.app',
-          storeNumber: whatsappSettings.storeNumber || '5524981244253',
+          baseUrl: whatsappSettings.baseUrl || '',
+          storeNumber: whatsappSettings.storeNumber || '',
           error: res?.error || 'Instância offline ou aguardando conexão.',
         });
       }
@@ -124,8 +130,8 @@ export function CommunicationSettingsSection() {
         connected: false,
         state: 'offline',
         instance: whatsappSettings.instance || 'marthi',
-        baseUrl: whatsappSettings.baseUrl || 'https://marthi-tec.discloud.app',
-        storeNumber: whatsappSettings.storeNumber || '5524981244253',
+        baseUrl: whatsappSettings.baseUrl || '',
+        storeNumber: whatsappSettings.storeNumber || '',
         error: 'Serviço de WhatsApp inacessível no momento.',
       });
     } finally {
@@ -167,8 +173,8 @@ export function CommunicationSettingsSection() {
           connected: true,
           state: 'open',
           instance: prev?.instance || 'marthi',
-          baseUrl: prev?.baseUrl || 'https://marthi-tec.discloud.app',
-          storeNumber: prev?.storeNumber || whatsappSettings.storeNumber || '5524981244253',
+          baseUrl: prev?.baseUrl || '',
+          storeNumber: prev?.storeNumber || whatsappSettings.storeNumber || '',
         }));
         setWaFeedback({
           type: 'success',
@@ -216,8 +222,8 @@ export function CommunicationSettingsSection() {
         connected: false,
         state: 'close',
         instance: prev?.instance || 'marthi',
-        baseUrl: prev?.baseUrl || 'https://marthi-tec.discloud.app',
-        storeNumber: prev?.storeNumber || '5524981244253',
+        baseUrl: prev?.baseUrl || '',
+        storeNumber: prev?.storeNumber || '',
       }));
       setWaFeedback({
         type: 'success',
@@ -241,27 +247,8 @@ export function CommunicationSettingsSection() {
     setWaTesting(true);
     setWaFeedback(null);
     try {
-      const url = `${nestApiUrl()}/api/v1/whatsapp/test`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          number: waTestNumber.trim(),
-          message: waTestMessage.trim() || undefined,
-        }),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setWaFeedback({
-          type: 'success',
-          message: `Mensagem de teste enviada com sucesso para ${json.data?.recipient || waTestNumber}!`,
-        });
-      } else {
-        setWaFeedback({
-          type: 'error',
-          message: json.error?.message || 'Falha ao enviar mensagem de teste.',
-        });
-      }
+      const result = await nestPost<{recipient: string}>('/whatsapp/test', {number: waTestNumber.trim(), message: waTestMessage.trim() || undefined});
+      setWaFeedback({type:'success', message: `Mensagem aceita pelo Evolution para ${result.recipient}. A entrega depende da conexão do WhatsApp.`});
     } catch {
       setWaFeedback({
         type: 'error',
@@ -375,6 +362,11 @@ export function CommunicationSettingsSection() {
       </header>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
+      <div style={{marginBottom:16}}>
+        <button type="button" className="btn btn--ghost" onClick={() => void loadDeliveryLogs()}>Atualizar histórico de envios</button>
+        {deliveryError && <p role="alert">{deliveryError}</p>}
+        {deliveryLogs && <><p>Aceito indica confirmação do provedor. Sem confirmação exige verificar antes de repetir o envio.</p><div style={{overflowX:'auto'}}><table className="admin-table"><thead><tr><th>Canal</th><th>Destinatário</th><th>Situação</th><th>Data</th></tr></thead><tbody>{deliveryLogs.map(log=><tr key={log.id}><td>{log.channel === 'email' ? 'E-mail' : 'WhatsApp'}</td><td>{log.recipient}</td><td>{({accepted:'Aceito pelo provedor',failed:'Recusado',unknown:'Sem confirmação',pending:'Em processamento'} as Record<string,string>)[log.status] || log.status}</td><td>{new Date(log.created_at).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div></>}
+      </div>
       {/* ABA 1: WHATSAPP & EVOLUTION API                                       */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'whatsapp' && (
@@ -642,7 +634,7 @@ export function CommunicationSettingsSection() {
                         className="comm-field__input"
                         value={whatsappSettings.apiKey}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, apiKey: e.target.value })}
-                        placeholder="5E280C9D-239A-4D8B-A765-63D00C291331"
+                        placeholder="Chave da instância Evolution desta loja"
                       />
                       <span className="comm-field__hint">Chave de segurança da API.</span>
                     </div>

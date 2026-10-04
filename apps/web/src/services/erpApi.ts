@@ -1988,11 +1988,11 @@ export type ApiClientAccountRow = {
 };
 
 export function apiListStores() {
-  return nestRequest<ApiStoreRow[]>('/stores', { headers: { 'x-store-id': '' } });
+return nestRequest<ApiStoreRow[]>('/stores', { headers: { 'x-store-id': '' } });
 }
 
 export function apiGetClientAccount() {
-  return nestRequest<ApiClientAccountRow>('/account', { headers: { 'x-store-id': '' } });
+return nestRequest<ApiClientAccountRow>('/account', { headers: { 'x-store-id': '' } });
 }
 
 export function apiCreateStore(body: Partial<ApiStoreRow> & { tradeName: string; document: string }) {
@@ -2155,5 +2155,3 @@ export function apiListPickups() {
 export function apiCreatePickup(body: { responsibleName: string; amount: number; notes?: string; pickupDate?: string }) {
   return nestPost<any>('/finance/pickups', body);
 }
-
-

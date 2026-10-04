@@ -75,25 +75,11 @@ const leadSchema = z.object({
 
 async function resolveStoreId(req: Request): Promise<string> {
   if (req.storeId) return req.storeId;
-  const headerStoreId = req.header('x-store-id')?.trim();
-  if (headerStoreId) return headerStoreId;
-  const queryStoreId = typeof req.query.storeId === 'string' ? req.query.storeId.trim() : '';
-  if (queryStoreId) return queryStoreId;
-
-  if (pool) {
-    try {
-      const q = await pool.query(
-        `SELECT id FROM stores WHERE is_matrix = true AND active = true ORDER BY created_at ASC LIMIT 1`,
-      );
-      if (q.rows.length > 0 && q.rows[0].id) {
-        return q.rows[0].id;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return 'STR-DEMO-01';
+  const selected=req.header('x-store-id')?.trim() || (typeof req.query.storeId === 'string' ? req.query.storeId.trim() : '');
+  if (!selected) throw Object.assign(new Error('Informe a loja do totem.'), {status:400});
+  const result=await pool.query('SELECT id FROM stores WHERE id=$1 AND active=true',[selected]);
+  if (!result.rows.length) throw Object.assign(new Error('Loja não encontrada.'), {status:404});
+  return selected;
 }
 
 async function getStoreTotemSettings(storeId: string) {
@@ -130,6 +116,7 @@ async function handleGetSettings(req: Request, res: Response, next: NextFunction
   try {
     const storeId = await resolveStoreId(req);
     const settings = await getStoreTotemSettings(storeId);
+    if (!req.user) { const {exitPassword, ...publicSettings}=settings; res.json({success:true,data:publicSettings}); return; }
     res.json({ success: true, data: settings });
   } catch (error) {
     next(error);
@@ -307,8 +294,8 @@ totemRouter.put('/store/totem-settings', requireOrDemoAuth, handleSaveSettings);
 // ── Rotas Públicas do Totem (cliente / terminal sem autenticação) ────────────
 totemRouter.get('/api/v1/totem/settings', handleGetSettings);
 totemRouter.get('/totem/settings', handleGetSettings);
-totemRouter.put('/api/v1/totem/settings', handleSaveSettings);
-totemRouter.put('/totem/settings', handleSaveSettings);
+totemRouter.put('/api/v1/totem/settings', requireAuth, handleSaveSettings);
+totemRouter.put('/totem/settings', requireAuth, handleSaveSettings);
 
 totemRouter.get('/api/v1/totem/catalog', handleGetCatalog);
 totemRouter.get('/totem/catalog', handleGetCatalog);

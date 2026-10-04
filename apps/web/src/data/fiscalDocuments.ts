@@ -1,3 +1,5 @@
+import {isNestAuthed} from '../services/nestClient';
+import {storeScopedKey} from './storeCache';
 /**
  * Adapter fiscal (MVP).
  * NFS-e: modelo Portal Nacional (DPS → ADN).
@@ -142,7 +144,7 @@ function uid(prefix: string) {
 
 function load(): State {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return { documents: [] };
     const parsed = JSON.parse(raw) as Partial<State>;
     return { documents: Array.isArray(parsed.documents) ? parsed.documents : [] };
@@ -152,7 +154,7 @@ function load(): State {
 }
 
 function save(state: State) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-fiscal-docs-updated'));
 }
 
@@ -199,6 +201,7 @@ export const FISCAL_STATUS_LABEL: Record<FiscalDocStatus, string> = {
 export function cancelFiscalDocumentForSale(
   orderId: string,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const state = load();
   const document = state.documents.find(
     (item) => item.refType === 'sale' && item.refId === orderId && item.status === 'authorized',
@@ -236,6 +239,7 @@ export function emitNfeFromSale(input: {
   customerDocument?: string;
   items?: { name: string; qty: number; unitPrice: number }[];
 }): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   if (!input.orderId) return { ok: false, error: 'Pedido inválido.' };
   if (input.amount <= 0) return { ok: false, error: 'Valor deve ser maior que zero.' };
 
@@ -367,6 +371,7 @@ export type EmitNfsePortalInput = {
 export function emitNfseFromOs(
   input: EmitNfsePortalInput,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   if (!input.workOrderId) return { ok: false, error: 'OS inválida.' };
   if (input.amount <= 0) return { ok: false, error: 'Valor do serviço deve ser maior que zero.' };
   if (!input.serviceDescription.trim()) {
@@ -495,6 +500,7 @@ export type TransmitNfeInvoiceInput = {
 export function transmitNfeForInvoice(
   input: TransmitNfeInvoiceInput,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const issuer = getFiscalIssuerSettings();
   if (!issuerIsReadyForNfe(issuer)) {
     return {
@@ -588,6 +594,7 @@ export function transmitNfeForInvoice(
 export function consultNfeStatus(
   documentId: string,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const state = load();
   const document = state.documents.find((item) => item.id === documentId);
   if (!document) return { ok: false, error: 'Documento fiscal não encontrado.' };
@@ -630,6 +637,7 @@ export function cancelNfeDocument(
   documentId: string,
   justification = 'Cancelamento solicitado pelo emitente',
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const state = load();
   const document = state.documents.find((item) => item.id === documentId);
   if (!document) return { ok: false, error: 'Documento fiscal não encontrado.' };
@@ -991,6 +999,7 @@ export type EmitNfseStandaloneInput = {
 export function emitNfseStandalone(
   input: EmitNfseStandaloneInput,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   if (!input.customerName.trim()) return { ok: false, error: 'Informe o tomador.' };
   if (input.amount <= 0) return { ok: false, error: 'Valor do serviço deve ser maior que zero.' };
   if (!input.xDescServ.trim()) return { ok: false, error: 'Informe a descrição do serviço.' };
@@ -1071,6 +1080,7 @@ export type EmitCteInput = {
 export function emitCteDocument(
   input: EmitCteInput,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const issuer = getFiscalIssuerSettings();
   if (!issuerIsReadyForCte(issuer)) {
     return { ok: false, error: 'Cadastre certificado e dados do emitente em Configuração fiscal.' };
@@ -1127,6 +1137,7 @@ export type EmitMdfeInput = {
 export function emitMdfeDocument(
   input: EmitMdfeInput,
 ): { ok: true; document: FiscalDocument } | { ok: false; error: string } {
+  if(!import.meta.env.DEV || isNestAuthed()) return {ok:false,error:'Emissão fiscal indisponível: configure a integração real com SEFAZ/ADN. Nenhum documento foi autorizado.'};
   const issuer = getFiscalIssuerSettings();
   if (!issuerIsReadyForMdfe(issuer)) {
     return { ok: false, error: 'Cadastre certificado e dados do emitente em Configuração fiscal.' };

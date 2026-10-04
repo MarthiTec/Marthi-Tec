@@ -906,7 +906,7 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
       }));
 
       const key = tenantScopedKey(STORAGE_KEY_STORES);
-      writeJson(key, mappedStores);
+writeJson(key, mappedStores);
       getActiveStoreId();
       recalculateAllStoreLicenses();
       changed = true;

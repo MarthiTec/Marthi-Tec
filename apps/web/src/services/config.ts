@@ -9,7 +9,8 @@ const PUBLIC_API_URL = 'https://marthi-totem.discloud.dev';
  */
 export function nestApiUrl() {
   const configured = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-  if (configured) return configured;
+  // In production the primary API validates the session/store before proxying modules.
+  if (configured && import.meta.env.DEV) return configured;
   if (import.meta.env.DEV) return '';
   if (typeof window !== 'undefined' && window.location.origin) {
     return window.location.origin;

@@ -60,6 +60,8 @@ export async function nestRequest<T>(
     // ignore
   }
 
+  const selectedAtStart = headers.get('x-store-id');
+  const hasExplicitStore = new Headers(init.headers).has('x-store-id');
   const response = await fetch(`${apiBase()}${path}`, { ...init, headers });
   const json = await readJson<ApiOkBody<T> | ApiErrorBody>(response);
 
@@ -72,6 +74,10 @@ export async function nestRequest<T>(
     );
   }
 
+  const selectedNow=localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1'));
+  if(getAuthToken() !== token || (!hasExplicitStore && selectedAtStart && selectedNow !== selectedAtStart)) {
+    throw new NestApiError('A sessão ou loja mudou durante a operação. Confira os registros da loja anterior antes de repetir.', 'STORE_CONTEXT_CHANGED', 409);
+  }
   return (json as ApiOkBody<T>).data;
 }
 

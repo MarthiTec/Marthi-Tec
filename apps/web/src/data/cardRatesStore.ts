@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * Registro de Maquininhas de Cartão e Taxas por Bandeira / Parcelamento.
  *
@@ -8,7 +9,6 @@
  *   - As taxas são compartilhadas com o Totem e com o Financeiro para cálculo de recebimento líquido.
  */
 
-import { tenantScopedKey } from './tenantContext';
 import { isNestAuthed } from '../services/nestClient';
 import { apiGetCardMachines, apiSaveCardMachines } from '../services/erpApi';
 
@@ -154,7 +154,7 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function listCardMachines(): CardMachine[] {
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
+  const key = storeScopedKey(STORAGE_KEY_CARD_MACHINES);
   const list = readJson<CardMachine[]>(key, DEFAULT_CARD_MACHINES);
   if (!Array.isArray(list) || list.length === 0) {
     return DEFAULT_CARD_MACHINES;
@@ -192,7 +192,7 @@ export function saveCardMachine(machine: CardMachine): CardMachine {
     });
   }
 
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
+  const key = storeScopedKey(STORAGE_KEY_CARD_MACHINES);
   writeJson(key, machines);
   window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
 
@@ -205,7 +205,7 @@ export function saveCardMachine(machine: CardMachine): CardMachine {
 }
 
 export function saveAllCardMachines(machines: CardMachine[]) {
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
+  const key = storeScopedKey(STORAGE_KEY_CARD_MACHINES);
   writeJson(key, machines);
   window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
 
@@ -344,7 +344,7 @@ export async function hydrateCardMachinesFromApi(): Promise<boolean> {
   try {
     const data = await apiGetCardMachines().catch(() => null);
     if (Array.isArray(data) && data.length > 0) {
-      const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
+      const key = storeScopedKey(STORAGE_KEY_CARD_MACHINES);
       writeJson(key, data);
       window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
       return true;
