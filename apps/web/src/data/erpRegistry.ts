@@ -684,6 +684,8 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
     return 'erp_customers';
   }
   if (
+    pathname.startsWith('/erp/marcas') ||
+    pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/erp/produtos') ||
     pathname.startsWith('/erp/kits') ||
     pathname.startsWith('/erp/lotes') ||

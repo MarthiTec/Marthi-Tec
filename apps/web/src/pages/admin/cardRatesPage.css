@@ -116,3 +116,13 @@
     padding: 16px;
   }
 }
+
+.card-rates-page .card-rates-machine-fields .admin-field-label,
+.card-rates-page .card-rates-machine-fields .admin-picker__caption {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.card-rates-page .card-rates-machine-fields .admin-picker { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 6px; }

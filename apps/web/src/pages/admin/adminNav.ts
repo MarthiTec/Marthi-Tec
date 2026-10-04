@@ -38,6 +38,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/totem', label: 'Dados e insights', end: true },
       { to: '/painel/totem/produtos', label: 'Catálogo do totem' },
       { to: '/painel/totem/atributos', label: 'Atributos' },
+      { to: '/painel/totem/marcas', label: 'Marcas' },
       { to: '/painel/totem/config', label: 'Configuração' },
     ],
   },
@@ -79,6 +80,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/atributos', label: 'Atributos & Variações' },
+      { to: '/painel/marcas', label: 'Marcas' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },
@@ -173,6 +175,7 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/fornecedores') ||
     pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
+    pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/kits') ||
     pathname.startsWith('/painel/lotes') ||

@@ -9,15 +9,18 @@
 }
 
 .exit-dialog__card {
-  width: min(440px, 100%);
+  box-sizing: border-box;
+  width: min(460px, 100%);
+  max-height: 94dvh;
+  overflow-y: auto;
   display: grid;
   gap: 12px;
-  padding: 22px;
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid rgba(16, 20, 24, 0.1);
+  padding: 28px;
+  border-radius: 24px;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, rgba(16, 20, 24, 0.1));
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-  color: #101418;
+  color: var(--ink, #101418);
 }
 
 .exit-dialog__card h2 {
@@ -28,7 +31,7 @@
 
 .exit-dialog__card > p {
   margin: 0;
-  color: #5c6b66;
+  color: var(--mute, #5c6b66);
   font-size: 0.92rem;
   line-height: 1.45;
 }
@@ -38,7 +41,7 @@
   gap: 6px;
   font-size: 0.85rem;
   font-weight: 650;
-  color: #334155;
+  color: var(--ink, #334155);
 }
 
 .exit-dialog__card input[type='password'] {
@@ -69,8 +72,8 @@
   text-align: left;
   padding: 14px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(16, 20, 24, 0.12);
-  background: #f8faf9;
+  border: 1px solid var(--line, rgba(16, 20, 24, 0.12));
+  background: var(--card-2, #f8faf9);
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -78,8 +81,8 @@
 }
 
 .exit-dialog__choice:hover {
-  border-color: #101418;
-  background: #fff;
+  border-color: var(--ink, #101418);
+  background: var(--card, #fff);
 }
 
 .exit-dialog__choice strong {
@@ -87,7 +90,7 @@
 }
 
 .exit-dialog__choice span {
-  color: #5c6b66;
+  color: var(--mute, #5c6b66);
   font-size: 0.86rem;
   line-height: 1.35;
 }
@@ -163,4 +166,38 @@
   background: #0f172a;
   border-color: rgba(255, 255, 255, 0.14);
   color: #e8eef6;
+}
+
+.exit-dialog { box-sizing: border-box; }
+.exit-dialog__symbol {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent, #0f766e) 12%, transparent);
+  color: var(--accent, #0f766e);
+}
+.exit-dialog__symbol .admin-ico { width: 24px; height: 24px; }
+.exit-dialog__eyebrow {
+  color: var(--mute, #64748b);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.exit-dialog__actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--line, #e2e8f0);
+  margin-top: 8px;
+}
+.exit-dialog__actions .btn { min-height: 44px; }
+.exit-dialog :focus-visible { outline: 3px solid var(--accent, #0f766e); outline-offset: 3px; }
+.is-theme-dark .exit-dialog__card label,
+.admin--dark .exit-dialog__card label { color: var(--ink, #e8eef6); }
+@media (max-width: 480px) {
+  .exit-dialog { padding: 12px; }
+  .exit-dialog__card { padding: 22px 20px; border-radius: 20px; }
+  .exit-dialog__actions { flex-direction: column-reverse; }
+  .exit-dialog__actions .btn { width: 100%; justify-content: center; }
 }

@@ -97,10 +97,11 @@ export function ExitOrLogoutDialog({
     return (
       <div className="exit-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="exit-dialog__card">
+          <span className="exit-dialog__symbol" aria-hidden="true"><AdminIcon name="logout" /></span>
+          <span className="exit-dialog__eyebrow">Conta Marthi</span>
           <h2 id={titleId}>Encerrar sessão?</h2>
           <p>
-            Isso faz <strong>Log-out</strong> da conta Marthi neste dispositivo. Você precisará
-            entrar de novo em <code>/login</code>.
+            Você sairá da sua conta neste dispositivo. Para continuar usando o Marthi, entre novamente com seu e-mail e senha.
           </p>
           <div className="exit-dialog__actions">
             <button type="button" className="btn btn--ghost" onClick={close}>
@@ -108,7 +109,7 @@ export function ExitOrLogoutDialog({
             </button>
             <button type="button" className="btn btn--primary exit-dialog__logout" onClick={doLogout}>
               <AdminIcon name="logout" />
-              Log-out
+              Encerrar sessão
             </button>
           </div>
         </div>
@@ -122,8 +123,7 @@ export function ExitOrLogoutDialog({
         <form className="exit-dialog__card" onSubmit={confirmPassword}>
           <h2 id={titleId}>Saída protegida</h2>
           <p>
-            Digite a senha da loja para {leaveLabel.toLowerCase()}. O operador não acessa o painel
-            por aqui.
+            Digite a senha da loja para {leaveLabel.toLowerCase()}.
           </p>
           {error ? (
             <p className="exit-dialog__error" role="alert">
@@ -165,7 +165,7 @@ export function ExitOrLogoutDialog({
     <div className="exit-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="exit-dialog__card">
         <h2 id={titleId}>Sair</h2>
-        <p>Escolha se quer apenas deixar o {appName} ou encerrar a sessão (Log-out).</p>
+        <p>Escolha para onde deseja ir ao sair do {appName}.</p>
         <div className="exit-dialog__choices">
           {appName !== 'Painel' && user ? (
             <button
@@ -190,7 +190,7 @@ export function ExitOrLogoutDialog({
             className="exit-dialog__choice exit-dialog__choice--logout"
             onClick={doLogout}
           >
-            <strong>{user ? 'Log-out' : 'Ir para Login'}</strong>
+            <strong>{user ? 'Encerrar sessão' : 'Entrar na conta'}</strong>
             <span>
               {user
                 ? 'Encerra a conta Marthi e volta para a tela de login.'

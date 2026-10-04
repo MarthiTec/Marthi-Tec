@@ -271,7 +271,7 @@ export function LoginPage() {
       return;
     }
     setFeedback(
-      'Recebemos seu interesse. Você entrou como lead no CRM Marthi. Nossa equipe comercial entra em contato para fechar o plano — depois o gestor da loja cadastra os operadores com e-mail, senha e função.',
+      'Recebemos seu interesse. Nossa equipe entrará em contato para ajudar você a escolher o plano e começar a usar o Marthi.',
     );
     setName('');
     setWhatsapp('');
@@ -295,7 +295,7 @@ export function LoginPage() {
             <h1>Entre na sua conta</h1>
             <p className="auth__lead">
               {loginStep === 'email'
-                ? 'Informe seu e-mail. Identificamos automaticamente como você deve acessar.'
+                ? 'Informe seu e-mail para continuar.'
                 : 'Identificação confirmada. Digite sua senha para entrar na loja.'}
             </p>
           </>
