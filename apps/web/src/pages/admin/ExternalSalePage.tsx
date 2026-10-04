@@ -730,7 +730,8 @@ export function ExternalSalePage() {
                 </h3>
               </div>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--mute)' }}>
-                Cliente entrega aparelho usado como crédito na aquisição de outro aparelho. Dá entrada automática no estoque de usados.
+                Use na entrega imediata: ao concluir a venda, o aparelho usado entra no estoque.
+                Se o cliente continuar com o usado enquanto aguarda uma encomenda, não finalize a troca nesta tela.
               </p>
             </div>
 
@@ -811,7 +812,7 @@ export function ExternalSalePage() {
 
                 <div>
                   <label className="admin-label" style={{ color: 'var(--accent, #2dd4bf)', fontWeight: 700 }}>
-                    Valor de Crédito Concedido (R$)
+                    Oferta acordada pelo usado / crédito (R$)
                   </label>
                   <input
                     type="number"
@@ -824,6 +825,10 @@ export function ExternalSalePage() {
                     onChange={(e) => setTradeIn({ ...tradeIn, tradeValue: Number(e.target.value) })}
                     required={hasTradeIn}
                   />
+                  <p className="empty">
+                    Informe a oferta após a avaliação. O preço de um aparelho equivalente no mercado
+                    é uma referência e não define automaticamente o crédito da troca.
+                  </p>
                 </div>
               </div>
 

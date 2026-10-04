@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   SEGMENT_PRESETS,
-  applySegmentPreset,
   getStoreCustomization,
   saveStoreCustomization,
   type SegmentPreset,
   type StoreCustomization,
   type StoreSegmentId,
 } from '../data/storeSegment';
+import { commercialRequest } from '../services/commercialApi';
+import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../data/multiStoreStore';
 import { AdminIcon } from './AdminIcons';
 import { usePanelTheme } from '../hooks/usePanelTheme';
 
@@ -28,23 +29,43 @@ export function StoreSegmentSettings({
   const [config, setConfig] = useState<StoreCustomization>(getStoreCustomization);
   const [toast, setToast] = useState('');
 
+  const [storeId, setStoreId] = useState(getActiveStoreId);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    const change = () => setStoreId(getActiveStoreId());
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, change);
+    return () => window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, change);
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController(); setLoaded(false);
+    void commercialRequest<{settings: StoreCustomization|null; segmentId: string|null}>('/segment','GET',undefined,controller.signal).then(data => {
+      if (controller.signal.aborted) return;
+      const preset = SEGMENT_PRESETS.find(p => p.id === data.segmentId) || SEGMENT_PRESETS[0];
+      setConfig(data.settings || {segmentId:preset.id,segmentName:preset.name,...preset.config,updatedAt:''});
+      setLoaded(true);
+    }).catch(e => {if (!controller.signal.aborted) setToast(e.message);});
+    return () => controller.abort();
+  }, [storeId]);
   function handleSelectPreset(preset: SegmentPreset) {
-    const updated = applySegmentPreset(preset.id);
-    setConfig(updated);
-    if (onSegmentChange) onSegmentChange(preset.id);
-    showFeedback(`Ramo definido para: ${preset.name}`);
+    if (!loaded || saving) return;
+    setConfig({segmentId:preset.id,segmentName:preset.name,...preset.config,updatedAt:config.updatedAt});
   }
-
   function handleToggle(field: keyof Omit<StoreCustomization, 'segmentId' | 'segmentName' | 'updatedAt'>) {
-    const nextVal = !config[field];
-    const updated = saveStoreCustomization({
-      segmentId: 'personalizado',
-      segmentName: 'Personalizado',
-      [field]: nextVal,
-    });
-    setConfig(updated);
-    if (onSegmentChange) onSegmentChange('personalizado');
-    showFeedback('Configuração personalizada atualizada!');
+    if (!loaded || saving) return;
+    setConfig({...config,segmentId:'personalizado',segmentName:'Personalizado',[field]:!config[field]});
+  }
+  async function persist() {
+    if (!loaded || saving) return;
+    setSaving(true);
+    try {
+      const {updatedAt,...input}=config;
+      const saved=await commercialRequest<StoreCustomization>('/segment','PUT',input);
+      if (storeId!==getActiveStoreId()) return;
+      setConfig(saveStoreCustomization(saved,storeId));
+      onSegmentChange?.(saved.segmentId);
+      showFeedback('Configurações salvas no banco e aplicadas à loja.');
+    } catch(e) {setToast((e as Error).message);} finally {setSaving(false);}
   }
 
   function showFeedback(msg: string) {
@@ -881,7 +902,7 @@ export function StoreSegmentSettings({
         </div>
       </section>
 
-      {showSaveButton ? (
+      {(showSaveButton || loaded) ? (
         <footer
           style={{
             background: isDark ? '#131922' : '#f8fafc',
@@ -896,12 +917,13 @@ export function StoreSegmentSettings({
           }}
         >
           <span style={{ fontSize: '0.84rem', color: 'var(--mute)' }}>
-            ⚡ As alterações são aplicadas e sincronizadas em tempo real em todas as telas abertas da loja.
+            As alterações serão aplicadas após a confirmação do banco.
           </span>
           <button
             type="button"
             className="btn btn--primary"
-            onClick={() => showFeedback('Configurações salvas e aplicadas com sucesso!')}
+            disabled={!loaded || saving}
+            onClick={() => void persist()}
           >
             Confirmar e Salvar
           </button>

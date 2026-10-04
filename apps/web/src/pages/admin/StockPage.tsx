@@ -20,6 +20,7 @@ import {
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
 import {
+  applyPriceTable,
   getAdminState,
   removeStockItem,
   STOCK_CONDITION_LABEL,
@@ -121,6 +122,7 @@ export function StockPage() {
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
+  const [costMarkup, setCostMarkup] = useState('');
 
   // ── Estado da Grade de Variações de Produto ────────────────────────
   const [useVariations, setUseVariations] = useState(false);
@@ -133,6 +135,10 @@ export function StockPage() {
   const warehouses = useMemo(() => listWarehouses(true), []);
   const suppliers = useMemo(() => listSuppliers(true), []);
   const readOnly = mode === 'view';
+
+  useEffect(() => {
+    setCostMarkup('');
+  }, [selectedId, mode, formVisible]);
 
   const corAttrDef = useMemo(() => {
     return (
@@ -1689,6 +1695,41 @@ export function StockPage() {
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>
+                  {!lite && !readOnly ? (
+                    <div className="span-2">
+                      <label>
+                        Acréscimo sobre o custo da última compra (%)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Informe o percentual acordado"
+                          value={costMarkup}
+                          onChange={(e) => setCostMarkup(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        disabled={costMarkup.trim() === '' || !Number.isFinite(Number(costMarkup))
+                          || Number(costMarkup) < 0 || !Number.isFinite(form.cost) || form.cost <= 0
+                          || !Number.isFinite(form.cost * (1 + Number(costMarkup) / 100) * 100)}
+                        onClick={() => setForm((current) => ({
+                          ...current,
+                          price: applyPriceTable(current.cost, {
+                            id: 'cost-preview', name: 'Cálculo interno', active: true,
+                            percent: Number(costMarkup),
+                          }),
+                        }))}
+                      >
+                        Calcular preço base pelo custo
+                      </button>
+                      <p className="empty">
+                        Cálculo interno: custo + acréscimo. Use 0% para vender pelo custo.
+                        O botão preenche o preço base; confira o valor e salve o cadastro.
+                      </p>
+                    </div>
+                  ) : null}
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
                       <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12)}{' '}

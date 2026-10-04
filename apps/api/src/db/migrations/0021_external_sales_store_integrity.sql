@@ -188,7 +188,7 @@ BEGIN
  RETURN NEW;
 END $$;
 DO $$ DECLARE target RECORD; BEGIN
- FOR target IN SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'store_id' AND table_name <> 'users' LOOP
+ FOR target IN SELECT c.table_name FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema=c.table_schema AND t.table_name=c.table_name WHERE c.table_schema = 'public' AND c.column_name = 'store_id' AND c.table_name <> 'users' AND t.table_type='BASE TABLE' LOOP
   EXECUTE format('DROP TRIGGER IF EXISTS marthi_guard_store_owner ON %I', target.table_name);
   EXECUTE format('CREATE TRIGGER marthi_guard_store_owner BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION marthi_guard_store_owner()', target.table_name);
  END LOOP;

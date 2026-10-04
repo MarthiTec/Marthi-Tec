@@ -1,4 +1,5 @@
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
+import { CommercialPage } from './CommercialPage';
 
 export function StoreSegmentPage() {
   return (
@@ -10,6 +11,7 @@ export function StoreSegmentPage() {
           showSaveButton={true}
         />
       </article>
+      <CommercialPage settingsOnly />
     </div>
   );
 }
