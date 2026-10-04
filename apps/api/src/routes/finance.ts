@@ -6,6 +6,17 @@ import { pool } from '../db/pool.js';
 
 export const financeRouter = Router();
 
+// Linked commercial balances follow the order ledger to avoid duplicate settlements.
+financeRouter.use('/api/v1/finance/receivables/:id', requireAuth, async (req, _res, next) => {
+  if (req.method === 'GET') { next(); return; }
+  try {
+    const linked = await pool.query('SELECT id FROM commercial_orders WHERE receivable_id=$1 AND store_id=$2 LIMIT 1', [req.params.id, req.storeId]);
+    if (linked.rows[0]) throw Object.assign(new Error('Registre pagamentos, reavaliações e devoluções pela encomenda vinculada.'), {status:409});
+    next();
+  } catch (error) { next(error); }
+});
+
+
 /* ── Schemas ───────────────────────────────────────────── */
 
 const payableSchema = z.object({

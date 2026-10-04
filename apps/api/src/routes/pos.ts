@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { unreservedQuantity } from '../services/commercialReservations.js';
 import { reduceStockQtyInMemory } from './stock.js';
 
 export const posRouter = Router();
@@ -394,7 +395,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
         }
         for (const [id, qty] of [...quantities.entries()].sort()) {
           const stock = await client.query('SELECT qty FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true FOR UPDATE',[id,storeId]);
-          if (!stock.rows.length || Number(stock.rows[0].qty) < qty) throw Object.assign(new Error('Produto indisponível ou estoque insuficiente nesta loja.'),{status:400});
+          if (!stock.rows.length || await unreservedQuantity(client,storeId,id,Number(stock.rows[0].qty)) < qty) throw Object.assign(new Error('Produto indisponível, reservado ou estoque insuficiente nesta loja.'),{status:400});
         }
         // 2. Localiza sessão de caixa aberta se houver
         const sessRes = await client.query(

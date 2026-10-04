@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { unreservedQuantity } from '../services/commercialReservations.js';
 import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
 import { sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 import { sendMail, escapeHtml } from '../services/emailService.js';
@@ -120,7 +121,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       // Lock in a stable order and check aggregate quantity, including repeated items.
       for (const [id, qty] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
         const stock = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 AND active = true FOR UPDATE', [id, storeId]);
-        if (!stock.rows.length || Number(stock.rows[0].qty) < qty) throw Object.assign(new Error('Produto indisponível ou estoque insuficiente na loja selecionada.'), {status: 400});
+        if (!stock.rows.length || await unreservedQuantity(client,storeId,id,Number(stock.rows[0].qty)) < qty) throw Object.assign(new Error('Produto indisponível, reservado ou estoque insuficiente na loja selecionada.'), {status: 400});
       }
       // 1. Obter custos e calcular totais
       let subtotal = 0;
@@ -774,6 +775,9 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
       }
 
       const sale = saleRes.rows[0];
+      if (sale.source === 'commercial') {
+        throw Object.assign(new Error('Cancele esta venda pela encomenda de origem para conciliar a antecipação e a troca.'), {status:409});
+      }
       if (sale.status === 'cancelled') {
         throw Object.assign(new Error('Esta venda já foi cancelada anteriormente.'), {status: 409});
       }

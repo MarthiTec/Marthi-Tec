@@ -52,6 +52,7 @@ import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
 import { ErpPanelPage } from './pages/admin/ErpPanelPage';
 import { CustomersPage } from './pages/admin/CustomersPage';
 import { StockPage } from './pages/admin/StockPage';
+import { CommercialPage } from './pages/admin/CommercialPage';
 import { AttributesPage } from './pages/admin/AttributesPage';
 import { OrdersPage } from './pages/admin/OrdersPage';
 import { FinancePage } from './pages/admin/FinancePage';
@@ -197,6 +198,7 @@ export function App() {
           <Route path="tabelas" element={<PriceTablesPage />} />
           <Route path="campanhas" element={<PromoCampaignsPage />} />
           <Route path="orcamentos" element={<QuotesManagementPage />} />
+          <Route path="comercial" element={<CommercialPage />} />
           <Route path="clientes" element={<CustomersPage />} />
           <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="permissoes" element={<PermissionsPage />} />

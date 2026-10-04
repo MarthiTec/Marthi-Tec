@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
+import { unreservedQuantity } from '../services/commercialReservations.js';
 import { pool } from '../db/pool.js';
 
 export const stockRouter = Router();
@@ -316,7 +317,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
         try {
           await client.query('BEGIN');
 
-          const currentRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
+          const currentRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
           if (currentRes.rows.length === 0) {
             await client.query('ROLLBACK');
             res.status(404).json({ success: false, error: { message: 'Item de estoque não encontrado.' } });
@@ -325,6 +326,10 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
 
           const curr = currentRes.rows[0];
           const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
+          const available=await unreservedQuantity(client,storeId,id,Number(curr.qty));
+          const reserved=Number(curr.qty)-available;
+          if(reserved>0 && (nextQty<reserved || body.active===false || ['name','brand','capacity','color','condition','attrs','cost'].some(k=>(body as any)[k]!==undefined && JSON.stringify((body as any)[k])!==JSON.stringify(curr[k])))) throw Object.assign(new Error('Produto reservado por encomenda. Libere a reserva antes de alterar sua variante, custo ou saldo.'),{status:409});
+
 
           // Se qty mudou, registra movimentação no kardex
           if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
@@ -437,6 +442,8 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
 
     if (pool) {
       try {
+        const linked=await pool.query("SELECT id FROM commercial_orders WHERE store_id=$1 AND (stock_id=$2 OR used_stock_id=$2) LIMIT 1",[storeId,id]);
+        if(linked.rows[0])throw Object.assign(new Error('Produto vinculado ao histórico de encomenda. Utilize inativação após liberar reservas.'),{status:409});
         await pool.query(`DELETE FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
         res.json({ success: true, data: { ok: true } });
         return;
