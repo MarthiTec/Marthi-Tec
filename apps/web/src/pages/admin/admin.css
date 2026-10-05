@@ -6603,3 +6603,40 @@ select.caixa-mov-input {
 .pickup-fields { display:flex; flex-wrap:wrap; gap:12px; width:100%; color:var(--ink); } .pickup-fields > .admin-picker {flex:1 1 180px;} .pickup-fields input { background:var(--card);color:var(--ink);border:1px solid var(--line);padding:10px;max-width:100%;box-sizing:border-box; } .is-theme-dark .pickup-fields,.admin--dark .pickup-fields{color:var(--ink);} @media(max-width:768px){.pickup-fields .admin-form{width:100%;}}
 
 .stock-id-content { display:grid; gap:12px; min-width:0; width:100%; } .stock-id-content .stock-automation-toggle { margin:0; } .stock-brand-field {display:grid;gap:6px;min-width:0;} .stock-brand-field .empty {margin:0;line-height:1.5;} .stock-id-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;} .stock-id-fields .span-2 {grid-column:1 / -1;} @media(max-width:720px){.stock-id-layout{justify-items:stretch;}.stock-id-fields{grid-template-columns:minmax(0,1fr);}.stock-photo-picker{width:100%;align-items:flex-start;justify-items:start;}.stock-id-content .stock-automation-toggle{display:flex;align-items:flex-start;gap:8px;}.stock-id-content .stock-automation-toggle input{flex-shrink:0;margin-top:3px;}.stock-id-fields .span-2{grid-column:auto;}}
+
+.stock-sku-automation {display:flex;align-items:center;gap:8px;margin:16px 0;color:var(--ink);}
+.product-price-metrics,.product-price-suggestion,.product-last-entry {display:grid;gap:8px;min-width:180px;color:var(--ink);}
+.product-price-suggestion {min-width:230px;}
+.product-price-suggestion input {width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px;border-radius:8px;}
+.product-last-entry a {color:var(--accent);}
+.is-theme-dark .product-price-suggestion input {background:var(--card);color:var(--ink);border-color:var(--line);}
+@media(max-width:720px){.product-price-metrics,.product-price-suggestion,.product-last-entry{min-width:0;}.product-price-suggestion{width:100%;}.product-price-suggestion button{width:100%;}}
+
+
+/* Product registration and delivery settings share the system form controls. */
+.admin-form .admin-checkbox {display:flex;align-items:center;gap:8px;min-height:40px;color:var(--ink);}
+.admin-form .admin-checkbox input[type="checkbox"] {width:16px;height:16px;min-height:16px;padding:0;flex:0 0 16px;accent-color:var(--accent);}
+.settings-form-actions {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;}
+.stock-variation-grid input:not([type="checkbox"]),.product-price-suggestion input {min-height:40px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--card);color:var(--ink);font:inherit;font-size:.84rem;box-sizing:border-box;max-width:100%;}
+.stock-variation-grid input:focus-visible,.product-price-suggestion input:focus-visible {outline:2px solid var(--accent);outline-offset:2px;}
+.product-price-suggestion label {display:grid;gap:8px;font-size:.75rem;font-weight:600;color:var(--mute);}
+.stock-variation-grid .product-price-suggestion {min-width:240px;}
+.stock-variation-grid .product-price-metrics,.stock-variation-grid .product-last-entry {min-width:180px;}
+.stock-variation-grid .col-actions {min-width:130px;}
+.product-last-entry {overflow-wrap:anywhere;}
+.invoice-detail-tabs {display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.erp-invoices .admin-table td:first-child {overflow-wrap:anywhere;}
+.is-theme-dark .stock-variation-grid input,.admin--dark .stock-variation-grid input {background:var(--card);border-color:var(--line);color:var(--ink);}
+@media(max-width:768px){.settings-form-actions > .btn{width:100%;}.stock-variation-tabs > button{flex:1 1 100%;min-height:40px;}.invoice-detail-tabs > button{flex:1 1 120px;}.stock-variation-toolbar > .btn{width:100%;}.pickup-methods-page .admin-card{min-width:0;}}
+
+.stock-variation-grid input[aria-label="Custo unitário da variação"] {width:110px;}
+@media(max-width:768px){.erp-app .page-heading-actions{display:flex;width:100%;}.erp-app .page-heading-actions > .btn{width:100%;min-height:44px;}.erp-app .erp-app__heading-actions{width:100%;}}
+
+.admin-picker--floating .admin-picker__dropdown {position:static;max-height:inherit;display:flex;flex-direction:column;}
+.admin-picker--floating .admin-picker__menu {min-height:0;flex:1 1 auto;}
+.admin-picker--floating .admin-picker__search-wrap {flex-shrink:0;}
+.pickup-fields > label {display:grid;gap:8px;flex:1 1 180px;font-size:.75rem;font-weight:600;color:var(--mute);}
+.pickup-fields input {min-height:40px;border-radius:12px;font:inherit;font-size:.84rem;width:100%;}
+.stock-sku-automation input[type="checkbox"] {width:16px;height:16px;flex-shrink:0;accent-color:var(--accent);}
+
+@media(max-width:768px){.erp-app #panel-page-actions .page-heading-actions > .btn{min-height:44px !important;font-size:.84rem !important;padding:10px 12px !important;}}

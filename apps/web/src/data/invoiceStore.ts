@@ -113,6 +113,7 @@ function mapInvoice(row: ApiInvoice): Invoice {
     id: row.id,
     kind: row.kind,
     number: row.number,
+    series:row.series,natOp:row.natOp,movementAt:row.movementAt,modFrete:row.modFrete,vFrete:row.vFrete,vDesc:row.vDesc,vOutro:row.vOutro,infCpl:row.infCpl,
     status: row.status,
     documentPurpose: (row.documentPurpose as FiscalDocPurpose) || 'normal',
     supplierId: row.supplierId ?? '',
@@ -216,6 +217,7 @@ export async function createInvoice(input: {
       const row = await apiCreateStockInvoice({
         kind: input.kind,
         number: input.number,
+        series:input.series,natOp:input.natOp,movementAt:input.movementAt,modFrete:input.modFrete,vFrete:input.vFrete,vDesc:input.vDesc,vOutro:input.vOutro,infCpl:input.infCpl,
         supplierId: input.supplierId,
         customerName: input.customerName,
         customerDocument: input.customerDocument,
@@ -303,6 +305,7 @@ export async function updateInvoiceDraft(
       }
       const row = await apiUpdateStockInvoice(id, {
         number: patch.number,
+        series:patch.series,natOp:patch.natOp,movementAt:patch.movementAt,modFrete:patch.modFrete,vFrete:patch.vFrete,vDesc:patch.vDesc,vOutro:patch.vOutro,infCpl:patch.infCpl,
         supplierId: patch.supplierId,
         customerName: patch.customerName,
         customerDocument: patch.customerDocument,

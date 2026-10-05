@@ -744,3 +744,18 @@
     min-height: 44px;
   }
 }
+
+/* Constrain the shell before hiding overflow: tables scroll inside their own container. */
+.erp-app {grid-template-columns:minmax(0,1fr);}
+.erp-app__shell,.erp-app__top,.erp-app__content {min-width:0;}
+@media(max-width:900px){.erp-app__shell,.erp-app.is-nav-closed .erp-app__shell,.erp-app.is-nav-open .erp-app__shell{grid-template-columns:minmax(0,1fr);}.erp-app .admin-form{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:480px){
+ .erp-app__top{gap:6px;padding-left:8px;padding-right:8px;}
+ .erp-app__brand,.erp-app__top .module-menu-btn > span,.erp-app__top .module-menu-btn kbd,.erp-app__top .app-to-panel-btn > span,.erp-app__top .store-switcher__compact-tag{display:none;}
+ .erp-app__top .module-menu-btn,.erp-app__top .app-to-panel-btn{width:36px;min-width:36px;padding:0;justify-content:center;flex-shrink:0;}
+ .erp-app__top .store-switcher{flex:1 1 80px;min-width:0;}
+ .erp-app__top .store-switcher__compact-btn{width:100%;max-width:100%;min-width:0;}
+ .erp-app__exit{padding:0 8px;flex-shrink:0;}
+ .erp-app__heading{flex-wrap:wrap;align-items:stretch;}
+ .erp-app__heading-actions{width:100%;}
+}

@@ -1,3 +1,4 @@
+import {stockInvoicesRouter} from './routes/stockInvoices.js';
 import { pickupRouter } from './routes/pickup.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -71,6 +72,7 @@ app.use(pickupRouter);
 app.use(brandsRouter);
 app.use(deviceReferenceRouter);
 app.use(stockRouter);
+app.use(stockInvoicesRouter);
 app.use(registryRouter);
 app.use(companyUsersRouter);
 app.use(storesRouter);

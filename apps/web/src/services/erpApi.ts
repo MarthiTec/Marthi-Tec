@@ -1052,6 +1052,7 @@ export type ApiInvoiceLine = {
 export type ApiInvoice = {
   id: string;
   kind: 'entry' | 'exit';
+  series?:string;natOp?:string;movementAt?:string;modFrete?:string;vFrete?:number;vDesc?:number;vOutro?:number;infCpl?:string;
   number: string;
   status: 'draft' | 'posted' | 'cancelled';
   documentPurpose: string;
@@ -1086,6 +1087,7 @@ export function apiGetStockInvoice(id: string) {
 
 export function apiCreateStockInvoice(body: {
   kind: ApiInvoice['kind'];
+  series?:string;natOp?:string;movementAt?:string;modFrete?:string;vFrete?:number;vDesc?:number;vOutro?:number;infCpl?:string;
   number?: string;
   documentPurpose?: string;
   supplierId?: string;
@@ -1104,6 +1106,7 @@ export function apiUpdateStockInvoice(
   id: string,
   body: Partial<{
     number: string;
+    series:string;natOp:string;movementAt:string;modFrete:string;vFrete:number;vDesc:number;vOutro:number;infCpl:string;
     documentPurpose: string;
     supplierId: string;
     customerName: string;
