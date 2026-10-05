@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 export type AdminPickerOption = {
   value: string;
@@ -44,6 +45,8 @@ export function AdminPicker({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [floating, setFloating] = useState<{style:CSSProperties;dark:boolean}|null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
   const items = useMemo(() => normalizeOptions(options), [options]);
@@ -62,6 +65,38 @@ export function AdminPicker({
         (opt.hint && opt.hint.toLowerCase().includes(q)),
     );
   }, [items, search, shouldSearch]);
+
+  useLayoutEffect(() => {
+    if (!open || !rootRef.current?.closest('.admin-table-container')) {
+      setFloating(null);
+      return;
+    }
+    const root = rootRef.current;
+    const place = () => {
+      const rect = root.querySelector('button')!.getBoundingClientRect();
+      const computed = getComputedStyle(root);
+      const below = window.innerHeight - rect.bottom;
+      const above = rect.top;
+      const upward = below < 220 && above > below;
+      const width = Math.min(Math.max(rect.width, 200), window.innerWidth - 24);
+      const style:CSSProperties = {position:'fixed',zIndex:1000,width,left:Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),maxHeight:Math.max(80,Math.min(340,(upward?above:below)-12)),fontFamily:computed.fontFamily,fontSize:computed.fontSize,color:computed.color,...(upward?{bottom:window.innerHeight-rect.top+6}:{top:rect.bottom+6})};
+      for (const name of ['--ink','--mute','--line','--card','--card-2','--surface','--accent','--accent-rgb','--teal','--red']) {
+        const value = computed.getPropertyValue(name);
+        if (value) (style as Record<string,unknown>)[name] = value;
+      }
+      setFloating({style,dark:Boolean(root.closest('.is-theme-dark,.admin--dark'))});
+    };
+    place();
+    const closeOnScroll = (event:Event) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -82,7 +117,7 @@ export function AdminPicker({
     if (!open) return;
 
     function onPointer(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (!rootRef.current?.contains(event.target as Node) && !dropdownRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     }
@@ -99,31 +134,8 @@ export function AdminPicker({
     };
   }, [open]);
 
-  return (
-    <div
-      className={`admin-picker ${compact ? 'admin-picker--compact' : ''} ${open ? 'is-open' : ''} ${disabled ? 'is-disabled' : ''} ${className}`.trim()}
-      ref={rootRef}
-    >
-      {showCaption ? <span className="admin-picker__caption">{label}</span> : null}
-      <button
-        type="button"
-        className="admin-picker__trigger"
-        aria-label={label}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listId}
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className={`admin-picker__value${selected ? '' : ' is-placeholder'}`}>
-          {selected?.icon ? <span className="admin-picker__item-icon">{selected.icon}</span> : null}
-          {selected?.label ?? placeholder}
-        </span>
-        <i aria-hidden="true" />
-      </button>
-
-      {open ? (
-        <div className="admin-picker__dropdown">
+  const dropdown = (
+        <div className="admin-picker__dropdown" ref={dropdownRef}>
           {shouldSearch ? (
             <div className="admin-picker__search-wrap">
               <input
@@ -186,7 +198,36 @@ export function AdminPicker({
             )}
           </ul>
         </div>
-      ) : null}
+  );
+
+  return (
+    <div
+      className={`admin-picker ${compact ? 'admin-picker--compact' : ''} ${open ? 'is-open' : ''} ${disabled ? 'is-disabled' : ''} ${className}`.trim()}
+      ref={rootRef}
+    >
+      {showCaption ? <span className="admin-picker__caption">{label}</span> : null}
+      <button
+        type="button"
+        className="admin-picker__trigger"
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className={`admin-picker__value${selected ? '' : ' is-placeholder'}`}>
+          {selected?.icon ? <span className="admin-picker__item-icon">{selected.icon}</span> : null}
+          {selected?.label ?? placeholder}
+        </span>
+        <i aria-hidden="true" />
+      </button>
+
+      {open && (floating ? createPortal(
+        <div className={`admin-picker admin-picker--floating ${floating.dark?'is-theme-dark':''}`} style={floating.style}>
+          {dropdown}
+        </div>, document.body
+      ) : dropdown)}
     </div>
   );
 }

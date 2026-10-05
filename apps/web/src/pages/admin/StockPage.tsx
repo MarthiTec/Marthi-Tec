@@ -1409,7 +1409,7 @@ export function StockPage() {
               </div>
 
               <div className="admin-table-container">
-                <table className="admin-table">
+                <table className="admin-table stock-variation-grid">
                   <thead>
                     <tr>
                       {selectedAttrIds.map((attrId) => {
@@ -1484,6 +1484,8 @@ export function StockPage() {
                             <td>
                               <input
                                 type="text"
+                                aria-label="SKU da variação"
+                                title={variationSku(row)}
                                 value={variationSku(row)}
                                 disabled={readOnly}
                                 placeholder="SKU"
@@ -1539,7 +1541,7 @@ export function StockPage() {
                               />
                             </td>
                             <td><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
-                            <td><ProductPriceSuggestion cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td><ProductPriceSuggestion compact cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
                             <td><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
                               <td className="col-actions">

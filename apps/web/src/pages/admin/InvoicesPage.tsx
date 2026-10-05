@@ -526,7 +526,7 @@ export function InvoicesPage() {
             Ambiente SEFAZ: <strong>{SEFAZ_ENV_LABEL[issuer.environment]}</strong> · Série Padrão: <strong>{issuer.nfeSeries || '1'}</strong>
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="settings-form-actions">
           <Link to="/painel/fiscal/config" className="btn btn--ghost btn--sm">
             ⚙️ Configuração Fiscal
           </Link>
@@ -626,7 +626,7 @@ export function InvoicesPage() {
                 <h2 style={{ margin: 0 }}>
                   {INVOICE_KIND_LABEL[selected.kind]} · {selected.id}
                 </h2>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="settings-form-actions">
                   <button
                     type="button"
                     className="btn btn--sm btn--ghost"
@@ -653,7 +653,7 @@ export function InvoicesPage() {
               </p>
 
               {/* Abas do Painel de Detalhes da Nota */}
-              <div style={{ display: 'flex', gap: 6, margin: '14px 0 10px', borderBottom: '1px solid var(--line)', paddingBottom: 6 }}>
+              <div className="invoice-detail-tabs">
                 <button
                   type="button"
                   className={`btn btn--sm ${detailTab === 'geral' ? 'btn--primary' : 'btn--ghost'}`}

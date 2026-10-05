@@ -28,6 +28,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/movimentos': { kicker: 'Estoque', title: 'Movimentação de estoque' },
   '/erp/atributos': { kicker: 'Produtos', title: 'Atributos' },
   '/erp/api-aparelhos': { kicker: 'Produtos', title: 'Consulta de aparelhos por API' },
+  '/erp/tipos-retirada': { kicker: 'Produtos', title: 'Retirada e entrega' },
   '/erp/notas': { kicker: 'Estoque', title: 'Notas de entrada e saída' },
   '/erp/marcas': { kicker: 'Produtos', title: 'Marcas' },
   '/erp/kits': { kicker: 'Produtos', title: 'Kits' },
