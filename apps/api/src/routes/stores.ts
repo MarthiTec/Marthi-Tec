@@ -113,20 +113,7 @@ storesRouter.get('/api/v1/account', requireAuth, async (req, res, next) => {
       }
     }
 
-    res.json({
-      success: true,
-      data: {
-        id: clientAccountId || 'ACC-MARTHI-DEMO',
-        legalName: req.user?.name ? `${req.user.name} LTDA` : 'Minha Empresa LTDA',
-        tradeName: req.user?.name || 'Minha Empresa',
-        document: '00.000.000/0001-91',
-        email: req.user?.email || '',
-        phone: '',
-        accessToken: generateStoreAccessToken('00000000000', req.user?.email || '', clientAccountId || 'ACC-MARTHI-DEMO'),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    throw Object.assign(new Error('Conta não encontrada no banco de dados.'),{status:404});
   } catch (error) {
     next(error);
   }
