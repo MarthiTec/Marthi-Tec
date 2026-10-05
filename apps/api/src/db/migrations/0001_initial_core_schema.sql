@@ -377,6 +377,7 @@ CREATE TABLE IF NOT EXISTS stock_items (
   card_rate NUMERIC(6,2) NOT NULL DEFAULT 0,
   show_on_totem BOOLEAN NOT NULL DEFAULT true,
   images JSONB NOT NULL DEFAULT '[]'::jsonb,
+  variations JSONB NOT NULL DEFAULT '[]'::jsonb,
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

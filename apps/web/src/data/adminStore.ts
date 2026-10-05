@@ -46,6 +46,25 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 /** UN = inteiro; KG = pesado (aceita qty fracionada / balança). */
 export type StockUnit = 'UN' | 'KG';
 
+export type StockVariationRow = {
+  id?: string;
+  tempKey?: string;
+  attrs: Record<string, string>;
+  price: number;
+  cost: number;
+  avgCost?: number;
+  pricingPolicy?: PricingPolicy | null;
+  lastEntry?: StockItem['lastEntry'];
+  cardRate?: number;
+  qty: number;
+  minQty: number;
+  condition: StockCondition;
+  barcode?: string;
+  imei?: string;
+  pickupMethodId?: string;
+  pickupPrices?: Record<string, number | null>;
+};
+
 export type StockItem = {
   active?: boolean;
   skuAuto?:boolean;
@@ -99,6 +118,8 @@ export type StockItem = {
   trackLot?: boolean;
   /** Produto é kit (composições em /kits). */
   isKit?: boolean;
+  /** Variações detail deste produto (grade de variações sem SKU individual). */
+  variations?: StockVariationRow[];
 };
 
 export function isWeighedUnit(unit: StockUnit | undefined) {
@@ -221,9 +242,37 @@ function normalizeStock(item: StockItem): StockItem {
         .map((url) => String(url).trim())
         .filter((url) => Boolean(url) && !url.startsWith('/totem/'))
     : [];
+
+  const variations: StockVariationRow[] = Array.isArray(item.variations)
+    ? item.variations.map((v, idx) => ({
+        id: v.id,
+        tempKey: v.tempKey || v.id || `var_${idx}`,
+        attrs: typeof v.attrs === 'object' && v.attrs ? { ...v.attrs } : {},
+        price: Number(v.price) || 0,
+        cost: Number(v.cost) || 0,
+        avgCost: v.avgCost !== undefined ? Number(v.avgCost) : Number(v.cost) || 0,
+        pricingPolicy: v.pricingPolicy ?? null,
+        lastEntry: v.lastEntry ?? null,
+        cardRate: v.cardRate !== undefined ? Number(v.cardRate) : undefined,
+        qty: Number(v.qty) || 0,
+        minQty: Number(v.minQty) || 0,
+        condition: v.condition || 'new',
+        barcode: v.barcode || '',
+        imei: v.imei || '',
+        pickupMethodId: v.pickupMethodId,
+        pickupPrices: v.pickupPrices ?? {},
+      }))
+    : [];
+
   const cost = Number(item.cost) || 0;
-  const qty = Math.max(0, Number(item.qty) || 0);
-  const minQty = Math.max(0, Number(item.minQty) || 0);
+  const rawQty = Math.max(0, Number(item.qty) || 0);
+  const rawMinQty = Math.max(0, Number(item.minQty) || 0);
+  const qty = variations.length > 0
+    ? variations.reduce((sum, v) => sum + v.qty, 0)
+    : rawQty;
+  const minQty = variations.length > 0
+    ? variations.reduce((sum, v) => sum + v.minQty, 0)
+    : rawMinQty;
   const maxQtyRaw = Number(item.maxQty);
   const maxQty =
     Number.isFinite(maxQtyRaw) && maxQtyRaw > 0
@@ -261,6 +310,7 @@ function normalizeStock(item: StockItem): StockItem {
     sourceWorkOrderId: item.sourceWorkOrderId,
     showOnTotem: item.showOnTotem ?? looksLikeDevice,
     images,
+    variations,
     supplierId: item.supplierId ?? '',
     fiscalClassificationId: item.fiscalClassificationId ?? '',
     warehouseId: item.warehouseId ?? '',
@@ -518,6 +568,7 @@ function toNestStockBody(item: StockItem) {
     warehouseId: item.warehouseId || undefined,
     trackLot: item.trackLot,
     isKit: item.isKit,
+    variations: item.variations && item.variations.length ? item.variations : undefined,
   };
 }
 

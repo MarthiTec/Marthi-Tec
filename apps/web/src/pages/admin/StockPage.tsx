@@ -37,6 +37,7 @@ import {
   type StockCondition,
   type StockItem,
   type StockKind,
+  type StockVariationRow,
 } from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes } from '../../data/attributeStore';
 import { listSuppliers } from '../../data/erpRegistry';
@@ -56,26 +57,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 type Mode = 'new' | 'edit' | 'view';
 
-export type StockVariationRow = {
-  id?: string;
-  tempKey: string;
-  sku: string;
-  skuAuto?:boolean;
-  pricingPolicy?:StockItem['pricingPolicy'];
-  lastEntry?:StockItem['lastEntry'];
-  avgCost?:number;
-  barcode: string;
-  imei: string;
-  pickupMethodId?:string;
-  pickupPrices?:Record<string,number|null>;
-  attrs: Record<string, string>;
-  price: number;
-  cardRate?: number;
-  qty: number;
-  minQty: number;
-  cost: number;
-  condition: StockCondition;
-};
+export type { StockVariationRow };
 
 const REFRESH_EVENTS = [
   'marthi-admin-state',
@@ -171,7 +153,7 @@ export function StockPage() {
       const combos=buildVariationCombinations(defs.map(a=>({id:a.id,values:referenceValues(a)})));
       setSelectedAttrIds(defs.map(a=>a.id));
       setUseVariations(true);
-      setVariations(combos.map((attrs,index)=>({tempKey:`help_${Date.now()}_${index}`,sku:form.sku ? `${form.sku}-${index+1}` : '',barcode:'',imei:'',attrs,price:form.price||0,cardRate:form.cardRate,qty:0,minQty:0,cost:form.cost||0,condition:form.condition||'new'})));
+      setVariations(combos.map((attrs,index)=>({tempKey:`help_${Date.now()}_${index}`,barcode:'',imei:'',attrs,price:form.price||0,cardRate:form.cardRate,qty:0,minQty:0,cost:form.cost||0,condition:form.condition||'new'})));
       generatedModel.current=signature;
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível gerar as variações.');}
   },[device,attrDefs,automationState.enabled,automationState.eligible,formVisible,mode,automationStoreId]);
@@ -271,7 +253,7 @@ export function StockPage() {
     setMode('new');
     setError('');
     setUseVariations(automationState.eligible && automationState.enabled);
-    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,sku:'',barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:1,minQty:1,cost:0,condition:'new'}] : []);
+    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:1,minQty:1,cost:0,condition:'new'}] : []);
     setOriginalVariationIds([]);
     setSelectedAttrIds((automationState.enabled ? attrDefs : attrDefs.slice(0, 2)).map((a) => a.id));
   }
@@ -348,7 +330,9 @@ export function StockPage() {
         {
           id: selectedId || undefined,
           tempKey: `init_${Date.now()}`,
-          sku: form.sku,skuAuto:form.skuAuto,pricingPolicy:form.pricingPolicy,lastEntry:form.lastEntry,avgCost:form.avgCost,
+          pricingPolicy: form.pricingPolicy,
+          lastEntry: form.lastEntry,
+          avgCost: form.avgCost,
           barcode: form.barcode,
           imei: form.imei,
           attrs: initialAttrs,
@@ -377,10 +361,10 @@ export function StockPage() {
     for (const attrId of selectedAttrIds) {
       newAttrs[attrId] = lastRow?.attrs[attrId] || '';
     }
-    const nextSku = form.sku ? `${form.sku}-${variations.length + 1}` : '';
     const newRow: StockVariationRow = {
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku: nextSku,skuAuto:form.skuAuto,pricingPolicy:lastRow?.pricingPolicy??form.pricingPolicy,lastEntry:null,
+      pricingPolicy: lastRow?.pricingPolicy ?? form.pricingPolicy,
+      lastEntry: null,
       barcode: '',
       imei: '',
       attrs: newAttrs,
@@ -402,7 +386,7 @@ export function StockPage() {
       ...target,
       id: undefined,
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku:'',skuAuto:true,lastEntry:null,
+      lastEntry: null,
       barcode: '',
       imei: '',
       attrs: { ...target.attrs },
@@ -466,11 +450,8 @@ export function StockPage() {
     }
 
     const generated: StockVariationRow[] = cartesian.map((comboAttrs, idx) => {
-      const attrVals = Object.values(comboAttrs).filter(Boolean);
-      const codeSuffix = attrVals.map((v) => v.slice(0, 3).toUpperCase()).join('-');
       return {
         tempKey: `gen_${Date.now()}_${idx}`,
-        sku: form.sku ? `${form.sku}-${codeSuffix}` : codeSuffix,
         barcode: '',
         imei: '',
         attrs: comboAttrs,
@@ -492,83 +473,118 @@ export function StockPage() {
     setMode(nextMode);
     setFormVisible(true);
 
-    const siblings = items.filter(
-      (row) => row.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
-    );
-    const hasMultiple = siblings.length > 1;
-    setUseVariations(hasMultiple);
-
     const corId = corAttrDef?.id || 'ATTR-COR';
     const capId = capAttrDef?.id || 'ATTR-CAP';
 
-    if (hasMultiple) {
-      const rows: StockVariationRow[] = siblings.map((sib) => ({
-        id: sib.id,
-        tempKey: sib.id,
-        sku: sib.sku,
-        skuAuto:false,pricingPolicy:sib.pricingPolicy,lastEntry:sib.lastEntry,avgCost:sib.avgCost,
-        barcode: sib.barcode || '',
-        imei: sib.imei || '',
-        attrs: {
-          ...sib.attrs,
-          ...(sib.color && corId ? { [corId]: sib.color } : {}),
-          ...(sib.capacity && capId ? { [capId]: sib.capacity } : {}),
-        },
-        price: sib.price,
-        pickupPrices: sib.pickupPrices,
-        cardRate: sib.cardRate,
-        qty: sib.qty,
-        minQty: sib.minQty,
-        cost: sib.cost,
-        condition: sib.condition,
+    if (item.variations && item.variations.length > 0) {
+      setUseVariations(true);
+      const rows: StockVariationRow[] = item.variations.map((v, idx) => ({
+        id: v.id,
+        tempKey: v.tempKey || v.id || `var_${Date.now()}_${idx}`,
+        pricingPolicy: v.pricingPolicy,
+        lastEntry: v.lastEntry,
+        avgCost: v.avgCost,
+        barcode: v.barcode || '',
+        imei: v.imei || '',
+        attrs: { ...v.attrs },
+        price: v.price,
+        pickupPrices: v.pickupPrices,
+        cardRate: v.cardRate,
+        qty: v.qty,
+        minQty: v.minQty,
+        cost: v.cost,
+        condition: v.condition,
       }));
       setVariations(rows);
-      setOriginalVariationIds(siblings.map((s) => s.id));
+      setOriginalVariationIds(item.id ? [item.id] : []);
       const used = new Set<string>();
-      for (const sib of siblings) {
-        for (const [k, v] of Object.entries(sib.attrs ?? {})) {
+      for (const row of rows) {
+        for (const [k, v] of Object.entries(row.attrs ?? {})) {
           if (v) used.add(k);
         }
-        if (sib.color && corId) used.add(corId);
-        if (sib.capacity && capId) used.add(capId);
       }
       setSelectedAttrIds(
         used.size > 0 ? Array.from(used) : attrDefs.slice(0, 2).map((a) => a.id),
       );
     } else {
-      setVariations([
-        {
-          id: item.id,
-          tempKey: item.id || `var_${Date.now()}`,
-          sku: item.sku,
-          skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,avgCost:item.avgCost,
-          barcode: item.barcode || '',
-          imei: item.imei || '',
-          attrs: {
-            ...item.attrs,
-            ...(item.color && corId ? { [corId]: item.color } : {}),
-            ...(item.capacity && capId ? { [capId]: item.capacity } : {}),
-          },
-          pickupPrices: item.pickupPrices ?? {},
-          price: item.price,
-          cardRate: item.cardRate,
-          qty: item.qty,
-          minQty: item.minQty,
-          cost: item.cost,
-          condition: item.condition,
-        },
-      ]);
-      setOriginalVariationIds(item.id ? [item.id] : []);
-      setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
-    }
+      const siblings = items.filter(
+        (row) => row.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+      );
+      const hasMultiple = siblings.length > 1;
+      setUseVariations(hasMultiple);
 
+      if (hasMultiple) {
+        const rows: StockVariationRow[] = siblings.map((sib) => ({
+          id: sib.id,
+          tempKey: sib.id,
+          pricingPolicy: sib.pricingPolicy,
+          lastEntry: sib.lastEntry,
+          avgCost: sib.avgCost,
+          barcode: sib.barcode || '',
+          imei: sib.imei || '',
+          attrs: {
+            ...sib.attrs,
+            ...(sib.color && corId ? { [corId]: sib.color } : {}),
+            ...(sib.capacity && capId ? { [capId]: sib.capacity } : {}),
+          },
+          price: sib.price,
+          pickupPrices: sib.pickupPrices,
+          cardRate: sib.cardRate,
+          qty: sib.qty,
+          minQty: sib.minQty,
+          cost: sib.cost,
+          condition: sib.condition,
+        }));
+        setVariations(rows);
+        setOriginalVariationIds(siblings.map((s) => s.id));
+        const used = new Set<string>();
+        for (const sib of siblings) {
+          for (const [k, v] of Object.entries(sib.attrs ?? {})) {
+            if (v) used.add(k);
+          }
+          if (sib.color && corId) used.add(corId);
+          if (sib.capacity && capId) used.add(capId);
+        }
+        setSelectedAttrIds(
+          used.size > 0 ? Array.from(used) : attrDefs.slice(0, 2).map((a) => a.id),
+        );
+      } else {
+        setVariations([
+          {
+            id: item.id,
+            tempKey: item.id || `var_${Date.now()}`,
+            pricingPolicy: item.pricingPolicy,
+            lastEntry: item.lastEntry,
+            avgCost: item.avgCost,
+            barcode: item.barcode || '',
+            imei: item.imei || '',
+            attrs: {
+              ...item.attrs,
+              ...(item.color && corId ? { [corId]: item.color } : {}),
+              ...(item.capacity && capId ? { [capId]: item.capacity } : {}),
+            },
+            pickupPrices: item.pickupPrices ?? {},
+            price: item.price,
+            cardRate: item.cardRate,
+            qty: item.qty,
+            minQty: item.minQty,
+            cost: item.cost,
+            condition: item.condition,
+          },
+        ]);
+        setOriginalVariationIds(item.id ? [item.id] : []);
+        setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
+      }
+    }
 
     setForm({
       name: item.name,
       brand: item.brand ?? '',
       category: item.category ?? 'Geral',
       sku: item.sku,
-      skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,
+      skuAuto: false,
+      pricingPolicy: item.pricingPolicy,
+      lastEntry: item.lastEntry,
       barcode: item.barcode,
       imei: item.imei,
       color: item.color,
@@ -605,10 +621,18 @@ export function StockPage() {
     }
   }
 
-  function skuPreview(attrs:Record<string,string>,condition=form.condition){
-    return form.name.trim()?productSku({...form,brand:findBrand(brands,form.brand??'')?.name??form.brand,attrs,color:attrs[attrDefs.find(a=>a.name.toLowerCase()==='cor')?.id??'']??'',capacity:attrs[attrDefs.find(a=>a.name.toLowerCase()==='capacidade')?.id??'']??'',condition}):'';
+  function skuPreview(attrs: Record<string, string> = form.attrs, condition = form.condition) {
+    return form.name.trim()
+      ? productSku({
+          ...form,
+          brand: findBrand(brands, form.brand ?? '')?.name ?? form.brand,
+          attrs,
+          color: attrs[attrDefs.find((a) => a.name.toLowerCase() === 'cor')?.id ?? ''] ?? '',
+          capacity: attrs[attrDefs.find((a) => a.name.toLowerCase() === 'capacidade')?.id ?? ''] ?? '',
+          condition,
+        })
+      : '';
   }
-  function variationSku(row:StockVariationRow){return row.skuAuto===false?row.sku:skuPreview(row.attrs,row.condition);}
 
   async function submit() {
     if (readOnly || !form.name.trim() || saveInProgress.current) return;
@@ -620,120 +644,124 @@ export function StockPage() {
       const corId = corAttrDef?.id || 'ATTR-COR';
       const capId = capAttrDef?.id || 'ATTR-CAP';
 
-      if (useVariations) {
-        if (variations.length === 0) {
-          setError('Adicione ao menos uma variação na grade ou volte para Produto Simples.');
-          return;
-        }
+      if (useVariations && variations.length === 0) {
+        setError('Adicione ao menos uma variação na grade ou volte para Produto Simples.');
+        saveInProgress.current = false;
+        setSaving(false);
+        return;
+      }
 
-        const savedVariationIds: string[] = [];
-        for (const row of variations) {
-          const corVal = row.attrs[corId] || (corAttrDef ? row.attrs[corAttrDef.name] : '') || '';
-          const capVal = row.attrs[capId] || (capAttrDef ? row.attrs[capAttrDef.name] : '') || '';
-          const payload: Omit<StockItem, 'id'> & { id?: string } = {
-            ...(row.id ? { id: row.id } : {}),
-            name: form.name.trim(),
-            brand: form.brand?.trim() || '',
-            category: form.category?.trim() || 'Geral',
-            sku: variationSku(row),
-            skuAuto: row.skuAuto!==false,
-            pricingPolicy:row.pricingPolicy??null,
-            barcode: row.barcode.trim(),
-            imei: row.imei.trim(),
-            color: corVal,
-            capacity: capVal,
-            pickupPrices: row.pickupPrices ?? form.pickupPrices ?? {},
+      const masterQty = useVariations
+        ? variations.reduce((sum, r) => sum + (Number(r.qty) || 0), 0)
+        : Number(form.qty) || 0;
+      const masterMinQty = useVariations
+        ? variations.reduce((sum, r) => sum + (Number(r.minQty) || 0), 0)
+        : Number(form.minQty) || 0;
+      const masterCost = useVariations
+        ? Number(variations[0]?.cost) || Number(form.cost) || 0
+        : Number(form.cost) || 0;
+      const masterPrice = useVariations
+        ? Number(variations[0]?.price) || Number(form.price) || 0
+        : Number(form.price) || 0;
+      const masterSku = form.skuAuto ? skuPreview(form.attrs) : form.sku.trim();
+
+      const cleanedVariations: StockVariationRow[] = useVariations
+        ? variations.map((row) => ({
+            id: row.id,
             attrs: { ...row.attrs },
+            price: Number(row.price) || 0,
+            cost: Number(row.cost) || 0,
+            avgCost: row.avgCost ?? (Number(row.cost) || 0),
             qty: Number(row.qty) || 0,
             minQty: Number(row.minQty) || 0,
-            maxQty: form.maxQty ?? 10,
-            cost: Number(row.cost) || 0,
-            avgCost: row.avgCost??Number(row.cost),
-            price: Number(row.price) || 0,
             cardRate:
               row.cardRate !== undefined && !Number.isNaN(row.cardRate)
                 ? Number(row.cardRate)
                 : form.cardRate,
-            lastPurchaseCost: Number(row.cost) || form.lastPurchaseCost || 0,
-            lastPurchaseAt: row.lastEntry?.enteredAt??'',
-            kind: form.kind,
             condition: row.condition || form.condition,
-            unit: form.unit,
-            showOnTotem: form.showOnTotem,
-            images: [...form.images].slice(0, 4),
-            supplierId: form.supplierId || '',
-            fiscalClassificationId: form.fiscalClassificationId || '',
-            warehouseId: form.warehouseId || '',
-            trackLot: Boolean(form.trackLot),
-            isKit: Boolean(form.isKit),
-          };
-          const savedState = await upsertStockItem(payload);
-          const savedRow = row.id ? savedState.stock.find(item => item.id === row.id) : savedState.stock[0];
-          if (savedRow) {
-            savedVariationIds.push(savedRow.id);
-            setVariations(current => current.map(item => item.tempKey === row.tempKey ? { ...item, id: savedRow.id } : item));
-          }
-        }
+            barcode: (row.barcode || '').trim(),
+            imei: (row.imei || '').trim(),
+            pickupPrices: row.pickupPrices ?? {},
+            pricingPolicy: row.pricingPolicy ?? null,
+          }))
+        : [];
 
-        // Remove variações excluídas na grade
-        const activeIds = new Set([...variations.map((v) => v.id).filter(Boolean), ...savedVariationIds]);
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+        brand: form.brand?.trim() || '',
+        category: form.category?.trim() || 'Geral',
+        sku: masterSku,
+        skuAuto: form.skuAuto !== false,
+        barcode: form.barcode.trim(),
+        imei: form.imei.trim(),
+        color: form.attrs[corId] ?? form.color,
+        capacity: form.attrs[capId] ?? form.capacity,
+        attrs: { ...form.attrs },
+        qty: masterQty,
+        minQty: masterMinQty,
+        maxQty: form.maxQty ?? 10,
+        cost: masterCost,
+        avgCost: form.avgCost || masterCost,
+        price: masterPrice,
+        cardRate: form.cardRate,
+        lastPurchaseCost: form.lastPurchaseCost || masterCost,
+        lastPurchaseAt: form.lastEntry?.enteredAt ?? '',
+        kind: form.kind,
+        condition: form.condition,
+        unit: form.unit,
+        showOnTotem: form.showOnTotem,
+        images: form.images.slice(0, 4),
+        supplierId: form.supplierId || '',
+        fiscalClassificationId: form.fiscalClassificationId || '',
+        warehouseId: form.warehouseId || '',
+        trackLot: Boolean(form.trackLot),
+        isKit: Boolean(form.isKit),
+        variations: cleanedVariations,
+      };
+
+      const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
+      const state = await upsertStockItem(
+        mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
+      );
+      setItems(state.stock);
+      const savedId =
+        mode === 'edit' && selectedId
+          ? selectedId
+          : state.stock.find((row) => row.sku === payload.sku)?.id ?? state.stock[0]?.id;
+
+      // Se havia registros duplicados legados (irmãos salvos como produtos avulsos no passado), limpa-os
+      if (useVariations && originalVariationIds.length > 0) {
         for (const oldId of originalVariationIds) {
-          if (!activeIds.has(oldId)) {
+          if (oldId && oldId !== savedId && oldId !== selectedId) {
             await removeStockItem(oldId);
           }
         }
-
-        const state = getAdminState();
-        setItems(state.stock);
-        onStockChanged(state.stock[0]?.id);
-        resetForm();
-        setFormVisible(false);
-      } else {
-        // Produto simples
-        const payload = {
-          ...form,
-          name: form.name.trim(),
-          sku:form.skuAuto?skuPreview(form.attrs):form.sku,
-          brand: form.brand?.trim() || '',
-          category: form.category?.trim() || 'Geral',
-          images: form.images.slice(0, 4),
-          color: form.attrs[corId] ?? form.color,
-          capacity: form.attrs[capId] ?? form.capacity,
-          avgCost: form.avgCost || form.cost,
-          lastPurchaseCost: form.lastPurchaseCost || form.cost,
-          lastPurchaseAt: form.lastEntry?.enteredAt??'',
-        };
-        const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
-        const state = await upsertStockItem(
-          mode === 'edit' && selectedId ? { ...payload, id: selectedId } : payload,
-        );
-        setItems(state.stock);
-        const savedId =
-          mode === 'edit' && selectedId
-            ? selectedId
-            : state.stock.find((row) => row.sku === payload.sku)?.id ?? state.stock[0]?.id;
-        onStockChanged(savedId);
-        if (prev && savedId && prev.qty !== payload.qty) {
-          const delta = payload.qty - prev.qty;
-          void import('../../data/stockLedger').then(({ logStockMovements }) => {
-            logStockMovements([
-              {
-                stockId: savedId,
-                stockName: payload.name,
-                sku: payload.sku,
-                type: 'adjust',
-                qty: Math.abs(delta),
-                direction: delta >= 0 ? 1 : -1,
-                unitCost: payload.avgCost || payload.cost,
-                balanceAfter: payload.qty,
-                note: 'Ajuste via cadastro de produto',
-              },
-            ]);
-          });
-        }
-        resetForm();
-        setFormVisible(false);
       }
+
+      onStockChanged(savedId);
+
+      if (prev && savedId && prev.qty !== payload.qty) {
+        const delta = payload.qty - prev.qty;
+        void import('../../data/stockLedger').then(({ logStockMovements }) => {
+          logStockMovements([
+            {
+              stockId: savedId,
+              stockName: payload.name,
+              sku: payload.sku,
+              type: 'adjust',
+              qty: Math.abs(delta),
+              direction: delta >= 0 ? 1 : -1,
+              unitCost: payload.avgCost || payload.cost,
+              balanceAfter: payload.qty,
+              note: 'Ajuste via cadastro de produto',
+            },
+          ]);
+        });
+      }
+
+      resetForm();
+      setFormVisible(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
     } finally {
@@ -1097,25 +1125,87 @@ export function StockPage() {
                     </td>
                     <td>{item.showOnTotem ? 'Sim' : 'Não'}</td>
                     <td>
-                      {attrDefs
-                        .map((attr) => item.attrs?.[attr.id])
-                        .filter(Boolean)
-                        .join(' · ') ||
+                      {item.variations && item.variations.length > 0 ? (
+                        <div>
+                          <span
+                            className="stock-brand-badge"
+                            style={{
+                              background: 'rgba(45, 212, 191, 0.15)',
+                              color: 'var(--accent, #2dd4bf)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {item.variations.length} {item.variations.length === 1 ? 'variação' : 'variações'}
+                          </span>
+                          <div className="empty" style={{ fontSize: '0.75rem', marginTop: 3 }}>
+                            {(() => {
+                              const attrSets: Record<string, Set<string>> = {};
+                              for (const v of item.variations) {
+                                for (const [k, val] of Object.entries(v.attrs || {})) {
+                                  if (val) {
+                                    if (!attrSets[k]) attrSets[k] = new Set();
+                                    attrSets[k].add(val);
+                                  }
+                                }
+                              }
+                              return Object.values(attrSets)
+                                .map((set) => Array.from(set).join(', '))
+                                .join(' · ');
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        attrDefs
+                          .map((attr) => item.attrs?.[attr.id])
+                          .filter(Boolean)
+                          .join(' · ') ||
                         [item.color, item.capacity].filter(Boolean).join(' · ') ||
-                        '—'}
+                        '—'
+                      )}
                     </td>
                     <td className={item.qty <= item.minQty ? 'qty-low' : ''}>
                       {item.qty} {item.unit ?? 'UN'}
+                      {item.variations && item.variations.length > 0 ? (
+                        <div className="empty" style={{ fontSize: '0.72rem' }}>
+                          (grade total)
+                        </div>
+                      ) : null}
                     </td>
                     <td>
                       {item.minQty}/{item.maxQty || '—'}
                     </td>
                     <td>{avg.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="price-red">
-                      {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      <div className="empty" style={{ fontSize: '0.78rem' }}>
-                        12x de {formatInstallment(item.price, 12).split('X')[1]?.trim() ?? ''}
-                      </div>
+                      {(() => {
+                        if (item.variations && item.variations.length > 0) {
+                          const prices = item.variations
+                            .map((v) => Number(v.price) || 0)
+                            .filter((p) => p > 0);
+                          const minP = prices.length ? Math.min(...prices) : item.price;
+                          const maxP = prices.length ? Math.max(...prices) : item.price;
+                          if (minP !== maxP && minP > 0) {
+                            return (
+                              <>
+                                <div>
+                                  {minP.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ~{' '}
+                                  {maxP.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </div>
+                                <div className="empty" style={{ fontSize: '0.78rem' }}>
+                                  12x a partir de {formatInstallment(minP, 12).split('X')[1]?.trim() ?? ''}
+                                </div>
+                              </>
+                            );
+                          }
+                        }
+                        return (
+                          <>
+                            {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            <div className="empty" style={{ fontSize: '0.78rem' }}>
+                              12x de {formatInstallment(item.price, 12).split('X')[1]?.trim() ?? ''}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </td>
                     <td>{margin === '—' ? '—' : `${margin}%`}</td>
                     <td className="admin-table__actions">
@@ -1330,7 +1420,7 @@ export function StockPage() {
 
 
           <p><Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link></p>
-          <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>{setForm(current=>({...current,skuAuto:e.target.checked}));setVariations(current=>current.map(row=>({...row,skuAuto:e.target.checked})));}}/> Gerar SKU automaticamente com os dados do produto</label>
+          <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>setForm(current=>({...current,skuAuto:e.target.checked}))}/> Gerar SKU automaticamente com os dados do produto</label>
           {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
           <p><Link to="/erp/tipos-retirada">Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
@@ -1430,7 +1520,6 @@ export function StockPage() {
                         return <th key={attrId}>{def?.name || attrId}</th>;
                       })}
                       <th>Tipo de retirada</th>
-                      <th>SKU</th>
                       <th>Custo unitário</th>
                       <th>Preço à vista</th>
                       <th>Qtd</th>
@@ -1445,7 +1534,7 @@ export function StockPage() {
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 10 + (readOnly ? 0 : 1)} className="empty">
+                        <td colSpan={selectedAttrIds.length + 9 + (readOnly ? 0 : 1)} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
@@ -1455,7 +1544,7 @@ export function StockPage() {
                         const installmentText = formatInstallment(rowPrice, 18);
 
                         return (
-                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
+                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 9) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
                             {selectedAttrIds.map((attrId, attrIdx) => {
                               const def = attrDefs.find((a) => a.id === attrId);
                               const options = referenceValues(def).map((v) => ({
@@ -1498,18 +1587,6 @@ export function StockPage() {
                               );
                             })}
                             <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
-                            <td data-label="SKU">
-                              <input
-                                type="text"
-                                aria-label="SKU da variação"
-                                title={variationSku(row)}
-                                value={variationSku(row)}
-                                disabled={readOnly}
-                                placeholder="SKU"
-                                style={{ width: 110 }}
-                                onChange={e=>setVariations(current=>current.map((r,i)=>i===index?{...r,sku:e.target.value,skuAuto:false}:r))}
-                              />
-                            </td>
                             <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
                             <td data-label="Preço à vista">
                               <input
@@ -1560,7 +1637,7 @@ export function StockPage() {
                               </span>
                             </td>
                             <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
-                            <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name,row.sku].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
                             <td data-label="Última entrada / nota"><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
                               <td className="col-actions" data-label="Ações">

@@ -54,6 +54,44 @@ export function findStockVariant(
   const rows = stock.filter((item) => namesMatch(item.name, productName));
   if (!rows.length) return null;
 
+  const master = rows[0];
+  if (master.variations && master.variations.length > 0) {
+    const matchAttrs = attrs.filter((attr) => master.variations!.some((v) => v.attrs?.[attr.id]));
+    const ranked = master.variations
+      .map((v) => {
+        let score = 0;
+        let miss = false;
+        for (const attr of matchAttrs) {
+          const selected = config[attr.id];
+          const stored = v.attrs?.[attr.id];
+          if (!selected || !stored) continue;
+          if (selected === stored) score += 1;
+          else miss = true;
+        }
+        return { v, score, miss };
+      })
+      .filter((item) => !item.miss)
+      .sort((a, b) => b.score - a.score || b.v.qty - a.v.qty);
+
+    const bestVar = ranked[0]?.v;
+    if (bestVar) {
+      return {
+        ...master,
+        price: bestVar.price,
+        cost: bestVar.cost,
+        avgCost: bestVar.avgCost ?? bestVar.cost,
+        qty: bestVar.qty,
+        minQty: bestVar.minQty,
+        condition: bestVar.condition,
+        cardRate: bestVar.cardRate ?? master.cardRate,
+        attrs: { ...master.attrs, ...bestVar.attrs },
+        barcode: bestVar.barcode || master.barcode,
+        imei: bestVar.imei || master.imei,
+        pickupPrices: bestVar.pickupPrices ?? master.pickupPrices,
+      };
+    }
+  }
+
   const keys = varyingStockAttrs(rows, attrs);
   const matchAttrs = keys.length ? keys : attrs.filter((attr) => rows.some((row) => row.attrs?.[attr.id]));
 

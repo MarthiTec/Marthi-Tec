@@ -79,6 +79,57 @@ test('registration rolls back when preparing persisted product details fails', a
  assert.equal(Number((await query("SELECT count(*) n FROM stock_items WHERE name='Rollback registration'")).rows[0].n),1);
 });
 
+test('product with variation grid persists as ONE single product with ONE SKU and detail variations in database', async () => {
+ const variations = [];
+ for (const color of ['Prateado','Laranja-cósmico','Azul-intenso']) {
+  for (const capacity of ['256GB','512GB']) {
+   const price = capacity === '256GB' ? 7520 : 8520;
+   const cost = capacity === '256GB' ? 6000 : 7000;
+   variations.push({
+    attrs: {'ATTR-COR': color, 'ATTR-CAP': capacity},
+    price,
+    cost,
+    qty: 2,
+    minQty: 1,
+    condition: 'new',
+    barcode: '',
+    imei: '',
+    pickupPrices: {'pickup-phone': price}
+   });
+  }
+ }
+ const body = {
+  name: 'iPhone 17 Pro Max Master',
+  brand: 'Apple',
+  sku: 'APPLE-IPHONE17PROMAX-MASTER-NEW',
+  skuAuto: false,
+  kind: 'device',
+  condition: 'new',
+  unit: 'UN',
+  price: 7520,
+  cost: 6000,
+  showOnTotem: true,
+  variations
+ };
+ const res = await request('/stock', 'POST', body);
+ assert.equal(res.status, 201, JSON.stringify(res.json));
+ const item = res.json.data;
+ assert.equal(item.name, 'iPhone 17 Pro Max Master');
+ assert.equal(item.sku, 'APPLE-IPHONE17PROMAX-MASTER-NEW');
+ assert.equal(item.qty, 12); // 6 variations * 2 qty each = 12
+ assert.equal(item.variations.length, 6);
+ assert.equal(item.variations[0].attrs['ATTR-COR'], 'Prateado');
+ assert.equal(item.variations[0].sku, undefined);
+
+ const dbVars = (await query("SELECT * FROM stock_item_variations WHERE stock_item_id = $1", [item.id])).rows;
+ assert.equal(dbVars.length, 6);
+ assert.equal(Number(dbVars[0].qty), 2);
+
+ const rows = (await request('/stock')).json.data.filter(r => r.name === 'iPhone 17 Pro Max Master');
+ assert.equal(rows.length, 1);
+ assert.equal(rows[0].variations.length, 6);
+});
+
 test('totem iPhone registration persists six variants with pickup prices', async () => {
  await query("INSERT INTO pickup_methods(id,store_id,name,kind) VALUES('pickup-phone','store-a','Em mãos teste iPhone','immediate')");
  for (const color of ['Prateado','Laranja-cósmico','Azul-intenso']) {

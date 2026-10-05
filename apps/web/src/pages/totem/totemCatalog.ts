@@ -49,6 +49,13 @@ function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
   const attrs: Record<string, string[]> = {};
 
   for (const row of rows) {
+    if (row.variations && row.variations.length > 0) {
+      for (const v of row.variations) {
+        for (const [attrId, value] of Object.entries(v.attrs ?? {})) {
+          pushUnique(attrs, attrId, value);
+        }
+      }
+    }
     for (const [attrId, value] of Object.entries(row.attrs ?? {})) {
       pushUnique(attrs, attrId, value);
     }
@@ -76,8 +83,15 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     const attrs = buildTotemAttrs(rows);
     const colors = attrs[ATTR_COR] ?? [];
     const storages = attrs[ATTR_CAP] ?? [];
-    const priced = [...rows].sort((a, b) => a.price - b.price);
+    const priced = [...rows].sort((a, b) => {
+      const minA = a.variations?.length ? Math.min(...a.variations.map(v => v.price)) : a.price;
+      const minB = b.variations?.length ? Math.min(...b.variations.map(v => v.price)) : b.price;
+      return minA - minB;
+    });
     const primary = priced[0];
+    const bestCashPrice = primary.variations?.length
+      ? Math.min(...primary.variations.map(v => v.price))
+      : primary.price;
     const images = rows
       .flatMap((row) => stockItemImages(row))
       .filter((url, index, all) => all.indexOf(url) === index)
@@ -94,8 +108,8 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       brand: resolveTotemBrand(primary.brand, name),
       storages,
       colors,
-      cashPrice: primary.price,
-      installmentLabel: formatInstallment(primary.price, 12, cardFeePercent),
+      cashPrice: bestCashPrice,
+      installmentLabel: formatInstallment(bestCashPrice, 12, cardFeePercent),
       images: (images.length ? images : stockItemImages(primary)).slice(0, 4),
       attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),

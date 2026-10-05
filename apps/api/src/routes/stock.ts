@@ -11,6 +11,24 @@ import { pool } from '../db/pool.js';
 
 export const stockRouter = Router();
 
+const stockVariationSchema = z.object({
+  id: z.string().optional(),
+  attrs: z.record(z.any()).default({}),
+  price: z.coerce.number().finite().nonnegative().default(0),
+  cost: z.coerce.number().finite().nonnegative().default(0),
+  avgCost: z.coerce.number().finite().nonnegative().optional(),
+  pricingPolicy: z.object({basis:z.enum(['markup','margin']),percent:z.number().finite().nonnegative()}).refine(p=>p.basis!=='margin'||p.percent<100,'A margem deve ser menor que 100%.').nullable().optional(),
+  lastEntry: z.any().optional().nullable(),
+  cardRate: z.coerce.number().optional(),
+  qty: z.coerce.number().default(0),
+  minQty: z.coerce.number().default(0),
+  condition: z.enum(['new', 'used', 'refurbished']).default('new'),
+  barcode: z.string().optional().default(''),
+  imei: z.string().optional().default(''),
+  pickupMethodId: z.string().optional().nullable(),
+  pickupPrices: z.record(z.number().finite().nonnegative().nullable()).optional().default({}),
+});
+
 const stockItemSchema = z.object({
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
@@ -40,6 +58,7 @@ const stockItemSchema = z.object({
   cardRate: z.coerce.number().optional().default(0),
   showOnTotem: z.boolean().optional().default(true),
   images: z.array(z.string()).optional().default([]),
+  variations: z.array(stockVariationSchema).optional().default([]),
 });
 
 export function formatStockRow(row: any) {
@@ -55,6 +74,13 @@ export function formatStockRow(row: any) {
     try { images = JSON.parse(row.images); } catch {}
   } else if (Array.isArray(row.images)) {
     images = row.images;
+  }
+
+  let variations: any[] = [];
+  if (typeof row.variations === 'string') {
+    try { variations = JSON.parse(row.variations); } catch {}
+  } else if (Array.isArray(row.variations)) {
+    variations = row.variations;
   }
 
   return {
@@ -91,6 +117,23 @@ export function formatStockRow(row: any) {
     cardRate: Number(row.card_rate ?? row.cardRate) || 0,
     showOnTotem: row.show_on_totem !== undefined ? Boolean(row.show_on_totem) : (row.showOnTotem !== undefined ? Boolean(row.showOnTotem) : true),
     images,
+    variations: variations.map((v: any, idx: number) => ({
+      id: v.id || `var_${idx}`,
+      attrs: typeof v.attrs === 'object' && v.attrs ? v.attrs : {},
+      price: Number(v.price) || 0,
+      cost: Number(v.cost) || 0,
+      avgCost: Number(v.avgCost ?? v.avg_cost ?? v.cost) || 0,
+      pricingPolicy: v.pricingPolicy ?? v.pricing_policy ?? null,
+      lastEntry: v.lastEntry ?? v.last_entry ?? null,
+      cardRate: v.cardRate !== undefined ? Number(v.cardRate) : (v.card_rate !== undefined ? Number(v.card_rate) : undefined),
+      qty: Number(v.qty) || 0,
+      minQty: Number(v.minQty ?? v.min_qty) || 0,
+      condition: v.condition || 'new',
+      barcode: v.barcode || '',
+      imei: v.imei || '',
+      pickupMethodId: v.pickupMethodId ?? v.pickup_method_id,
+      pickupPrices: v.pickupPrices ?? v.pickup_prices ?? {},
+    })),
     createdAt: row.created_at || row.createdAt,
     updatedAt: row.updated_at || row.updatedAt,
   };
@@ -142,7 +185,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -191,7 +234,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
           FROM stock_items
           WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
           LIMIT 1
@@ -237,14 +280,20 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
       if (client) {
         try {
           await client.query('BEGIN');
-          body.sku=await allocateSku(client,storeId,body,id);
+          if (body.variations && body.variations.length > 0) {
+            body.qty = body.variations.reduce((acc, v) => acc + (Number(v.qty) || 0), 0);
+            body.minQty = body.variations.reduce((acc, v) => acc + (Number(v.minQty) || 0), 0);
+            if (body.cost <= 0 && body.variations[0].cost > 0) body.cost = Number(body.variations[0].cost);
+            if (body.price <= 0 && body.variations[0].price > 0) body.price = Number(body.variations[0].price);
+          }
+          body.sku = await allocateSku(client, storeId, body, id);
 
           await client.query(
             `INSERT INTO stock_items (
               id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-              attrs, color, capacity, card_rate, show_on_totem, images
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+              attrs, color, capacity, card_rate, show_on_totem, images, variations
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
             [
               id,
               storeId,
@@ -271,8 +320,38 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
               body.cardRate || 0,
               body.showOnTotem !== undefined ? body.showOnTotem : true,
               JSON.stringify(body.images || []),
+              JSON.stringify(body.variations || []),
             ],
           );
+
+          if (body.variations && body.variations.length > 0) {
+            for (const v of body.variations) {
+              const varId = v.id || `var_${randomUUID()}`;
+              await client.query(
+                `INSERT INTO stock_item_variations (
+                  id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
+                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                [
+                  varId,
+                  storeId,
+                  id,
+                  JSON.stringify(v.attrs || {}),
+                  v.price,
+                  v.cost,
+                  v.avgCost ?? v.cost,
+                  v.qty,
+                  v.minQty,
+                  v.cardRate ?? null,
+                  v.condition,
+                  v.barcode || '',
+                  v.imei || '',
+                  JSON.stringify(v.pickupPrices || {}),
+                  v.pricingPolicy ? JSON.stringify(v.pricingPolicy) : null,
+                ],
+              );
+            }
+          }
 
           await client.query('UPDATE stock_items SET avg_cost=$3,pricing_policy=$4 WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost??body.cost,JSON.stringify(body.pricingPolicy??{})]);
           await validatePickupPrices(client,storeId,body.pickupPrices);
@@ -346,6 +425,10 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           }
 
           const curr = currentRes.rows[0];
+          if (body.variations !== undefined && body.variations.length > 0) {
+            body.qty = body.variations.reduce((acc, v) => acc + (Number(v.qty) || 0), 0);
+            body.minQty = body.variations.reduce((acc, v) => acc + (Number(v.minQty) || 0), 0);
+          }
           if(body.skuAuto||body.sku!==undefined&&body.sku!==curr.sku)body.sku=await allocateSku(client,storeId,{...curr,...body},id);
           if(body.avgCost!==undefined||body.pricingPolicy!==undefined)await client.query('UPDATE stock_items SET avg_cost=COALESCE($3,avg_cost),pricing_policy=COALESCE($4,pricing_policy) WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost,body.pricingPolicy!==undefined?JSON.stringify(body.pricingPolicy??{}):null]);
           const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
@@ -399,8 +482,9 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
                  card_rate = COALESCE($18, card_rate),
                  show_on_totem = COALESCE($19, show_on_totem),
                  images = COALESCE($20, images),
+                 variations = COALESCE($21, variations),
                  updated_at = now()
-             WHERE id = $21 AND store_id = $22`,
+             WHERE id = $22 AND store_id = $23`,
             [
               body.name,
               body.sku,
@@ -422,10 +506,41 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
               body.cardRate,
               body.showOnTotem,
               body.images !== undefined ? JSON.stringify(body.images) : null,
+              body.variations !== undefined ? JSON.stringify(body.variations) : null,
               id,
               storeId,
             ],
           );
+
+          if (body.variations !== undefined) {
+            await client.query('DELETE FROM stock_item_variations WHERE store_id = $1 AND stock_item_id = $2', [storeId, id]);
+            for (const v of body.variations) {
+              const varId = v.id || `var_${randomUUID()}`;
+              await client.query(
+                `INSERT INTO stock_item_variations (
+                  id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
+                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                [
+                  varId,
+                  storeId,
+                  id,
+                  JSON.stringify(v.attrs || {}),
+                  v.price,
+                  v.cost,
+                  v.avgCost ?? v.cost,
+                  v.qty,
+                  v.minQty,
+                  v.cardRate ?? null,
+                  v.condition,
+                  v.barcode || '',
+                  v.imei || '',
+                  JSON.stringify(v.pickupPrices || {}),
+                  v.pricingPolicy ? JSON.stringify(v.pricingPolicy) : null,
+                ],
+              );
+            }
+          }
 
           await client.query('COMMIT');
 
@@ -494,7 +609,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,
