@@ -146,7 +146,7 @@ BEGIN
       
       IF NOT EXISTS (SELECT 1 FROM store_licenses WHERE store_id = v_store_id) THEN
         INSERT INTO store_licenses(id, client_account_id, store_id, plan_id, status, starts_at, modules, final_price, created_at, updated_at)
-        VALUES(gen_random_uuid()::text, v_account_id, v_store_id, 'golden', 'active', now(), '["totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, 597, now(), now());
+        VALUES(gen_random_uuid()::text, v_account_id, v_store_id, 'golden', 'active', now(), ARRAY['totem','pdv','os','erp','fiscal','ecommerce']::text[], 597, now(), now());
       ELSE
         UPDATE store_licenses SET status = 'active', updated_at = now() WHERE store_id = v_store_id;
       END IF;
