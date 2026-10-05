@@ -820,7 +820,7 @@ export function ExternalSalePage() {
                   />
                 </div>
                 <div>
-                  {tradeDevice ? <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={color => setTradeIn({ ...tradeIn, color })} /> : <label className="admin-label">Cor<input className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={e => setTradeIn({ ...tradeIn, color: e.target.value })} /></label>}
+                  {tradeDevice ? <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={color => setTradeIn({ ...tradeIn, color })} /> : <><label className="admin-label" htmlFor="trade-in-color">Cor</label><input id="trade-in-color" className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={e => setTradeIn({ ...tradeIn, color: e.target.value })} /></>}
                 </div>
 
                 <div>

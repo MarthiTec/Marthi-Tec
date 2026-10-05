@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
@@ -13,6 +14,11 @@ export function BrandsPage() {
   const [readOnly, setReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  useEffect(() => {
+    const changed = () => { setForm(null); setMessage(''); setQuery(''); };
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, changed);
+    return () => window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, changed);
+  }, []);
   function open(brand?: Brand, view = false, duplicate = false) {
     setMessage(''); setReadOnly(view);
     setForm(brand ? { id: duplicate ? undefined : brand.id, name: duplicate ? `${brand.name} (cópia)` : brand.name, active: brand.active } : { name: '', active: true });
@@ -33,12 +39,12 @@ export function BrandsPage() {
     catch (err) { setMessage(err instanceof Error ? err.message : 'Não foi possível excluir a marca.'); }
   }
   return (
-    <div>
-      <div className="admin-toolbar">
+    <section className="admin-page brands-page">
+      <div className="admin-card"><div className="admin-toolbar">
         <input aria-label="Buscar marcas" placeholder="Buscar marca" value={query} onChange={e => setQuery(e.target.value)} />
         {canEdit && <button className="btn btn--primary" onClick={() => open()}>Nova marca</button>}
       </div>
-      <p className="empty">Organize as marcas usadas no cadastro de produtos e na venda externa.</p>
+      <p className="empty">Marcas disponíveis para os produtos desta loja.</p></div>
       {(message || error) && <p role="alert">{message || error} {error && <button className="btn btn--ghost" onClick={() => void reload()}>Tentar novamente</button>}</p>}
       {form && <form className="admin-card" onSubmit={e => { e.preventDefault(); void save(); }}>
         <h3>{readOnly ? 'Consultar marca' : form.id ? 'Editar marca' : 'Nova marca'}</h3>
@@ -64,6 +70,6 @@ export function BrandsPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }

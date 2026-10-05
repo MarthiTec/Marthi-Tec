@@ -5,6 +5,10 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const profileRouter = Router();
+profileRouter.use((req,res,next)=>{
+ if(!pool) {res.status(503).json({success:false,error:{code:'DATABASE_UNAVAILABLE',message:'Banco indisponível. Nenhuma alteração foi gravada.'}});return;}
+ next();
+});
 
 const profileSchema = z.object({
   displayName: z.string().optional(),
@@ -196,6 +200,7 @@ profileRouter.post('/api/v1/payments', requireAuth, async (req, res, next) => {
         }
       }
 
+      if(pTableId && !(await pool.query('SELECT id FROM price_tables WHERE id=$1 AND store_id=$2 AND active=true',[pTableId,storeId])).rows[0]) throw Object.assign(new Error('Selecione uma tabela ativa desta loja.'),{status:400});
       await pool.query(
         `INSERT INTO payment_methods (id, store_id, name, type, price_table_id, max_installments, active)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -218,11 +223,12 @@ profileRouter.patch('/api/v1/payments/:id', requireAuth, async (req, res, next) 
     const body = paymentMethodSchema.partial().parse(req.body);
 
     if (pool) {
+      if(body.priceTableId && !(await pool.query('SELECT id FROM price_tables WHERE id=$1 AND store_id=$2 AND active=true',[body.priceTableId,storeId])).rows[0]) throw Object.assign(new Error('Selecione uma tabela ativa desta loja.'),{status:400});
       await pool.query(
         `UPDATE payment_methods
-         SET name = COALESCE($1, name), type = COALESCE($2, type), max_installments = COALESCE($3, max_installments), active = COALESCE($4, active)
+         SET name = COALESCE($1, name), type = COALESCE($2, type), max_installments = COALESCE($3, max_installments), active = COALESCE($4, active), price_table_id = COALESCE($7, price_table_id)
          WHERE id = $5 AND store_id = $6`,
-        [body.name, body.type, body.maxInstallments, body.active, id, storeId],
+        [body.name, body.type, body.maxInstallments, body.active, id, storeId, body.priceTableId],
       );
       const updated = await pool.query(`SELECT * FROM payment_methods WHERE id = $1 AND store_id = $2`, [id, storeId]);
       res.json({ success: true, data: rowToClient(updated.rows[0]) });

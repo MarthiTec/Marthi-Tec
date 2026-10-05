@@ -147,10 +147,7 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
     throw error;
   }
 
-  const shouldNotify =
-    typeof (config?.notifyCustomer ?? (config?.notifyCustomer ?? lead.notifyCustomer)) === 'boolean'
-      ? lead.notifyCustomer
-      : Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
+  const shouldNotify = config?.notifyCustomer ?? lead.notifyCustomer ?? Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
 
   let customerNotified = false;
   if (shouldNotify) {
@@ -163,8 +160,10 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
       'Em breve a loja entrará em contato para confirmar o pedido.',
     ].join('\n');
 
-    const customerResult = await sendEvolutionText(lead.customerPhone, customerMsg, config ? {...config, storeId:lead.storeId} : undefined);
-    customerNotified = customerResult.ok;
+    try {
+      const customerResult = await sendEvolutionText(lead.customerPhone, customerMsg, config ? {...config, storeId:lead.storeId} : undefined);
+      customerNotified = customerResult.ok;
+    } catch { /* Store delivery was accepted; do not repeat it because customer acknowledgement failed. */ }
   }
 
   return {

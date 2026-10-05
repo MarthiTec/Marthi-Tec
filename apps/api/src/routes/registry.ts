@@ -1,12 +1,16 @@
 import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 import { hashPassword, upsertClientUserInMemory } from '../services/authService.js';
 import { randomBytes } from 'node:crypto';
 
 export const registryRouter = Router();
+registryRouter.use((req,res,next)=>{
+ if(!pool) { res.status(503).json({success:false,error:{code:'DATABASE_UNAVAILABLE',message:'Banco indisponível. Nenhum cadastro foi gravado.'}});return; }
+ next();
+});
 
 /* ── Schemas ───────────────────────────────────────────── */
 
@@ -28,6 +32,8 @@ const employeeSchema = z.object({
 
 const customerSchema = z.object({
   id: z.string().optional(),
+  active: z.boolean().default(true),
+  neighborhood: z.string().optional(),
   name: z.string().min(1, 'Nome do cliente é obrigatório.'),
   tradeName: z.string().default(''),
   documentType: z.enum(['cnpj', 'cpf']).default('cpf'),
@@ -71,27 +77,7 @@ const sellerSchema = z.object({
 
 /* ── In-Memory Fallbacks ────────────────────────────────── */
 
-const memoryEmployees = new Map<string, any>([
-  [
-    'EMP-MARTHI-ADMIN',
-    {
-      id: 'EMP-MARTHI-ADMIN',
-      storeId: 'STR-DEMO-01',
-      name: 'Marthi Tecnologia',
-      phone: '',
-      email: 'marthi.tecnologia@gmail.com',
-      document: '',
-      role: 'admin',
-      isSystemUser: true,
-      userEmail: 'marthi.tecnologia@gmail.com',
-      accessAreas: ['painel', 'totem', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce'],
-      permissions: { all: true },
-      active: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-]);
+const memoryEmployees = new Map<string, any>();
 const memoryCustomers = new Map<string, any>();
 const memorySuppliers = new Map<string, any>();
 const memorySellers = new Map<string, any>();
@@ -102,7 +88,7 @@ function onlyDigits(v: string) {
 
 /* ── 1. Employees / Usuários com Limites do Plano ───────── */
 
-registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
+registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const clientAccountId = req.clientAccountId!;
@@ -154,7 +140,7 @@ registryRouter.get('/api/v1/employees', requireOrDemoAuth, async (req, res, next
   }
 });
 
-registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, next) => {
+registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => {
   try {
     if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
     const storeId = req.storeId!;
@@ -304,7 +290,7 @@ registryRouter.post('/api/v1/employees', requireOrDemoAuth, async (req, res, nex
   }
 });
 
-registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
+registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next) => {
   try {
     if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
     const storeId = req.storeId!;
@@ -479,7 +465,7 @@ registryRouter.patch('/api/v1/employees/:id', requireOrDemoAuth, async (req, res
   }
 });
 
-registryRouter.delete('/api/v1/employees/:id', requireOrDemoAuth, async (req, res, next) => {
+registryRouter.delete('/api/v1/employees/:id', requireAuth, async (req, res, next) => {
   try {
     if (!['admin', 'superadmin'].includes(req.user!.role || '')) throw Object.assign(new Error('Somente administradores podem alterar usuários.'), {status: 403});
     const storeId = req.storeId!;
@@ -539,6 +525,8 @@ registryRouter.get('/api/v1/customers', requireAuth, async (req, res, next) => {
           district: r.district || '',
           city: r.city || '',
           state: r.state || '',
+          active: Boolean(r.active),
+          neighborhood: r.district || '',
           customerGroup: r.customer_group || 'Padrão',
           creditLimit: Number(r.credit_limit) || 0,
           notes: r.notes || '',
@@ -568,13 +556,12 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
     const pDigits = onlyDigits(body.phone);
 
     if (pool) {
-      await pool.query(
+      const inserted = await pool.query(
         `INSERT INTO customers (
           id, store_id, name, trade_name, document_type, document, phone, phone_digits,
-          email, zip_code, street, number, complement, district, city, state, customer_group, credit_limit, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-        ON CONFLICT (store_id, phone_digits) DO UPDATE SET
-          name = EXCLUDED.name, document = EXCLUDED.document, email = EXCLUDED.email, updated_at = now()`,
+          email, zip_code, street, number, complement, district, city, state, customer_group, credit_limit, notes, active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        ON CONFLICT (store_id, phone_digits) DO NOTHING RETURNING *`,
         [
           id,
           storeId,
@@ -583,23 +570,24 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
           body.documentType,
           body.document.trim(),
           body.phone.trim(),
-          pDigits || '0000000000',
+          pDigits || null,
           body.email.trim(),
           body.zipCode.trim(),
           body.street.trim(),
           body.number.trim(),
           body.complement.trim(),
-          body.district.trim(),
+          (body.neighborhood ?? body.district).trim(),
           body.city.trim(),
           body.state.trim().toUpperCase(),
           body.customerGroup,
           body.creditLimit,
           body.notes.trim(),
+          body.active,
         ],
       );
 
-      const createdRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: rowToClient(createdRes.rows[0]) });
+      if(!inserted.rows[0]) throw Object.assign(new Error('Já existe um cliente com este telefone nesta loja.'),{status:409});
+      res.status(201).json({success:true,data:rowToClient(inserted.rows[0])});
       return;
     }
 
@@ -634,6 +622,8 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
              customer_group = COALESCE($12, customer_group),
              credit_limit = COALESCE($13, credit_limit),
              notes = COALESCE($14, notes),
+             complement = COALESCE($17, complement), document_type = COALESCE($18, document_type),
+             active = COALESCE($19, active), phone_digits = CASE WHEN $20 THEN $21 ELSE phone_digits END,
              updated_at = now()
          WHERE id = $15 AND store_id = $16`,
         [
@@ -645,7 +635,7 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
           body.zipCode,
           body.street,
           body.number,
-          body.district,
+          body.neighborhood ?? body.district,
           body.city,
           body.state,
           body.customerGroup,
@@ -653,9 +643,10 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
           body.notes,
           id,
           storeId,
+          body.complement,body.documentType,body.active,body.phone!==undefined,body.phone===undefined ? null : onlyDigits(body.phone)||null,
         ],
       );
-      const updated = await pool.query(`SELECT * FROM customers WHERE id = $1`, [id]);
+      const updated = await pool.query(`SELECT * FROM customers WHERE id = $1 AND store_id=$2`, [id,storeId]);
       res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }

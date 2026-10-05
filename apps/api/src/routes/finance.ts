@@ -6,6 +6,18 @@ import { pool } from '../db/pool.js';
 
 export const financeRouter = Router();
 
+// Reject references to records belonging to a different store before any mutation.
+financeRouter.use('/api/v1/finance',requireAuth,async(req,_res,next)=>{
+ try {
+  if(!['POST','PUT','PATCH'].includes(req.method)){next();return;}
+  for(const [field,table] of [['accountId','bank_accounts'],['supplierId','suppliers'],['customerId','customers'],['invoiceId','stock_invoices']] as const){
+   const id=req.body?.[field];if(id==null||id==='')continue;
+   if(typeof id!=='string'||!(await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND store_id=$2`,[id,req.storeId])).rows.length)throw Object.assign(new Error('Registro vinculado não disponível nesta loja.'),{status:400});
+  }
+  next();
+ }catch(error){next(error);}
+});
+
 // Linked commercial balances follow the order ledger to avoid duplicate settlements.
 financeRouter.use('/api/v1/finance/receivables/:id', requireAuth, async (req, _res, next) => {
   if (req.method === 'GET') { next(); return; }
