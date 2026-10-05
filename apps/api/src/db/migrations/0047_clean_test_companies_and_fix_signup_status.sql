@@ -129,6 +129,7 @@ DECLARE
   v_account_id TEXT;
   v_gilvan_id TEXT;
   v_marina_id TEXT;
+  v_admin_id TEXT;
 BEGIN
   -- Localiza a loja Cell Ponto
   SELECT id, client_account_id INTO v_store_id, v_account_id 
@@ -151,9 +152,16 @@ BEGIN
         UPDATE store_licenses SET status = 'active', updated_at = now() WHERE store_id = v_store_id;
       END IF;
 
-      INSERT INTO client_payment_confirmations(client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status, confirmed_at)
-      VALUES(v_account_id, v_store_id, 'pix', 'ATIVACAO-AUTORIZADA', 'Acesso e pagamento ativados para Cell Ponto', 'admin', 'acesso_ativado', now())
-      ON CONFLICT (client_account_id) DO UPDATE SET contracting_status = 'acesso_ativado', confirmed_at = now();
+      SELECT id INTO v_admin_id FROM users WHERE global_role = 'superadmin' LIMIT 1;
+      IF v_admin_id IS NULL THEN
+        SELECT id INTO v_admin_id FROM users LIMIT 1;
+      END IF;
+
+      IF v_admin_id IS NOT NULL THEN
+        INSERT INTO client_payment_confirmations(client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status, confirmed_at)
+        VALUES(v_account_id, v_store_id, 'pix', 'ATIVACAO-AUTORIZADA', 'Acesso e pagamento ativados para Cell Ponto', v_admin_id, 'acesso_ativado', now())
+        ON CONFLICT (client_account_id) DO UPDATE SET contracting_status = 'acesso_ativado', confirmed_at = now();
+      END IF;
     END IF;
 
     -- Localiza ou cria gilvanteodo@gmail.com
