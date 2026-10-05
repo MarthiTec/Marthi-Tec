@@ -1455,8 +1455,8 @@ export function StockPage() {
                         const installmentText = formatInstallment(rowPrice, 18);
 
                         return (
-                          <tr key={row.tempKey} style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
-                            {selectedAttrIds.map((attrId) => {
+                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
+                            {selectedAttrIds.map((attrId, attrIdx) => {
                               const def = attrDefs.find((a) => a.id === attrId);
                               const options = referenceValues(def).map((v) => ({
                                 value: v,
@@ -1465,7 +1465,11 @@ export function StockPage() {
                               const val = row.attrs[attrId] ?? '';
 
                               return (
-                                <td key={attrId} data-label={def?.name || "Atributo"}>
+                                <td
+                                  key={attrId}
+                                  className="stock-variation-attr-cell"
+                                  data-label={attrIdx === 0 ? `Item #${index + 1} · ${def?.name || 'Atributo'}` : (def?.name || 'Atributo')}
+                                >
                                   {options.length > 0 ? (
                                     <AdminPicker
                                       compact
