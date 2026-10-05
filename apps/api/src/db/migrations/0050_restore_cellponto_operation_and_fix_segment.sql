@@ -421,7 +421,7 @@ BEGIN
       COALESCE((elem->>'qty')::int, si.qty),
       COALESCE((elem->>'minQty')::int, si.min_qty),
       (elem->>'cardRate')::numeric,
-      COALESCE(elem->>'condition', si.condition),
+      COALESCE(elem->>'condition', si.condition::text),
       COALESCE(elem->>'barcode', ''),
       COALESCE(elem->>'imei', ''),
       COALESCE(elem->'pickupPrices', '{}'::jsonb),
