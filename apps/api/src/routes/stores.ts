@@ -813,9 +813,12 @@ storesRouter.delete('/api/v1/admin/clients/:id', requireSession, requirePlatform
   try {
     const clientId = req.params.id;
     if (pool && clientId) {
+      await pool.query('DELETE FROM client_payment_confirmations WHERE client_account_id = $1', [clientId]);
       await pool.query('DELETE FROM store_licenses WHERE client_account_id = $1', [clientId]);
+      await pool.query('DELETE FROM user_stores WHERE store_id IN (SELECT id FROM stores WHERE client_account_id = $1)', [clientId]);
       await pool.query('DELETE FROM stores WHERE client_account_id = $1', [clientId]);
-      await pool.query('DELETE FROM users WHERE client_account_id = $1', [clientId]);
+      await pool.query("DELETE FROM users WHERE client_account_id = $1 AND global_role <> 'superadmin'", [clientId]);
+      await pool.query('DELETE FROM partner_signups WHERE id = $1', [clientId]);
       await pool.query('DELETE FROM client_accounts WHERE id = $1', [clientId]);
     }
     res.json({ success: true, message: 'Cliente removido com sucesso do banco de dados.' });
