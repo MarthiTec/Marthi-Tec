@@ -271,7 +271,7 @@ export function CommunicationSettingsSection() {
         }
       }
     } catch (err) {
-      console.warn('Erro ao carregar configurações SMTP:', err);
+      setSmtpFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Não foi possível carregar a configuração de e-mail da loja.' });
     } finally {
       setSmtpLoading(false);
     }
@@ -296,6 +296,11 @@ export function CommunicationSettingsSection() {
   async function handleSendSmtpTest() {
     if (!smtpTestRecipient.trim()) {
       setSmtpFeedback({ type: 'error', message: 'Informe o e-mail de destino para realizar o teste.' });
+      return;
+    }
+    const missing = [!smtpSettings.host.trim() && 'Servidor SMTP', !smtpSettings.from.trim() && 'Remetente', !smtpSettings.user.trim() && 'Usuário', !smtpSettings.pass && 'Senha de app'].filter(Boolean);
+    if (missing.length) {
+      setSmtpFeedback({ type: 'error', message: `Preencha a configuração de e-mail: ${missing.join(', ')}.` });
       return;
     }
     setSmtpTesting(true);

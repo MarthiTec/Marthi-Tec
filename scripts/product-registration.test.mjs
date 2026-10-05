@@ -56,6 +56,45 @@ test('automatic SKU collision, manual SKU and true entry history persist',async(
  assert.equal((await request('/stock','POST',{...body,skuAuto:false,sku:row.sku})).status,409);
  assert.equal((await request('/stock/'+row.id,'PATCH',{pricingPolicy:{basis:'margin',percent:100}})).status,400);
 });
+test('product without a pricing calculation stays editable after reload',async()=>{
+ const created=await request('/stock','POST',{name:'No pricing policy',qty:0,cost:0,price:0});
+ assert.equal(created.status,201,JSON.stringify(created.json));
+ assert.equal(created.json.data.pricingPolicy,null);
+ const list=await request('/stock');
+ assert.equal(list.json.data.find(row=>row.id===created.json.data.id).pricingPolicy,null);
+ const updated=await request('/stock/'+created.json.data.id,'PATCH',{price:0,pricingPolicy:null});
+ assert.equal(updated.status,200,JSON.stringify(updated.json));
+ assert.equal(updated.json.data.pricingPolicy,null);
+});
+test('registration rolls back when preparing persisted product details fails', async () => {
+ const normalConnect=pool.connect;
+ pool.connect=async()=>({query:async(sql,args)=>{if(sql.includes('SELECT s.id,s.avg_cost'))throw new Error('Simulated product detail failure');return query(sql,args);},release(){}});
+ try {
+  const result=await request('/stock','POST',{name:'Rollback registration',qty:1,cost:10,price:20});
+  assert.equal(result.status,500);
+  assert.equal(Number((await query("SELECT count(*) n FROM stock_items WHERE name='Rollback registration'")).rows[0].n),0);
+ }finally{pool.connect=normalConnect;}
+ const retry=await request('/stock','POST',{name:'Rollback registration',qty:1,cost:10,price:20});
+ assert.equal(retry.status,201,JSON.stringify(retry.json));
+ assert.equal(Number((await query("SELECT count(*) n FROM stock_items WHERE name='Rollback registration'")).rows[0].n),1);
+});
+
+test('totem iPhone registration persists six variants with pickup prices', async () => {
+ await query("INSERT INTO pickup_methods(id,store_id,name,kind) VALUES('pickup-phone','store-a','Em mãos teste iPhone','immediate')");
+ for (const color of ['Prateado','Laranja-cósmico','Azul-intenso']) {
+  for (const capacity of ['256GB','512GB']) {
+   const price = capacity === '256GB' ? 7520 : 8520;
+   const body = {name:'IPHONE 17 PRO MAX',brand:'Apple',sku:'APPLE-IPHONE17PROMAX-NEW',skuAuto:true,kind:'device',condition:'new',unit:'UN',qty:1,minQty:0,cost:capacity === '256GB' ? 6000 : 7000,avgCost:capacity === '256GB' ? 6000 : 7000,price:0,pricingPolicy:null,supplierId:'',attrs:{'ATTR-COR':color,'ATTR-CAP':capacity},color,capacity,pickupPrices:{'pickup-phone':price},images:[],showOnTotem:true};
+   const result = await request('/stock','POST',body);
+   assert.equal(result.status,201,JSON.stringify(result.json));
+   assert.equal(result.json.data.pickupPrices['pickup-phone'],price);
+   assert.equal(result.json.data.qty,1);
+  }
+ }
+ const rows = (await request('/stock')).json.data.filter(row=>row.name==='IPHONE 17 PRO MAX');
+ assert.equal(rows.length,6);
+ assert.equal(new Set(rows.map(row=>row.sku)).size,6);
+});
 test('invoice posting, weighted cost and cancellation are transactional and tenant scoped',async()=>{
  await query("INSERT INTO suppliers(id,store_id,name) VALUES('supplier-a','store-a','Fornecedor teste')");
  const item=(await request('/stock','POST',{name:'Item nota',qty:2,cost:100,avgCost:100,price:150})).json.data;

@@ -51,3 +51,6 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE OR REPLACE TRIGGER guard_stock_invoice_line_store BEFORE INSERT OR UPDATE ON stock_invoice_lines FOR EACH ROW EXECUTE FUNCTION guard_stock_invoice_line_store();
+
+ALTER TABLE price_tables ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();

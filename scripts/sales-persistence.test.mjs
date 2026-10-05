@@ -78,6 +78,18 @@ test('SMTP test uses the store sender, readable HTML and verified TLS without re
   reject=true;assert.equal((await request('/store/smtp-settings/test',{recipient:'test@example.com'})).status,502);
  }finally{nodemailer.createTransport=original;}
 });
+test('SMTP rejects missing host or sender before contacting a mail server', async () => {
+ const saved=(await query("SELECT smtp_settings FROM stores WHERE id='store-a'")).rows[0].smtp_settings;
+ const original=nodemailer.createTransport;
+ nodemailer.createTransport=()=>{throw new Error('Must not connect with incomplete settings');};
+ try {
+  await query("UPDATE stores SET smtp_settings=$1::jsonb WHERE id='store-a'",[JSON.stringify({...saved,host:'',from:''})]);
+  const result=await request('/store/smtp-settings/test',{recipient:'test@example.com'});
+  assert.equal(result.status,400);
+  const body=await result.json();assert.match(body.error.message,/Servidor SMTP/);assert.match(body.error.message,/Remetente/);
+ }finally{nodemailer.createTransport=original;await query("UPDATE stores SET smtp_settings=$1::jsonb WHERE id='store-a'",[JSON.stringify(saved)]);}
+});
+
 after(async()=>{server.close();await once(server,'close');await pool.end();await db.close();});
 test('external sale commits stock, payment, receivable and finance in one store',async()=>{
  const response=await request('/sales/external',payload);const json=await response.json();assert.equal(response.status,201,JSON.stringify(json));saleId=json.data.id;
