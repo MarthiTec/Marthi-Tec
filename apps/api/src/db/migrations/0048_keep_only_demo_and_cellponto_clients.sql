@@ -24,30 +24,30 @@ BEGIN
   WHERE trade_name ILIKE '%Cell Ponto%' OR id = 'STR-CELL-PONTO'
   LIMIT 1;
 
-  IF v_cellponto_store_id IS NULL THEN
-    v_cellponto_store_id := 'STR-CELL-PONTO';
-  END IF;
-
   IF v_cellponto_account_id IS NULL THEN
     SELECT id INTO v_cellponto_account_id
     FROM client_accounts
     WHERE trade_name ILIKE '%Cell Ponto%' OR email IN ('marinaveigatav@gmail.com', 'gilvanteodo@gmail.com')
     LIMIT 1;
+  END IF;
 
-    IF v_cellponto_account_id IS NULL THEN
-      v_cellponto_account_id := 'PRT-CELL-PONTO';
-      INSERT INTO client_accounts(id, legal_name, trade_name, document, email, phone, contact_name, status, created_at, updated_at)
-      VALUES(v_cellponto_account_id, 'Cell Ponto Manutenção e Comércio LTDA', 'Cell Ponto', '33.444.555/0001-66', 'marinaveigatav@gmail.com', '(11) 99999-9999', 'Cell Ponto', 'active', now(), now())
-      ON CONFLICT (id) DO UPDATE SET status = 'active', updated_at = now();
-    END IF;
+  IF v_cellponto_account_id IS NULL THEN
+    v_cellponto_account_id := 'PRT-CELL-PONTO';
+    INSERT INTO client_accounts(id, legal_name, trade_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
+    VALUES(v_cellponto_account_id, 'Cell Ponto Manutenção e Comércio LTDA', 'Cell Ponto', 'cnpj', '33.444.555/0001-66', 'marinaveigatav@gmail.com', '(11) 99999-9999', 'Cell Ponto', 'active', now(), now())
+    ON CONFLICT (id) DO UPDATE SET status = 'active', updated_at = now();
   ELSE
     UPDATE client_accounts SET status = 'active', updated_at = now() WHERE id = v_cellponto_account_id;
   END IF;
 
-  -- Garante Cell Ponto em stores
-  INSERT INTO stores(id, client_account_id, legal_name, trade_name, document, email, is_matrix, active, created_at, updated_at)
-  VALUES(v_cellponto_store_id, v_cellponto_account_id, 'Cell Ponto Manutenção e Comércio LTDA', 'Cell Ponto', '33.444.555/0001-66', 'marinaveigatav@gmail.com', true, true, now(), now())
-  ON CONFLICT (id) DO UPDATE SET client_account_id = v_cellponto_account_id, active = true, updated_at = now();
+  IF v_cellponto_store_id IS NULL THEN
+    v_cellponto_store_id := 'STR-CELL-PONTO';
+    INSERT INTO stores(id, client_account_id, legal_name, trade_name, document_type, document, email, is_matrix, active, created_at, updated_at)
+    VALUES(v_cellponto_store_id, v_cellponto_account_id, 'Cell Ponto Manutenção e Comércio LTDA', 'Cell Ponto', 'cnpj', '33.444.555/0001-66', 'marinaveigatav@gmail.com', true, true, now(), now())
+    ON CONFLICT (id) DO UPDATE SET client_account_id = v_cellponto_account_id, active = true, updated_at = now();
+  ELSE
+    UPDATE stores SET active = true, updated_at = now() WHERE id = v_cellponto_store_id;
+  END IF;
 
   -- Garante licença ativa Cell Ponto
   INSERT INTO store_licenses(id, client_account_id, store_id, plan_id, status, starts_at, modules, final_price, created_at, updated_at)
@@ -60,56 +60,60 @@ BEGIN
   WHERE trade_name ILIKE '%Marthi Demonstra%' OR id = 'STR-DEMO-01'
   LIMIT 1;
 
-  IF v_demo_store_id IS NULL THEN
-    v_demo_store_id := 'STR-DEMO-01';
-  END IF;
-
   IF v_demo_account_id IS NULL THEN
     SELECT id INTO v_demo_account_id
     FROM client_accounts
     WHERE trade_name ILIKE '%Marthi Demonstra%' OR id = 'ACC-MARTHI-DEMO'
     LIMIT 1;
-
-    IF v_demo_account_id IS NULL THEN
-      v_demo_account_id := 'ACC-MARTHI-DEMO';
-    END IF;
   END IF;
 
-  INSERT INTO client_accounts(id, legal_name, trade_name, document, email, phone, contact_name, status, created_at, updated_at)
-  VALUES(
-    v_demo_account_id,
-    'Marthi Tecnologia e Demonstração LTDA',
-    'Marthi Demonstração',
-    '00.000.000/0001-91',
-    'contato@marthi.com.br',
-    '(11) 3000-0000',
-    'Marthi Demonstração',
-    'active',
-    now(),
-    now()
-  ) ON CONFLICT (id) DO UPDATE SET 
-    trade_name = 'Marthi Demonstração',
-    status = 'active',
-    updated_at = now();
+  IF v_demo_account_id IS NULL THEN
+    v_demo_account_id := 'ACC-MARTHI-DEMO';
+    INSERT INTO client_accounts(id, legal_name, trade_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
+    VALUES(
+      v_demo_account_id,
+      'Marthi Tecnologia e Demonstração LTDA',
+      'Marthi Demonstração',
+      'cnpj',
+      '00.000.000/0001-91',
+      'contato@marthi.com.br',
+      '(11) 3000-0000',
+      'Marthi Demonstração',
+      'active',
+      now(),
+      now()
+    ) ON CONFLICT (id) DO UPDATE SET 
+      trade_name = 'Marthi Demonstração',
+      status = 'active',
+      updated_at = now();
+  ELSE
+    UPDATE client_accounts SET trade_name = 'Marthi Demonstração', status = 'active', updated_at = now() WHERE id = v_demo_account_id;
+  END IF;
 
-  INSERT INTO stores(id, client_account_id, legal_name, trade_name, document, email, phone, is_matrix, active, created_at, updated_at)
-  VALUES(
-    v_demo_store_id,
-    v_demo_account_id,
-    'Marthi Tecnologia e Demonstração LTDA',
-    'Marthi Demonstração',
-    '00.000.000/0001-91',
-    'loja@marthi.com.br',
-    '(11) 3000-0000',
-    true,
-    true,
-    now(),
-    now()
-  ) ON CONFLICT (id) DO UPDATE SET 
-    trade_name = 'Marthi Demonstração',
-    client_account_id = v_demo_account_id,
-    active = true,
-    updated_at = now();
+  IF v_demo_store_id IS NULL THEN
+    v_demo_store_id := 'STR-DEMO-01';
+    INSERT INTO stores(id, client_account_id, legal_name, trade_name, document_type, document, email, phone, is_matrix, active, created_at, updated_at)
+    VALUES(
+      v_demo_store_id,
+      v_demo_account_id,
+      'Marthi Tecnologia e Demonstração LTDA',
+      'Marthi Demonstração',
+      'cnpj',
+      '00.000.000/0001-91',
+      'loja@marthi.com.br',
+      '(11) 3000-0000',
+      true,
+      true,
+      now(),
+      now()
+    ) ON CONFLICT (id) DO UPDATE SET 
+      trade_name = 'Marthi Demonstração',
+      client_account_id = v_demo_account_id,
+      active = true,
+      updated_at = now();
+  ELSE
+    UPDATE stores SET active = true, updated_at = now() WHERE id = v_demo_store_id;
+  END IF;
 
   INSERT INTO store_licenses(id, client_account_id, store_id, plan_id, status, starts_at, modules, final_price, created_at, updated_at)
   VALUES(
