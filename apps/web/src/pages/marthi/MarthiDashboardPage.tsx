@@ -94,7 +94,6 @@ export function MarthiDashboardPage() {
 
   return (
     <section className="admin-page">
-      <CompanyUserSummary />
       <div className="dash-hero">
         <div>
           <p className="empty" style={{ margin: 0 }}>
@@ -192,6 +191,8 @@ export function MarthiDashboardPage() {
           </p>
         </article>
       </div>
+
+      <CompanyUserSummary />
     </section>
   );
 }
