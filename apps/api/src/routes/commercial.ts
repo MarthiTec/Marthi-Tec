@@ -387,6 +387,11 @@ commercialRouter.put(`${prefix}/segment`, async (req, res, next) => {
         "UPDATE stores SET segment=$1,updated_at=now() WHERE id=$2",
         [settings.segmentId, req.storeId],
       );
+      try {
+        await db.query("SELECT provision_store_attributes($1, $2)", [req.storeId, settings.segmentId]);
+      } catch {
+        // ignore if function not available
+      }
       const r = await db.query(
         "SELECT settings FROM commercial_profiles WHERE store_id=$1 FOR UPDATE",
         [req.storeId],

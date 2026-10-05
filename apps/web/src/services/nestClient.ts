@@ -52,7 +52,26 @@ export async function nestRequest<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   try {
-    const activeStoreId = localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1'));
+    const key = tenantScopedKey('marthi.multi_store.active_store_id.v1');
+    let activeStoreId = localStorage.getItem(key);
+    const rawStores = localStorage.getItem(tenantScopedKey('marthi.multi_store.stores.v1'));
+    if (rawStores) {
+      try {
+        const parsed = JSON.parse(rawStores);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (!activeStoreId || !parsed.some((s: any) => s.id === activeStoreId && s.active !== false)) {
+            const fallback = parsed.find((s: any) => s.isMatrix && s.active !== false) || parsed.find((s: any) => s.active !== false) || parsed[0];
+            if (fallback?.id) {
+              const resolvedId = String(fallback.id);
+              activeStoreId = resolvedId;
+              localStorage.setItem(key, resolvedId);
+            }
+          }
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+    }
     if (activeStoreId && !headers.has('x-store-id')) {
       headers.set('x-store-id', activeStoreId);
     }

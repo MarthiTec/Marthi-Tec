@@ -899,6 +899,7 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
         state: s.state || 'RJ',
         ibgeCityCode: '',
         taxRegime: (s.taxRegime as StoreTaxRegime) || 'simples_nacional',
+        segmentId: ((s as any).segmentId || (s as any).segment || 'assistencia_tecnica') as StoreSegmentId,
         active: s.active !== false,
         isMatrix: Boolean(s.isMatrix),
         createdAt: s.createdAt || new Date().toISOString(),

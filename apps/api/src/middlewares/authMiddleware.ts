@@ -59,9 +59,32 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Usuário sem conta vinculada.' } });
       return;
     }
-    const requestedStore = req.header('x-store-id')?.trim();
+    const requestedStore = req.header('x-store-id')?.trim() || null;
+    if (user.role === 'superadmin') {
+      const stores = await pool.query(
+        `SELECT s.id, s.client_account_id, 'superadmin' as role 
+         FROM stores s 
+         WHERE s.active = true AND ($1::text IS NULL OR s.id = $1)
+         ORDER BY s.is_matrix DESC, s.created_at ASC LIMIT 1`,
+        [requestedStore || null],
+      );
+      if (stores.rows[0]) {
+        const license = await pool.query(
+          'SELECT plan_id FROM store_licenses WHERE store_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT 1',
+          [stores.rows[0].id, 'active'],
+        );
+        const rawPlan = license.rows[0]?.plan_id;
+        req.user = { ...user, role: 'superadmin' };
+        req.clientAccountId = stores.rows[0].client_account_id;
+        req.storeId = stores.rows[0].id;
+        req.planId = rawPlan === 'golden' || rawPlan === 'scale' ? 'golden' : rawPlan === 'silver' || rawPlan === 'growth' ? 'silver' : 'bronze';
+        req.userLimit = getPlanUserLimit(req.planId);
+        return next();
+      }
+    }
+
     const stores = await pool.query(
-      `SELECT s.id, us.role FROM stores s JOIN user_stores us ON us.store_id = s.id
+      `SELECT s.id, us.role, s.client_account_id FROM stores s JOIN user_stores us ON us.store_id = s.id
        WHERE us.user_id = $1 AND s.client_account_id = $2 AND s.active = true
        AND ($3::text IS NULL OR s.id = $3)
        ORDER BY us.is_default DESC, s.created_at ASC LIMIT 1`,
@@ -76,7 +99,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       [stores.rows[0].id, user.clientAccountId, 'active'],
     );
     const rawPlan = license.rows[0]?.plan_id;
-    req.user = { ...user, role: user.role === 'superadmin' ? 'superadmin' : stores.rows[0].role || 'operator' };
+    const effectiveRole = user.role === 'admin' ? 'admin' : (stores.rows[0].role || user.role || 'operator');
+    req.user = { ...user, role: effectiveRole };
     req.clientAccountId = user.clientAccountId;
     req.storeId = stores.rows[0].id;
     req.planId = rawPlan === 'golden' || rawPlan === 'scale' ? 'golden' : rawPlan === 'silver' || rawPlan === 'growth' ? 'silver' : 'bronze';

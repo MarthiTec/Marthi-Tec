@@ -1978,6 +1978,8 @@ export type ApiStoreRow = {
   taxRegime: string;
   isMatrix: boolean;
   active: boolean;
+  segment?: string;
+  segmentId?: string;
   planId?: string;
   modules?: string[];
   discountPercent?: number;

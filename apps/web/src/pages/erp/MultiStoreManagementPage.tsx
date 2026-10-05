@@ -255,6 +255,8 @@ export function MultiStoreManagementPage() {
           taxRegime: saved.taxRegime,
           isMatrix: saved.isMatrix,
           active: saved.active,
+          segment: saved.segmentId || 'assistencia_tecnica',
+          segmentId: saved.segmentId || 'assistencia_tecnica',
         };
         if (editingStore.id) {
           await apiUpdateStore(editingStore.id, payload).catch((err) =>
@@ -265,6 +267,7 @@ export function MultiStoreManagementPage() {
             console.warn('Falha ao criar filial na API', err),
           );
         }
+        await hydrateMultiStoreFromApi().catch(() => null);
       }
 
       setModalOpen(false);

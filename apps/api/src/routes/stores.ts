@@ -25,6 +25,8 @@ const storeSchema = z.object({
   taxRegime: z.string().default('simples_nacional'),
   isMatrix: z.boolean().default(false),
   active: z.boolean().default(true),
+  segment: z.string().optional(),
+  segmentId: z.string().optional(),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   accessToken: z.string().optional(),
 });
@@ -186,6 +188,8 @@ if (hasRestrictedStores) {
           taxRegime: r.tax_regime,
           isMatrix: Boolean(r.is_matrix),
           active: Boolean(r.active),
+          segment: r.segment || 'assistencia_tecnica',
+          segmentId: r.segment || 'assistencia_tecnica',
           planId: r.plan_id || 'golden',
           modules: r.modules || ['totem', 'os', 'erp', 'fiscal'],
           discountPercent: Number(r.discount_percent) || 0,
@@ -243,14 +247,15 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
           }
         }
 
+        const initialSegment = body.segment || body.segmentId || 'assistencia_tecnica';
         await client.query(
           `INSERT INTO stores (
             id, client_account_id, trade_name, legal_name, document_type, document,
             state_registration, municipal_registration, email, phone, zip_code, street,
-            number, complement, district, city, state, tax_regime, is_matrix, active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+            number, complement, district, city, state, tax_regime, is_matrix, active, segment
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
           ON CONFLICT (client_account_id, document) DO UPDATE
-          SET trade_name = EXCLUDED.trade_name, active = true, updated_at = now()`,
+          SET trade_name = EXCLUDED.trade_name, segment = EXCLUDED.segment, active = true, updated_at = now()`,
           [
             id,
             clientAccountId,
@@ -272,6 +277,7 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
             body.taxRegime,
             body.isMatrix,
             body.active,
+            initialSegment,
           ],
         );
 
@@ -326,6 +332,9 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
     const id = req.params.id;
     const body = storeSchema.partial().parse(req.body);
 
+    const targetSegment = body.segment || body.segmentId || null;
+    const isSuper = req.user?.role === 'superadmin';
+
     if (pool) {
       await pool.query(
         `UPDATE stores
@@ -344,8 +353,9 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
              state = COALESCE($13, state),
              is_matrix = COALESCE($14, is_matrix),
              active = COALESCE($15, active),
+             segment = COALESCE($18, segment),
              updated_at = now()
-         WHERE id = $16 AND client_account_id = $17`,
+         WHERE id = $16 AND ($17::boolean = true OR client_account_id = $19)`,
         [
           body.tradeName,
           body.legalName,
@@ -363,9 +373,25 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
           body.isMatrix,
           body.active,
           id,
+          isSuper,
+          targetSegment,
           clientAccountId,
         ],
       );
+
+      if (targetSegment) {
+        await pool.query(
+          `INSERT INTO commercial_store_customization(store_id, settings)
+           VALUES($1, jsonb_build_object('segmentId', $2::text, 'segmentName', $3::text, 'showCardRates', true, 'showImei', true, 'showDevicePassword', true, 'showTablesAndKitchen', false, 'showCardapioDigital', false, 'showTechnicalBench', true, 'showSizeColorGrid', false))
+           ON CONFLICT(store_id) DO UPDATE SET settings = jsonb_set(commercial_store_customization.settings, '{segmentId}', to_jsonb($2::text)), updated_at = now()`,
+          [id, targetSegment, targetSegment === 'assistencia_tecnica' ? 'Oficina, Assistência Técnica & Acessórios' : targetSegment],
+        );
+        try {
+          await pool.query('SELECT provision_store_attributes($1, $2)', [id, targetSegment]);
+        } catch {
+          // ignore if function not available
+        }
+      }
 
       if (body.discountPercent !== undefined) {
         await pool.query(
@@ -374,7 +400,7 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
         );
       }
 
-      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1 AND client_account_id = $2`, [id, clientAccountId]);
+      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1`, [id]);
       res.json({ success: true, data: updated.rows[0] });
       return;
     }
