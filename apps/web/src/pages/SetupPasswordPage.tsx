@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../contexts/AuthContext';
-import { findClientByAccessToken, listMarthiClients, upsertMarthiClient } from '../data/marthiClientsStore';
 import { nestApiUrl } from '../services/config';
 
 type TokenInfo = {
@@ -74,39 +73,7 @@ export function SetupPasswordPage() {
         return;
       }
     } catch (err) {
-      console.warn('[SetupPassword] API inspect error, using client fallback:', err);
-    }
-
-    // 2. Client fallback
-    const matched = findClientByAccessToken(clean);
-    if (matched) {
-      setTokenInfo({
-        email: matched.email,
-        name: matched.tradeName || matched.legalName || 'Cliente Marthi',
-        type: 'activation',
-        expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
-      });
-      setActiveToken(clean);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    // 3. Special check for Cell Ponto or TK-DSR-000182
-    if (
-      clean.toUpperCase().startsWith('TK-') &&
-      (clean.includes('000182') || clean.includes('DSR') || clean.includes('TEST1') || clean.toUpperCase().includes('CELLPONTO'))
-    ) {
-      setTokenInfo({
-        email: 'gilvanteodo@gmail.com',
-        name: 'Cell Ponto',
-        type: 'activation',
-        expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
-      });
-      setActiveToken(clean);
-      setError(null);
-      setLoading(false);
-      return;
+      console.warn('[SetupPassword] Falha ao consultar token na API:', err);
     }
 
     setError('Token de ativação não localizado ou expirado. Verifique o código e tente novamente.');
@@ -145,19 +112,7 @@ export function SetupPasswordPage() {
 
       const json = await res.json().catch(() => null);
       if (!res.ok || json?.success === false) {
-        console.warn('API setup-password note:', json?.error?.message);
-      }
-
-      // Sincroniza cliente no store local
-      const localClients = listMarthiClients();
-      const targetEmail = (tokenInfo?.email || '').trim().toLowerCase();
-      const hit = localClients.find((c) => c.email.toLowerCase() === targetEmail);
-      if (hit) {
-        hit.passwordConfigured = true;
-        hit.status = 'active';
-        hit.contractingStatus = 'acesso_ativado';
-        hit.paymentOk = true;
-        upsertMarthiClient(hit);
+        throw new Error(json?.error?.message || 'Não foi possível salvar a senha no banco de dados.');
       }
 
       // Automatically advance to phone confirmation / onboarding step
