@@ -1,4 +1,13 @@
 -- Migration 0050: Restaurar dados operacionais da Cell Ponto, catalogo de produtos, atributos e correcao de ramo
+-- Atualiza marthi_guard_account_owner para permitir atribuição inicial quando OLD.client_account_id for NULL
+CREATE OR REPLACE FUNCTION marthi_guard_account_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.client_account_id IS NOT NULL AND NEW.client_account_id IS DISTINCT FROM OLD.client_account_id THEN
+    RAISE EXCEPTION 'Account ownership cannot be reassigned' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $$;
+
 DO $$
 DECLARE
   v_cellponto_account_id TEXT;
