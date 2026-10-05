@@ -410,7 +410,7 @@ export function PermissionsPage() {
               status={status}
               onStatusChange={setStatus}
             />
-            <table className="admin-table">
+            <div className="admin-table-container"><table className="admin-table">
               <thead>
                 <tr>
                   <th>Pessoa</th>
@@ -456,7 +456,7 @@ export function PermissionsPage() {
                   })
                 )}
               </tbody>
-            </table>
+            </table></div>
           </article>
         </>
       ) : null}

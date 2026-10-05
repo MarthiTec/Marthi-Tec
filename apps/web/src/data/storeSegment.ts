@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { commercialRequest } from '../services/commercialApi';
 import type { PartnerModuleId } from './catalog';
 import {
   getActiveStore,
@@ -10,6 +11,7 @@ import {
 
 export type StoreSegmentId =
   | 'assistencia_tecnica'
+  | 'comercio_eletronicos'
   | 'vestuario_moda'
   | 'restaurante_gastronomia'
   | 'varejo_geral'
@@ -19,6 +21,7 @@ export type StoreSegmentId =
 export type StoreCustomization = {
   segmentId: StoreSegmentId;
   segmentName: string;
+  showCardRates: boolean;
   showImei: boolean;
   showDevicePassword: boolean;
   showTablesAndKitchen: boolean;
@@ -48,6 +51,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Smartphones, computadores e eletrônicos. Ativa IMEI/Série obrigatório, senhas de desbloqueio para teste e bancada técnica.',
     recommendedModules: ['os', 'erp'],
     config: {
+      showCardRates: true,
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: false,
@@ -55,6 +59,12 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       showTechnicalBench: true,
       showSizeColorGrid: false,
     },
+  },
+  {
+    id: 'comercio_eletronicos', name: 'Celulares & Eletrônicos', icon: '📱', badge: 'Venda & Upgrade',
+    description: 'Lojas de celulares e eletrônicos, com regras comerciais e encomendas opcionais.',
+    recommendedModules: ['erp', 'fiscal'],
+    config: {showCardRates:false,showImei:true,showDevicePassword:false,showTablesAndKitchen:false,showCardapioDigital:false,showTechnicalBench:false,showSizeColorGrid:false},
   },
   {
     id: 'vestuario_moda',
@@ -65,6 +75,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Lojas de roupas, calçados e acessórios. Ativa grade de tamanhos e cores no catálogo e PDV. Oculta IMEI, senhas e mesas/cozinha.',
     recommendedModules: ['erp', 'ecommerce'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -82,6 +93,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Bares, lanchonetes, restaurantes e cafeterias. Ativa mesas, pedidos por comanda, tela de cozinha e cardápio digital. Oculta IMEI e senhas de aparelhos.',
     recommendedModules: ['totem', 'erp'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: true,
@@ -99,6 +111,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Comércio de prateleira, mercados, papelarias e utilidades. Foco em frente de caixa ágil. Oculta mesas e IMEI.',
     recommendedModules: ['erp', 'fiscal'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -116,6 +129,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Empresas de serviços, montagens, marcenarias e orçamentos comerciais. Oculta mesas/cozinha e IMEI de eletrônicos.',
     recommendedModules: ['os', 'erp'],
     config: {
+      showCardRates: false,
       showImei: false,
       showDevicePassword: false,
       showTablesAndKitchen: false,
@@ -133,6 +147,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
       'Defina você mesmo quais campos e módulos ficam visíveis na sua loja conforme a sua necessidade específica.',
     recommendedModules: ['totem', 'erp', 'os'],
     config: {
+      showCardRates: false,
       showImei: true,
       showDevicePassword: true,
       showTablesAndKitchen: true,
@@ -145,6 +160,7 @@ export const SEGMENT_PRESETS: SegmentPreset[] = [
 
 export const STORE_SEGMENT_OPTIONS: { value: StoreSegmentId; label: string }[] = [
   { value: 'assistencia_tecnica', label: '🔧 Oficina, Assistência Técnica & Eletrônicos' },
+  { value: 'comercio_eletronicos', label: '📱 Celulares & Eletrônicos' },
   { value: 'vestuario_moda', label: '👗 Moda, Vestuário & Calçados' },
   { value: 'restaurante_gastronomia', label: '🍔 Restaurante, Bar & Gastronomia' },
   { value: 'varejo_geral', label: '🛒 Varejo Geral, Mercado & Utilidades' },
@@ -172,30 +188,7 @@ export function getStoreCustomization(explicitStoreId?: string): StoreCustomizat
     const preset = SEGMENT_PRESETS.find((p) => p.id === segmentId) || SEGMENT_PRESETS[0];
 
     const storeKey = store?.id ? `${STORAGE_KEY}:${store.id}` : STORAGE_KEY;
-    const raw = localStorage.getItem(storeKey) || localStorage.getItem(STORAGE_KEY);
-
-    // Validação estrita por segmento:
-    // Se a loja é Oficina / Assistência Técnica (ou Cell Ponto), NUNCA exibir Cardápio, Mesas e Cozinha
-    const isOficinaOrCell =
-      segmentId === 'assistencia_tecnica' ||
-      (store &&
-        (store.tradeName?.toLowerCase().includes('cell') ||
-          store.name?.toLowerCase().includes('cell') ||
-          store.cnpj === '61.506.270/0001-63'));
-
-    if (isOficinaOrCell) {
-      return {
-        segmentId: 'assistencia_tecnica',
-        segmentName: preset.name,
-        showImei: true,
-        showDevicePassword: true,
-        showTablesAndKitchen: false,
-        showCardapioDigital: false,
-        showTechnicalBench: true,
-        showSizeColorGrid: false,
-        updatedAt: new Date().toISOString(),
-      };
-    }
+    const raw = localStorage.getItem(storeKey);
 
     if (!raw) {
       return {
@@ -211,8 +204,8 @@ export function getStoreCustomization(explicitStoreId?: string): StoreCustomizat
       ...defaultStoreCustomization(),
       ...preset.config,
       ...parsed,
-      segmentId: preset.id,
-      segmentName: preset.name,
+      segmentId: parsed.segmentId || preset.id,
+      segmentName: parsed.segmentName || preset.name,
     };
   } catch {
     return defaultStoreCustomization();
@@ -271,12 +264,27 @@ export function useStoreCustomization() {
     function handleUpdate() {
       setCustomization(getStoreCustomization());
     }
+    let disposed = false;
+    async function refreshDatabase() {
+      const selected = getActiveStore()?.id;
+      if (!selected) return;
+      try {
+        const data = await commercialRequest<{settings: StoreCustomization|null; segmentId: StoreSegmentId|null}>('/segment');
+        if (disposed || selected !== getActiveStore()?.id) return;
+        const preset = SEGMENT_PRESETS.find(p => p.id === data.segmentId);
+        if (data.settings) saveStoreCustomization(data.settings, selected);
+        else if (preset) saveStoreCustomization({segmentId:preset.id,segmentName:preset.name,...preset.config}, selected);
+      } catch { /* Cached presentation remains available; writes require database confirmation. */ }
+    }
+    const contextUpdate = () => {handleUpdate(); void refreshDatabase();};
+    void refreshDatabase();
     window.addEventListener(SEGMENT_UPDATED_EVENT, handleUpdate);
-    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, handleUpdate);
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, contextUpdate);
     window.addEventListener(MULTI_STORE_CHANGED_EVENT, handleUpdate);
     return () => {
+      disposed = true;
       window.removeEventListener(SEGMENT_UPDATED_EVENT, handleUpdate);
-      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, handleUpdate);
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, contextUpdate);
       window.removeEventListener(MULTI_STORE_CHANGED_EVENT, handleUpdate);
     };
   }, []);

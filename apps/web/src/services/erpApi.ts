@@ -1,3 +1,4 @@
+import type {DeliveryAddress} from '../data/pickup';
 import type {
   Customer,
   FinanceEntry,
@@ -22,6 +23,7 @@ import type {
   WorkOrderStatus,
 } from '../data/osStore';
 import {
+  nestRequest,
   nestDelete,
   nestGet,
   nestPatch,
@@ -191,6 +193,8 @@ export function apiClosePosSale(body: {
   sellerId?: string;
   sellerName?: string;
   lines: Array<{
+    pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
+    attributes?: Array<{id:string;name:string;value:string}>;
     stockId: string;
     name: string;
     qty: number;
@@ -519,6 +523,7 @@ export type ApiMeAccess = {
 };
 
 export type ApiPosTicket = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;cashPrice?:number;
   id: string;
   source: 'totem' | 'manual';
   status: 'open' | 'sold' | 'cancelled';
@@ -615,6 +620,8 @@ export function apiGetTotemPublicAttributes() {
 }
 
 export function apiSubmitTotemLead(body: {
+  requestKey?:string;destination?:'cashier'|'whatsapp';
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -626,7 +633,7 @@ export function apiSubmitTotemLead(body: {
   installment: string | null;
   priceLabel: string;
 }) {
-  return nestPost<{ id: string; customerNotified?: boolean }>('/totem/leads', body);
+  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number }>('/totem/leads', body);
 }
 
 export function apiListPosTickets(status?: ApiPosTicket['status']) {
@@ -1046,6 +1053,7 @@ export type ApiInvoiceLine = {
 export type ApiInvoice = {
   id: string;
   kind: 'entry' | 'exit';
+  series?:string;natOp?:string;movementAt?:string;modFrete?:string;vFrete?:number;vDesc?:number;vOutro?:number;infCpl?:string;
   number: string;
   status: 'draft' | 'posted' | 'cancelled';
   documentPurpose: string;
@@ -1080,6 +1088,7 @@ export function apiGetStockInvoice(id: string) {
 
 export function apiCreateStockInvoice(body: {
   kind: ApiInvoice['kind'];
+  series?:string;natOp?:string;movementAt?:string;modFrete?:string;vFrete?:number;vDesc?:number;vOutro?:number;infCpl?:string;
   number?: string;
   documentPurpose?: string;
   supplierId?: string;
@@ -1098,6 +1107,7 @@ export function apiUpdateStockInvoice(
   id: string,
   body: Partial<{
     number: string;
+    series:string;natOp:string;movementAt:string;modFrete:string;vFrete:number;vDesc:number;vOutro:number;infCpl:string;
     documentPurpose: string;
     supplierId: string;
     customerName: string;
@@ -1987,11 +1997,11 @@ export type ApiClientAccountRow = {
 };
 
 export function apiListStores() {
-  return nestGet<ApiStoreRow[]>('/stores');
+return nestRequest<ApiStoreRow[]>('/stores', { headers: { 'x-store-id': '' } });
 }
 
 export function apiGetClientAccount() {
-  return nestGet<ApiClientAccountRow>('/account');
+return nestRequest<ApiClientAccountRow>('/account', { headers: { 'x-store-id': '' } });
 }
 
 export function apiCreateStore(body: Partial<ApiStoreRow> & { tradeName: string; document: string }) {
@@ -2016,4 +2026,144 @@ export function apiSaveCardMachines(machines: any[]) {
   return nestPut<{ ok: true; count: number }>('/card-machines', { machines });
 }
 
+/* ── External Sales (Venda sem Caixa), Trade-in & Goals ──── */
 
+export type ExternalSaleLine = {
+  pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
+  attributes?: Array<{id:string;name:string;value:string}>;
+  stockId?: string | null;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  unitCost?: number;
+  discount?: number;
+  surcharge?: number;
+  imei?: string;
+  isAdHoc?: boolean;
+  itemType?: string;
+};
+
+export type TradeInPayload = {
+  brand?: string;
+  deviceName: string;
+  imei?: string;
+  capacity?: string;
+  color?: string;
+  conditionState?: 'used' | 'refurbished' | 'damaged';
+  notes?: string;
+  tradeValue: number;
+};
+
+export type ExternalSalePayload = {
+  requestId?: string;
+  customerId?: string | null;
+  customerName?: string;
+  customerPhone?: string;
+  customerDocument?: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  paymentMethod: string;
+  installments?: number;
+  discount?: number;
+  surcharge?: number;
+  notes?: string;
+  warrantyMonths?: number;
+  warrantyTerms?: string;
+  lines: ExternalSaleLine[];
+  tradeIn?: TradeInPayload | null;
+};
+
+export type GoalRow = {
+  id: string;
+  name: string;
+  goalType: 'revenue' | 'profit' | 'sales_count' | 'products_count';
+  targetValue: number;
+  startDate: string;
+  endDate: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  active: boolean;
+  realized: number;
+  percent: number;
+  remaining: number;
+  salesCount: number;
+  accumulatedProfit: number;
+  averageTicket: number;
+  isReached: boolean;
+  currentTierName?: string;
+  commissionAmount: number;
+  progressiveTiers?: Array<{ name: string; value: number }>;
+  commissionRules?: {
+    enabled?: boolean;
+    percent?: number;
+    type?: 'percent_revenue' | 'percent_profit' | 'fixed_value';
+    requiresGoalReached?: boolean;
+    fixedValue?: number;
+  };
+};
+
+export function apiCreateExternalSale(body: ExternalSalePayload, storeId?: string) {
+  return nestRequest<any>('/sales/external', { method: 'POST', body: JSON.stringify(body), headers: storeId ? { 'x-store-id': storeId } : undefined });
+}
+
+export function apiGetSaleReceipt(saleId: string, storeId?: string) {
+  return nestRequest<any>(`/sales/${saleId}/receipt`, { headers: storeId ? { 'x-store-id': storeId } : undefined });
+}
+
+export function apiSendWarrantyWhatsApp(saleId: string, body: { phone: string; customNote?: string }, storeId?: string) {
+  return nestRequest<any>(`/sales/${saleId}/send-warranty-whatsapp`, {method: 'POST', body: JSON.stringify(body), headers: storeId ? {'x-store-id': storeId} : undefined});
+}
+
+export function apiGetDailyPendingTasks() {
+  return nestGet<{
+    pendingCashSalesCount: number;
+    pendingCashTotal: number;
+    pendingTradeInsCount: number;
+    pendingTradeInsTotal: number;
+    payablesDueCount: number;
+    payablesDueAmount: number;
+    receivablesDueCount: number;
+    receivablesDueAmount: number;
+  }>('/sales/external/daily-tasks');
+}
+
+export function apiCancelSale(saleId: string, reason?: string) {
+  return nestPost<any>(`/sales/${saleId}/cancel`, { reason });
+}
+
+export function apiListGoals() {
+  return nestGet<GoalRow[]>('/goals');
+}
+
+export function apiCreateGoal(body: Partial<GoalRow>) {
+  return nestPost<GoalRow>('/goals', body);
+}
+
+export function apiUpdateGoal(id: string, body: Partial<GoalRow>) {
+  return nestPatch<GoalRow>(`/goals/${id}`, body);
+}
+
+export function apiDeleteGoal(id: string) {
+  return nestDelete<{ ok: true }>(`/goals/${id}`);
+}
+
+export function apiGetGoalsDashboard() {
+  return nestGet<any>('/goals/dashboard');
+}
+
+export function apiGetSalesGoalsReport(params: Record<string, string | undefined>) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) qs.set(k, v);
+  }
+  const query = qs.toString();
+  return nestGet<any>(`/reports/sales-goals${query ? `?${query}` : ''}`);
+}
+
+export function apiListPickups() {
+  return nestGet<{ pendingCashBalance: number; pickups: any[] }>('/finance/pickups');
+}
+
+export function apiCreatePickup(body: { responsibleName: string; amount: number; notes?: string; pickupDate?: string }) {
+  return nestPost<any>('/finance/pickups', body);
+}

@@ -1,6 +1,15 @@
+import {productSku} from '../../data/productSku';
+import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
+import {ProductPickupPrices} from '../../components/PickupFields';
+import { usePickupMethods } from '../../data/pickup';
+import { buildVariationCombinations } from '../../data/variationCombinations';
+import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { nestRequest } from '../../services/nestClient';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
+import { useDeviceReference, attributeKind } from '../../data/deviceCatalog';
 import {
   CrudListBar,
   CrudNameButton,
@@ -29,7 +38,7 @@ import {
   type StockItem,
   type StockKind,
 } from '../../data/adminStore';
-import { ATTRIBUTES_EVENT, getAttributes, stockAttributes } from '../../data/attributeStore';
+import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes } from '../../data/attributeStore';
 import { listSuppliers } from '../../data/erpRegistry';
 import {
   getFiscalClassification,
@@ -51,8 +60,14 @@ export type StockVariationRow = {
   id?: string;
   tempKey: string;
   sku: string;
+  skuAuto?:boolean;
+  pricingPolicy?:StockItem['pricingPolicy'];
+  lastEntry?:StockItem['lastEntry'];
+  avgCost?:number;
   barcode: string;
   imei: string;
+  pickupMethodId?:string;
+  pickupPrices?:Record<string,number|null>;
   attrs: Record<string, string>;
   price: number;
   cardRate?: number;
@@ -91,6 +106,7 @@ export function StockPage() {
   const [query, setQuery] = useState('');
   const [codeQuery, setCodeQuery] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | StockKind>('all');
+  const [brandFilter, setBrandFilter] = useState('all');
   const [attrFilterId, setAttrFilterId] = useState('all');
   const [attrFilterValue, setAttrFilterValue] = useState('all');
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
@@ -102,14 +118,74 @@ export function StockPage() {
 
   // ── Estado da Grade de Variações de Produto ────────────────────────
   const [useVariations, setUseVariations] = useState(false);
+  const [automationStoreId,setAutomationStoreId]=useState(getActiveStoreId);
+  useEffect(()=>{const changed=()=>{setAutomationStoreId(getActiveStoreId());setFormVisible(false);setAttrDefs([]);setAutomationState({enabled:false,eligible:false});};window.addEventListener(STORE_CONTEXT_CHANGED_EVENT,changed);return()=>window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT,changed);},[]);
+  const [automationState, setAutomationState] = useState({enabled:false,eligible:false});
+  const [automationBusy, setAutomationBusy] = useState(false);
+  useEffect(() => {
+    if (!isNestAuthed()) return;
+    let disposed=false;
+    void nestRequest<{enabled:boolean;eligible:boolean;attributes:ReturnType<typeof getAttributes>}>('/attributes/automation').then(data=>{
+      if(disposed)return;
+      replaceAttributes(data.attributes);
+      setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
+      setAutomationState(data);
+    }).catch(e=>{if(!disposed)setError(e.message);});
+    return ()=>{disposed=true;};
+  }, [automationStoreId]);
+  async function toggleAutomation(enabled:boolean) {
+    setAutomationBusy(true);
+    try {
+      const data=await nestRequest<{enabled:boolean;eligible:boolean;attributes:ReturnType<typeof getAttributes>}>('/attributes/automation',{method:'PUT',body:JSON.stringify({enabled})});
+      replaceAttributes(data.attributes);
+      setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
+      setAutomationState(data);
+      if(enabled&&mode==='new') {generatedModel.current='';setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível salvar a automação.');}
+    finally{setAutomationBusy(false);}
+  }
+
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
+  const {methods:pickupMethods}=usePickupMethods();
+  const saveInProgress = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const generatedModel=useRef('');
+  const { brands, error: brandsError } = useBrands();
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '',form.brand??'');
+  const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
+  useEffect(() => {
+    if (!device || readOnly) return;
+    const brand = findBrand(brands.filter(b => b.active), device.brand);
+    if (brand) setForm(current => current.brand ? current : { ...current, brand: brand.slug });
+  }, [device, brands, mode]);
+
+  useEffect(() => {
+    if (!formVisible || mode !== 'new' || !automationState.enabled || !automationState.eligible || !device) return;
+    const defs=attrDefs.filter(a=>a.active && a.useOnStock && attributeKind(a.name));
+    if(!defs.some(a=>attributeKind(a.name)==='color') || !defs.some(a=>attributeKind(a.name)==='capacity'))return;
+    const signature=JSON.stringify([automationStoreId,device.model,defs.map(a=>[a.id,referenceValues(a)])]);
+    if(generatedModel.current===signature)return;
+    try {
+      const combos=buildVariationCombinations(defs.map(a=>({id:a.id,values:referenceValues(a)})));
+      setSelectedAttrIds(defs.map(a=>a.id));
+      setUseVariations(true);
+      setVariations(combos.map((attrs,index)=>({tempKey:`help_${Date.now()}_${index}`,sku:form.sku ? `${form.sku}-${index+1}` : '',barcode:'',imei:'',attrs,price:form.price||0,cardRate:form.cardRate,qty:0,minQty:0,cost:form.cost||0,condition:form.condition||'new'})));
+      generatedModel.current=signature;
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível gerar as variações.');}
+  },[device,attrDefs,automationState.enabled,automationState.eligible,formVisible,mode,automationStoreId]);
+
+  function referenceValues(attr: { name: string; values: string[] } | undefined) {
+    const kind = attr ? attributeKind(attr.name) : null;
+    return device && kind ? (kind === 'color' ? device.colors : device.capacities) : (attr?.values ?? []);
+  }
 
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   const suppliers = useMemo(() => listSuppliers(true), []);
   const readOnly = mode === 'view';
+
 
   const corAttrDef = useMemo(() => {
     return (
@@ -161,6 +237,7 @@ export function StockPage() {
     return items.filter((item) => {
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
       if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
+      if (brandFilter !== 'all' && normalizeBrand(item.brand) !== normalizeBrand(brandFilter)) return false;
       if (totemFilter === 'totem' && !item.showOnTotem) return false;
       if (totemFilter === 'hidden' && item.showOnTotem) return false;
       if (attrFilterId !== 'all') {
@@ -173,11 +250,11 @@ export function StockPage() {
         if (!matchesQuery(codeHay, codeQuery)) return false;
       }
       return matchesQuery(
-        `${item.name} ${item.sku} ${item.barcode} ${item.imei} ${item.color} ${item.capacity} ${Object.values(item.attrs ?? {}).join(' ')}`,
+        `${item.name} ${item.brand ?? ''} ${item.sku} ${item.barcode} ${item.imei} ${item.color} ${item.capacity} ${Object.values(item.attrs ?? {}).join(' ')}`,
         query,
       );
     });
-  }, [items, kindFilter, conditionFilter, totemFilter, attrFilterId, attrFilterValue, codeQuery, query]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, attrFilterId, attrFilterValue, codeQuery, query]);
 
   function focusNameField() {
     requestAnimationFrame(() => {
@@ -188,14 +265,15 @@ export function StockPage() {
   }
 
   function resetForm() {
+    generatedModel.current='';
     setForm(emptyForm(attrDefs.map((item) => item.id), totemSurface));
     setSelectedId(null);
     setMode('new');
     setError('');
-    setUseVariations(false);
-    setVariations([]);
+    setUseVariations(automationState.eligible && automationState.enabled);
+    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,sku:'',barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:1,minQty:1,cost:0,condition:'new'}] : []);
     setOriginalVariationIds([]);
-    setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
+    setSelectedAttrIds((automationState.enabled ? attrDefs : attrDefs.slice(0, 2)).map((a) => a.id));
   }
 
   function closeForm() {
@@ -270,7 +348,7 @@ export function StockPage() {
         {
           id: selectedId || undefined,
           tempKey: `init_${Date.now()}`,
-          sku: form.sku,
+          sku: form.sku,skuAuto:form.skuAuto,pricingPolicy:form.pricingPolicy,lastEntry:form.lastEntry,avgCost:form.avgCost,
           barcode: form.barcode,
           imei: form.imei,
           attrs: initialAttrs,
@@ -302,7 +380,7 @@ export function StockPage() {
     const nextSku = form.sku ? `${form.sku}-${variations.length + 1}` : '';
     const newRow: StockVariationRow = {
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku: nextSku,
+      sku: nextSku,skuAuto:form.skuAuto,pricingPolicy:lastRow?.pricingPolicy??form.pricingPolicy,lastEntry:null,
       barcode: '',
       imei: '',
       attrs: newAttrs,
@@ -324,7 +402,7 @@ export function StockPage() {
       ...target,
       id: undefined,
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku: target.sku ? `${target.sku}-CP` : '',
+      sku:'',skuAuto:true,lastEntry:null,
       barcode: '',
       imei: '',
       attrs: { ...target.attrs },
@@ -366,7 +444,7 @@ export function StockPage() {
 
   function generateCombinations() {
     if (readOnly) return;
-    const activeDefs = attrDefs.filter((a) => selectedAttrIds.includes(a.id) && a.values.length > 0);
+    const activeDefs = attrDefs.filter((a) => selectedAttrIds.includes(a.id) && referenceValues(a).length > 0);
     if (activeDefs.length === 0) {
       setError('Selecione ao menos um atributo com valores cadastrados para gerar combinações.');
       return;
@@ -375,7 +453,7 @@ export function StockPage() {
     for (const def of activeDefs) {
       const nextCartesian: Record<string, string>[] = [];
       for (const item of cartesian) {
-        for (const val of def.values) {
+        for (const val of referenceValues(def)) {
           nextCartesian.push({ ...item, [def.id]: val });
         }
       }
@@ -428,6 +506,7 @@ export function StockPage() {
         id: sib.id,
         tempKey: sib.id,
         sku: sib.sku,
+        skuAuto:false,pricingPolicy:sib.pricingPolicy,lastEntry:sib.lastEntry,avgCost:sib.avgCost,
         barcode: sib.barcode || '',
         imei: sib.imei || '',
         attrs: {
@@ -436,6 +515,7 @@ export function StockPage() {
           ...(sib.capacity && capId ? { [capId]: sib.capacity } : {}),
         },
         price: sib.price,
+        pickupPrices: sib.pickupPrices,
         cardRate: sib.cardRate,
         qty: sib.qty,
         minQty: sib.minQty,
@@ -461,6 +541,7 @@ export function StockPage() {
           id: item.id,
           tempKey: item.id || `var_${Date.now()}`,
           sku: item.sku,
+          skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,avgCost:item.avgCost,
           barcode: item.barcode || '',
           imei: item.imei || '',
           attrs: {
@@ -468,6 +549,7 @@ export function StockPage() {
             ...(item.color && corId ? { [corId]: item.color } : {}),
             ...(item.capacity && capId ? { [capId]: item.capacity } : {}),
           },
+          pickupPrices: item.pickupPrices ?? {},
           price: item.price,
           cardRate: item.cardRate,
           qty: item.qty,
@@ -480,9 +562,13 @@ export function StockPage() {
       setSelectedAttrIds(attrDefs.slice(0, 2).map((a) => a.id));
     }
 
+
     setForm({
       name: item.name,
+      brand: item.brand ?? '',
+      category: item.category ?? 'Geral',
       sku: item.sku,
+      skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,
       barcode: item.barcode,
       imei: item.imei,
       color: item.color,
@@ -493,6 +579,7 @@ export function StockPage() {
       maxQty: item.maxQty,
       cost: item.cost,
       avgCost: item.avgCost,
+      pickupPrices: item.pickupPrices ?? {},
       price: item.price,
       cardRate: item.cardRate,
       lastPurchaseAt: item.lastPurchaseAt,
@@ -518,8 +605,15 @@ export function StockPage() {
     }
   }
 
+  function skuPreview(attrs:Record<string,string>,condition=form.condition){
+    return form.name.trim()?productSku({...form,brand:findBrand(brands,form.brand??'')?.name??form.brand,attrs,color:attrs[attrDefs.find(a=>a.name.toLowerCase()==='cor')?.id??'']??'',capacity:attrs[attrDefs.find(a=>a.name.toLowerCase()==='capacidade')?.id??'']??'',condition}):'';
+  }
+  function variationSku(row:StockVariationRow){return row.skuAuto===false?row.sku:skuPreview(row.attrs,row.condition);}
+
   async function submit() {
-    if (readOnly || !form.name.trim()) return;
+    if (readOnly || !form.name.trim() || saveInProgress.current) return;
+    saveInProgress.current = true;
+    setSaving(true);
     setError('');
 
     try {
@@ -532,32 +626,36 @@ export function StockPage() {
           return;
         }
 
+        const savedVariationIds: string[] = [];
         for (const row of variations) {
           const corVal = row.attrs[corId] || (corAttrDef ? row.attrs[corAttrDef.name] : '') || '';
           const capVal = row.attrs[capId] || (capAttrDef ? row.attrs[capAttrDef.name] : '') || '';
           const payload: Omit<StockItem, 'id'> & { id?: string } = {
             ...(row.id ? { id: row.id } : {}),
             name: form.name.trim(),
-            sku:
-              row.sku.trim() ||
-              `${form.sku || 'SKU'}-${(corVal || 'VAR').slice(0, 3)}-${(capVal || Math.random().toString(36).slice(2, 6))}`.toUpperCase(),
+            brand: form.brand?.trim() || '',
+            category: form.category?.trim() || 'Geral',
+            sku: variationSku(row),
+            skuAuto: row.skuAuto!==false,
+            pricingPolicy:row.pricingPolicy??null,
             barcode: row.barcode.trim(),
             imei: row.imei.trim(),
             color: corVal,
             capacity: capVal,
+            pickupPrices: row.pickupPrices ?? form.pickupPrices ?? {},
             attrs: { ...row.attrs },
             qty: Number(row.qty) || 0,
             minQty: Number(row.minQty) || 0,
             maxQty: form.maxQty ?? 10,
             cost: Number(row.cost) || 0,
-            avgCost: Number(row.cost) || form.avgCost || 0,
+            avgCost: row.avgCost??Number(row.cost),
             price: Number(row.price) || 0,
             cardRate:
               row.cardRate !== undefined && !Number.isNaN(row.cardRate)
                 ? Number(row.cardRate)
                 : form.cardRate,
             lastPurchaseCost: Number(row.cost) || form.lastPurchaseCost || 0,
-            lastPurchaseAt: form.lastPurchaseAt || new Date().toISOString(),
+            lastPurchaseAt: row.lastEntry?.enteredAt??'',
             kind: form.kind,
             condition: row.condition || form.condition,
             unit: form.unit,
@@ -569,11 +667,16 @@ export function StockPage() {
             trackLot: Boolean(form.trackLot),
             isKit: Boolean(form.isKit),
           };
-          await upsertStockItem(payload);
+          const savedState = await upsertStockItem(payload);
+          const savedRow = row.id ? savedState.stock.find(item => item.id === row.id) : savedState.stock[0];
+          if (savedRow) {
+            savedVariationIds.push(savedRow.id);
+            setVariations(current => current.map(item => item.tempKey === row.tempKey ? { ...item, id: savedRow.id } : item));
+          }
         }
 
         // Remove variações excluídas na grade
-        const activeIds = new Set(variations.map((v) => v.id).filter(Boolean));
+        const activeIds = new Set([...variations.map((v) => v.id).filter(Boolean), ...savedVariationIds]);
         for (const oldId of originalVariationIds) {
           if (!activeIds.has(oldId)) {
             await removeStockItem(oldId);
@@ -589,12 +692,16 @@ export function StockPage() {
         // Produto simples
         const payload = {
           ...form,
+          name: form.name.trim(),
+          sku:form.skuAuto?skuPreview(form.attrs):form.sku,
+          brand: form.brand?.trim() || '',
+          category: form.category?.trim() || 'Geral',
           images: form.images.slice(0, 4),
           color: form.attrs[corId] ?? form.color,
           capacity: form.attrs[capId] ?? form.capacity,
           avgCost: form.avgCost || form.cost,
           lastPurchaseCost: form.lastPurchaseCost || form.cost,
-          lastPurchaseAt: form.lastPurchaseAt || (form.cost > 0 ? new Date().toISOString() : ''),
+          lastPurchaseAt: form.lastEntry?.enteredAt??'',
         };
         const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
         const state = await upsertStockItem(
@@ -629,6 +736,9 @@ export function StockPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
+    } finally {
+      saveInProgress.current = false;
+      setSaving(false);
     }
   }
 
@@ -650,7 +760,7 @@ export function StockPage() {
     setFormVisible(true);
     setForm({
       name: `${item.name} (cópia)`,
-      sku: item.sku ? `${item.sku}-COPIA` : '',
+      sku: '',skuAuto:true,pricingPolicy:item.pricingPolicy,lastEntry:null,
       barcode: '',
       imei: '',
       color: item.color,
@@ -661,6 +771,7 @@ export function StockPage() {
       maxQty: item.maxQty,
       cost: item.cost,
       avgCost: item.avgCost,
+      pickupPrices: item.pickupPrices ?? {},
       price: item.price,
       lastPurchaseAt: '',
       lastPurchaseCost: item.lastPurchaseCost,
@@ -752,7 +863,7 @@ export function StockPage() {
       ) : (
         <>
           <HeadingCancelButton onClick={closeForm} />
-          <HeadingSaveButton onClick={() => void submit()} />
+          <HeadingSaveButton onClick={() => void submit()} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
         </>
       )}
     </PageHeadingActions>
@@ -834,6 +945,19 @@ export function StockPage() {
                       />
                     </label>
                   ) : null}
+                  <label className="admin-field crud-filter-field">
+                    Marca
+                    <AdminPicker
+                      compact
+                      label="Marca"
+                      value={brandFilter}
+                      options={[
+                        { value: 'all', label: 'Todas marcas' },
+                        ...brands.map(b => ({ value: b.slug, label: b.name })),
+                      ]}
+                      onChange={setBrandFilter}
+                    />
+                  </label>
                   {!lite ? (
                     <label className="admin-field crud-filter-field">
                       Condição
@@ -945,17 +1069,22 @@ export function StockPage() {
                     </td>
                     <td className="col-product">
                       <CrudNameButton onClick={() => openForm(item, 'view')}>{item.name}</CrudNameButton>
-                      {item.condition === 'refurbished' ? (
-                        <div className="empty">
-                          Recondicionado
-                          {item.sourceWorkOrderId ? (
-                            <>
-                              {' · '}
-                              <Link to={`/os/${item.sourceWorkOrderId}`}>{item.sourceWorkOrderId}</Link>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                        {item.brand ? (
+                          <span className="stock-brand-badge">{findBrand(brands, item.brand)?.name ?? item.brand}</span>
+                        ) : null}
+                        {item.condition === 'refurbished' ? (
+                          <span className="empty" style={{ fontSize: '0.75rem' }}>
+                            Recondicionado
+                            {item.sourceWorkOrderId ? (
+                              <>
+                                {' · '}
+                                <Link to={`/os/${item.sourceWorkOrderId}`}>{item.sourceWorkOrderId}</Link>
+                              </>
+                            ) : null}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="col-sku">
                       <div>{item.sku || '—'}</div>
@@ -1091,22 +1220,38 @@ export function StockPage() {
                 </p>
               </div>
 
+              <div className="stock-id-content">
+          {automationState.eligible && <label className="stock-automation-toggle">
+            <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
+            Receber ajuda para criar todas as variações do produto
+          </label>}
+              {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
+              {deviceError && <p role="status" className="empty">{deviceError}</p>}
+              {device && <div className="device-reference">
+                <strong>{device.model}</strong>
+                <p>As combinações de cor e capacidade estão na grade abaixo. Exclua as que não vende e informe preço e estoque antes de salvar.</p>
+                <a href={device.sourceUrl} target="_blank" rel="noreferrer">Fonte das especificações</a>{device.stale&&<p className="empty">Dados salvos anteriormente; a API está indisponível para atualizar.</p>}
+              </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
                 <label className="span-2">
                   Produto
                   <input
                     ref={nameRef}
                     value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
                     disabled={readOnly}
                     placeholder="Nome do produto"
                   />
                 </label>
+                <div className="stock-brand-field">
+                <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
+                <p className="empty"><Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Cadastrar ou gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
+                </div>
                 <label>
                   SKU
                   <input
-                    value={form.sku}
-                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    value={form.skuAuto?skuPreview(form.attrs):form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value,skuAuto:false })}
                     disabled={readOnly}
                   />
                 </label>
@@ -1154,6 +1299,7 @@ export function StockPage() {
                   </span>
                 </label>
               </div>
+              </div>
             </div>
           </article>
 
@@ -1182,6 +1328,11 @@ export function StockPage() {
             </div>
           </article>
 
+
+          <p><Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link></p>
+          <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>{setForm(current=>({...current,skuAuto:e.target.checked}));setVariations(current=>current.map(row=>({...row,skuAuto:e.target.checked})));}}/> Gerar SKU automaticamente com os dados do produto</label>
+          {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
+          <p><Link to="/erp/tipos-retirada">Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -1214,9 +1365,9 @@ export function StockPage() {
                 <div>
                   <h3 style={{ margin: 0 }}>Grade de Itens e Variações</h3>
                   <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>
-                    Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 12x para o Totem. As taxas de cartão são centralizadas em{' '}
+                    Cada linha representa um item com seus atributos, preço e cálculo de parcelas em 18x para o Totem. As taxas de cartão são centralizadas em{' '}
                     <Link to="/painel/taxas-cartao" style={{ color: 'var(--accent, #2dd4bf)', textDecoration: 'underline' }}>
-                      Taxas de Cartão & Maquininhas ({getTotemCardRate(12).brandName}: {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}%)
+                      Taxas de Cartão & Maquininhas ({getTotemCardRate(18).brandName}: {getTotemCardRate(18).rate.toFixed(2).replace('.', ',')}%)
                     </Link>.
                   </p>
                 </div>
@@ -1270,46 +1421,51 @@ export function StockPage() {
                 </div>
               </div>
 
-              <div className="admin-table-container">
-                <table className="admin-table">
+              <div className="stock-variation-container">
+                <table className="admin-table stock-variation-grid">
                   <thead>
                     <tr>
                       {selectedAttrIds.map((attrId) => {
                         const def = attrDefs.find((a) => a.id === attrId);
                         return <th key={attrId}>{def?.name || attrId}</th>;
                       })}
+                      <th>Tipo de retirada</th>
                       <th>SKU</th>
+                      <th>Custo unitário</th>
                       <th>Preço à vista</th>
-                      <th>Parcelado (12x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
-                      <th>Custo</th>
+                      <th>Parcelado (18x)</th>
+                      <th>Margem / markup</th>
+                      <th>Sugestão de venda</th>
+                      <th>Última entrada / nota</th>
                       {!readOnly ? <th className="col-actions">Ações</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 7} className="empty">
+                        <td colSpan={selectedAttrIds.length + 10 + (readOnly ? 0 : 1)} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
                     ) : (
                       variations.map((row, index) => {
-                        const installmentText = formatInstallment(row.price, 12);
+                        const rowPrice=row.pickupMethodId ? row.pickupPrices?.[row.pickupMethodId]??row.price : row.price;
+                        const installmentText = formatInstallment(rowPrice, 18);
 
                         return (
-                          <tr key={row.tempKey}>
+                          <tr key={row.tempKey} style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
                             {selectedAttrIds.map((attrId) => {
                               const def = attrDefs.find((a) => a.id === attrId);
-                              const options = (def?.values ?? []).map((v) => ({
+                              const options = referenceValues(def).map((v) => ({
                                 value: v,
                                 label: v,
                               }));
                               const val = row.attrs[attrId] ?? '';
 
                               return (
-                                <td key={attrId} style={{ minWidth: 130 }}>
+                                <td key={attrId} data-label={def?.name || "Atributo"}>
                                   {options.length > 0 ? (
                                     <AdminPicker
                                       compact
@@ -1325,10 +1481,10 @@ export function StockPage() {
                                   ) : (
                                     <input
                                       type="text"
+                                      aria-label={def?.name || 'Atributo'}
                                       value={val}
                                       disabled={readOnly}
                                       placeholder="Valor"
-                                      style={{ minWidth: 90 }}
                                       onChange={(e) =>
                                         updateVariationAttr(index, attrId, e.target.value)
                                       }
@@ -1337,39 +1493,37 @@ export function StockPage() {
                                 </td>
                               );
                             })}
-                            <td>
+                            <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
+                            <td data-label="SKU">
                               <input
                                 type="text"
-                                value={row.sku}
+                                aria-label="SKU da variação"
+                                title={variationSku(row)}
+                                value={variationSku(row)}
                                 disabled={readOnly}
                                 placeholder="SKU"
                                 style={{ width: 110 }}
-                                onChange={(e) => updateVariationRow(index, 'sku', e.target.value)}
+                                onChange={e=>setVariations(current=>current.map((r,i)=>i===index?{...r,sku:e.target.value,skuAuto:false}:r))}
                               />
                             </td>
-                            <td>
+                            <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
+                            <td data-label="Preço à vista">
                               <input
+                                aria-label="Preço de venda da variação"
                                 type="number"
                                 min={0}
                                 step="0.01"
-                                value={row.price}
+                                value={rowPrice}
                                 disabled={readOnly}
                                 style={{ width: 95 }}
                                 onChange={(e) =>
-                                  updateVariationRow(index, 'price', Number(e.target.value))
+                                  row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:Number(e.target.value)}}:r)) : updateVariationRow(index, 'price', Number(e.target.value))
                                 }
                               />
                             </td>
-                            <td>
-                              <span
-                                className="stock-installment-badge"
-                                title="Cálculo automático de 12x para totem"
-                              >
-                                {installmentText}
-                              </span>
-                            </td>
-                            <td>
+                            <td data-label="Quantidade">
                               <input
+                                aria-label="Quantidade da variação"
                                 type="number"
                                 min={0}
                                 value={row.qty}
@@ -1380,8 +1534,9 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td>
+                            <td data-label="Estoque mínimo">
                               <input
+                                aria-label="Estoque mínimo da variação"
                                 type="number"
                                 min={0}
                                 value={row.minQty}
@@ -1392,21 +1547,19 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={row.cost}
-                                disabled={readOnly}
-                                style={{ width: 85 }}
-                                onChange={(e) =>
-                                  updateVariationRow(index, 'cost', Number(e.target.value))
-                                }
-                              />
+                            <td data-label="Parcelado (18x)">
+                              <span
+                                className="stock-installment-badge"
+                                title="Simulação de 18x com as taxas cadastradas"
+                              >
+                                {installmentText}
+                              </span>
                             </td>
+                            <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
+                            <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name,row.sku].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td data-label="Última entrada / nota"><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
-                              <td className="col-actions">
+                              <td className="col-actions" data-label="Ações">
                                 <div style={{ display: 'flex', gap: 4 }}>
                                   <button
                                     type="button"
@@ -1446,8 +1599,8 @@ export function StockPage() {
                   </span>
                   <span>
                     <strong>Faixa de Preços:</strong> R${' '}
-                    {Math.min(...variations.map((r) => Number(r.price) || 0)).toFixed(2)} até R${' '}
-                    {Math.max(...variations.map((r) => Number(r.price) || 0)).toFixed(2)}
+                    {Math.min(...variations.map((r) => Number(r.pickupMethodId ? r.pickupPrices?.[r.pickupMethodId] ?? r.price : r.price) || 0)).toFixed(2)} até R${' '}
+                    {Math.max(...variations.map((r) => Number(r.pickupMethodId ? r.pickupPrices?.[r.pickupMethodId] ?? r.price : r.price) || 0)).toFixed(2)}
                   </span>
                 </div>
               ) : null}
@@ -1472,7 +1625,7 @@ export function StockPage() {
                         value={form.attrs[attr.id] ?? ''}
                         placeholder="Selecionar"
                         disabled={readOnly}
-                        options={attr.values.map((value) => ({ value, label: value }))}
+                        options={referenceValues(attr).map((value) => ({ value, label: value }))}
                         onChange={(value) =>
                           setForm({ ...form, attrs: { ...form.attrs, [attr.id]: value } })
                         }
@@ -1522,9 +1675,9 @@ export function StockPage() {
               <article className="admin-card stock-form-card">
                 <h3>Preços e custos</h3>
                 <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-                  {!lite ? (
+
                     <label>
-                      Custo (última compra)
+                      Custo unitário de referência
                       <input
                         type="number"
                         value={form.cost}
@@ -1540,8 +1693,8 @@ export function StockPage() {
                         }}
                       />
                     </label>
-                  ) : null}
-                  {!lite ? (
+
+
                     <label>
                       Custo médio
                       <input
@@ -1551,7 +1704,7 @@ export function StockPage() {
                         onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
                       />
                     </label>
-                  ) : null}
+
                   <label>
                     Preço base
                     <input
@@ -1561,12 +1714,13 @@ export function StockPage() {
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>
+                  <div className="span-2"><ProductPriceSuggestion price={form.price} itemLabel={form.name||'Produto'} cost={form.cost} policy={form.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setForm(current=>({...current,pricingPolicy}))} onApply={price=>setForm(current=>({...current,price}))}/></div>
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
-                      <strong>Simulação Totem (12×):</strong> {formatInstallment(form.price, 12)}{' '}
+                      <strong>Simulação Totem (18×):</strong> {formatInstallment(form.price, 18)}{' '}
                       <span style={{ fontSize: '0.82rem' }}>
-                        (baseado na maquininha padrão: {getTotemCardRate(12).brandName} a{' '}
-                        {getTotemCardRate(12).rate.toFixed(2).replace('.', ',')}% — configure em{' '}
+                        (baseado na maquininha padrão: {getTotemCardRate(18).brandName} a{' '}
+                        {getTotemCardRate(18).rate.toFixed(2).replace('.', ',')}% — configure em{' '}
                         <Link to="/painel/taxas-cartao" style={{ textDecoration: 'underline' }}>
                           Taxas de Cartão
                         </Link>
@@ -1574,24 +1728,8 @@ export function StockPage() {
                       </span>
                     </p>
                   ) : null}
-                  {!lite ? (
-                    <p className="empty span-2">
-                      Markup{' '}
-                      {form.avgCost || form.cost
-                        ? `${(((form.price - (form.avgCost || form.cost)) / (form.avgCost || form.cost)) * 100).toFixed(1)}%`
-                        : '—'}{' '}
-                      · margem{' '}
-                      {form.price
-                        ? `${(((form.price - (form.avgCost || form.cost)) / form.price) * 100).toFixed(1)}%`
-                        : '—'}{' '}
-                      ·{' '}
-                      <Link to="/erp/balanco">balanço</Link>
-                      {' · '}
-                      <Link to="/erp/movimentos">movimentos</Link>
-                      {' · '}
-                      <Link to="/erp/tabelas">tipos de preço</Link>
-                    </p>
-                  ) : null}
+                  <div className="span-2"><ProductPriceMetrics cost={form.cost} price={form.price}/></div>
+                  <div className="span-2"><h4>Última entrada de estoque</h4><LastStockEntry entry={form.lastEntry}/></div>
                 </div>
               </article>
             </>
@@ -1671,7 +1809,10 @@ export function StockPage() {
 function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'> {
   return {
     name: '',
+    brand: '',
+    category: 'Geral',
     sku: '',
+    skuAuto:true,pricingPolicy:null,lastEntry:null,
     barcode: '',
     imei: '',
     color: '',

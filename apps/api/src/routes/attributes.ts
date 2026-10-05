@@ -1,375 +1,116 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
-import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const attributesRouter = Router();
-
-const attributeSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1, 'Nome do atributo é obrigatório.'),
-  values: z.array(z.string()).default([]),
-  priceDeltas: z.record(z.coerce.number()).default({}),
-  useOnTotem: z.boolean().default(true),
-  filterOnTotem: z.boolean().default(false),
-  useOnStock: z.boolean().default(true),
-  sort: z.coerce.number().default(0),
-  active: z.boolean().default(true),
+const schema = z.object({
+ name: z.string().trim().min(1).max(100),
+ values: z.array(z.string().trim().min(1).max(100)).max(100).default([]),
+ priceDeltas: z.record(z.coerce.number().finite()).default({}),
+ useOnTotem: z.boolean().default(true), filterOnTotem: z.boolean().default(false),
+ useOnStock: z.boolean().default(true), useOnPdv: z.boolean().default(true),
+ useOnExternalSale: z.boolean().default(true), sort: z.coerce.number().int().default(0), active: z.boolean().default(true),
 });
-
-// Memória de apoio para isolamento local quando sem DB externo
-const memoryAttrs = new Map<string, any>();
-
-function formatAttrResponse(row: any, valueRows: any[]) {
-  const values: string[] = [];
-  const priceDeltas: Record<string, number> = {};
-
-  for (const v of valueRows) {
-    values.push(v.value);
-    if (Number(v.price_delta) !== 0) {
-      priceDeltas[v.value] = Number(v.price_delta);
-    }
-  }
-
-  return {
-    id: row.id,
-    name: row.name,
-    values,
-    priceDeltas,
-    useOnTotem: Boolean(row.use_on_totem),
-    filterOnTotem: Boolean(row.filter_on_totem),
-    useOnStock: Boolean(row.use_on_stock),
-    sort: Number(row.sort) || 0,
-    active: Boolean(row.active),
-  };
+export function formatAttrResponse(row: any, values: any[]) {
+ return { id: row.id, name: row.name, values: values.map(v => v.value),
+ priceDeltas: Object.fromEntries(values.filter(v => Number(v.price_delta) !== 0).map(v => [v.value,Number(v.price_delta)])),
+ useOnTotem: row.use_on_totem, filterOnTotem: row.filter_on_totem, useOnStock: row.use_on_stock,
+ useOnPdv: row.use_on_pdv, useOnExternalSale: row.use_on_external_sale, sort: row.sort, active: row.active };
 }
-
-/**
- * Listar atributos da loja
- */
-attributesRouter.get('/api/v1/attributes', requireOrDemoAuth, async (req, res, next) => {
-  try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-
-    if (pool) {
-      try {
-        const attrsRes = await pool.query(
-          `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
-           FROM product_attributes
-           WHERE store_id = $1
-           ORDER BY sort ASC, name ASC`,
-          [storeId],
-        );
-
-        if (attrsRes.rows.length > 0) {
-          const items = [];
-          for (const row of attrsRes.rows) {
-            const valRes = await pool.query(
-              `SELECT value, price_delta, sort FROM product_attribute_values WHERE attribute_id = $1 ORDER BY sort ASC, id ASC`,
-              [row.id],
-            );
-            items.push(formatAttrResponse(row, valRes.rows));
-          }
-
-          res.json({ success: true, data: items });
-          return;
-        }
-
-        // Se a loja não tem atributos no DB, retorna lista vazia (a não ser que seja a loja demo)
-        if (storeId !== 'STR-DEMO-01') {
-          res.json({ success: true, data: [] });
-          return;
-        }
-      } catch (dbErr) {
-        console.warn('[attributes] Falha ao consultar banco, usando fallback:', dbErr);
-      }
-    }
-
-    // Memory fallback
-    let items = Array.from(memoryAttrs.values())
-      .filter((a) => a.storeId === storeId)
-      .sort((a, b) => a.sort - b.sort);
-
-    if (items.length === 0 && storeId === 'STR-DEMO-01') {
-      items = [
-        { id: 'ATTR-COR', storeId, name: 'Cor', values: ['Preto', 'Branco', 'Azul', 'Desert', 'Titânio Natural'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 1, priceDeltas: {} },
-        { id: 'ATTR-CAP', storeId, name: 'Capacidade', values: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'], active: true, useOnTotem: true, useOnStock: true, filterOnTotem: true, sort: 2, priceDeltas: {} },
-      ];
-      for (const item of items) memoryAttrs.set(item.id, item);
-    }
-
-    res.json({ success: true, data: items });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Criar novo atributo com opções
- */
-attributesRouter.post('/api/v1/attributes', requireOrDemoAuth, async (req, res, next) => {
-  try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const body = attributeSchema.parse(req.body);
-    const attrId = body.id || `ATTR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-
-    if (pool) {
-      let client: any = null;
-      try {
-        client = await pool.connect();
-      } catch (connErr) {
-        console.warn('[attributes] Falha ao conectar ao PostgreSQL no POST, usando memória:', connErr);
-      }
-
-      if (client) {
-        try {
-          await client.query('BEGIN');
-
-          // Garante a loja em stores para não quebrar a FK
-          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
-          if (storeExists.rowCount === 0) {
-            await client.query(
-              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
-               VALUES ($1, 'ACC-MARTHI-DEMO', 'Loja Padrão', 'Loja Padrão LTDA', 'cnpj', '61.506.270/0001-63', 'contato@marthi.com.br', '(24) 99999-9999', true)
-               ON CONFLICT (id) DO NOTHING`,
-              [storeId],
-            );
-          }
-
-          await client.query(
-            `INSERT INTO product_attributes (id, store_id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             ON CONFLICT (id) DO UPDATE SET
-               name = $3, use_on_totem = $4, filter_on_totem = $5, use_on_stock = $6, sort = $7, active = $8`,
-            [
-              attrId,
-              storeId,
-              body.name.trim(),
-              body.useOnTotem,
-              body.filterOnTotem,
-              body.useOnStock,
-              body.sort,
-              body.active,
-            ],
-          );
-
-          await client.query(`DELETE FROM product_attribute_values WHERE attribute_id = $1`, [attrId]);
-
-          let sortIdx = 0;
-          for (const val of body.values) {
-            const cleanVal = val.trim();
-            if (!cleanVal) continue;
-            const delta = body.priceDeltas[cleanVal] || 0;
-            const valId = `ATV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-            await client.query(
-              `INSERT INTO product_attribute_values (id, attribute_id, value, price_delta, sort)
-               VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (attribute_id, value) DO UPDATE SET price_delta = $4, sort = $5`,
-              [valId, attrId, cleanVal, delta, sortIdx++],
-            );
-          }
-
-          await client.query('COMMIT');
-
-          const created = {
-            id: attrId,
-            name: body.name.trim(),
-            values: body.values.filter(Boolean),
-            priceDeltas: body.priceDeltas,
-            useOnTotem: body.useOnTotem,
-            filterOnTotem: body.filterOnTotem,
-            useOnStock: body.useOnStock,
-            sort: body.sort,
-            active: body.active,
-          };
-
-          res.status(201).json({ success: true, data: created });
-          return;
-        } catch (err) {
-          await client.query('ROLLBACK');
-          console.error('[attributes] Erro ao criar atributo no banco:', err);
-          throw err;
-        } finally {
-          client.release();
-        }
-      }
-    }
-
-    // Memory fallback
-    const record = {
-      id: attrId,
-      storeId,
-      ...body,
-    };
-    memoryAttrs.set(attrId, record);
-    res.status(201).json({ success: true, data: record });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Atualizar atributo (PATCH e PUT)
- */
-async function handleUpdateAttribute(req: any, res: any, next: any) {
-  try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const id = req.params.id;
-    const body = attributeSchema.partial().parse(req.body);
-
-    if (pool) {
-      let client: any = null;
-      try {
-        client = await pool.connect();
-      } catch (connErr) {
-        console.warn('[attributes] Falha ao conectar ao PostgreSQL no UPDATE, usando memória:', connErr);
-      }
-
-      if (client) {
-        try {
-          await client.query('BEGIN');
-
-          // Garante a loja em stores para não quebrar a FK
-          const clientAccountId = req.clientAccountId || 'ACC-MARTHI-DEMO';
-          const storeExists = await client.query('SELECT id FROM stores WHERE id = $1', [storeId]);
-          if (storeExists.rowCount === 0) {
-            await client.query(
-              `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, active)
-               VALUES ($1, $2, 'Minha Loja', 'Minha Empresa LTDA', 'cnpj', '00.000.000/0001-91', 'contato@marthi.com.br', '(24) 99999-9999', true)
-               ON CONFLICT (id) DO NOTHING`,
-              [storeId, clientAccountId],
-            );
-          }
-
-          const existing = await client.query(
-            `SELECT id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active
-             FROM product_attributes
-             WHERE (id = $1 OR LOWER(name) = LOWER($3)) AND store_id = $2`,
-            [id, storeId, body.name || id],
-          );
-
-          let targetId = id;
-          let nextName = body.name !== undefined ? body.name.trim() : 'Atributo';
-          let nextTotem = body.useOnTotem !== undefined ? body.useOnTotem : true;
-          let nextFilter = body.filterOnTotem !== undefined ? body.filterOnTotem : false;
-          let nextStock = body.useOnStock !== undefined ? body.useOnStock : true;
-          let nextSort = body.sort !== undefined ? body.sort : 0;
-          let nextActive = body.active !== undefined ? body.active : true;
-
-          if (existing.rows.length > 0) {
-            const current = existing.rows[0];
-            targetId = current.id;
-            nextName = body.name !== undefined ? body.name.trim() : current.name;
-            nextTotem = body.useOnTotem !== undefined ? body.useOnTotem : current.use_on_totem;
-            nextFilter = body.filterOnTotem !== undefined ? body.filterOnTotem : current.filter_on_totem;
-            nextStock = body.useOnStock !== undefined ? body.useOnStock : current.use_on_stock;
-            nextSort = body.sort !== undefined ? body.sort : current.sort;
-            nextActive = body.active !== undefined ? body.active : current.active;
-
-            await client.query(
-              `UPDATE product_attributes
-               SET name = $1, use_on_totem = $2, filter_on_totem = $3, use_on_stock = $4, sort = $5, active = $6
-               WHERE id = $7`,
-              [nextName, nextTotem, nextFilter, nextStock, nextSort, nextActive, targetId],
-            );
-          } else {
-            // Se ainda não existia no banco, cria o registro diretamente
-            await client.query(
-              `INSERT INTO product_attributes (id, store_id, name, use_on_totem, filter_on_totem, use_on_stock, sort, active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-               ON CONFLICT (id) DO UPDATE SET name = $3`,
-              [targetId, storeId, nextName, nextTotem, nextFilter, nextStock, nextSort, nextActive],
-            );
-          }
-
-          if (body.values !== undefined) {
-            await client.query(`DELETE FROM product_attribute_values WHERE attribute_id = $1`, [targetId]);
-            let sortIdx = 0;
-            for (const val of body.values) {
-              const cleanVal = val.trim();
-              if (!cleanVal) continue;
-              const delta = (body.priceDeltas && body.priceDeltas[cleanVal]) || 0;
-              const valId = `ATV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-              await client.query(
-                `INSERT INTO product_attribute_values (id, attribute_id, value, price_delta, sort)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (attribute_id, value) DO UPDATE SET price_delta = $4, sort = $5`,
-                [valId, targetId, cleanVal, delta, sortIdx++],
-              );
-            }
-          }
-
-          await client.query('COMMIT');
-
-          // Busca atualizado
-          const updatedValRes = await pool.query(
-            `SELECT value, price_delta, sort FROM product_attribute_values WHERE attribute_id = $1 ORDER BY sort ASC`,
-            [targetId],
-          );
-
-          const updated = formatAttrResponse(
-            { id: targetId, name: nextName, use_on_totem: nextTotem, filter_on_totem: nextFilter, use_on_stock: nextStock, sort: nextSort, active: nextActive },
-            updatedValRes.rows,
-          );
-
-          res.json({ success: true, data: updated });
-          return;
-        } catch (err) {
-          await client.query('ROLLBACK');
-          console.error('[attributes] Erro ao atualizar atributo no banco:', err);
-          throw err;
-        } finally {
-          client.release();
-        }
-      }
-    }
-
-    const current = memoryAttrs.get(id);
-    if (!current) {
-      // Se não encontrou pelo ID exato, tenta pelo nome
-      const byName = Array.from(memoryAttrs.values()).find((a) => a.name.toLowerCase() === (body.name || id).toLowerCase());
-      if (byName) {
-        const updated = { ...byName, ...body };
-        memoryAttrs.set(byName.id, updated);
-        res.json({ success: true, data: updated });
-        return;
-      }
-    }
-    const updated = { ...current, id, storeId, ...body };
-    memoryAttrs.set(id, updated);
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    next(error);
-  }
+async function read(db: Pick<PoolClient,'query'>,storeId: string,id?: string) {
+ const result=await db.query(`SELECT * FROM product_attributes WHERE store_id=$1 ${id ? 'AND id=$2' : ''} ORDER BY sort,name`,id ? [storeId,id] : [storeId]);
+ return Promise.all(result.rows.map(async row=>formatAttrResponse(row,(await db.query('SELECT value,price_delta FROM product_attribute_values WHERE attribute_id=$1 ORDER BY sort,id',[row.id])).rows)));
 }
-
-attributesRouter.patch('/api/v1/attributes/:id', requireOrDemoAuth, handleUpdateAttribute);
-attributesRouter.put('/api/v1/attributes/:id', requireOrDemoAuth, handleUpdateAttribute);
-
-/**
- * Excluir atributo
- */
-attributesRouter.delete('/api/v1/attributes/:id', requireOrDemoAuth, async (req, res, next) => {
-  try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const id = req.params.id;
-
-    if (pool) {
-      try {
-        await pool.query(
-          `DELETE FROM product_attributes WHERE id = $1 AND store_id = $2`,
-          [id, storeId],
-        );
-        res.json({ success: true, data: { ok: true } });
-        return;
-      } catch (dbErr) {
-        console.warn('[attributes] Falha ao deletar atributo do banco, usando memória:', dbErr);
-      }
-    }
-
-    memoryAttrs.delete(id);
-    res.json({ success: true, data: { ok: true } });
-  } catch (error) {
-    next(error);
+async function writeValues(db: PoolClient,id: string,values: string[],deltas: Record<string,number>) {
+ const unique=[...new Set(values)];
+ // Preserve identifiers of unchanged values referenced by product configurations.
+ await db.query('DELETE FROM product_attribute_values WHERE attribute_id=$1 AND NOT (value=ANY($2::text[]))',[id,unique]);
+ for(const [sort,value] of unique.entries()) await db.query(`INSERT INTO product_attribute_values(id,attribute_id,value,price_delta,sort) VALUES($1,$2,$3,$4,$5) ON CONFLICT(attribute_id,value) DO UPDATE SET price_delta=excluded.price_delta,sort=excluded.sort`,[`ATV-${randomUUID()}`,id,value,deltas[value] ?? 0,sort]);
+}
+function canEdit(req: any,res: any) {
+ if(['admin','manager','superadmin'].includes(req.user?.role)) return true;
+ res.status(403).json({success:false,error:{code:'FORBIDDEN',message:'Sem permissão para alterar atributos.'}}); return false;
+}
+function missing(res: any) { return res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Atributo não encontrado nesta loja.'}}); }
+async function automation(storeId: string, enabled?: boolean) {
+ const db=await pool.connect();
+ try {
+  await db.query('BEGIN');
+  const r=await db.query('SELECT segment,attribute_automation_enabled FROM stores WHERE id=$1 FOR UPDATE',[storeId]);
+  if(!r.rows[0]) throw Object.assign(new Error('Loja não encontrada.'),{status:404});
+  if(enabled!==undefined) await db.query('UPDATE stores SET attribute_automation_enabled=$2 WHERE id=$1',[storeId,enabled]);
+  const eligible=(await db.query('SELECT 1 FROM segment_attribute_templates WHERE segment=$1 LIMIT 1',[r.rows[0].segment])).rows.length>0;
+  await db.query('SELECT provision_store_attributes($1,$2)',[storeId,r.rows[0].segment]);
+  const attributes=await read(db,storeId);
+  await db.query('COMMIT');
+  return {enabled:enabled??r.rows[0].attribute_automation_enabled,eligible,attributes};
+ }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
+}
+attributesRouter.get('/api/v1/attributes/automation',requireAuth,async(req,res,next)=>{try{res.json({success:true,data:await automation(req.storeId!)});}catch(e){next(e);}});
+attributesRouter.put('/api/v1/attributes/automation',requireAuth,async(req,res,next)=>{
+ if(!canEdit(req,res))return;
+ try{const {enabled}=z.object({enabled:z.boolean()}).parse(req.body);res.json({success:true,data:await automation(req.storeId!,enabled)});}catch(e){next(e);}
+});
+attributesRouter.get('/api/v1/attributes',requireAuth,async(req,res,next)=>{
+ try { res.json({success:true,data:(await automation(req.storeId!)).attributes}); } catch(e) { next(e); }
+});
+attributesRouter.post('/api/v1/attributes/replicate',requireAuth,async(req,res,next)=>{
+ if(!canEdit(req,res)) return;
+ let db: PoolClient | undefined;
+ try {
+  const {targetStoreId}=z.object({targetStoreId:z.string().min(1)}).parse(req.body);
+  if(targetStoreId===req.storeId) throw Object.assign(new Error('Escolha outra filial.'),{status:400});
+  db=await pool.connect(); await db.query('BEGIN');
+  const allowed=await db.query(`SELECT s.id FROM stores s JOIN user_stores u ON u.store_id=s.id
+   WHERE s.id=$1 AND s.client_account_id=$2 AND s.active=true AND s.is_matrix=false
+    AND u.user_id=$3 AND u.role IN ('admin','manager','superadmin')`,[targetStoreId,req.clientAccountId,req.user!.id]);
+  if(!allowed.rows.length) throw Object.assign(new Error('Filial não disponível para cópia.'),{status:403});
+  await db.query('SELECT id FROM stores WHERE id=ANY($1::text[]) ORDER BY id FOR UPDATE',[[req.storeId,targetStoreId]]);
+  const source=await read(db,req.storeId!); const target=await read(db,targetStoreId);
+  const missingAttributes=source.filter(attr=>!target.some(other=>other.name.trim().toLowerCase()===attr.name.trim().toLowerCase()));
+  if(target.length+missingAttributes.length>5) throw Object.assign(new Error('A filial ultrapassaria o limite de 5 atributos. Ajuste os cadastros antes de copiar.'),{status:409});
+  for(const attr of missingAttributes) {
+   const id=`ATTR-${randomUUID()}`;
+   await db.query(`INSERT INTO product_attributes(id,store_id,name,use_on_totem,filter_on_totem,use_on_stock,use_on_pdv,use_on_external_sale,sort,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[id,targetStoreId,attr.name,attr.useOnTotem,attr.filterOnTotem,attr.useOnStock,attr.useOnPdv,attr.useOnExternalSale,attr.sort,attr.active]);
+   await writeValues(db,id,attr.values,attr.priceDeltas);
   }
+  await db.query('COMMIT'); res.json({success:true,data:{copied:missingAttributes.length,preserved:source.length-missingAttributes.length}});
+ } catch(e) { if(db) await db.query('ROLLBACK'); next(e); } finally { db?.release(); }
+});
+attributesRouter.post('/api/v1/attributes',requireAuth,async(req,res,next)=>{
+ if(!canEdit(req,res)) return;
+ let db: PoolClient | undefined;
+ try {
+  const body=schema.parse(req.body); const id=`ATTR-${randomUUID()}`;
+  db=await pool.connect(); await db.query('BEGIN');
+  await db.query('SELECT id FROM stores WHERE id=$1 FOR UPDATE',[req.storeId]);
+  const count=await db.query('SELECT count(*)::int AS count FROM product_attributes WHERE store_id=$1',[req.storeId]);
+  if(count.rows[0].count>=5) { await db.query('ROLLBACK'); res.status(409).json({success:false,error:{code:'ATTRIBUTE_LIMIT',message:'Máximo de 5 atributos por loja.'}}); return; }
+  await db.query(`INSERT INTO product_attributes(id,store_id,name,use_on_totem,filter_on_totem,use_on_stock,use_on_pdv,use_on_external_sale,sort,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[id,req.storeId,body.name,body.useOnTotem,body.filterOnTotem,body.useOnStock,body.useOnPdv,body.useOnExternalSale,body.sort,body.active]);
+  await writeValues(db,id,body.values,body.priceDeltas);
+  const [record]=await read(db,req.storeId!,id); await db.query('COMMIT');
+  res.status(201).json({success:true,data:record});
+ } catch(e) { if(db) await db.query('ROLLBACK'); next(e); } finally { db?.release(); }
+});
+async function update(req: any,res: any,next: any) {
+ if(!canEdit(req,res)) return;
+ let db: PoolClient | undefined;
+ try {
+  const patch=schema.partial().parse(req.body); db=await pool.connect(); await db.query('BEGIN');
+  const current=await db.query('SELECT * FROM product_attributes WHERE id=$1 AND store_id=$2 FOR UPDATE',[req.params.id,req.storeId]);
+  if(!current.rows[0]) { await db.query('ROLLBACK'); missing(res); return; }
+  const [old]=await read(db,req.storeId,req.params.id); const body={...old,...patch};
+  await db.query(`UPDATE product_attributes SET name=$3,use_on_totem=$4,filter_on_totem=$5,use_on_stock=$6,use_on_pdv=$7,use_on_external_sale=$8,sort=$9,active=$10 WHERE id=$1 AND store_id=$2`,[req.params.id,req.storeId,body.name,body.useOnTotem,body.filterOnTotem,body.useOnStock,body.useOnPdv,body.useOnExternalSale,body.sort,body.active]);
+  if(patch.values!==undefined || patch.priceDeltas!==undefined) await writeValues(db,req.params.id,body.values,body.priceDeltas);
+  const [record]=await read(db,req.storeId,req.params.id); await db.query('COMMIT'); res.json({success:true,data:record});
+ } catch(e) { if(db) await db.query('ROLLBACK'); next(e); } finally { db?.release(); }
+}
+attributesRouter.patch('/api/v1/attributes/:id',requireAuth,update);
+attributesRouter.put('/api/v1/attributes/:id',requireAuth,update);
+attributesRouter.delete('/api/v1/attributes/:id',requireAuth,async(req,res,next)=>{
+ if(!canEdit(req,res)) return;
+ try { const result=await pool.query('DELETE FROM product_attributes WHERE id=$1 AND store_id=$2 RETURNING id',[req.params.id,req.storeId]); if(!result.rows[0]) { missing(res); return; } res.json({success:true,data:{ok:true}}); } catch(e) { next(e); }
 });

@@ -338,7 +338,7 @@ export function TeamUsersSection({ variant, id }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
               <div>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#2dd4bf', background: 'rgba(45, 212, 191, 0.12)', border: '1px solid rgba(45, 212, 191, 0.25)', padding: '3px 8px', borderRadius: 6, marginBottom: 8 }}>
-                  🏢 Empresa Vinculada: {account.tradeName || 'Cell Ponto'}
+                  🏢 Empresa Vinculada: {account.tradeName || 'Empresa'}
                 </span>
                 <h2 style={{ margin: 0 }}>
                   {variant === 'painel'
@@ -350,13 +350,13 @@ export function TeamUsersSection({ variant, id }: Props) {
               </div>
               <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, padding: '8px 12px', flex: '1 1 240px', minWidth: 0, maxWidth: '100%' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main, #fff)' }}>
-                  {store?.name || 'Cell Ponto Matriz'}
+                  {store?.name || account.tradeName || 'Loja Principal'}
                 </div>
                 <div style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: 2 }}>
-                  CNPJ: <strong>{account.document || store?.cnpj || '61.506.270/0001-63'}</strong> &nbsp;·&nbsp; {store?.city || 'Três Rios'}/{store?.state || 'RJ'}
+                  CNPJ: <strong>{account.document || store?.cnpj || '—'}</strong>{store?.city ? ` · ${store.city}/${store.state || ''}` : ''}
                 </div>
                 <div style={{ fontSize: '0.70rem', color: '#2dd4bf', marginTop: 4 }}>
-                  Razão Social: {account.legalName || 'Cell Ponto Telecomunicações LTDA'}
+                  Razão Social: {account.legalName || account.tradeName || '—'}
                 </div>
               </div>
             </div>

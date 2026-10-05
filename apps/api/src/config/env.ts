@@ -11,7 +11,7 @@ const envSchema = z.object({
   APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
   APP_NAME: z.string().default('Marthi API'),
   PORT: z.coerce.number().default(8080),
-  DATABASE_URL: z.string().optional(),
+  DATABASE_URL: z.string().default(''),
   DB_HOST: z.string().optional(),
   DB_PORT: z.coerce.number().default(5432),
   DB_DATABASE: z.string().optional(),
@@ -19,9 +19,10 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().optional(),
   DB_SSLMODE: z.string().default('prefer'),
   GOOGLE_CLIENT_ID: z.string().optional(),
-  JWT_SECRET: z.string().min(16).default('marthi-dev-secret-change-me'),
-  AUTH_DEV_EMAIL: z.string().email().default('teste@marthi.com.br'),
-  AUTH_DEV_PASSWORD: z.string().default('123'),
+  JWT_SECRET: z.string().min(16).default(
+    process.env.JWT_SECRET ||
+    'fd8de888699d045d11573928a658e500d222a071be8339cc625c2f870b4214ad'
+  ),
   EVOLUTION_BASE_URL: z.string().url().optional(),
   EVOLUTION_INSTANCE: z.string().optional(),
   EVOLUTION_API_KEY: z.string().optional(),
@@ -35,7 +36,7 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: z.preprocess((value) => value === true || value === 'true', z.boolean()).default(false),
   SMTP_FROM: z.string().default('Marthi Tecnologia <marthi.tecnologia@gmail.com>'),
   INTERNAL_NOTIFICATION_EMAIL: z.string().email().default('marthi.tecnologia@gmail.com'),
   FRONTEND_URL: z.string().default(
@@ -54,3 +55,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+if (!env.DATABASE_URL && !(env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD)) {
+  console.warn('[marthi-api] MarthiDB não configurado com credenciais completas.');
+}

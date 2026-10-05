@@ -21,6 +21,7 @@ import { getAdminState } from '../../data/adminStore';
 import { listSuppliers } from '../../data/erpRegistry';
 import {
   listPromoCampaigns,
+  hydratePromoCampaigns,
   PROMO_EVENT,
   PROMO_KIND_LABEL,
   removePromoCampaign,
@@ -162,6 +163,7 @@ export function PromoCampaignsPage() {
     function refresh() {
       setItems(listPromoCampaigns());
     }
+    void hydratePromoCampaigns().catch((error) => setError(error instanceof Error ? error.message : 'Falha ao carregar campanhas.'));
     window.addEventListener(PROMO_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
@@ -243,7 +245,7 @@ export function PromoCampaignsPage() {
     }));
   }
 
-  function save() {
+  async function save() {
     setError('');
     if (!form.name.trim()) {
       setError('Informe o nome da campanha comercial.');
@@ -297,7 +299,7 @@ export function PromoCampaignsPage() {
       }
     }
 
-    upsertPromoCampaign({
+    try { await upsertPromoCampaign({
       id: mode === 'edit' && selectedId ? selectedId : undefined,
       name: form.name.trim(),
       active: form.active,
@@ -329,13 +331,17 @@ export function PromoCampaignsPage() {
     setItems(listPromoCampaigns());
     resetForm();
     setFormVisible(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Falha ao salvar campanha no MarthiDB.');
+    }
   }
 
-  function remove(item: PromoCampaign) {
+  async function remove(item: PromoCampaign) {
     if (!confirmDelete(`a campanha comercial "${item.name}"`)) return;
-    removePromoCampaign(item.id);
+    try { await removePromoCampaign(item.id);
     setItems(listPromoCampaigns());
     if (selectedId === item.id) closeForm();
+    } catch (error) { setError(error instanceof Error ? error.message : 'Falha ao excluir campanha.'); }
   }
 
   function addStock(id: string) {

@@ -131,12 +131,13 @@ export function StockInventoryActiveView({ balance, onBalanceUpdated, onBalanceF
     onBalanceUpdated();
   }
 
-  function handleCancelBalance() {
+  async function handleCancelBalance() {
     const reason = window.prompt(
       'Tem certeza de que deseja cancelar este balanço em andamento?\nDigite o motivo do cancelamento:',
     );
     if (reason === null) return;
-    cancelStockBalance(balance.id, reason);
+    try { await cancelStockBalance(balance.id, reason); }
+    catch (error) { window.alert(error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'); return; }
     onBalanceUpdated();
   }
 

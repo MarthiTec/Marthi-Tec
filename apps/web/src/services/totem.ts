@@ -1,3 +1,4 @@
+import type {DeliveryAddress} from '../data/pickup';
 import { enqueueKitchenOrder } from '../data/kitchenOrderStore';
 import type { PickedAttribute } from '../data/attributeStore';
 import { formatPicked } from '../data/attributeStore';
@@ -6,6 +7,8 @@ import { getTotemSettings } from '../data/totemSettings';
 import { apiSubmitTotemLead } from './erpApi';
 
 export type TotemLeadRequest = {
+  destination?:'cashier'|'whatsapp';
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -27,11 +30,17 @@ export type TotemLeadRequest = {
 
 function shouldSendToKitchen() {
   const settings = getTotemSettings();
-  return settings.vertical === 'food' || settings.printTicket || settings.offerFulfillment;
+  return settings.vertical === 'food';
 }
 
+const pendingRequests=new Map<string,string>();
 export async function submitTotemLead(payload: TotemLeadRequest) {
+  const signature=JSON.stringify(payload);
+  const requestKey=pendingRequests.get(signature)??crypto.randomUUID();
+  pendingRequests.set(signature,requestKey);
   const result = await apiSubmitTotemLead({
+    requestKey,destination:payload.destination,
+    stockId:payload.stockId,pickupMethodId:payload.pickupMethodId,deliveryAddress:payload.deliveryAddress,
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
     productName: payload.productName,
@@ -43,13 +52,14 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     installment: payload.installment,
     priceLabel: payload.priceLabel,
   });
+  pendingRequests.delete(signature);
   const ticketId = result.id;
   const customerNotified = Boolean(result.customerNotified);
   enqueueTotemLead({
     ...payload,
     source: 'totem',
     id: ticketId,
-    cashPrice: payload.cashPrice,
+    cashPrice: result.quotedPrice ?? payload.cashPrice,
     ticketSenha: payload.ticketSenha,
     sentToCashier: payload.sentToCashier ?? true,
   });
@@ -75,5 +85,5 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     }
   }
 
-  return { ticketId, customerNotified };
+  return { ticketId, notificationWarning:result.notificationWarning,customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice };
 }

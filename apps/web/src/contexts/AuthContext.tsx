@@ -56,9 +56,9 @@ async function applySession(
     actorEmail: session.user.email,
     action: 'login',
   });
-  await bootstrapErpFromApi().catch(() => false);
-  setErpReady(true);
-  setErpError(null);
+  const ready = await bootstrapErpFromApi().catch(() => false);
+  setErpReady(ready);
+  setErpError(ready ? null : 'Não foi possível sincronizar com o banco.');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -110,10 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setUser(current);
         }
-        await bootstrapErpFromApi().catch(() => false);
+        const ready = await bootstrapErpFromApi().catch(() => false);
         if (active) {
-          setErpReady(true);
-          setErpError(null);
+          setErpReady(ready);
+          setErpError(ready ? null : 'Não foi possível sincronizar com o banco.');
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);

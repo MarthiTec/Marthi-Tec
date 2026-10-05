@@ -112,7 +112,7 @@ export function CrmPanelPage() {
         {recent.length === 0 ? (
           <p className="empty">Nenhum lead ainda. Homepage, parceiro e Trabalhe conosco alimentam o CRM.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>

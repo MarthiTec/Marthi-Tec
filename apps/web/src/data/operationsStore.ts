@@ -1,6 +1,6 @@
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
 import type { AdminIconName } from '../components/AdminIcons';
 
-const STORAGE_KEY = 'marthi.operations.shortcuts.v1';
 export const OPERATIONS_EVENT = 'marthi-operations-updated';
 
 /** Ativo = verde fixo; inativo = vermelho fixo. */
@@ -95,44 +95,20 @@ function normalize(item: Partial<OperationShortcut>, index: number): OperationSh
   };
 }
 
-function loadRaw(): OperationShortcut[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_OPS.map((item) => ({ ...item }));
-    const parsed = JSON.parse(raw) as { items?: Partial<OperationShortcut>[] };
-    if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
-      return DEFAULT_OPS.map((item) => ({ ...item }));
-    }
-    return parsed.items
-      .map((item, index) => normalize(item, index))
-      .filter((item): item is OperationShortcut => Boolean(item))
-      .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'pt-BR'));
-  } catch {
-    return DEFAULT_OPS.map((item) => ({ ...item }));
-  }
-}
+function loadRaw(): OperationShortcut[] { return readModuleState('operations', DEFAULT_OPS.map(item => ({ ...item }))).map(normalize).filter((item): item is OperationShortcut => item !== null); }
 
-function save(items: OperationShortcut[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ items }));
-  window.dispatchEvent(new Event(OPERATIONS_EVENT));
-}
+async function save(state: OperationShortcut[]) { await saveModuleState('operations', state); window.dispatchEvent(new Event(OPERATIONS_EVENT)); }
 
 export function listOperationShortcuts() {
   const items = loadRaw();
-  const missing = DEFAULT_OPS.filter((def) => !items.some((item) => item.id === def.id));
-  if (!missing.length) return items;
-  const merged = [...items, ...missing.map((item) => ({ ...item }))].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'pt-BR'),
-  );
-  save(merged);
-  return merged;
+  return items;
 }
 
 export function operationStatusColor(active: boolean) {
   return active ? OPERATION_STATUS_ACTIVE : OPERATION_STATUS_INACTIVE;
 }
 
-export function upsertOperationShortcut(
+export async function upsertOperationShortcut(
   input: Omit<OperationShortcut, 'id' | 'sortOrder'> & { id?: string; sortOrder?: number },
 ) {
   const items = loadRaw();
@@ -150,26 +126,28 @@ export function upsertOperationShortcut(
   if (idx >= 0) items[idx] = next;
   else items.push(next);
   items.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'pt-BR'));
-  save(items);
+  await save(items);
   return next;
 }
 
-export function setOperationActive(id: string, active: boolean) {
+export async function setOperationActive(id: string, active: boolean) {
   const items = loadRaw();
   const idx = items.findIndex((item) => item.id === id);
   if (idx < 0) return null;
   items[idx] = { ...items[idx], active };
-  save(items);
+  await save(items);
   return items[idx];
 }
 
-export function deleteOperationShortcut(id: string) {
+export async function deleteOperationShortcut(id: string) {
   const items = loadRaw().filter((item) => item.id !== id);
-  save(items);
+  await save(items);
 }
 
-export function resetOperationShortcuts() {
-  save(DEFAULT_OPS.map((item) => ({ ...item })));
+export async function resetOperationShortcuts() {
+  await save(DEFAULT_OPS.map((item) => ({ ...item })));
 }
 
 export const OPERATION_ICON_OPTIONS = ICONS;
+
+export async function hydrateOperationsFromApi() { await loadModuleState('operations', DEFAULT_OPS.map(item => ({ ...item }))); window.dispatchEvent(new Event(OPERATIONS_EVENT)); }

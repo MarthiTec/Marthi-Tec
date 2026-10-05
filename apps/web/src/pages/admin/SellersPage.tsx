@@ -330,7 +330,7 @@ export function SellersPage() {
 
           />
 
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
 
             <thead>
 
@@ -404,7 +404,7 @@ export function SellersPage() {
 
             </tbody>
 
-          </table>
+          </table></div>
 
         </article>
 

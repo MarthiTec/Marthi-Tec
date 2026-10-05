@@ -1,3 +1,11 @@
+import {hydrateCardMachinesFromApi} from './cardRatesStore';
+import { hydrateStockInventoryFromApi } from './stockInventoryStore';
+import { hydratePosQuotesFromApi } from './posQuotesStore';
+import { hydrateCashSettingsFromApi } from './cashSettings';
+import { hydrateOsPrintSettingsFromApi } from './osPrintSettings';
+import { hydrateBankFilesFromApi } from './bankFinanceFiles';
+import { hydrateOperationsFromApi } from './operationsStore';
+import { hydratePromoCampaigns } from './promoCampaignStore';
 import {
   replaceAdminState,
   type Customer,
@@ -80,6 +88,7 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
   setBootstrap({ loading: true, ready: false, error: null });
 
   try {
+    if (!await hydrateMultiStoreFromApi()) throw new Error("Não foi possível carregar as lojas autorizadas.");
     const [
       customers,
       stock,
@@ -106,6 +115,14 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       apiGetTotemSettings(),
       apiGetOperatorProfile(),
       apiListPosTickets(),
+      hydratePromoCampaigns(),
+      hydrateBankFilesFromApi(),
+      hydrateOperationsFromApi(),
+      hydrateOsPrintSettingsFromApi(),
+      hydrateCashSettingsFromApi(),
+      hydratePosQuotesFromApi(),
+      hydrateStockInventoryFromApi(),
+      hydrateCardMachinesFromApi(),
     ]);
     // 1. Aplica o estado central da retaguarda e plano imediatamente
     replaceAdminState({

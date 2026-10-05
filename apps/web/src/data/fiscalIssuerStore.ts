@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /**
  * Hub único do emissor fiscal.
  * Certificado, senha, CSC, ambiente e pastas (XML / LOG / PDF) valem para
@@ -154,7 +155,7 @@ const EMPTY: FiscalIssuerSettings = {
 
 function load(): FiscalIssuerSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return { ...EMPTY };
     const parsed = JSON.parse(raw) as Partial<FiscalIssuerSettings>;
     return { ...EMPTY, ...parsed };
@@ -164,7 +165,7 @@ function load(): FiscalIssuerSettings {
 }
 
 function save(settings: FiscalIssuerSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(settings));
   window.dispatchEvent(new Event('marthi-fiscal-issuer-updated'));
 }
 

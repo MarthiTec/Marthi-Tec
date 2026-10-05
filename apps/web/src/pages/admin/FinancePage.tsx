@@ -706,7 +706,7 @@ function ExtratoPanel({
             </button>
           </div>
         </div>
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Quando</th>
@@ -736,7 +736,7 @@ function ExtratoPanel({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </>
   );
@@ -908,7 +908,7 @@ function PagarPanel({
           </div>
         </div>
 
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Descrição &amp; Detalhes</th>
@@ -979,7 +979,7 @@ function PagarPanel({
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       </article>
 
       <SettleBillModal
@@ -1145,7 +1145,7 @@ function ReceberPanel({
           </div>
         </div>
 
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Descrição &amp; Detalhes</th>
@@ -1216,7 +1216,7 @@ function ReceberPanel({
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       </article>
 
       <SettleBillModal
@@ -1312,7 +1312,7 @@ function ContasPanel({
       </article>
       <article className="admin-card">
         <h2>Contas</h2>
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Nome</th>
@@ -1335,7 +1335,7 @@ function ContasPanel({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </>
   );
@@ -1422,7 +1422,7 @@ function TesourariaPanel({
       </article>
       <article className="admin-card">
         <h2>Histórico</h2>
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Quando</th>
@@ -1449,7 +1449,7 @@ function TesourariaPanel({
               ))
             )}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </>
   );
@@ -1531,7 +1531,7 @@ function AntecipadosPanel({
       </article>
       <article className="admin-card">
         <h2>Antecipações</h2>
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>Tipo</th>
@@ -1588,7 +1588,7 @@ function AntecipadosPanel({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </>
   );
@@ -1657,7 +1657,7 @@ function DrePanel({
       <p className="empty">
         Demonstrativo consolidado: fluxo de caixa + baixas com juros/multas/descontos e vínculos fiscais.
       </p>
-      <table className="admin-table fin-dre-table">
+      <div className="admin-table-container"><table className="admin-table fin-dre-table">
         <thead>
           <tr>
             <th>Linha</th>
@@ -1682,7 +1682,7 @@ function DrePanel({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </article>
   );
 }

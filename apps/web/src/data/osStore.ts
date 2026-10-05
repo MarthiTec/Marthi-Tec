@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import {
   apiAddPhoto,
   apiClearSignature,
@@ -16,7 +17,6 @@ import { isNestAuthed, NestApiError } from '../services/nestClient';
 import { listEmployees, EMPLOYEE_ROLE_LABEL } from './erpRegistry';
 import {
   getActiveStoreId,
-  getActiveStore,
   STORE_CONTEXT_CHANGED_EVENT,
 } from './multiStoreStore';
 
@@ -383,7 +383,7 @@ export const DEFAULT_OPERATIONS: WorkOrderOperation[] = [];
 
 export function listOperations(): WorkOrderOperation[] {
   try {
-    const raw = localStorage.getItem(OPERATIONS_STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(OPERATIONS_STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -406,7 +406,7 @@ export function listOperations(): WorkOrderOperation[] {
 
 export function saveOperations(ops: WorkOrderOperation[]) {
   try {
-    localStorage.setItem(OPERATIONS_STORAGE_KEY, JSON.stringify(ops));
+    localStorage.setItem(storeScopedKey(OPERATIONS_STORAGE_KEY), JSON.stringify(ops));
     window.dispatchEvent(new Event(OS_STATE_EVENT));
   } catch {
     /* ignore */
@@ -650,21 +650,6 @@ function load(): WorkOrder[] {
 
   try {
     let raw = localStorage.getItem(currentKey);
-    // Retrocompatibilidade: se a chave escopada da loja estiver vazia, mas existir a global marthi.os.v2
-    if (!raw && currentKey !== 'marthi.os.v2') {
-      const globalRaw = localStorage.getItem('marthi.os.v2');
-      if (globalRaw) {
-        const store = getActiveStore();
-        if (store?.isMatrix) {
-          raw = globalRaw;
-          try {
-            localStorage.setItem(currentKey, globalRaw);
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-    }
 
     if (!raw) {
       memoryOrders = [];
@@ -703,10 +688,7 @@ function save(items: WorkOrder[]) {
   memoryOrdersKey = currentKey;
   try {
     localStorage.setItem(currentKey, JSON.stringify(items));
-    const store = getActiveStore();
-    if (!store || store.isMatrix) {
-      localStorage.setItem('marthi.os.v2', JSON.stringify(items));
-    }
+
   } catch {
     /* ignore */
   }

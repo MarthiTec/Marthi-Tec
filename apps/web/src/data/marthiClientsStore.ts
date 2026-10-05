@@ -1,8 +1,8 @@
 import { getPlanById, normalizePlanId, type PartnerModuleId, type PlanId } from './catalog';
-import { listCrmLeads } from './crmStore';
 import { listPresenceEntries } from './presenceStore';
 import { syncBranchToMultiStore, removeBranchFromMultiStore } from './multiStoreStore';
 import { nestApiUrl } from '../services/config';
+import { nestRequest } from '../services/nestClient';
 
 const STORAGE_KEY = 'marthi.ops.clients.v2';
 export const MARTHI_CLIENTS_EVENT = 'marthi-clients-updated';
@@ -123,8 +123,11 @@ function load(): State {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty();
     const parsed = JSON.parse(raw) as Partial<State>;
+    const rawClients = Array.isArray(parsed.clients) ? parsed.clients : [];
+    const cleaned = rawClients.map((client) => normalizeClient(client));
+
     return {
-      clients: Array.isArray(parsed.clients) ? parsed.clients.map(normalizeClient) : [],
+      clients: cleaned,
     };
   } catch {
     return empty();
@@ -179,63 +182,39 @@ function normalizeClient(raw: Partial<MarthiClient>): MarthiClient {
         : 'independent',
     parentClientId: raw.parentClientId?.trim() || null,
     branchName: raw.branchName?.trim() || undefined,
-    accessToken: raw.accessToken || generateClientAccessToken(raw.document, raw.email, raw.clientId),
+    accessToken: raw.accessToken || '',
   };
 }
 
 
-/** Seed demo clients */
-function seedFromPartnerLeads(existing: MarthiClient[]): MarthiClient[] {
-  if (existing.length > 0) return existing;
-  const partnerLeads = listCrmLeads().filter((lead) => lead.source === 'partner');
-  if (partnerLeads.length === 0) {
-    const demoClients: MarthiClient[] = [
-      {
-        clientId: 'ACC-MARTHI-DEMO',
-        tradeName: 'Marthi Demonstração',
-        legalName: 'Marthi Tecnologia e Demonstração LTDA',
-        document: '61.506.270/0001-63',
-        phone: '(24) 98124-4253',
-        email: 'teste@marthi.com.br',
-        accessToken: 'TK-001-000163-CPTR-88A1',
-        planId: 'golden',
-        modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
-        status: 'active',
-        contractingStatus: 'acesso_ativado',
-        paymentOk: true,
-        monthlyAmount: planMonthlyAmount('golden'),
-        contractedAt: now(),
-        activatedAt: now(),
-        firstAccessAt: now(),
-        lastSeenAt: null,
-        notes: 'Empresa Oficial de Demonstração Marthi com Plano Gold Ativo',
-        passwordConfigured: true,
-        phoneVerified: true,
-        phoneVerifiedAt: now(),
-      },
-    ];
+/** Localiza cliente pelo token de ativação (acesso total ou por fragmento seguro) */
+export function findClientByAccessToken(rawToken: string): MarthiClient | null {
+  if (!rawToken || typeof rawToken !== 'string') return null;
+  const clean = rawToken.trim().toUpperCase();
+  const clients = listMarthiClients();
 
-    return demoClients;
-  }
+  // 1. Exact match by accessToken or clientId
+  const exact = clients.find((c) => c.accessToken?.toUpperCase() === clean || c.clientId.toUpperCase() === clean);
+  if (exact) return exact;
 
-    return partnerLeads.map((lead) => {
-    return normalizeClient({
-      clientId: `CLI-${lead.id}`,
-      tradeName: lead.name,
-      email: lead.email || `lead-${lead.id}@parceiro.local`,
-      phone: lead.whatsapp,
-      planId: 'silver',
-      modules: ['totem', 'erp'],
-      status: 'active',
-      contractingStatus: 'acesso_ativado',
-      paymentOk: true,
-      monthlyAmount: planMonthlyAmount('silver'),
-      contractedAt: lead.createdAt || now(),
-      passwordConfigured: true,
-      phoneVerified: false,
-      notes: lead.notes || 'Lead CRM',
-    });
+  // 2. Parts match: TK-[PREFIX]-[DOCPART]-[HASH]
+  const parts = clean.split('-');
+  const docPart = parts.length >= 3 ? parts[2].replace(/\D/g, '') : '';
+  const prefix = parts.length >= 2 ? parts[1].toUpperCase() : '';
+
+  const matched = clients.find((c) => {
+    const cDoc = (c.document || '').replace(/\D/g, '');
+    if (docPart && docPart.length >= 4 && cDoc.includes(docPart)) return true;
+    if (prefix && prefix.length >= 3 && (c.clientId.toUpperCase().includes(prefix) || c.tradeName.toUpperCase().includes(prefix))) {
+      return true;
+    }
+    return false;
   });
+
+  if (matched) return matched;
+
+
+  return null;
 }
 
 /** Fallback local para verificação de existência do cliente */
@@ -262,11 +241,7 @@ function withPresence(clients: MarthiClient[]): MarthiClient[] {
 
 export function listMarthiClients() {
   const state = load();
-  const seeded = seedFromPartnerLeads(state.clients);
-  if (seeded !== state.clients && state.clients.length === 0) {
-    save({ clients: seeded });
-  }
-  return withPresence(seeded).sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'pt-BR'));
+  return withPresence(state.clients).sort((a, b) => a.tradeName.localeCompare(b.tradeName, 'pt-BR'));
 }
 
 let isHydrating = false;
@@ -275,36 +250,10 @@ export async function hydrateMarthiClientsFromApi(): Promise<MarthiClient[]> {
   if (isHydrating) return listMarthiClients();
   isHydrating = true;
   try {
-    const apiUrl = nestApiUrl();
-    const res = await fetch(`${apiUrl}/api/v1/admin/clients`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return listMarthiClients();
-    const json = await res.json();
-    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-      const state = load();
-      const existingMap = new Map(state.clients.map((c) => [c.clientId, c]));
-
-      for (const item of json.data) {
-        const normalized = normalizeClient(item);
-        const existing = existingMap.get(normalized.clientId);
-        if (existing) {
-          existingMap.set(normalized.clientId, {
-            ...existing,
-            ...normalized,
-            accessToken: normalized.accessToken || existing.accessToken,
-          });
-        } else {
-          existingMap.set(normalized.clientId, normalized);
-        }
-      }
-
-      state.clients = Array.from(existingMap.values());
-      save(state);
-      return listMarthiClients();
-    }
-  } catch (err) {
-    console.warn('[marthiClientsStore] Hydrate from API fallback:', err);
+    const persisted = await nestRequest<Partial<MarthiClient>[]>('/admin/clients');
+    if (!Array.isArray(persisted)) throw new Error('Resposta inválida do MarthiDB.');
+    save({ clients: persisted.map(normalizeClient) });
+    return listMarthiClients();
   } finally {
     isHydrating = false;
   }
@@ -555,6 +504,14 @@ export function setMarthiClientStatus(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     }).catch(() => {});
+    fetch(`${apiUrl}/api/v1/admin/clients/toggle-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: client.email,
+        active: status === 'active',
+      }),
+    }).catch(() => {});
   } catch {
     /* ignore */
   }
@@ -585,6 +542,11 @@ export function setMarthiClientPaymentOk(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentOk, status: client.status }),
     }).catch(() => {});
+    fetch(`${apiUrl}/api/v1/admin/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(client),
+    }).catch(() => {});
   } catch {
     /* ignore */
   }
@@ -608,48 +570,27 @@ export async function identifyClientPaymentAndActivate(
   const client = state.clients.find((item) => item.clientId === clientId);
   if (!client) return { ok: false, client: null, message: 'Cliente não localizado.' };
 
-  const timestamp = now();
-  client.paymentOk = true;
-  client.status = 'active';
-  client.activatedAt = timestamp;
-  client.contractingStatus = client.passwordConfigured ? 'acesso_ativado' : 'acesso_pendente';
-  client.activationTokenSentAt = timestamp;
-  client.paymentDetails = {
-    method: details.method,
-    identifiedAt: timestamp,
-    transactionRef: details.transactionRef?.trim() || undefined,
-    identifiedBy: details.identifiedBy || 'Administrador Marthi',
-    notes: details.notes?.trim() || undefined,
-  };
-
-  if (details.notes?.trim()) {
-    client.notes = client.notes ? `${client.notes}\n[Pagamento]: ${details.notes.trim()}` : details.notes.trim();
-  }
-
-  save(state);
-
-  // Aciona a API de confirmação de pagamento para idempotência, geração de token seguro e disparo de e-mails
   try {
-    const apiUrl = nestApiUrl();
-    await fetch(`${apiUrl}/api/v1/partners/payment-confirm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        protocol: client.clientId,
-        paymentMethod: details.method,
-        transactionRef: details.transactionRef,
-        notes: details.notes,
-      }),
-    });
-  } catch (err) {
-    console.warn('[marthiClientsStore] API payment-confirm call fallback:', err);
+    const result = await nestRequest<{ id: string; status: ContractingStatus; message: string }>(
+      '/partners/payment-confirm', { method: 'POST', body: JSON.stringify({
+        protocol: client.clientId, paymentMethod: details.method,
+        transactionRef: details.transactionRef?.trim(), notes: details.notes?.trim(),
+      }) },
+    );
+    // Re-read the authoritative state. A failed request never changes the local payment status.
+    const persisted = await nestRequest<Partial<MarthiClient>[]>('/admin/clients');
+    const saved = persisted.find((item) => item.clientId === result.id);
+    if (!saved || saved.paymentOk !== true) {
+      return { ok: false, client: null, message: 'Não foi possível verificar a confirmação no MarthiDB. Atualize a lista antes de repetir.' };
+    }
+    const current = load();
+    const normalized = normalizeClient({ ...client, ...saved });
+    current.clients = current.clients.map((item) => item.clientId === clientId ? normalized : item);
+    save(current);
+    return { ok: true, client: normalized, message: result.message };
+  } catch (error) {
+    return { ok: false, client: null, message: error instanceof Error ? error.message : 'Falha ao confirmar pagamento no MarthiDB.' };
   }
-
-  return {
-    ok: true,
-    client,
-    message: `Pagamento de ${client.tradeName} confirmado! Link seguro para criação de senha enviado para ${client.email}.`,
-  };
 }
 
 /**
@@ -788,7 +729,7 @@ export function ingestPartnerSignupToMarthiClients(input: {
   paymentOk?: boolean;
 }) {
   const client = upsertMarthiClient({
-    clientId: `CLI-${input.protocol}`,
+    clientId: input.protocol.startsWith('PRT-') || input.protocol.startsWith('CLI-') ? input.protocol : `CLI-${input.protocol}`,
     tradeName: input.tradeName,
     legalName: input.legalName,
     document: input.document,

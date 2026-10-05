@@ -2,10 +2,14 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool } from '../db/pool.js';
-import { requireOrDemoAuth } from '../middlewares/authMiddleware.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 import { sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 
+import { getStoreWhatsAppConfig, saveStoreCommunication, requireCommunicationAdmin } from '../services/storeCommunication.js';
 export const whatsappRouter = Router();
+whatsappRouter.use('/api/v1/whatsapp', requireAuth, requireCommunicationAdmin);
+whatsappRouter.use('/api/v1/store/whatsapp-settings', requireAuth, requireCommunicationAdmin);
+const safeConfig = (cfg: StoreWhatsAppConfig) => ({...cfg, apiKey: cfg.apiKey ? '••••••••' : ''});
 
 export type StoreWhatsAppConfig = {
   enabled: boolean;
@@ -17,100 +21,49 @@ export type StoreWhatsAppConfig = {
   locationLabel: string;
 };
 
-const defaultWhatsAppConfig: StoreWhatsAppConfig = {
-  enabled: true,
-  baseUrl: env.EVOLUTION_BASE_URL?.replace(/\/$/, '') || 'https://marthi-tec.discloud.app',
-  instance: env.EVOLUTION_INSTANCE || 'marthi',
-  apiKey: env.EVOLUTION_API_KEY || '5E280C9D-239A-4D8B-A765-63D00C291331',
-  storeNumber: env.EVOLUTION_STORE_NUMBER || '5524981244253',
-  notifyCustomer: Boolean(env.EVOLUTION_NOTIFY_CUSTOMER ?? true),
-  locationLabel: env.TOTEM_LOCATION_LABEL || 'Cell Ponto Três Rios',
-};
-
-const memoryWhatsAppConfigs = new Map<string, StoreWhatsAppConfig>([
-  ['STR-DEMO-01', { ...defaultWhatsAppConfig }],
-]);
-
 const storeWhatsAppSchema = z.object({
   enabled: z.boolean().default(true),
-  baseUrl: z.string().default('https://marthi-tec.discloud.app'),
-  instance: z.string().default('marthi'),
-  apiKey: z.string().default('5E280C9D-239A-4D8B-A765-63D00C291331'),
-  storeNumber: z.string().default('5524981244253'),
+  baseUrl: z.string().trim().default(''),
+  instance: z.string().trim().default(''),
+  apiKey: z.string().default(''),
+  storeNumber: z.string().default(''),
   notifyCustomer: z.boolean().default(true),
   locationLabel: z.string().optional().default(''),
 });
 
-export function normalizeInstanceName(raw?: string): string {
-  const norm = (raw || '').trim();
-  if (!norm || norm.includes('discloud.app') || norm.includes('http') || norm === 'marthi-tec') {
-    return 'marthi';
-  }
-  return norm;
-}
-
-async function getStoreWhatsAppConfig(storeId: string): Promise<StoreWhatsAppConfig> {
-  if (pool) {
-    try {
-      const res = await pool.query(`SELECT whatsapp_settings FROM stores WHERE id = $1`, [storeId]);
-      if (res.rows.length > 0 && res.rows[0].whatsapp_settings) {
-        const raw = typeof res.rows[0].whatsapp_settings === 'string'
-          ? JSON.parse(res.rows[0].whatsapp_settings)
-          : res.rows[0].whatsapp_settings;
-        return {
-          ...defaultWhatsAppConfig,
-          ...raw,
-          instance: normalizeInstanceName(raw?.instance),
-        };
-      }
-    } catch (err) {
-      console.warn('[whatsapp] Falha ao ler whatsapp_settings do banco:', err);
-    }
-  }
-
-  const mem = memoryWhatsAppConfigs.get(storeId) || memoryWhatsAppConfigs.get('STR-DEMO-01') || { ...defaultWhatsAppConfig };
-  return {
-    ...mem,
-    instance: normalizeInstanceName(mem.instance),
-  };
-}
-
+export function normalizeInstanceName(raw?: string): string { return (raw || '').trim(); }
 // ── 1. Rotas de Configuração da Loja (Operações) ───────────────────────────
 
-whatsappRouter.get('/api/v1/store/whatsapp-settings', requireOrDemoAuth, async (req: Request, res: Response, next: NextFunction) => {
+whatsappRouter.get('/api/v1/store/whatsapp-settings', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const config = await getStoreWhatsAppConfig(storeId);
-    res.json({ success: true, data: config });
+    res.json({ success: true, data: safeConfig(config) });
   } catch (error) {
     next(error);
   }
 });
 
-whatsappRouter.put('/api/v1/store/whatsapp-settings', requireOrDemoAuth, async (req: Request, res: Response, next: NextFunction) => {
+whatsappRouter.put('/api/v1/store/whatsapp-settings', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const body = storeWhatsAppSchema.parse(req.body);
     const merged = {
-      ...defaultWhatsAppConfig,
+      ...await getStoreWhatsAppConfig(storeId),
       ...body,
       instance: normalizeInstanceName(body.instance),
       baseUrl: body.baseUrl.replace(/\/$/, ''),
     };
 
-    if (pool) {
-      try {
-        await pool.query(
-          `UPDATE stores SET whatsapp_settings = $1::jsonb, updated_at = now() WHERE id = $2`,
-          [JSON.stringify(merged), storeId],
-        );
-      } catch (err) {
-        console.error('[whatsapp] Erro ao gravar whatsapp_settings no banco:', err);
-      }
+    const current = await getStoreWhatsAppConfig(storeId);
+    merged.apiKey = !body.apiKey || body.apiKey.includes('••') ? current.apiKey : body.apiKey.trim();
+    if (merged.enabled && (!merged.baseUrl || !merged.instance || !merged.apiKey)) throw Object.assign(new Error('Informe URL, instância e chave do Evolution.'), { status: 400 });
+    if (merged.baseUrl) {
+      const url = new URL(merged.baseUrl);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw Object.assign(new Error('URL do Evolution inválida.'), { status: 400 });
     }
-
-    memoryWhatsAppConfigs.set(storeId, merged);
-    res.json({ success: true, data: merged });
+    await saveStoreCommunication(storeId, 'whatsapp_settings', merged);
+    res.json({ success: true, data: safeConfig(merged) });
   } catch (error) {
     next(error);
   }
@@ -118,8 +71,9 @@ whatsappRouter.put('/api/v1/store/whatsapp-settings', requireOrDemoAuth, async (
 
 // ── 2. Rotas Operacionais (Status, QR Code, Desconectar, Teste) ─────────────
 
-whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response) => {
-  const storeId = req.header('x-store-id') || (typeof req.query.storeId === 'string' ? req.query.storeId : 'STR-DEMO-01');
+whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response, next: NextFunction) => {
+ try {
+  const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
 
   const baseUrl = cfg.baseUrl;
@@ -130,37 +84,39 @@ whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response
   try {
     const response = await fetch(`${baseUrl}/instance/connectionState/${encodeURIComponent(instance)}`, {
       method: 'GET',
-      headers: { apikey: apiKey },
+      headers: { apikey: apiKey }, signal: AbortSignal.timeout(15000), redirect: 'error',
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      res.json({
+
+      res.json({success:true,data:{
         success: true,
         connected: false,
         state: 'error',
-        error: `HTTP ${response.status}: ${errText}`,
+        error: `Evolution indisponível (HTTP ${response.status}).`,
         instance,
         baseUrl,
         storeNumber,
-      });
+      }});
       return;
     }
 
+    if (!response.ok) throw new Error(`Evolution recusou a operação (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(`Evolution recusou a operação (HTTP ${response.status}).`);
     const data = await response.json();
     const state = data?.instance?.state || 'unknown';
     const connected = state === 'open';
 
-    res.json({
+    res.json({success:true,data:{
       success: true,
       connected,
       state,
       instance,
       baseUrl,
       storeNumber,
-    });
+    }});
   } catch (error) {
-    res.json({
+    res.json({success:true,data:{
       success: true,
       connected: false,
       state: 'offline',
@@ -168,8 +124,9 @@ whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response
       instance,
       baseUrl,
       storeNumber,
-    });
+    }});
   }
+ } catch (error) { next(error); }
 });
 
 const testMessageSchema = z.object({
@@ -180,15 +137,16 @@ const testMessageSchema = z.object({
 whatsappRouter.post('/api/v1/whatsapp/test', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { number, message } = testMessageSchema.parse(req.body);
-    const storeId = req.header('x-store-id') || 'STR-DEMO-01';
+    const storeId = req.storeId!;
     const cfg = await getStoreWhatsAppConfig(storeId);
+    if (!cfg.enabled) throw Object.assign(new Error('WhatsApp desativado nesta loja.'), {status:400});
     const instance = normalizeInstanceName(cfg.instance);
 
     const text = message?.trim() || '✅ *Marthi ERP*: Conexão com Evolution API ativa com sucesso!';
     const result = await sendEvolutionText(number, text, {
       baseUrl: cfg.baseUrl,
       instance,
-      apiKey: cfg.apiKey,
+      apiKey: cfg.apiKey, storeId,
     });
 
     if (!result.ok) {
@@ -202,7 +160,7 @@ whatsappRouter.post('/api/v1/whatsapp/test', async (req: Request, res: Response,
     res.json({
       success: true,
       data: {
-        message: 'Mensagem de teste enviada com sucesso!',
+        message: 'Mensagem de teste aceita pelo Evolution.',
         recipient: normalizeBrazilPhone(number),
         response: result.body,
       },
@@ -212,8 +170,9 @@ whatsappRouter.post('/api/v1/whatsapp/test', async (req: Request, res: Response,
   }
 });
 
-whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response) => {
-  const storeId = req.header('x-store-id') || (typeof req.query.storeId === 'string' ? req.query.storeId : 'STR-DEMO-01');
+whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response, next: NextFunction) => {
+ try {
+  const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
 
   const baseUrl = cfg.baseUrl;
@@ -226,7 +185,7 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
       try {
         await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {
           method: 'DELETE',
-          headers: { apikey: apiKey },
+          headers: { apikey: apiKey }, signal: AbortSignal.timeout(15000), redirect: 'error',
         });
       } catch (logoutErr) {
         console.warn('[whatsapp] Aviso ao efetuar logout antes de gerar QR:', logoutErr);
@@ -235,29 +194,32 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
 
     const response = await fetch(`${baseUrl}/instance/connect/${encodeURIComponent(instance)}`, {
       method: 'GET',
-      headers: { apikey: apiKey },
+      headers: { apikey: apiKey }, signal: AbortSignal.timeout(15000), redirect: 'error',
     });
 
+    if (!response.ok) throw new Error(`Evolution recusou a operação (HTTP ${response.status}).`);
     const data = await response.json();
 
     const state = data?.instance?.state;
     const isAlreadyConnected = state === 'open' && !data?.base64 && !data?.qrcode?.base64 && !data?.code;
 
-    res.json({
+    res.json({success:true,data:{
       success: true,
       alreadyConnected: isAlreadyConnected,
       data,
-    });
+    }});
   } catch (error) {
     res.status(500).json({
       success: false,
       error: { message: error instanceof Error ? error.message : 'Erro ao obter QR Code.' },
     });
   }
+ } catch (error) { next(error); }
 });
 
-whatsappRouter.post('/api/v1/whatsapp/disconnect', requireOrDemoAuth, async (req: Request, res: Response) => {
-  const storeId = req.storeId || 'STR-DEMO-01';
+whatsappRouter.post('/api/v1/whatsapp/disconnect', async (req: Request, res: Response, next: NextFunction) => {
+ try {
+  const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
   const baseUrl = cfg.baseUrl;
   const instance = normalizeInstanceName(cfg.instance);
@@ -266,15 +228,17 @@ whatsappRouter.post('/api/v1/whatsapp/disconnect', requireOrDemoAuth, async (req
   try {
     const response = await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {
       method: 'DELETE',
-      headers: { apikey: apiKey },
+      headers: { apikey: apiKey }, signal: AbortSignal.timeout(15000), redirect: 'error',
     });
+    if (!response.ok) throw new Error(`Evolution recusou a operação (HTTP ${response.status}).`);
     const data = await response.json();
-    res.json({ success: true, message: 'WhatsApp desconectado da instância com sucesso.', data });
+    res.json({success:true,data:{ success: true, message: 'WhatsApp desconectado da instância com sucesso.', data }});
   } catch (error) {
     res.status(500).json({
       success: false,
       error: { message: error instanceof Error ? error.message : 'Falha ao desconectar WhatsApp.' },
     });
   }
+ } catch (error) { next(error); }
 });
 

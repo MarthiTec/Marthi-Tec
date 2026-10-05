@@ -1,3 +1,4 @@
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
 /**
  * Store de Orçamentos Comerciais do PDV (Marthi-Tec).
  *
@@ -12,8 +13,6 @@
  */
 
 export const POS_QUOTES_EVENT = 'marthi-pos-quotes-updated';
-const STORAGE_KEY = 'marthi.pos.quotes.v1';
-const SETTINGS_KEY = 'marthi.pos.quotes.settings.v1';
 
 export type PosQuoteStatus =
   | 'draft'
@@ -142,25 +141,15 @@ function formatSequence(num: number): string {
   return String(num).padStart(6, '0');
 }
 
-function loadSettings(): PosQuoteSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_QUOTE_SETTINGS };
-    return { ...DEFAULT_QUOTE_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    return { ...DEFAULT_QUOTE_SETTINGS };
-  }
-}
-
-export function saveQuoteSettings(next: Partial<PosQuoteSettings>): PosQuoteSettings {
-  const current = loadSettings();
-  const merged = { ...current, ...next };
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
-  } catch {
-    /* ignore */
-  }
-  return merged;
+type PersistedQuotes = { state: State; settings: PosQuoteSettings };
+function emptyQuotes(): PersistedQuotes { return { state: seedQuotes(), settings: { ...DEFAULT_QUOTE_SETTINGS } }; }
+function loadSettings(): PosQuoteSettings { return readModuleState('pos-quotes', emptyQuotes()).settings; }
+export async function saveQuoteSettings(next: Partial<PosQuoteSettings>): Promise<PosQuoteSettings> {
+  const current = readModuleState('pos-quotes', emptyQuotes());
+  current.settings = { ...current.settings, ...next };
+  await saveModuleState('pos-quotes', current);
+  window.dispatchEvent(new Event(POS_QUOTES_EVENT));
+  return current.settings;
 }
 
 export function getQuoteSettings(): PosQuoteSettings {
@@ -170,44 +159,18 @@ export function getQuoteSettings(): PosQuoteSettings {
 function seedQuotes(): State {
   return {
     quotes: [],
-    lastSequence: 100,
+    lastSequence: 0,
   };
 }
 
 function load(): State {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const seeded = seedQuotes();
-      save(seeded);
-      return seeded;
-    }
-    const parsed = JSON.parse(raw) as Partial<State>;
-    const rawQuotes = Array.isArray(parsed.quotes) ? parsed.quotes.map(normalizeQuote) : [];
-    const quotes = rawQuotes.filter((q) => q.id && !q.id.startsWith('ORC-DEMO-'));
-    const maxSeq = quotes.reduce((acc, q) => Math.max(acc, q.sequenceNumber || 0), parsed.lastSequence || 100);
-    const state: State = {
-      quotes,
-      lastSequence: maxSeq,
-    };
-    if (quotes.length !== rawQuotes.length) {
-      save(state);
-    }
-    return state;
-  } catch {
-    return seedQuotes();
-  }
+  const state = readModuleState('pos-quotes', emptyQuotes()).state;
+  return { quotes: state.quotes.map(normalizeQuote), lastSequence: state.lastSequence };
 }
-
-function save(state: State) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    /* ignore */
-  }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(POS_QUOTES_EVENT));
-  }
+async function save(state: State) {
+  const current = readModuleState('pos-quotes', emptyQuotes());
+  await saveModuleState('pos-quotes', { ...current, state });
+  window.dispatchEvent(new Event(POS_QUOTES_EVENT));
 }
 
 function normalizeQuote(raw: any): PosQuote {
@@ -290,7 +253,7 @@ export function isQuoteExpired(quote: PosQuote, nowMs = Date.now()): boolean {
 }
 
 /** Atualiza status de orçamentos expirados automaticamente caso configurado. */
-export function autoSyncExpiredQuotes(): void {
+export async function autoSyncExpiredQuotes(): Promise<void> {
   const settings = getQuoteSettings();
   if (!settings.autoExpireCheck) return;
   const state = load();
@@ -313,13 +276,12 @@ export function autoSyncExpiredQuotes(): void {
   }
 
   if (changed) {
-    save(state);
+    await save(state);
   }
 }
 
 /** Retorna todos os orçamentos, ordenados por data decrescente. */
 export function listPosQuotes(): PosQuote[] {
-  autoSyncExpiredQuotes();
   return load().quotes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -362,7 +324,7 @@ export type CreatePosQuoteInput = {
 };
 
 /** Cria um novo orçamento a partir do PDV ou Retaguarda. */
-export function createPosQuote(input: CreatePosQuoteInput): PosQuote {
+export async function createPosQuote(input: CreatePosQuoteInput): Promise<PosQuote> {
   const state = load();
   const settings = getQuoteSettings();
   const now = new Date();
@@ -437,16 +399,16 @@ export function createPosQuote(input: CreatePosQuoteInput): PosQuote {
 
   state.quotes.unshift(newQuote);
   state.lastSequence = nextSeq;
-  save(state);
+  await save(state);
   return newQuote;
 }
 
 /** Atualiza dados de um orçamento existente (se não estiver convertido ou cancelado). */
-export function updatePosQuote(
+export async function updatePosQuote(
   id: string,
   patch: Partial<Omit<PosQuote, 'id' | 'quoteNumber' | 'sequenceNumber' | 'createdAt' | 'history'>>,
   actorName: string,
-): { ok: true; quote: PosQuote } | { ok: false; error: string } {
+): Promise<{ ok: true; quote: PosQuote } | { ok: false; error: string }> {
   const state = load();
   const index = state.quotes.findIndex((q) => q.id === id);
   if (index === -1) return { ok: false, error: 'Orçamento não encontrado.' };
@@ -494,17 +456,17 @@ export function updatePosQuote(
   });
 
   state.quotes[index] = updated;
-  save(state);
+  await save(state);
   return { ok: true, quote: updated };
 }
 
 /** Atualiza status de um orçamento (ex: Aprovado, Recusado, Cancelado, Enviado). */
-export function changeQuoteStatus(
+export async function changeQuoteStatus(
   id: string,
   newStatus: PosQuoteStatus,
   actorName: string,
   reason?: string,
-): { ok: true; quote: PosQuote } | { ok: false; error: string } {
+): Promise<{ ok: true; quote: PosQuote } | { ok: false; error: string }> {
   const state = load();
   const quote = state.quotes.find((q) => q.id === id);
   if (!quote) return { ok: false, error: 'Orçamento não encontrado.' };
@@ -536,20 +498,20 @@ export function changeQuoteStatus(
     createdAt: now,
   });
 
-  save(state);
+  await save(state);
   return { ok: true, quote };
 }
 
 /** Duplica um orçamento gerando uma nova proposta preservando os produtos e condições. */
-export function duplicatePosQuote(
+export async function duplicatePosQuote(
   id: string,
   actorName: string,
-): { ok: true; quote: PosQuote } | { ok: false; error: string } {
+): Promise<{ ok: true; quote: PosQuote } | { ok: false; error: string }> {
   const original = getPosQuote(id);
   if (!original) return { ok: false, error: 'Orçamento de origem não encontrado.' };
 
   const settings = getQuoteSettings();
-  const created = createPosQuote({
+  const created = await createPosQuote({
     customerId: original.customerId,
     customerName: original.customerName,
     customerDocument: original.customerDocument,
@@ -599,14 +561,14 @@ export function duplicatePosQuote(
   const idx = state.quotes.findIndex((q) => q.id === created.id);
   if (idx !== -1) {
     state.quotes[idx] = created;
-    save(state);
+    await save(state);
   }
 
   return { ok: true, quote: created };
 }
 
 /** Registra impressão de um orçamento para histórico de auditoria. */
-export function registerQuotePrint(id: string, actorName: string): void {
+export async function registerQuotePrint(id: string, actorName: string): Promise<void> {
   const state = load();
   const quote = state.quotes.find((q) => q.id === id);
   if (!quote) return;
@@ -619,15 +581,15 @@ export function registerQuotePrint(id: string, actorName: string): void {
     details: `Documento impresso / visualizado (${quote.printedCount}ª via).`,
     createdAt: new Date().toISOString(),
   });
-  save(state);
+  await save(state);
 }
 
 /** Converte orçamento em venda (acionado quando a venda do PDV é concluída). */
-export function markQuoteConverted(
+export async function markQuoteConverted(
   quoteId: string,
   orderId: string,
   actorName: string,
-): { ok: true; quote: PosQuote } | { ok: false; error: string } {
+): Promise<{ ok: true; quote: PosQuote } | { ok: false; error: string }> {
   const state = load();
   const quote = state.quotes.find((q) => q.id === quoteId);
   if (!quote) return { ok: false, error: 'Orçamento não encontrado.' };
@@ -645,12 +607,12 @@ export function markQuoteConverted(
     createdAt: now,
   });
 
-  save(state);
+  await save(state);
   return { ok: true, quote };
 }
 
 /** Exclui um orçamento (caso não esteja convertido). */
-export function deletePosQuote(id: string): { ok: true } | { ok: false; error: string } {
+export async function deletePosQuote(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const state = load();
   const quote = state.quotes.find((q) => q.id === id);
   if (!quote) return { ok: false, error: 'Orçamento não encontrado.' };
@@ -659,7 +621,7 @@ export function deletePosQuote(id: string): { ok: true } | { ok: false; error: s
   }
 
   state.quotes = state.quotes.filter((q) => q.id !== id);
-  save(state);
+  await save(state);
   return { ok: true };
 }
 
@@ -719,3 +681,5 @@ export function getQuotesDashboardKpis() {
     totalConverted,
   };
 }
+
+export async function hydratePosQuotesFromApi() { await loadModuleState('pos-quotes', emptyQuotes()); await autoSyncExpiredQuotes(); window.dispatchEvent(new Event(POS_QUOTES_EVENT)); }

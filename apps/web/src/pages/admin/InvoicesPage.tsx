@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAdminState } from '../../data/adminStore';
@@ -55,9 +55,11 @@ function money(value: number) {
 
 export function InvoicesPage() {
   const { user } = useAuth();
+  const [searchParams]=useSearchParams();
   const [kindFilter, setKindFilter] = useState<'all' | InvoiceKind>('all');
   const [invoices, setInvoices] = useState(() => listInvoices());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('nota'));
+  useEffect(()=>{setSelectedId(searchParams.get('nota'));},[searchParams]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [stockId, setStockId] = useState('');
@@ -351,7 +353,7 @@ export function InvoicesPage() {
     const draftDoc: FiscalDocument = fiscalDoc || {
       id: `XML-${selected.id}`,
       kind: 'nfe',
-      status: 'authorized',
+      status: 'pending',
       refType: 'invoice',
       refId: selected.id,
       customerName: partyName(selected),
@@ -360,7 +362,7 @@ export function InvoicesPage() {
       amount: invoiceTotal(selected),
       number: selected.number || '1',
       series: selected.series || '1',
-      accessKey: `332609${cleanDocument(issuer.cnpj || '00000000000100')}55001${String(selected.number).padStart(9, '0')}1000000018`,
+      accessKey: 'PREVIEW-SEM-TRANSMISSAO',
       provider: 'sefaz_mock',
       createdAt: new Date().toISOString(),
       message: selected.notes || 'Emissão regular de nota fiscal',
@@ -372,11 +374,11 @@ export function InvoicesPage() {
       })),
       nfe: {
         environment: issuer.environment,
-        protocol: '133260000000001',
-        receiptNumber: 'REC2026001',
-        statusCode: '100',
-        statusMessage: 'Autorizado o uso da NF-e',
-        xmlDigest: 'Wp6Z9v8h34+=',
+        protocol: '—',
+        receiptNumber: '—',
+        statusCode: '—',
+        statusMessage: 'Pré-visualização sem transmissão',
+        xmlDigest: '',
         documentPurpose: docPurpose,
       },
     };
@@ -429,9 +431,7 @@ export function InvoicesPage() {
     flash(`Status SEFAZ consultado: ${res.document.nfe?.statusMessage || 'Autorizado'}.`);
   }
 
-  function cleanDocument(doc: string) {
-    return doc.replace(/\D/g, '');
-  }
+
 
   // Cálculos de totais de impostos
   const itemsSum = selected ? invoiceItemsTotal(selected) : 0;
@@ -526,7 +526,7 @@ export function InvoicesPage() {
             Ambiente SEFAZ: <strong>{SEFAZ_ENV_LABEL[issuer.environment]}</strong> · Série Padrão: <strong>{issuer.nfeSeries || '1'}</strong>
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="settings-form-actions">
           <Link to="/painel/fiscal/config" className="btn btn--ghost btn--sm">
             ⚙️ Configuração Fiscal
           </Link>
@@ -626,7 +626,7 @@ export function InvoicesPage() {
                 <h2 style={{ margin: 0 }}>
                   {INVOICE_KIND_LABEL[selected.kind]} · {selected.id}
                 </h2>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="settings-form-actions">
                   <button
                     type="button"
                     className="btn btn--sm btn--ghost"
@@ -653,7 +653,7 @@ export function InvoicesPage() {
               </p>
 
               {/* Abas do Painel de Detalhes da Nota */}
-              <div style={{ display: 'flex', gap: 6, margin: '14px 0 10px', borderBottom: '1px solid var(--line)', paddingBottom: 6 }}>
+              <div className="invoice-detail-tabs">
                 <button
                   type="button"
                   className={`btn btn--sm ${detailTab === 'geral' ? 'btn--primary' : 'btn--ghost'}`}

@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 /** Sessão de caixa do PDV (localStorage) + vales e trocas. Dual-path Nest. */
 
 import {
@@ -202,7 +203,7 @@ function load(): State {
   try {
     let raw = localStorage.getItem(currentKey);
     if (!raw && currentKey !== STORAGE_KEY) {
-      const globalRaw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+      const globalRaw = localStorage.getItem(storeScopedKey(STORAGE_KEY)) ?? localStorage.getItem(LEGACY_KEY);
       if (globalRaw) {
         const store = getActiveStore();
         if (store?.isMatrix) {
@@ -239,7 +240,7 @@ function save(state: State) {
     localStorage.setItem(currentKey, JSON.stringify(state));
     const store = getActiveStore();
     if (!store || store.isMatrix) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
     }
   } catch {
     /* ignore */

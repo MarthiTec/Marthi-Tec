@@ -1,3 +1,6 @@
+import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
+import {PickupMethodsPage} from './pages/admin/PickupMethodsPage';
+import {PickupTrackingPage} from './pages/PickupTrackingPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -52,6 +55,8 @@ import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
 import { ErpPanelPage } from './pages/admin/ErpPanelPage';
 import { CustomersPage } from './pages/admin/CustomersPage';
 import { StockPage } from './pages/admin/StockPage';
+import { CommercialPage } from './pages/admin/CommercialPage';
+import { BrandsPage } from './pages/admin/BrandsPage';
 import { AttributesPage } from './pages/admin/AttributesPage';
 import { OrdersPage } from './pages/admin/OrdersPage';
 import { FinancePage } from './pages/admin/FinancePage';
@@ -93,6 +98,9 @@ import { CardapioAdminPage } from './pages/cardapio/CardapioAdminPage';
 import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
 import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 import { PainelUsersPage } from './pages/admin/PainelUsersPage';
+import { ExternalSalePage } from './pages/admin/ExternalSalePage';
+import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
+import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
 function LegacyMarthiRedirect() {
   const location = useLocation();
@@ -105,6 +113,7 @@ export function App() {
     <AuthProvider>
       <ErrorBoundary fallbackTitle="Ocorreu um erro no sistema">
         <Routes>
+        <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
@@ -122,6 +131,9 @@ export function App() {
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />
         <Route path="/totem" element={<TotemPage />} />
         <Route path="/caixa" element={<CaixaPage />} />
+        <Route path="/venda-externa" element={<Navigate to="/painel/venda-externa" replace />} />
+        <Route path="/metas" element={<Navigate to="/painel/metas" replace />} />
+        <Route path="/relatorio-vendas" element={<Navigate to="/painel/relatorio-vendas" replace />} />
         <Route path="/mesa" element={<MesaPage />} />
         <Route path="/cozinha" element={<CozinhaPage />} />
         <Route path="/cardapio" element={<CardapioPublicPage />} />
@@ -184,13 +196,18 @@ export function App() {
           <Route path="produtos" element={<StockPage />} />
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
+          <Route path="notas" element={<InvoicesPage />} />
+          <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
+          <Route path="tipos-retirada" element={<PickupMethodsPage />} />
           <Route path="atributos" element={<AttributesPage />} />
+          <Route path="marcas" element={<BrandsPage />} />
           <Route path="kits" element={<KitsPage />} />
           <Route path="lotes" element={<LotsPage />} />
           <Route path="almoxarifado" element={<WarehousePage />} />
           <Route path="tabelas" element={<PriceTablesPage />} />
           <Route path="campanhas" element={<PromoCampaignsPage />} />
           <Route path="orcamentos" element={<QuotesManagementPage />} />
+          <Route path="comercial" element={<CommercialPage />} />
           <Route path="clientes" element={<CustomersPage />} />
           <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="permissoes" element={<PermissionsPage />} />
@@ -215,9 +232,13 @@ export function App() {
           <Route path="operacoes/whatsapp" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
+          <Route path="venda-externa" element={<ExternalSalePage />} />
+          <Route path="metas" element={<GoalsManagementPage />} />
+          <Route path="relatorio-vendas" element={<SalesGoalsReportPage />} />
           <Route path="totem" element={<TotemInsightsPage />} />
           <Route path="totem/produtos" element={<StockPage />} />
           <Route path="totem/atributos" element={<AttributesPage />} />
+          <Route path="totem/marcas" element={<BrandsPage />} />
           <Route path="totem/config" element={<TotemSettingsPage />} />
           <Route path="pedidos" element={<OrdersPage />} />
           <Route path="crm" element={<CrmPanelPage />} />

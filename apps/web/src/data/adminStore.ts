@@ -1,3 +1,5 @@
+import type {PricingPolicy} from './productPricing';
+import {storeScopedKey} from './storeCache';
 import { ATTR_CAP, ATTR_COR } from './attributeStore';
 import {
   apiClosePosSale,
@@ -16,7 +18,7 @@ import {
   apiUpdateStock,
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
-import { getActiveTenantKey, tenantScopedKey, isRealClientTenant } from './tenantContext';
+import { isRealClientTenant } from './tenantContext';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
@@ -45,8 +47,17 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 export type StockUnit = 'UN' | 'KG';
 
 export type StockItem = {
+  active?: boolean;
+  skuAuto?:boolean;
+  pricingPolicy?:PricingPolicy|null;
+  lastEntry?:{movementId:string;enteredAt:string;origin:string;qty:number;unitCost:number;notes:string;invoice:{id:string;number:string;series:string;issuedAt:string;movementAt?:string;status:string}|null}|null;
+  pickupPrices?: Record<string,number|null>;
   id: string;
   name: string;
+  /** Marca do produto (ex: Apple, Xiaomi, Samsung...). */
+  brand?: string;
+  /** Categoria do produto (ex: Smartphones, Acessórios, Peças...). */
+  category?: string;
   sku: string;
   barcode: string;
   imei: string;
@@ -163,6 +174,7 @@ export type FinanceEntry = {
 };
 
 export type PosLineInput = {
+  attributes?: Array<{id:string;name:string;value:string}>;
   stockId: string;
   name: string;
   qty: number;
@@ -185,66 +197,8 @@ function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-function seedPriceTables(): PriceTable[] {
-  return [
-    { id: 'TAB-VISTA', name: 'Vista', percent: 0, active: true },
-    { id: 'TAB-ATACADO', name: 'Atacado', percent: -8, active: true },
-    { id: 'TAB-CARTAO', name: 'Cartão', percent: 5, active: true },
-  ];
-}
-
-function seedPayments(): PaymentMethod[] {
-  return [
-    {
-      id: 'PAY-DIN',
-      name: 'Dinheiro',
-      type: 'cash',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-PIX',
-      name: 'Pix',
-      type: 'pix',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-DEB',
-      name: 'Cartão de débito',
-      type: 'debit',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-CRE',
-      name: 'Cartão de crédito',
-      type: 'credit',
-      priceTableId: 'TAB-CARTAO',
-      maxInstallments: 12,
-      active: true,
-    },
-    {
-      id: 'PAY-VR',
-      name: 'Vale Refeição',
-      type: 'other',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-VC',
-      name: 'Vale Crédito',
-      type: 'other',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-  ];
-}
+function seedPriceTables(): PriceTable[] { return []; }
+function seedPayments(): PaymentMethod[] { return []; }
 
 function seed(): AdminState {
   return {
@@ -278,6 +232,9 @@ function normalizeStock(item: StockItem): StockItem {
   const avgCost = Number(item.avgCost);
   return {
     ...item,
+    brand: item.brand ?? '',
+    category: item.category ?? 'Geral',
+    pickupPrices: item.pickupPrices ?? {},
     barcode: item.barcode ?? '',
     imei: item.imei ?? '',
     attrs,
@@ -355,8 +312,8 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
       sellerName: order.sellerName ?? '',
     })),
     finance: (parsed.finance ?? base.finance).map(normalizeFinance),
-    priceTables: parsed.priceTables?.length ? parsed.priceTables : base.priceTables,
-    payments: parsed.payments?.length ? parsed.payments : base.payments,
+    priceTables: Array.isArray(parsed.priceTables) ? parsed.priceTables : [],
+    payments: Array.isArray(parsed.payments) ? parsed.payments : [],
   };
 }
 
@@ -364,8 +321,7 @@ let memoryState: AdminState | null = null;
 let memoryStateTenant: string | null = null;
 
 function load(): AdminState {
-  const activeTenant = getActiveTenantKey();
-  if (memoryState && memoryStateTenant === activeTenant) {
+  if (memoryState && memoryStateTenant === storeScopedKey(STORAGE_KEY)) {
     return {
       customers: memoryState.customers.map((item) => ({ ...item })),
       stock: memoryState.stock.map((item) => ({ ...item, attrs: { ...item.attrs }, images: [...item.images] })),
@@ -376,8 +332,8 @@ function load(): AdminState {
     };
   }
 
-  memoryStateTenant = activeTenant;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  memoryStateTenant = storeScopedKey(STORAGE_KEY);
+  const key = storeScopedKey(STORAGE_KEY);
 
   try {
     localStorage.removeItem('marthi.admin.v1');
@@ -389,8 +345,8 @@ function load(): AdminState {
           stock: [],
           orders: [],
           finance: [],
-          priceTables: seedPriceTables(),
-          payments: seedPayments(),
+          priceTables: [],
+          payments: [],
         };
         save(fresh);
         return fresh;
@@ -407,8 +363,8 @@ function load(): AdminState {
           stock: [],
           orders: [],
           finance: [],
-          priceTables: seedPriceTables(),
-          payments: seedPayments(),
+          priceTables: [],
+          payments: [],
         };
         save(fresh);
         return fresh;
@@ -479,10 +435,9 @@ export function defaultCardRate(): number {
 }
 
 function save(state: AdminState) {
-  const activeTenant = getActiveTenantKey();
-  memoryStateTenant = activeTenant;
+  memoryStateTenant = storeScopedKey(STORAGE_KEY);
   memoryState = state;
-  const key = tenantScopedKey(STORAGE_KEY, activeTenant);
+  const key = storeScopedKey(STORAGE_KEY);
   try {
     localStorage.setItem(key, JSON.stringify(state));
   } catch {
@@ -537,7 +492,13 @@ function apiErrorMessage(error: unknown, fallback: string) {
 /** Payload Nest Create/UpdateStockDto — sem maxQty/avgCost/unit etc. (forbidNonWhitelisted). */
 function toNestStockBody(item: StockItem) {
   return {
+    pickupPrices: item.pickupPrices ?? {},
+    skuAuto: item.skuAuto,
+    avgCost: item.avgCost,
+    pricingPolicy: item.pricingPolicy?.basis ? item.pricingPolicy : null,
     name: item.name,
+    brand: item.brand || undefined,
+    category: item.category || undefined,
     kind: item.kind,
     sku: item.sku || undefined,
     barcode: item.barcode || undefined,
@@ -845,7 +806,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
     try {
       await apiDeleteStock(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -858,11 +819,12 @@ export async function removeStockItem(id: string): Promise<AdminState> {
 }
 
 export async function removePriceTable(id: string): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeletePriceTable(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover tabela no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -872,11 +834,12 @@ export async function removePriceTable(id: string): Promise<AdminState> {
 }
 
 export async function removePayment(id: string): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeletePayment(id);
     } catch (error) {
-      console.warn('[adminStore] Falha ao remover pagamento no Nest, removendo localmente:', error);
+      throw error;
     }
   }
   const state = load();
@@ -949,6 +912,7 @@ export async function upsertStockItem(
 }
 
 export async function savePriceTables(items: PriceTable[]): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const current = load().priceTables;
@@ -980,6 +944,7 @@ export async function savePriceTables(items: PriceTable[]): Promise<AdminState> 
 }
 
 export async function savePayments(items: PaymentMethod[]): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const current = load().payments;

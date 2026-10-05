@@ -308,7 +308,7 @@ export function StockExcelImportModal({ balance, isOpen, onClose, onImportComple
                 </div>
               ) : null}
 
-              <div className="stock-inv-modal-table-box">
+              <div className="stock-inv-modal-table-box admin-table-container">
                 <table className="stock-inv-modal-table">
                   <thead>
                     <tr>

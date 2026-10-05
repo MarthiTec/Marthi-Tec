@@ -1,3 +1,6 @@
+import { nestGet, nestPost, nestDelete } from '../services/nestClient';
+import { getActiveStoreId } from './multiStoreStore';
+import {storeScopedKey} from './storeCache';
 /**
  * Motor de Campanhas de Desconto e Promoções Comerciais (ERP → PDV & Orçamentos).
  *
@@ -115,6 +118,7 @@ export type PromoCampaign = {
 type Store = { campaigns: PromoCampaign[] };
 
 let memory: Store | null = null;
+let memoryStoreId: string | null = null;
 
 function uid(prefix = 'PROMO') {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -214,9 +218,11 @@ function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
 }
 
 function load(): Store {
+  const storeId = getActiveStoreId();
+  if (memoryStoreId !== storeId) { memory = null; memoryStoreId = storeId; }
   if (memory) return memory;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Store>;
       const rawCampaigns = Array.isArray(parsed.campaigns) ? parsed.campaigns.map(normalize) : [];
@@ -227,7 +233,7 @@ function load(): Store {
       memory = { campaigns: sanitized };
       if (JSON.stringify(sanitized) !== JSON.stringify(rawCampaigns)) {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+          localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(memory));
         } catch {
           /* ignore */
         }
@@ -244,7 +250,7 @@ function load(): Store {
 function save(next: Store) {
   memory = next;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(next));
   } catch {
     /* ignore */
   }
@@ -270,9 +276,9 @@ export function getPromoCampaign(id: string): PromoCampaign | null {
   return listPromoCampaigns().find((item) => item.id === id) ?? null;
 }
 
-export function upsertPromoCampaign(
+export async function upsertPromoCampaign(
   input: Omit<PromoCampaign, 'id' | 'createdAt'> & { id?: string },
-): PromoCampaign {
+): Promise<PromoCampaign> {
   const state = load();
   const saved = normalize({
     ...input,
@@ -281,14 +287,16 @@ export function upsertPromoCampaign(
       ? state.campaigns.find((row) => row.id === input.id)?.createdAt || new Date().toISOString()
       : new Date().toISOString(),
   });
-  const idx = state.campaigns.findIndex((row) => row.id === saved.id);
-  if (idx >= 0) state.campaigns[idx] = saved;
-  else state.campaigns.unshift(saved);
+  const persisted = normalize(await nestPost<PromoCampaign>('/promotions', saved));
+  const idx = state.campaigns.findIndex((row) => row.id === persisted.id);
+  if (idx >= 0) state.campaigns[idx] = persisted;
+  else state.campaigns.unshift(persisted);
   save({ ...state, campaigns: [...state.campaigns] });
-  return saved;
+  return persisted;
 }
 
-export function removePromoCampaign(id: string): void {
+export async function removePromoCampaign(id: string): Promise<void> {
+  await nestDelete('/promotions/' + encodeURIComponent(id));
   const state = load();
   state.campaigns = state.campaigns.filter((row) => row.id !== id);
   save({ ...state });
@@ -636,4 +644,12 @@ export function evaluateCampaignForLine(
     explanation: best.explanation,
     giftDescription: best.giftDescription,
   };
+}
+
+export async function hydratePromoCampaigns() {
+  const storeId = getActiveStoreId();
+  const rows = await nestGet<PromoCampaign[]>('/promotions');
+  if (storeId !== getActiveStoreId()) throw new Error('A loja mudou durante a consulta.');
+  memoryStoreId = storeId;
+  save({ campaigns: rows.map(normalize) });
 }

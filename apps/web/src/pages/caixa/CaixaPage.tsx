@@ -1,3 +1,6 @@
+import {PickupFields} from '../../components/PickupFields';
+import type {DeliveryAddress} from '../../data/pickup';
+import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
@@ -130,6 +133,8 @@ function isValidCpf(value: string) {
 type MoneyMode = 'money' | 'percent';
 
 type CartLine = {
+  pickupMethodId?:string;deliveryAddress?:DeliveryAddress;sourceTicketId?:string;
+  attributes?: Array<{id:string;name:string;value:string}>;
   key: string;
   stockId: string;
   name: string;
@@ -423,7 +428,10 @@ export function CaixaPage() {
 
   async function confirmCancelSale(event: FormEvent) {
     event.preventDefault();
-    if (!verifyDeleteItemPassword(cancelSalePassword)) {
+    let authorized = false;
+    try { authorized = await verifyDeleteItemPassword(cancelSalePassword); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível conferir autorização.'); return; }
+    if (!authorized) {
       setError('Senha administrativa / autorização incorreta.');
       return;
     }
@@ -948,7 +956,7 @@ export function CaixaPage() {
     const lineKey = `totem:${ticket.id}:${Date.now()}`;
     const newLine: CartLine = {
       key: lineKey,
-      stockId: '',
+      stockId: ticket.stockId||'',sourceTicketId:ticket.id,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,attributes:ticket.attributes,
       name: itemFullName,
       sku: 'TOTEM',
       imei: '',
@@ -962,7 +970,7 @@ export function CaixaPage() {
       lineSurcharge: 0,
       lineSurchargeMode: 'money',
       isFrozenPrice: true,
-      isAdHoc: true,
+      isAdHoc: !ticket.stockId,
       itemType: 'product',
       promoLabel: `Totem ${ticket.ticketSenha || ticket.id}`,
     };
@@ -1019,7 +1027,7 @@ export function CaixaPage() {
     let qtyAdd = qtyOverride ?? pendingQty ?? null;
     if (qtyAdd == null) {
       if (isWeighedUnit(unit) && getCashSettings().scaleEnabled) {
-        qtyAdd = readScaleKg() ?? 1;
+        qtyAdd = readScaleKg();
       } else {
         qtyAdd = 1;
       }
@@ -1035,6 +1043,10 @@ export function CaixaPage() {
       return;
     }
     const qtyAddRaw = resolveAddQty(item, qtyOverride);
+    if (qtyAddRaw == null || !Number.isFinite(qtyAddRaw) || qtyAddRaw <= 0) {
+      setError('Não há leitura válida da balança. Informe o peso medido para adicionar o produto.');
+      return;
+    }
     if (!isWeighedUnit(unit) && Math.abs(qtyAddRaw % 1) > 1e-9) {
       setError(`${item.name} é UN — quantidade deve ser inteira (ex.: 12*).`);
       return;
@@ -1166,10 +1178,13 @@ export function CaixaPage() {
     focusCode();
   }
 
-  function confirmDeleteLine(event: FormEvent) {
+  async function confirmDeleteLine(event: FormEvent) {
     event.preventDefault();
     if (!deletePrompt) return;
-    if (!verifyDeleteItemPassword(deletePassword)) {
+    let authorized = false;
+    try { authorized = await verifyDeleteItemPassword(deletePassword); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Não foi possível conferir autorização.'); return; }
+    if (!authorized) {
       setError('Senha administrativa / autorização incorreta.');
       return;
     }
@@ -1302,6 +1317,8 @@ export function CaixaPage() {
         lines: pricedLines.map((line) => ({
           stockId: line.stockId,
           name: line.name,
+          pickupMethodId:line.pickupMethodId,deliveryAddress:line.deliveryAddress,sourceTicketId:line.sourceTicketId,
+          attributes: line.attributes,
           qty: line.qty,
           unitPrice: line.unitPrice,
           imei: line.imei,
@@ -1340,7 +1357,8 @@ export function CaixaPage() {
         setLinkedOsId(null);
       }
       if (linkedQuoteId) {
-        void markQuoteConverted(linkedQuoteId, order?.id || '', user?.name || operatorName);
+        try { await markQuoteConverted(linkedQuoteId, order?.id || '', user?.name || operatorName); }
+        catch (error) { setError('Venda registrada, mas o vínculo com o orçamento não foi atualizado: ' + (error instanceof Error ? error.message : 'Atualize e confira o orçamento.')); }
         setLinkedQuoteId(null);
       }
       setLastOrderId(order?.id ?? null);
@@ -2315,7 +2333,7 @@ export function CaixaPage() {
               {pricedLines.length === 0 ? (
                 <p className="empty">Nenhum item. Escaneie ou use o estoque rápido.</p>
               ) : (
-                <table className="admin-table pdv__cart-table">
+                <div className="admin-table-container"><table className="admin-table pdv__cart-table">
                   <thead>
                     <tr>
                       <th>Produto</th>
@@ -2341,6 +2359,8 @@ export function CaixaPage() {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <strong className="pdv__item">{line.name}</strong>
+                                <PickupFields product={stock.find(item=>item.id===line.stockId)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map(entry=>entry.key===line.key?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
+                                <SaleAttributeFields surface="pdv" product={stock.find(item=>item.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map(entry=>entry.key===line.key ? {...entry,attributes} : entry))}/>
                                 {line.isAdHoc ? (
                                   <span
                                     style={{
@@ -2549,7 +2569,7 @@ export function CaixaPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </div>
           </article>

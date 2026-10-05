@@ -4,8 +4,8 @@ import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
 import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
-import { PLANS, type PlanId } from '../data/catalog';
-import { getCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
+import { type PlanId } from '../data/catalog';
+import { getCommercialPlans, hydrateCommercialPlans, PLANS_UPDATED_EVENT, type CommercialPlan } from '../data/plansStore';
 import { MARTHI_PRODUCTS } from '../data/marthiProducts';
 import {
   enableLivePresentation,
@@ -16,7 +16,6 @@ import {
   MARTHI_COMPANY,
   marthiWhatsAppHref,
 } from '../data/companyContact';
-import { ingestSellerApplicantToCrm, listLeadMessages, postHomepageCrmChat } from '../data/crmStore';
 import { hasModule } from '../data/storePlan';
 import { useStoreCustomization } from '../data/storeSegment';
 import './home.css';
@@ -73,10 +72,6 @@ export function HomePage() {
   const [contactPhone, setContactPhone] = useState('');
   const [contactMsg, setContactMsg] = useState('');
   const [contactFeedback, setContactFeedback] = useState('');
-  const [guestLeadId, setGuestLeadId] = useState<string | null>(null);
-  const [guestThread, setGuestThread] = useState<
-    Array<{ id: string; fromName: string; text: string; fromLead?: boolean; createdAt: string }>
-  >([]);
   const [jobName, setJobName] = useState('');
   const [jobPhone, setJobPhone] = useState('');
   const [jobCity, setJobCity] = useState('');
@@ -131,6 +126,7 @@ export function HomePage() {
       setCommercialPlans(getCommercialPlans());
     }
     window.addEventListener('marthi-plan-updated', refresh);
+    void hydrateCommercialPlans().catch(() => { /* O catálogo permanece indisponível; não substituímos por preços inventados. */ });
     window.addEventListener(PLANS_UPDATED_EVENT, refreshPlans);
     window.addEventListener('storage', refresh);
     window.addEventListener('storage', refreshPlans);
@@ -167,7 +163,7 @@ export function HomePage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [helpOpen]);
 
-  const selected = commercialPlans.find((plan) => plan.id === activePlan) ?? commercialPlans[0] ?? PLANS[1];
+  const selected = commercialPlans.find((plan) => plan.id === activePlan) ?? commercialPlans[0];
 
   function openDemo(product: 'totem' | 'caixa' | 'os', to: string) {
     setDemoGate({ product, to });
@@ -610,7 +606,7 @@ export function HomePage() {
               </button>
             ))}
           </div>
-          <div className="plan-detail">
+          {selected ? <div className="plan-detail">
             <div>
               <h3>{selected.name}</h3>
               <p>{selected.blurb}</p>
@@ -623,7 +619,7 @@ export function HomePage() {
             <Link to={`/parceiro?plano=${selected.id}&passo=pagamento`} className="btn btn--primary">
               Contratar e pagar
             </Link>
-          </div>
+          </div> : <p role="status">Os planos estão indisponíveis no momento. <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer">Consulte a equipe pelo WhatsApp.</a></p>}
         </section>
 
         <section id="trabalhe-conosco" className="section careers">
@@ -643,16 +639,10 @@ export function HomePage() {
             </div>
             <form
               className="careers__form"
-              onSubmit={async (event) => {
+              onSubmit={(event) => {
                 event.preventDefault();
-                const result = await ingestSellerApplicantToCrm({
-                  name: jobName,
-                  whatsapp: jobPhone,
-                  city: jobCity,
-                  experience: jobExp,
-                });
-                if (!result.ok) {
-                  setJobFeedback(result.error);
+                if (jobPhone.replace(/\D/g, '').length < 10) {
+                  setJobFeedback('Informe um WhatsApp válido com DDD.');
                   return;
                 }
                 const text = [
@@ -665,16 +655,13 @@ export function HomePage() {
                 ]
                   .filter(Boolean)
                   .join('\n');
-                setJobFeedback('Abrindo WhatsApp… Candidatura também entrou no CRM.');
+                setJobFeedback('Confira a candidatura no WhatsApp e toque em enviar.');
                   window.open(
                   marthiWhatsAppHref(text),
                   '_blank',
                   'noopener,noreferrer',
                 );
-                setJobName('');
-                setJobPhone('');
-                setJobCity('');
-                setJobExp('');
+
               }}
             >
               <h3>Cadastro de vendedor</h3>
@@ -723,11 +710,11 @@ export function HomePage() {
 
         <section id="contato" className="section contact">
           <div className="section__head">
-            <p className="eyebrow">Canal CRM</p>
+            <p className="eyebrow">Contato comercial</p>
             <h2>Converse com um vendedor Marthi.</h2>
             <p className="empty" style={{ marginTop: 8 }}>
               Sede em {MARTHI_COMPANY.city} — {MARTHI_COMPANY.venue}, {MARTHI_COMPANY.district}. A
-              mensagem chega no CRM da equipe comercial.
+              mensagem pode ser enviada à equipe pelo WhatsApp.
             </p>
           </div>
           <div className="contact__grid">
@@ -767,43 +754,24 @@ export function HomePage() {
             </article>
             <article className="home-crm-channel" style={{ gridColumn: '1 / -1' }}>
               <div className="home-crm-channel__head">
-                <h3>Chat com a equipe comercial</h3>
+                <h3>Mensagem para a equipe comercial</h3>
                 <p className="empty" style={{ margin: 0 }}>
-                  Digite nome, WhatsApp e a mensagem. O vendedor responde no app CRM · Conversas.
+                  Preencha seus dados para abrir o WhatsApp com a mensagem pronta. Confirme o envio no WhatsApp.
                 </p>
               </div>
-              {guestThread.length > 0 ? (
-                <div className="home-crm-channel__thread">
-                  {guestThread.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`home-crm-channel__bubble ${msg.fromLead ? 'is-me' : 'is-them'}`}
-                    >
-                      <strong>{msg.fromName}</strong>
-                      <p>{msg.text}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
               <form
                 className="admin-form"
                 style={{ marginTop: 12 }}
-                onSubmit={async (event) => {
+                onSubmit={(event) => {
                   event.preventDefault();
-                  const result = await postHomepageCrmChat({
-                    name: contactName,
-                    whatsapp: contactPhone,
-                    text: contactMsg,
-                    leadId: guestLeadId || undefined,
-                  });
-                  if (!result.ok) {
-                    setContactFeedback(result.error);
+                  if (contactPhone.replace(/\D/g, '').length < 10) {
+                    setContactFeedback('Informe um WhatsApp válido com DDD.');
                     return;
                   }
-                  setGuestLeadId(result.lead.id);
-                  setGuestThread(listLeadMessages(result.lead.id));
-                  setContactFeedback('Mensagem enviada. Um vendedor responde por aqui e no CRM.');
-                  setContactMsg('');
+                  const message = `Olá Marthi! Vim pelo site.\nNome: ${contactName.trim()}\nWhatsApp: ${contactPhone.trim()}\n\n${contactMsg.trim()}`;
+                  window.open(marthiWhatsAppHref(message), '_blank', 'noopener,noreferrer');
+                  setContactFeedback('Confira a mensagem no WhatsApp e toque em enviar.');
+
                 }}
               >
                 <label>
@@ -833,7 +801,7 @@ export function HomePage() {
                 </label>
                 <div className="span-2 admin-toolbar">
                   <button type="submit" className="btn btn--primary">
-                    Enviar no canal CRM
+                    Abrir mensagem no WhatsApp
                   </button>
                   {user ? (
                     <Link to="/crm/conversas" className="btn btn--ghost">

@@ -124,43 +124,43 @@ export function generateStoreAccessToken(cnpj: string, email: string, storeId?: 
 }
 
 /**
- * Conta comercial padrão para a empresa habilitada Cell Ponto
+ * Conta comercial padrão para a empresa de demonstração Marthi
  */
 export const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
   id: 'ACC-MARTHI-DEMO',
-  legalName: 'Cell Ponto Telecomunicações LTDA',
-  tradeName: 'Cell Ponto',
-  document: '61.506.270/0001-63',
-  email: 'contato@cellponto.com.br',
-  phone: '(24) 98124-4253',
+  legalName: 'Marthi Tecnologia e Demonstração LTDA',
+  tradeName: 'Marthi Demonstração',
+  document: '00.000.000/0001-91',
+  email: 'contato@marthi.com.br',
+  phone: '(11) 3000-0000',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: new Date().toISOString(),
 };
 
 /**
- * Loja padrão única habilitada para a Cell Ponto (Matriz em Três Rios / RJ)
+ * Loja padrão única habilitada para a Demonstração Marthi
  */
 export const DEFAULT_STORES: Store[] = [
   {
     id: 'STR-DEMO-01',
     clientAccountId: 'ACC-MARTHI-DEMO',
     code: '001',
-    name: 'Cell Ponto Matriz',
-    tradeName: 'Cell Ponto',
-    cnpj: '61.506.270/0001-63',
+    name: 'Loja Demonstração Marthi',
+    tradeName: 'Marthi Demonstração',
+    cnpj: '00.000.000/0001-91',
     stateRegistration: 'ISENTO',
     municipalRegistration: '12345',
-    accessToken: 'TK-001-000163-CPTR-88A1',
-    email: 'matriz@cellponto.com.br',
-    phone: '(24) 98124-4253',
-    zipCode: '25800-000',
-    street: 'Rua Prefeito Walter Franklin',
-    number: '120',
-    complement: 'Loja 01',
-    neighborhood: 'Centro',
-    city: 'Três Rios',
-    state: 'RJ',
-    ibgeCityCode: '3306008',
+    accessToken: 'TK-DEMO-000191-MDEM-01',
+    email: 'loja@marthi.com.br',
+    phone: '(11) 3000-0000',
+    zipCode: '01310-100',
+    street: 'Avenida Paulista',
+    number: '1000',
+    complement: 'Sala Demo',
+    neighborhood: 'Bela Vista',
+    city: 'São Paulo',
+    state: 'SP',
+    ibgeCityCode: '3550308',
     taxRegime: 'simples_nacional',
     active: true,
     isMatrix: true,
@@ -231,6 +231,8 @@ export function cleanLegacyMocks() {
             val.includes('Shopping Plaza') ||
             val.includes('Loja Matriz Centro') ||
             val.includes('00.000.000/0001-00') ||
+            val.includes('61.506.270/0001-63') ||
+            val.includes('CPTR-88A1') ||
             val.includes('varejobrasil.com.br')),
       );
 
@@ -293,23 +295,18 @@ function getLocalMarthiClients(): Array<{
 export function resolveDefaultClientAccount(): ClientAccount {
   cleanLegacyMocks();
   const tenantKey = getActiveTenantKey();
-  if (tenantKey.startsWith('client_')) {
-    const clientId = tenantKey.slice('client_'.length);
+  const clientId = tenantKey.startsWith('client_')
+    ? tenantKey.slice('client_'.length)
+    : tenantKey.startsWith('acc_')
+      ? tenantKey.slice('acc_'.length)
+      : '';
+
+  if (clientId && clientId !== 'ACC-MARTHI-DEMO') {
     const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
     if (client) {
-      const realDoc =
-        client.document && client.document !== '00.000.000/0001-00'
-          ? client.document
-          : '61.506.270/0001-63';
-      const realTrade =
-        client.tradeName && !client.tradeName.includes('demo') && client.tradeName !== 'Cliente'
-          ? client.tradeName
-          : 'Cell Ponto';
-      const realLegal =
-        client.legalName ||
-        (realTrade.toLowerCase().includes('cell')
-          ? 'Cell Ponto Telecomunicações LTDA'
-          : realTrade);
+      const realDoc = client.document && client.document !== '00.000.000/0001-00' ? client.document : '';
+      const realTrade = client.tradeName && client.tradeName !== 'Cliente' ? client.tradeName : 'Minha Empresa';
+      const realLegal = client.legalName || realTrade;
 
       return {
         id: client.clientId,
@@ -317,7 +314,7 @@ export function resolveDefaultClientAccount(): ClientAccount {
         tradeName: realTrade,
         document: realDoc,
         email: client.email || '',
-        phone: client.phone || '(24) 98124-4253',
+        phone: client.phone || '',
         createdAt: client.contractedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -329,18 +326,17 @@ export function resolveDefaultClientAccount(): ClientAccount {
 export function resolveDefaultStores(): Store[] {
   cleanLegacyMocks();
   const tenantKey = getActiveTenantKey();
-  if (tenantKey.startsWith('client_')) {
-    const clientId = tenantKey.slice('client_'.length);
+  const clientId = tenantKey.startsWith('client_')
+    ? tenantKey.slice('client_'.length)
+    : tenantKey.startsWith('acc_')
+      ? tenantKey.slice('acc_'.length)
+      : '';
+
+  if (clientId && clientId !== 'ACC-MARTHI-DEMO') {
     const client = getLocalMarthiClients().find((c) => c.clientId === clientId);
     if (client) {
-      const realDoc =
-        client.document && client.document !== '00.000.000/0001-00'
-          ? client.document
-          : '61.506.270/0001-63';
-      const realTrade =
-        client.tradeName && !client.tradeName.includes('demo') && client.tradeName !== 'Cliente'
-          ? client.tradeName
-          : 'Cell Ponto Matriz';
+      const realDoc = client.document && client.document !== '00.000.000/0001-00' ? client.document : '';
+      const realTrade = client.tradeName && client.tradeName !== 'Cliente' ? client.tradeName : 'Loja Principal';
 
       return [
         {
@@ -351,17 +347,17 @@ export function resolveDefaultStores(): Store[] {
           tradeName: realTrade,
           cnpj: realDoc,
           stateRegistration: 'ISENTO',
-          municipalRegistration: '12345',
-          accessToken: `TK-001-${(realDoc.replace(/\D/g, '') || '000163').slice(-6)}-CPTR-88A1`,
-          email: client.email || 'matriz@cellponto.com.br',
-          phone: client.phone || '(24) 98124-4253',
-          zipCode: '25800-000',
-          street: 'Rua Prefeito Walter Franklin',
-          number: '120',
-          complement: 'Loja 01',
-          neighborhood: 'Centro',
-          city: 'Três Rios',
-          state: 'RJ',
+          municipalRegistration: '',
+          accessToken: generateStoreAccessToken(realDoc, client.email, client.clientId),
+          email: client.email || '',
+          phone: client.phone || '',
+          zipCode: '',
+          street: '',
+          number: '',
+          complement: '',
+          neighborhood: '',
+          city: '',
+          state: 'SP',
           ibgeCityCode: '',
           taxRegime: 'simples_nacional',
           active: true,
@@ -429,7 +425,7 @@ export function saveClientAccount(account: ClientAccount): ClientAccount {
 export function listStores(): Store[] {
   cleanLegacyMocks();
   const key = tenantScopedKey(STORAGE_KEY_STORES);
-  const fallback = resolveDefaultStores();
+  const fallback = isNestAuthed() ? [] : resolveDefaultStores();
   const stores = readJson<Store[]>(key, fallback);
 
   // Filtragem definitiva para evitar que qualquer mock residual seja exibido
@@ -443,22 +439,11 @@ export function listStores(): Store[] {
 
   const list = filtered.length === 0 ? fallback : filtered;
 
-  // Garante que toda loja tenha seu Token de Acesso exclusivo preenchido e CNPJ real
+  // Garante que toda loja tenha seu Token de Acesso exclusivo preenchido
   let hasUpdated = false;
   const withTokens = list.map((s) => {
     let currentStore = s;
-    if (s.cnpj === '00.000.000/0001-00' || !s.cnpj || s.name === 'Gilvan Teodo') {
-      currentStore = {
-        ...s,
-        cnpj: '61.506.270/0001-63',
-        name: s.isMatrix ? 'Cell Ponto Matriz' : s.name,
-        tradeName: s.isMatrix ? 'Cell Ponto' : s.tradeName,
-        city: 'Três Rios',
-        state: 'RJ',
-      };
-      hasUpdated = true;
-    }
-    if (!currentStore.accessToken) {
+    if (!isNestAuthed() && !currentStore.accessToken) {
       hasUpdated = true;
       return {
         ...currentStore,
@@ -871,10 +856,11 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
   if (!isNestAuthed()) return false;
   try {
     const [accountRow, storesRows] = await Promise.all([
-      apiGetClientAccount().catch(() => null),
-      apiListStores().catch(() => null),
+      apiGetClientAccount(),
+      apiListStores(),
     ]);
 
+    if (!accountRow?.id || !Array.isArray(storesRows) || storesRows.length === 0) throw new Error('Conta sem lojas autorizadas.');
     let changed = false;
 
     if (accountRow && accountRow.id) {
@@ -920,7 +906,8 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
       }));
 
       const key = tenantScopedKey(STORAGE_KEY_STORES);
-      writeJson(key, mappedStores);
+writeJson(key, mappedStores);
+      getActiveStoreId();
       recalculateAllStoreLicenses();
       changed = true;
     }

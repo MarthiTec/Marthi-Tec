@@ -212,7 +212,7 @@ export function EcommerceChannelPage() {
             <Link to="/ecommerce/anuncios">Anúncios</Link> (produto do estoque com imagem).
           </p>
         ) : (
-          <table className="admin-table">
+          <div className="admin-table-container"><table className="admin-table">
             <thead>
               <tr>
                 <th>Foto</th>
@@ -249,13 +249,13 @@ export function EcommerceChannelPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </article>
 
       <article className="admin-card">
         <h2>Pedidos recentes — {CHANNEL_LABEL[channelId]}</h2>
-        <table className="admin-table">
+        <div className="admin-table-container"><table className="admin-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -286,7 +286,7 @@ export function EcommerceChannelPage() {
               ))
             )}
           </tbody>
-        </table>
+        </table></div>
       </article>
     </section>
   );

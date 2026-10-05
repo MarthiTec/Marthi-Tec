@@ -1,0 +1,26 @@
+.goals-page { width: 100%; min-width: 0; box-sizing: border-box; }
+.goals-page .admin-modal { box-sizing: border-box; max-height: 94dvh; overflow: auto; background: var(--card); color: var(--ink); }
+.goals-page h1, .goals-page h2, .goals-page h3 { overflow-wrap: anywhere; }
+.goals-page .admin-input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; }
+.goals-page .admin-modal-backdrop { position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; padding: 12px; background: rgba(0,0,0,.55); }
+.is-theme-dark .goals-page .admin-modal { background: var(--card); border: 1px solid var(--line); }
+@media(max-width:768px) {
+ .goals-page { padding: 12px !important; }
+ .goals-page .admin-modal__foot { flex-wrap: wrap; gap: 8px; }
+ .goals-page .admin-modal__foot button { width: 100%; min-height: 44px; }
+ .goals-page .admin-modal__body > div[style*="grid"], .goals-page .admin-modal__body div[style*="gridTemplate"], .goals-page .admin-modal__body div[style*="grid-template-columns"] { grid-template-columns: minmax(0,1fr) !important; }
+ .goals-page > div > div > div:has(>h1) { flex-wrap: wrap; }
+}
+
+.goals-page .admin-input { display:block; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); font:inherit; }
+.goals-page .admin-label { display:block; margin-bottom:7px; color:var(--ink); font-size:.85rem; font-weight:600; }
+.goals-page .admin-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 15px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); font:inherit; font-size:.85rem; font-weight:650; cursor:pointer; }
+.goals-page .admin-btn--primary { background:var(--accent); color:var(--accent-ink,#fff); border-color:var(--accent); }
+.goals-page .admin-btn:disabled { opacity:.6; cursor:not-allowed; }
+.goals-page .admin-modal__head { padding:16px; border-bottom:1px solid var(--line); gap:12px; }
+.goals-page .admin-badge { display:inline-flex; padding:5px 8px; border-radius:7px; background:var(--card-2); color:var(--ink); }
+.goals-page { --goals-success:#15803d; --goals-danger:#b91c1c; --goals-warning:#854d0e; }
+.is-theme-dark .goals-page { --goals-success:#86efac; --goals-danger:#fca5a5; --goals-warning:#fde047; }
+@media(max-width:480px) { .goals-page div[style*="minmax(140px"] { grid-template-columns:1fr !important; } }
+
+.is-theme-dark .goals-page .admin-btn--primary { color:var(--surface); }

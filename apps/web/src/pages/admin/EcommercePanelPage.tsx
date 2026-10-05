@@ -66,7 +66,7 @@ export function EcommercePanelPage() {
 
       <article className="admin-card" style={{ marginTop: 12 }}>
         <h2>Canais</h2>
-        <div className="table-wrap">
+        <div className="table-wrap admin-table-container">
           <table className="admin-table">
             <thead>
               <tr>
@@ -98,7 +98,7 @@ export function EcommercePanelPage() {
         {recentOrders.length === 0 ? (
           <p className="empty">Nenhum pedido ainda.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>

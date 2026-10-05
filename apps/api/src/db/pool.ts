@@ -26,7 +26,7 @@ function sslFromUrl(connectionString: string): PoolConfig['ssl'] | undefined {
   return undefined;
 }
 
-function buildPoolConfig(): PoolConfig | null {
+function buildPoolConfig(): PoolConfig {
   if (env.DATABASE_URL) {
     return {
       connectionString: env.DATABASE_URL,
@@ -35,9 +35,6 @@ function buildPoolConfig(): PoolConfig | null {
     };
   }
 
-  if (!env.DB_HOST || !env.DB_DATABASE) {
-    return null;
-  }
 
   return {
     host: env.DB_HOST,
@@ -57,8 +54,12 @@ function buildPoolConfig(): PoolConfig | null {
 
 const poolConfig = buildPoolConfig();
 
-export const dbConfigured = poolConfig !== null;
-export const pool = poolConfig ? new Pool(poolConfig) : null;
+export const dbConfigured = Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD));
+export const pool = new Pool(poolConfig);
+
+pool.on('error', (err) => {
+  console.warn('[marthi-api] Pool de conexões PostgreSQL emitiu erro não crítico:', err.message);
+});
 
 function publicDbError(error: unknown): string {
   if (!(error instanceof Error)) return 'Falha ao conectar no PostgreSQL.';
@@ -71,7 +72,7 @@ export async function checkDatabaseConnection(): Promise<{
   connected: boolean;
   error: string | null;
 }> {
-  if (!pool) {
+  if (!dbConfigured) {
     return {
       configured: false,
       connected: false,
@@ -82,13 +83,13 @@ export async function checkDatabaseConnection(): Promise<{
   try {
     await pool.query('SELECT 1');
     return {
-      configured: true,
+      configured: dbConfigured,
       connected: true,
       error: null,
     };
   } catch (error) {
     return {
-      configured: true,
+      configured: dbConfigured,
       connected: false,
       error: publicDbError(error),
     };

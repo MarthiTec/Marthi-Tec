@@ -1,6 +1,9 @@
 import { env } from '../config/env.js';
+import { getStoreWhatsAppConfig } from './storeCommunication.js';
+import { beginDelivery, finishDelivery } from './communicationAudit.js';
 
 export type TotemLeadPayload = {
+  storeId?: string;
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -65,15 +68,15 @@ export function buildTotemLeadMessage(
 export async function sendEvolutionText(
   number: string,
   text: string,
-  customConfig?: { baseUrl?: string; instance?: string; apiKey?: string },
+  customConfig?: { baseUrl?: string; instance?: string; apiKey?: string; storeId?: string },
 ): Promise<{
   ok: boolean;
   status: number;
   body: unknown;
 }> {
-  const baseUrl = (customConfig?.baseUrl || env.EVOLUTION_BASE_URL)?.replace(/\/$/, '');
-  const instance = customConfig?.instance || env.EVOLUTION_INSTANCE;
-  const apiKey = customConfig?.apiKey || env.EVOLUTION_API_KEY;
+  const baseUrl = (customConfig ? customConfig.baseUrl : env.EVOLUTION_BASE_URL)?.replace(/\/$/, '');
+  const instance = customConfig ? customConfig.instance : env.EVOLUTION_INSTANCE;
+  const apiKey = customConfig ? customConfig.apiKey : env.EVOLUTION_API_KEY;
 
   if (!baseUrl || !instance || !apiKey) {
     const error = new Error(
@@ -83,8 +86,13 @@ export async function sendEvolutionText(
     throw error;
   }
 
-  const response = await fetch(`${baseUrl}/message/sendText/${encodeURIComponent(instance)}`, {
-    method: 'POST',
+  const recipient = normalizeBrazilPhone(number);
+  if (!/^55\d{10,11}$/.test(recipient)) throw Object.assign(new Error('Telefone brasileiro inválido. Informe DDD e número.'), {status:400});
+  const deliveryId = await beginDelivery(customConfig?.storeId, 'whatsapp', recipient);
+  let response: Response;
+  try {
+  response = await fetch(`${baseUrl}/message/sendText/${encodeURIComponent(instance)}`, {
+    method: 'POST', signal: AbortSignal.timeout(15000), redirect: 'error',
     headers: {
       'Content-Type': 'application/json',
       apikey: apiKey,
@@ -97,15 +105,18 @@ export async function sendEvolutionText(
     }),
   });
 
-  let body: unknown = null;
-  try {
-    body = await response.json();
-  } catch {
-    body = await response.text();
+  } catch (error) {
+    await finishDelivery(deliveryId, 'unknown');
+    throw Object.assign(new Error('Sem confirmação do Evolution. Verifique o histórico antes de repetir para evitar duplicidade.'), {status:502});
   }
+  const raw = await response.text();
+  let body: any;
+  try { body = JSON.parse(raw); } catch { body = null; }
+  const accepted = response.ok && !!body?.key?.id;
+  await finishDelivery(deliveryId, accepted ? 'accepted' : response.ok ? 'unknown' : 'failed', response.status, accepted ? String(body.key.id) : undefined);
 
   return {
-    ok: response.ok,
+    ok: accepted,
     status: response.status,
     body,
   };
@@ -115,7 +126,9 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
   storeMessageId: unknown;
   customerNotified: boolean;
 }> {
-  const storeNumber = lead.storeWhatsApp?.trim() || env.EVOLUTION_STORE_NUMBER;
+  const config = lead.storeId ? await getStoreWhatsAppConfig(lead.storeId) : undefined;
+  if (config && !config.enabled) throw Object.assign(new Error('WhatsApp desativado nesta loja.'), {status:400});
+  const storeNumber = config ? config.storeNumber : lead.storeWhatsApp?.trim() || env.EVOLUTION_STORE_NUMBER;
   if (!storeNumber) {
     const error = new Error(
       'Número da loja não configurado. Informe o WhatsApp em Painel → Totem → WhatsApp, ou EVOLUTION_STORE_NUMBER.',
@@ -125,7 +138,7 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
   }
 
   const message = buildTotemLeadMessage(lead, lead.locationLabel);
-  const storeResult = await sendEvolutionText(storeNumber, message);
+  const storeResult = await sendEvolutionText(storeNumber, message, config ? {...config, storeId:lead.storeId} : undefined);
 
   if (!storeResult.ok) {
     const error = new Error('Falha ao enviar WhatsApp via Evolution para a loja.');
@@ -134,10 +147,7 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
     throw error;
   }
 
-  const shouldNotify =
-    typeof lead.notifyCustomer === 'boolean'
-      ? lead.notifyCustomer
-      : Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
+  const shouldNotify = config?.notifyCustomer ?? lead.notifyCustomer ?? Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
 
   let customerNotified = false;
   if (shouldNotify) {
@@ -150,8 +160,10 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
       'Em breve a loja entrará em contato para confirmar o pedido.',
     ].join('\n');
 
-    const customerResult = await sendEvolutionText(lead.customerPhone, customerMsg);
-    customerNotified = customerResult.ok;
+    try {
+      const customerResult = await sendEvolutionText(lead.customerPhone, customerMsg, config ? {...config, storeId:lead.storeId} : undefined);
+      customerNotified = customerResult.ok;
+    } catch { /* Store delivery was accepted; do not repeat it because customer acknowledgement failed. */ }
   }
 
   return {

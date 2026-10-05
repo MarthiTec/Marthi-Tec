@@ -37,9 +37,7 @@ export const BOLETO_STATUS_LABEL: Record<BoletoStatus, string> = {
   expired: 'Vencido',
 };
 
-function uid() {
-  return `BOL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
+
 
 function emit() {
   if (typeof window !== 'undefined') {
@@ -92,7 +90,7 @@ export function boletoSnapshot() {
   };
 }
 
-export function createBoleto(input: {
+export function createBoleto(_input: {
   kind: BoletoKind;
   customerName: string;
   customerDocument: string;
@@ -102,38 +100,7 @@ export function createBoleto(input: {
   bankAccountId?: string;
   receivableId?: string;
 }) {
-  const items = load();
-  const id = uid();
-  const boleto: Boleto = {
-    id,
-    kind: input.kind,
-    status: 'open',
-    customerName: input.customerName.trim(),
-    customerDocument: input.customerDocument.trim(),
-    description: input.description.trim(),
-    amount: input.amount,
-    dueDate: input.dueDate,
-    bankAccountId: input.bankAccountId,
-    receivableId: input.receivableId,
-    createdAt: new Date().toISOString(),
-  };
-
-  if (input.kind === 'pix' || input.kind === 'hybrid') {
-    boleto.pixCopyPaste = `00020126580014BR.GOV.BCB.PIX0136${id.toLowerCase()}52040000530398654${input.amount
-      .toFixed(2)
-      .padStart(10, '0')}5802BR5913Marthi ERP6009TRES RIOS62070503***6304XXXX`;
-  }
-  if (input.kind === 'hybrid' || input.kind === 'bank') {
-    const cents = Math.round(input.amount * 100)
-      .toString()
-      .padStart(10, '0');
-    boleto.digitableLine = `23793.38128 60000.000003 00000.000400 1 9666${cents}`;
-    boleto.barcode = `237919666${cents}3381286000000000000000004`;
-  }
-
-  items.unshift(boleto);
-  save(items);
-  return boleto;
+  throw new Error('Emissão de cobrança indisponível: configure um provedor bancário. Nenhum boleto ou Pix foi emitido.');
 }
 
 export function attachBoletoToRemessa(

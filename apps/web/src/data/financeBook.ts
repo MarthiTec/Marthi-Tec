@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { addFinance, getAdminState, type FinanceEntry } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import {
@@ -211,7 +212,7 @@ function seed(): BookState {
 
 function load(): BookState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) {
       const seeded = seed();
       save(seeded);
@@ -244,7 +245,7 @@ function load(): BookState {
 }
 
 function save(state: BookState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try { localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state)); } catch { /* Persisted API records remain authoritative when browser storage is full. */ }
   window.dispatchEvent(new Event('marthi-finance-book-updated'));
 }
 
@@ -485,6 +486,7 @@ export async function upsertBankAccount(input: {
 }): Promise<BookResult<BankAccount>> {
   if (!input.name.trim()) return { ok: false, error: 'Informe o nome da conta.' };
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const body = {
@@ -505,7 +507,7 @@ export async function upsertBankAccount(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      console.warn('[financeBook] Falha ao sincronizar conta com Nest, gravando localmente:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível gravar no banco de dados.') };
     }
   }
 
@@ -567,6 +569,7 @@ export async function upsertPayable(input: {
   }
   const supplier = input.supplierId ? getSupplier(input.supplierId) : null;
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const body = {
@@ -592,7 +595,7 @@ export async function upsertPayable(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      console.warn('[financeBook] Falha ao sincronizar conta a pagar com Nest, gravando localmente:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível gravar no banco de dados.') };
     }
   }
 
@@ -668,6 +671,7 @@ export async function upsertReceivable(input: {
     return { ok: false, error: 'Valor inválido.' };
   }
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const body = {
@@ -692,7 +696,7 @@ export async function upsertReceivable(input: {
       save(state);
       return { ok: true, data: mapped };
     } catch (error) {
-      console.warn('[financeBook] Falha ao sincronizar conta a receber com Nest, gravando localmente:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível gravar no banco de dados.') };
     }
   }
 
@@ -756,6 +760,7 @@ export async function settlePayableDetailed(
   const discountAmount = Number(options.discountAmount) || 0;
   const netAmount = Math.max(0, amount + interestAmount + fineAmount - discountAmount);
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiPayPayable(id, {
@@ -839,6 +844,7 @@ export async function settleReceivableDetailed(
   const discountAmount = Number(options.discountAmount) || 0;
   const netAmount = Math.max(0, amount + interestAmount + fineAmount - discountAmount);
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiReceiveReceivable(id, {
@@ -919,6 +925,7 @@ export async function cancelBill(
   kind: 'payable' | 'receivable',
   id: string,
 ): Promise<BookResult> {
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       if (kind === 'payable') {
@@ -972,6 +979,7 @@ export async function createTreasuryMove(input: {
     return { ok: false, error: 'Valor inválido.' };
   }
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiCreateTreasury({
@@ -1031,6 +1039,7 @@ export async function createAdvance(input: {
     return { ok: false, error: 'Valor inválido.' };
   }
 
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiCreateAdvance({
@@ -1076,6 +1085,7 @@ export async function applyAdvance(
   id: string,
   amount: number,
 ): Promise<BookResult<AdvancePayment>> {
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiApplyAdvance(id, { amount });
@@ -1108,6 +1118,7 @@ export async function applyAdvance(
 }
 
 export async function refundAdvance(id: string): Promise<BookResult<AdvancePayment>> {
+  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
   if (isNestAuthed()) {
     try {
       const row = await apiRefundAdvance(id);

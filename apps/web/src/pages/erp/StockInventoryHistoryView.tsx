@@ -30,17 +30,19 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
     }
   }
 
-  function handleReopen(id: string) {
+  async function handleReopen(id: string) {
     if (!window.confirm('Deseja reabrir este balanço para continuar a contagem?')) return;
-    const res = reopenStockBalance(id);
+    try {
+    const res = await reopenStockBalance(id);
     if (res) {
       onReopenSuccess(res);
     } else {
       alert('Não é possível reabrir este balanço no momento (verifique se já existe outro balanço em andamento).');
     }
+    } catch (error) { setMsg({type:'err',text:error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'}); }
   }
 
-  function handleEdit(b: StockBalanceAudit) {
+  async function handleEdit(b: StockBalanceAudit) {
     if (b.status === 'in_progress') {
       onReopenSuccess(b);
       return;
@@ -50,7 +52,8 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
       b.title,
     );
     if (choice !== null && choice.trim() && choice.trim() !== b.title) {
-      updateStockBalanceMetadata(b.id, { title: choice.trim() });
+      try { await updateStockBalanceMetadata(b.id, { title: choice.trim() }); }
+      catch (error) { setMsg({type:'err',text:error instanceof Error ? error.message : 'Falha ao salvar.'}); return; }
       refresh();
       setMsg({ type: 'ok', text: `Título do balanço ${b.code} atualizado!` });
     }
@@ -72,15 +75,17 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
     }
   }
 
-  function handleDelete(b: StockBalanceAudit) {
+  async function handleDelete(b: StockBalanceAudit) {
     if (!confirmDelete(`o balanço ${b.code} ("${b.title}")`)) return;
-    deleteStockBalance(b.id);
+    try {
+    await deleteStockBalance(b.id);
     refresh();
     if (selectedAudit?.id === b.id) setSelectedAudit(null);
     setMsg({ type: 'ok', text: `Balanço ${b.code} excluído com sucesso.` });
+    } catch (error) { setMsg({type:'err',text:error instanceof Error ? error.message : 'Não foi possível salvar no MarthiDB.'}); }
   }
 
-  function handleApplyAdjustment(balance: StockBalanceAudit) {
+  async function handleApplyAdjustment(balance: StockBalanceAudit) {
     if (
       !window.confirm(
         `Deseja aplicar as divergências do balanço ${balance.code} diretamente no estoque do sistema?\n\nIsso atualizará os saldos dos produtos e gerará os movimentos de auditoria.`,
@@ -89,7 +94,7 @@ export function StockInventoryHistoryView({ onReopenSuccess }: Props) {
       return;
     }
 
-    const res = applyStockAdjustment(balance.id);
+    const res = await applyStockAdjustment(balance.id);
     if (res.ok) {
       setMsg({
         type: 'ok',

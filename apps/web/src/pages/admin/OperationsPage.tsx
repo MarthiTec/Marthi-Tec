@@ -20,6 +20,7 @@ import {
   upsertOperationShortcut,
   type OperationShortcut,
 } from '../../data/operationsStore';
+import { getActiveStoreId, MULTI_STORE_CHANGED_EVENT } from '../../data/multiStoreStore';
 import './operations.css';
 
 type Draft = {
@@ -44,6 +45,12 @@ type OpsTab = 'ramo' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
 /** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
   const location = useLocation();
+  const [communicationStoreId, setCommunicationStoreId] = useState(() => getActiveStoreId());
+  useEffect(() => {
+    const refreshStore = () => setCommunicationStoreId(getActiveStoreId());
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+    return () => window.removeEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
@@ -109,7 +116,7 @@ export function OperationsPage() {
     setEditing(false);
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft) return;
     const label = draft.label.trim();
@@ -118,7 +125,8 @@ export function OperationsPage() {
       setMessage('Informe nome e link da operação.');
       return;
     }
-    upsertOperationShortcut({
+    try {
+    await upsertOperationShortcut({
       id: draft.id,
       label,
       href,
@@ -129,27 +137,34 @@ export function OperationsPage() {
     setItems(listOperationShortcuts());
     setMessage('Operação salva.');
     cancelEdit();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function toggleActive(item: OperationShortcut) {
-    setOperationActive(item.id, !item.active);
+  async function toggleActive(item: OperationShortcut) {
+    try {
+    await setOperationActive(item.id, !item.active);
     setItems(listOperationShortcuts());
     setMessage(item.active ? 'Operação desativada.' : 'Operação ativada.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function remove(item: OperationShortcut) {
+  async function remove(item: OperationShortcut) {
     if (!window.confirm(`Remover "${item.label}"?`)) return;
-    deleteOperationShortcut(item.id);
+    try {
+    await deleteOperationShortcut(item.id);
     setItems(listOperationShortcuts());
     setMessage('Operação removida.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
-  function resetDefaults() {
+  async function resetDefaults() {
     if (!window.confirm('Restaurar atalhos padrão da loja?')) return;
-    resetOperationShortcuts();
+    try {
+    await resetOperationShortcuts();
     setItems(listOperationShortcuts());
     setMessage('Atalhos restaurados.');
     cancelEdit();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar a operação.'); }
   }
 
   return (
@@ -423,7 +438,7 @@ export function OperationsPage() {
 
       {/* ABA 3: Comunicação & Mensageria (WhatsApp & E-mail) */}
       {tab === 'comunicacao' || tab === 'whatsapp' ? (
-        <CommunicationSettingsSection />
+        <CommunicationSettingsSection key={communicationStoreId} />
       ) : null}
 
       {/* ABA 4: Equipe & Usuários da Loja */}

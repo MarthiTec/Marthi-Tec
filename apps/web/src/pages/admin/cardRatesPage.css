@@ -1,0 +1,128 @@
+.card-rates-page {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.card-rates-fields {
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
+  min-width: 0;
+}
+
+.card-rates-fields:disabled {
+  opacity: 0.6;
+}
+
+.card-rates-page input:not([type='checkbox']) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.card-rates-page input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.card-rates-page .admin-field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.card-rates-page .admin-picker {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.card-rates-page .admin-picker__caption {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.card-rates-page .admin-picker__trigger {
+  min-height: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.card-rates-page .btn--outline {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.card-rates-page .admin-card {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  box-sizing: border-box;
+  transition: box-shadow 0.15s;
+}
+
+.is-theme-dark .card-rates-page input {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.is-theme-dark .card-rates-page .admin-picker__trigger {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+@media (max-width: 768px) {
+  .card-rates-page .admin-page__head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .card-rates-page .btn {
+    min-height: 44px;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-rates-page div[style*="grid-template-columns"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .card-rates-page .admin-card {
+    padding: 16px;
+  }
+}
+
+.card-rates-page .card-rates-machine-fields .admin-field-label,
+.card-rates-page .card-rates-machine-fields .admin-picker__caption {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.card-rates-page .card-rates-machine-fields .admin-picker { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 6px; }

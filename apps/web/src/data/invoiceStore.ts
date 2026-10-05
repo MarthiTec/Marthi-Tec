@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import { getAdminState } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import { applyStockMovement } from './stockLedger';
@@ -83,7 +84,7 @@ function now() {
 
 function load(): InvoiceState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return { invoices: [] };
     const parsed = JSON.parse(raw) as Partial<InvoiceState>;
     const invoices = Array.isArray(parsed.invoices)
@@ -103,7 +104,7 @@ function load(): InvoiceState {
 }
 
 function save(state: InvoiceState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(state));
   window.dispatchEvent(new Event('marthi-invoices-updated'));
 }
 
@@ -112,6 +113,7 @@ function mapInvoice(row: ApiInvoice): Invoice {
     id: row.id,
     kind: row.kind,
     number: row.number,
+    series:row.series,natOp:row.natOp,movementAt:row.movementAt,modFrete:row.modFrete,vFrete:row.vFrete,vDesc:row.vDesc,vOutro:row.vOutro,infCpl:row.infCpl,
     status: row.status,
     documentPurpose: (row.documentPurpose as FiscalDocPurpose) || 'normal',
     supplierId: row.supplierId ?? '',
@@ -215,6 +217,7 @@ export async function createInvoice(input: {
       const row = await apiCreateStockInvoice({
         kind: input.kind,
         number: input.number,
+        series:input.series,natOp:input.natOp,movementAt:input.movementAt,modFrete:input.modFrete,vFrete:input.vFrete,vDesc:input.vDesc,vOutro:input.vOutro,infCpl:input.infCpl,
         supplierId: input.supplierId,
         customerName: input.customerName,
         customerDocument: input.customerDocument,
@@ -302,6 +305,7 @@ export async function updateInvoiceDraft(
       }
       const row = await apiUpdateStockInvoice(id, {
         number: patch.number,
+        series:patch.series,natOp:patch.natOp,movementAt:patch.movementAt,modFrete:patch.modFrete,vFrete:patch.vFrete,vDesc:patch.vDesc,vOutro:patch.vOutro,infCpl:patch.infCpl,
         supplierId: patch.supplierId,
         customerName: patch.customerName,
         customerDocument: patch.customerDocument,

@@ -7,6 +7,9 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
+    "test:client-payments": "npm run build:api && node --test scripts/client-payment-activation.test.mjs scripts/client-payment-ui.test.mjs",
+    "test:commercial": "npm run build:api && node --test scripts/commercial-orders.test.mjs",
+    "test:security": "npm run build:api && node --test scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs",
     "build": "tsc -p apps/api/tsconfig.json && node -e \"const fs=require('fs'); if(!fs.existsSync('dist/db/migrations')) fs.mkdirSync('dist/db/migrations', {recursive:true}); fs.cpSync('apps/api/src/db/migrations', 'dist/db/migrations', {recursive:true});\" && npm --prefix apps/web run build && node -e \"require('fs').accessSync('dist/public/index.html')\"",
     "start": "node index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
@@ -14,7 +17,8 @@
     "build:api": "tsc -p apps/api/tsconfig.json && node -e \"const fs=require('fs'); if(!fs.existsSync('dist/db/migrations')) fs.mkdirSync('dist/db/migrations', {recursive:true}); fs.cpSync('apps/api/src/db/migrations', 'dist/db/migrations', {recursive:true});\"",
     "build:web": "npm --prefix apps/web run build",
     "db:migrate": "npm run db:migrate --workspace=@marthi/api",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "test:audit": "npm run build:api && node --test scripts/module-persistence.test.mjs scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs scripts/client-payment-activation.test.mjs scripts/client-payment-ui.test.mjs scripts/commercial-orders.test.mjs"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.2",
@@ -46,5 +50,8 @@
   },
   "workspaces": [
     "apps/*"
-  ]
+  ],
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
 }

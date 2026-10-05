@@ -1,6 +1,9 @@
+import { storeScopedKey } from './storeCache';
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
 import * as XLSX from 'xlsx';
-import { getAdminState, adjustStockQty, type StockItem } from './adminStore';
-import { logStockMovements } from './stockLedger';
+import { getAdminState, type StockItem } from './adminStore';
+import { nestPost } from '../services/nestClient';
+import { refreshAdminSlices } from './erpBootstrap';
 
 export type StockBalanceStatus = 'in_progress' | 'completed' | 'cancelled';
 export type CountSource = 'barcode' | 'manual' | 'collector' | 'txt' | 'excel';
@@ -82,7 +85,8 @@ export type StockBalanceAudit = {
 };
 
 let memoryActiveBalance: StockBalanceAudit | null = null;
-let memoryHistory: StockBalanceAudit[] = [];
+let activeMemoryContext = '';
+function ensureActiveContext() { const context = storeScopedKey(ACTIVE_STORAGE_KEY); if (context !== activeMemoryContext) { memoryActiveBalance = null; activeMemoryContext = context; } }
 const idbSupported = typeof window !== 'undefined' && 'indexedDB' in window;
 
 function uid(prefix = 'ENTRY') {
@@ -136,7 +140,7 @@ function openIdb(): Promise<IDBDatabase | null> {
   if (!idbSupported) return Promise.resolve(null);
   return new Promise((resolve) => {
     try {
-      const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+      const request = indexedDB.open(storeScopedKey(IDB_NAME), IDB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(IDB_STORE_BALANCES)) {
@@ -238,13 +242,14 @@ export function recalculateBalanceMetrics(audit: StockBalanceAudit): StockBalanc
 }
 
 function saveActiveBalance(balance: StockBalanceAudit | null) {
+  ensureActiveContext();
   memoryActiveBalance = balance;
   try {
     if (typeof window !== 'undefined') {
       if (balance) {
-        localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(balance));
+        localStorage.setItem(storeScopedKey(ACTIVE_STORAGE_KEY), JSON.stringify(balance));
       } else {
-        localStorage.removeItem(ACTIVE_STORAGE_KEY);
+        localStorage.removeItem(storeScopedKey(ACTIVE_STORAGE_KEY));
       }
       window.dispatchEvent(new Event(STOCK_INVENTORY_EVENT));
     }
@@ -258,10 +263,9 @@ function saveActiveBalance(balance: StockBalanceAudit | null) {
 }
 
 function saveHistory(history: StockBalanceAudit[]) {
-  memoryHistory = history;
   try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history.slice(0, 100)));
+      localStorage.setItem(storeScopedKey(HISTORY_STORAGE_KEY), JSON.stringify(history.slice(0, 100)));
       window.dispatchEvent(new Event(STOCK_INVENTORY_EVENT));
     }
   } catch (err) {
@@ -269,29 +273,16 @@ function saveHistory(history: StockBalanceAudit[]) {
   }
 }
 
-export function listStockBalances(): StockBalanceAudit[] {
-  if (memoryHistory.length > 0) return memoryHistory;
-  try {
-    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        memoryHistory = parsed;
-        return parsed;
-      }
-    }
-  } catch {
-    // fallback
-  }
-  return [];
-}
+export function listStockBalances(): StockBalanceAudit[] { return readModuleState('stock-inventory', [] as StockBalanceAudit[]); }
+async function commitHistory(history: StockBalanceAudit[]) { await saveModuleState('stock-inventory', history); saveHistory(history); }
 
 export function getActiveStockBalance(): StockBalanceAudit | null {
+  ensureActiveContext();
   if (memoryActiveBalance && memoryActiveBalance.status === 'in_progress') {
     return memoryActiveBalance;
   }
   try {
-    const raw = localStorage.getItem(ACTIVE_STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(ACTIVE_STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw) as StockBalanceAudit;
       if (parsed && parsed.status === 'in_progress') {
@@ -323,8 +314,7 @@ export function createStockBalance(options: {
 }): StockBalanceAudit {
   const existing = getActiveStockBalance();
   if (existing && existing.status === 'in_progress') {
-    const hist = listStockBalances().filter((b) => b.id !== existing.id);
-    saveHistory([existing, ...hist]);
+    throw new Error('Finalize ou cancele a contagem atual antes de iniciar outro balanço.');
   }
 
   const now = new Date();
@@ -590,8 +580,9 @@ export function setDirectCount(
   return active;
 }
 
-export function finalizeStockBalance(balanceId: string, notes?: string): StockBalanceAudit | null {
-  const active = getActiveStockBalance();
+export async function finalizeStockBalance(balanceId: string, notes?: string): Promise<StockBalanceAudit | null> {
+  const source = getActiveStockBalance();
+  const active = source ? structuredClone(source) : null;
   if (!active || active.id !== balanceId) return null;
 
   active.status = 'completed';
@@ -602,14 +593,15 @@ export function finalizeStockBalance(balanceId: string, notes?: string): StockBa
 
   const history = listStockBalances().filter((b) => b.id !== active.id);
   const updatedHistory = [active, ...history];
-  saveHistory(updatedHistory);
+  await commitHistory(updatedHistory);
   saveActiveBalance(null);
 
   return active;
 }
 
-export function cancelStockBalance(balanceId: string, reason?: string): StockBalanceAudit | null {
-  const active = getActiveStockBalance();
+export async function cancelStockBalance(balanceId: string, reason?: string): Promise<StockBalanceAudit | null> {
+  const source = getActiveStockBalance();
+  const active = source ? structuredClone(source) : null;
   if (!active || active.id !== balanceId) return null;
 
   active.status = 'cancelled';
@@ -619,13 +611,13 @@ export function cancelStockBalance(balanceId: string, reason?: string): StockBal
   recalculateBalanceMetrics(active);
 
   const history = listStockBalances().filter((b) => b.id !== active.id);
-  saveHistory([active, ...history]);
+  await commitHistory([active, ...history]);
   saveActiveBalance(null);
 
   return active;
 }
 
-export function reopenStockBalance(balanceId: string): StockBalanceAudit | null {
+export async function reopenStockBalance(balanceId: string): Promise<StockBalanceAudit | null> {
   const currentActive = getActiveStockBalance();
   if (currentActive && currentActive.status === 'in_progress') {
     return null;
@@ -640,79 +632,32 @@ export function reopenStockBalance(balanceId: string): StockBalanceAudit | null 
   recalculateBalanceMetrics(target);
 
   const remainingHistory = history.filter((b) => b.id !== balanceId);
-  saveHistory(remainingHistory);
+  await commitHistory(remainingHistory);
   saveActiveBalance(target);
 
   return target;
 }
 
-export function applyStockAdjustment(
-  balanceId: string,
-  operator = 'Operador',
-): {
-  ok: boolean;
-  adjustedItemsCount: number;
-  totalUnitsDelta: number;
-  error?: string;
-} {
+export async function applyStockAdjustment(balanceId: string, operator = 'Operador'): Promise<{ ok:boolean; adjustedItemsCount:number; totalUnitsDelta:number; error?:string }> {
   const balance = getStockBalance(balanceId);
-  if (!balance) return { ok: false, adjustedItemsCount: 0, totalUnitsDelta: 0, error: 'Balanço não encontrado.' };
-
-  const items = Object.values(balance.items).filter(
-    (i) => i.countedQty !== null && i.difference !== 0,
-  );
-
-  if (items.length === 0) {
-    return { ok: true, adjustedItemsCount: 0, totalUnitsDelta: 0 };
-  }
-
-  let totalDelta = 0;
-  const movementsToLog = [];
-
-  for (const item of items) {
-    const delta = item.difference;
-    totalDelta += delta;
-    adjustStockQty(item.stockId, delta);
-
-    movementsToLog.push({
-      stockId: item.stockId,
-      stockName: item.name,
-      sku: item.sku,
-      type: 'adjust' as const,
-      qty: Math.abs(delta),
-      direction: (delta >= 0 ? 1 : -1) as 1 | -1,
-      unitCost: item.avgCost || item.cost,
-      balanceAfter: item.countedQty ?? item.systemQty,
-      note: `Balanço de estoque ${balance.code} (${delta >= 0 ? '+' : ''}${delta} ${item.unit})`,
-      warehouseId: balance.warehouseId,
-    });
-  }
-
-  if (movementsToLog.length > 0) {
-    logStockMovements(movementsToLog);
-  }
-
-  balance.adjustmentAppliedAt = new Date().toISOString();
-  balance.adjustmentUser = operator;
-  balance.updatedAt = new Date().toISOString();
-
-  if (memoryActiveBalance && memoryActiveBalance.id === balance.id) {
-    saveActiveBalance(balance);
-  } else {
-    const hist = listStockBalances().map((b) => (b.id === balance.id ? balance : b));
-    saveHistory(hist);
-  }
-
-  return { ok: true, adjustedItemsCount: items.length, totalUnitsDelta: totalDelta };
+  if (!balance) return {ok:false,adjustedItemsCount:0,totalUnitsDelta:0,error:'Balanço não encontrado.'};
+  const items=Object.values(balance.items).filter(item=>item.countedQty!==null && item.difference!==0);
+  if (!items.length) return {ok:true,adjustedItemsCount:0,totalUnitsDelta:0};
+  try {
+    const result=await nestPost<{ok:boolean;adjustedItemsCount:number;totalUnitsDelta:number;appliedAt:string}>('/stock/inventory-adjustments', {balanceId,items:items.map(item=>({stockId:item.stockId,expectedQty:item.systemQty,countedQty:item.countedQty}))});
+    balance.adjustmentAppliedAt=result.appliedAt;balance.adjustmentUser=operator;balance.updatedAt=result.appliedAt;
+    if (memoryActiveBalance?.id===balance.id) saveActiveBalance(balance);
+    else await commitHistory(listStockBalances().map(item=>item.id===balance.id?balance:item));
+    await refreshAdminSlices(['stock']);
+    return result;
+  } catch(error) { return {ok:false,adjustedItemsCount:0,totalUnitsDelta:0,error:error instanceof Error?error.message:'Falha ao aplicar ajustes.'}; }
 }
 
-export function deleteStockBalance(balanceId: string) {
+export async function deleteStockBalance(balanceId: string) {
   const active = getActiveStockBalance();
-  if (active && active.id === balanceId) {
-    saveActiveBalance(null);
-  }
   const hist = listStockBalances().filter((b) => b.id !== balanceId);
-  saveHistory(hist);
+  await commitHistory(hist);
+  if (active && active.id === balanceId) saveActiveBalance(null);
   void deleteFromIdb(balanceId);
 }
 
@@ -732,10 +677,10 @@ export function duplicateStockBalance(
   });
 }
 
-export function updateStockBalanceMetadata(
+export async function updateStockBalanceMetadata(
   balanceId: string,
   data: { title?: string; notes?: string },
-): StockBalanceAudit | null {
+): Promise<StockBalanceAudit | null> {
   const active = getActiveStockBalance();
   if (active && active.id === balanceId) {
     if (data.title !== undefined) active.title = data.title;
@@ -750,7 +695,7 @@ export function updateStockBalanceMetadata(
   if (data.title !== undefined) target.title = data.title;
   if (data.notes !== undefined) target.notes = data.notes;
   target.updatedAt = new Date().toISOString();
-  saveHistory(history.map((b) => (b.id === balanceId ? target : b)));
+  await commitHistory(history.map((b) => (b.id === balanceId ? target : b)));
   return target;
 }
 
@@ -903,10 +848,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     if (memoryActiveBalance && memoryActiveBalance.status === 'in_progress') {
       try {
-        localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(memoryActiveBalance));
+        localStorage.setItem(storeScopedKey(ACTIVE_STORAGE_KEY), JSON.stringify(memoryActiveBalance));
       } catch {
         // ignore
       }
     }
   });
 }
+
+export async function hydrateStockInventoryFromApi() { memoryActiveBalance = null; const history=await loadModuleState('stock-inventory', [] as StockBalanceAudit[]); saveHistory(history); }

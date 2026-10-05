@@ -38,6 +38,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/totem', label: 'Dados e insights', end: true },
       { to: '/painel/totem/produtos', label: 'Catálogo do totem' },
       { to: '/painel/totem/atributos', label: 'Atributos' },
+      { to: '/painel/totem/marcas', label: 'Marcas' },
       { to: '/painel/totem/config', label: 'Configuração' },
     ],
   },
@@ -48,11 +49,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     module: 'erp',
     children: [
       { to: '/caixa', label: 'Abrir caixa', openApp: true, accent: '#1d4ed8' },
+      { to: '/painel/venda-externa', label: 'Venda Externa / Sem Caixa', accent: '#059669' },
       { to: '/painel/pdv', label: 'Fila do totem', end: true },
       { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
       { to: '/painel/taxas-cartao', label: 'Taxas & Maquininhas' },
+      { to: '/painel/metas', label: 'Metas & Comissões', accent: '#6366f1' },
+      { to: '/painel/relatorio-vendas', label: 'Relatório Vendas & Metas', accent: '#d97706' },
     ],
   },
   {
@@ -76,6 +80,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/atributos', label: 'Atributos & Variações' },
+      { to: '/erp/tipos-retirada', label: 'Tipos de retirada' },
+      { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
+      { to: '/painel/marcas', label: 'Marcas' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },
@@ -150,6 +157,9 @@ export function navGroupForPath(pathname: string, search = '') {
   if (pathname.startsWith('/painel/totem')) return 'totem';
   if (
     pathname.startsWith('/painel/pdv') ||
+    pathname.startsWith('/painel/venda-externa') ||
+    pathname.startsWith('/painel/metas') ||
+    pathname.startsWith('/painel/relatorio-vendas') ||
     pathname.startsWith('/painel/pedidos') ||
     pathname.startsWith('/painel/pagamentos')
   ) {
@@ -167,6 +177,7 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/fornecedores') ||
     pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
+    pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/kits') ||
     pathname.startsWith('/painel/lotes') ||

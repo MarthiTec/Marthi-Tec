@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { z } from 'zod';
 import {
   activateStoredClientUser,
@@ -6,9 +7,11 @@ import {
   adminResendActivationLink,
   adminToggleUserAccess,
   getUserSecurityStatus,
+  identifyUserAccess,
   loginWithGoogleIdToken,
   loginWithPassword,
   registerClientUser,
+  requestFirstAccess,
   requestPasswordReset,
   resetPasswordWithToken,
   setupPasswordWithToken,
@@ -86,6 +89,31 @@ authRouter.get('/api/v1/auth/providers', (_req, res) => {
   });
 });
 
+const identifySchema = z.object({
+  email: z.string().email('Informe um e-mail válido.'),
+});
+
+authRouter.post('/api/v1/auth/identify', async (req, res, next) => {
+  try {
+    const body = identifySchema.parse(req.body);
+    const result = await identifyUserAccess(body.email);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get('/api/v1/auth/identify', async (req, res, next) => {
+  try {
+    const emailParam = typeof req.query.email === 'string' ? req.query.email : '';
+    const body = identifySchema.parse({ email: emailParam });
+    const result = await identifyUserAccess(body.email);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRouter.post('/api/v1/auth/login', async (req, res, next) => {
   try {
     const body = passwordSchema.parse(req.body);
@@ -96,7 +124,7 @@ authRouter.post('/api/v1/auth/login', async (req, res, next) => {
   }
 });
 
-authRouter.post('/api/v1/auth/register', async (req, res, next) => {
+authRouter.post('/api/v1/auth/register', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
     const session = await registerClientUser(body);
@@ -106,10 +134,10 @@ authRouter.post('/api/v1/auth/register', async (req, res, next) => {
   }
 });
 
-authRouter.post('/api/v1/auth/activate', (req, res, next) => {
+authRouter.post('/api/v1/auth/activate', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = activateSchema.parse(req.body);
-    const ok = activateStoredClientUser(body.email);
+    const ok = await activateStoredClientUser(body.email);
     res.json({
       success: true,
       data: {
@@ -136,7 +164,8 @@ authRouter.post('/api/v1/auth/google', async (req, res, next) => {
 /**
  * Inspeciona token seguro (para criação de senha ou redefinição) antes do usuário preencher o formulário
  */
-authRouter.get('/api/v1/auth/token/inspect', async (req, res) => {
+authRouter.get('/api/v1/auth/token/inspect', async (req, res, next) => {
+  try {
   const token = typeof req.query.token === 'string' ? req.query.token : '';
   const expectedType = req.query.type === 'password_reset' ? 'password_reset' : 'activation';
 
@@ -167,6 +196,7 @@ authRouter.get('/api/v1/auth/token/inspect', async (req, res) => {
       expiresAt: result.record.expiresAt,
     },
   });
+  } catch (error) { next(error); }
 });
 
 /**
@@ -176,6 +206,23 @@ authRouter.post('/api/v1/auth/setup-password', async (req, res, next) => {
   try {
     const body = setupPasswordSchema.parse(req.body);
     const result = await setupPasswordWithToken(body.token, body.password);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const firstAccessSchema = z.object({
+  email: z.string().email(),
+});
+
+/**
+ * Primeiro Acesso — Solicitação de link seguro de ativação e criação de senha inicial
+ */
+authRouter.post('/api/v1/auth/first-access', async (req, res, next) => {
+  try {
+    const body = firstAccessSchema.parse(req.body);
+    const result = await requestFirstAccess(body.email);
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -224,10 +271,10 @@ authRouter.post('/api/v1/auth/otp/send', async (req, res, next) => {
 /**
  * Validação do código OTP informado
  */
-authRouter.post('/api/v1/auth/otp/verify', (req, res, next) => {
+authRouter.post('/api/v1/auth/otp/verify', async (req, res, next) => {
   try {
     const body = verifyOtpSchema.parse(req.body);
-    const result = verifyPhoneOtp(body.phone, body.code);
+    const result = await verifyPhoneOtp(body.phone, body.code);
     if (!result.success) {
       res.status(400).json({ success: false, error: { message: result.message } });
       return;
@@ -244,7 +291,7 @@ authRouter.post('/api/v1/auth/otp/verify', (req, res, next) => {
 authRouter.post('/api/v1/admin/clients/resend-activation', async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
-    const actor = req.header('x-actor-name') || 'Administrador Marthi';
+    const actor = req.user?.name || req.header('x-actor-name') || 'Administrador Marthi';
     const result = await adminResendActivationLink(
       body.email,
       body.clientName || 'Cliente',
@@ -257,7 +304,7 @@ authRouter.post('/api/v1/admin/clients/resend-activation', async (req, res, next
   }
 });
 
-authRouter.post('/api/v1/admin/clients/force-reset', async (req, res, next) => {
+authRouter.post('/api/v1/admin/clients/force-reset', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
     const actor = req.header('x-actor-name') || 'Administrador Marthi';
@@ -280,11 +327,13 @@ authRouter.post('/api/v1/admin/clients/toggle-access', async (req, res, next) =>
   }
 });
 
-authRouter.get('/api/v1/admin/clients/security-status', (req, res) => {
+authRouter.get('/api/v1/admin/clients/security-status', requireSession, requirePlatformAdmin, async (req, res, next) => {
+  try {
   const email = typeof req.query.email === 'string' ? req.query.email : '';
   const phone = typeof req.query.phone === 'string' ? req.query.phone : undefined;
-  const status = getUserSecurityStatus(email, phone);
+  const status = await getUserSecurityStatus(email, phone);
   res.json({ success: true, data: status });
+  } catch (error) { next(error); }
 });
 
 authRouter.get('/api/v1/auth/me', async (req, res, next) => {
@@ -308,4 +357,3 @@ authRouter.get('/api/v1/auth/me', async (req, res, next) => {
     next(error);
   }
 });
-

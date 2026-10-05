@@ -1,3 +1,5 @@
+import {getStoreCustomization} from './storeSegment';
+import { readModuleState, loadModuleState, saveModuleState } from './moduleState';
 /**
  * Registro de Maquininhas de Cartão e Taxas por Bandeira / Parcelamento.
  *
@@ -8,9 +10,6 @@
  *   - As taxas são compartilhadas com o Totem e com o Financeiro para cálculo de recebimento líquido.
  */
 
-import { tenantScopedKey } from './tenantContext';
-import { isNestAuthed } from '../services/nestClient';
-import { apiGetCardMachines, apiSaveCardMachines } from '../services/erpApi';
 
 export type CardBrandInstallment = {
   installment: number; // 1, 2, 3, ... 12, 18, 24
@@ -38,128 +37,18 @@ export type CardMachine = {
   updatedAt: string;
 };
 
-const STORAGE_KEY_CARD_MACHINES = 'marthi.card_machines.v1';
 export const CARD_RATES_CHANGED_EVENT = 'marthi-card-rates-changed';
 
-/**
- * Gera as 12 parcelas padrão com base na taxa 1x e acréscimo linear
- */
-function generateDefaultInstallments(rate1x: number, rate2x: number, step = 1.15): CardBrandInstallment[] {
-  const list: CardBrandInstallment[] = [
-    { installment: 1, rate: rate1x },
-    { installment: 2, rate: rate2x },
-  ];
-  let prev = rate2x;
-  for (let i = 3; i <= 12; i++) {
-    prev = Number((prev + step).toFixed(2));
-    list.push({ installment: i, rate: prev });
-  }
-  return list;
-}
-
-export const DEFAULT_CARD_BRANDS: CardBrand[] = [
-  {
-    id: 'master',
-    name: 'Mastercard',
-    debitRate: 1.39,
-    installments: [
-      { installment: 1, rate: 3.14 },
-      { installment: 2, rate: 5.28 },
-      { installment: 3, rate: 6.45 },
-      { installment: 4, rate: 7.60 },
-      { installment: 5, rate: 8.75 },
-      { installment: 6, rate: 9.90 },
-      { installment: 7, rate: 11.05 },
-      { installment: 8, rate: 12.20 },
-      { installment: 9, rate: 13.35 },
-      { installment: 10, rate: 14.50 },
-      { installment: 11, rate: 15.65 },
-      { installment: 12, rate: 16.80 },
-    ],
-    active: true,
-  },
-  {
-    id: 'visa',
-    name: 'Visa',
-    debitRate: 1.39,
-    installments: [
-      { installment: 1, rate: 3.14 },
-      { installment: 2, rate: 5.28 },
-      { installment: 3, rate: 6.45 },
-      { installment: 4, rate: 7.60 },
-      { installment: 5, rate: 8.75 },
-      { installment: 6, rate: 9.90 },
-      { installment: 7, rate: 11.05 },
-      { installment: 8, rate: 12.20 },
-      { installment: 9, rate: 13.35 },
-      { installment: 10, rate: 14.50 },
-      { installment: 11, rate: 15.65 },
-      { installment: 12, rate: 16.80 },
-    ],
-    active: true,
-  },
-  {
-    id: 'elo',
-    name: 'Elo',
-    debitRate: 1.85,
-    installments: generateDefaultInstallments(3.80, 5.95, 1.15),
-    active: true,
-  },
-  {
-    id: 'hipercard',
-    name: 'Hipercard',
-    debitRate: 1.99,
-    installments: generateDefaultInstallments(3.99, 6.15, 1.15),
-    active: true,
-  },
-  {
-    id: 'amex',
-    name: 'American Express',
-    debitRate: 2.20,
-    installments: generateDefaultInstallments(4.20, 6.40, 1.15),
-    active: true,
-  },
-];
-
-export const DEFAULT_CARD_MACHINES: CardMachine[] = [
-  {
-    id: 'MACH-DEFAULT-01',
-    name: 'Maquininha Principal (Loja)',
-    model: 'Smart POS',
-    isDefaultTotem: true,
-    defaultBrandId: 'master',
-    brands: DEFAULT_CARD_BRANDS,
-    active: true,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error(`Erro ao salvar ${key}:`, e);
-  }
-}
+/** Empty editable drafts: each store supplies its own negotiated rates. */
+export const DEFAULT_CARD_BRANDS: CardBrand[] = ['Mastercard','Visa','Elo','Hipercard','American Express'].map((name,index)=>({
+  id:['master','visa','elo','hipercard','amex'][index],name,debitRate:0,active:true,
+  installments:Array.from({length:18},(_,i)=>({installment:i+1,rate:0})),
+}));
+export const DEFAULT_CARD_MACHINES: CardMachine[] = [{id:'',name:'',isDefaultTotem:false,defaultBrandId:'master',
+ brands:DEFAULT_CARD_BRANDS,active:true,createdAt:'',updatedAt:''}];
 
 export function listCardMachines(): CardMachine[] {
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
-  const list = readJson<CardMachine[]>(key, DEFAULT_CARD_MACHINES);
-  if (!Array.isArray(list) || list.length === 0) {
-    return DEFAULT_CARD_MACHINES;
-  }
-  return list;
+  return readModuleState<CardMachine[]>('card-rates', []);
 }
 
 export function getCardMachineById(id: string): CardMachine | null {
@@ -170,10 +59,10 @@ export function getCardMachineById(id: string): CardMachine | null {
 export function getDefaultTotemMachine(): CardMachine {
   const machines = listCardMachines();
   const def = machines.find((m) => m.isDefaultTotem && m.active) ?? machines.find((m) => m.active) ?? machines[0];
-  return def || DEFAULT_CARD_MACHINES[0];
+  return def || {id:'',name:'Sem maquininha configurada',isDefaultTotem:false,defaultBrandId:'',brands:[],active:false,createdAt:'',updatedAt:''};
 }
 
-export function saveCardMachine(machine: CardMachine): CardMachine {
+export async function saveCardMachine(machine: CardMachine): Promise<CardMachine> {
   const machines = listCardMachines();
   const now = new Date().toISOString();
   machine.updatedAt = now;
@@ -192,36 +81,24 @@ export function saveCardMachine(machine: CardMachine): CardMachine {
     });
   }
 
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
-  writeJson(key, machines);
-  window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
-
-  // Sync com API se autenticado
-  if (isNestAuthed()) {
-    apiSaveCardMachines(machines).catch((e: unknown) => console.warn('Erro ao sincronizar maquininhas com a API', e));
-  }
+  await saveAllCardMachines(machines);
 
   return machine;
 }
 
-export function saveAllCardMachines(machines: CardMachine[]) {
-  const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
-  writeJson(key, machines);
+export async function saveAllCardMachines(machines: CardMachine[]) {
+  await saveModuleState('card-rates', machines);
   window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
-
-  if (isNestAuthed()) {
-    apiSaveCardMachines(machines).catch((e: unknown) => console.warn('Erro ao sincronizar maquininhas com a API', e));
-  }
 }
 
-export function deleteCardMachine(id: string): boolean {
+export async function deleteCardMachine(id: string): Promise<boolean> {
   const machines = listCardMachines();
   if (machines.length <= 1) return false; // Impede apagar a única máquina
   const filtered = machines.filter((m) => m.id !== id);
   if (!filtered.some((m) => m.isDefaultTotem)) {
     filtered[0].isDefaultTotem = true;
   }
-  saveAllCardMachines(filtered);
+  await saveAllCardMachines(filtered);
   return true;
 }
 
@@ -237,6 +114,7 @@ export function getTotemCardRate(parcels = 12): {
   rate: number;
 } {
   const machine = getDefaultTotemMachine();
+  if (!getStoreCustomization().showCardRates) return {machineId:'',machineName:'Taxas desativadas',brandId:'',brandName:'Taxas desativadas',parcels,rate:0};
   const brand =
     machine.brands.find((b) => b.id === machine.defaultBrandId && b.active) ??
     machine.brands.find((b) => b.active) ??
@@ -246,23 +124,23 @@ export function getTotemCardRate(parcels = 12): {
     return {
       machineId: machine.id,
       machineName: machine.name,
-      brandId: 'master',
-      brandName: 'Mastercard',
+      brandId: '',
+      brandName: 'Sem taxa configurada',
       parcels,
-      rate: 16.80,
+      rate: 0,
     };
   }
 
   const targetInst = brand.installments.find((it) => it.installment === parcels);
   const rate = targetInst
     ? targetInst.rate
-    : (brand.installments[brand.installments.length - 1]?.rate ?? 16.80);
+    : (brand?.installments[brand.installments.length - 1]?.rate ?? 0);
 
   return {
     machineId: machine.id,
     machineName: machine.name,
     brandId: brand.id,
-    brandName: brand.name,
+    brandName: brand?.name ?? 'Sem taxa configurada',
     parcels,
     rate,
   };
@@ -318,10 +196,10 @@ export function calculateCardNetReceived(
   let feePercent = 0;
   if (parcels <= 0) {
     // Débito
-    feePercent = brand.debitRate;
+    feePercent = brand?.debitRate ?? 0;
   } else {
-    const inst = brand.installments.find((it) => it.installment === parcels);
-    feePercent = inst ? inst.rate : (brand.installments[brand.installments.length - 1]?.rate ?? 0);
+    const inst = brand?.installments.find((it) => it.installment === parcels);
+    feePercent = inst ? inst.rate : (brand?.installments[brand.installments.length - 1]?.rate ?? 0);
   }
 
   const feeAmount = Number(((grossAmount * feePercent) / 100).toFixed(2));
@@ -332,7 +210,7 @@ export function calculateCardNetReceived(
     feePercent,
     feeAmount,
     netAmount,
-    brandName: brand.name,
+    brandName: brand?.name ?? 'Sem taxa configurada',
   };
 }
 
@@ -340,17 +218,7 @@ export function calculateCardNetReceived(
  * Hidrata a configuração de maquininhas a partir do backend se logado
  */
 export async function hydrateCardMachinesFromApi(): Promise<boolean> {
-  if (!isNestAuthed()) return false;
-  try {
-    const data = await apiGetCardMachines().catch(() => null);
-    if (Array.isArray(data) && data.length > 0) {
-      const key = tenantScopedKey(STORAGE_KEY_CARD_MACHINES);
-      writeJson(key, data);
-      window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  await loadModuleState<CardMachine[]>('card-rates', []);
+  window.dispatchEvent(new Event(CARD_RATES_CHANGED_EVENT));
+  return true;
 }

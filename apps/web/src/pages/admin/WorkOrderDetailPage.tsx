@@ -1287,7 +1287,7 @@ function WorkOrderDetailBody({ id }: { id: string }) {
           </div>
         ) : null}
 
-        <table className="admin-table" style={{ marginTop: 16 }}>
+        <div className="admin-table-container"><table className="admin-table" style={{ marginTop: 16 }}>
           <thead>
             <tr>
               <th>Item</th>
@@ -1345,7 +1345,7 @@ function WorkOrderDetailBody({ id }: { id: string }) {
                 })
             )}
           </tbody>
-        </table>
+        </table></div>
         <p className="empty" style={{ marginTop: 8 }}>
           Total peças ao cliente {money(partsCharge)} · mão de obra {money(form.labor)} · cobrança{' '}
           {money(workOrderTotal(form))}

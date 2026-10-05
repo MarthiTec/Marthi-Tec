@@ -1,3 +1,5 @@
+import {PickupFields} from '../../components/PickupFields';
+import type {DeliveryAddress} from '../../data/pickup';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -57,6 +59,7 @@ type BrandFilter = TotemBrand | 'all';
 type CardConfig = Record<string, string>;
 
 type Selection = {
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;pickupPrices?:Record<string,number|null>;baseCashPrice:number;
   product: TotemProduct;
   picked: PickedAttribute[];
   payment: string;
@@ -193,6 +196,7 @@ export function TotemPage() {
   const [sessionMode, setSessionMode] = useState<TotemMode | null>(null);
   const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
+  const [trackingToken,setTrackingToken]=useState<string>();
   const [catalog, setCatalog] = useState<(TotemProduct & { totalQty?: number })[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -275,6 +279,14 @@ export function TotemPage() {
       priceLabel,
     });
   }
+
+  const totemBrandTabs = useMemo(() => {
+    const hasOther = catalog.some((item) => item.brand === 'other');
+    if (hasOther) {
+      return [...TOTEM_BRANDS, { id: 'other' as const, label: 'Outros' }];
+    }
+    return TOTEM_BRANDS;
+  }, [catalog]);
 
   const brandProducts = useMemo(() => {
     return catalog.filter((item) => brand === 'all' || item.brand === brand);
@@ -509,9 +521,6 @@ export function TotemPage() {
   useEffect(() => {
     function applyCatalog(next: ReturnType<typeof listTotemCatalog>) {
       setCatalog((current) => {
-        if (next.length === 0 && current.length > 0) {
-          return current;
-        }
         return catalogFingerprint(current) === catalogFingerprint(next) ? current : next;
       });
     }
@@ -550,7 +559,7 @@ export function TotemPage() {
         /* cache local já aplicado */
       }
       applySettingsFromCache();
-      void loadTotemCatalog().then(applyCatalog);
+      void loadTotemCatalog().then(applyCatalog).catch(()=>{setCatalog([]);setCatalogError('Não foi possível carregar o estoque do servidor.');});
     }
 
     void refreshLive();
@@ -616,6 +625,7 @@ export function TotemPage() {
         : undefined;
     const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
     setSelection({
+      stockId:quote.stock?.id,pickupPrices:quote.stock?.pickupPrices,baseCashPrice:quote.cashPrice,
       product,
       picked,
       payment: PAYMENT_OPTIONS[0],
@@ -699,6 +709,7 @@ export function TotemPage() {
     setSearch((current) => current.slice(0, -1));
   }
 
+  const [notificationWarning,setNotificationWarning]=useState<string>();
   async function handleSubmitOrder(destination: 'cashier' | 'whatsapp') {
     if (!selection) return;
     if (!name.trim()) {
@@ -715,6 +726,7 @@ export function TotemPage() {
     setSubmitting(true);
     setCheckoutKb(null);
 
+    if(!selection.stockId||!selection.pickupMethodId){setError('Escolha o tipo de retirada para continuar.');setSubmitting(false);return;}
     const priceLabel =
       !copy.showInstallments || selection.payment === 'À vista'
         ? formatBRL(selection.cashPrice)
@@ -727,6 +739,8 @@ export function TotemPage() {
 
     try {
       const result = await submitTotemLead({
+        destination,
+        stockId:selection.stockId,pickupMethodId:selection.pickupMethodId,deliveryAddress:selection.deliveryAddress,
         customerName: name.trim(),
         customerPhone: phone.trim(),
         productName: selection.product.name,
@@ -739,6 +753,8 @@ export function TotemPage() {
         cashPrice: selection.cashPrice,
         sentToCashier: isToCashier,
       });
+      setNotificationWarning(result.notificationWarning);
+      setTrackingToken(result.trackingToken);
       setTicketId(result.ticketId);
       setSentToCashierDone(isToCashier);
       setStep('done');
@@ -951,7 +967,7 @@ export function TotemPage() {
               {copy.showBrandFilters ? (
                 <div className="totem__toolbar totem__toolbar--quiet">
                   <div className="totem__brands" role="tablist" aria-label="Marcas">
-                    {TOTEM_BRANDS.map((item) => (
+                    {totemBrandTabs.map((item) => (
                       <button
                         key={item.id}
                         type="button"
@@ -1225,6 +1241,7 @@ export function TotemPage() {
 
             <div className="totem__checkout-form">
               <h1>{selection.product.name}</h1>
+              <PickupFields publicMode product={{id:selection.stockId,price:selection.baseCashPrice,pickupPrices:selection.pickupPrices}} methodId={selection.pickupMethodId} address={selection.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setSelection(current=>current?{...current,pickupMethodId,deliveryAddress,cashPrice:price??current.baseCashPrice}:current)}/>
               <div className="totem__summary">
                 {selection.picked.map((item) => (
                   <p key={item.id}>
@@ -1430,7 +1447,8 @@ export function TotemPage() {
 
       {step === 'done' && selection && (
         <section className="totem__done">
-          <h1>{sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
+          {notificationWarning&&<p role="status">{notificationWarning}</p>}
+          <h1>{notificationWarning?'Pedido registrado':sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
           {senha ? (
             <div className="totem__senha" aria-label={`Senha ${senha}`}>
               {senha}
@@ -1440,12 +1458,13 @@ export function TotemPage() {
             {name.trim() ? `Obrigado, ${name.trim()}!` : 'Obrigado!'}{' '}
             {sentToCashierDone
               ? 'Seu pedido foi encaminhado com sucesso para a fila do caixa.'
-              : copy.doneHint}
+              : notificationWarning?'O pedido está na fila do caixa para atendimento.':copy.doneHint}
           </p>
           <p>
             <strong>{selection.product.name}</strong>
             {formatPicked(selection.picked) ? ` (${formatPicked(selection.picked)})` : ''}.
           </p>
+          {trackingToken&&<p><a href={`/acompanhar-retirada/${trackingToken}`} target="_blank" rel="noreferrer">Acompanhar disponibilidade e entrega</a></p>}
           {sentToCashierDone ? (
             <div
               style={{

@@ -1,10 +1,14 @@
+import { ensureOwnerTeamMember } from '../services/ownerTeam.js';
+import { randomUUID } from 'node:crypto';
+import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { preRegisterClientAccount } from '../services/authService.js';
 import { createSecureToken } from '../services/tokenService.js';
-import { sendInternalNotificationEmail, sendWelcomeEmail } from '../services/emailService.js';
+import { sendInternalNotificationEmail, sendSignupReceivedEmail, sendWelcomeEmail } from '../services/emailService.js';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
+import { confirmExistingClientPayment } from '../services/clientPaymentActivation.js';
 
 /**
  * Cadastro público de parceiro, ciclo de contratação e ativação comercial.
@@ -78,23 +82,25 @@ const signupSchema = z
   });
 
 const paymentConfirmSchema = z.object({
-  protocol: z.string().min(3),
+  protocol: z.string().min(1),
+  email: z.string().optional(),
+  document: z.string().optional(),
+  tradeName: z.string().optional(),
+  planId: z.string().optional(),
+  monthlyAmount: z.coerce.number().optional(),
   paymentMethod: z.string().default('pix'),
   transactionRef: z.string().optional(),
   notes: z.string().optional(),
 });
 
-function calculatePlanAmount(planId: string): number {
-  switch (planId) {
-    case 'golden':
-    case 'scale':
-      return 597;
-    case 'silver':
-    case 'growth':
-      return 497;
-    default:
-      return 197;
-  }
+async function calculatePlanAmount(planId: string, modules: string[]): Promise<number> {
+  const id = planId === 'scale' ? 'golden' : planId === 'growth' ? 'silver' : planId === 'start' ? 'bronze' : planId;
+  const result = await pool.query('SELECT settings FROM platform_commercial_plans WHERE id=$1', [id]);
+  const plan = result.rows[0]?.settings;
+  if (!plan || plan.active === false) throw Object.assign(new Error('Plano indisponível para contratação.'), { status: 409 });
+  if (!Number.isFinite(plan.priceNumeric) || plan.priceNumeric < 0) throw Object.assign(new Error('Preço do plano inválido no catálogo.'), { status: 409 });
+  if (plan.allModules !== true && modules.length > plan.maxModules) throw Object.assign(new Error('Quantidade de módulos excede o limite do plano contratado.'), { status: 400 });
+  return plan.priceNumeric;
 }
 
 function planDisplayName(planId: string): string {
@@ -123,15 +129,13 @@ function resolveRequestFrontendUrl(req: any): string {
   return env.FRONTEND_URL || 'https://marthi-totem.discloud.dev';
 }
 
-// In-memory store de fallback para contratações
-const signupsStore = new Map<string, PartnerSignupRecord>();
-const processedTransactions = new Set<string>();
 
 /**
  * 1. Conclusão da Contratação
  * Registra o pedido de contratação, previne duplicidades e aguarda confirmação de pagamento.
  */
-partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
+partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
+  try {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -165,37 +169,28 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
         existingId = existingRes.rows[0].id;
       }
     } catch (err) {
-      console.warn('[partners] DB lookup existing signup warning:', err);
+      throw err;
     }
   }
 
-  if (!existingId) {
-    for (const [id, item] of signupsStore.entries()) {
-      if (
-        item.email.toLowerCase() === normEmail ||
-        item.document.replace(/\D/g, '') === cleanDoc
-      ) {
-        existingId = id;
-        break;
-      }
-    }
+  if (existingId) {
+    res.status(409).json({ success:false, error:{ code:'SIGNUP_EXISTS', message:'Já existe uma contratação para esses dados. Consulte a equipe Marthi para acompanhar ou alterar o cadastro.' } });
+    return;
   }
-
-  const id = existingId || `PRT-${Date.now().toString(36).toUpperCase()}`;
+  const id = `PRT-${randomUUID()}`;
   const now = new Date().toISOString();
-  const monthlyAmount = calculatePlanAmount(data.planId);
+  const monthlyAmount = await calculatePlanAmount(data.planId, data.modules);
 
-  const initialStatus: ContractingStatus = data.payNow ? 'pagamento_aprovado' : 'aguardando_pagamento';
+  const initialStatus: ContractingStatus = 'aguardando_pagamento';
 
   const record: PartnerSignupRecord = {
     ...data,
     id,
     status: initialStatus,
     monthlyAmount,
-    createdAt: signupsStore.get(id)?.createdAt || now,
+    createdAt: now,
     updatedAt: now,
     auditTrail: [
-      ...(signupsStore.get(id)?.auditTrail || []),
       {
         status: 'contratacao_iniciada',
         timestamp: now,
@@ -204,14 +199,11 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
       {
         status: initialStatus,
         timestamp: now,
-        detail: data.payNow
-          ? `Pagamento processado imediatamente via ${data.paymentMethod}`
-          : 'Aguardando confirmação de pagamento pelo gateway/PIX',
+        detail: 'Aguardando confirmação de pagamento; a preferência informada não confirma a cobrança.',
       },
     ],
   };
 
-  signupsStore.set(id, record);
 
   // Persiste no PostgreSQL partner_signups
   if (pool) {
@@ -241,21 +233,8 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
         ],
       );
     } catch (err) {
-      console.warn('[partners] DB partner_signups save error:', err);
+      throw err;
     }
-  }
-
-  // Pré-registra a conta com segurança (sem senha em texto puro!)
-  try {
-    await preRegisterClientAccount({
-      email: data.email,
-      name: data.contactName || data.tradeName,
-      tradeName: data.tradeName,
-      clientAccountId: id,
-      role: 'admin',
-    });
-  } catch (err) {
-    console.warn('[partners] DB/Memory pre-register account fallback:', err);
   }
 
   let activationToken: string | undefined = undefined;
@@ -263,6 +242,42 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
   if (record.status === 'pagamento_aprovado') {
     const act = await executePaymentActivation(record, data.paymentMethod || 'pix', data.transactionRef, undefined, frontendUrl);
     activationToken = act.rawToken;
+  } else {
+    // 1. Notifica a equipe Marthi que uma nova contratação foi realizada e aguarda conferência do pagamento
+    try {
+      await sendInternalNotificationEmail({
+        companyName: record.tradeName,
+        contactName: record.contactName || record.tradeName,
+        email: record.email,
+        phone: record.phone,
+        planName: planDisplayName(record.planId),
+        monthlyAmount: record.monthlyAmount,
+        paymentMethod: record.paymentMethod || 'pix',
+        paymentStatus: 'Aguardando Pagamento Pix (Pendente de Liberação no /admin)',
+        contractedAt: record.createdAt,
+        transactionRef: record.transactionRef,
+        clientId: record.id,
+        frontendUrl,
+      });
+    } catch (err) {
+      console.error('[partners] Erro ao enviar notificação interna de nova contratação:', err);
+    }
+
+    // 2. Envia e-mail ao cliente confirmando o registro do pedido e instruções de aguardar a liberação
+    try {
+      await sendSignupReceivedEmail({
+        toEmail: record.email,
+        contactName: record.contactName || record.tradeName,
+        companyName: record.tradeName,
+        planName: planDisplayName(record.planId),
+        monthlyAmount: record.monthlyAmount,
+        paymentMethod: record.paymentMethod || 'pix',
+        protocol: record.id,
+        frontendUrl,
+      });
+    } catch (err) {
+      console.error('[partners] Erro ao enviar e-mail de recebimento de pedido para o cliente:', err);
+    }
   }
 
   console.log('[partners] Contratação registrada', {
@@ -286,28 +301,56 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res) => {
           : 'Contratação registrada com sucesso. Aguardando confirmação do pagamento para ativação.',
     },
   });
+  } catch (error) { next(error); }
 });
 
 /**
  * 2. Confirmação de Pagamento com Idempotência Estrita
  * Acionado por Webhook de Gateway ou Confirmação Manual pelo Administrador.
  */
-partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) => {
+partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = paymentConfirmSchema.parse(req.body);
     const protocol = body.protocol.trim();
     const frontendUrl = resolveRequestFrontendUrl(req);
 
-    // 1. Busca registro no DB ou em memória
+    const existing = await confirmExistingClientPayment({ protocol, paymentMethod: body.paymentMethod,
+      transactionRef: body.transactionRef, notes: body.notes, actorId: req.user!.id });
+    if (existing) {
+      let activationEmailSent = false;
+      if (existing.rawToken) {
+        try {
+          const sent = await sendWelcomeEmail({ toEmail: existing.account.email,
+            contactName: existing.account.contact_name || existing.account.trade_name,
+            companyName: existing.account.trade_name, planName: planDisplayName(existing.planId),
+            monthlyAmount: existing.monthlyAmount, activationToken: existing.rawToken, frontendUrl });
+          activationEmailSent = sent.success;
+        } catch { activationEmailSent = false; }
+      }
+      res.json({ success: true, data: { id: existing.account.id, status: existing.status,
+        alreadyProcessed: existing.alreadyProcessed, activationEmailSent,
+        message: existing.alreadyProcessed ? 'Pagamento já confirmado no MarthiDB.' :
+          existing.status === 'acesso_ativado' ? 'Pagamento confirmado no MarthiDB. Acesso liberado com a senha existente.' :
+          activationEmailSent ? 'Pagamento confirmado no MarthiDB. Link de criação de senha enviado.' :
+          'Pagamento confirmado no MarthiDB. O e-mail de ativação não foi enviado; use Reenviar ativação.' } });
+      return;
+    }
+
+    const lookupEmail = (body.email || (protocol.includes('@') ? protocol : '')).trim().toLowerCase();
+    const lookupDoc = (body.document || protocol).replace(/\D/g, '');
+
+    // 1. Busca a contratação no MarthiDB
     let record: PartnerSignupRecord | null = null;
 
     if (pool) {
       try {
         const dbRes = await pool.query(
           `SELECT * FROM partner_signups
-           WHERE id = $1 OR lower(email) = lower($1) OR regexp_replace(document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+           WHERE id = $1
+              OR (lower(email) = lower($2) AND $2 != '')
+              OR (regexp_replace(document, '\\D', '', 'g') = $3 AND $3 != '')
            LIMIT 1`,
-          [protocol],
+          [protocol, lookupEmail, lookupDoc],
         );
         if (dbRes.rows.length > 0) {
           const row = dbRes.rows[0];
@@ -345,55 +388,16 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
           };
         }
       } catch (err) {
-        console.warn('[partners] DB payment-confirm lookup warning:', err);
+        throw err;
       }
     }
 
     if (!record) {
-      record = signupsStore.get(protocol) || null;
-      if (!record) {
-        for (const item of signupsStore.values()) {
-          if (
-            item.email.toLowerCase() === protocol.toLowerCase() ||
-            item.document.replace(/\D/g, '') === protocol.replace(/\D/g, '')
-          ) {
-            record = item;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!record) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Contratação não encontrada para o protocolo/cliente informado.' },
-      });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Contratação não encontrada no MarthiDB. Complete o cadastro antes de liberar o acesso.' } });
       return;
     }
 
-    // 2. Idempotência: se pagamento já confirmado com a mesma transação, retorna sucesso sem duplicar e-mails
-    const txKey = body.transactionRef ? `${record.id}:${body.transactionRef}` : `${record.id}:paid`;
-    if (
-      record.status === 'acesso_ativado' ||
-      record.status === 'acesso_pendente' ||
-      processedTransactions.has(txKey)
-    ) {
-      console.log(`[partners] Pagamento já processado para protocolo ${record.id} (idempotência preservada)`);
-      res.json({
-        success: true,
-        data: {
-          id: record.id,
-          status: record.status,
-          alreadyProcessed: true,
-          message: 'Pagamento já havia sido confirmado anteriormente. Nenhuma ação duplicada realizada.',
-        },
-      });
-      return;
-    }
-
-    processedTransactions.add(txKey);
-
+    // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
     // 3. Executa a ativação completa
     const act = await executePaymentActivation(record, body.paymentMethod, body.transactionRef, body.notes, frontendUrl);
 
@@ -403,7 +407,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
         id: record.id,
         status: record.status,
         activationToken: act.rawToken,
-        message: 'Pagamento confirmado com sucesso! E-mails de boas-vindas e notificação interna enviados.',
+        message: 'Pagamento confirmado no MarthiDB. O envio do acesso depende da configuração de e-mail.',
       },
     });
   } catch (error) {
@@ -414,7 +418,8 @@ partnersRouter.post('/api/v1/partners/payment-confirm', async (req, res, next) =
 /**
  * Consulta de status do ciclo de vida da contratação
  */
-partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
+partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) => {
+  try {
   const protocol = req.params.protocol.trim();
   let record: PartnerSignupRecord | null = null;
 
@@ -422,7 +427,7 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
     try {
       const dbRes = await pool.query(
         `SELECT * FROM partner_signups
-         WHERE id = $1 OR lower(email) = lower($1) OR regexp_replace(document, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+         WHERE id = $1
          LIMIT 1`,
         [protocol],
       );
@@ -462,13 +467,10 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
         };
       }
     } catch (err) {
-      console.warn('[partners] DB status lookup warning:', err);
+      throw err;
     }
   }
 
-  if (!record) {
-    record = signupsStore.get(protocol) || null;
-  }
 
   if (!record) {
     res.status(404).json({
@@ -496,9 +498,11 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res) => {
       auditTrail: record.auditTrail,
     },
   });
+  } catch (error) { next(error); }
 });
 
-partnersRouter.get('/api/v1/partners/signup/pending', async (_req, res) => {
+partnersRouter.get('/api/v1/partners/signup/pending', requireSession, requirePlatformAdmin, async (_req, res, next) => {
+  try {
   if (pool) {
     try {
       const dbRes = await pool.query(
@@ -530,35 +534,12 @@ partnersRouter.get('/api/v1/partners/signup/pending', async (_req, res) => {
       });
       return;
     } catch (err) {
-      console.warn('[partners] DB pending lookup fallback to memory:', err);
+      throw err;
     }
   }
 
-  const items = Array.from(signupsStore.values())
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 100);
-
-  res.json({
-    success: true,
-    data: {
-      count: items.length,
-      items: items.map((item) => ({
-        id: item.id,
-        createdAt: item.createdAt,
-        planId: item.planId,
-        planName: planDisplayName(item.planId),
-        modules: item.modules,
-        tradeName: item.tradeName,
-        legalName: item.legalName,
-        email: item.email,
-        phone: item.phone,
-        status: item.status,
-        monthlyAmount: item.monthlyAmount,
-        city: item.city,
-        state: item.state,
-      })),
-    },
-  });
+  throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  } catch (error) { next(error); }
 });
 
 /**
@@ -590,17 +571,20 @@ async function executePaymentActivation(
   });
 
   const storeId = `STR-${record.id}`;
-  const userId = `usr-${record.id}`;
+  let userId = `usr-${record.id}`;
 
   // 1. Vincula cliente, loja, licença e usuário no PostgreSQL
   if (pool) {
+    const db = await pool.connect();
     try {
+      await db.query('BEGIN');
       // 1.1 Contas de Clientes (Tenant Root)
-      await pool.query(
+      const caRes = await db.query(
         `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), now())
          ON CONFLICT (document) DO UPDATE
-         SET status = 'active', email = $6, phone = $7, trade_name = $2, legal_name = $3, updated_at = now()`,
+         SET status = 'active', email = $6, phone = $7, trade_name = $2, legal_name = $3, updated_at = now()
+         RETURNING id`,
         [
           record.id,
           record.tradeName,
@@ -612,9 +596,10 @@ async function executePaymentActivation(
           record.contactName,
         ],
       );
+      const actualAccountId = caRes.rows[0]?.id || record.id;
 
       // 1.2 Loja Matriz do Lojista
-      await pool.query(
+      await db.query(
         `INSERT INTO stores (
           id, client_account_id, trade_name, legal_name, document_type, document,
           email, phone, zip_code, street, number, complement, district, city, state,
@@ -627,69 +612,79 @@ async function executePaymentActivation(
         SET trade_name = $3, legal_name = $4, email = $7, phone = $8, active = true, updated_at = now()`,
         [
           storeId,
-          record.id,
+          actualAccountId,
           record.tradeName,
           record.legalName,
           record.documentType,
           record.document,
           record.email,
-          record.phone,
-          record.zipCode || '25800-000',
-          record.street || 'Rua Principal',
-          record.number || '100',
+          record.phone || '',
+          record.zipCode || '',
+          record.street || '',
+          record.number || '',
           record.complement || '',
-          record.district || 'Centro',
-          record.city || 'Três Rios',
-          record.state || 'RJ',
+          record.district || '',
+          record.city || '',
+          record.state || '',
         ],
       );
 
       // 1.3 Licença do Plano e Módulos
-      await pool.query(
+      const licenseModules = Array.isArray(record.modules) && record.modules.length > 0
+        ? record.modules
+        : [];
+      if (!licenseModules.length || !record.planId) throw Object.assign(new Error('Contratação sem plano ou módulos definidos.'), { status: 409 });
+
+      await db.query(
         `INSERT INTO store_licenses (
           id, client_account_id, store_id, plan_id, status, starts_at, expires_at,
           modules, final_price, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, 'active', now(), now() + interval '30 days',
-          $5::jsonb, $6, now(), now()
-        ) ON CONFLICT (id) DO UPDATE
-        SET plan_id = $4, modules = $5::jsonb, status = 'active', updated_at = now()`,
+          (jsonb_populate_record(NULL::store_licenses, jsonb_build_object('modules', $5::jsonb))).modules, $6, now(), now()
+        ) ON CONFLICT (store_id) DO UPDATE
+        SET plan_id = $4, modules = EXCLUDED.modules, status = 'active', updated_at = now()`,
         [
           `LIC-${record.id}`,
-          record.id,
+          actualAccountId,
           storeId,
           record.planId,
-          JSON.stringify(record.modules),
+          JSON.stringify(licenseModules),
           record.monthlyAmount,
         ],
       );
 
       // 1.4 Usuário Admin da Conta (Aguardando criação de senha segura)
-      await pool.query(
+      await db.query(
         `INSERT INTO users (
           id, client_account_id, email, name, provider, password_hash, global_role, active, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, 'password', 'LOCKED_PENDING_ACTIVATION', 'admin', false, now(), now()
-        ) ON CONFLICT (email) DO UPDATE
-        SET client_account_id = $2, name = $4, updated_at = now()`,
+        ) ON CONFLICT (email) DO NOTHING`,
         [
           userId,
-          record.id,
+          actualAccountId,
           record.email.trim().toLowerCase(),
           record.contactName || record.tradeName,
         ],
       );
 
+      const actualOwner = await db.query('SELECT id,client_account_id FROM users WHERE lower(email)=lower($1) FOR UPDATE', [record.email]);
+      if (!actualOwner.rows[0] || actualOwner.rows[0].client_account_id !== actualAccountId) throw Object.assign(new Error('E-mail vinculado a outra conta.'), { status: 409 });
+      userId = actualOwner.rows[0].id;
       // 1.5 Vínculo do Usuário com a Loja Matriz em user_stores
-      await pool.query(
-        `INSERT INTO user_stores (user_id, store_id, role, is_default, created_at)
-         VALUES ($1, $2, 'admin', true, now())
+      await db.query(
+        `INSERT INTO user_stores (id, user_id, store_id, role, is_default, created_at)
+         VALUES ('UST-' || $1 || '-' || $2, $1, $2, 'admin', true, now())
          ON CONFLICT (user_id, store_id) DO NOTHING`,
         [userId, storeId],
       );
+      await ensureOwnerTeamMember(db,userId,storeId);
+      await db.query('COMMIT');
     } catch (err) {
-      console.warn('[partners] DB tenant activation records creation error:', err);
-    }
+      await db.query('ROLLBACK');
+      throw err;
+    } finally { db.release(); }
   }
 
   record.status = 'cliente_criado';
@@ -723,11 +718,21 @@ async function executePaymentActivation(
         `UPDATE partner_signups
          SET status = $1, payment_confirmed_at = now(), payment_method = $2,
              transaction_ref = $3, activation_token_sent_at = now(), audit_trail = $4::jsonb, updated_at = now()
-         WHERE id = $5`,
-        [record.status, record.paymentMethod, record.transactionRef, JSON.stringify(record.auditTrail), record.id],
+         WHERE id = $5
+            OR lower(email) = lower($6)
+            OR (regexp_replace(document, '\\D', '', 'g') = regexp_replace($7, '\\D', '', 'g') AND regexp_replace($7, '\\D', '', 'g') != '')`,
+        [
+          record.status,
+          record.paymentMethod,
+          record.transactionRef,
+          JSON.stringify(record.auditTrail),
+          record.id,
+          record.email,
+          record.document,
+        ],
       );
     } catch (err) {
-      console.warn('[partners] DB partner_signups update error:', err);
+      throw err;
     }
   }
 

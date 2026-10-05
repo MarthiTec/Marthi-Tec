@@ -733,7 +733,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
               </header>
 
               <div className="os-jira-desc-card">
-                <table className="os-jira-desc-table">
+                <div className="admin-table-container"><table className="os-jira-desc-table">
                   <tbody>
                     <tr>
                       <th>Título do Chamado</th>
@@ -798,7 +798,7 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                       </tr>
                     ) : null}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </section>
 

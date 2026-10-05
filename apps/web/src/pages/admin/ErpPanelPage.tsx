@@ -264,7 +264,7 @@ export function ErpPanelPage() {
         {users.length === 0 ? (
           <p className="empty">Nenhum usuário do sistema cadastrado.</p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap admin-table-container">
             <table className="admin-table">
               <thead>
                 <tr>

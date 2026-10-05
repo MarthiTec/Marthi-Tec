@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CompanyUserSummary } from '../../components/CompanyUserSummary';
 import { CrudNameButton, CrudRowActions } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
@@ -35,6 +36,7 @@ import {
 import { PRESENCE_EVENT } from '../../data/presenceStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { lookupCnpjData } from '../../services/cnpj';
+import { nestApiUrl } from '../../services/config';
 
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -181,11 +183,13 @@ export function MarthiClientsPage() {
   const [paymentMethod, setPaymentMethod] = useState('pix');
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   // Activation / Credentials Success Dialog
   const [activatedNotice, setActivatedNotice] = useState<{
     client: MarthiClient;
     isNew?: boolean;
+    message?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -195,7 +199,9 @@ export function MarthiClientsPage() {
 
   useEffect(() => {
     refresh();
-    hydrateMarthiClientsFromApi().then(() => refresh()).catch(() => {});
+    hydrateMarthiClientsFromApi().then(() => refresh()).catch((error) => {
+      setFlash(error instanceof Error ? error.message : 'Não foi possível atualizar os clientes do MarthiDB.');
+    });
     window.addEventListener(MARTHI_CLIENTS_EVENT, refresh);
     window.addEventListener(PRESENCE_EVENT, refresh);
     window.addEventListener('storage', refresh);
@@ -239,7 +245,6 @@ export function MarthiClientsPage() {
   function openEdit(client: MarthiClient) {
     setFormError(null);
     setEditing(toEditForm(client));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleOpenCreate() {
@@ -372,6 +377,22 @@ export function MarthiClientsPage() {
       detail: `${saved.tradeName} (${saved.clientId}) · ${planLabel(saved.planId)}${parentClientId ? ' [Filial Unificada]' : ''}`,
     });
 
+    try {
+      const apiUrl = nestApiUrl();
+      fetch(`${apiUrl}/api/v1/admin/clients/${saved.clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saved),
+      }).catch(() => {});
+      fetch(`${apiUrl}/api/v1/admin/clients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saved),
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+
     setFlash(`Registro de ${saved.tradeName} atualizado.`);
     setEditing(null);
     setFormError(null);
@@ -386,9 +407,10 @@ export function MarthiClientsPage() {
   }
 
   async function handleConfirmManualPayment() {
-    if (!paymentModalClient) return;
+    if (!paymentModalClient || paymentSaving) return;
     const client = paymentModalClient;
-
+    setPaymentSaving(true);
+    try {
     const res = await identifyClientPaymentAndActivate(client.clientId, {
       method: paymentMethod,
       transactionRef: paymentRef,
@@ -401,17 +423,25 @@ export function MarthiClientsPage() {
         actorName: user?.name ?? 'Admin Marthi',
         actorEmail: user?.email ?? 'admin@marthi.com.br',
         action: 'marthi.cliente.pagamento_identificado_ativado',
-        detail: `Pagamento identificado manualmente para ${client.tradeName} via ${paymentMethod} (${paymentRef || 'Sem comprovante'}). Token seguro gerado e e-mail de ativação enviado.`,
+        detail: `Pagamento confirmado no MarthiDB para ${client.tradeName} via ${paymentMethod} (${paymentRef || 'Sem referência'}).`,
       });
 
       setPaymentModalClient(null);
       refresh();
+      if (auditClient && auditClient.clientId === client.clientId) {
+        setAuditClient(res.client);
+      }
       setFlash(res.message);
       setActivatedNotice({
         client: res.client,
         isNew: false,
+        message: res.message,
       });
+    } else {
+      setFlash(res.message || 'Falha ao confirmar pagamento.');
+      alert(res.message || 'Falha ao confirmar pagamento. Verifique os dados ou tente novamente.');
     }
+    } finally { setPaymentSaving(false); }
   }
 
   async function runAction(action: PendingAction) {
@@ -644,10 +674,33 @@ export function MarthiClientsPage() {
         </p>
       ) : null}
 
-      {/* Drawer Edição */}
+      {/* Modal Edição de Cliente */}
+      <CompanyUserSummary />
+
       {editing ? (
-        <article className="admin-card marthi-edit" style={{ marginTop: '20px' }}>
-          <h2>Editar empresa · {editing.tradeName || editing.clientId}</h2>
+        <div className="marthi-modal-backdrop" onClick={() => { setEditing(null); setFormError(null); }}>
+          <div
+            className="marthi-modal-card marthi-modal-card--lg"
+            style={{ maxWidth: 760 }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header className="marthi-modal-head">
+              <div>
+                <span className="marthi-modal-kicker">Edição de Cadastro</span>
+                <h2>Editar Empresa · {editing.tradeName || editing.clientId}</h2>
+              </div>
+              <button
+                type="button"
+                className="marthi-modal-close"
+                onClick={() => { setEditing(null); setFormError(null); }}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </header>
+            <div className="marthi-modal-form">
           {formError ? <p className="qty-low">{formError}</p> : null}
           <div className="admin-form">
             <label>
@@ -878,8 +931,10 @@ export function MarthiClientsPage() {
               </div>
             </div>
           </div>
-        </article>
-      ) : null}
+        </div>
+      </div>
+    </div>
+  ) : null}
 
       {/* Toolbar & Filtros */}
       <div className="admin-toolbar marthi-toolbar" style={{ marginTop: '20px' }}>
@@ -1037,13 +1092,38 @@ export function MarthiClientsPage() {
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={
-                            client.paymentOk ? 'marthi-pill marthi-pill--ok' : 'marthi-pill marthi-pill--late'
-                          }
-                        >
-                          {client.paymentOk ? '✓ Em dia' : '⏳ Pendente'}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                          <span
+                            className={
+                              client.paymentOk ? 'marthi-pill marthi-pill--ok' : 'marthi-pill marthi-pill--late'
+                            }
+                          >
+                            {client.paymentOk ? '✓ Em dia' : '⏳ Pendente'}
+                          </span>
+                          {!client.paymentOk ? (
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '0.72rem',
+                                color: '#059669',
+                                borderColor: '#059669',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPaymentModal(client);
+                              }}
+                              title="Confirmar pagamento e liberar acesso do cliente"
+                            >
+                              ✓ Liberar Acesso
+                            </button>
+                          ) : null}
+                        </div>
                         {client.paymentDetails?.method ? (
                           <div style={{ fontSize: '0.72rem', color: 'var(--mute)', marginTop: '2px' }}>
                             via {client.paymentDetails.method.toUpperCase()}
@@ -1158,7 +1238,7 @@ export function MarthiClientsPage() {
                     required
                     value={newForm.tradeName}
                     onChange={(e) => setNewForm({ ...newForm, tradeName: e.target.value })}
-                    placeholder="Ex: Cell Ponto Assistência"
+                    placeholder="Ex: Smart Tech Assistência"
                   />
                 </label>
 
@@ -1328,8 +1408,8 @@ export function MarthiClientsPage() {
               {/* Estrutura Corporativa: Filial ou Loja Independente */}
               <div
                 style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.08))',
+                  background: 'var(--card-2, #f8fafc)',
+                  border: '1px solid var(--line, #e2e8f0)',
                   borderRadius: '8px',
                   padding: '12px 14px',
                   marginTop: '4px',
@@ -1425,17 +1505,7 @@ export function MarthiClientsPage() {
             </header>
 
             <div className="marthi-modal-form">
-              <div
-                style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.08))',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  display: 'grid',
-                  gap: '4px',
-                }}
-              >
+              <div className="marthi-summary-box">
                 <div>
                   <strong>Cliente:</strong> {paymentModalClient.tradeName} ({paymentModalClient.email})
                 </div>
@@ -1483,27 +1553,28 @@ export function MarthiClientsPage() {
               <div
                 style={{
                   fontSize: '0.82rem',
-                  color: 'var(--mute, #94a3b8)',
-                  lineHeight: 1.4,
-                  background: 'rgba(148, 163, 184, 0.08)',
+                  color: 'var(--ink, #0f172a)',
+                  lineHeight: 1.45,
+                  background: 'rgba(15, 118, 110, 0.08)',
+                  border: '1px solid rgba(15, 118, 110, 0.25)',
                   padding: '10px 12px',
                   borderRadius: '8px',
                 }}
               >
-                ℹ️ Ao confirmar, o sistema marca o pagamento como <strong>Confirmado</strong>, gera um <strong>token seguro de uso único</strong> e envia automaticamente o e-mail oficial com as instruções para o responsável criar sua senha.
+                ℹ️ Ao confirmar, o sistema registra o pagamento no <strong>MarthiDB</strong> e libera a loja cadastrada. Se o responsável precisar criar a senha, será gerado um link seguro de ativação. O resultado informa se o e-mail foi enviado.
               </div>
 
               <div className="marthi-modal-foot">
-                <button type="button" className="btn btn--ghost" onClick={() => setPaymentModalClient(null)}>
+                <button type="button" className="btn btn--ghost" disabled={paymentSaving} onClick={() => setPaymentModalClient(null)}>
                   Cancelar
                 </button>
                 <button
                   type="button"
                   className="btn btn--primary"
-                  style={{ background: '#059669', borderColor: '#059669' }}
+                  disabled={paymentSaving}
                   onClick={handleConfirmManualPayment}
                 >
-                  Confirmar Pagamento &amp; Ativar Acesso
+                  {paymentSaving ? 'Salvando no MarthiDB…' : 'Confirmar Pagamento & Ativar Acesso'}
                 </button>
               </div>
             </div>
@@ -1572,7 +1643,7 @@ export function MarthiClientsPage() {
                       onClick={() => handleOpenPaymentModal(auditClient)}
                       title="Identificar pagamento manual e disparar ativação"
                     >
-                      💰 Ativar Pagamento (Manual)
+                      💰 Confirmar Pagamento &amp; Liberar Acesso
                     </button>
                   ) : (
                     <button
@@ -1686,7 +1757,7 @@ export function MarthiClientsPage() {
                 </div>
               </div>
 
-              <table className="admin-table" style={{ fontSize: '0.85rem' }}>
+              <div className="admin-table-container"><table className="admin-table" style={{ fontSize: '0.85rem' }}>
                 <tbody>
                   <tr>
                     <td style={{ color: 'var(--mute)' }}>Identificador:</td>
@@ -1800,7 +1871,7 @@ export function MarthiClientsPage() {
                     </tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
 
               <div className="marthi-modal-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <button
@@ -1861,10 +1932,10 @@ export function MarthiClientsPage() {
             <header className="marthi-modal-head" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
               <div>
                 <span className="marthi-modal-kicker" style={{ color: '#10b981' }}>
-                  Ativação Segura Concluída
+                  Resultado da operação
                 </span>
                 <h2 style={{ color: '#34d399' }}>
-                  {activatedNotice.isNew ? 'Cliente Cadastrado com Sucesso!' : 'Pagamento Confirmado & Acesso Ativado!'}
+                  {activatedNotice.isNew ? 'Cliente Cadastrado com Sucesso!' : 'Pagamento confirmado no MarthiDB'}
                 </h2>
               </div>
               <button
@@ -1879,20 +1950,10 @@ export function MarthiClientsPage() {
 
             <div className="marthi-modal-form">
               <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--ink)' }}>
-                O e-mail oficial com o <strong>link seguro para criação de senha</strong> foi despachado para o responsável:
+                Confira os dados do cliente e o resultado da operação:
               </p>
 
-              <div
-                style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(255,255,255,0.1))',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  display: 'grid',
-                  gap: '8px',
-                  fontSize: '0.88rem',
-                }}
-              >
+              <div className="marthi-summary-box" style={{ borderRadius: '12px', padding: '16px', gap: '8px', fontSize: '0.88rem' }}>
                 <div><strong>Empresa:</strong> {activatedNotice.client.tradeName}</div>
                 <div><strong>E-mail:</strong> {activatedNotice.client.email}</div>
                 <div><strong>Plano:</strong> {planLabel(activatedNotice.client.planId)} ({money(activatedNotice.client.monthlyAmount)}/mês)</div>
@@ -1905,7 +1966,7 @@ export function MarthiClientsPage() {
                   </div>
                 ) : null}
                 <div style={{ color: '#10b981', fontWeight: 600 }}>
-                  ✓ Link de ativação de uso único enviado para o e-mail do cliente
+                  {activatedNotice.message || 'Consulte a situação do acesso e o envio da ativação nos detalhes do cliente.'}
                 </div>
               </div>
 

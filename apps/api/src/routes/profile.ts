@@ -1,9 +1,14 @@
+import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const profileRouter = Router();
+profileRouter.use((req,res,next)=>{
+ if(!pool) {res.status(503).json({success:false,error:{code:'DATABASE_UNAVAILABLE',message:'Banco indisponível. Nenhuma alteração foi gravada.'}});return;}
+ next();
+});
 
 const profileSchema = z.object({
   displayName: z.string().optional(),
@@ -33,55 +38,33 @@ const paymentMethodSchema = z.object({
 
 /* ── 1. Perfil do Operador (/me/profile) ─────────────────── */
 
+function profileFromRow(row: any) {
+  return { id: row.id, displayName: row.name, email: row.email, role: row.global_role,
+    photo: row.picture, phone: row.profile_phone, address: row.profile_address, theme: row.panel_theme };
+}
+
 profileRouter.get('/api/v1/me/profile', requireAuth, async (req, res, next) => {
   try {
-    const user = req.user!;
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        displayName: user.name,
-        email: user.email,
-        role: user.role || 'admin',
-        photo: user.picture,
-        theme: 'dark',
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+    const result = await pool.query('SELECT * FROM users WHERE id = $1 AND active = true', [req.user!.id]);
+    if (!result.rows[0]) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Perfil não encontrado.' } }); return; }
+    res.json({ success: true, data: profileFromRow(result.rows[0]) });
+  } catch (error) { next(error); }
 });
 
 profileRouter.put('/api/v1/me/profile', requireAuth, async (req, res, next) => {
   try {
-    const user = req.user!;
     const body = profileSchema.parse(req.body);
-
-    if (pool && user.id.startsWith('usr-')) {
-      await pool.query(
-        `UPDATE users
-         SET name = COALESCE($1, name), picture = COALESCE($2, picture)
-         WHERE id = $3`,
-        [body.displayName, body.photo, user.id],
-      );
-    }
-
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        displayName: body.displayName || user.name,
-        email: body.email || user.email,
-        role: body.role || user.role || 'admin',
-        photo: body.photo !== undefined ? body.photo : user.picture,
-        phone: body.phone,
-        address: body.address,
-        theme: body.theme || 'dark',
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+    const result = await pool.query(
+      `UPDATE users SET name = COALESCE($1, name),
+       picture = CASE WHEN $2 THEN $3 ELSE picture END,
+       profile_phone = COALESCE($4, profile_phone), profile_address = COALESCE($5, profile_address),
+       panel_theme = COALESCE($6, panel_theme), updated_at = now()
+       WHERE id = $7 AND active = true RETURNING *`,
+      [body.displayName, body.photo !== undefined, body.photo ?? null, body.phone, body.address, body.theme, req.user!.id],
+    );
+    if (!result.rows[0]) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Perfil não encontrado.' } }); return; }
+    res.json({ success: true, data: profileFromRow(result.rows[0]) });
+  } catch (error) { next(error); }
 });
 
 /* ── 2. Tabelas de Preço (/price-tables) ─────────────────── */
@@ -123,8 +106,8 @@ profileRouter.post('/api/v1/price-tables', requireAuth, async (req, res, next) =
         `INSERT INTO price_tables (id, store_id, name, percent, active) VALUES ($1, $2, $3, $4, $5)`,
         [id, storeId, body.name.trim(), body.percent, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM price_tables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM price_tables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
     res.status(201).json({ success: true, data: { id, storeId, ...body } });
@@ -146,8 +129,8 @@ profileRouter.patch('/api/v1/price-tables/:id', requireAuth, async (req, res, ne
          WHERE id = $4 AND store_id = $5`,
         [body.name, body.percent, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM price_tables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM price_tables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
     res.json({ success: true, data: { id, ...body } });
@@ -217,13 +200,14 @@ profileRouter.post('/api/v1/payments', requireAuth, async (req, res, next) => {
         }
       }
 
+      if(pTableId && !(await pool.query('SELECT id FROM price_tables WHERE id=$1 AND store_id=$2 AND active=true',[pTableId,storeId])).rows[0]) throw Object.assign(new Error('Selecione uma tabela ativa desta loja.'),{status:400});
       await pool.query(
         `INSERT INTO payment_methods (id, store_id, name, type, price_table_id, max_installments, active)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [id, storeId, body.name.trim(), body.type, pTableId, body.maxInstallments, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM payment_methods WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM payment_methods WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
     res.status(201).json({ success: true, data: { id, storeId, ...body } });
@@ -239,14 +223,15 @@ profileRouter.patch('/api/v1/payments/:id', requireAuth, async (req, res, next) 
     const body = paymentMethodSchema.partial().parse(req.body);
 
     if (pool) {
+      if(body.priceTableId && !(await pool.query('SELECT id FROM price_tables WHERE id=$1 AND store_id=$2 AND active=true',[body.priceTableId,storeId])).rows[0]) throw Object.assign(new Error('Selecione uma tabela ativa desta loja.'),{status:400});
       await pool.query(
         `UPDATE payment_methods
-         SET name = COALESCE($1, name), type = COALESCE($2, type), max_installments = COALESCE($3, max_installments), active = COALESCE($4, active)
+         SET name = COALESCE($1, name), type = COALESCE($2, type), max_installments = COALESCE($3, max_installments), active = COALESCE($4, active), price_table_id = COALESCE($7, price_table_id)
          WHERE id = $5 AND store_id = $6`,
-        [body.name, body.type, body.maxInstallments, body.active, id, storeId],
+        [body.name, body.type, body.maxInstallments, body.active, id, storeId, body.priceTableId],
       );
-      const updated = await pool.query(`SELECT * FROM payment_methods WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM payment_methods WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
     res.json({ success: true, data: { id, ...body } });

@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 export type TotemMode = 'kiosk' | 'catalog';
 export type TotemColumns = 1 | 2 | 3 | 4;
 export type TotemVertical = 'general' | 'food' | 'retail' | 'phones' | 'optics';
@@ -316,6 +317,7 @@ export const TOTEM_VERTICALS: {
   },
 ];
 
+let memoryScope='';
 const STORAGE_KEY = 'marthi.totem.settings.v1';
 export const TOTEM_SETTINGS_EVENT = 'marthi-totem-settings';
 
@@ -460,9 +462,9 @@ function normalizeWhatsAppDigits(value: unknown): string {
 }
 
 function readStored(): Partial<TotemSettings> | null {
-  if (memorySettings) return { ...memorySettings };
+  if (memorySettings && memoryScope===storeScopedKey(STORAGE_KEY)) return { ...memorySettings };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return null;
     return JSON.parse(raw) as Partial<TotemSettings>;
   } catch {
@@ -532,10 +534,11 @@ export async function hydrateTotemSettingsFromApi() {
 export function replaceTotemSettings(input: Partial<TotemSettings>) {
   const next = mergeTotemSettings(readStored(), input);
   memorySettings = next;
+  memoryScope=storeScopedKey(STORAGE_KEY);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(next));
   } catch {
-    throw new Error('A imagem é grande demais para este navegador. Use um arquivo menor.');
+    /* Settings are already persisted by the API; local quota must not report a failed save. */
   }
   window.dispatchEvent(new Event(TOTEM_SETTINGS_EVENT));
   return next;
@@ -543,14 +546,9 @@ export function replaceTotemSettings(input: Partial<TotemSettings>) {
 
 export async function saveTotemSettings(input: Partial<TotemSettings>) {
   const next = mergeTotemSettings(read(), input);
-  try {
-    const { apiPutTotemSettings } = await import('../services/erpApi');
-    const saved = await apiPutTotemSettings(toApiTotemSettings(next));
-    return replaceTotemSettings(saved);
-  } catch (err) {
-    console.warn('[totemSettings] Erro ao sincronizar com backend/Postgres:', err);
-    return replaceTotemSettings(next);
-  }
+  const { apiPutTotemSettings } = await import('../services/erpApi');
+  const saved = await apiPutTotemSettings(toApiTotemSettings(next));
+  return replaceTotemSettings(saved);
 }
 
 export function invalidateTotemSettingsMemory() {

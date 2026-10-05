@@ -1,9 +1,33 @@
+import {rowToClient} from '../services/rowMapper.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const financeRouter = Router();
+
+// Reject references to records belonging to a different store before any mutation.
+financeRouter.use('/api/v1/finance',requireAuth,async(req,_res,next)=>{
+ try {
+  if(!['POST','PUT','PATCH'].includes(req.method)){next();return;}
+  for(const [field,table] of [['accountId','bank_accounts'],['supplierId','suppliers'],['customerId','customers'],['invoiceId','stock_invoices']] as const){
+   const id=req.body?.[field];if(id==null||id==='')continue;
+   if(typeof id!=='string'||!(await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND store_id=$2`,[id,req.storeId])).rows.length)throw Object.assign(new Error('Registro vinculado não disponível nesta loja.'),{status:400});
+  }
+  next();
+ }catch(error){next(error);}
+});
+
+// Linked commercial balances follow the order ledger to avoid duplicate settlements.
+financeRouter.use('/api/v1/finance/receivables/:id', requireAuth, async (req, _res, next) => {
+  if (req.method === 'GET') { next(); return; }
+  try {
+    const linked = await pool.query('SELECT id FROM commercial_orders WHERE receivable_id=$1 AND store_id=$2 LIMIT 1', [req.params.id, req.storeId]);
+    if (linked.rows[0]) throw Object.assign(new Error('Registre pagamentos, reavaliações e devoluções pela encomenda vinculada.'), {status:409});
+    next();
+  } catch (error) { next(error); }
+});
+
 
 /* ── Schemas ───────────────────────────────────────────── */
 
@@ -130,7 +154,7 @@ financeRouter.post('/api/v1/finance/accounts', requireAuth, async (req, res, nex
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)`,
         [id, storeId, body.name.trim(), body.bank.trim(), body.agency.trim(), body.number.trim(), body.type, body.initialBalance, body.active],
       );
-      const resQuery = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1`, [id]);
+      const resQuery = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
       const r = resQuery.rows[0];
       res.status(201).json({
         success: true,
@@ -178,8 +202,8 @@ financeRouter.patch('/api/v1/finance/accounts/:id', requireAuth, async (req, res
          WHERE id = $7 AND store_id = $8`,
         [body.name, body.bank, body.agency, body.number, body.type, body.active, id, storeId],
       );
-      const updated = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -279,8 +303,8 @@ financeRouter.post('/api/v1/finance/payables', requireAuth, async (req, res, nex
           body.invoiceType || '',
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -334,8 +358,8 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
           storeId,
         ],
       );
-      const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -367,7 +391,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a pagar não encontrada.' } });
@@ -375,6 +399,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
         }
 
         const curr = currentRes.rows[0];
+        if (curr.status === 'paid' || curr.status === 'cancelled') throw Object.assign(new Error('Conta já liquidada ou cancelada.'), { status: 409 });
         const totalAmount = Number(curr.amount) || 0;
         const currentPaid = Number(curr.paid_amount) || 0;
         const remaining = Math.max(0, totalAmount - currentPaid);
@@ -383,7 +408,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
         const interest = Number(body.interestAmount) || 0;
         const fine = Number(body.fineAmount) || 0;
         const discount = Number(body.discountAmount) || 0;
-        const netAmount = Math.max(0, payAmount + interest + fine - discount);
+        if (discount > payAmount + interest + fine) throw Object.assign(new Error('Desconto superior ao pagamento.'), { status: 400 });
+        const netAmount = Math.round((payAmount + interest + fine - discount) * 100) / 100;
 
         const newPaidAmount = currentPaid + payAmount;
         const isFullyPaid = newPaidAmount >= totalAmount - 0.001;
@@ -435,8 +461,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -477,7 +503,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a pagar não encontrada.' } });
@@ -485,20 +511,16 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const entries = await client.query('SELECT account_id, amount, type FROM finance_entries WHERE ref_id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+        if (!entries.rows.length && Number(curr.paid_amount) === 0) throw Object.assign(new Error('Conta sem pagamento para estornar.'), { status: 409 });
 
         await client.query(
-          `UPDATE payables SET status = 'open', paid_amount = 0, paid_at = null, updated_at = now() WHERE id = $1`,
+          `UPDATE payables SET status = 'open', paid_amount = 0, paid_at = null, interest_amount = 0, fine_amount = 0, discount_amount = 0, updated_at = now() WHERE id = $1`,
           [id],
         );
 
-        // Estorno na conta bancária se vinculada
-        if (accountId) {
-          await client.query(
-            `UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
-          );
+        for (const entry of entries.rows) {
+          if (entry.account_id) await client.query('UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3', [entry.type === 'out' ? Number(entry.amount) : -Number(entry.amount), entry.account_id, storeId]);
         }
 
         // Remove ou estorna lançamento
@@ -506,8 +528,8 @@ financeRouter.post(['/api/v1/finance/payables/:id/revert', '/api/v1/finance/paya
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -627,8 +649,8 @@ financeRouter.post('/api/v1/finance/receivables', requireAuth, async (req, res, 
           body.invoiceType || '',
         ],
       );
-      const resQuery = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-      res.status(201).json({ success: true, data: resQuery.rows[0] });
+      const resQuery = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.status(201).json({ success: true, data: rowToClient(resQuery.rows[0]) });
       return;
     }
 
@@ -682,8 +704,8 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
           storeId,
         ],
       );
-      const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-      res.json({ success: true, data: updated.rows[0] });
+      const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
 
@@ -715,7 +737,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a receber não encontrada.' } });
@@ -723,6 +745,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
         }
 
         const curr = currentRes.rows[0];
+        if (curr.status === 'paid' || curr.status === 'cancelled') throw Object.assign(new Error('Conta já liquidada ou cancelada.'), { status: 409 });
         const totalAmount = Number(curr.amount) || 0;
         const currentReceived = Number(curr.received_amount) || 0;
         const remaining = Math.max(0, totalAmount - currentReceived);
@@ -783,8 +806,8 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -822,7 +845,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/revert', '/api/v1/finance/r
       try {
         await client.query('BEGIN');
 
-        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        const currentRes = await client.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2 FOR UPDATE`, [id, storeId]);
         if (currentRes.rows.length === 0) {
           await client.query('ROLLBACK');
           res.status(404).json({ success: false, error: { message: 'Conta a receber não encontrada.' } });
@@ -830,27 +853,24 @@ financeRouter.post(['/api/v1/finance/receivables/:id/revert', '/api/v1/finance/r
         }
 
         const curr = currentRes.rows[0];
-        const amount = Number(curr.amount) || 0;
-        const accountId = curr.account_id;
+        const entries = await client.query('SELECT account_id, amount, type FROM finance_entries WHERE ref_id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+        if (!entries.rows.length && Number(curr.received_amount) === 0) throw Object.assign(new Error('Conta sem pagamento para estornar.'), { status: 409 });
 
         await client.query(
-          `UPDATE receivables SET status = 'open', received_amount = 0, received_at = null, updated_at = now() WHERE id = $1`,
+          `UPDATE receivables SET status = 'open', received_amount = 0, received_at = null, interest_amount = 0, fine_amount = 0, discount_amount = 0, updated_at = now() WHERE id = $1`,
           [id],
         );
 
-        if (accountId) {
-          await client.query(
-            `UPDATE bank_accounts SET current_balance = current_balance - $1 WHERE id = $2 AND store_id = $3`,
-            [amount, accountId, storeId],
-          );
+        for (const entry of entries.rows) {
+          if (entry.account_id) await client.query('UPDATE bank_accounts SET current_balance = current_balance + $1 WHERE id = $2 AND store_id = $3', [entry.type === 'out' ? Number(entry.amount) : -Number(entry.amount), entry.account_id, storeId]);
         }
 
         await client.query(`DELETE FROM finance_entries WHERE ref_id = $1 AND store_id = $2`, [id, storeId]);
 
         await client.query('COMMIT');
 
-        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1`, [id]);
-        res.json({ success: true, data: updated.rows[0] });
+        const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.json({ success: true, data: rowToClient(updated.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -966,8 +986,8 @@ financeRouter.post('/api/v1/finance', requireAuth, async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        const createdRes = await pool.query(`SELECT * FROM finance_entries WHERE id = $1`, [id]);
-        res.status(201).json({ success: true, data: createdRes.rows[0] });
+        const createdRes = await pool.query(`SELECT * FROM finance_entries WHERE id = $1 AND store_id = $2`, [id, storeId]);
+        res.status(201).json({ success: true, data: rowToClient(createdRes.rows[0]) });
         return;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -984,3 +1004,156 @@ financeRouter.post('/api/v1/finance', requireAuth, async (req, res, next) => {
     next(error);
   }
 });
+
+/* ── 5. Recolhimento de Valores em Espécie (Gilvan Teodo) ──── */
+
+const pickupSchema = z.object({
+  responsibleName: z.string().min(1, 'Nome do responsável é obrigatório.').default('Gilvan Teodo'),
+  amount: z.coerce.number().min(0.01, 'Valor de recolhimento deve ser positivo.'),
+  origin: z.string().default('vendas_externas'),
+  paymentMethod: z.string().default('dinheiro'),
+  pickupDate: z.string().default(() => new Date().toISOString().slice(0, 10)),
+  notes: z.string().default(''),
+});
+
+financeRouter.get('/api/v1/finance/pickups', requireAuth, async (req, res, next) => {
+  try {
+    const storeId = req.storeId!;
+    if (!pool) {
+      res.json({ success: true, data: { pendingCashBalance: 0, pickups: [] } });
+      return;
+    }
+
+    // 1. Saldo físico de vendas em dinheiro ainda não recolhidas
+    const pendingRes = await pool.query(
+      `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+       FROM sales_orders
+       WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
+      [storeId],
+    );
+
+    // 2. Histórico de recolhimentos efetuados
+    const pickupsRes = await pool.query(
+      `SELECT * FROM cash_pickups WHERE store_id = $1 ORDER BY pickup_date DESC, created_at DESC LIMIT 100`,
+      [storeId],
+    );
+
+    res.json({
+      success: true,
+      data: {
+        pendingCashBalance: Number(pendingRes.rows[0]?.pending_total) || 0,
+        pickups: pickupsRes.rows.map((r) => ({
+          id: r.id,
+          responsibleName: r.responsible_name,
+          amount: Number(r.amount),
+          origin: r.origin,
+          paymentMethod: r.payment_method,
+          pickupDate: r.pickup_date,
+          notes: r.notes || '',
+          createdAt: r.created_at,
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+financeRouter.post('/api/v1/finance/pickups', requireAuth, async (req, res, next) => {
+  try {
+    const storeId = req.storeId!;
+    const body = pickupSchema.parse(req.body);
+    const pickupId = `PCK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    if (!pool) {
+      res.status(503).json({ success: false, error: { message: 'Banco indisponível.' } });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Lança saída de tesouraria / recolhimento no livro caixa
+      const entryId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      await client.query(
+        `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, category, operator_name)
+         VALUES ($1, $2, 'out', $3, $4, 'manual', $5, 'Recolhimento / Retirada', $6)`,
+        [
+          entryId,
+          storeId,
+          `Recolhimento de dinheiro em espécie - Responsável: ${body.responsibleName}`,
+          body.amount,
+          pickupId,
+          req.user?.name || 'Gilvan Teodo',
+        ],
+      );
+
+      // 2. Insere registro formal na tabela cash_pickups
+      await client.query(
+        `INSERT INTO cash_pickups (
+          id, store_id, responsible_name, amount, origin, payment_method, pickup_date, notes, finance_entry_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          pickupId,
+          storeId,
+          body.responsibleName.trim(),
+          body.amount,
+          body.origin,
+          body.paymentMethod,
+          body.pickupDate,
+          body.notes.trim(),
+          entryId,
+        ],
+      );
+
+      // 3. Atualiza status de vendas em dinheiro pendentes até o montante recolhido
+      let remainingToClear = body.amount;
+      const pendingSales = await client.query(
+        `SELECT id, total_amount FROM sales_orders
+         WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'
+         ORDER BY created_at ASC`,
+        [storeId],
+      );
+
+      for (const s of pendingSales.rows) {
+        if (remainingToClear <= 0) break;
+        const sAmount = Number(s.total_amount);
+        await client.query(
+          `UPDATE sales_orders SET external_cash_status = 'collected', updated_at = now() WHERE id = $1`,
+          [s.id],
+        );
+        remainingToClear -= sAmount;
+      }
+
+      await client.query('COMMIT');
+
+      const updatedPending = await pool.query(
+        `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+         FROM sales_orders
+         WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
+        [storeId],
+      );
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: pickupId,
+          responsibleName: body.responsibleName,
+          amount: body.amount,
+          pickupDate: body.pickupDate,
+          notes: body.notes,
+          remainingPendingCash: Number(updatedPending.rows[0]?.pending_total) || 0,
+        },
+      });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, error: { message: err.message || 'Erro ao registrar recolhimento.' } });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+

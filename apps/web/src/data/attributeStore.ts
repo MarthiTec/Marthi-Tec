@@ -1,3 +1,5 @@
+import { getActiveTenantKey, tenantScopedKey } from './tenantContext';
+import { isNestAuthed, getAuthToken } from '../services/nestClient';
 export const ATTR_COR = 'ATTR-COR';
 export const ATTR_CAP = 'ATTR-CAP';
 export const ATTR_RET = 'ATTR-RET';
@@ -36,6 +38,8 @@ export type ProductAttribute = {
   useOnTotem: boolean;
   filterOnTotem: boolean;
   useOnStock: boolean;
+  useOnPdv?: boolean;
+  useOnExternalSale?: boolean;
   sort: number;
   active: boolean;
 };
@@ -46,254 +50,65 @@ export type PickedAttribute = {
   value: string;
 };
 
-const STORAGE_KEY = 'marthi.attributes.v1';
 export const ATTRIBUTES_EVENT = 'marthi-attributes-updated';
-
-let memoryAttrs: ProductAttribute[] | null = null;
-
-export function seedAttributes(): ProductAttribute[] {
-  return [];
+let memoryAttrs: ProductAttribute[] = [];
+let memoryContext = '';
+function context() {
+  const store = localStorage.getItem(tenantScopedKey('marthi.multi_store.active_store_id.v1')) || '';
+  return [getActiveTenantKey(),getAuthToken(),store,window.location.search].join('|');
 }
-
-export function clearAttributes(): ProductAttribute[] {
-  memoryAttrs = [];
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
-  }
-  return [];
+function load() {
+  if (memoryContext !== context()) { memoryAttrs=[]; memoryContext=context(); }
+  return [...memoryAttrs].sort((a,b)=>a.sort-b.sort || a.name.localeCompare(b.name,'pt-BR'));
 }
-
-const IGNORED_ATTR_NAMES = new Set(['MAIS UM TESTE PAPAI', 'TESTE']);
-
-function isCleanAttr(item: unknown): item is ProductAttribute {
-  if (!item || typeof item !== 'object') return false;
-  const name = String((item as ProductAttribute).name || '').trim().toUpperCase();
-  return !IGNORED_ATTR_NAMES.has(name);
-}
-
-function sortAttrs(items: ProductAttribute[]) {
-  if (!Array.isArray(items)) return [];
-  return [...items]
-    .filter(isCleanAttr)
-    .sort(
-      (a, b) =>
-        (Number(a.sort) || 0) - (Number(b.sort) || 0) ||
-        String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR'),
-    );
-}
-
-function load(): ProductAttribute[] {
-  if (memoryAttrs) {
-    return sortAttrs(
-      memoryAttrs
-        .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
-        .map((item) => ({
-          ...item,
-          values: Array.isArray(item.values) ? item.values.filter(Boolean) : [],
-          priceDeltas: { ...(item.priceDeltas ?? {}) },
-        })),
-    );
-  }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return [];
-    }
-    return sortAttrs(
-      parsed
-        .filter((item): item is ProductAttribute => Boolean(item && typeof item === 'object'))
-        .map((item, index) => {
-          const values = Array.isArray(item.values) ? item.values.filter(Boolean) : [];
-          const priceDeltas = { ...(item.priceDeltas ?? {}) };
-          return {
-            id: String(item.id || `ATTR-${index}`),
-            name: String(item.name || ''),
-            values,
-            priceDeltas,
-            useOnTotem: Boolean(item.useOnTotem),
-            filterOnTotem: Boolean(item.filterOnTotem),
-            useOnStock: Boolean(item.useOnStock),
-            sort: Number(item.sort) || index + 1,
-            active: item.active !== false,
-          };
-        }),
-    );
-  } catch (err) {
-    console.warn('[attributeStore] Erro ao carregar atributos locais, resetando:', err);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    return [];
-  }
-}
-
-function persist(items: ProductAttribute[]) {
-  const safeItems = Array.isArray(items) ? items : [];
-  const next = sortAttrs(safeItems);
-  memoryAttrs = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
-  }
-  return next;
-}
-
-export function replaceAttributes(items: ProductAttribute[]) {
-  const safeItems = Array.isArray(items) ? items : [];
-  return persist(safeItems.slice(0, MAX_ATTRIBUTES));
-}
-
-/** Hidrata atributos do Nest (público no totem ou autenticado no painel). */
-export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
-  try {
-    const { isNestAuthed } = await import('../services/nestClient');
-    const { apiGetTotemPublicAttributes, apiListAttributes } = await import('../services/erpApi');
-    let remote: unknown = null;
-    if (isNestAuthed()) {
-      try {
-        remote = await apiListAttributes();
-      } catch {
-        remote = await apiGetTotemPublicAttributes().catch(() => null);
-      }
-    } else {
-      remote = await apiGetTotemPublicAttributes().catch(() => null);
-    }
-    if (Array.isArray(remote)) {
-      return replaceAttributes(remote as ProductAttribute[]);
-    }
-    return load();
-  } catch (err) {
-    console.warn('[attributeStore] Falha ao hidratar atributos da API:', err);
-    return load();
-  }
-}
-
-export function getAttributes() {
+function persist(items: ProductAttribute[], expected = context()) {
+  if(expected !== context()) return load();
+  memoryContext=expected; memoryAttrs=items;
+  window.dispatchEvent(new Event(ATTRIBUTES_EVENT));
   return load();
 }
-
-/** Cria um novo atributo de produto via Nest API (se autenticado) ou armazenamento local. */
-export async function createAttribute(payload: Omit<ProductAttribute, 'id'>): Promise<ProductAttribute[]> {
-  const { isNestAuthed } = await import('../services/nestClient');
-  const current = load();
-  if (current.length >= MAX_ATTRIBUTES) {
-    throw new Error(`Máximo de ${MAX_ATTRIBUTES} atributos por loja.`);
-  }
-
-  if (isNestAuthed()) {
-    const { apiCreateAttribute } = await import('../services/erpApi');
-    const created = await apiCreateAttribute({
-      name: payload.name.trim(),
-      values: payload.values,
-      priceDeltas: payload.priceDeltas,
-      useOnTotem: payload.useOnTotem,
-      filterOnTotem: payload.filterOnTotem,
-      useOnStock: payload.useOnStock,
-      sort: payload.sort ?? current.length + 1,
-      active: payload.active,
-    });
-    return persist([created, ...current.filter((item) => item.id !== created.id)]);
-  }
-
-  const localItem: ProductAttribute = {
-    ...payload,
-    name: payload.name.trim(),
-    id: `ATTR-${Date.now().toString(36).toUpperCase()}`,
-    sort: payload.sort ?? current.length + 1,
-  };
-  return persist([localItem, ...current]);
+export function seedAttributes(): ProductAttribute[] { return []; }
+export function clearAttributes(): ProductAttribute[] { return persist([]); }
+export function replaceAttributes(items: ProductAttribute[]) { return persist(items); }
+export function getAttributes() { return load(); }
+export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
+ const expected=context();
+ const { apiGetTotemPublicAttributes,apiListAttributes }=await import('../services/erpApi');
+ try { return persist(await (isNestAuthed() ? apiListAttributes() : apiGetTotemPublicAttributes()),expected); }
+ catch(error) { persist([],expected); throw error; }
 }
-
-/** Atualiza um atributo existente via Nest API ou armazenamento local. */
-export async function updateAttribute(
-  id: string,
-  payload: Partial<Omit<ProductAttribute, 'id'>>,
-): Promise<ProductAttribute[]> {
-  const { isNestAuthed } = await import('../services/nestClient');
-  const current = load();
-
-  if (isNestAuthed()) {
-    const { apiUpdateAttribute } = await import('../services/erpApi');
-    const updated = await apiUpdateAttribute(id, payload);
-    return persist(current.map((item) => (item.id === id ? updated : item)));
-  }
-
-  return persist(
-    current.map((item) => (item.id === id ? { ...item, ...payload } : item)),
-  );
+function authenticated() { if(!isNestAuthed()) throw new Error('Entre na sua conta para salvar atributos.'); }
+export async function createAttribute(payload: Omit<ProductAttribute,'id'>) {
+ authenticated(); const expected=context(); const current=load();
+ const { apiCreateAttribute }=await import('../services/erpApi');
+ const created=await apiCreateAttribute(payload);
+ return persist([...current,created],expected);
 }
-
+export async function updateAttribute(id: string,payload: Partial<Omit<ProductAttribute,'id'>>) {
+ authenticated(); const expected=context(); const current=load();
+ const { apiUpdateAttribute }=await import('../services/erpApi');
+ const updated=await apiUpdateAttribute(id,payload);
+ return persist(current.map(item=>item.id===id ? updated : item),expected);
+}
+export async function removeAttribute(id: string) {
+ authenticated(); const expected=context(); const current=load();
+ const { apiDeleteAttribute }=await import('../services/erpApi');
+ await apiDeleteAttribute(id); return persist(current.filter(item=>item.id!==id),expected);
+}
 export async function saveAttributes(items: ProductAttribute[]) {
-  const { isNestAuthed } = await import('../services/nestClient');
-  if (isNestAuthed()) {
-    try {
-      const {
-        apiCreateAttribute,
-        apiListAttributes,
-        apiUpdateAttribute,
-      } = await import('../services/erpApi');
-      const current = await apiListAttributes();
-      const next = items.slice(0, MAX_ATTRIBUTES);
-      const saved: ProductAttribute[] = [];
-      for (const item of next) {
-        const body = {
-          name: item.name,
-          values: item.values,
-          priceDeltas: item.priceDeltas,
-          useOnTotem: item.useOnTotem,
-          filterOnTotem: item.filterOnTotem,
-          useOnStock: item.useOnStock,
-          sort: item.sort,
-          active: item.active,
-        };
-        if (current.some((row) => row.id === item.id)) {
-          saved.push(await apiUpdateAttribute(item.id, body));
-        } else {
-          saved.push(await apiCreateAttribute(body));
-        }
-      }
-      const nextIds = new Set(saved.map((item) => item.id));
-      const merged = [...saved];
-      for (const old of current) {
-        if (!nextIds.has(old.id)) {
-          merged.push(old);
-        }
-      }
-      return persist(merged);
-    } catch (err) {
-      console.warn('[attributeStore] Falha ao sincronizar atributos com Nest, gravando localmente:', err);
-    }
-  }
-  return persist(items.slice(0, MAX_ATTRIBUTES));
+ authenticated(); const expected=context();
+ const { apiCreateAttribute,apiUpdateAttribute,apiListAttributes }=await import('../services/erpApi');
+ const current=await apiListAttributes();
+ for(const item of items) {
+  if(expected!==context()) throw new Error('A loja selecionada mudou.');
+  if(current.some(row=>row.id===item.id)) await apiUpdateAttribute(item.id,item);
+  else await apiCreateAttribute(item);
+ }
+ return persist(await apiListAttributes(),expected);
 }
-
-export async function removeAttribute(id: string): Promise<ProductAttribute[]> {
-  const { isNestAuthed } = await import('../services/nestClient');
-  if (isNestAuthed()) {
-    const { apiDeleteAttribute } = await import('../services/erpApi');
-    try {
-      await apiDeleteAttribute(id);
-    } catch (err: unknown) {
-      console.warn('[attributeStore] Aviso ao excluir atributo no backend:', err);
-    }
-  }
-  return persist(load().filter((item) => item && item.id !== id).slice(0, MAX_ATTRIBUTES));
-}
+export function posAttributes() { return load().filter(a=>a.active && a.useOnPdv!==false); }
+export function externalSaleAttributes() { return load().filter(a=>a.active && a.useOnExternalSale!==false); }
+function sortAttrs(items: ProductAttribute[]) { return [...items].sort((a,b)=>a.sort-b.sort); }
 
 export function totemAttributes() {
   return load()

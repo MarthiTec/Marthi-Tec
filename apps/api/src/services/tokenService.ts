@@ -15,8 +15,7 @@ export type SecureTokenRecord = {
   createdAt: string;
 };
 
-// In-memory token store as reliable backup & rapid access
-const memoryTokens = new Map<string, SecureTokenRecord>();
+
 
 function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken.trim()).digest('hex');
@@ -52,52 +51,17 @@ export async function createSecureToken(params: {
     createdAt,
   };
 
-  memoryTokens.set(tokenHash, record);
-
-  // Invalidate any previous unused tokens of the same type for this email
-  for (const [hash, existing] of memoryTokens.entries()) {
-    if (
-      hash !== tokenHash &&
-      existing.email.toLowerCase() === record.email &&
-      existing.type === record.type &&
-      !existing.usedAt
-    ) {
-      existing.usedAt = new Date().toISOString();
-    }
-  }
-
-  // Persist in DB if pool is available
-  if (pool) {
-    try {
-      await pool.query(
-        `CREATE TABLE IF NOT EXISTS auth_tokens (
-          id TEXT PRIMARY KEY,
-          token_hash TEXT NOT NULL UNIQUE,
-          type TEXT NOT NULL,
-          email TEXT NOT NULL,
-          client_id TEXT,
-          name TEXT,
-          expires_at TIMESTAMPTZ NOT NULL,
-          used_at TIMESTAMPTZ,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )`
-      );
-      // Invalidate old
-      await pool.query(
-        `UPDATE auth_tokens SET used_at = now() WHERE lower(email) = lower($1) AND type = $2 AND used_at IS NULL`,
-        [record.email, record.type]
-      );
-      // Insert new
-      await pool.query(
-        `INSERT INTO auth_tokens (id, token_hash, type, email, client_id, name, expires_at, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [id, tokenHash, record.type, record.email, record.clientId || null, record.name || null, expiresAt, createdAt]
-      );
-    } catch (err) {
-      console.warn('[tokenService] DB token persistence error, using memory store:', err);
-    }
-  }
-
+  if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [record.email + ':' + record.type]);
+    await client.query('UPDATE auth_tokens SET used_at = now() WHERE lower(email) = $1 AND type = $2 AND used_at IS NULL', [record.email, record.type]);
+    await client.query(`INSERT INTO auth_tokens (id, token_hash, type, email, client_id, name, expires_at, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, tokenHash, record.type, record.email, record.clientId ?? null, record.name ?? null, expiresAt, createdAt]);
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
   return { rawToken, record };
 }
 
@@ -109,33 +73,15 @@ export async function inspectToken(rawToken: string, expectedType?: TokenType): 
   reason?: 'invalid' | 'expired' | 'already_used' | 'type_mismatch';
   record?: SecureTokenRecord;
 }> {
-  if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length < 16) {
-    return { valid: false, reason: 'invalid' };
-  }
-
-  const tokenHash = hashToken(rawToken);
-  let record = memoryTokens.get(tokenHash);
-
-  if (!record && pool) {
-    try {
-      const res = await pool.query(
-        `SELECT id, token_hash as "tokenHash", type, email, client_id as "clientId", name, expires_at as "expiresAt", used_at as "usedAt", created_at as "createdAt"
-         FROM auth_tokens WHERE token_hash = $1`,
-        [tokenHash]
-      );
-      if (res.rows.length > 0) {
-        record = res.rows[0];
-        if (record) memoryTokens.set(tokenHash, record);
-      }
-    } catch {
-      // fallback
-    }
-  }
-
-  if (!record) {
-    return { valid: false, reason: 'invalid' };
-  }
-
+  if (typeof rawToken !== 'string' || !/^[a-f0-9]{64}$/i.test(rawToken.trim())) return { valid: false, reason: 'invalid' };
+  if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  const result = await pool.query(
+    `SELECT id, token_hash as "tokenHash", type, email, client_id as "clientId", name,
+     expires_at as "expiresAt", used_at as "usedAt", created_at as "createdAt"
+     FROM auth_tokens WHERE token_hash = $1`, [hashToken(rawToken)],
+  );
+  const record: SecureTokenRecord | undefined = result.rows[0];
+  if (!record) return { valid: false, reason: 'invalid' };
   if (expectedType && record.type !== expectedType) {
     return { valid: false, reason: 'type_mismatch', record };
   }
@@ -173,17 +119,11 @@ export async function consumeSecureToken(rawToken: string, expectedType: TokenTy
     };
   }
 
-  const now = new Date().toISOString();
-  inspection.record.usedAt = now;
-  memoryTokens.set(inspection.record.tokenHash, inspection.record);
-
-  if (pool) {
-    try {
-      await pool.query(`UPDATE auth_tokens SET used_at = now() WHERE token_hash = $1`, [inspection.record.tokenHash]);
-    } catch (err) {
-      console.warn('[tokenService] DB token consumption update error:', err);
-    }
-  }
-
+  const result = await pool.query(
+    'UPDATE auth_tokens SET used_at = now() WHERE token_hash = $1 AND type = $2 AND used_at IS NULL AND expires_at > now() RETURNING used_at',
+    [inspection.record.tokenHash, expectedType],
+  );
+  if (!result.rowCount) return { success: false, reason: 'Este link expirou ou já foi utilizado.' };
+  inspection.record.usedAt = result.rows[0].used_at;
   return { success: true, record: inspection.record };
 }

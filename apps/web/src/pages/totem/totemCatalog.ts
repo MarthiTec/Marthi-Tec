@@ -1,44 +1,18 @@
 import {
-  getAdminState,
   stockItemImages,
   type StockItem,
 } from '../../data/adminStore';
 import { ATTR_CAP, ATTR_COR } from '../../data/attributeStore';
 import { formatInstallment } from '../../data/variantQuote';
 import { getTotemSettings } from '../../data/totemSettings';
-import { apiGetTotemCatalog, apiListStock } from '../../services/erpApi';
-import { isNestAuthed } from '../../services/nestClient';
+import { apiGetTotemCatalog } from '../../services/erpApi';
+import {storeScopedKey} from '../../data/storeCache';
 import { type TotemBrand, type TotemProduct } from './totemData';
 
-const TOTEM_CATALOG_CACHE_KEY = 'marthi.totem.catalog.cache.v2';
-
-function readPersistedStockCache(): StockItem[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(TOTEM_CATALOG_CACHE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Limpeza automática de mocks legados residuais no cache
-    const hasLegacy = parsed.some(
-      (item) =>
-        /iphone|redmi/i.test(item.name || '') ||
-        item.sku === 'APL-16P-128' ||
-        item.sku === 'APL-15-128' ||
-        item.sku === 'XIA-RN13-256',
-    );
-    if (hasLegacy) {
-      localStorage.removeItem(TOTEM_CATALOG_CACHE_KEY);
-      return [];
-    }
-    return parsed;
-  } catch {
-    return [];
-  }
-}
-
-/** Cache em memória do último catálogo Nest (inicializado com cache persistido se houver). */
-let catalogStockCache: StockItem[] = readPersistedStockCache();
+// Public catalog is fetched from the database; never hydrate stock from a browser cache.
+let catalogStockCache: StockItem[]=[];
+let catalogScope='';
+const scope=()=>storeScopedKey('marthi.totem.catalog');
 
 function stableId(name: string) {
   let hash = 0;
@@ -48,10 +22,18 @@ function stableId(name: string) {
   return hash || 1;
 }
 
+function resolveTotemBrand(rawBrand: string | undefined, name: string): TotemBrand {
+  const b = (rawBrand || '').trim().toLowerCase();
+  if (b === 'apple' || b === 'iphone') return 'apple';
+  if (b === 'xiaomi' || b === 'redmi' || b === 'poco') return 'xiaomi';
+  if (b) return 'other';
+  return guessBrand(name);
+}
+
 function guessBrand(name: string): TotemBrand {
   const slug = name.toLowerCase();
-  if (slug.includes('xiaomi') || slug.includes('redmi')) return 'xiaomi';
-  if (slug.includes('iphone') || slug.includes('apple')) return 'apple';
+  if (slug.includes('xiaomi') || slug.includes('redmi') || slug.includes('poco')) return 'xiaomi';
+  if (slug.includes('iphone') || slug.includes('apple') || slug.includes('ipad')) return 'apple';
   return 'other';
 }
 
@@ -80,7 +62,7 @@ function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
 function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: number })[] {
   const groups = new Map<string, StockItem[]>();
   for (const item of items) {
-    if (!item.showOnTotem) continue;
+    if (!item.showOnTotem || item.active===false) continue;
     if (item.qty < 0) continue;
     if (item.kind === 'supply') continue;
     const key = item.name.trim();
@@ -109,7 +91,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     return {
       id: stableId(name),
       name,
-      brand: guessBrand(name),
+      brand: resolveTotemBrand(primary.brand, name),
       storages,
       colors,
       cashPrice: primary.price,
@@ -127,21 +109,17 @@ function rememberStock(items: StockItem[]) {
     attrs: { ...(item.attrs ?? {}) },
     images: [...(item.images ?? [])],
   }));
-  try {
-    localStorage.setItem(TOTEM_CATALOG_CACHE_KEY, JSON.stringify(catalogStockCache));
-  } catch {
-    /* quota / private mode */
-  }
+  catalogScope=scope();
 }
 
 /** Estoque cru do último GET Nest — a cotação do card usa isto, não o seed local. */
 export function listTotemStock(): StockItem[] {
-  return catalogStockCache;
+  return catalogScope===scope()?catalogStockCache:[];
 }
 
 /** Sync: só cache Nest em memória — nunca adminStore/seed. */
 export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
-  return groupStockForTotem(catalogStockCache);
+  return groupStockForTotem(listTotemStock());
 }
 
 /**
@@ -150,60 +128,25 @@ export function listTotemCatalog(): (TotemProduct & { totalQty?: number })[] {
  * Sem fallback para mock, com retenção resiliente em caso de falha de rede/rate-limit.
  */
 export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: number })[]> {
+  const requestedScope=scope();
   try {
-    const remoteStock = isNestAuthed()
-      ? await apiListStock().catch(() => apiGetTotemCatalog())
-      : await apiGetTotemCatalog();
-
-    // Obtém itens do estoque do ERP local que possuem showOnTotem: true
-    const localStock = getAdminState().stock.filter((item) => item.showOnTotem === true);
-
-    // Mescla estoque remoto com o local, preservando os itens locais para evitar que sumam do catálogo
-    const stockMap = new Map<string, StockItem>();
-    for (const item of localStock) {
-      const key = (item.id || item.sku || item.name).trim().toLowerCase();
-      if (key) stockMap.set(key, item);
-    }
-    for (const item of (Array.isArray(remoteStock) ? remoteStock : [])) {
-      if (item.showOnTotem === true) {
-        const key = (item.id || item.sku || item.name).trim().toLowerCase();
-        if (key) stockMap.set(key, item);
-      }
-    }
-
-    const forTotem = stockMap.size > 0
-      ? Array.from(stockMap.values())
-      : (Array.isArray(remoteStock) ? remoteStock.filter((i) => i.showOnTotem === true) : []);
-
-    rememberStock(forTotem);
-    return groupStockForTotem(forTotem);
-  } catch (error) {
-    console.warn('[totem] falha ao carregar catálogo Nest, mantendo cache existente:', error);
-    // Preserva itens do estoque local se houver
-    const localStock = getAdminState().stock.filter((item) => item.showOnTotem === true);
-    if (localStock.length > 0) {
-      rememberStock(localStock);
-      return groupStockForTotem(localStock);
-    }
-    if (catalogStockCache.length > 0) {
-      return groupStockForTotem(catalogStockCache);
-    }
-    const persisted = readPersistedStockCache();
-    if (persisted.length > 0) {
-      catalogStockCache = persisted;
-      return groupStockForTotem(persisted);
-    }
-    return [];
+    const remote=await apiGetTotemCatalog();
+    if(requestedScope!==scope()) throw new Error('A loja selecionada mudou. Atualize o catálogo.');
+    rememberStock(Array.isArray(remote)?remote:[]);
+    return groupStockForTotem(listTotemStock());
+  } catch(error) {
+    if(requestedScope===scope())rememberStock([]);
+    throw error;
   }
 }
 
 export function findStockImageById(stockId: string) {
-  const item = catalogStockCache.find((entry) => entry.id === stockId);
+  const item = listTotemStock().find((entry) => entry.id === stockId);
   return stockItemImages(item);
 }
 
 export function findStockImageByName(name: string) {
-  const item = catalogStockCache.find(
+  const item = listTotemStock().find(
     (entry) => entry.name.toLowerCase() === name.trim().toLowerCase(),
   );
   return stockItemImages(item);

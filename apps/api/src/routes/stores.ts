@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, getPlanUserLimit } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireSession, requirePlatformAdmin, getPlanUserLimit } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 
 export const storesRouter = Router();
@@ -55,22 +55,22 @@ const memoryStores = new Map<string, any>([
     {
       id: 'STR-DEMO-01',
       clientAccountId: 'ACC-MARTHI-DEMO',
-      tradeName: 'Cell Ponto Matriz',
-      legalName: 'Cell Ponto Telecomunicações LTDA',
+      tradeName: 'Loja Demonstração Marthi',
+      legalName: 'Marthi Tecnologia e Demonstração LTDA',
       documentType: 'cnpj',
-      document: '61.506.270/0001-63',
+      document: '00.000.000/0001-91',
       stateRegistration: 'ISENTO',
       municipalRegistration: '12345',
-      accessToken: 'TK-001-000163-CPTR-88A1',
-      email: 'matriz@cellponto.com.br',
-      phone: '(24) 98124-4253',
-      zipCode: '25800-000',
-      street: 'Rua Prefeito Walter Franklin',
-      number: '120',
-      complement: 'Loja 01',
-      district: 'Centro',
-      city: 'Três Rios',
-      state: 'RJ',
+      accessToken: 'TK-DEMO-000191-MDEM-01',
+      email: 'loja@marthi.com.br',
+      phone: '(11) 3000-0000',
+      zipCode: '01310-100',
+      street: 'Avenida Paulista',
+      number: '1000',
+      complement: 'Sala Demo',
+      district: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
       taxRegime: 'simples_nacional',
       isMatrix: true,
       active: true,
@@ -154,7 +154,7 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
       `;
       const params: any[] = [clientAccountId];
 
-      if (hasRestrictedStores && req.user?.role !== 'admin') {
+if (hasRestrictedStores) {
         sql += ` AND s.id IN (SELECT store_id FROM user_stores WHERE user_id = $2)`;
         params.push(userId);
       }
@@ -275,14 +275,19 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
           ],
         );
 
-        // Cria licença da filial com o desconto
-        const licId = `LIC-${id}`;
+        // A filial herda o plano e os módulos realmente contratados pela conta.
+        const license = await client.query(
+          `SELECT l.* FROM store_licenses l JOIN stores s ON s.id=l.store_id
+           WHERE l.client_account_id=$1 AND l.status='active' ORDER BY s.is_matrix DESC,l.created_at ASC LIMIT 1`, [clientAccountId],
+        );
+        if (!license.rows[0]) throw Object.assign(new Error('Conta sem licença ativa para cadastrar uma filial.'), { status: 409 });
+        const source = license.rows[0];
         await client.query(
-          `INSERT INTO store_licenses (
-            id, store_id, client_account_id, plan_id, modules, base_price, discount_percent, status
-          ) VALUES ($1, $2, $3, 'scale', ARRAY['totem', 'os', 'erp', 'fiscal']::module_id[], 597.00, $4, 'active')
-          ON CONFLICT (store_id) DO UPDATE SET discount_percent = $4, status = 'active'`,
-          [licId, id, clientAccountId, discount],
+          `INSERT INTO store_licenses(id,store_id,client_account_id,plan_id,modules,base_price,discount_percent,final_price,status)
+           SELECT $1,$2,$3,plan_id,modules,final_price,$4,round(final_price*(1-$4::numeric/100),2),'active'
+           FROM store_licenses WHERE id=$5
+           ON CONFLICT (store_id) DO UPDATE SET discount_percent=EXCLUDED.discount_percent, status='active'`,
+          [`LIC-${id}`,id,clientAccountId,discount,source.id],
         );
 
         await client.query('COMMIT');
@@ -369,7 +374,7 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
         );
       }
 
-      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1`, [id]);
+      const updated = await pool.query(`SELECT * FROM stores WHERE id = $1 AND client_account_id = $2`, [id, clientAccountId]);
       res.json({ success: true, data: updated.rows[0] });
       return;
     }
@@ -502,24 +507,33 @@ const adminClientSchema = z.object({
   modules: z.array(z.string()).default(['totem', 'os', 'erp', 'fiscal', 'ecommerce']),
   status: z.enum(['active', 'blocked', 'inactive']).default('active'),
   paymentOk: z.boolean().default(true),
-  monthlyAmount: z.coerce.number().default(597),
+  monthlyAmount: z.coerce.number().nonnegative(),
   notes: z.string().optional().default(''),
   accessToken: z.string().optional(),
   parentClientId: z.string().optional().nullable(),
   branchName: z.string().optional(),
 });
 
-storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
+storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
     if (pool) {
+      // 1. Busca contas de clientes existentes cruzadas com partner_signups para dados reais de pagamento/ativação
       const sql = `
-        SELECT c.*, 
+        SELECT c.*,
                s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
-               l.plan_id, l.modules
+               l.plan_id, l.modules::text[] as modules, l.final_price,
+               pc.confirmed_at as manual_confirmed_at, pc.contracting_status as manual_status,
+               pc.payment_method as manual_method, pc.transaction_ref as manual_ref,
+               ((u.provider <> 'password' AND u.active=true) OR (u.password_hash IS NOT NULL AND u.password_hash <> 'LOCKED_PENDING_ACTIVATION')) as owner_password_configured,
+               ps.status as partner_status, ps.payment_confirmed_at, ps.payment_method as partner_pay_method,
+               ps.transaction_ref as partner_tx_ref, ps.notes as partner_notes, ps.monthly_amount as partner_amount
         FROM client_accounts c
         LEFT JOIN stores s ON s.client_account_id = c.id
-        LEFT JOIN store_licenses l ON l.client_account_id = c.id
-        ORDER BY c.created_at ASC
+        LEFT JOIN store_licenses l ON l.client_account_id = c.id AND l.store_id=s.id
+        LEFT JOIN partner_signups ps ON (ps.id = c.id OR (ps.document = c.document AND ps.document != ''))
+        LEFT JOIN client_payment_confirmations pc ON pc.client_account_id=c.id
+        LEFT JOIN users u ON u.client_account_id=c.id AND lower(u.email)=lower(c.email)
+        ORDER BY c.created_at ASC, s.is_matrix DESC, s.created_at ASC, s.id ASC
       `;
       const result = await pool.query(sql);
       const map = new Map<string, any>();
@@ -527,7 +541,19 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
       for (const row of result.rows) {
         if (!map.has(row.id)) {
           const rawDoc = row.document || '';
-          const token = row.access_token || row.store_token || generateStoreAccessToken(rawDoc, row.email, row.id);
+          const token = row.access_token || row.store_token || '';
+
+          const isPaymentOk =
+            Boolean(row.manual_confirmed_at) ||
+            Boolean(row.payment_confirmed_at) ||
+            ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.partner_status) ||
+            (row.status === 'active' && !row.partner_status);
+          let contractingStatus = row.manual_status || (row.partner_status || 'aguardando_pagamento');
+          if (row.manual_confirmed_at && row.owner_password_configured) contractingStatus = 'acesso_ativado';
+          if (!isPaymentOk) {
+            contractingStatus = 'aguardando_pagamento';
+          }
+
           map.set(row.id, {
             clientId: row.id,
             tradeName: row.trade_name,
@@ -536,31 +562,85 @@ storesRouter.get('/api/v1/admin/clients', async (_req, res, next) => {
             email: row.email,
             phone: row.phone || '',
             planId: row.plan_id || 'golden',
-            modules: row.modules || ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+            modules: row.modules || [],
             status: row.status || 'active',
-            contractingStatus: 'acesso_ativado',
-            paymentOk: true,
-            monthlyAmount: row.plan_id === 'bronze' ? 197 : row.plan_id === 'silver' ? 497 : 597,
+            contractingStatus,
+            paymentOk: isPaymentOk,
+            monthlyAmount: Number(row.partner_amount ?? row.final_price ?? 0),
             contractedAt: row.created_at,
-            passwordConfigured: true,
-            phoneVerified: true,
-            notes: '',
+            passwordConfigured: Boolean(row.owner_password_configured),
+            phoneVerified: false,
+            notes: row.partner_notes || '',
             accessToken: token,
+            paymentDetails: (row.manual_method || row.partner_pay_method) ? {
+              method: row.manual_method || row.partner_pay_method,
+              identifiedAt: row.manual_confirmed_at || row.payment_confirmed_at || row.created_at,
+              transactionRef: row.manual_ref || row.partner_tx_ref || undefined,
+            } : undefined,
           });
         }
+      }
+
+      // 2. Busca também cadastros em partner_signups pendentes que ainda não estejam em client_accounts
+      try {
+        const signupsSql = `
+          SELECT ps.*
+          FROM partner_signups ps
+          WHERE NOT EXISTS (
+            SELECT 1 FROM client_accounts c WHERE c.id = ps.id OR (c.document = ps.document AND ps.document != '')
+          )
+          ORDER BY ps.created_at DESC
+        `;
+        const signupsRes = await pool.query(signupsSql);
+        for (const row of signupsRes.rows) {
+          if (!map.has(row.id)) {
+            const rawDoc = row.document || '';
+            const token = '';
+            const isPaymentOk =
+              Boolean(row.payment_confirmed_at) ||
+              ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.status);
+            const contractingStatus = isPaymentOk ? (row.status || 'acesso_pendente') : 'aguardando_pagamento';
+
+            map.set(row.id, {
+              clientId: row.id,
+              tradeName: row.trade_name,
+              legalName: row.legal_name || row.trade_name,
+              document: rawDoc,
+              email: row.email,
+              phone: row.phone || '',
+              planId: row.plan_id || 'golden',
+              modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || [],
+              status: 'active',
+              contractingStatus,
+              paymentOk: isPaymentOk,
+              monthlyAmount: Number(row.monthly_amount ?? 0),
+              contractedAt: row.created_at,
+              passwordConfigured: false,
+              phoneVerified: false,
+              notes: row.notes || '',
+              accessToken: token,
+              paymentDetails: row.payment_method ? {
+                method: row.payment_method,
+                identifiedAt: row.payment_confirmed_at || row.created_at,
+                transactionRef: row.transaction_ref || undefined,
+              } : undefined,
+            });
+          }
+        }
+      } catch (signupsErr) {
+        console.warn('[storesRouter] Aviso ao buscar signups adicionais:', signupsErr);
       }
 
       res.json({ success: true, data: Array.from(map.values()) });
       return;
     }
 
-    res.json({ success: true, data: [] });
-  } catch (error) {
-    next(error);
-  }
+    throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+  } catch (error) { next(error); }
+
 });
 
-storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
+storesRouter.post('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminClientSchema.parse(req.body);
     const clientId = body.clientId || `CLI-${Date.now().toString(36).toUpperCase()}`;
@@ -586,9 +666,16 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
       // 2. stores
       const storeId = `STR-${clientId.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`;
       await pool.query(
-        `INSERT INTO stores (id, client_account_id, trade_name, legal_name, document_type, document, email, phone, is_matrix, active, access_token)
-         VALUES ($1, $2, $3, $4, 'cnpj', $5, $6, $7, true, true, $8)
-         ON CONFLICT (client_account_id, document) DO UPDATE SET
+        `INSERT INTO stores (
+           id, client_account_id, trade_name, legal_name, document_type, document,
+           email, phone, zip_code, street, number, complement, district, city, state,
+           tax_regime, is_matrix, active, access_token
+         ) VALUES (
+           $1, $2, $3, $4, 'cnpj', $5, $6, $7,
+           '25800-000', 'Endereço Comercial', '100', '', 'Centro', 'Três Rios', 'RJ',
+           'simples_nacional', true, true, $8
+         )
+         ON CONFLICT (id) DO UPDATE SET
            trade_name = EXCLUDED.trade_name,
            email = EXCLUDED.email,
            phone = EXCLUDED.phone,
@@ -604,9 +691,9 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
 
       await pool.query(
         `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-         VALUES ($1, $2, $3, $4::plan_id, $5::module_id[], 'active')
+         VALUES ($1, $2, $3, $4, $5::TEXT[], 'active')
          ON CONFLICT (store_id) DO UPDATE
-         SET plan_id = $4::plan_id, modules = $5::module_id[], updated_at = now()`,
+         SET plan_id = $4, modules = $5::TEXT[], updated_at = now()`,
         [`LIC-${storeId}`, storeId, clientId, dbPlan, ['totem', 'os', 'erp', 'fiscal']],
       );
 
@@ -632,27 +719,28 @@ storesRouter.post('/api/v1/admin/clients', async (req, res, next) => {
   }
 });
 
-storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
+storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const clientId = req.params.id;
     const body = adminClientSchema.partial().parse(req.body);
 
     if (pool && clientId) {
-      if (body.tradeName || body.legalName || body.document || body.email || body.phone || body.status || body.accessToken) {
-        await pool.query(
-          `UPDATE client_accounts
-           SET trade_name = COALESCE($1, trade_name),
-               legal_name = COALESCE($2, legal_name),
-               document = COALESCE($3, document),
-               email = COALESCE($4, email),
-               phone = COALESCE($5, phone),
-               status = COALESCE($6, status),
-               access_token = COALESCE($7, access_token),
-               updated_at = now()
-           WHERE id = $8`,
-          [body.tradeName, body.legalName, body.document, body.email, body.phone, body.status, body.accessToken, clientId],
-        );
+      const cleanDoc = (body.document || '').replace(/\D/g, '');
+      await pool.query(
+        `UPDATE client_accounts
+         SET trade_name = COALESCE($1, trade_name),
+             legal_name = COALESCE($2, legal_name),
+             document = COALESCE($3, document),
+             email = COALESCE($4, email),
+             phone = COALESCE($5, phone),
+             status = COALESCE($6, status),
+             access_token = COALESCE($7, access_token),
+             updated_at = now()
+         WHERE id = $8 OR lower(email) = lower($4) OR (length($9) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $9)`,
+        [body.tradeName, body.legalName, body.document, body.email, body.phone, body.status, body.accessToken, clientId, cleanDoc],
+      );
 
+      if (body.tradeName || body.legalName || body.document || body.email || body.phone || body.accessToken || body.status) {
         await pool.query(
           `UPDATE stores
            SET trade_name = COALESCE($1, trade_name),
@@ -663,7 +751,7 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
                access_token = COALESCE($6, access_token),
                active = CASE WHEN $7 = 'blocked' OR $7 = 'inactive' THEN false ELSE true END,
                updated_at = now()
-           WHERE client_account_id = $8`,
+           WHERE client_account_id = $8 OR id = $8`,
           [body.tradeName, body.legalName, body.document, body.email, body.phone, body.accessToken, body.status, clientId],
         );
       }
@@ -688,6 +776,19 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
           [validModules, clientId],
         );
       }
+
+      if (body.paymentOk !== undefined || body.tradeName || body.email) {
+        await pool.query(
+          `UPDATE partner_signups
+           SET trade_name = COALESCE($1, trade_name),
+               email = COALESCE($2, email),
+               payment_confirmed_at = CASE WHEN $3 = true THEN COALESCE(payment_confirmed_at, now()) ELSE payment_confirmed_at END,
+               status = CASE WHEN $3 = true THEN 'acesso_ativado' WHEN $3 = false THEN 'aguardando_pagamento' ELSE status END,
+               updated_at = now()
+           WHERE id = $4 OR lower(email) = lower($2) OR (length($5) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $5)`,
+          [body.tradeName, body.email, body.paymentOk, clientId, cleanDoc],
+        );
+      }
     }
 
     res.json({
@@ -702,7 +803,7 @@ storesRouter.put('/api/v1/admin/clients/:id', async (req, res, next) => {
   }
 });
 
-storesRouter.delete('/api/v1/admin/clients/:id', async (req, res, next) => {
+storesRouter.delete('/api/v1/admin/clients/:id', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const clientId = req.params.id;
     if (pool && clientId) {
