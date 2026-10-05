@@ -171,7 +171,7 @@ BEGIN
       INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
       VALUES(v_gilvan_id, v_account_id, 'gilvanteodo@gmail.com', 'Gilvan Teodoro', 'password', 'admin', true, now(), now());
     ELSE
-      UPDATE users SET active = true, client_account_id = COALESCE(v_account_id, client_account_id), updated_at = now() WHERE id = v_gilvan_id;
+      UPDATE users SET active = true, updated_at = now() WHERE id = v_gilvan_id;
     END IF;
 
     -- Vincula Gilvan em user_stores
@@ -191,7 +191,7 @@ BEGIN
       INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
       VALUES(v_marina_id, v_account_id, 'marinaveigatav@gmail.com', 'Marina Veiga', 'password', 'admin', true, now(), now());
     ELSE
-      UPDATE users SET active = true, client_account_id = COALESCE(v_account_id, client_account_id), updated_at = now() WHERE id = v_marina_id;
+      UPDATE users SET active = true, updated_at = now() WHERE id = v_marina_id;
     END IF;
 
     -- Vincula Marina em user_stores
