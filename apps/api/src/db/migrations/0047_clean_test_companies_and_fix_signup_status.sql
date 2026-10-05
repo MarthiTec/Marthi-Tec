@@ -30,10 +30,47 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Limpeza de lojas e cadastros de teste gerados por scripts e2e
+-- 3. Limpeza dinâmica e segura de lojas e cadastros de teste gerados por scripts e2e
 DO $$
 DECLARE
   v_test_stores TEXT[];
+  tbl TEXT;
+  tbls TEXT[] := ARRAY[
+    'pickup_requests',
+    'pickup_methods',
+    'device_catalog_models',
+    'device_catalog_settings',
+    'stock_inventory_adjustments',
+    'client_payment_confirmations',
+    'commercial_order_contracts',
+    'commercial_order_quotes',
+    'commercial_orders',
+    'communication_deliveries',
+    'cash_session_events',
+    'product_allowed_values',
+    'product_attribute_values',
+    'product_attributes',
+    'stock_item_variations',
+    'stock_movements',
+    'stock_items',
+    'sales_order_lines',
+    'sale_payments',
+    'sales_orders',
+    'cash_sessions',
+    'store_brands',
+    'store_module_state',
+    'pos_tickets',
+    'pos_quotes',
+    'pos_terminals',
+    'work_orders',
+    'customers',
+    'suppliers',
+    'sellers',
+    'employees',
+    'user_stores',
+    'store_licenses',
+    'products'
+  ];
 BEGIN
   SELECT ARRAY_AGG(id) INTO v_test_stores
   FROM stores 
@@ -42,36 +79,22 @@ BEGIN
      OR id LIKE 'STR-PRT-%';
 
   IF v_test_stores IS NOT NULL AND array_length(v_test_stores, 1) > 0 THEN
-    IF to_regclass('pickup_requests') IS NOT NULL THEN
-      DELETE FROM pickup_requests WHERE store_id = ANY(v_test_stores);
-    END IF;
+    FOREACH tbl IN ARRAY tbls LOOP
+      IF to_regclass(tbl) IS NOT NULL THEN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = tbl AND column_name = 'store_id'
+        ) THEN
+          EXECUTE format('DELETE FROM %I WHERE store_id = ANY($1)', tbl) USING v_test_stores;
+        END IF;
+      END IF;
+    END LOOP;
 
-    IF to_regclass('stock_inventory_adjustments') IS NOT NULL THEN
-      DELETE FROM stock_inventory_adjustments WHERE store_id = ANY(v_test_stores);
+    IF to_regclass('product_allowed_values') IS NOT NULL AND to_regclass('product_attributes') IS NOT NULL THEN
+      EXECUTE 'DELETE FROM product_allowed_values WHERE attribute_id NOT IN (SELECT id FROM product_attributes)';
     END IF;
-
-    IF to_regclass('client_payment_confirmations') IS NOT NULL THEN
-      DELETE FROM client_payment_confirmations WHERE store_id = ANY(v_test_stores);
-    END IF;
-
-    IF to_regclass('commercial_order_contracts') IS NOT NULL THEN
-      DELETE FROM commercial_order_contracts WHERE store_id = ANY(v_test_stores);
-    END IF;
-
-    IF to_regclass('commercial_order_quotes') IS NOT NULL THEN
-      DELETE FROM commercial_order_quotes WHERE store_id = ANY(v_test_stores);
-    END IF;
-
-    IF to_regclass('commercial_orders') IS NOT NULL THEN
-      DELETE FROM commercial_orders WHERE store_id = ANY(v_test_stores);
-    END IF;
-
-    IF to_regclass('communication_deliveries') IS NOT NULL THEN
-      DELETE FROM communication_deliveries WHERE store_id = ANY(v_test_stores);
-    END IF;
-
-    IF to_regclass('cash_session_events') IS NOT NULL THEN
-      DELETE FROM cash_session_events WHERE store_id = ANY(v_test_stores);
+    IF to_regclass('product_attribute_values') IS NOT NULL AND to_regclass('product_attributes') IS NOT NULL THEN
+      EXECUTE 'DELETE FROM product_attribute_values WHERE attribute_id NOT IN (SELECT id FROM product_attributes)';
     END IF;
 
     DELETE FROM stores WHERE id = ANY(v_test_stores);
@@ -126,10 +149,20 @@ BEGIN
     -- Ativa a loja Cell Ponto
     UPDATE stores SET active = true, updated_at = now() WHERE id = v_store_id;
 
-    -- Se tiver conta de cliente vinculada, ativa e confirma
+    -- Se tiver conta de cliente vinculada, ativa e confirma licença
     IF v_account_id IS NOT NULL THEN
       UPDATE client_accounts SET status = 'active', updated_at = now() WHERE id = v_account_id;
-      UPDATE store_licenses SET status = 'active', updated_at = now() WHERE store_id = v_store_id;
+      
+      IF NOT EXISTS (SELECT 1 FROM store_licenses WHERE store_id = v_store_id) THEN
+        INSERT INTO store_licenses(id, client_account_id, store_id, plan_id, status, starts_at, modules, final_price, created_at, updated_at)
+        VALUES(gen_random_uuid()::text, v_account_id, v_store_id, 'golden', 'active', now(), '["totem","pdv","os","erp","fiscal","ecommerce"]'::jsonb, 597, now(), now());
+      ELSE
+        UPDATE store_licenses SET status = 'active', updated_at = now() WHERE store_id = v_store_id;
+      END IF;
+
+      INSERT INTO client_payment_confirmations(client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status, confirmed_at)
+      VALUES(v_account_id, v_store_id, 'pix', 'ATIVACAO-AUTORIZADA', 'Acesso e pagamento ativados para Cell Ponto', 'admin', 'acesso_ativado', now())
+      ON CONFLICT (client_account_id) DO UPDATE SET contracting_status = 'acesso_ativado', confirmed_at = now();
     END IF;
 
     -- Localiza ou cria gilvanteodo@gmail.com
