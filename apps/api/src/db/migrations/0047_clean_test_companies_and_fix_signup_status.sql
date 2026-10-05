@@ -79,6 +79,21 @@ BEGIN
      OR id LIKE 'STR-PRT-%';
 
   IF v_test_stores IS NOT NULL AND array_length(v_test_stores, 1) > 0 THEN
+    -- Limpa valores de atributos antes de deletar product_attributes
+    IF to_regclass('product_attribute_values') IS NOT NULL AND EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_name = 'product_attribute_values' AND column_name = 'attribute_id'
+    ) THEN
+      EXECUTE 'DELETE FROM product_attribute_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id = ANY($1))' USING v_test_stores;
+    END IF;
+
+    IF to_regclass('product_allowed_values') IS NOT NULL THEN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_allowed_values' AND column_name = 'attribute_id') THEN
+        EXECUTE 'DELETE FROM product_allowed_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id = ANY($1))' USING v_test_stores;
+      ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_allowed_values' AND column_name = 'product_id') THEN
+        EXECUTE 'DELETE FROM product_allowed_values WHERE product_id IN (SELECT id FROM products WHERE store_id = ANY($1))' USING v_test_stores;
+      END IF;
+    END IF;
+
     FOREACH tbl IN ARRAY tbls LOOP
       IF to_regclass(tbl) IS NOT NULL THEN
         IF EXISTS (
@@ -89,13 +104,6 @@ BEGIN
         END IF;
       END IF;
     END LOOP;
-
-    IF to_regclass('product_allowed_values') IS NOT NULL AND to_regclass('product_attributes') IS NOT NULL THEN
-      EXECUTE 'DELETE FROM product_allowed_values WHERE attribute_id NOT IN (SELECT id FROM product_attributes)';
-    END IF;
-    IF to_regclass('product_attribute_values') IS NOT NULL AND to_regclass('product_attributes') IS NOT NULL THEN
-      EXECUTE 'DELETE FROM product_attribute_values WHERE attribute_id NOT IN (SELECT id FROM product_attributes)';
-    END IF;
 
     DELETE FROM stores WHERE id = ANY(v_test_stores);
   END IF;
