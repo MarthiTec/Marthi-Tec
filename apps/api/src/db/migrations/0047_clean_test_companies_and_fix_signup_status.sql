@@ -164,6 +164,15 @@ BEGIN
       END IF;
     END IF;
 
+    -- Se Gilvan ou Marina existirem sob outra conta de teste, limpa para associar à conta correta da Cell Ponto
+    IF v_account_id IS NOT NULL THEN
+      DELETE FROM user_stores WHERE user_id IN (
+        SELECT id FROM users WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com') AND client_account_id IS DISTINCT FROM v_account_id
+      );
+      DELETE FROM employees WHERE lower(user_email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com') AND store_id <> v_store_id;
+      DELETE FROM users WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com') AND client_account_id IS DISTINCT FROM v_account_id;
+    END IF;
+
     -- Localiza ou cria gilvanteodo@gmail.com
     SELECT id INTO v_gilvan_id FROM users WHERE lower(email) = 'gilvanteodo@gmail.com';
     IF v_gilvan_id IS NULL THEN
