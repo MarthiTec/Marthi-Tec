@@ -526,7 +526,7 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
           ${payload.monthlyAmount ? `<tr><td style="color:#526775;">Valor Mensal:</td><td style="color:#20333d;">R$ ${payload.monthlyAmount.toFixed(2)}</td></tr>` : ''}
           <tr>
             <td style="color:#526775;">Forma de Pagamento:</td>
-            <td style="color:#20333d;">${payload.paymentMethod.toUpperCase()}</td>
+            <td style="color:#20333d;">${escapeHtml(payload.paymentMethod.toUpperCase())}</td>
           </tr>
           <tr>
             <td style="color:#526775;">Status Atual:</td>
@@ -539,7 +539,7 @@ export async function sendSignupReceivedEmail(payload: SignupReceivedEmailPayloa
         </table>
 
         <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); border-radius:8px; padding:16px; margin-bottom:24px;">
-          <p style="font-size:14px; line-height:1.6; color:#fde68a; margin:0;">
+          <p style="font-size:14px; line-height:1.6; color:#854d0e; margin:0;">
             ⏳ <strong>Próximo Passo — Liberação de Acesso:</strong><br>
             Assim que nosso time confirmar o recebimento do pagamento Pix, seu acesso será liberado no sistema e você receberá um novo e-mail contendo o link exclusivo e seguro para criar sua senha de acesso.
           </p>

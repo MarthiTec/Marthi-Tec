@@ -149,6 +149,8 @@ export function StockPage() {
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
   const {methods:pickupMethods}=usePickupMethods();
+  const saveInProgress = useRef(false);
+  const [saving, setSaving] = useState(false);
   const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
   const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '',form.brand??'');
@@ -609,7 +611,9 @@ export function StockPage() {
   function variationSku(row:StockVariationRow){return row.skuAuto===false?row.sku:skuPreview(row.attrs,row.condition);}
 
   async function submit() {
-    if (readOnly || !form.name.trim()) return;
+    if (readOnly || !form.name.trim() || saveInProgress.current) return;
+    saveInProgress.current = true;
+    setSaving(true);
     setError('');
 
     try {
@@ -622,6 +626,7 @@ export function StockPage() {
           return;
         }
 
+        const savedVariationIds: string[] = [];
         for (const row of variations) {
           const corVal = row.attrs[corId] || (corAttrDef ? row.attrs[corAttrDef.name] : '') || '';
           const capVal = row.attrs[capId] || (capAttrDef ? row.attrs[capAttrDef.name] : '') || '';
@@ -662,11 +667,16 @@ export function StockPage() {
             trackLot: Boolean(form.trackLot),
             isKit: Boolean(form.isKit),
           };
-          await upsertStockItem(payload);
+          const savedState = await upsertStockItem(payload);
+          const savedRow = row.id ? savedState.stock.find(item => item.id === row.id) : savedState.stock[0];
+          if (savedRow) {
+            savedVariationIds.push(savedRow.id);
+            setVariations(current => current.map(item => item.tempKey === row.tempKey ? { ...item, id: savedRow.id } : item));
+          }
         }
 
         // Remove variações excluídas na grade
-        const activeIds = new Set(variations.map((v) => v.id).filter(Boolean));
+        const activeIds = new Set([...variations.map((v) => v.id).filter(Boolean), ...savedVariationIds]);
         for (const oldId of originalVariationIds) {
           if (!activeIds.has(oldId)) {
             await removeStockItem(oldId);
@@ -726,6 +736,9 @@ export function StockPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
+    } finally {
+      saveInProgress.current = false;
+      setSaving(false);
     }
   }
 
@@ -850,7 +863,7 @@ export function StockPage() {
       ) : (
         <>
           <HeadingCancelButton onClick={closeForm} />
-          <HeadingSaveButton onClick={() => void submit()} />
+          <HeadingSaveButton onClick={() => void submit()} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
         </>
       )}
     </PageHeadingActions>
@@ -1408,7 +1421,7 @@ export function StockPage() {
                 </div>
               </div>
 
-              <div className="admin-table-container">
+              <div className="stock-variation-container">
                 <table className="admin-table stock-variation-grid">
                   <thead>
                     <tr>
@@ -1420,9 +1433,9 @@ export function StockPage() {
                       <th>SKU</th>
                       <th>Custo unitário</th>
                       <th>Preço à vista</th>
-                      <th>Parcelado (18x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
+                      <th>Parcelado (18x)</th>
                       <th>Margem / markup</th>
                       <th>Sugestão de venda</th>
                       <th>Última entrada / nota</th>
@@ -1442,7 +1455,7 @@ export function StockPage() {
                         const installmentText = formatInstallment(rowPrice, 18);
 
                         return (
-                          <tr key={row.tempKey}>
+                          <tr key={row.tempKey} style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
                             {selectedAttrIds.map((attrId) => {
                               const def = attrDefs.find((a) => a.id === attrId);
                               const options = referenceValues(def).map((v) => ({
@@ -1452,7 +1465,7 @@ export function StockPage() {
                               const val = row.attrs[attrId] ?? '';
 
                               return (
-                                <td key={attrId} style={{ minWidth: 130 }}>
+                                <td key={attrId} data-label={def?.name || "Atributo"}>
                                   {options.length > 0 ? (
                                     <AdminPicker
                                       compact
@@ -1468,10 +1481,10 @@ export function StockPage() {
                                   ) : (
                                     <input
                                       type="text"
+                                      aria-label={def?.name || 'Atributo'}
                                       value={val}
                                       disabled={readOnly}
                                       placeholder="Valor"
-                                      style={{ minWidth: 90 }}
                                       onChange={(e) =>
                                         updateVariationAttr(index, attrId, e.target.value)
                                       }
@@ -1480,8 +1493,8 @@ export function StockPage() {
                                 </td>
                               );
                             })}
-                            <td><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
-                            <td>
+                            <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
+                            <td data-label="SKU">
                               <input
                                 type="text"
                                 aria-label="SKU da variação"
@@ -1493,8 +1506,8 @@ export function StockPage() {
                                 onChange={e=>setVariations(current=>current.map((r,i)=>i===index?{...r,sku:e.target.value,skuAuto:false}:r))}
                               />
                             </td>
-                            <td><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
-                            <td>
+                            <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
+                            <td data-label="Preço à vista">
                               <input
                                 aria-label="Preço de venda da variação"
                                 type="number"
@@ -1508,16 +1521,9 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td>
-                              <span
-                                className="stock-installment-badge"
-                                title="Simulação de 18x com as taxas cadastradas"
-                              >
-                                {installmentText}
-                              </span>
-                            </td>
-                            <td>
+                            <td data-label="Quantidade">
                               <input
+                                aria-label="Quantidade da variação"
                                 type="number"
                                 min={0}
                                 value={row.qty}
@@ -1528,8 +1534,9 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td>
+                            <td data-label="Estoque mínimo">
                               <input
+                                aria-label="Estoque mínimo da variação"
                                 type="number"
                                 min={0}
                                 value={row.minQty}
@@ -1540,11 +1547,19 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
-                            <td><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name,row.sku].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
-                            <td><LastStockEntry entry={row.lastEntry}/></td>
+                            <td data-label="Parcelado (18x)">
+                              <span
+                                className="stock-installment-badge"
+                                title="Simulação de 18x com as taxas cadastradas"
+                              >
+                                {installmentText}
+                              </span>
+                            </td>
+                            <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
+                            <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name,row.sku].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td data-label="Última entrada / nota"><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
-                              <td className="col-actions">
+                              <td className="col-actions" data-label="Ações">
                                 <div style={{ display: 'flex', gap: 4 }}>
                                   <button
                                     type="button"
@@ -1584,8 +1599,8 @@ export function StockPage() {
                   </span>
                   <span>
                     <strong>Faixa de Preços:</strong> R${' '}
-                    {Math.min(...variations.map((r) => Number(r.price) || 0)).toFixed(2)} até R${' '}
-                    {Math.max(...variations.map((r) => Number(r.price) || 0)).toFixed(2)}
+                    {Math.min(...variations.map((r) => Number(r.pickupMethodId ? r.pickupPrices?.[r.pickupMethodId] ?? r.price : r.price) || 0)).toFixed(2)} até R${' '}
+                    {Math.max(...variations.map((r) => Number(r.pickupMethodId ? r.pickupPrices?.[r.pickupMethodId] ?? r.price : r.price) || 0)).toFixed(2)}
                   </span>
                 </div>
               ) : null}

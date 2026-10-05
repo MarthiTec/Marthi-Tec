@@ -9,6 +9,7 @@ export function ProductPriceMetrics({cost,price}:{cost:number;price:number}){
  const m=priceMetrics(cost,price);return <div className="product-price-metrics"><span>Margem bruta: <strong>{m.margin===null?'—':decimal(m.margin)+'%'}</strong></span><span>Markup: <strong>{m.markup===null?'—':decimal(m.markup)+'%'}</strong>{m.factor!==null&&' ('+decimal(m.factor)+'×)'}</span></div>;
 }
 export function ProductPriceSuggestion({cost,price=0,policy,disabled,onChange,onApply,compact=false,itemLabel='Produto'}:{cost:number;price?:number;policy?:PricingPolicy|null;compact?:boolean;itemLabel?:string;disabled:boolean;onChange:(policy:PricingPolicy|null)=>void;onApply:(price:number)=>void}){
+ policy=policy&&(policy.basis==='markup'||policy.basis==='margin')&&Number.isFinite(policy.percent)?policy:null;
  const [open,setOpen]=useState(false);
  const [draft,setDraft]=useState<PricingPolicy|null>(null);
  const dialog=useRef<HTMLDialogElement>(null);

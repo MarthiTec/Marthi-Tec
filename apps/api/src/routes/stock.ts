@@ -68,7 +68,10 @@ export function formatStockRow(row: any) {
     minQty: Number(row.min_qty ?? row.minQty) || 0,
     cost: Number(row.cost) || 0,
     avgCost: Number(row.avg_cost ?? row.avgCost ?? row.cost) || 0,
-    pricingPolicy: row.pricing_policy ?? row.pricingPolicy ?? {},
+    pricingPolicy: (() => {
+      const policy = row.pricing_policy ?? row.pricingPolicy;
+      return policy && (policy.basis === 'markup' || policy.basis === 'margin') && Number.isFinite(policy.percent) ? policy : null;
+    })(),
     lastEntry: row.last_entry ?? row.lastEntry ?? null,
     lastPurchaseAt: row.last_entry?.enteredAt ?? '',
     lastPurchaseCost: Number(row.last_entry?.unitCost ?? 0),
@@ -285,10 +288,10 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             );
           }
 
+          const createdRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
+          const created = formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0]);
           await client.query('COMMIT');
-
-          const createdRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-          res.status(201).json({ success: true, data: formatStockRow((await stockDetails(pool,storeId,createdRes.rows))[0]) });
+          res.status(201).json({ success: true, data: created });
           return;
         } catch (err) {
           await client.query('ROLLBACK');

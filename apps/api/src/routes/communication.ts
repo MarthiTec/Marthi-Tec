@@ -117,11 +117,13 @@ communicationRouter.post('/api/v1/store/smtp-settings/test', requireOrDemoAuth, 
     const pass = (body.pass && !body.pass.includes('••')) ? body.pass : (saved.pass);
     const from = body.from?.trim() || saved.from;
 
-    if (!user || !pass) {
-      res.status(400).json({
-        success: false,
-        error: { message: 'Usuário (SMTP_USER) e Senha (SMTP_PASS) são obrigatórios para testar o envio.' },
-      });
+    const missing = [!host && 'Servidor SMTP', !from && 'Remetente', !user && 'Usuário', !pass && 'Senha de app'].filter(Boolean);
+    if (missing.length) {
+      res.status(400).json({ success: false, error: { message: `Preencha a configuração de e-mail: ${missing.join(', ')}.` } });
+      return;
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      res.status(400).json({ success: false, error: { message: 'Informe uma porta SMTP válida (1 a 65535).' } });
       return;
     }
 

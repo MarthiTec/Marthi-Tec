@@ -6654,6 +6654,28 @@ select.caixa-mov-input {
 .product-price-summary:focus-visible {outline:2px solid var(--accent);outline-offset:4px;border-radius:4px;}
 .product-price-summary:disabled {cursor:default;opacity:1;}
 .stock-variation-grid .product-price-metrics {min-width:145px;gap:4px;white-space:nowrap;font-size:.8rem;}
+
+/* Two compact fields per column keep each variation within the form width. */
+.stock-variation-container {width:100%;min-width:0;}
+.stock-variation-container .stock-variation-grid {display:block;width:100%;min-width:0;}
+.stock-variation-container thead {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+.stock-variation-container tbody {display:block;}
+.stock-variation-container tbody tr {display:grid;grid-template-rows:auto auto;grid-auto-flow:column;gap:8px 12px;padding:12px 0;border-bottom:1px solid var(--line);}
+.stock-variation-container tbody td {display:flex;flex-direction:column;gap:4px;padding:0;min-width:0;width:auto;border:0;white-space:normal;overflow-wrap:anywhere;}
+.stock-variation-container tbody td::before {content:attr(data-label);font-size:.7rem;font-weight:700;color:var(--mute);line-height:1.2;}
+.stock-variation-container input:not([type="checkbox"]),.stock-variation-container .admin-picker {width:100%!important;min-width:0;}
+.stock-variation-container .product-price-metrics,.stock-variation-container .product-last-entry,.stock-variation-container .product-price-summary {min-width:0;white-space:normal;font-size:.75rem;gap:2px;padding:0;}
+.stock-variation-container .stock-installment-badge {align-self:flex-start;white-space:normal;}
+.stock-variation-container .stock-variation-grid td.col-actions {grid-row:1 / span 2;min-width:0;}
+.stock-variation-container .col-actions>div {flex-direction:column;}
+.stock-variation-container .col-actions button {padding:6px 4px;font-size:.72rem;min-width:0;}
+.stock-variation-container td.empty {grid-column:1 / -1;}
+.is-theme-dark .stock-variation-container tbody tr,.admin--dark .stock-variation-container tbody tr {border-color:var(--line);color:var(--ink);}
+@media(max-width:760px){
+ .stock-variation-container tbody tr {grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:none;grid-auto-flow:row;}
+ .stock-variation-container .stock-variation-grid td.col-actions {grid-row:auto;}
+}
+@media(max-width:480px){.stock-variation-container tbody tr {grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
 .product-pricing-dialog {width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:18px;padding:24px;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25);}
 .product-pricing-dialog::backdrop {background:rgba(10,14,20,.55);}
 .product-pricing-dialog .product-price-suggestion {min-width:0;gap:16px;}

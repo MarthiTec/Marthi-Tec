@@ -14,9 +14,11 @@ const email=await import('../dist/services/emailService.js');
 test('customer and internal mail use readable valid table layout and escape user HTML',async()=>{
  await email.sendWelcomeEmail({toEmail:'preview@example.com',contactName:'<script>test</script>',companyName:'Loja de validação',planName:'Golden',activationToken:'preview-only'});
  await email.sendInternalNotificationEmail({companyName:'Loja de validação',contactName:'Responsável',email:'preview@example.com',phone:'',planName:'Golden',paymentMethod:'Pix',paymentStatus:'Confirmado',contractedAt:new Date().toISOString(),clientId:'preview'});
- assert.equal(captured.length,2);
- for(const mail of captured){assert.ok(mail.html.includes('bgcolor="#ffffff"'));assert.ok(!mail.html.includes('#0b0f14'));assert.ok(!mail.html.includes('data:image'));assert.ok(mail.html.includes('<table role="presentation"'));assert.ok(!mail.html.includes('<script>'));}
+ await email.sendPasswordResetEmail({toEmail:'preview@example.com',userName:'Administrador Marthi',resetToken:'preview-only'});
+ await email.sendSignupReceivedEmail({toEmail:'preview@example.com',contactName:'Responsável',companyName:'Loja',planName:'Silver',paymentMethod:'Pix',protocol:'preview-only'});
+ assert.equal(captured.length,4);
+ for(const mail of captured){assert.ok(mail.html.includes('bgcolor="#ffffff"'));assert.ok(!mail.html.includes('#0b0f14'));assert.ok(!mail.html.includes('data:image'));assert.ok(mail.html.includes('<table role="presentation"'));assert.ok(!mail.html.includes('<script>'));assert.ok(Buffer.byteLength(mail.html,'utf8')<30_000);assert.ok(mail.text.length>0);}
  assert.ok(captured[0].html.includes('&lt;script&gt;'));
- if(process.env.EMAIL_PREVIEW_DIR){fs.mkdirSync(process.env.EMAIL_PREVIEW_DIR,{recursive:true});fs.writeFileSync(process.env.EMAIL_PREVIEW_DIR+'/email-cliente.html',captured[0].html);fs.writeFileSync(process.env.EMAIL_PREVIEW_DIR+'/email-interno.html',captured[1].html);}
+ if(process.env.EMAIL_PREVIEW_DIR){fs.mkdirSync(process.env.EMAIL_PREVIEW_DIR,{recursive:true});fs.writeFileSync(process.env.EMAIL_PREVIEW_DIR+'/email-cliente.html',captured[0].html);fs.writeFileSync(process.env.EMAIL_PREVIEW_DIR+'/email-interno.html',captured[1].html);fs.writeFileSync(process.env.EMAIL_PREVIEW_DIR+'/email-recuperacao.html',captured[2].html);}
  await pool.end();
 });
