@@ -34,13 +34,22 @@ BEGIN
   END IF;
 
   -- 2. Localizar ou assegurar conta contratante da Cell Ponto
-  SELECT id INTO v_cellponto_account_id
-  FROM client_accounts
-  WHERE trade_name ILIKE '%Cell Ponto%'
-     OR email IN ('marinaveigatav@gmail.com', 'gilvanteodo@gmail.com')
-     OR id IN ('PRT-CELL-PONTO', 'PRT-MUM5YWBG8DSR')
-  ORDER BY created_at DESC
+  -- Prioridade máxima: usar o client_account_id que a própria loja já possui
+  SELECT client_account_id INTO v_cellponto_account_id
+  FROM stores
+  WHERE id = v_cellponto_store_id OR (trade_name ILIKE '%Cell Ponto%' AND id <> v_demo_store_id)
+  ORDER BY (id = v_cellponto_store_id) DESC
   LIMIT 1;
+
+  IF v_cellponto_account_id IS NULL THEN
+    SELECT id INTO v_cellponto_account_id
+    FROM client_accounts
+    WHERE trade_name ILIKE '%Cell Ponto%'
+       OR email IN ('marinaveigatav@gmail.com', 'gilvanteodo@gmail.com')
+       OR id IN ('PRT-CELL-PONTO', 'PRT-MUM5YWBG8DSR')
+    ORDER BY created_at DESC
+    LIMIT 1;
+  END IF;
 
   IF v_cellponto_account_id IS NULL THEN
     v_cellponto_account_id := 'PRT-CELL-PONTO';
@@ -68,14 +77,13 @@ BEGIN
       v_cellponto_store_id := 'STR-CELL-PONTO';
       INSERT INTO stores(id, client_account_id, legal_name, trade_name, document_type, document, email, phone, is_matrix, active, segment, created_at, updated_at)
       VALUES(v_cellponto_store_id, v_cellponto_account_id, 'Cell Ponto Manutenção e Comércio LTDA', 'Cell Ponto', 'cnpj', '33.444.555/0001-66', 'marinaveigatav@gmail.com', '(11) 99999-9999', true, true, 'assistencia_tecnica', now(), now())
-      ON CONFLICT (id) DO UPDATE SET client_account_id = v_cellponto_account_id, active = true, segment = 'assistencia_tecnica', updated_at = now();
+      ON CONFLICT (id) DO UPDATE SET active = true, segment = 'assistencia_tecnica', updated_at = now();
     END IF;
   END IF;
 
   UPDATE stores
   SET trade_name = 'Cell Ponto',
       legal_name = 'Cell Ponto Manutenção e Comércio LTDA',
-      client_account_id = v_cellponto_account_id,
       segment = 'assistencia_tecnica',
       active = true,
       is_matrix = true,
@@ -434,14 +442,23 @@ BEGIN
   END IF;
 
   -- 13. Garantir Usuários Gilvan e Marina como Administradores da Loja Cell Ponto
+  DELETE FROM user_stores WHERE user_id IN (
+    SELECT id FROM users 
+    WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+      AND client_account_id IS DISTINCT FROM v_cellponto_account_id
+  );
+  DELETE FROM users 
+  WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+    AND client_account_id IS DISTINCT FROM v_cellponto_account_id;
+
   -- 13.1 Gilvan Teodoro
-  SELECT id INTO v_gilvan_id FROM users WHERE lower(email) = 'gilvanteodo@gmail.com';
+  SELECT id INTO v_gilvan_id FROM users WHERE lower(email) = 'gilvanteodo@gmail.com' AND client_account_id = v_cellponto_account_id;
   IF v_gilvan_id IS NULL THEN
     v_gilvan_id := gen_random_uuid()::text;
     INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
     VALUES(v_gilvan_id, v_cellponto_account_id, 'gilvanteodo@gmail.com', 'Gilvan Teodoro', 'password', 'admin', true, now(), now());
   ELSE
-    UPDATE users SET client_account_id = v_cellponto_account_id, global_role = 'admin', active = true, updated_at = now() WHERE id = v_gilvan_id;
+    UPDATE users SET global_role = 'admin', active = true, updated_at = now() WHERE id = v_gilvan_id;
   END IF;
 
   INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
@@ -453,13 +470,13 @@ BEGIN
   ON CONFLICT DO NOTHING;
 
   -- 13.2 Marina Veiga
-  SELECT id INTO v_marina_id FROM users WHERE lower(email) = 'marinaveigatav@gmail.com';
+  SELECT id INTO v_marina_id FROM users WHERE lower(email) = 'marinaveigatav@gmail.com' AND client_account_id = v_cellponto_account_id;
   IF v_marina_id IS NULL THEN
     v_marina_id := gen_random_uuid()::text;
     INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
     VALUES(v_marina_id, v_cellponto_account_id, 'marinaveigatav@gmail.com', 'Marina Veiga', 'password', 'admin', true, now(), now());
   ELSE
-    UPDATE users SET client_account_id = v_cellponto_account_id, global_role = 'admin', active = true, updated_at = now() WHERE id = v_marina_id;
+    UPDATE users SET global_role = 'admin', active = true, updated_at = now() WHERE id = v_marina_id;
   END IF;
 
   INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
