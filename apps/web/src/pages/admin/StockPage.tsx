@@ -1522,9 +1522,9 @@ export function StockPage() {
                       <th>Tipo de retirada</th>
                       <th>Custo unitário</th>
                       <th>Preço à vista</th>
+                      <th>Parcelado (18x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
-                      <th>Parcelado (18x)</th>
                       <th>Margem / markup</th>
                       <th>Sugestão de venda</th>
                       <th>Última entrada / nota</th>
@@ -1596,11 +1596,18 @@ export function StockPage() {
                                 step="0.01"
                                 value={rowPrice}
                                 disabled={readOnly}
-                                style={{ width: 95 }}
                                 onChange={(e) =>
                                   row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:Number(e.target.value)}}:r)) : updateVariationRow(index, 'price', Number(e.target.value))
                                 }
                               />
+                            </td>
+                            <td data-label="Parcelado (18x)">
+                              <span
+                                className="stock-installment-badge"
+                                title="Simulação de 18x com as taxas cadastradas"
+                              >
+                                {installmentText}
+                              </span>
                             </td>
                             <td data-label="Quantidade">
                               <input
@@ -1609,7 +1616,6 @@ export function StockPage() {
                                 min={0}
                                 value={row.qty}
                                 disabled={readOnly}
-                                style={{ width: 65 }}
                                 onChange={(e) =>
                                   updateVariationRow(index, 'qty', Number(e.target.value))
                                 }
@@ -1622,19 +1628,10 @@ export function StockPage() {
                                 min={0}
                                 value={row.minQty}
                                 disabled={readOnly}
-                                style={{ width: 60 }}
                                 onChange={(e) =>
                                   updateVariationRow(index, 'minQty', Number(e.target.value))
                                 }
                               />
-                            </td>
-                            <td data-label="Parcelado (18x)">
-                              <span
-                                className="stock-installment-badge"
-                                title="Simulação de 18x com as taxas cadastradas"
-                              >
-                                {installmentText}
-                              </span>
                             </td>
                             <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
                             <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
