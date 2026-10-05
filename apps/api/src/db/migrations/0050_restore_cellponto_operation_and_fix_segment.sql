@@ -34,13 +34,20 @@ BEGIN
   END IF;
 
   -- 2. Localizar ou assegurar conta contratante da Cell Ponto
-  -- Prioridade máxima: usar o client_account_id que a própria loja já possui
+  -- 2.1 Verifica primeiro se a loja STR-CELL-PONTO já existe e possui client_account_id
   SELECT client_account_id INTO v_cellponto_account_id
   FROM stores
-  WHERE id = v_cellponto_store_id OR (trade_name ILIKE '%Cell Ponto%' AND id <> v_demo_store_id)
-  ORDER BY (id = v_cellponto_store_id) DESC
-  LIMIT 1;
+  WHERE id = v_cellponto_store_id AND client_account_id IS NOT NULL;
 
+  -- 2.2 Se não encontrou, busca qualquer loja Cell Ponto
+  IF v_cellponto_account_id IS NULL THEN
+    SELECT client_account_id INTO v_cellponto_account_id
+    FROM stores
+    WHERE trade_name ILIKE '%Cell Ponto%' AND id <> v_demo_store_id AND client_account_id IS NOT NULL
+    LIMIT 1;
+  END IF;
+
+  -- 2.3 Se não encontrou nas lojas, busca em client_accounts
   IF v_cellponto_account_id IS NULL THEN
     SELECT id INTO v_cellponto_account_id
     FROM client_accounts
@@ -51,6 +58,7 @@ BEGIN
     LIMIT 1;
   END IF;
 
+  -- 2.4 Se ainda não tem conta, cria PRT-CELL-PONTO
   IF v_cellponto_account_id IS NULL THEN
     v_cellponto_account_id := 'PRT-CELL-PONTO';
     INSERT INTO client_accounts(id, legal_name, trade_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
@@ -65,9 +73,9 @@ BEGIN
     WHERE id = v_cellponto_account_id;
   END IF;
 
-  -- 3. Localizar ou assegurar loja matriz Cell Ponto
+  -- 3. Assegurar loja matriz Cell Ponto
   IF NOT EXISTS (SELECT 1 FROM stores WHERE id = v_cellponto_store_id) THEN
-    -- Verifica se havia loja da Cell Ponto com outro ID
+    -- Se havia outra loja Cell Ponto, adota o ID dela
     SELECT id INTO v_cellponto_store_id
     FROM stores
     WHERE trade_name ILIKE '%Cell Ponto%' AND id <> v_demo_store_id
@@ -81,6 +89,12 @@ BEGIN
     END IF;
   END IF;
 
+  -- Se a loja existir com client_account_id NULO, preenche (permitido por marthi_guard_account_owner pois OLD é NULL)
+  UPDATE stores
+  SET client_account_id = v_cellponto_account_id
+  WHERE id = v_cellponto_store_id AND client_account_id IS NULL;
+
+  -- Assegura dados da loja
   UPDATE stores
   SET trade_name = 'Cell Ponto',
       legal_name = 'Cell Ponto Manutenção e Comércio LTDA',
@@ -89,6 +103,9 @@ BEGIN
       is_matrix = true,
       updated_at = now()
   WHERE id = v_cellponto_store_id;
+
+  -- Recarrega v_cellponto_account_id DIRETAMENTE da loja matriz definitiva
+  SELECT client_account_id INTO v_cellponto_account_id FROM stores WHERE id = v_cellponto_store_id;
 
   -- Garante licença ativa para Cell Ponto
   INSERT INTO store_licenses(id, client_account_id, store_id, plan_id, status, starts_at, modules, final_price, created_at, updated_at)
@@ -442,11 +459,27 @@ BEGIN
   END IF;
 
   -- 13. Garantir Usuários Gilvan e Marina como Administradores da Loja Cell Ponto
+  -- 13.0 Assegurar que v_cellponto_account_id é EXATAMENTE o client_account_id da loja
+  SELECT client_account_id INTO v_cellponto_account_id FROM stores WHERE id = v_cellponto_store_id;
+
+  -- Se o usuário existir com client_account_id nulo, preenche com v_cellponto_account_id
+  UPDATE users 
+  SET client_account_id = v_cellponto_account_id, updated_at = now()
+  WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+    AND client_account_id IS NULL;
+
+  -- Limpa funcionários conflitantes
+  DELETE FROM employees WHERE (
+    lower(user_email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+    OR lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+  );
+
   DELETE FROM user_stores WHERE user_id IN (
     SELECT id FROM users 
     WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
       AND client_account_id IS DISTINCT FROM v_cellponto_account_id
   );
+
   DELETE FROM users 
   WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
     AND client_account_id IS DISTINCT FROM v_cellponto_account_id;
@@ -461,9 +494,12 @@ BEGIN
     UPDATE users SET global_role = 'admin', active = true, updated_at = now() WHERE id = v_gilvan_id;
   END IF;
 
-  INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
-  VALUES(gen_random_uuid()::text, v_gilvan_id, v_cellponto_store_id, 'admin', true, now())
-  ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true;
+  BEGIN
+    INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
+    VALUES(gen_random_uuid()::text, v_gilvan_id, v_cellponto_store_id, 'admin', true, now())
+    ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin', is_default = true;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
 
   INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
   VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Gilvan Teodoro', 'gilvanteodo@gmail.com', 'gilvanteodo@gmail.com', 'admin', true, true)
@@ -479,9 +515,12 @@ BEGIN
     UPDATE users SET global_role = 'admin', active = true, updated_at = now() WHERE id = v_marina_id;
   END IF;
 
-  INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
-  VALUES(gen_random_uuid()::text, v_marina_id, v_cellponto_store_id, 'admin', false, now())
-  ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
+  BEGIN
+    INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
+    VALUES(gen_random_uuid()::text, v_marina_id, v_cellponto_store_id, 'admin', false, now())
+    ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
 
   INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
   VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Marina Veiga', 'marinaveigatav@gmail.com', 'marinaveigatav@gmail.com', 'admin', true, true)
