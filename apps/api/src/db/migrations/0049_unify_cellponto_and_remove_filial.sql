@@ -1,7 +1,7 @@
 -- Migration 0049: Unificar usuários na loja matriz Cell Ponto e remover loja filial duplicada
 DO $$
 DECLARE
-  v_cellponto_store_id TEXT;
+  v_cellponto_store_id TEXT := 'STR-CELL-PONTO';
   v_cellponto_account_id TEXT;
   v_gilvan_id TEXT;
   v_marina_id TEXT;
@@ -14,63 +14,91 @@ BEGIN
     RETURN;
   END IF;
 
-  -- 1. Identificar a loja matriz Cell Ponto
-  SELECT id, client_account_id INTO v_cellponto_store_id, v_cellponto_account_id
+  -- 1. Obter a conta de cliente proprietária da loja matriz STR-CELL-PONTO
+  SELECT client_account_id INTO v_cellponto_account_id
   FROM stores
-  WHERE id = 'STR-CELL-PONTO' OR (trade_name ILIKE '%Cell Ponto%' AND trade_name NOT ILIKE '%Filial%' AND trade_name NOT ILIKE '%Shopping%')
-  ORDER BY (id = 'STR-CELL-PONTO') DESC, is_matrix DESC
-  LIMIT 1;
+  WHERE id = v_cellponto_store_id;
 
-  IF v_cellponto_store_id IS NULL THEN
-    v_cellponto_store_id := 'STR-CELL-PONTO';
-  END IF;
-
+  -- Se não achou por ID fixo, busca por trade_name
   IF v_cellponto_account_id IS NULL THEN
-    SELECT id INTO v_cellponto_account_id
-    FROM client_accounts
-    WHERE trade_name ILIKE '%Cell Ponto%' OR email IN ('marinaveigatav@gmail.com', 'gilvanteodo@gmail.com')
+    SELECT id, client_account_id INTO v_cellponto_store_id, v_cellponto_account_id
+    FROM stores
+    WHERE trade_name ILIKE '%Cell Ponto%' AND trade_name NOT ILIKE '%Filial%' AND trade_name NOT ILIKE '%Shopping%'
+    ORDER BY is_matrix DESC
     LIMIT 1;
   END IF;
 
-  -- 2. Garantir usuários Gilvan e Marina vinculados à conta da Cell Ponto
-  SELECT id INTO v_gilvan_id FROM users WHERE lower(email) = 'gilvanteodo@gmail.com';
-  SELECT id INTO v_marina_id FROM users WHERE lower(email) = 'marinaveigatav@gmail.com';
+  IF v_cellponto_account_id IS NULL THEN
+    RETURN;
+  END IF;
 
-  -- Garantir que Gilvan está ativo e na conta certa
-  IF v_gilvan_id IS NOT NULL THEN
+  -- 2. Limpar vínculos antigos e recriar Gilvan e Marina sob a mesma conta da loja matriz
+  -- (Evita violação da trigger marthi_guard_account_owner e marthi_guard_user_store)
+  DELETE FROM user_stores WHERE user_id IN (
+    SELECT id FROM users 
+    WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+      AND client_account_id IS DISTINCT FROM v_cellponto_account_id
+  );
+
+  DELETE FROM employees WHERE (
+    lower(user_email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+    OR lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+  ) AND store_id <> v_cellponto_store_id;
+
+  DELETE FROM users 
+  WHERE lower(email) IN ('gilvanteodo@gmail.com', 'marinaveigatav@gmail.com')
+    AND client_account_id IS DISTINCT FROM v_cellponto_account_id;
+
+  -- 3. Localizar ou inserir Gilvan Teodoro com o client_account_id correto
+  SELECT id INTO v_gilvan_id 
+  FROM users 
+  WHERE lower(email) = 'gilvanteodo@gmail.com' AND client_account_id = v_cellponto_account_id;
+
+  IF v_gilvan_id IS NULL THEN
+    v_gilvan_id := gen_random_uuid()::text;
+    INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
+    VALUES(v_gilvan_id, v_cellponto_account_id, 'gilvanteodo@gmail.com', 'Gilvan Teodoro', 'password', 'admin', true, now(), now());
+  ELSE
     UPDATE users SET active = true, updated_at = now() WHERE id = v_gilvan_id;
-    
-    -- Vincula à loja matriz STR-CELL-PONTO
-    INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
-    VALUES(gen_random_uuid()::text, v_gilvan_id, v_cellponto_store_id, 'admin', true, now())
-    ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
-
-    -- Adiciona ou atualiza em employees da loja matriz
-    INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
-    VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Gilvan Teodoro', 'gilvanteodo@gmail.com', 'gilvanteodo@gmail.com', 'admin', true, true)
-    ON CONFLICT DO NOTHING;
   END IF;
 
-  -- Garantir que Marina está ativa e na conta certa
-  IF v_marina_id IS NOT NULL THEN
+  -- Vincula Gilvan em user_stores na matriz STR-CELL-PONTO
+  INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
+  VALUES(gen_random_uuid()::text, v_gilvan_id, v_cellponto_store_id, 'admin', true, now())
+  ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
+
+  -- Registra Gilvan em employees
+  INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
+  VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Gilvan Teodoro', 'gilvanteodo@gmail.com', 'gilvanteodo@gmail.com', 'admin', true, true)
+  ON CONFLICT DO NOTHING;
+
+  -- 4. Localizar ou inserir Marina Veiga com o client_account_id correto
+  SELECT id INTO v_marina_id 
+  FROM users 
+  WHERE lower(email) = 'marinaveigatav@gmail.com' AND client_account_id = v_cellponto_account_id;
+
+  IF v_marina_id IS NULL THEN
+    v_marina_id := gen_random_uuid()::text;
+    INSERT INTO users(id, client_account_id, email, name, provider, global_role, active, created_at, updated_at)
+    VALUES(v_marina_id, v_cellponto_account_id, 'marinaveigatav@gmail.com', 'Marina Veiga', 'password', 'admin', true, now(), now());
+  ELSE
     UPDATE users SET active = true, updated_at = now() WHERE id = v_marina_id;
-
-    -- Vincula à loja matriz STR-CELL-PONTO
-    INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
-    VALUES(gen_random_uuid()::text, v_marina_id, v_cellponto_store_id, 'admin', false, now())
-    ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
-
-    -- Adiciona ou atualiza em employees da loja matriz
-    INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
-    VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Marina Veiga', 'marinaveigatav@gmail.com', 'marinaveigatav@gmail.com', 'admin', true, true)
-    ON CONFLICT DO NOTHING;
   END IF;
 
-  -- 3. Identificar lojas filiais excedentes a serem removidas (como STR-DEMO-02 ou Cell Ponto Shopping)
+  -- Vincula Marina em user_stores na matriz STR-CELL-PONTO
+  INSERT INTO user_stores(id, user_id, store_id, role, is_default, created_at)
+  VALUES(gen_random_uuid()::text, v_marina_id, v_cellponto_store_id, 'admin', false, now())
+  ON CONFLICT (user_id, store_id) DO UPDATE SET role = 'admin';
+
+  -- Registra Marina em employees
+  INSERT INTO employees(id, store_id, name, email, user_email, role, is_system_user, active)
+  VALUES(gen_random_uuid()::text, v_cellponto_store_id, 'Marina Veiga', 'marinaveigatav@gmail.com', 'marinaveigatav@gmail.com', 'admin', true, true)
+  ON CONFLICT DO NOTHING;
+
+  -- 5. Identificar e remover qualquer loja filial excedente (como STR-DEMO-02 ou Cell Ponto Shopping)
   SELECT ARRAY_AGG(id) INTO v_filiais_to_remove
   FROM stores
   WHERE id NOT IN (v_cellponto_store_id, 'STR-DEMO-01')
-    AND id <> 'STR-DEMO-01'
     AND (
       trade_name ILIKE '%Filial%'
       OR trade_name ILIKE '%Shopping%'
@@ -80,7 +108,6 @@ BEGIN
     );
 
   IF v_filiais_to_remove IS NOT NULL AND array_length(v_filiais_to_remove, 1) > 0 THEN
-    -- Mover referências ou limpar tabelas dependentes
     FOR pass IN 1..5 LOOP
       FOR tbl IN (
         SELECT DISTINCT c.table_name
