@@ -1,3 +1,5 @@
+import {productSku} from '../../data/productSku';
+import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
 import {ProductPickupPrices} from '../../components/PickupFields';
 import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
@@ -27,7 +29,6 @@ import {
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
 import {
-  applyPriceTable,
   getAdminState,
   removeStockItem,
   STOCK_CONDITION_LABEL,
@@ -59,6 +60,10 @@ export type StockVariationRow = {
   id?: string;
   tempKey: string;
   sku: string;
+  skuAuto?:boolean;
+  pricingPolicy?:StockItem['pricingPolicy'];
+  lastEntry?:StockItem['lastEntry'];
+  avgCost?:number;
   barcode: string;
   imei: string;
   pickupMethodId?:string;
@@ -110,7 +115,6 @@ export function StockPage() {
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
-  const [costMarkup, setCostMarkup] = useState('');
 
   // ── Estado da Grade de Variações de Produto ────────────────────────
   const [useVariations, setUseVariations] = useState(false);
@@ -147,7 +151,7 @@ export function StockPage() {
   const {methods:pickupMethods}=usePickupMethods();
   const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
-  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '');
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '',form.brand??'');
   const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
   useEffect(() => {
     if (!device || readOnly) return;
@@ -180,9 +184,6 @@ export function StockPage() {
   const suppliers = useMemo(() => listSuppliers(true), []);
   const readOnly = mode === 'view';
 
-  useEffect(() => {
-    setCostMarkup('');
-  }, [selectedId, mode, formVisible]);
 
   const corAttrDef = useMemo(() => {
     return (
@@ -345,7 +346,7 @@ export function StockPage() {
         {
           id: selectedId || undefined,
           tempKey: `init_${Date.now()}`,
-          sku: form.sku,
+          sku: form.sku,skuAuto:form.skuAuto,pricingPolicy:form.pricingPolicy,lastEntry:form.lastEntry,avgCost:form.avgCost,
           barcode: form.barcode,
           imei: form.imei,
           attrs: initialAttrs,
@@ -377,7 +378,7 @@ export function StockPage() {
     const nextSku = form.sku ? `${form.sku}-${variations.length + 1}` : '';
     const newRow: StockVariationRow = {
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku: nextSku,
+      sku: nextSku,skuAuto:form.skuAuto,pricingPolicy:lastRow?.pricingPolicy??form.pricingPolicy,lastEntry:null,
       barcode: '',
       imei: '',
       attrs: newAttrs,
@@ -399,7 +400,7 @@ export function StockPage() {
       ...target,
       id: undefined,
       tempKey: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      sku: target.sku ? `${target.sku}-CP` : '',
+      sku:'',skuAuto:true,lastEntry:null,
       barcode: '',
       imei: '',
       attrs: { ...target.attrs },
@@ -503,6 +504,7 @@ export function StockPage() {
         id: sib.id,
         tempKey: sib.id,
         sku: sib.sku,
+        skuAuto:false,pricingPolicy:sib.pricingPolicy,lastEntry:sib.lastEntry,avgCost:sib.avgCost,
         barcode: sib.barcode || '',
         imei: sib.imei || '',
         attrs: {
@@ -537,6 +539,7 @@ export function StockPage() {
           id: item.id,
           tempKey: item.id || `var_${Date.now()}`,
           sku: item.sku,
+          skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,avgCost:item.avgCost,
           barcode: item.barcode || '',
           imei: item.imei || '',
           attrs: {
@@ -563,6 +566,7 @@ export function StockPage() {
       brand: item.brand ?? '',
       category: item.category ?? 'Geral',
       sku: item.sku,
+      skuAuto:false,pricingPolicy:item.pricingPolicy,lastEntry:item.lastEntry,
       barcode: item.barcode,
       imei: item.imei,
       color: item.color,
@@ -599,6 +603,11 @@ export function StockPage() {
     }
   }
 
+  function skuPreview(attrs:Record<string,string>,condition=form.condition){
+    return form.name.trim()?productSku({...form,brand:findBrand(brands,form.brand??'')?.name??form.brand,attrs,color:attrs[attrDefs.find(a=>a.name.toLowerCase()==='cor')?.id??'']??'',capacity:attrs[attrDefs.find(a=>a.name.toLowerCase()==='capacidade')?.id??'']??'',condition}):'';
+  }
+  function variationSku(row:StockVariationRow){return row.skuAuto===false?row.sku:skuPreview(row.attrs,row.condition);}
+
   async function submit() {
     if (readOnly || !form.name.trim()) return;
     setError('');
@@ -621,9 +630,9 @@ export function StockPage() {
             name: form.name.trim(),
             brand: form.brand?.trim() || '',
             category: form.category?.trim() || 'Geral',
-            sku:
-              row.sku.trim() ||
-              `${form.sku || 'SKU'}-${(corVal || 'VAR').slice(0, 3)}-${(capVal || Math.random().toString(36).slice(2, 6))}`.toUpperCase(),
+            sku: variationSku(row),
+            skuAuto: row.skuAuto!==false,
+            pricingPolicy:row.pricingPolicy??null,
             barcode: row.barcode.trim(),
             imei: row.imei.trim(),
             color: corVal,
@@ -634,14 +643,14 @@ export function StockPage() {
             minQty: Number(row.minQty) || 0,
             maxQty: form.maxQty ?? 10,
             cost: Number(row.cost) || 0,
-            avgCost: Number(row.cost) || form.avgCost || 0,
+            avgCost: row.avgCost??Number(row.cost),
             price: Number(row.price) || 0,
             cardRate:
               row.cardRate !== undefined && !Number.isNaN(row.cardRate)
                 ? Number(row.cardRate)
                 : form.cardRate,
             lastPurchaseCost: Number(row.cost) || form.lastPurchaseCost || 0,
-            lastPurchaseAt: form.lastPurchaseAt || new Date().toISOString(),
+            lastPurchaseAt: row.lastEntry?.enteredAt??'',
             kind: form.kind,
             condition: row.condition || form.condition,
             unit: form.unit,
@@ -674,6 +683,7 @@ export function StockPage() {
         const payload = {
           ...form,
           name: form.name.trim(),
+          sku:form.skuAuto?skuPreview(form.attrs):form.sku,
           brand: form.brand?.trim() || '',
           category: form.category?.trim() || 'Geral',
           images: form.images.slice(0, 4),
@@ -681,7 +691,7 @@ export function StockPage() {
           capacity: form.attrs[capId] ?? form.capacity,
           avgCost: form.avgCost || form.cost,
           lastPurchaseCost: form.lastPurchaseCost || form.cost,
-          lastPurchaseAt: form.lastPurchaseAt || (form.cost > 0 ? new Date().toISOString() : ''),
+          lastPurchaseAt: form.lastEntry?.enteredAt??'',
         };
         const prev = mode === 'edit' && selectedId ? items.find((item) => item.id === selectedId) : null;
         const state = await upsertStockItem(
@@ -737,7 +747,7 @@ export function StockPage() {
     setFormVisible(true);
     setForm({
       name: `${item.name} (cópia)`,
-      sku: item.sku ? `${item.sku}-COPIA` : '',
+      sku: '',skuAuto:true,pricingPolicy:item.pricingPolicy,lastEntry:null,
       barcode: '',
       imei: '',
       color: item.color,
@@ -1207,7 +1217,7 @@ export function StockPage() {
               {device && <div className="device-reference">
                 <strong>{device.model}</strong>
                 <p>As combinações de cor e capacidade estão na grade abaixo. Exclua as que não vende e informe preço e estoque antes de salvar.</p>
-                <a href={device.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a>
+                <a href={device.sourceUrl} target="_blank" rel="noreferrer">Fonte das especificações</a>{device.stale&&<p className="empty">Dados salvos anteriormente; a API está indisponível para atualizar.</p>}
               </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
                 <label className="span-2">
@@ -1227,8 +1237,8 @@ export function StockPage() {
                 <label>
                   SKU
                   <input
-                    value={form.sku}
-                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    value={form.skuAuto?skuPreview(form.attrs):form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value,skuAuto:false })}
                     disabled={readOnly}
                   />
                 </label>
@@ -1306,6 +1316,8 @@ export function StockPage() {
           </article>
 
 
+          <p><Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link></p>
+          <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>{setForm(current=>({...current,skuAuto:e.target.checked}));setVariations(current=>current.map(row=>({...row,skuAuto:e.target.checked})));}}/> Gerar SKU automaticamente com os dados do produto</label>
           {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
           <p><Link to="/erp/tipos-retirada">Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
@@ -1406,18 +1418,21 @@ export function StockPage() {
                       })}
                       <th>Tipo de retirada</th>
                       <th>SKU</th>
+                      <th>Custo unitário</th>
                       <th>Preço à vista</th>
                       <th>Parcelado (18x)</th>
                       <th>Qtd</th>
                       <th>Mín</th>
-                      <th>Custo</th>
+                      <th>Margem / markup</th>
+                      <th>Sugestão de venda</th>
+                      <th>Última entrada / nota</th>
                       {!readOnly ? <th className="col-actions">Ações</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 7} className="empty">
+                        <td colSpan={selectedAttrIds.length + 10 + (readOnly ? 0 : 1)} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
@@ -1469,15 +1484,17 @@ export function StockPage() {
                             <td>
                               <input
                                 type="text"
-                                value={row.sku}
+                                value={variationSku(row)}
                                 disabled={readOnly}
                                 placeholder="SKU"
                                 style={{ width: 110 }}
-                                onChange={(e) => updateVariationRow(index, 'sku', e.target.value)}
+                                onChange={e=>setVariations(current=>current.map((r,i)=>i===index?{...r,sku:e.target.value,skuAuto:false}:r))}
                               />
                             </td>
+                            <td><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
                             <td>
                               <input
+                                aria-label="Preço de venda da variação"
                                 type="number"
                                 min={0}
                                 step="0.01"
@@ -1521,19 +1538,9 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={row.cost}
-                                disabled={readOnly}
-                                style={{ width: 85 }}
-                                onChange={(e) =>
-                                  updateVariationRow(index, 'cost', Number(e.target.value))
-                                }
-                              />
-                            </td>
+                            <td><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
+                            <td><ProductPriceSuggestion cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
                               <td className="col-actions">
                                 <div style={{ display: 'flex', gap: 4 }}>
@@ -1651,9 +1658,9 @@ export function StockPage() {
               <article className="admin-card stock-form-card">
                 <h3>Preços e custos</h3>
                 <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-                  {!lite ? (
+
                     <label>
-                      Custo (última compra)
+                      Custo unitário de referência
                       <input
                         type="number"
                         value={form.cost}
@@ -1669,8 +1676,8 @@ export function StockPage() {
                         }}
                       />
                     </label>
-                  ) : null}
-                  {!lite ? (
+
+
                     <label>
                       Custo médio
                       <input
@@ -1680,7 +1687,7 @@ export function StockPage() {
                         onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
                       />
                     </label>
-                  ) : null}
+
                   <label>
                     Preço base
                     <input
@@ -1690,41 +1697,7 @@ export function StockPage() {
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>
-                  {!lite && !readOnly ? (
-                    <div className="span-2">
-                      <label>
-                        Acréscimo sobre o custo da última compra (%)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Informe o percentual acordado"
-                          value={costMarkup}
-                          onChange={(e) => setCostMarkup(e.target.value)}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        disabled={costMarkup.trim() === '' || !Number.isFinite(Number(costMarkup))
-                          || Number(costMarkup) < 0 || !Number.isFinite(form.cost) || form.cost <= 0
-                          || !Number.isFinite(form.cost * (1 + Number(costMarkup) / 100) * 100)}
-                        onClick={() => setForm((current) => ({
-                          ...current,
-                          price: applyPriceTable(current.cost, {
-                            id: 'cost-preview', name: 'Cálculo interno', active: true,
-                            percent: Number(costMarkup),
-                          }),
-                        }))}
-                      >
-                        Calcular preço base pelo custo
-                      </button>
-                      <p className="empty">
-                        Cálculo interno: custo + acréscimo. Use 0% para vender pelo custo.
-                        O botão preenche o preço base; confira o valor e salve o cadastro.
-                      </p>
-                    </div>
-                  ) : null}
+                  <div className="span-2"><ProductPriceSuggestion cost={form.cost} policy={form.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setForm(current=>({...current,pricingPolicy}))} onApply={price=>setForm(current=>({...current,price}))}/></div>
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
                       <strong>Simulação Totem (18×):</strong> {formatInstallment(form.price, 18)}{' '}
@@ -1738,24 +1711,8 @@ export function StockPage() {
                       </span>
                     </p>
                   ) : null}
-                  {!lite ? (
-                    <p className="empty span-2">
-                      Markup{' '}
-                      {form.avgCost || form.cost
-                        ? `${(((form.price - (form.avgCost || form.cost)) / (form.avgCost || form.cost)) * 100).toFixed(1)}%`
-                        : '—'}{' '}
-                      · margem{' '}
-                      {form.price
-                        ? `${(((form.price - (form.avgCost || form.cost)) / form.price) * 100).toFixed(1)}%`
-                        : '—'}{' '}
-                      ·{' '}
-                      <Link to="/erp/balanco">balanço</Link>
-                      {' · '}
-                      <Link to="/erp/movimentos">movimentos</Link>
-                      {' · '}
-                      <Link to="/erp/tabelas">tipos de preço</Link>
-                    </p>
-                  ) : null}
+                  <div className="span-2"><ProductPriceMetrics cost={form.cost} price={form.price}/></div>
+                  <div className="span-2"><h4>Última entrada de estoque</h4><LastStockEntry entry={form.lastEntry}/></div>
                 </div>
               </article>
             </>
@@ -1838,6 +1795,7 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     brand: '',
     category: 'Geral',
     sku: '',
+    skuAuto:true,pricingPolicy:null,lastEntry:null,
     barcode: '',
     imei: '',
     color: '',

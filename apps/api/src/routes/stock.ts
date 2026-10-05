@@ -1,3 +1,5 @@
+import {productSku} from '../services/productSku.js';
+import {stockDetails} from '../services/stockDetails.js';
 import { validatePickupPrices } from '../services/pickup.js';
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
@@ -13,14 +15,17 @@ const stockItemSchema = z.object({
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
-  sku: z.string().default(''),
+  sku: z.string().max(200).default(''),
+  skuAuto: z.boolean().optional(),
+  avgCost: z.coerce.number().finite().nonnegative().optional(),
+  pricingPolicy: z.object({basis:z.enum(['markup','margin']),percent:z.number().finite().nonnegative()}).refine(p=>p.basis!=='margin'||p.percent<100,'A margem deve ser menor que 100%.').nullable().optional(),
   barcode: z.string().default(''),
   imei: z.string().default(''),
   unit: z.string().default('UN'),
   qty: z.coerce.number().default(0),
   minQty: z.coerce.number().default(0),
-  cost: z.coerce.number().default(0),
-  price: z.coerce.number().default(0),
+  cost: z.coerce.number().finite().nonnegative().default(0),
+  price: z.coerce.number().finite().nonnegative().default(0),
   kind: z.enum(['part', 'device', 'supply', 'product', 'service']).default('part').transform(val => (val === 'product' || val === 'service') ? 'part' : val),
   condition: z.enum(['new', 'used', 'refurbished']).default('new'),
   category: z.string().default('Geral'),
@@ -62,6 +67,11 @@ export function formatStockRow(row: any) {
     qty: Number(row.qty) || 0,
     minQty: Number(row.min_qty ?? row.minQty) || 0,
     cost: Number(row.cost) || 0,
+    avgCost: Number(row.avg_cost ?? row.avgCost ?? row.cost) || 0,
+    pricingPolicy: row.pricing_policy ?? row.pricingPolicy ?? {},
+    lastEntry: row.last_entry ?? row.lastEntry ?? null,
+    lastPurchaseAt: row.last_entry?.enteredAt ?? '',
+    lastPurchaseCost: Number(row.last_entry?.unitCost ?? 0),
     price: Number(row.price) || 0,
     kind: row.kind,
     condition: row.condition,
@@ -136,7 +146,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         `;
 
         const result = await pool.query(sql, values);
-        res.json({ success: true, data: result.rows.map(formatStockRow) });
+        res.json({ success: true, data: (await stockDetails(pool,storeId,result.rows)).map(formatStockRow) });
         return;
       } catch (dbErr) {
         throw dbErr;
@@ -188,7 +198,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
           res.json({ success: true, data: null });
           return;
         }
-        res.json({ success: true, data: formatStockRow(resQuery.rows[0]) });
+        res.json({ success: true, data: formatStockRow((await stockDetails(pool,storeId,resQuery.rows))[0]) });
         return;
       } catch (dbErr) {
         throw dbErr;
@@ -224,6 +234,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
       if (client) {
         try {
           await client.query('BEGIN');
+          body.sku=await allocateSku(client,storeId,body,id);
 
           await client.query(
             `INSERT INTO stock_items (
@@ -260,6 +271,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             ],
           );
 
+          await client.query('UPDATE stock_items SET avg_cost=$3,pricing_policy=$4 WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost??body.cost,JSON.stringify(body.pricingPolicy??{})]);
           await validatePickupPrices(client,storeId,body.pickupPrices);
           await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);
           // Se qty inicial > 0, registra kardex
@@ -276,11 +288,10 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           await client.query('COMMIT');
 
           const createdRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-          res.status(201).json({ success: true, data: formatStockRow(createdRes.rows[0]) });
+          res.status(201).json({ success: true, data: formatStockRow((await stockDetails(pool,storeId,createdRes.rows))[0]) });
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          throw err;
           throw err;
         } finally {
           client.release();
@@ -332,6 +343,8 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           }
 
           const curr = currentRes.rows[0];
+          if(body.skuAuto||body.sku!==undefined&&body.sku!==curr.sku)body.sku=await allocateSku(client,storeId,{...curr,...body},id);
+          if(body.avgCost!==undefined||body.pricingPolicy!==undefined)await client.query('UPDATE stock_items SET avg_cost=COALESCE($3,avg_cost),pricing_policy=COALESCE($4,pricing_policy) WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost,body.pricingPolicy!==undefined?JSON.stringify(body.pricingPolicy??{}):null]);
           const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
           const available=await unreservedQuantity(client,storeId,id,Number(curr.qty));
           const reserved=Number(curr.qty)-available;
@@ -414,11 +427,10 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           await client.query('COMMIT');
 
           const updatedRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-          res.json({ success: true, data: formatStockRow(updatedRes.rows[0]) });
+          res.json({ success: true, data: formatStockRow((await stockDetails(pool,storeId,updatedRes.rows))[0]) });
           return;
         } catch (err) {
           await client.query('ROLLBACK');
-          throw err;
           throw err;
         } finally {
           client.release();
@@ -530,3 +542,14 @@ stockRouter.post('/api/v1/stock/inventory-adjustments', requireAuth, async (req,
   } catch(error) { if (db) await db.query('ROLLBACK');next(error); }
   finally { db?.release(); }
 });
+
+async function allocateSku(db:PoolClient,storeId:string,body:any,id:string){
+ await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['sku:'+storeId]);
+ const automatic=body.skuAuto===true||!body.sku?.trim();
+ const base=automatic?productSku(body):body.sku.trim();
+ const existing=await db.query('SELECT sku FROM stock_items WHERE store_id=$1 AND id<>$2 AND (sku=$3 OR sku LIKE $4)',[storeId,id,base,base+'-%']);
+ const used=new Set(existing.rows.map(r=>r.sku));
+ if(!automatic&&used.has(base))throw Object.assign(new Error('Este SKU já pertence a outro produto da loja.'),{status:409});
+ let candidate=base;let n=2;while(used.has(candidate))candidate=base+'-'+n++;
+ return candidate;
+}

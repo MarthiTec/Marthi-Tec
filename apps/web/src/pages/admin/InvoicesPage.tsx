@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAdminState } from '../../data/adminStore';
@@ -55,9 +55,11 @@ function money(value: number) {
 
 export function InvoicesPage() {
   const { user } = useAuth();
+  const [searchParams]=useSearchParams();
   const [kindFilter, setKindFilter] = useState<'all' | InvoiceKind>('all');
   const [invoices, setInvoices] = useState(() => listInvoices());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('nota'));
+  useEffect(()=>{setSelectedId(searchParams.get('nota'));},[searchParams]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [stockId, setStockId] = useState('');

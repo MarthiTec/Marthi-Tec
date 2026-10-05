@@ -6603,3 +6603,14 @@ select.caixa-mov-input {
 .pickup-fields { display:flex; flex-wrap:wrap; gap:12px; width:100%; color:var(--ink); } .pickup-fields > .admin-picker {flex:1 1 180px;} .pickup-fields input { background:var(--card);color:var(--ink);border:1px solid var(--line);padding:10px;max-width:100%;box-sizing:border-box; } .is-theme-dark .pickup-fields,.admin--dark .pickup-fields{color:var(--ink);} @media(max-width:768px){.pickup-fields .admin-form{width:100%;}}
 
 .stock-id-content { display:grid; gap:12px; min-width:0; width:100%; } .stock-id-content .stock-automation-toggle { margin:0; } .stock-brand-field {display:grid;gap:6px;min-width:0;} .stock-brand-field .empty {margin:0;line-height:1.5;} .stock-id-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;} .stock-id-fields .span-2 {grid-column:1 / -1;} @media(max-width:720px){.stock-id-layout{justify-items:stretch;}.stock-id-fields{grid-template-columns:minmax(0,1fr);}.stock-photo-picker{width:100%;align-items:flex-start;justify-items:start;}.stock-id-content .stock-automation-toggle{display:flex;align-items:flex-start;gap:8px;}.stock-id-content .stock-automation-toggle input{flex-shrink:0;margin-top:3px;}.stock-id-fields .span-2{grid-column:auto;}}
+
+.stock-sku-automation {display:flex;align-items:center;gap:8px;margin:16px 0;color:var(--ink);}
+.product-price-metrics,.product-price-suggestion,.product-last-entry {display:grid;gap:8px;min-width:180px;color:var(--ink);}
+.product-price-suggestion {min-width:230px;}
+.product-price-suggestion input {width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px;border-radius:8px;}
+.product-last-entry a {color:var(--accent);}
+.is-theme-dark .product-price-suggestion input {background:var(--card);color:var(--ink);border-color:var(--line);}
+@media(max-width:720px){.product-price-metrics,.product-price-suggestion,.product-last-entry{min-width:0;}.product-price-suggestion{width:100%;}.product-price-suggestion button{width:100%;}}
+
+.admin-form .device-catalog-toggle {display:flex;align-items:center;gap:8px;}
+.admin-form .device-catalog-toggle input[type="checkbox"] {width:16px;height:16px;min-height:16px;padding:0;flex:0 0 16px;accent-color:var(--accent);}

@@ -1,3 +1,4 @@
+import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
 import {PickupMethodsPage} from './pages/admin/PickupMethodsPage';
 import {PickupTrackingPage} from './pages/PickupTrackingPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -195,6 +196,8 @@ export function App() {
           <Route path="produtos" element={<StockPage />} />
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
+          <Route path="notas" element={<InvoicesPage />} />
+          <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
           <Route path="tipos-retirada" element={<PickupMethodsPage />} />
           <Route path="atributos" element={<AttributesPage />} />
           <Route path="marcas" element={<BrandsPage />} />

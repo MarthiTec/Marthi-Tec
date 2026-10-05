@@ -1,3 +1,4 @@
+import type {PricingPolicy} from './productPricing';
 import {storeScopedKey} from './storeCache';
 import { ATTR_CAP, ATTR_COR } from './attributeStore';
 import {
@@ -46,6 +47,9 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 export type StockUnit = 'UN' | 'KG';
 
 export type StockItem = {
+  skuAuto?:boolean;
+  pricingPolicy?:PricingPolicy|null;
+  lastEntry?:{movementId:string;enteredAt:string;origin:string;qty:number;unitCost:number;notes:string;invoice:{id:string;number:string;series:string;issuedAt:string;movementAt?:string;status:string}|null}|null;
   pickupPrices?: Record<string,number|null>;
   id: string;
   name: string;
@@ -546,6 +550,9 @@ function apiErrorMessage(error: unknown, fallback: string) {
 function toNestStockBody(item: StockItem) {
   return {
     pickupPrices: item.pickupPrices ?? {},
+    skuAuto: item.skuAuto,
+    avgCost: item.avgCost,
+    pricingPolicy: item.pricingPolicy?.basis ? item.pricingPolicy : null,
     name: item.name,
     brand: item.brand || undefined,
     category: item.category || undefined,
