@@ -25,7 +25,7 @@ export async function confirmExistingClientPayment(input: {
     if (!store) throw Object.assign(new Error('Cliente sem loja cadastrada. Complete o cadastro antes de liberar o acesso.'), { status: 409 });
     const licenses = await db.query('SELECT * FROM store_licenses WHERE store_id=$1 AND client_account_id=$2 FOR UPDATE', [store.id, account.id]);
     const license = licenses.rows[0];
-    if (!license) throw Object.assign(new Error('Cliente sem licença cadastrada. Configure o plano antes de liberar o acesso.'), { status: 409 });
+    if (!license) throw Object.assign(new Error('Loja sem licença cadastrada. Ative ou defina a licença antes de liberar o acesso.'), { status: 409 });
     const users = await db.query('SELECT * FROM users WHERE lower(email)=lower($1) FOR UPDATE', [account.email]);
     let owner = users.rows[0];
     if (owner && owner.client_account_id !== account.id) throw Object.assign(new Error('O e-mail do responsável pertence a outra conta.'), { status: 409 });
@@ -54,11 +54,20 @@ export async function confirmExistingClientPayment(input: {
     await db.query('UPDATE stores SET active=true,updated_at=now() WHERE id=$1', [store.id]);
     await db.query("UPDATE store_licenses SET status='active',updated_at=now() WHERE id=$1", [license.id]);
     const event = JSON.stringify([{ status, timestamp: new Date().toISOString(), detail: `Pagamento confirmado manualmente por ${input.actorId}` }]);
-    await db.query(`UPDATE partner_signups SET status=$1,payment_confirmed_at=now(),payment_method=$2,transaction_ref=$3,
-      audit_trail=COALESCE(audit_trail,'[]'::jsonb)||$4::jsonb,updated_at=now()
-      WHERE id=$5 OR (document=$6 AND $6<>'')`, [status,input.paymentMethod,input.transactionRef || null,event,account.id,account.document]);
+    try {
+      await db.query(`UPDATE partner_signups SET status=$1,payment_confirmed_at=now(),payment_method=$2,transaction_ref=$3,
+        audit_trail=COALESCE(audit_trail,'[]'::jsonb)||$4::jsonb,updated_at=now()
+        WHERE id=$5 OR (document=$6 AND $6<>'')`, [status,input.paymentMethod,input.transactionRef || null,event,account.id,account.document]);
+    } catch {
+      try {
+        await db.query(`UPDATE partner_signups SET payment_confirmed_at=now(),payment_method=$1,transaction_ref=$2,updated_at=now()
+          WHERE id=$3 OR (document=$4 AND $4<>'')`, [input.paymentMethod,input.transactionRef || null,account.id,account.document]);
+      } catch {
+        // safe fallback if partner_signups is missing or restricted
+      }
+    }
     await db.query(`INSERT INTO client_payment_confirmations(client_account_id,store_id,payment_method,transaction_ref,notes,confirmed_by,contracting_status)
-      VALUES($1,$2,$3,$4,$5,$6,$7)`, [account.id,store.id,input.paymentMethod,input.transactionRef || null,input.notes || '',input.actorId,status]);
+      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (client_account_id) DO UPDATE SET contracting_status=EXCLUDED.contracting_status, confirmed_at=now()`, [account.id,store.id,input.paymentMethod,input.transactionRef || null,input.notes || '',input.actorId,status]);
     await db.query('COMMIT');
     return { account, alreadyProcessed: false, status, rawToken, monthlyAmount: Number(license.final_price), planId: license.plan_id };
   } catch (error) {

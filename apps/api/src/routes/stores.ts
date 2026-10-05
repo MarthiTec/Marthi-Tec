@@ -609,7 +609,13 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
               email: row.email,
               phone: row.phone || '',
               planId: row.plan_id || 'golden',
-              modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules || [],
+              modules: Array.isArray(row.modules)
+                ? row.modules
+                : typeof row.modules === 'string' && row.modules.trim().startsWith('{')
+                  ? row.modules.trim().slice(1, -1).split(',').map((s: string) => s.replace(/^"|"$/g, '').trim()).filter(Boolean)
+                  : typeof row.modules === 'string'
+                    ? (() => { try { return JSON.parse(row.modules); } catch { return []; } })()
+                    : [],
               status: 'active',
               contractingStatus,
               paymentOk: isPaymentOk,
