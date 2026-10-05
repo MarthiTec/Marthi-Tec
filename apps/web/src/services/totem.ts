@@ -7,6 +7,7 @@ import { getTotemSettings } from '../data/totemSettings';
 import { apiSubmitTotemLead } from './erpApi';
 
 export type TotemLeadRequest = {
+  destination?:'cashier'|'whatsapp';
   stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
@@ -29,11 +30,16 @@ export type TotemLeadRequest = {
 
 function shouldSendToKitchen() {
   const settings = getTotemSettings();
-  return settings.vertical === 'food' || settings.printTicket || settings.offerFulfillment;
+  return settings.vertical === 'food';
 }
 
+const pendingRequests=new Map<string,string>();
 export async function submitTotemLead(payload: TotemLeadRequest) {
+  const signature=JSON.stringify(payload);
+  const requestKey=pendingRequests.get(signature)??crypto.randomUUID();
+  pendingRequests.set(signature,requestKey);
   const result = await apiSubmitTotemLead({
+    requestKey,destination:payload.destination,
     stockId:payload.stockId,pickupMethodId:payload.pickupMethodId,deliveryAddress:payload.deliveryAddress,
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
@@ -46,6 +52,7 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     installment: payload.installment,
     priceLabel: payload.priceLabel,
   });
+  pendingRequests.delete(signature);
   const ticketId = result.id;
   const customerNotified = Boolean(result.customerNotified);
   enqueueTotemLead({
@@ -78,5 +85,5 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     }
   }
 
-  return { ticketId, customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice };
+  return { ticketId, notificationWarning:result.notificationWarning,customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice };
 }

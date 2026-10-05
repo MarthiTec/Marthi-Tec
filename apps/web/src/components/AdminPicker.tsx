@@ -226,7 +226,7 @@ export function AdminPicker({
       {open && (floating ? createPortal(
         <div className={`admin-picker admin-picker--floating ${floating.dark?'is-theme-dark':''}`} style={floating.style}>
           {dropdown}
-        </div>, document.body
+        </div>, rootRef.current?.closest('dialog') ?? document.body
       ) : dropdown)}
     </div>
   );

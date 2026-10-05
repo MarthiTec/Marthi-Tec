@@ -1,3 +1,6 @@
+import { apiListPriceTables } from '../../services/erpApi';
+import { replaceAdminState } from '../../data/adminStore';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminPicker } from '../../components/AdminPicker';
@@ -98,10 +101,14 @@ export function PriceTablesPage() {
 
     }
 
+    let active=true;
+    const reload=()=>{setItems([]);setFormVisible(false);setSelectedId(null);void apiListPriceTables().then(rows=>{if(active){replaceAdminState({...getAdminState(),priceTables:rows});setItems(rows);}}).catch(e=>{if(active)setError(e instanceof Error ? e.message : 'Não foi possível consultar as tabelas.');});};
+    reload();window.addEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);
     for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
 
     return () => {
 
+      active=false;window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);
       for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
 
     };

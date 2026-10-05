@@ -1,9 +1,11 @@
+import {submitTotemLead as sendTotemWhatsApp} from '../services/evolutionWhatsApp.js';
+import {validateSaleAttributes} from '../services/saleAttributes.js';
 import {pickupSelection,resolvePickup,recordPickup} from '../services/pickup.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
-import { formatStockRow, memoryStock } from './stock.js';
+import { formatStockRow } from './stock.js';
 
 export const totemRouter = Router();
 
@@ -30,12 +32,8 @@ const defaultTotemSettings = {
   storeWhatsApp: '',
   notifyCustomerOnLead: false,
   locationLabel: 'Loja Principal',
-  cardFeePercent: 12.0,
+  cardFeePercent: 0,
 };
-
-const memoryTotemSettingsByStore = new Map<string, any>([
-  ['STR-DEMO-01', { ...defaultTotemSettings, storeName: 'Loja Demonstração Marthi' }],
-]);
 
 const totemSettingsSchema = z.object({
   mode: z.enum(['kiosk', 'catalog']).default('kiosk'),
@@ -64,11 +62,13 @@ const totemSettingsSchema = z.object({
 });
 
 const leadSchema = z.object({
-  ...pickupSelection,
-  stockId:z.string().optional(),
-  payment:z.string().default('À vista'),installment:z.string().nullable().optional(),priceLabel:z.string().optional(),
-  customerName: z.string().default('Cliente Totem'),
-  customerPhone: z.string().default(''),
+  pickupMethodId:pickupSelection.pickupMethodId,deliveryAddress:pickupSelection.deliveryAddress,
+  requestKey:z.string().min(8).max(100).optional(),
+  destination:z.enum(['cashier','whatsapp']).default('cashier'),
+  stockId:z.string().min(1),
+  payment:z.enum(['À vista','Parcelado']).default('À vista'),installment:z.string().nullable().optional(),priceLabel:z.string().optional(),
+  customerName: z.string().trim().min(1).max(100),
+  customerPhone: z.string().max(30).default(''),
   productName: z.string().default('Produto'),
   attributes: z.array(z.object({ id: z.string(), name: z.string(), value: z.string() })).optional(),
   color: z.string().optional().default(''),
@@ -112,8 +112,7 @@ async function getStoreTotemSettings(storeId: string) {
     }
   }
 
-  const memory = memoryTotemSettingsByStore.get(storeId) || memoryTotemSettingsByStore.get('STR-DEMO-01');
-  return { ...defaultTotemSettings, ...(memory || {}) };
+  throw Object.assign(new Error('Loja indisponível.'),{status:404});
 }
 
 async function handleGetSettings(req: Request, res: Response, next: NextFunction) {
@@ -143,22 +142,12 @@ async function handleSaveSettings(req: Request, res: Response, next: NextFunctio
       exitPassword: nextExitPassword,
     };
 
-    if (pool) {
-      try {
-        await pool.query(
-          `UPDATE stores 
-           SET totem_exit_password = $1,
-               totem_settings = $2::jsonb,
-               updated_at = now()
-           WHERE id = $3`,
-          [nextExitPassword, JSON.stringify(merged), storeId],
-        );
-      } catch (err) {
-        console.error('[totem] Erro ao gravar totem_settings no Postgres:', err);
-      }
-    }
-
-    memoryTotemSettingsByStore.set(storeId, merged);
+    const saved=await pool.query(
+      `UPDATE stores SET totem_exit_password=$1,totem_settings=$2::jsonb,updated_at=now()
+       WHERE id=$3 AND active=true RETURNING id`,
+      [nextExitPassword,JSON.stringify(merged),storeId],
+    );
+    if(!saved.rows.length)throw Object.assign(new Error('Loja indisponível.'),{status:404});
     res.json({ success: true, data: merged });
   } catch (error) {
     next(error);
@@ -189,10 +178,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
       }
     }
 
-    const items = Array.from(memoryStock.values())
-      .filter((i) => i.storeId === storeId && i.active !== false && i.showOnTotem !== false)
-      .map(formatStockRow);
-    res.json({ success: true, data: items });
+    throw Object.assign(new Error('Banco de dados indisponível.'),{status:503});
   } catch (error) {
     next(error);
   }
@@ -260,26 +246,60 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
     const ticketId = `TCK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const code = Math.floor(100 + Math.random() * 900);
 
-    const desc = `${body.productName} · ${body.color || ''} ${body.storage || ''} ${body.fulfillment || ''}`.trim();
+
 
     if (pool) {
       const client=await pool.connect();
       try{await client.query('BEGIN');
+      if(body.requestKey){
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[storeId+':totem:'+body.requestKey]);
+        const existing=(await client.query('SELECT * FROM pos_tickets WHERE store_id=$1 AND request_key=$2',[storeId,body.requestKey])).rows[0];
+        if(existing){await client.query('COMMIT');res.status(200).json({success:true,data:{...existing.configuration,notificationWarning:existing.configuration.whatsappStatus==='pending'?'Pedido registrado. O envio do WhatsApp ainda não foi confirmado; procure o atendente.':existing.configuration.notificationWarning,id:existing.id,code:existing.code,status:existing.status}});return;}
+      }
+      const serviceOptions=body.attributes?.filter(a=>a.id==='TOTEM-DINE')??[];
+      if(serviceOptions.length){const settings=await getStoreTotemSettings(storeId);if(settings.vertical!=='food'||serviceOptions.some(a=>!['Consumir no local','Retirada'].includes(a.value)))throw Object.assign(new Error('Opção de atendimento indisponível.'),{status:400});}
+      await validateSaleAttributes(client,storeId,[{stockId:body.stockId,attributes:body.attributes?.filter(a=>a.id!=='TOTEM-DINE')}],'totem');
+      if(body.stockId){const stock=(await client.query('SELECT name,color,capacity,card_rate FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true',[body.stockId,storeId])).rows[0];if(stock){body.productName=stock.name;body.color=stock.color||body.color;body.storage=stock.capacity||body.storage;(body as any).cardFeePercent=stock.card_rate===null||stock.card_rate===undefined?(await getStoreTotemSettings(storeId)).cardFeePercent:Number(stock.card_rate);}}
+
       let pickup:any;
       if(body.stockId){if(!(await client.query('SELECT id FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',[body.stockId,storeId])).rows.length)throw Object.assign(new Error('Produto não disponível no Totem.'),{status:404});if(!body.pickupMethodId)throw Object.assign(new Error('Escolha o tipo de retirada.'),{status:400});pickup=await resolvePickup(client,storeId,body.stockId,body.pickupMethodId,body.deliveryAddress);if(pickup.kind==='order'&&!body.customerPhone.trim())throw Object.assign(new Error('Informe o telefone para acompanhar a encomenda.'),{status:400});}
+      if(pickup) {
+        const money=(amount:number)=>amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+        if(body.payment==='Parcelado') {
+          const count=Number(String(body.installment??'').replace(/x$/i,''));
+          if(!Number.isInteger(count)||count<1||count>18) throw Object.assign(new Error('Parcelamento inválido.'),{status:400});
+          const total=pickup.unitPrice*(1+Math.max(0,Number((body as any).cardFeePercent)||0)/100);
+          body.priceLabel=count+'x · '+count+' X '+money(Math.round(total/count*100)/100);
+        } else {body.priceLabel=money(pickup.unitPrice);body.installment=null;}
+      }
       await client.query(
-        `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes)
-         VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6)`,
-        [ticketId, storeId, code, body.customerName, body.customerPhone, `${desc}\n${body.notes}`.trim()],
+        `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes, request_key)
+         VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7)`,
+        [ticketId, storeId, code, body.customerName, body.customerPhone, `${body.productName} · ${body.color || ''} ${body.storage || ''}\n${body.notes}`.trim(),body.requestKey??null],
       );
       if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
-      await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice}),storeId]);
+      await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice,whatsappStatus:body.destination==='whatsapp'?'pending':'not_requested'}),storeId]);
       await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
     }
 
+    let customerNotified=false;
+    let whatsappStatus=body.destination==='whatsapp'?'pending':'not_requested';
+    let notificationWarning:string|undefined;
+    if(body.destination==='whatsapp'){
+      try {
+        const settings=await getStoreTotemSettings(storeId);
+        const result=await sendTotemWhatsApp({...body,storeId,installment:body.installment??null,priceLabel:body.priceLabel||'',locationLabel:settings.locationLabel});
+        customerNotified=result.customerNotified;whatsappStatus='accepted';
+      } catch {
+        whatsappStatus='unconfirmed';
+        notificationWarning='Pedido registrado na fila do caixa. O WhatsApp não confirmou o envio; procure o atendente.';
+      }
+      await pool.query(`UPDATE pos_tickets SET configuration=configuration || $2::jsonb WHERE id=$1 AND store_id=$3`,[ticketId,JSON.stringify({customerNotified,whatsappStatus,notificationWarning}),storeId]);
+    }
     res.status(201).json({
       success: true,
       data: {
+        customerNotified,whatsappStatus,notificationWarning,
         trackingToken:(body as any).trackingToken,
         quotedPrice:(body as any).quotedPrice,
         id: ticketId,
@@ -287,6 +307,7 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
         customerName: body.customerName,
         customerPhone: body.customerPhone,
         productName: body.productName,
+        priceLabel: body.priceLabel,
         status: 'open',
         source: 'totem',
       },

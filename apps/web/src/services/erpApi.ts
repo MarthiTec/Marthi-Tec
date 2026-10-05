@@ -620,6 +620,7 @@ export function apiGetTotemPublicAttributes() {
 }
 
 export function apiSubmitTotemLead(body: {
+  requestKey?:string;destination?:'cashier'|'whatsapp';
   stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   customerName: string;
   customerPhone: string;
@@ -632,7 +633,7 @@ export function apiSubmitTotemLead(body: {
   installment: string | null;
   priceLabel: string;
 }) {
-  return nestPost<{ id: string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number }>('/totem/leads', body);
+  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number }>('/totem/leads', body);
 }
 
 export function apiListPosTickets(status?: ApiPosTicket['status']) {

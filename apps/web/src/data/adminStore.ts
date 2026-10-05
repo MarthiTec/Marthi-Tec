@@ -47,6 +47,7 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 export type StockUnit = 'UN' | 'KG';
 
 export type StockItem = {
+  active?: boolean;
   skuAuto?:boolean;
   pricingPolicy?:PricingPolicy|null;
   lastEntry?:{movementId:string;enteredAt:string;origin:string;qty:number;unitCost:number;notes:string;invoice:{id:string;number:string;series:string;issuedAt:string;movementAt?:string;status:string}|null}|null;
@@ -196,66 +197,8 @@ function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-function seedPriceTables(): PriceTable[] {
-  return [
-    { id: 'TAB-VISTA', name: 'Vista', percent: 0, active: true },
-    { id: 'TAB-ATACADO', name: 'Atacado', percent: -8, active: true },
-    { id: 'TAB-CARTAO', name: 'Cartão', percent: 5, active: true },
-  ];
-}
-
-function seedPayments(): PaymentMethod[] {
-  return [
-    {
-      id: 'PAY-DIN',
-      name: 'Dinheiro',
-      type: 'cash',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-PIX',
-      name: 'Pix',
-      type: 'pix',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-DEB',
-      name: 'Cartão de débito',
-      type: 'debit',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-CRE',
-      name: 'Cartão de crédito',
-      type: 'credit',
-      priceTableId: 'TAB-CARTAO',
-      maxInstallments: 12,
-      active: true,
-    },
-    {
-      id: 'PAY-VR',
-      name: 'Vale Refeição',
-      type: 'other',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-    {
-      id: 'PAY-VC',
-      name: 'Vale Crédito',
-      type: 'other',
-      priceTableId: 'TAB-VISTA',
-      maxInstallments: 1,
-      active: true,
-    },
-  ];
-}
+function seedPriceTables(): PriceTable[] { return []; }
+function seedPayments(): PaymentMethod[] { return []; }
 
 function seed(): AdminState {
   return {
@@ -369,8 +312,8 @@ function hydrate(parsed: Partial<AdminState>): AdminState {
       sellerName: order.sellerName ?? '',
     })),
     finance: (parsed.finance ?? base.finance).map(normalizeFinance),
-    priceTables: parsed.priceTables?.length ? parsed.priceTables : base.priceTables,
-    payments: parsed.payments?.length ? parsed.payments : base.payments,
+    priceTables: Array.isArray(parsed.priceTables) ? parsed.priceTables : [],
+    payments: Array.isArray(parsed.payments) ? parsed.payments : [],
   };
 }
 
@@ -876,6 +819,7 @@ export async function removeStockItem(id: string): Promise<AdminState> {
 }
 
 export async function removePriceTable(id: string): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeletePriceTable(id);
@@ -890,6 +834,7 @@ export async function removePriceTable(id: string): Promise<AdminState> {
 }
 
 export async function removePayment(id: string): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeletePayment(id);
@@ -967,6 +912,7 @@ export async function upsertStockItem(
 }
 
 export async function savePriceTables(items: PriceTable[]): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const current = load().priceTables;
@@ -998,6 +944,7 @@ export async function savePriceTables(items: PriceTable[]): Promise<AdminState> 
 }
 
 export async function savePayments(items: PaymentMethod[]): Promise<AdminState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const current = load().payments;

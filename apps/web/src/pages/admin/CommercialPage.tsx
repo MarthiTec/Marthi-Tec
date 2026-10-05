@@ -162,7 +162,7 @@ export function CommercialPage({
   const [storeId, setStoreId] = useState(getActiveStoreId);
   const [state, setState] = useState<CommercialState | null>(null),
     [profile, setProfile] = useState<CommercialProfile | null>(null);
-  const [tab, setTab] = useState("rules"),
+  const [tab, setTab] = useState(settingsOnly ? "rules" : "orders"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
@@ -332,19 +332,19 @@ export function CommercialPage({
   return (
     <div className="admin-page commercial-page">
       <article className="admin-card">
-        <h2>Comercial por ramo — {state.storeName}</h2>
+        <h2>Encomendas — {state.storeName}</h2>
         <p className="empty">
-          Regras opcionais desta loja. Ofertas de fornecedor não são saldo
-          físico. Encomendas só movimentam estoque no recebimento e na entrega.
+          Acompanhe pedidos, consulte ofertas e registre recebimentos.
         </p>
         {!settingsOnly ? (
           <div className="commercial-toolbar">
             {[
-              ["rules", "Regras"],
-              ["offers", "Fornecedores / ofertas"],
-              ["orders", "Encomendas / upgrades"],
+
+              ["offers", "Ofertas de fornecedores"],
+              ["orders", "Encomendas"],
               ["agenda", "Recebimentos"],
-              ["catalog", "Tabela WhatsApp"],
+              ["catalog", "Catálogo"],
+              ["rules", "Configurações"],
             ].map(([value, label]) => (
               <button
                 key={value}

@@ -1,3 +1,4 @@
+import {storeScopedKey} from './storeCache';
 import type {DeliveryAddress} from './pickup';
 import type { PickedAttribute } from './attributeStore';
 import { formatPicked } from './attributeStore';
@@ -35,7 +36,7 @@ function uid() {
 
 function load(): QueueTicket[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as QueueTicket[];
     return Array.isArray(parsed) ? parsed : [];
@@ -45,7 +46,7 @@ function load(): QueueTicket[] {
 }
 
 function save(items: QueueTicket[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 300)));
+  try { localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(items.slice(0, 300))); } catch { /* The database is authoritative; cache failure must not duplicate an order. */ }
   window.dispatchEvent(new Event(POS_QUEUE_EVENT));
 }
 

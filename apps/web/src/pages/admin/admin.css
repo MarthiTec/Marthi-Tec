@@ -6640,3 +6640,26 @@ select.caixa-mov-input {
 .stock-sku-automation input[type="checkbox"] {width:16px;height:16px;flex-shrink:0;accent-color:var(--accent);}
 
 @media(max-width:768px){.erp-app #panel-page-actions .page-heading-actions > .btn{min-height:44px !important;font-size:.84rem !important;padding:10px 12px !important;}}
+
+/* Pricing details stay in the dialog instead of stretching each variation row. */
+.product-price-summary {display:grid;gap:4px;text-align:left;border:0;background:transparent;color:var(--ink);font:inherit;padding:6px 0;cursor:pointer;min-width:150px;}
+.product-price-summary>span {font-weight:600;}
+.brands-page .admin-toolbar {display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+.brands-page .admin-toolbar > input {flex:1 1 220px;min-width:0;}
+.brands-page .admin-form {grid-template-columns:repeat(2,minmax(0,1fr));}
+.brands-page .admin-table-container {max-width:100%;overflow-x:auto;}
+@media(max-width:640px){.brands-page .admin-form{grid-template-columns:minmax(0,1fr);}.brands-page .admin-toolbar .btn{width:100%;}}
+.product-price-summary small {color:var(--mute);font-size:.75rem;}
+.product-price-summary .product-price-summary__action {color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
+.product-price-summary:focus-visible {outline:2px solid var(--accent);outline-offset:4px;border-radius:4px;}
+.product-price-summary:disabled {cursor:default;opacity:1;}
+.stock-variation-grid .product-price-metrics {min-width:145px;gap:4px;white-space:nowrap;font-size:.8rem;}
+.product-pricing-dialog {width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:18px;padding:24px;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.product-pricing-dialog::backdrop {background:rgba(10,14,20,.55);}
+.product-pricing-dialog .product-price-suggestion {min-width:0;gap:16px;}
+.product-pricing-dialog h2 {margin:0;font-size:1.15rem;}
+.product-pricing-dialog__item {margin:0;color:var(--mute);overflow-wrap:anywhere;}
+.product-pricing-dialog__values {display:flex;flex-wrap:wrap;gap:12px;}
+.product-pricing-dialog__actions {display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;}
+.is-theme-dark .product-pricing-dialog,.admin--dark .product-pricing-dialog {background:var(--card);color:var(--ink);border-color:var(--line);}
+@media(max-width:480px){.product-pricing-dialog{padding:18px;}.product-pricing-dialog__actions .btn{width:100%;min-height:44px;}}

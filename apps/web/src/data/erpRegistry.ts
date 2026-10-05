@@ -214,33 +214,9 @@ function load(): RegistryState {
     const suppliers = (Array.isArray(parsed.suppliers) ? parsed.suppliers : []).filter(
       (s) => !isMockEmail(s.email) && !isMockName(s.name),
     );
-    let employees = (Array.isArray(parsed.employees) ? parsed.employees : []).filter(
+    const employees = (Array.isArray(parsed.employees) ? parsed.employees : []).filter(
       (e) => !isMockEmail(e.email) && !isMockEmail(e.userEmail) && !isMockName(e.name),
     );
-
-    // Se o cliente for novo e não tiver funcionário admin ainda, adiciona automaticamente o responsável
-    if (activeTenant.startsWith('client_') && employees.length === 0) {
-      const clientId = activeTenant.slice('client_'.length);
-      const client = listMarthiClients().find((c) => c.clientId === clientId);
-      if (client) {
-        employees = [
-          {
-            id: uid('EMP'),
-            name: client.tradeName,
-            phone: client.phone || '',
-            email: client.email,
-            document: client.document || '',
-            role: 'admin',
-            isSystemUser: true,
-            userEmail: client.email,
-            accessAreas: [...ALL_ACCESS_AREAS],
-            active: true,
-            createdAt: now(),
-            updatedAt: now(),
-          },
-        ];
-      }
-    }
 
     const state: RegistryState = { sellers, suppliers, employees };
     memoryRegistryState = state;
@@ -373,6 +349,7 @@ export function getEmployee(id: string) {
 export async function upsertSeller(
   input: Omit<Seller, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const body = {
@@ -426,6 +403,7 @@ export async function upsertSeller(
 export async function upsertSupplier(
   input: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<RegistryState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       const body = {
@@ -478,6 +456,7 @@ export async function upsertSupplier(
 }
 
 export async function removeSeller(id: string): Promise<RegistryState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeleteSeller(id);
@@ -492,6 +471,7 @@ export async function removeSeller(id: string): Promise<RegistryState> {
 }
 
 export async function removeSupplier(id: string): Promise<RegistryState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeleteSupplier(id);
@@ -506,6 +486,7 @@ export async function removeSupplier(id: string): Promise<RegistryState> {
 }
 
 export async function removeEmployee(id: string): Promise<RegistryState> {
+  if(!isNestAuthed()) throw new Error('Entre na sua conta para gravar no banco.');
   if (isNestAuthed()) {
     try {
       await apiDeleteEmployee(id);

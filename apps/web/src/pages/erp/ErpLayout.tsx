@@ -37,7 +37,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/tabelas': { kicker: 'Produtos', title: 'Tabelas de preço' },
   '/erp/campanhas': { kicker: 'Produtos', title: 'Campanhas de desconto' },
   '/erp/orcamentos': { kicker: 'Comercial', title: 'Orçamentos e Propostas Comerciais' },
-  '/erp/comercial': { kicker: 'Comercial', title: 'Encomendas, fornecedores e upgrades' },
+  '/erp/comercial': { kicker: 'Comercial', title: 'Encomendas e fornecedores' },
   '/erp/clientes': { kicker: 'Pessoas', title: 'Clientes' },
   '/erp/funcionarios': { kicker: 'Pessoas', title: 'Funcionários' },
   '/erp/permissoes': { kicker: 'Pessoas', title: 'Permissões de acesso' },

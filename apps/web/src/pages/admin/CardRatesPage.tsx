@@ -1,3 +1,4 @@
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import './cardRatesPage.css';
 import {useStoreCustomization,saveStoreCustomization} from '../../data/storeSegment';
 import {commercialRequest} from '../../services/commercialApi';
@@ -36,18 +37,13 @@ export function CardRatesPage() {
   const [simGross, setSimGross] = useState<number>(1000);
   const [simParcels, setSimParcels] = useState<number>(12);
 
-  // Sincroniza e recarrega maquininhas
   useEffect(() => {
-    function onRatesChanged() {
-      setMachines(listCardMachines());
-    }
-    window.addEventListener(CARD_RATES_CHANGED_EVENT, onRatesChanged);
-    void hydrateCardMachinesFromApi().then((updated) => {
-      if (updated) setMachines(listCardMachines());
-    }).catch(err=>setError(err instanceof Error ? err.message : 'Falha ao consultar taxas.')).finally(()=>setLoaded(true));
-    return () => {
-      window.removeEventListener(CARD_RATES_CHANGED_EVENT, onRatesChanged);
-    };
+    let active=true;
+    const drafts=()=>listCardMachines().map(machine=>({...machine,brands:machine.brands.map(brand=>({...brand,installments:[...Array.from({length:18},(_,i)=>brand.installments.find(row=>row.installment===i+1) || {installment:i+1,rate:0}),...brand.installments.filter(row=>row.installment>18)]}))}));
+    const refresh=()=>{if(active)setMachines(drafts());};
+    const reload=()=>{setMachines([]);setLoaded(false);setError('');setSaveSuccess(false);void hydrateCardMachinesFromApi().then(refresh).catch(err=>{if(active)setError(err instanceof Error ? err.message : 'Falha ao consultar taxas.');}).finally(()=>{if(active)setLoaded(true);});};
+    reload();window.addEventListener(CARD_RATES_CHANGED_EVENT,refresh);window.addEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);
+    return()=>{active=false;window.removeEventListener(CARD_RATES_CHANGED_EVENT,refresh);window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT,reload);};
   }, []);
 
   const activeMachine = useMemo(() => {

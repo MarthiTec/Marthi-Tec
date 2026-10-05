@@ -24,6 +24,9 @@
 :is(.external-sale-page, .external-sale-modal) .admin-btn:disabled { opacity:.5; cursor:not-allowed; }
 :is(.external-sale-page, .external-sale-modal) .admin-badge { white-space:nowrap; flex-shrink:0; display:inline-flex; padding:6px 10px; border-radius:7px; background:rgba(15,118,110,.09); color:var(--ink); font-weight:600; }
 .external-sale-page h3 { letter-spacing:-.02em; }
+.external-sale-trade-fields .admin-label,
+.external-sale-trade-fields .admin-picker__caption { margin:0 0 7px; font-size:.82rem; font-weight:650; line-height:20px; color:var(--ink); }
+.external-sale-trade-fields .admin-picker__trigger { min-height:42px; height:42px; box-sizing:border-box; }
 .external-sale-page input[type=checkbox] { accent-color:#0f766e; width:17px; height:17px; }
 @media(max-width:640px) {
   .external-sale-line, .external-sale-trade-fields { grid-template-columns: minmax(0, 1fr); }

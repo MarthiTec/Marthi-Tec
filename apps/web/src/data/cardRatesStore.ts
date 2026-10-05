@@ -42,7 +42,7 @@ export const CARD_RATES_CHANGED_EVENT = 'marthi-card-rates-changed';
 /** Empty editable drafts: each store supplies its own negotiated rates. */
 export const DEFAULT_CARD_BRANDS: CardBrand[] = ['Mastercard','Visa','Elo','Hipercard','American Express'].map((name,index)=>({
   id:['master','visa','elo','hipercard','amex'][index],name,debitRate:0,active:true,
-  installments:Array.from({length:12},(_,i)=>({installment:i+1,rate:0})),
+  installments:Array.from({length:18},(_,i)=>({installment:i+1,rate:0})),
 }));
 export const DEFAULT_CARD_MACHINES: CardMachine[] = [{id:'',name:'',isDefaultTotem:false,defaultBrandId:'master',
  brands:DEFAULT_CARD_BRANDS,active:true,createdAt:'',updatedAt:''}];

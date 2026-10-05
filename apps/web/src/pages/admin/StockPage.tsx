@@ -1541,7 +1541,7 @@ export function StockPage() {
                               />
                             </td>
                             <td><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
-                            <td><ProductPriceSuggestion compact cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
+                            <td><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name,row.sku].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
                             <td><LastStockEntry entry={row.lastEntry}/></td>
                             {!readOnly ? (
                               <td className="col-actions">
@@ -1699,7 +1699,7 @@ export function StockPage() {
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>
-                  <div className="span-2"><ProductPriceSuggestion cost={form.cost} policy={form.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setForm(current=>({...current,pricingPolicy}))} onApply={price=>setForm(current=>({...current,price}))}/></div>
+                  <div className="span-2"><ProductPriceSuggestion price={form.price} itemLabel={form.name||'Produto'} cost={form.cost} policy={form.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setForm(current=>({...current,pricingPolicy}))} onApply={price=>setForm(current=>({...current,price}))}/></div>
                   {form.price > 0 ? (
                     <p className="empty span-2" style={{ marginTop: 2, marginBottom: 4 }}>
                       <strong>Simulação Totem (18×):</strong> {formatInstallment(form.price, 18)}{' '}

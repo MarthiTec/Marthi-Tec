@@ -521,9 +521,6 @@ export function TotemPage() {
   useEffect(() => {
     function applyCatalog(next: ReturnType<typeof listTotemCatalog>) {
       setCatalog((current) => {
-        if (next.length === 0 && current.length > 0) {
-          return current;
-        }
         return catalogFingerprint(current) === catalogFingerprint(next) ? current : next;
       });
     }
@@ -562,7 +559,7 @@ export function TotemPage() {
         /* cache local já aplicado */
       }
       applySettingsFromCache();
-      void loadTotemCatalog().then(applyCatalog);
+      void loadTotemCatalog().then(applyCatalog).catch(()=>{setCatalog([]);setCatalogError('Não foi possível carregar o estoque do servidor.');});
     }
 
     void refreshLive();
@@ -712,6 +709,7 @@ export function TotemPage() {
     setSearch((current) => current.slice(0, -1));
   }
 
+  const [notificationWarning,setNotificationWarning]=useState<string>();
   async function handleSubmitOrder(destination: 'cashier' | 'whatsapp') {
     if (!selection) return;
     if (!name.trim()) {
@@ -741,6 +739,7 @@ export function TotemPage() {
 
     try {
       const result = await submitTotemLead({
+        destination,
         stockId:selection.stockId,pickupMethodId:selection.pickupMethodId,deliveryAddress:selection.deliveryAddress,
         customerName: name.trim(),
         customerPhone: phone.trim(),
@@ -754,6 +753,7 @@ export function TotemPage() {
         cashPrice: selection.cashPrice,
         sentToCashier: isToCashier,
       });
+      setNotificationWarning(result.notificationWarning);
       setTrackingToken(result.trackingToken);
       setTicketId(result.ticketId);
       setSentToCashierDone(isToCashier);
@@ -1447,7 +1447,8 @@ export function TotemPage() {
 
       {step === 'done' && selection && (
         <section className="totem__done">
-          <h1>{sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
+          {notificationWarning&&<p role="status">{notificationWarning}</p>}
+          <h1>{notificationWarning?'Pedido registrado':sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
           {senha ? (
             <div className="totem__senha" aria-label={`Senha ${senha}`}>
               {senha}
@@ -1457,7 +1458,7 @@ export function TotemPage() {
             {name.trim() ? `Obrigado, ${name.trim()}!` : 'Obrigado!'}{' '}
             {sentToCashierDone
               ? 'Seu pedido foi encaminhado com sucesso para a fila do caixa.'
-              : copy.doneHint}
+              : notificationWarning?'O pedido está na fila do caixa para atendimento.':copy.doneHint}
           </p>
           <p>
             <strong>{selection.product.name}</strong>
