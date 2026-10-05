@@ -35,42 +35,7 @@ DO $$
 DECLARE
   v_test_stores TEXT[];
   tbl TEXT;
-  tbls TEXT[] := ARRAY[
-    'pickup_requests',
-    'pickup_methods',
-    'device_catalog_models',
-    'device_catalog_settings',
-    'stock_inventory_adjustments',
-    'client_payment_confirmations',
-    'commercial_order_contracts',
-    'commercial_order_quotes',
-    'commercial_orders',
-    'communication_deliveries',
-    'cash_session_events',
-    'product_allowed_values',
-    'product_attribute_values',
-    'product_attributes',
-    'stock_item_variations',
-    'stock_movements',
-    'stock_items',
-    'sales_order_lines',
-    'sale_payments',
-    'sales_orders',
-    'cash_sessions',
-    'store_brands',
-    'store_module_state',
-    'pos_tickets',
-    'pos_quotes',
-    'pos_terminals',
-    'work_orders',
-    'customers',
-    'suppliers',
-    'sellers',
-    'employees',
-    'user_stores',
-    'store_licenses',
-    'products'
-  ];
+  pass INT;
 BEGIN
   SELECT ARRAY_AGG(id) INTO v_test_stores
   FROM stores 
@@ -79,34 +44,52 @@ BEGIN
      OR id LIKE 'STR-PRT-%';
 
   IF v_test_stores IS NOT NULL AND array_length(v_test_stores, 1) > 0 THEN
-    -- Limpa valores de atributos antes de deletar product_attributes
-    IF to_regclass('product_attribute_values') IS NOT NULL AND EXISTS (
-      SELECT 1 FROM information_schema.columns WHERE table_name = 'product_attribute_values' AND column_name = 'attribute_id'
-    ) THEN
-      EXECUTE 'DELETE FROM product_attribute_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id = ANY($1))' USING v_test_stores;
-    END IF;
-
-    IF to_regclass('product_allowed_values') IS NOT NULL THEN
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_allowed_values' AND column_name = 'attribute_id') THEN
-        EXECUTE 'DELETE FROM product_allowed_values WHERE attribute_id IN (SELECT id FROM product_attributes WHERE store_id = ANY($1))' USING v_test_stores;
-      ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_allowed_values' AND column_name = 'product_id') THEN
-        EXECUTE 'DELETE FROM product_allowed_values WHERE product_id IN (SELECT id FROM products WHERE store_id = ANY($1))' USING v_test_stores;
-      END IF;
-    END IF;
-
-    FOREACH tbl IN ARRAY tbls LOOP
-      IF to_regclass(tbl) IS NOT NULL THEN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = tbl AND column_name = 'store_id'
-        ) THEN
+    -- Múltiplas passagens sobre qualquer tabela que contenha store_id no banco para resolver dependências de FK
+    FOR pass IN 1..5 LOOP
+      FOR tbl IN (
+        SELECT DISTINCT c.table_name
+        FROM information_schema.columns c
+        JOIN information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = 'public'
+        WHERE c.column_name = 'store_id'
+          AND c.table_name <> 'stores'
+          AND t.table_type = 'BASE TABLE'
+      ) LOOP
+        BEGIN
           EXECUTE format('DELETE FROM %I WHERE store_id = ANY($1)', tbl) USING v_test_stores;
-        END IF;
-      END IF;
+        EXCEPTION WHEN foreign_key_violation THEN
+          NULL;
+        END;
+      END LOOP;
     END LOOP;
 
+    -- Deleta as lojas de teste
     DELETE FROM stores WHERE id = ANY(v_test_stores);
   END IF;
+
+  -- Limpeza das contas de teste e dependências
+  FOR pass IN 1..4 LOOP
+    FOR tbl IN (
+      SELECT DISTINCT c.table_name
+      FROM information_schema.columns c
+      JOIN information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = 'public'
+      WHERE c.column_name = 'client_account_id'
+        AND c.table_name <> 'client_accounts'
+        AND t.table_type = 'BASE TABLE'
+    ) LOOP
+      BEGIN
+        EXECUTE format('DELETE FROM %I WHERE client_account_id IN (
+          SELECT id FROM client_accounts 
+          WHERE trade_name ILIKE ''%%AutoPeças Alpha%%'' 
+             OR trade_name ILIKE ''%%Padaria Beta%%'' 
+             OR email ILIKE ''%%@marthi.teste''
+             OR id LIKE ''PRT-MURB%%''
+             OR id LIKE ''PRT-MURC%%''
+        )', tbl);
+      EXCEPTION WHEN foreign_key_violation THEN
+        NULL;
+      END;
+    END LOOP;
+  END LOOP;
 
   IF to_regclass('client_accounts') IS NOT NULL THEN
     DELETE FROM client_accounts 
