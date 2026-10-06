@@ -20,7 +20,7 @@ export const TOTEM_BRANDS: { id: TotemBrand | 'all'; label: string }[] = [
 ];
 
 export const PAYMENT_OPTIONS = ['À vista', 'Parcelado'] as const;
-export const INSTALLMENTS = ['2x', '3x', '6x', '10x', '12x'] as const;
+export const INSTALLMENTS = ['2x', '3x', '6x', '10x', '12x', '15x', '18x'] as const;
 
 export function formatBRL(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

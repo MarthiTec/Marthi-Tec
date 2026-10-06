@@ -18,6 +18,12 @@ function namesMatch(left: string, right: string) {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
+export function totemCardFee(parcels:number) {
+  const settings=getTotemSettings();
+  const machine=getTotemCardRate(parcels);
+  return settings.cardInstallmentRates?.[parcels] ?? (machine?.brandId ? machine.rate : settings.cardFeePercent) ?? 0;
+}
+
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -26,12 +32,12 @@ function money(value: number) {
  * Formata o rótulo de parcelamento.
  * @param cardFeePercent Percentual de taxa de cartão a ser embutida no preço parcelado (ex.: 3.5 = 3,5%). Se omitido, usa a taxa da bandeira/maquininha padrão do Totem.
  */
-export function formatInstallment(price: number, parcels = 12, cardFeePercent?: number) {
+export function formatInstallment(price: number, parcels = 18, cardFeePercent?: number) {
   const count = Math.max(1, parcels);
   const fee =
     cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
       ? cardFeePercent
-      : (getTotemCardRate(count)?.rate ?? getTotemSettings().cardFeePercent ?? 0);
+      : totemCardFee(count);
   const feeMultiplier = 1 + Math.max(0, fee) / 100;
   const adjusted = price * feeMultiplier;
   const parcel = Math.round((adjusted / count) * 100) / 100;
@@ -142,14 +148,14 @@ export function quoteTotemVariant(
 
   // Prioridade: se o item em estoque tiver taxa específica definida (cardRate), usa ela. Senão usa o cardFeePercent fornecido ou padrão de totemSettings.
   const stockFee =
-    matched?.cardRate !== undefined && matched?.cardRate !== null && Number.isFinite(Number(matched.cardRate))
+    matched?.cardRate !== undefined && matched?.cardRate !== null && Number.isFinite(Number(matched.cardRate)) && Number(matched.cardRate)>0
       ? Number(matched.cardRate)
       : undefined;
 
   const defaultFee =
     cardFeePercent !== undefined && Number.isFinite(cardFeePercent)
       ? cardFeePercent
-      : (getTotemCardRate(12)?.rate ?? getTotemSettings().cardFeePercent ?? 0);
+      : totemCardFee(18);
 
   const effectiveFee = stockFee !== undefined ? stockFee : defaultFee;
 
@@ -158,7 +164,7 @@ export function quoteTotemVariant(
     stock: matched,
     cashPrice,
     qty: matched?.qty ?? 0,
-    installmentLabel: formatInstallment(cashPrice, 12, effectiveFee),
+    installmentLabel: formatInstallment(cashPrice, 18, effectiveFee),
   };
 }
 

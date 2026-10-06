@@ -1,3 +1,4 @@
+import { nestGet } from '../services/nestClient';
 import { ADMIN_STATE_EVENT, STOCK_EVENT, invalidateAdminMemory } from './adminStore';
 import { ATTRIBUTES_EVENT } from './attributeStore';
 import { TOTEM_SETTINGS_EVENT, invalidateTotemSettingsMemory } from './totemSettings';
@@ -67,6 +68,22 @@ export function subscribeTotemLive(onChange: () => void | Promise<void>) {
 
   // Intervalo seguro de 45s (evita estourar o rate limiter/throttler do servidor)
   const poll = window.setInterval(safeBackgroundPoll, 45_000);
+  let revision: string | null = null;
+  let checkingRevision = false;
+  async function checkRevision() {
+    if(disposed || checkingRevision || document.hidden) return;
+    checkingRevision=true;
+    try {
+      const next=await nestGet<{revision:string}>('/totem/revision');
+      if(!disposed && revision!==null && revision!==next.revision) refresh();
+      revision=next.revision;
+    }catch { /* O polling completo continua tentando após falhas de conexão. */ }
+    finally {checkingRevision=false;}
+  }
+  void checkRevision();
+  const revisionPoll=window.setInterval(checkRevision,5_000);
+  window.addEventListener('online',refresh);
+
 
   return () => {
     disposed = true;
@@ -78,5 +95,7 @@ export function subscribeTotemLive(onChange: () => void | Promise<void>) {
     window.removeEventListener('storage', onStorage);
     channel?.close();
     window.clearInterval(poll);
+    window.clearInterval(revisionPoll);
+    window.removeEventListener('online',refresh);
   };
 }

@@ -43,8 +43,10 @@ test('settings save fails honestly and never changes stored settings on a databa
 });
 test('custom kiosk header survives a database reread and stays in its own store',async()=>{
  const before=(await request('/store/totem-settings')).json.data;
- const saved=await request('/store/totem-settings','PUT',{...before,headerSubtitle:'Assistência técnica · Centro'});
+ const saved=await request('/store/totem-settings','PUT',{...before,headerSubtitle:'Assistência técnica · Centro',attractLayout:'logoPromo',attractContent:'background'});
  assert.equal(saved.status,200,JSON.stringify(saved.json));
+ assert.equal((await request('/store/totem-settings')).json.data.attractLayout,'logoPromo');
+ assert.equal((await request('/totem/settings')).json.data.attractContent,'background');
  assert.equal((await request('/store/totem-settings')).json.data.headerSubtitle,'Assistência técnica · Centro');
  const others=(await query("SELECT count(*)::int n FROM stores WHERE totem_settings->>'headerSubtitle'=$1",['Assistência técnica · Centro'])).rows[0].n;
  assert.equal(others,1);
@@ -58,12 +60,29 @@ test('Totem request is canonical, tenant scoped, idempotent and WhatsApp failure
  assert.equal(first.json.data.whatsappStatus,'unconfirmed');assert.ok(first.json.data.notificationWarning);
  const second=await request('/totem/leads','POST',body);assert.equal(second.status,200);assert.equal(second.json.data.id,first.json.data.id);
  assert.equal((await query('SELECT count(*)::int n FROM pos_tickets WHERE request_key=$1',[body.requestKey])).rows[0].n,1);
+ assert.equal((await query('SELECT product_name FROM pos_tickets WHERE id=$1',[first.json.data.id])).rows[0].product_name,'Audit device');
  const ticket=(await request('/pos/tickets')).json.data.items.find(t=>t.id===first.json.data.id);assert.equal(ticket.cashPrice,140);assert.equal(ticket.status,'open');
  assert.equal((await request('/totem/leads','POST',{...body,requestKey:'audit-bad-attribute',attributes:[{id:'foreign',name:'Cor',value:'Azul'}]})).status,400);
  const foreign=(await request('/stock','POST',{name:'Hidden item',qty:1,price:10,showOnTotem:false})).json.data;
  assert.equal((await request('/totem/leads','POST',{...body,requestKey:'audit-hidden',stockId:foreign.id})).status,404);
  assert.equal((await request('/totem/leads','POST',{...body,requestKey:'audit-store-change'},'store-b')).status,404);
  const publicCatalog=(await request('/totem/catalog')).json.data;assert.ok(publicCatalog.some(i=>i.id===item.id));assert.ok(!publicCatalog.some(i=>i.id===foreign.id));
+});
+test('18 installments use the same machine fee in public settings and the canonical order',async()=>{
+ const machine=[{id:'machine',active:true,isDefaultTotem:true,defaultBrandId:'visa',brands:[{id:'visa',active:true,installments:[{installment:12,rate:16.8}]}]}];
+ await query("INSERT INTO store_module_state(store_id,module_key,data,revision,updated_by) VALUES($1,'card-rates',$2::jsonb,1,'user-a')",['store-a',JSON.stringify(machine)]);
+ const settings=(await request('/totem/settings')).json.data;assert.equal(settings.cardInstallmentRates['18'],16.8);
+ const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
+ const item=(await request('/stock','POST',{name:'Installment device',qty:1,price:7500,showOnTotem:true,pickupPrices:{[method.id]:7500}})).json.data;
+ const result=await request('/totem/leads','POST',{stockId:item.id,pickupMethodId:method.id,customerName:'Local audit',payment:'Parcelado',installment:'18x',destination:'cashier'});
+ assert.equal(result.status,201,JSON.stringify(result.json));assert.equal(result.json.data.priceLabel,'18x · 18 X '+(486.67).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
+});
+test('public revision changes for price updates only in the selected store',async()=>{
+ const first=(await request('/totem/revision')).json.data.revision;
+ const other=(await request('/totem/revision','GET',undefined,'store-b')).json.data.revision;
+ await query("UPDATE stock_items SET price=price+1,updated_at=now() WHERE store_id='store-a'");
+ assert.notEqual((await request('/totem/revision')).json.data.revision,first);
+ assert.equal((await request('/totem/revision','GET',undefined,'store-b')).json.data.revision,other);
 });
 test('finance rejects a bank account from another store without settling or creating an entry',async()=>{
  await query("INSERT INTO bank_accounts(id,store_id,name) VALUES('foreign-account','store-b','Private account')");

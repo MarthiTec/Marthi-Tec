@@ -1,0 +1,1 @@
+ALTER TABLE pos_tickets ADD COLUMN IF NOT EXISTS product_name TEXT NOT NULL DEFAULT '';

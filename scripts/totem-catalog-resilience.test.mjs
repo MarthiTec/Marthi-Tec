@@ -11,7 +11,7 @@ test('transient catalog failure preserves verified stock; store changes and acce
   const stubs={
     '../../data/adminStore':{stockItemImages:item=>item?.images||[]},
     '../../data/attributeStore':{ATTR_COR:'ATTR-COR',ATTR_CAP:'ATTR-CAP'},
-    '../../data/variantQuote':{formatInstallment:()=>''},
+    '../../data/variantQuote':{formatInstallment:()=>'',totemCardFee:()=>0},
     '../../data/totemSettings':{getTotemSettings:()=>({cardFeePercent:0})},
     '../../services/erpApi':{apiGetTotemCatalog:async()=>{if(failure)throw failure;return [row];}},
     '../../data/storeCache':{storeScopedKey:()=>scope},

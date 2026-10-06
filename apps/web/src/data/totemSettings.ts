@@ -78,6 +78,7 @@ export type TotemSettings = {
    * 0 = sem taxa (padrão).
    */
   cardFeePercent: number;
+  cardInstallmentRates?: Record<string,number>;
 };
 
 export type TotemCopy = {
@@ -462,6 +463,7 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     storeWhatsApp: normalizeWhatsAppDigits(parsed?.storeWhatsApp),
     notifyCustomerOnLead: Boolean(parsed?.notifyCustomerOnLead),
     locationLabel: typeof parsed?.locationLabel === 'string' ? parsed.locationLabel.trim().slice(0, 80) : '',
+    cardInstallmentRates: parsed?.cardInstallmentRates,
     cardFeePercent: Math.max(0, Math.min(100, Number(parsed?.cardFeePercent) || 0)),
   };
 }
@@ -538,7 +540,7 @@ export async function hydrateTotemSettingsFromApi() {
   const { isNestAuthed } = await import('../services/nestClient');
   const { apiGetTotemPublicSettings, apiGetTotemSettings } = await import('../services/erpApi');
   const remote = isNestAuthed() && !getExplicitTotemStoreId()
-    ? await apiGetTotemSettings().catch(() => apiGetTotemPublicSettings())
+    ? await apiGetTotemSettings()
     : await apiGetTotemPublicSettings();
   return replaceTotemSettings(remote);
 }
