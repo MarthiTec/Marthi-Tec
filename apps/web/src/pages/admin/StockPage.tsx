@@ -1248,13 +1248,12 @@ export function StockPage() {
 
           <article className="admin-card stock-form-card">
             <h3>Identificação</h3>
-            <ProductDayOffers stockId={selectedId} name={form.name} variations={variations} basePrice={form.price}/>
             <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
-              <div className="stock-photo-picker" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <span className="admin-field-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+              <div className="stock-photo-picker">
+                <span className="stock-photo-picker__title">
                   Fotos do produto ({form.images.length})
                 </span>
-                <button type="button" className="btn btn--ghost" onClick={()=>setTotemPhotoPreview(true)}>Visualizar prévia no totem</button>
+                <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
                 <div className="stock-photos-gallery">
                   {form.images.map((imgSrc, index) => (
                     <div
@@ -1316,7 +1315,7 @@ export function StockPage() {
                     catch {setError('Informe uma URL HTTPS válida para a foto.');}
                   }}>Adicionar URL</button>
                 </div>}
-                <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.78rem' }}>
+                <p className="empty stock-photo-picker__help">
                   A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.
                 </p>
               </div>
@@ -1823,6 +1822,8 @@ export function StockPage() {
               </article>
             </>
           )}
+
+          <ProductDayOffers stockId={selectedId} name={form.name} variations={useVariations ? variations : []} basePrice={form.price}/>
 
           {!lite || totemSurface ? (
             <article className="admin-card stock-form-card">
