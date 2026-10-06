@@ -88,8 +88,10 @@ export function findStockVariant(
         barcode: bestVar.barcode || master.barcode,
         imei: bestVar.imei || master.imei,
         pickupPrices: bestVar.pickupPrices ?? master.pickupPrices,
+        variations: [bestVar],
       };
     }
+    return null;
   }
 
   const keys = varyingStockAttrs(rows, attrs);

@@ -1,4 +1,5 @@
 import {storeScopedKey} from './storeCache';
+import {DEFAULT_TOTEM_ASSISTANT,type TotemAssistantSettings} from './totemAssistant';
 export type TotemMode = 'kiosk' | 'catalog';
 export type TotemColumns = 1 | 2 | 3 | 4;
 export type TotemVertical = 'general' | 'food' | 'retail' | 'phones' | 'optics';
@@ -14,6 +15,8 @@ export const TOTEM_DINE_ID = 'TOTEM-DINE';
 export const TOTEM_DINE_OPTIONS = ['Consumir no local', 'Retirada'] as const;
 
 export type TotemSettings = {
+  attractContent: 'full'|'text'|'background';
+  assistant: TotemAssistantSettings;
   mode: TotemMode;
   /** Senha para sair da tela /totem (operador da loja). */
   exitPassword: string;
@@ -36,6 +39,8 @@ export type TotemSettings = {
   customSubtitleText: string;
   /** Nome da loja na tela de abertura e no ticket. */
   storeName: string;
+  /** Optional text below the store name in the kiosk header. */
+  headerSubtitle: string;
   /** Logo da loja (data URL). Sem arquivo, usa a marca Marthi. */
   storeLogo: string | null;
   /** Foto / propaganda de fundo da tela de abertura (data URL). */
@@ -343,6 +348,7 @@ function verticalMeta(id: TotemVertical) {
 export function defaultTotemSettings(): TotemSettings {
   const general = verticalMeta('general');
   return {
+    attractContent:'full',assistant:{...DEFAULT_TOTEM_ASSISTANT},
     mode: general.preset.mode,
     exitPassword: DEFAULT_EXIT,
     shareStockWithErp: true,
@@ -353,6 +359,7 @@ export function defaultTotemSettings(): TotemSettings {
     customGreetingText: '',
     customSubtitleText: '',
     storeName: 'Sua Loja',
+    headerSubtitle: '',
     storeLogo: null,
     attractBackground: null,
     attractGradientColor: DEFAULT_ATTRACT_GRADIENT,
@@ -430,6 +437,8 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
   const storeName = typeof parsed?.storeName === 'string' ? parsed.storeName.trim() : '';
   const storeLogo = normalizeDataImage(parsed?.storeLogo);
   return {
+    attractContent:parsed?.attractContent==='text'||parsed?.attractContent==='background'?parsed.attractContent:'full',
+    assistant:{...DEFAULT_TOTEM_ASSISTANT,...parsed?.assistant},
     mode: parsed?.mode === 'catalog' ? 'catalog' : 'kiosk',
     exitPassword: normalizeExitPassword(parsed?.exitPassword),
     shareStockWithErp: Boolean(parsed?.shareStockWithErp),
@@ -440,6 +449,7 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     customGreetingText: typeof parsed?.customGreetingText === 'string' ? parsed.customGreetingText.slice(0, 120) : '',
     customSubtitleText: typeof parsed?.customSubtitleText === 'string' ? parsed.customSubtitleText.slice(0, 300) : '',
     storeName: storeName || 'Sua Loja',
+    headerSubtitle: typeof parsed?.headerSubtitle === 'string' ? parsed.headerSubtitle.trim().slice(0, 140) : '',
     storeLogo,
     attractBackground: normalizeDataImage(parsed?.attractBackground),
     attractGradientColor: normalizeHexColor(parsed?.attractGradientColor),
@@ -492,6 +502,7 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     customGreetingText: patch.customGreetingText !== undefined ? patch.customGreetingText : base?.customGreetingText,
     customSubtitleText: patch.customSubtitleText !== undefined ? patch.customSubtitleText : base?.customSubtitleText,
     storeName: patch.storeName ?? base?.storeName,
+    headerSubtitle: patch.headerSubtitle ?? base?.headerSubtitle,
     storeLogo: patch.storeLogo !== undefined ? patch.storeLogo : base?.storeLogo,
     attractBackground: patch.attractBackground !== undefined ? patch.attractBackground : base?.attractBackground,
     attractGradientColor: patch.attractGradientColor ?? base?.attractGradientColor,
@@ -523,9 +534,10 @@ export function effectiveGreeting(customText?: string): string {
 
 /** Carrega settings do Nest (público ou autenticado). Sem seed mock. */
 export async function hydrateTotemSettingsFromApi() {
+  const { getExplicitTotemStoreId } = await import('./totemContext');
   const { isNestAuthed } = await import('../services/nestClient');
   const { apiGetTotemPublicSettings, apiGetTotemSettings } = await import('../services/erpApi');
-  const remote = isNestAuthed()
+  const remote = isNestAuthed() && !getExplicitTotemStoreId()
     ? await apiGetTotemSettings().catch(() => apiGetTotemPublicSettings())
     : await apiGetTotemPublicSettings();
   return replaceTotemSettings(remote);

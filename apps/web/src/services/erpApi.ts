@@ -523,6 +523,7 @@ export type ApiMeAccess = {
 };
 
 export type ApiPosTicket = {
+  destination?:'cashier'|'whatsapp';sellerId?:string;
   stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;cashPrice?:number;
   id: string;
   source: 'totem' | 'manual';
@@ -633,7 +634,7 @@ export function apiSubmitTotemLead(body: {
   installment: string | null;
   priceLabel: string;
 }) {
-  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number }>('/totem/leads', body);
+  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number;whatsappUrl?:string }>('/totem/leads', body);
 }
 
 export function apiListPosTickets(status?: ApiPosTicket['status']) {
@@ -1980,7 +1981,9 @@ export type ApiStoreRow = {
   active: boolean;
   segment?: string;
   segmentId?: string;
+  accessToken?: string;
   planId?: string;
+  license?: import("../data/multiStoreStore").StoreLicense | null;
   modules?: string[];
   discountPercent?: number;
   createdAt: string;
@@ -2031,6 +2034,7 @@ export function apiSaveCardMachines(machines: any[]) {
 /* ── External Sales (Venda sem Caixa), Trade-in & Goals ──── */
 
 export type ExternalSaleLine = {
+  sourceTicketId?:string;
   pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
   attributes?: Array<{id:string;name:string;value:string}>;
   stockId?: string | null;

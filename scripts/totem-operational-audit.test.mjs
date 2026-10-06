@@ -41,6 +41,14 @@ test('settings save fails honestly and never changes stored settings on a databa
  try {assert.equal((await request('/store/totem-settings','PUT',{storeName:'Must not save'})).status,500);}finally{pool.query=original;}
  assert.equal((await request('/store/totem-settings')).json.data.storeName,before.storeName);
 });
+test('custom kiosk header survives a database reread and stays in its own store',async()=>{
+ const before=(await request('/store/totem-settings')).json.data;
+ const saved=await request('/store/totem-settings','PUT',{...before,headerSubtitle:'Assistência técnica · Centro'});
+ assert.equal(saved.status,200,JSON.stringify(saved.json));
+ assert.equal((await request('/store/totem-settings')).json.data.headerSubtitle,'Assistência técnica · Centro');
+ const others=(await query("SELECT count(*)::int n FROM stores WHERE totem_settings->>'headerSubtitle'=$1",['Assistência técnica · Centro'])).rows[0].n;
+ assert.equal(others,1);
+});
 test('Totem request is canonical, tenant scoped, idempotent and WhatsApp failure retains the cashier queue',async()=>{
  const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
  const item=(await request('/stock','POST',{name:'Audit device',qty:2,price:150,showOnTotem:true,pickupPrices:{[method.id]:140}})).json.data;

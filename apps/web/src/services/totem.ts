@@ -85,5 +85,5 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
     }
   }
 
-  return { ticketId, notificationWarning:result.notificationWarning,customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice };
+  return { ticketId, notificationWarning:result.notificationWarning,customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice,whatsappUrl:result.whatsappUrl };
 }

@@ -1,4 +1,6 @@
 import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
+import {applyDayOffersToLines} from '../services/dayOffers.js';
+import {changeVariationQuantity} from '../services/variationInventory.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -395,6 +397,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
         }
 
         await validatePickupLines(client,storeId,body.lines);
+        await applyDayOffersToLines(client,storeId,body.lines,'pdv');
         subtotal=body.lines.reduce((sum,line)=>sum+line.qty*line.unitPrice,0);
         total=Math.max(0,Math.round((subtotal-body.discount+body.surcharge)*100)/100);
         if(body.discount>subtotal+body.surcharge)throw Object.assign(new Error("Desconto superior ao valor da venda."),{status:400});
@@ -465,6 +468,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           await recordPickup(client,storeId,orderId,body,line);
           // Se tem stockId cadastrado, debita estoque e gera kardex
           if (line.stockId && line.pickupKind!=='order') {
+            await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
             const stockCheck = await client.query(
               `SELECT qty, cost FROM stock_items WHERE id = $1 AND store_id = $2`,
               [line.stockId, storeId],

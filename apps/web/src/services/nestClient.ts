@@ -1,4 +1,5 @@
 import { tenantScopedKey } from '../data/tenantContext';
+import { getExplicitTotemStoreId } from '../data/totemContext';
 import { nestApiUrl } from './config';
 import { readJson } from './http';
 
@@ -51,6 +52,9 @@ export async function nestRequest<T>(
   }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
+  const kioskStore = path.startsWith('/totem/') ? getExplicitTotemStoreId() : null;
+  if (kioskStore && !headers.has('x-store-id')) headers.set('x-store-id', kioskStore);
+
   try {
     const key = tenantScopedKey('marthi.multi_store.active_store_id.v1');
     let activeStoreId = localStorage.getItem(key);
@@ -80,7 +84,7 @@ export async function nestRequest<T>(
   }
 
   const selectedAtStart = headers.get('x-store-id');
-  const hasExplicitStore = new Headers(init.headers).has('x-store-id');
+  const hasExplicitStore = Boolean(kioskStore) || new Headers(init.headers).has('x-store-id');
   const response = await fetch(`${apiBase()}${path}`, { ...init, headers });
   const json = await readJson<ApiOkBody<T> | ApiErrorBody>(response);
 

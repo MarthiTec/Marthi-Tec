@@ -40,6 +40,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/totem/produtos': { kicker: 'Totem', title: 'Catálogo do totem' },
   '/painel/totem/atributos': { kicker: 'Totem', title: 'Atributos do totem' },
   '/painel/totem/marcas': { kicker: 'Totem', title: 'Marcas' },
+  '/painel/totem/previa': { kicker: 'Totem', title: 'Prévia do Totem' },
   '/painel/totem/config': { kicker: 'Totem', title: 'Configurações do totem' },
   '/painel/pedidos': { kicker: 'Vendas', title: 'Consultar vendas' },
   '/painel/clientes': { kicker: 'Pessoas', title: 'Clientes' },

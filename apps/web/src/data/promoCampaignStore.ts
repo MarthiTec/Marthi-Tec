@@ -53,6 +53,7 @@ export type PromoTier = {
 };
 
 export type PromoRuleCriteria = {
+  attributes?:Record<string,string>;
   /** Se vazio, aplica a qualquer fornecedor */
   supplierId?: string;
   /** Nome ou ID da categoria / departamento */
@@ -70,6 +71,8 @@ export type PromoRuleCriteria = {
 };
 
 export type PromoCampaign = {
+  dayOffer?:boolean;
+  channels?:('totem'|'pdv'|'external')[];
   id: string;
   name: string;
   active: boolean;
@@ -147,10 +150,12 @@ function normalize(item: any): PromoCampaign {
 
   return {
     id: String(item.id || uid()),
+    dayOffer:Boolean(item.dayOffer),channels:item.channels??['totem','pdv','external'],
     name: String(item.name ?? '').trim() || 'Campanha Comercial',
     active: item.active !== false,
     kind,
     criteria: {
+      attributes:item.criteria?.attributes??{},
       supplierId: item.criteria?.supplierId ? String(item.criteria.supplierId).trim() : undefined,
       category: item.criteria?.category ? String(item.criteria.category).trim() : undefined,
       brand: item.criteria?.brand ? String(item.criteria.brand).trim() : undefined,
@@ -410,6 +415,7 @@ export function evaluateCampaignForLine(
 
   const activeCampaigns = listPromoCampaigns(true);
   const eligibleCampaigns = activeCampaigns.filter((camp) => {
+    if(camp.dayOffer)return false; // Day offers are applied once by the server for the selected combination.
     const { criteria } = camp;
 
     // 1. Filtro de Grupo de Cliente (se a campanha exige grupo específico, cliente precisa pertencer)

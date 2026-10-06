@@ -232,6 +232,8 @@ export async function fileToProductImage(file: File): Promise<string> {
     bitmap.close();
     throw new Error('Não foi possível ler a imagem.');
   }
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   return canvas.toDataURL('image/jpeg', 0.86);

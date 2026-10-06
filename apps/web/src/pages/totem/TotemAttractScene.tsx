@@ -17,6 +17,7 @@ export function TotemAttractScene({
   showActionButtons = true,
   customGreetingText,
   customSubtitleText,
+  content = 'full',
   onStartOrder,
   onBrowseCatalog,
 }: {
@@ -30,6 +31,7 @@ export function TotemAttractScene({
   showActionButtons?: boolean;
   customGreetingText?: string;
   customSubtitleText?: string;
+  content?:'full'|'text'|'background';
   onStartOrder?: () => void;
   onBrowseCatalog?: () => void;
 }) {
@@ -77,16 +79,16 @@ export function TotemAttractScene({
       ) : null}
       <div className="totem-attract__grain" aria-hidden />
 
-      <div className="totem-attract__brand">
-        <div className="totem-attract__mark">
+      {content !== 'background' && <div className="totem-attract__brand">
+        {content === 'full' && <div className="totem-attract__mark">
           {storeLogo ? (
             <img src={storeLogo} alt={name} className="totem-attract__logo" />
           ) : (
             <BrandLogo variant="mark" className="totem-attract__logo totem-attract__logo--mark" />
           )}
-        </div>
+        </div>}
         {!logoPromo ? <p className="totem-attract__hello">{effectiveHello}</p> : null}
-        {logoPromo && storeLogo ? (
+        {logoPromo && storeLogo && content === 'full' ? (
           <p className="totem-attract__hint totem-attract__hint--soft">
             Toque para começar
             <span className="totem-attract__pulse" aria-hidden />
@@ -106,7 +108,7 @@ export function TotemAttractScene({
             {customSubtitleText!.trim()}
           </p>
         ) : null}
-      </div>
+      </div>}
 
       {showActionButtons ? (
         <div className="totem-attract__actions" onClick={(e) => e.stopPropagation()}>

@@ -693,6 +693,15 @@ export type StoreLicensingSummary = {
 export function calculateLicensingSummary(basePrice = 197): StoreLicensingSummary {
   const stores = listStores();
   const activeStoresList = stores.filter((s) => s.active);
+  if (isNestAuthed()) {
+    const licenses = readJson<StoreLicense[]>(tenantScopedKey(STORAGE_KEY_LICENSES), []);
+    const items = activeStoresList.flatMap(store => {
+      const license = licenses.find(l => l.storeId === store.id);
+      if (!license) return [];
+      return [{store,isMatrix:store.isMatrix,basePrice:license.baseMonthlyPrice,discountPercent:license.baseMonthlyPrice > 0 ? license.discountAmount / license.baseMonthlyPrice * 100 : 0,discountValue:license.discountAmount,finalPrice:license.finalMonthlyPrice}];
+    });
+    return {totalStores:stores.length,activeStores:activeStoresList.length,basePricePerStore:items[0]?.basePrice ?? 0,applicableRule:null,items,totalBase:items.reduce((n,i)=>n+i.basePrice,0),totalDiscount:items.reduce((n,i)=>n+i.discountValue,0),totalFinal:items.reduce((n,i)=>n+i.finalPrice,0)};
+  }
   const totalCount = activeStoresList.length;
   const rule = getApplicableDiscountRule(totalCount);
 
@@ -748,13 +757,14 @@ export function calculateLicensingSummary(basePrice = 197): StoreLicensingSummar
 export function listStoreLicenses(): StoreLicense[] {
   const key = tenantScopedKey(STORAGE_KEY_LICENSES);
   const licenses = readJson<StoreLicense[]>(key, []);
-  if (licenses.length === 0) {
+  if (licenses.length === 0 && !isNestAuthed()) {
     return recalculateAllStoreLicenses();
   }
   return licenses;
 }
 
 export function recalculateAllStoreLicenses(basePrice = 197): StoreLicense[] {
+  if (isNestAuthed()) return listStoreLicenses();
   const summary = calculateLicensingSummary(basePrice);
   const now = new Date().toISOString();
   const expires = new Date();
@@ -886,6 +896,7 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
         name: s.tradeName || s.legalName,
         tradeName: s.tradeName || s.legalName,
         cnpj: s.document,
+        accessToken: s.accessToken,
         stateRegistration: s.stateRegistration || '',
         municipalRegistration: s.municipalRegistration || '',
         email: s.email || '',
@@ -909,7 +920,7 @@ export async function hydrateMultiStoreFromApi(): Promise<boolean> {
       const key = tenantScopedKey(STORAGE_KEY_STORES);
 writeJson(key, mappedStores);
       getActiveStoreId();
-      recalculateAllStoreLicenses();
+      writeJson(tenantScopedKey(STORAGE_KEY_LICENSES), storesRows.flatMap(s => s.license ? [s.license] : []));
       changed = true;
     }
 

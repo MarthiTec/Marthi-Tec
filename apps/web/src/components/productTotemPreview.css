@@ -1,0 +1,5 @@
+.product-preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;display:grid;place-items:center;padding:16px}
+.product-preview-dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:20px;width:min(580px,96vw);max-height:94vh;overflow:auto}
+.product-preview-dialog .totem-card{width:min(100%,340px);margin:16px auto;box-sizing:border-box}
+.product-preview-guide{width:100%;max-height:180px;object-fit:contain}
+.is-theme-dark .product-preview-dialog,.admin--dark .product-preview-dialog{background:var(--card,#171e27);color:var(--ink,#e8eef4)}

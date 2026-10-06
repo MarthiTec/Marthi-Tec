@@ -1,4 +1,6 @@
 import {productSku} from '../../data/productSku';
+import {ProductTotemPreview} from '../../components/ProductTotemPreview';
+import {ProductDayOffers} from '../../components/ProductDayOffers';
 import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
 import {ProductPickupPrices} from '../../components/PickupFields';
 import { usePickupMethods } from '../../data/pickup';
@@ -70,7 +72,7 @@ export function StockPage() {
   const location = useLocation();
   const totemSurface = isTotemCatalogPath(location.pathname);
   const catalogFull = hasCapability('catalog.full');
-  const lite = totemSurface || !catalogFull;
+  const lite = !catalogFull && !totemSurface;
   const { confirm, dialog } = useConfirmDialog();
 
   const nameRef = useRef<HTMLInputElement>(null);
@@ -127,6 +129,8 @@ export function StockPage() {
     finally{setAutomationBusy(false);}
   }
 
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [totemPhotoPreview,setTotemPhotoPreview]=useState(false);
   const [variations, setVariations] = useState<StockVariationRow[]>([]);
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
@@ -269,30 +273,24 @@ export function StockPage() {
     focusNameField();
   }
 
-  // ── Gestão de Fotos (Limite Estrito de até 4 Fotos) ─────────────────
+  // ── Gestão de fotos do produto ─────────────────
   async function onAddPhotos(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!files.length || readOnly) return;
-    const availableSlots = 4 - form.images.length;
-    if (availableSlots <= 0) {
-      setError('Limite máximo de 4 fotos por produto atingido.');
-      return;
-    }
-    const toProcess = files.slice(0, availableSlots);
-    if (files.length > availableSlots) {
-      setError(`Apenas as primeiras ${availableSlots} fotos foram adicionadas (limite máximo de 4 fotos).`);
-    } else {
-      setError('');
-    }
+    setError('');
     try {
-      const processed = await Promise.all(toProcess.map((f) => fileToProductImage(f)));
+      const processed: string[] = [];
+      for (const file of files) processed.push(await fileToProductImage(file));
+      if (JSON.stringify([...form.images,...processed]).length > 4_000_000) {
+        throw new Error('As fotos excedem o tamanho permitido por envio. Utilize URLs de fotos hospedadas para um catálogo maior.');
+      }
       setForm((current) => ({
         ...current,
-        images: [...current.images, ...processed].slice(0, 4),
+        images: [...current.images, ...processed],
       }));
-    } catch {
-      setError('Não foi possível processar algumas imagens. Tente outros arquivos.');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Não foi possível processar algumas imagens.');
     }
   }
 
@@ -605,7 +603,7 @@ export function StockPage() {
       unit: item.unit ?? 'UN',
       sourceWorkOrderId: item.sourceWorkOrderId,
       showOnTotem: item.showOnTotem,
-      images: [...(item.images ?? [])].slice(0, 4),
+      images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
       fiscalClassificationId: item.fiscalClassificationId ?? '',
       warehouseId: item.warehouseId ?? '',
@@ -682,6 +680,7 @@ export function StockPage() {
             barcode: (row.barcode || '').trim(),
             imei: (row.imei || '').trim(),
             pickupPrices: row.pickupPrices ?? {},
+            pickupMethodId: row.pickupMethodId || undefined,
             pricingPolicy: row.pricingPolicy ?? null,
           }))
         : [];
@@ -711,7 +710,7 @@ export function StockPage() {
         condition: form.condition,
         unit: form.unit,
         showOnTotem: form.showOnTotem,
-        images: form.images.slice(0, 4),
+        images: [...form.images],
         supplierId: form.supplierId || '',
         fiscalClassificationId: form.fiscalClassificationId || '',
         warehouseId: form.warehouseId || '',
@@ -900,6 +899,7 @@ export function StockPage() {
   return (
     <section className={`admin-page ${formVisible ? 'admin-page--stock-form' : ''}`}>
       {dialog}
+      {totemPhotoPreview && <ProductTotemPreview name={form.name} images={form.images} price={variations.find(v=>v.price>0)?.price??form.price} attributes={variations.find(v=>v.price>0)?.attrs??form.attrs} onClose={()=>setTotemPhotoPreview(false)}/>}
       {headingActions}
       {!formVisible ? (
         <>
@@ -1248,11 +1248,13 @@ export function StockPage() {
 
           <article className="admin-card stock-form-card">
             <h3>Identificação</h3>
+            <ProductDayOffers stockId={selectedId} name={form.name} variations={variations} basePrice={form.price}/>
             <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
               <div className="stock-photo-picker" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span className="admin-field-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                  Fotos do produto ({form.images.length}/4)
+                  Fotos do produto ({form.images.length})
                 </span>
+                <button type="button" className="btn btn--ghost" onClick={()=>setTotemPhotoPreview(true)}>Visualizar prévia no totem</button>
                 <div className="stock-photos-gallery">
                   {form.images.map((imgSrc, index) => (
                     <div
@@ -1289,10 +1291,10 @@ export function StockPage() {
                     </div>
                   ))}
 
-                  {!readOnly && form.images.length < 4 ? (
+                  {!readOnly ? (
                     <label
                       className="stock-photo-slot stock-photo-slot--add"
-                      title="Adicionar foto (máximo 4 fotos)"
+                      title="Adicionar fotos"
                     >
                       <input
                         type="file"
@@ -1301,12 +1303,21 @@ export function StockPage() {
                         onChange={onAddPhotos}
                       />
                       <span>+ Foto</span>
-                      <small>({form.images.length}/4)</small>
+                      <small>({form.images.length})</small>
                     </label>
                   ) : null}
                 </div>
+                {!readOnly && <div className="stock-photo-url">
+                  <label className="admin-field">Foto hospedada (HTTPS)
+                    <input type="url" value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="https://…" />
+                  </label>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={()=>{
+                    try {const url=new URL(photoUrl.trim());if(url.protocol!=='https:')throw new Error();setForm(current=>({...current,images:[...current.images,url.href]}));setPhotoUrl('');setError('');}
+                    catch {setError('Informe uma URL HTTPS válida para a foto.');}
+                  }}>Adicionar URL</button>
+                </div>}
                 <p className="empty" style={{ margin: '4px 0 0', fontSize: '0.78rem' }}>
-                  Limite em até 4 fotos por produto (a primeira é a capa no Totem e ERP).
+                  A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.
                 </p>
               </div>
 
@@ -1813,7 +1824,7 @@ export function StockPage() {
             </>
           )}
 
-          {!lite ? (
+          {!lite || totemSurface ? (
             <article className="admin-card stock-form-card">
               <h3>Fiscal e logística</h3>
               <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>

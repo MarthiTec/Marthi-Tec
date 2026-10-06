@@ -15,6 +15,7 @@ import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
 import { PartnerSignupPage } from './pages/PartnerSignupPage';
 import { TotemPage } from './pages/totem/TotemPage';
+import { TotemPreviewPage } from './pages/admin/TotemPreviewPage';
 import { CaixaPage } from './pages/caixa/CaixaPage';
 import { MesaPage } from './pages/mesa/MesaPage';
 import { CozinhaPage } from './pages/cozinha/CozinhaPage';
@@ -240,6 +241,7 @@ export function App() {
           <Route path="totem/atributos" element={<AttributesPage />} />
           <Route path="totem/marcas" element={<BrandsPage />} />
           <Route path="totem/config" element={<TotemSettingsPage />} />
+          <Route path="totem/previa" element={<TotemPreviewPage />} />
           <Route path="pedidos" element={<OrdersPage />} />
           <Route path="crm" element={<CrmPanelPage />} />
           <Route path="ecommerce" element={<EcommercePanelPage />} />

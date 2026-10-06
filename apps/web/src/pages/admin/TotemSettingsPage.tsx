@@ -1,14 +1,11 @@
-﻿import { useState, useEffect } from 'react';
+import {TotemSettingToggle,TotemSettingsImage} from './TotemSettingsControls';
+import {assistantText} from '../../data/totemAssistant';
+import './totemSettings.css';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {apiListSellers,type ApiSeller} from '../../services/erpApi';
 import { TotemAttractScene } from '../totem/TotemAttractScene';
 import { TotemRigPreview } from './TotemRigPreview';
-import {
-  getActiveStore,
-  saveStore,
-  STORE_CONTEXT_CHANGED_EVENT,
-  MULTI_STORE_CHANGED_EVENT,
-  type Store,
-} from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   ATTRACT_COLOR_PRESETS,
@@ -84,10 +81,16 @@ export function TotemSettingsPage() {
     () => initial.customSubtitleText || '',
   );
   const [storeName, setStoreName] = useState(() => initial.storeName);
+  const [headerSubtitle, setHeaderSubtitle] = useState(() => initial.headerSubtitle || '');
   const [storeLogo, setStoreLogo] = useState(() => initial.storeLogo);
   const [attractBackground, setAttractBackground] = useState(() => initial.attractBackground);
   const [attractGradientColor, setAttractGradientColor] = useState(() => initial.attractGradientColor);
   const [attractLayout, setAttractLayout] = useState<TotemAttractLayout>(() => initial.attractLayout);
+  const [attractContent,setAttractContent]=useState(initial.attractContent);
+  const [assistant,setAssistant]=useState(initial.assistant);
+  const [exampleName,setExampleName]=useState('Ana Paula');
+  const [assistantSellers,setAssistantSellers]=useState<ApiSeller[]>([]);
+  useEffect(()=>{let active=true;void apiListSellers(true).then(rows=>{if(active)setAssistantSellers(rows);}).catch(()=>{});return()=>{active=false;};},[]);
   const [keyboardPlacement, setKeyboardPlacement] = useState<TotemKeyboardPlacement>(
     () => initial.keyboardPlacement,
   );
@@ -102,11 +105,7 @@ export function TotemSettingsPage() {
   const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // ── Dados Fiscais e Logísticos da loja ativa ─────────────────────────
-  const [storeData, setStoreData] = useState<Partial<Store>>(() => getActiveStore() ?? {});
-  const [fiscalSaved, setFiscalSaved] = useState(false);
-  const [fiscalError, setFiscalError] = useState<string | null>(null);
+  useEffect(()=>setSaved(false),[assistant,attractContent]);
 
   useEffect(() => {
     let mounted = true;
@@ -123,10 +122,12 @@ export function TotemSettingsPage() {
         setCustomGreetingText(s.customGreetingText || '');
         setCustomSubtitleText(s.customSubtitleText || '');
         setStoreName(s.storeName);
+        setHeaderSubtitle(s.headerSubtitle || '');
         setStoreLogo(s.storeLogo);
         setAttractBackground(s.attractBackground);
         setAttractGradientColor(s.attractGradientColor);
         setAttractLayout(s.attractLayout);
+        setAttractContent(s.attractContent);setAssistant(s.assistant);
         setKeyboardPlacement(s.keyboardPlacement);
         setAskCustomerName(s.askCustomerName);
         setOfferFulfillment(s.offerFulfillment);
@@ -144,40 +145,6 @@ export function TotemSettingsPage() {
       mounted = false;
     };
   }, []);
-
-  // Sincroniza os dados da loja ativa quando o contexto muda
-  useEffect(() => {
-    function refreshStore() {
-      const active = getActiveStore();
-      if (active) setStoreData({ ...active });
-    }
-    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, refreshStore);
-    window.addEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
-    return () => {
-      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, refreshStore);
-      window.removeEventListener(MULTI_STORE_CHANGED_EVENT, refreshStore);
-    };
-  }, []);
-
-  function patchStore(patch: Partial<Store>) {
-    setStoreData((prev) => ({ ...prev, ...patch }));
-    setFiscalSaved(false);
-    setFiscalError(null);
-  }
-
-  function saveFiscalData() {
-    try {
-      if (!storeData.id) {
-        setFiscalError('Nenhuma loja ativa para salvar.');
-        return;
-      }
-      saveStore(storeData as Store);
-      setFiscalSaved(true);
-      setFiscalError(null);
-    } catch (err) {
-      setFiscalError(err instanceof Error ? err.message : 'Falha ao salvar dados da loja.');
-    }
-  }
 
   const copy = totemCopy(vertical);
   const catalogOnly = mode === 'catalog';
@@ -226,10 +193,12 @@ export function TotemSettingsPage() {
         customGreetingText,
         customSubtitleText,
         storeName,
+        headerSubtitle,
         storeLogo,
         attractBackground,
         attractGradientColor,
         attractLayout,
+        attractContent,assistant,
         keyboardPlacement,
         askCustomerName,
         offerFulfillment,
@@ -249,7 +218,15 @@ export function TotemSettingsPage() {
   }
 
   return (
-    <section className="admin-page">
+    <section className="admin-page totem-settings-page">
+      <h1>Configure a experiência do seu Totem</h1>
+      <p>Escolha a aparência, personalize a conversa e indique quem receberá os pedidos. Preços, ofertas e dados fiscais ficam no cadastro de produtos.</p>
+      <nav className="admin-toolbar" aria-label="Seções das configurações">
+        <a className="btn btn--ghost" href="#totem-assistant">Atendimento guiado</a>
+        <a className="btn btn--ghost" href="#totem-opening">Tela de abertura</a>
+        <Link className="btn btn--ghost" to="/painel/totem/produtos">Produtos e ofertas</Link>
+      </nav>
+      <Link to="/painel/totem/previa" className="btn btn--primary">Visualizar Totem em escala real</Link>
       <article className="admin-card">
         <h2>Ramo da loja</h2>
         <p>
@@ -295,8 +272,42 @@ export function TotemSettingsPage() {
         </div>
       </article>
 
-      <article className="admin-card">
+      <article className="admin-card" id="totem-assistant">
+        <h2>Atendimento guiado</h2>
+        <p>Uma conversa simples para ajudar o cliente a escolher e encaminhar o pedido ao vendedor.</p>
+        <TotemSettingToggle label="Conversa passo a passo" hint="O assistente recebe o cliente e ajuda na escolha." checked={assistant.enabled} onChange={enabled=>setAssistant(current=>({...current,enabled}))}/>
+        <div className="totem-settings-identity">
+          <TotemSettingsImage label="Foto do assistente" hint="Use uma foto ou avatar. Sem imagem, mostramos a inicial do nome." portrait value={assistant.avatar} convert={fileToStoreLogo} onChange={avatar=>setAssistant(current=>({...current,avatar}))}/>
+        <div className="admin-form">
+          <label>Nome do assistente<input value={assistant.name} maxLength={80} onChange={e=>setAssistant(current=>({...current,name:e.target.value}))}/></label>
+          <AdminPicker label="Vendedor que receberá o atendimento" value={assistant.sellerId} options={[{value:'',label:'Atendimento da loja'},...assistantSellers.map(seller=>({value:seller.id,label:seller.name}))]} onChange={id=>{const seller=assistantSellers.find(item=>item.id===id);setAssistant(current=>({...current,sellerId:id,name:seller?.name||current.name,whatsapp:seller?.phone||current.whatsapp}));}}/>
+          <label>WhatsApp do vendedor (DDI e DDD)<input value={assistant.whatsapp} onChange={e=>setAssistant(current=>({...current,whatsapp:e.target.value.replace(/\D/g,'')}))} placeholder="5524…"/></label>
+        </div></div>
+        <div className="totem-settings-options">
+          <TotemSettingToggle label="Preferência de compra" hint="Perguntar sobre preço baixo, ofertas ou novidades." checked={assistant.askIntent} onChange={askIntent=>setAssistant(current=>({...current,askIntent}))}/>
+          <TotemSettingToggle label="Marca preferida" hint="Mostrar apenas marcas com produtos disponíveis." checked={assistant.askBrand} onChange={askBrand=>setAssistant(current=>({...current,askBrand}))}/>
+        </div>
+        <div className="totem-settings-conversation">
+          <div className="totem-settings-messages">
+            <h3>Personalize as mensagens</h3>
+            <p>O marcador <code>{'{nome}'}</code> usa o nome que o cliente informar, inclusive nomes como Ana Paula. <code>{'{vendedor}'}</code> usa o nome do assistente.</p>
+            {(['namePrompt','intentPrompt','brandPrompt','productsPrompt','closingPrompt'] as const).map((key,index)=><details key={key} className="totem-settings-step" open={key==='namePrompt'?true:undefined}><summary><span>{index+1}</span><strong>{['Boas-vindas','Preferência de compra','Marca','Produtos sugeridos','Finalizar com vendedor'][index]}</strong></summary><label>Mensagem do assistente<textarea rows={3} value={assistant[key]} maxLength={300} onChange={e=>setAssistant(current=>({...current,[key]:e.target.value}))}/></label></details>)}
+          </div>
+          <aside className="totem-settings-chat" aria-label="Exemplo da conversa">
+            <div className="totem-settings-chat__heading">{assistant.avatar?<img src={assistant.avatar} alt=""/>:<span aria-hidden="true">{assistant.name.slice(0,1)||'M'}</span>}<div><strong>{assistant.name||'Assistente'}</strong><small>Prévia da conversa</small></div></div>
+            <label>Nome de exemplo<input value={exampleName} maxLength={100} onChange={e=>setExampleName(e.target.value)} placeholder="Ana Paula"/></label>
+            <p className="totem-settings-chat__bubble">{assistantText(assistant.namePrompt,exampleName,assistant.name)}</p>
+            <p className="totem-settings-chat__reply">{exampleName||'Seu cliente'}</p>
+            {(assistant.askIntent?[assistant.intentPrompt]:[]).concat(assistant.askBrand?[assistant.brandPrompt]:[],[assistant.productsPrompt,assistant.closingPrompt]).map((text,index)=><p key={index} className="totem-settings-chat__bubble">{assistantText(text,exampleName,assistant.name)}</p>)}
+            <small>Exemplo de como o cliente verá as mensagens. O nome real será informado no totem.</small>
+          </aside>
+        </div>
+        <p className="totem-settings-note">Configure o WhatsApp de quem recebe a venda para gerar o QR Code. O vendedor conclui o pagamento.</p>
+      </article>
+
+      <article className="admin-card" id="totem-opening">
         <h2>Tela de boas-vindas · logo e propaganda</h2>
+        <AdminPicker label="Conteúdo sobre o fundo" value={attractContent} options={[{value:'full',label:'Logo e textos'},{value:'text',label:'Somente textos'},{value:'background',label:'Somente fundo'}]} onChange={value=>setAttractContent(value as typeof attractContent)}/>
         <p>
           Tela cheia esperando o cliente. Ideal enquanto o mix de produtos ainda é pequeno: destaque
           a logo da loja e uma propaganda de fundo. Depois de 2 minutos sem toque, o totem volta para
@@ -466,68 +477,14 @@ export function TotemSettingsPage() {
             />
           </label>
           <label>
-            Logo da loja
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (!file) return;
-                void fileToStoreLogo(file)
-                  .then((dataUrl) => {
-                    setStoreLogo(dataUrl);
-                    markDirty();
-                  })
-                  .catch(() => setError('Não foi possível ler a logo.'));
-              }}
-            />
-          </label>
-          <label className="span-2">
-            Propaganda de fundo (foto / arte)
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (!file) return;
-                void fileToAttractBackground(file)
-                  .then((dataUrl) => {
-                    setAttractBackground(dataUrl);
-                    setAttractLayout('logoPromo');
-                    markDirty();
-                  })
-                  .catch(() => setError('Não foi possível ler a imagem de fundo.'));
-              }}
-            />
+            Descrição no cabeçalho
+            <input value={headerSubtitle} maxLength={140} placeholder="Ex.: Quiosque de venda — Shopping" onChange={event => { setHeaderSubtitle(event.target.value); markDirty(); }} />
+            <small>Texto exibido abaixo do nome da loja. Deixe vazio para usar a descrição padrão.</small>
           </label>
         </div>
-        <div className="admin-toolbar" style={{ marginTop: 8, flexWrap: 'wrap', gap: 8 }}>
-          {storeLogo ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setStoreLogo(null);
-                markDirty();
-              }}
-            >
-              Remover logo
-            </button>
-          ) : null}
-          {attractBackground ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setAttractBackground(null);
-                markDirty();
-              }}
-            >
-              Remover propaganda de fundo
-            </button>
-          ) : null}
+        <div className="totem-settings-brand-media">
+          <TotemSettingsImage label="Logo da loja" hint="Prefira uma imagem quadrada com fundo transparente." value={storeLogo} convert={fileToStoreLogo} onChange={value=>{setStoreLogo(value);markDirty();}}/>
+          <TotemSettingsImage label="Imagem de abertura" hint="Uma foto ou arte vertical funciona melhor no totem. Confira o resultado na prévia abaixo." value={attractBackground} convert={fileToAttractBackground} onChange={value=>{setAttractBackground(value);if(value)setAttractLayout('logoPromo');markDirty();}}/>
         </div>
         <div className="totem-color-field">
           <p>Cor do gradiente</p>
@@ -590,6 +547,7 @@ export function TotemSettingsPage() {
                     gradientColor={attractGradientColor}
                     backgroundImage={attractBackground}
                     layout={attractLayout}
+                    content={attractContent}
                     showActionButtons={showActionButtons}
                     customGreetingText={customGreetingText}
                     customSubtitleText={customSubtitleText}
@@ -598,7 +556,7 @@ export function TotemSettingsPage() {
                   <div className="totem-screen-preview__catalog">
                     <header>
                       <strong>{storeName.trim() || 'Sua Loja'}</strong>
-                      <span>Catálogo</span>
+                      <span>{headerSubtitle.trim() || 'Catálogo'}</span>
                     </header>
                     <div
                       className="totem-preview__grid"
@@ -925,171 +883,6 @@ export function TotemSettingsPage() {
         </div>
       </article>
 
-      <article className="admin-card admin-card--form">
-        <h2>Dados Fiscais da Loja</h2>
-        <p>
-          Informações de identificação fiscal da loja ativa. Usados para emissão de notas fiscais e
-          documentos gerados pelo sistema. Todos os campos são opcionais.
-        </p>
-        <div className="admin-form">
-          <label className="span-2">
-            Razão Social
-            <input
-              value={storeData.name || ''}
-              onChange={(e) => patchStore({ name: e.target.value })}
-              placeholder="Ex: Marthi Comércio de Eletrônicos Ltda"
-            />
-          </label>
-          <label>
-            Nome Fantasia
-            <input
-              value={storeData.tradeName || ''}
-              onChange={(e) => patchStore({ tradeName: e.target.value })}
-              placeholder="Ex: Marthi Tech"
-            />
-          </label>
-          <label>
-            CNPJ
-            <input
-              value={storeData.cnpj || ''}
-              onChange={(e) => patchStore({ cnpj: e.target.value })}
-              placeholder="00.000.000/0000-00"
-            />
-          </label>
-          <label>
-            Inscrição Estadual (IE)
-            <input
-              value={storeData.stateRegistration || ''}
-              onChange={(e) => patchStore({ stateRegistration: e.target.value })}
-              placeholder="Número ou ISENTO"
-            />
-          </label>
-          <label>
-            Inscrição Municipal (IM)
-            <input
-              value={storeData.municipalRegistration || ''}
-              onChange={(e) => patchStore({ municipalRegistration: e.target.value })}
-              placeholder="Opcional"
-            />
-          </label>
-          <AdminPicker
-            label="Regime Tributário"
-            value={storeData.taxRegime || 'simples_nacional'}
-            options={[
-              { value: 'simples_nacional', label: 'Simples Nacional' },
-              { value: 'lucro_presumido', label: 'Lucro Presumido' },
-              { value: 'lucro_real', label: 'Lucro Real' },
-              { value: 'mei', label: 'Microempreendedor Individual (MEI)' },
-            ]}
-            onChange={(val) => patchStore({ taxRegime: val as Store['taxRegime'] })}
-          />
-        </div>
-        {fiscalError ? <p className="qty-low" style={{ marginTop: 10 }}>{fiscalError}</p> : null}
-        <div className="admin-toolbar admin-toolbar--stack" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={saveFiscalData}>
-            Salvar dados fiscais
-          </button>
-          {fiscalSaved ? (
-            <span className="empty" style={{ color: 'var(--accent, #0f766e)', fontWeight: 600 }}>
-              ✓ Dados fiscais salvos!
-            </span>
-          ) : null}
-        </div>
-      </article>
-
-      <article className="admin-card admin-card--form">
-        <h2>Dados de Contato e Endereço</h2>
-        <p>
-          Informações logísticas da loja ativa: endereço, telefone e e-mail. Todos os campos são opcionais.
-        </p>
-        <div className="admin-form">
-          <label>
-            Telefone
-            <input
-              value={storeData.phone || ''}
-              onChange={(e) => patchStore({ phone: e.target.value })}
-              placeholder="(00) 00000-0000"
-            />
-          </label>
-          <label>
-            E-mail da loja
-            <input
-              type="email"
-              value={storeData.email || ''}
-              onChange={(e) => patchStore({ email: e.target.value })}
-              placeholder="contato@minhaloja.com.br"
-            />
-          </label>
-          <label>
-            CEP
-            <input
-              value={storeData.zipCode || ''}
-              onChange={(e) => patchStore({ zipCode: e.target.value })}
-              placeholder="00000-000"
-            />
-          </label>
-          <label>
-            Logradouro
-            <input
-              value={storeData.street || ''}
-              onChange={(e) => patchStore({ street: e.target.value })}
-              placeholder="Rua, Av., Travessa..."
-            />
-          </label>
-          <label>
-            Número
-            <input
-              value={storeData.number || ''}
-              onChange={(e) => patchStore({ number: e.target.value })}
-              placeholder="S/N"
-            />
-          </label>
-          <label>
-            Complemento
-            <input
-              value={storeData.complement || ''}
-              onChange={(e) => patchStore({ complement: e.target.value })}
-              placeholder="Sala, Loja, Bloco..."
-            />
-          </label>
-          <label>
-            Bairro
-            <input
-              value={storeData.neighborhood || ''}
-              onChange={(e) => patchStore({ neighborhood: e.target.value })}
-              placeholder="Bairro"
-            />
-          </label>
-          <label>
-            Cidade
-            <input
-              value={storeData.city || ''}
-              onChange={(e) => patchStore({ city: e.target.value })}
-              placeholder="Cidade"
-            />
-          </label>
-          <label>
-            UF
-            <input
-              value={storeData.state || ''}
-              onChange={(e) => patchStore({ state: e.target.value })}
-              placeholder="RJ"
-              maxLength={2}
-              style={{ textTransform: 'uppercase' }}
-            />
-          </label>
-        </div>
-        <div className="admin-toolbar admin-toolbar--stack" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={saveFiscalData}>
-            Salvar dados de contato
-          </button>
-          {fiscalSaved ? (
-            <span className="empty" style={{ color: 'var(--accent, #0f766e)', fontWeight: 600 }}>
-              ✓ Dados salvos!
-            </span>
-          ) : null}
-        </div>
-      </article>
       <article className="admin-card">
         <h2>Catálogo e atributos</h2>
         <p>

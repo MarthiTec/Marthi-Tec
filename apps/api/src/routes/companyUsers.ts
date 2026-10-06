@@ -6,7 +6,7 @@ export const companyUsersRouter = Router();
 
 companyUsersRouter.get('/api/v1/admin/company-users', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
-    const stores = await pool.query('SELECT id, trade_name FROM stores ORDER BY trade_name, id');
+    const stores = await pool.query('SELECT id, trade_name FROM stores WHERE active=true ORDER BY trade_name, id');
     const members = await pool.query(`
       SELECT DISTINCT u.id, u.name, u.email, u.active, us.store_id, us.role
       FROM users u

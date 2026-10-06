@@ -136,7 +136,7 @@ storesRouter.get('/api/v1/stores', requireAuth, async (req, res, next) => {
       const hasRestrictedStores = (userStoreCount.rows[0]?.total || 0) > 0;
 
       let sql = `
-        SELECT s.*, l.plan_id, l.modules, l.discount_percent, l.final_price
+        SELECT s.*, l.plan_id, l.modules, l.discount_percent, l.final_price, l.base_price, l.discount_amount, l.status AS license_status, l.id AS license_id, l.starts_at, l.expires_at
         FROM stores s
         LEFT JOIN store_licenses l ON l.store_id = s.id
         WHERE s.client_account_id = $1 AND s.active = true
@@ -180,6 +180,7 @@ if (hasRestrictedStores) {
           planId: r.plan_id || 'golden',
           modules: r.modules || ['totem', 'os', 'erp', 'fiscal'],
           discountPercent: Number(r.discount_percent) || 0,
+          license: r.license_id ? { id:r.license_id, storeId:r.id, planId:r.plan_id, status:r.license_status, baseMonthlyPrice:Number(r.base_price), discountAmount:Number(r.discount_amount), finalMonthlyPrice:Number(r.final_price), startDate:r.starts_at, expiresDate:r.expires_at, active:r.license_status === "active", createdAt:r.created_at } : null,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         })),
@@ -541,7 +542,7 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
                ps.status as partner_status, ps.payment_confirmed_at, ps.payment_method as partner_pay_method,
                ps.transaction_ref as partner_tx_ref, ps.notes as partner_notes, ps.monthly_amount as partner_amount
         FROM client_accounts c
-        LEFT JOIN stores s ON s.client_account_id = c.id
+        LEFT JOIN stores s ON s.client_account_id = c.id AND s.active=true
         LEFT JOIN store_licenses l ON l.client_account_id = c.id AND l.store_id=s.id
         LEFT JOIN partner_signups ps ON (ps.id = c.id OR (ps.document = c.document AND ps.document != ''))
         LEFT JOIN client_payment_confirmations pc ON pc.client_account_id=c.id
@@ -560,7 +561,7 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
             Boolean(row.manual_confirmed_at) ||
             Boolean(row.payment_confirmed_at) ||
             ['pagamento_aprovado', 'acesso_ativado', 'acesso_pendente', 'cliente_criado'].includes(row.partner_status) ||
-            (row.status === 'active' && !row.partner_status);
+            false;
           let contractingStatus = row.manual_status || (row.partner_status || 'aguardando_pagamento');
           if (row.manual_confirmed_at && row.owner_password_configured) contractingStatus = 'acesso_ativado';
           if (!isPaymentOk) {
@@ -569,6 +570,7 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
 
           map.set(row.id, {
             clientId: row.id,
+            isDemo: Boolean(row.is_demo),
             tradeName: row.trade_name,
             legalName: row.legal_name || row.trade_name,
             document: rawDoc,
@@ -579,7 +581,7 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
             status: row.status || 'active',
             contractingStatus,
             paymentOk: isPaymentOk,
-            monthlyAmount: Number(row.partner_amount ?? row.final_price ?? 0),
+            monthlyAmount: Number(row.final_price ?? row.partner_amount ?? 0),
             contractedAt: row.created_at,
             passwordConfigured: Boolean(row.owner_password_configured),
             phoneVerified: false,

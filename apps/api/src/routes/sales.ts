@@ -1,4 +1,6 @@
 import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
+import {applyDayOffersToLines} from '../services/dayOffers.js';
+import {changeVariationQuantity} from '../services/variationInventory.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -111,6 +113,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         }
       }
       await validatePickupLines(client,storeId,body.lines);
+      await applyDayOffersToLines(client,storeId,body.lines,'external');
       body.sellerName = req.user!.name;
       for (const [table, id] of [['customers', body.customerId], ['sellers', body.sellerId]] as const) {
         if (!id) continue;
@@ -255,6 +258,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         await client.query('UPDATE sales_order_lines SET pickup_kind=$2 WHERE id=$1',[lineId,line.pickupKind||'']);
         await recordPickup(client,storeId,orderId,body,line);
         if (line.stockId && line.pickupKind!=='order') {
+          await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
           const prevRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`, [line.stockId, storeId]);
           const prevQty = Number(prevRes.rows[0].qty);
           const newQty = prevQty - line.qty;
@@ -818,6 +822,7 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
       await client.query("UPDATE pickup_requests SET status='cancelled',updated_at=now() WHERE store_id=$1 AND reference_id=$2",[storeId,saleId]);
       for (const line of linesRes.rows) {
         if (line.stock_id && line.pickup_kind!=='order') {
+          await changeVariationQuantity(client,storeId,line.stock_id,line.attributes,Number(line.qty));
           const sRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE`, [line.stock_id, storeId]);
           if (sRes.rows.length > 0) {
             const prev = Number(sRes.rows[0].qty);

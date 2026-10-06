@@ -1,4 +1,5 @@
 import {PickupFields} from '../../components/PickupFields';
+import {TotemExternalQueue} from '../../components/TotemExternalQueue';
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
@@ -293,6 +294,7 @@ export function ExternalSalePage() {
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
           pickupMethodId:l.pickupMethodId,deliveryAddress:l.deliveryAddress,
+          sourceTicketId:l.sourceTicketId,
           attributes: l.attributes ?? [],
           name: l.name.trim(),
           qty: Number(l.qty) || 1,
@@ -428,6 +430,7 @@ export function ExternalSalePage() {
         </div>
       )}
 
+      <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPaymentMethod(ticket.payment==='Parcelado'?'Cartão de Crédito':'PIX');setInstallments(ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1);requestId.current=crypto.randomUUID();}}/>
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '16px', marginBottom: '16px' }}>
           {/* Card 1: Identificação da Operação (Vendedora & Cliente) */}

@@ -2,9 +2,9 @@ import {useEffect,useState} from 'react';
 import {nestRequest} from '../services/nestClient';
 import {AdminPicker} from './AdminPicker';
 import {usePickupMethods,type DeliveryAddress} from '../data/pickup';
-export function PickupFields({product,methodId,address,onChange,publicMode=false}:{product?:{id?:string;pickupPrices?:Record<string,number|null>;price?:number};methodId?:string;address?:DeliveryAddress;onChange:(methodId:string,address?:DeliveryAddress,price?:number)=>void;publicMode?:boolean}){
+export function PickupFields({product,methodId,address,onChange,publicMode=false}:{product?:{id?:string;pickupPrices?:Record<string,number|null>;price?:number;allowedPickupMethodIds?:string[]};methodId?:string;address?:DeliveryAddress;onChange:(methodId:string,address?:DeliveryAddress,price?:number)=>void;publicMode?:boolean}){
  const {methods,error}=usePickupMethods(publicMode);
- const available=methods.filter(m=>m.active&&product?.pickupPrices?.[m.id]!==null);const method=available.find(m=>m.id===methodId);
+ const prices=product?.pickupPrices??{};const available=methods.filter(m=>m.active&&(product?.allowedPickupMethodIds?product.allowedPickupMethodIds.includes(m.id):Object.keys(prices).length?Object.hasOwn(prices,m.id)&&prices[m.id]!==null:m.kind==='immediate'));const method=available.find(m=>m.id===methodId);
  const [estimatedDate,setEstimatedDate]=useState<string>();
  const [quoteError,setQuoteError]=useState('');
  useEffect(()=>{let alive=true;setEstimatedDate(undefined);setQuoteError('');if(method?.kind==='order'&&product?.id){void nestRequest<{estimatedDate:string}>(`${publicMode?'/totem/pickup-quote':'/pickup-quote'}?stockId=${encodeURIComponent(product.id)}&methodId=${encodeURIComponent(method.id)}`).then(q=>{if(alive)setEstimatedDate(q.estimatedDate);}).catch(e=>{if(alive)setQuoteError(e.message);});}return()=>{alive=false;};},[method?.id,product?.id,publicMode]);

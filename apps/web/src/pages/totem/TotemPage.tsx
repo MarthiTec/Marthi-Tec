@@ -1,4 +1,6 @@
 import {PickupFields} from '../../components/PickupFields';
+import {usePickupMethods} from '../../data/pickup';
+import {productPickupMethods,selectProductVariation,productAvailableForTotem} from '../../data/productPickup';
 import type {DeliveryAddress} from '../../data/pickup';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +39,10 @@ import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../dat
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemAttractScene } from './TotemAttractScene';
+import {TotemGuidedFlow} from './TotemGuidedFlow';
+import {assistantText} from '../../data/totemAssistant';
+import {loadTotemOffers,dayOfferFor,type DayOffer} from '../../data/dayOffers';
+import QRCode from 'qrcode';
 import { TotemFooter } from './TotemFooter';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
@@ -54,12 +60,12 @@ import './totem.css';
 const TRANSACTION_IDLE_MS = 5 * 60 * 1000;
 const DONE_IDLE_MS = 45 * 1000;
 
-type Step = 'attract' | 'welcome' | 'catalog' | 'checkout' | 'done';
+type Step = 'attract' | 'welcome' | 'guided' | 'catalog' | 'checkout' | 'done';
 type BrandFilter = TotemBrand | 'all';
 type CardConfig = Record<string, string>;
 
 type Selection = {
-  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;pickupPrices?:Record<string,number|null>;baseCashPrice:number;
+  stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;pickupPrices?:Record<string,number|null>;baseCashPrice:number;pickupAllowedIds?:string[];
   product: TotemProduct;
   picked: PickedAttribute[];
   payment: string;
@@ -142,6 +148,7 @@ function pickedFromConfig(
 }
 
 export function TotemPage() {
+  const preview = new URLSearchParams(window.location.search).get("preview") === "1";
   const navigate = useNavigate();
   const listRef = useRef<HTMLDivElement>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
@@ -161,6 +168,13 @@ export function TotemPage() {
   const [error, setError] = useState<string | null>(null);
   const [idleTick, setIdleTick] = useState(0);
   const [cardAttrs, setCardAttrs] = useState(() => totemCardAttributes());
+  const {methods: pickupMethods} = usePickupMethods(true);
+  const [guidedSettings,setGuidedSettings]=useState(()=>getTotemSettings().assistant);
+  const [attractContent,setAttractContent]=useState(()=>getTotemSettings().attractContent);
+  const [shoppingIntent,setShoppingIntent]=useState('all');
+  const [dayOffers,setDayOffers]=useState<DayOffer[]>([]);
+  const [offerNow,setOfferNow]=useState(Date.now);
+  useEffect(()=>{let active=true;const refresh=()=>{void loadTotemOffers().then(rows=>{if(active)setDayOffers(rows);}).catch(()=>{});setOfferNow(Date.now());};refresh();const timer=window.setInterval(refresh,60000);return()=>{active=false;window.clearInterval(timer);};},[]);
   const [filterAttrs, setFilterAttrs] = useState(() => totemFilterAttributes());
 
   const [exitOpen, setExitOpen] = useState(false);
@@ -184,6 +198,7 @@ export function TotemPage() {
     () => getTotemSettings().customSubtitleText || '',
   );
   const [storeName, setStoreName] = useState(() => getTotemSettings().storeName);
+  const [headerSubtitle, setHeaderSubtitle] = useState(() => getTotemSettings().headerSubtitle);
   const [storeLogo, setStoreLogo] = useState(() => getTotemSettings().storeLogo);
   const [attractBackground, setAttractBackground] = useState(() => getTotemSettings().attractBackground);
   const [attractGradientColor, setAttractGradientColor] = useState(
@@ -197,6 +212,9 @@ export function TotemPage() {
   const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
   const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
   const [trackingToken,setTrackingToken]=useState<string>();
+  const [whatsappUrl,setWhatsappUrl]=useState<string>();
+  const [whatsappQr,setWhatsappQr]=useState<string>();
+  useEffect(()=>{let alive=true;setWhatsappQr(undefined);if(whatsappUrl)void QRCode.toDataURL(whatsappUrl,{width:300,margin:2}).then(image=>{if(alive)setWhatsappQr(image);}).catch(()=>{});return()=>{alive=false;};},[whatsappUrl]);
   const [catalog, setCatalog] = useState<(TotemProduct & { totalQty?: number })[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -204,7 +222,7 @@ export function TotemPage() {
   const [sentToCashierDone, setSentToCashierDone] = useState(false);
   const effectiveMode = sessionMode ?? mode;
   const catalogOnly = effectiveMode === 'catalog';
-  const showDineIn = offerFulfillment && !catalogOnly;
+  const showDineIn = vertical === 'food' && offerFulfillment && !catalogOnly;
   const collectNameUpFront = askCustomerName && !catalogOnly;
   const canPrintTicket = printTicket && !catalogOnly;
   const askPhoneOnCheckout = !catalogOnly;
@@ -256,6 +274,7 @@ export function TotemPage() {
     setExitError(null);
     setConfigs({});
     setTicketId(null);
+    setShoppingIntent('all');setWhatsappUrl(undefined);setTrackingToken(undefined);
     setSentToCashierDone(false);
     setSessionMode(null);
     stopTotemSpeech();
@@ -289,8 +308,8 @@ export function TotemPage() {
   }, [catalog]);
 
   const brandProducts = useMemo(() => {
-    return catalog.filter((item) => brand === 'all' || item.brand === brand);
-  }, [brand, catalog]);
+    return catalog.filter((item) => (brand === 'all' || item.brand === brand) && productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===item.stockId)));
+  }, [brand, catalog,pickupMethods]);
 
   const products = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -301,9 +320,10 @@ export function TotemPage() {
         if (selected === 'all') return true;
         return productAttrValues(item, attr).includes(selected);
       });
-      return searchOk && attrOk;
-    });
-  }, [brandProducts, search, filters, filterAttrs]);
+      const offerOk=shoppingIntent!=='offers'||dayOffers.some(offer=>offer.criteria.stockIds.includes(item.stockId||'')&&Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow));
+      return searchOk && attrOk && offerOk;
+    }).sort((a,b)=>shoppingIntent==='low'?a.cashPrice-b.cashPrice:shoppingIntent==='new'?Date.parse(listTotemStock().find(row=>row.id===b.stockId)?.createdAt||'')-Date.parse(listTotemStock().find(row=>row.id===a.stockId)?.createdAt||''):0);
+  }, [brandProducts, search, filters, filterAttrs,shoppingIntent,dayOffers,offerNow]);
 
   useEffect(() => {
     const scrolling = step === 'catalog';
@@ -485,6 +505,8 @@ export function TotemPage() {
           setAudioAssist(settings.audioAssist);
           setShowAttractScreen(settings.showAttractScreen);
           setStoreName(settings.storeName);
+          setHeaderSubtitle(settings.headerSubtitle);
+          setGuidedSettings(settings.assistant);setAttractContent(settings.attractContent);
           setStoreLogo(settings.storeLogo);
           setAttractBackground(settings.attractBackground);
           setAttractGradientColor(settings.attractGradientColor);
@@ -539,6 +561,8 @@ export function TotemPage() {
       setCustomGreetingText(settings.customGreetingText || '');
       setCustomSubtitleText(settings.customSubtitleText || '');
       setStoreName(settings.storeName);
+      setHeaderSubtitle(settings.headerSubtitle);
+      setGuidedSettings(settings.assistant);setAttractContent(settings.attractContent);
       setStoreLogo(settings.storeLogo);
       setAttractBackground(settings.attractBackground);
       setAttractGradientColor(settings.attractGradientColor);
@@ -559,10 +583,12 @@ export function TotemPage() {
         /* cache local já aplicado */
       }
       applySettingsFromCache();
-      void loadTotemCatalog().then(applyCatalog).catch(()=>{setCatalog([]);setCatalogError('Não foi possível carregar o estoque do servidor.');});
+      await loadTotemCatalog().then(next => {applyCatalog(next);setCatalogError(null);}).catch(()=>{
+        applyCatalog(listTotemCatalog());
+        setCatalogError('Conexão instável. Tentando atualizar o catálogo novamente.');
+      });
     }
 
-    void refreshLive();
     return subscribeTotemLive(refreshLive);
   }, []);
 
@@ -576,7 +602,7 @@ export function TotemPage() {
   function beginOrder() {
     bumpIdle();
     setSessionMode('kiosk');
-    setStep(askCustomerName ? 'welcome' : 'catalog');
+    setStep(guidedSettings.enabled?'guided':askCustomerName ? 'welcome' : 'catalog');
   }
 
   function beginCatalogBrowse() {
@@ -595,20 +621,31 @@ export function TotemPage() {
         base[attr.id] = selected;
       }
     }
+    const stock=listTotemStock().find(item=>item.id===product.stockId);
+    const selected=selectProductVariation(stock,base);
+    if(selected) Object.assign(base,selected.attrs);
+    const available=productPickupMethods(pickupMethods,stock??null,selected);
+    if(!available.some(method=>method.id===base['pickup-method'])) base['pickup-method']=available[0]?.id||'';
     return base;
   }
 
   function patchConfig(productId: number, attrId: string, value: string) {
     setConfigs((current) => {
       const product = catalog.find((item) => item.id === productId);
-      const base = current[productId] ?? (product ? defaultConfig(product, cardAttrs) : {});
-      return { ...current, [productId]: { ...base, [attrId]: value } };
+      const base = product ? getConfig(product) : current[productId] ?? {};
+      const next={...base,[attrId]:value};
+      if(product && attrId!=='pickup-method') {
+        const selected=selectProductVariation(listTotemStock().find(item=>item.id===product.stockId),next,attrId);
+        if(selected) Object.assign(next,selected.attrs);
+      }
+      return { ...current, [productId]: next };
     });
   }
 
   function openCheckout(product: TotemProduct) {
-    trackTotemProductClick({ productId: product.id, productName: product.name });
-    if (catalogOnly) return;
+    if (!preview) trackTotemProductClick({ productId: product.id, productName: product.name });
+    if (catalogOnly && mode !== 'kiosk') return;
+    if (catalogOnly) setSessionMode('kiosk');
     const config = getConfig(product);
     const picked = pickedFromConfig(product, config, cardAttrs);
     if (showDineIn) {
@@ -618,7 +655,7 @@ export function TotemPage() {
         value: config[TOTEM_DINE_ID] || TOTEM_DINE_OPTIONS[0],
       });
     }
-    const quote = quoteFromPicked(product.name, product.cashPrice, picked, listTotemStock());
+    const quote = quoteFromPicked(product.name, product.cashPrice, picked, listTotemStock().filter(s => s.id === product.stockId));
     const stockFee =
       quote.stock?.cardRate !== undefined && quote.stock?.cardRate !== null && Number.isFinite(Number(quote.stock.cardRate))
         ? Number(quote.stock.cardRate)
@@ -626,12 +663,14 @@ export function TotemPage() {
     const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
     setSelection({
       stockId:quote.stock?.id,pickupPrices:quote.stock?.pickupPrices,baseCashPrice:quote.cashPrice,
+      pickupAllowedIds:productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]).map(method=>method.id),
+      pickupMethodId:config['pickup-method'],
       product,
       picked,
       payment: PAYMENT_OPTIONS[0],
       installment: INSTALLMENTS[0],
-      cashPrice: quote.cashPrice,
-      installmentLabel: quote.installmentLabel,
+      cashPrice: dayOfferFor(dayOffers,product.stockId||'',config,quote.stock?.pickupPrices?.[config['pickup-method']]??quote.cashPrice)?.promoPrice ?? quote.stock?.pickupPrices?.[config['pickup-method']] ?? quote.cashPrice,
+      installmentLabel: formatInstallment(dayOfferFor(dayOffers,product.stockId||'',config,quote.stock?.pickupPrices?.[config['pickup-method']]??quote.cashPrice)?.promoPrice ?? quote.stock?.pickupPrices?.[config['pickup-method']] ?? quote.cashPrice, 12, cardFeePercent),
       cardFeePercent,
     });
     setError(null);
@@ -711,6 +750,7 @@ export function TotemPage() {
 
   const [notificationWarning,setNotificationWarning]=useState<string>();
   async function handleSubmitOrder(destination: 'cashier' | 'whatsapp') {
+    if (preview) { setError('Esta é uma prévia. Abra o Totem para enviar um pedido real.'); return; }
     if (!selection) return;
     if (!name.trim()) {
       setError('Informe seu nome para confirmar o pedido.');
@@ -755,6 +795,7 @@ export function TotemPage() {
       });
       setNotificationWarning(result.notificationWarning);
       setTrackingToken(result.trackingToken);
+      setWhatsappUrl(result.whatsappUrl);
       setTicketId(result.ticketId);
       setSentToCashierDone(isToCashier);
       setStep('done');
@@ -792,7 +833,7 @@ export function TotemPage() {
         ) : (
           <div className="totem__top-meta">
             <strong>{storeName}</strong>
-            <span>{catalogOnly ? copy.catalogSubtitle : copy.kioskSubtitle}</span>
+            <span>{headerSubtitle || (catalogOnly ? copy.catalogSubtitle : copy.kioskSubtitle)}</span>
           </div>
         )}
         {showTotemBack ? (
@@ -841,6 +882,7 @@ export function TotemPage() {
           gradientColor={attractGradientColor}
           backgroundImage={attractBackground}
           layout={attractLayout}
+          content={attractContent}
           showActionButtons={showActionButtons}
           customGreetingText={customGreetingText}
           customSubtitleText={customSubtitleText}
@@ -849,6 +891,7 @@ export function TotemPage() {
         />
       )}
 
+      {step==='guided'&&<TotemGuidedFlow settings={guidedSettings} brands={totemBrandTabs.filter(item=>item.id!=='all'&&catalog.some(product=>product.brand===item.id&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} hasOffers={dayOffers.some(offer=>Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow)&&catalog.some(product=>offer.criteria.stockIds.includes(product.stockId||'')&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} onCancel={resetTotem} onComplete={(customer,intent,chosenBrand)=>{setName(customer);setShoppingIntent(intent);setBrand(chosenBrand as BrandFilter);setStep('catalog');bumpIdle();}}/>}
       {step === 'welcome' && collectNameUpFront && (
         <section className={`totem__welcome totem__welcome--kb-${keyboardPlacement}`}>
           {keyboardPlacement === 'top' ? (
@@ -983,6 +1026,7 @@ export function TotemPage() {
                         {item.label}
                       </button>
                     ))}
+                    <button type="button" className={`totem-chip totem-chip--offer ${shoppingIntent==='offers'?'is-active':''}`} onClick={()=>{bumpIdle();setShoppingIntent(current=>current==='offers'?'all':'offers');}}>OFERTAS DO DIA</button>
                   </div>
                 </div>
               ) : null}
@@ -1090,14 +1134,18 @@ export function TotemPage() {
             <div
               className="totem__scroll"
               ref={listRef}
-              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
             >
               {products.map((product) => {
                 const config = getConfig(product);
                 const pickers = cardAttrs
                   .filter((attr) => resolveTotemAttrOptions(product, attr).length > 0)
                   .slice(0, 5);
-                const quote = quoteTotemVariant(product.name, product.cashPrice, config, listTotemStock());
+                const quote = quoteTotemVariant(product.name, product.cashPrice, config, listTotemStock().filter(s => s.id === product.stockId));
+                const availablePickup = productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]);
+                const pickupPrice = quote.stock?.pickupPrices?.[config['pickup-method']];
+                const normalPrice = typeof pickupPrice === 'number' ? pickupPrice : quote.cashPrice;
+                const offer=dayOfferFor(dayOffers,product.stockId||'',config,normalPrice,offerNow);
+                const displayedPrice = offer?.promoPrice ?? normalPrice;
                 return (
                   <article
                     key={product.id}
@@ -1107,7 +1155,7 @@ export function TotemPage() {
                     <div
                       className="totem-card__media"
                       onClick={() => {
-                        if (catalogOnly) {
+                        if (catalogOnly && !preview) {
                           trackTotemProductClick({
                             productId: product.id,
                             productName: product.name,
@@ -1124,9 +1172,10 @@ export function TotemPage() {
                     </div>
 
                     <div className="totem-card__body">
-                      <h2>{product.name}</h2>
+                      {offer&&<div className="totem-card__offer"><strong>OFERTA DO DIA</strong><span>{offer.name}</span><small>Termina em {Math.max(1,Math.ceil((Date.parse(offer.endDate)-offerNow)/60000))} min</small></div>}
+                      <h2 title={product.name}>{product.name}</h2>
 
-                      <div className="totem-card__fields" data-count={pickers.length + (showDineIn ? 1 : 0)}>
+                      <div className="totem-card__fields" data-count={pickers.length + 1 + (showDineIn ? 1 : 0)}>
                         {pickers.map((attr) => {
                           const options = resolveTotemAttrOptions(product, attr);
                           return (
@@ -1144,6 +1193,16 @@ export function TotemPage() {
                             />
                           );
                         })}
+                        <TotemPicker
+                          label="Tipo de retirada"
+                          value={availablePickup.find(method => method.id === config['pickup-method'])?.name || 'Selecionar'}
+                          options={availablePickup.map(method => method.name)}
+                          onChange={value => {
+                            bumpIdle();
+                            const method = availablePickup.find(method => method.name === value);
+                            if (method) patchConfig(product.id, 'pickup-method', method.id);
+                          }}
+                        />
                         {showDineIn ? (
                           <TotemPicker
                             label="Pedido"
@@ -1160,21 +1219,24 @@ export function TotemPage() {
                       <div className="totem-card__footer">
                         <div className="totem-card__price">
                           {copy.showInstallments ? <span>À Vista</span> : <span>Preço</span>}
-                          <strong>{formatBRL(quote.cashPrice)}</strong>
-                          {copy.showInstallments ? <small>{quote.installmentLabel}</small> : null}
+                          {offer&&<del>De {formatBRL(normalPrice)}</del>}
+                          <strong>{formatBRL(displayedPrice)}</strong>
+                          {copy.showInstallments ? <small>{formatInstallment(displayedPrice, 12, quote.stock?.cardRate ?? undefined)}</small> : null}
                           {quote.stock ? (
                             <em className="totem-card__stock">
                               {quote.qty > 0 ? `${quote.qty} un. em estoque` : 'Sob consulta'}
                             </em>
                           ) : null}
                         </div>
-                        {catalogOnly ? null : (
+                        {catalogOnly && mode !== 'kiosk' ? null : (
                           <button
                             type="button"
-                            className="totem-btn totem-btn--primary"
+                            className="totem-btn totem-btn--primary totem-card__order"
+                            aria-label={`Fazer pedido de ${product.name}`}
+                            disabled={!quote.stock || displayedPrice<=0 || !config['pickup-method']}
                             onClick={() => openCheckout(product)}
                           >
-                            {copy.nextButton}
+                            Fazer pedido
                           </button>
                         )}
                       </div>
@@ -1183,6 +1245,7 @@ export function TotemPage() {
                 );
               })}
 
+              {catalogError && products.length > 0 && <p className="totem__empty" role="status">{catalogError}</p>}
               {catalogLoading && products.length === 0 && (
                 <p className="totem__empty">Carregando catálogo…</p>
               )}
@@ -1241,7 +1304,7 @@ export function TotemPage() {
 
             <div className="totem__checkout-form">
               <h1>{selection.product.name}</h1>
-              <PickupFields publicMode product={{id:selection.stockId,price:selection.baseCashPrice,pickupPrices:selection.pickupPrices}} methodId={selection.pickupMethodId} address={selection.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setSelection(current=>current?{...current,pickupMethodId,deliveryAddress,cashPrice:price??current.baseCashPrice}:current)}/>
+              <PickupFields publicMode product={{id:selection.stockId,price:selection.baseCashPrice,pickupPrices:selection.pickupPrices,allowedPickupMethodIds:selection.pickupAllowedIds}} methodId={selection.pickupMethodId} address={selection.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setSelection(current=>current?{...current,pickupMethodId,deliveryAddress,cashPrice:dayOfferFor(dayOffers,current.stockId||'',Object.fromEntries(current.picked.map(a=>[a.id,a.value])),price??current.baseCashPrice)?.promoPrice??price??current.baseCashPrice}:current)}/>
               <div className="totem__summary">
                 {selection.picked.map((item) => (
                   <p key={item.id}>
@@ -1447,6 +1510,8 @@ export function TotemPage() {
 
       {step === 'done' && selection && (
         <section className="totem__done">
+          {guidedSettings.enabled&&<h2>{assistantText(guidedSettings.closingPrompt,name,guidedSettings.name)}</h2>}
+          {!sentToCashierDone&&whatsappUrl&&<div className="totem-whatsapp-handoff">{whatsappQr&&<img src={whatsappQr} alt="QR Code para continuar este pedido com o vendedor no WhatsApp"/>}<p>Leia o QR Code com seu celular ou toque no botão para continuar com {guidedSettings.name||'o vendedor'}.</p><a className="totem-btn totem-btn--primary" href={whatsappUrl} target="_blank" rel="noreferrer">Continuar no WhatsApp</a></div>}
           {notificationWarning&&<p role="status">{notificationWarning}</p>}
           <h1>{notificationWarning?'Pedido registrado':sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
           {senha ? (

@@ -51,10 +51,12 @@ function buildTotemAttrs(rows: StockItem[]): Record<string, string[]> {
   for (const row of rows) {
     if (row.variations && row.variations.length > 0) {
       for (const v of row.variations) {
+        if (Number(v.price) <= 0 && !Object.values(v.pickupPrices ?? {}).some(price => Number(price) > 0)) continue;
         for (const [attrId, value] of Object.entries(v.attrs ?? {})) {
           pushUnique(attrs, attrId, value);
         }
       }
+      continue;
     }
     for (const [attrId, value] of Object.entries(row.attrs ?? {})) {
       pushUnique(attrs, attrId, value);
@@ -72,14 +74,17 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     if (!item.showOnTotem || item.active===false) continue;
     if (item.qty < 0) continue;
     if (item.kind === 'supply') continue;
-    const key = item.name.trim();
+    if (item.variations?.length && !item.variations.some(v => Number(v.price)>0 || Object.values(v.pickupPrices ?? {}).some(price=>Number(price)>0))) continue;
+    if (!item.variations?.length && Number(item.price)<=0) continue;
+    const key = item.id;
     if (!key) continue;
     const list = groups.get(key) ?? [];
     list.push(item);
     groups.set(key, list);
   }
 
-  return [...groups.entries()].map(([name, rows]) => {
+  return [...groups.values()].map((rows) => {
+    const name = rows[0].name;
     const attrs = buildTotemAttrs(rows);
     const colors = attrs[ATTR_COR] ?? [];
     const storages = attrs[ATTR_CAP] ?? [];
@@ -90,12 +95,11 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     });
     const primary = priced[0];
     const bestCashPrice = primary.variations?.length
-      ? Math.min(...primary.variations.map(v => v.price))
+      ? Math.min(...primary.variations.flatMap(v => [v.price,...Object.values(v.pickupPrices??{})].map(Number).filter(price=>price>0)))
       : primary.price;
     const images = rows
       .flatMap((row) => stockItemImages(row))
-      .filter((url, index, all) => all.indexOf(url) === index)
-      .slice(0, 4);
+      .filter((url, index, all) => all.indexOf(url) === index);
     const stockFee =
       primary.cardRate !== undefined && primary.cardRate !== null && Number.isFinite(Number(primary.cardRate))
         ? Number(primary.cardRate)
@@ -103,14 +107,15 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
     const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
 
     return {
-      id: stableId(name),
+      id: stableId(primary.id),
+      stockId: primary.id,
       name,
       brand: resolveTotemBrand(primary.brand, name),
       storages,
       colors,
       cashPrice: bestCashPrice,
       installmentLabel: formatInstallment(bestCashPrice, 12, cardFeePercent),
-      images: (images.length ? images : stockItemImages(primary)).slice(0, 4),
+      images: images.length ? images : stockItemImages(primary),
       attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),
     };
@@ -149,7 +154,8 @@ export async function loadTotemCatalog(): Promise<(TotemProduct & { totalQty?: n
     rememberStock(Array.isArray(remote)?remote:[]);
     return groupStockForTotem(listTotemStock());
   } catch(error) {
-    if(requestedScope===scope())rememberStock([]);
+    const status=(error as {status?:number}).status;
+    if(requestedScope===scope() && (status===401 || status===403 || status===404))rememberStock([]);
     throw error;
   }
 }

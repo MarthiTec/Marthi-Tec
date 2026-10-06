@@ -2,6 +2,7 @@ export type TotemBrand = 'apple' | 'xiaomi' | 'other';
 
 export type TotemProduct = {
   id: number;
+  stockId?: string;
   name: string;
   brand: TotemBrand;
   storages: string[];

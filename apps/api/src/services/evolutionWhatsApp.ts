@@ -128,7 +128,7 @@ export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
 }> {
   const config = lead.storeId ? await getStoreWhatsAppConfig(lead.storeId) : undefined;
   if (config && !config.enabled) throw Object.assign(new Error('WhatsApp desativado nesta loja.'), {status:400});
-  const storeNumber = config ? config.storeNumber : lead.storeWhatsApp?.trim() || env.EVOLUTION_STORE_NUMBER;
+  const storeNumber = lead.storeWhatsApp?.trim() || (config ? config.storeNumber : env.EVOLUTION_STORE_NUMBER);
   if (!storeNumber) {
     const error = new Error(
       'Número da loja não configurado. Informe o WhatsApp em Painel → Totem → WhatsApp, ou EVOLUTION_STORE_NUMBER.',

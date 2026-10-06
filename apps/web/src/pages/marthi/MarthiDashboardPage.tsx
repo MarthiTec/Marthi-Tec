@@ -39,12 +39,12 @@ function buildRevenueCurve(clients: ReturnType<typeof listMarthiClients>) {
 
 export function MarthiDashboardPage() {
   const [metrics, setMetrics] = useState<MarthiDashboardMetrics>(() => getMarthiDashboardMetrics());
-  const [clients, setClients] = useState(() => listMarthiClients());
+  const [clients, setClients] = useState(() => listMarthiClients().filter(c => !c.isDemo));
 
   useEffect(() => {
     function refresh() {
       setMetrics(getMarthiDashboardMetrics());
-      setClients(listMarthiClients());
+      setClients(listMarthiClients().filter(c => !c.isDemo));
     }
     refresh();
     window.addEventListener(MARTHI_CLIENTS_EVENT, refresh);
@@ -115,7 +115,7 @@ export function MarthiDashboardPage() {
           <p>Ativos com pagamento em dia.</p>
         </article>
         <article className="admin-card">
-          <h2>Receita mensal</h2>
+          <h2>Mensalidade contratada</h2>
           <strong className="price-red">{money(metrics.monthlyRevenue)}</strong>
           <p>Soma dos planos Bronze / Silver / Golden.</p>
         </article>

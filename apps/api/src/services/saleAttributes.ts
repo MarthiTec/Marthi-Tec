@@ -11,11 +11,13 @@ export async function validateSaleAttributes(db: PoolClient,storeId: string,line
    if(!result.rows.length) throw Object.assign(new Error('Atributo não disponível nesta loja.'),{status:400});
    let values=result.rows.map(row=>row.value);
    if(line.stockId) {
-    const stock=(await db.query('SELECT attrs,color,capacity FROM stock_items WHERE id=$1 AND store_id=$2',[line.stockId,storeId])).rows[0];
+    const stock=(await db.query('SELECT attrs,color,capacity,variations FROM stock_items WHERE id=$1 AND store_id=$2',[line.stockId,storeId])).rows[0];
     if(stock) {
      const mapped=stock.attrs?.[picked.id]; const name=result.rows[0].name.toLowerCase();
      const legacy=name==='cor' ? stock.color : name==='capacidade' ? stock.capacity : '';
-     if(Array.isArray(mapped) && mapped.length) values=mapped;
+     const variants=Array.isArray(stock.variations)?stock.variations.map((v:any)=>v.attrs?.[picked.id]).filter(Boolean):[];
+     if(variants.length) values=variants;
+     else if(Array.isArray(mapped) && mapped.length) values=mapped;
      else if(typeof mapped==='string' && mapped) values=[mapped];
      else if(legacy) values=[legacy];
     }

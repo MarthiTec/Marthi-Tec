@@ -19,24 +19,27 @@ export function ProductCarousel({
 }: ProductCarouselProps) {
   const slides = images.length > 0 ? images : [];
   const [index, setIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const paused = useRef(false);
 
   useEffect(() => {
     setIndex(0);
+    setFailedImages(new Set());
   }, [slides.join('|')]);
 
   useEffect(() => {
     if (slides.length < 2 || !autoPlayMs) return;
     const timer = window.setInterval(() => {
       if (paused.current) return;
+      if (document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       setIndex((current) => (current + 1) % slides.length);
     }, autoPlayMs);
     return () => window.clearInterval(timer);
-  }, [slides.length, autoPlayMs, index]);
+  }, [slides.length, autoPlayMs]);
 
   if (slides.length === 0) {
-    return <div className={`totem-carousel totem-carousel--empty ${className}`} />;
+    return <div className={`totem-carousel totem-carousel--${size} totem-carousel--empty ${className}`} role="img" aria-label={`${alt} — sem foto`}><span className="totem-carousel__placeholder">Sem foto</span></div>;
   }
 
   function go(delta: number) {
@@ -87,7 +90,11 @@ export function ProductCarousel({
       >
         {slides.map((src, slideIndex) => (
           <div className="totem-carousel__slide" key={`${src}-${slideIndex}`}>
-            <img src={src} alt={`${alt} — foto ${slideIndex + 1}`} draggable={false} />
+            {failedImages.has(src) ? (
+              <span className="totem-carousel__placeholder" role="img" aria-label={`${alt} — foto indisponível`}>Foto indisponível</span>
+            ) : (
+              <img src={src} alt={`${alt} — foto ${slideIndex + 1}`} draggable={false} loading="lazy" decoding="async" onError={() => setFailedImages(current => new Set([...current, src]))} />
+            )}
           </div>
         ))}
       </div>

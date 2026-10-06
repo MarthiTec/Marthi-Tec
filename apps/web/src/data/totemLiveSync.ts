@@ -17,25 +17,28 @@ export function notifyTotemLive() {
   }
 }
 
-export function subscribeTotemLive(onChange: () => void) {
+export function subscribeTotemLive(onChange: () => void | Promise<void>) {
   if (typeof window === 'undefined') {
     return () => undefined;
   }
 
+  let refreshing = false;
+  let disposed = false;
   function refresh() {
+    if (refreshing || disposed) return;
+    refreshing = true;
     invalidateAdminMemory();
     invalidateTotemSettingsMemory();
-    onChange();
+    try {
+      void Promise.resolve(onChange()).catch(() => undefined).finally(() => { refreshing = false; });
+    } catch {
+      refreshing = false;
+    }
   }
 
   function onStorage(event: StorageEvent) {
-    if (
-      event.key &&
-      event.key !== 'marthi.admin.v2' &&
-      event.key !== 'marthi.admin.v1' &&
-      event.key !== 'marthi.totem.settings.v1' &&
-      event.key !== 'marthi.attributes.v1'
-    ) {
+    const keys = ['marthi.admin.v2', 'marthi.admin.v1', 'marthi.totem.settings.v1', 'marthi.attributes.v1'];
+    if (event.key && !keys.some(key => event.key === key || event.key!.startsWith(`${key}:`))) {
       return;
     }
     refresh();
@@ -56,25 +59,17 @@ export function subscribeTotemLive(onChange: () => void) {
     channel = null;
   }
 
-  let isPolling = false;
   function safeBackgroundPoll() {
     // Não executa polling se a aba estiver em segundo plano ou se outra chamada estiver pendente
     if (typeof document !== 'undefined' && document.hidden) return;
-    if (isPolling) return;
-    isPolling = true;
-    try {
-      refresh();
-    } finally {
-      setTimeout(() => {
-        isPolling = false;
-      }, 1500);
-    }
+    refresh();
   }
 
   // Intervalo seguro de 45s (evita estourar o rate limiter/throttler do servidor)
   const poll = window.setInterval(safeBackgroundPoll, 45_000);
 
   return () => {
+    disposed = true;
     window.removeEventListener(STOCK_EVENT, refresh);
     window.removeEventListener(ADMIN_STATE_EVENT, refresh);
     window.removeEventListener(ATTRIBUTES_EVENT, refresh);

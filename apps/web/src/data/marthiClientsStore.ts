@@ -30,6 +30,7 @@ export type MarthiClientPaymentDetails = {
 };
 
 export type MarthiClient = {
+  isDemo?: boolean;
   clientId: string;
   tradeName: string;
   legalName?: string;
@@ -154,6 +155,7 @@ function normalizeClient(raw: Partial<MarthiClient>): MarthiClient {
 
   return {
     clientId: raw.clientId || uid(),
+    isDemo: Boolean(raw.isDemo),
     tradeName: (raw.tradeName ?? '').trim() || 'Cliente',
     legalName: raw.legalName?.trim() || undefined,
     document: raw.document?.trim() || undefined,
@@ -761,7 +763,7 @@ export type MarthiDashboardMetrics = {
 };
 
 export function getMarthiDashboardMetrics(): MarthiDashboardMetrics {
-  const clients = listMarthiClients();
+  const clients = listMarthiClients().filter(c => !c.isDemo);
   const presence = listPresenceEntries();
   const onlineEmails = new Set(
     presence

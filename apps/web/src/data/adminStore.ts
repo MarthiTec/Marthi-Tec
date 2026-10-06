@@ -66,6 +66,7 @@ export type StockVariationRow = {
 };
 
 export type StockItem = {
+  createdAt?:string;
   active?: boolean;
   skuAuto?:boolean;
   pricingPolicy?:PricingPolicy|null;

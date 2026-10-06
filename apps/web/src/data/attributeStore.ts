@@ -1,5 +1,6 @@
 import { getActiveTenantKey, tenantScopedKey } from './tenantContext';
 import { isNestAuthed, getAuthToken } from '../services/nestClient';
+import { getExplicitTotemStoreId } from './totemContext';
 export const ATTR_COR = 'ATTR-COR';
 export const ATTR_CAP = 'ATTR-CAP';
 export const ATTR_RET = 'ATTR-RET';
@@ -74,8 +75,12 @@ export function getAttributes() { return load(); }
 export async function hydrateAttributesFromApi(): Promise<ProductAttribute[]> {
  const expected=context();
  const { apiGetTotemPublicAttributes,apiListAttributes }=await import('../services/erpApi');
- try { return persist(await (isNestAuthed() ? apiListAttributes() : apiGetTotemPublicAttributes()),expected); }
- catch(error) { persist([],expected); throw error; }
+ try { return persist(await (isNestAuthed() && !getExplicitTotemStoreId() ? apiListAttributes() : apiGetTotemPublicAttributes()),expected); }
+ catch(error) {
+   const status=(error as {status?:number}).status;
+   if(status===401 || status===403 || status===404) persist([],expected);
+   throw error;
+ }
 }
 function authenticated() { if(!isNestAuthed()) throw new Error('Entre na sua conta para salvar atributos.'); }
 export async function createAttribute(payload: Omit<ProductAttribute,'id'>) {
@@ -149,15 +154,14 @@ export function productAttrValues(
   return [];
 }
 
-/** Opções do picker no card: valores do produto, senão os valores cadastrados no atributo. */
+/** Somente opções vinculadas ao produto podem ser oferecidas ao comprador. */
 export function resolveTotemAttrOptions(
   product: { attrs?: Record<string, string[]>; colors?: string[]; storages?: string[] },
   attr?: ProductAttribute,
 ) {
   if (!attr) return [];
   const fromProduct = productAttrValues(product, attr);
-  if (fromProduct.length) return fromProduct;
-  return Array.isArray(attr.values) ? attr.values.filter(Boolean) : [];
+  return fromProduct.filter(Boolean);
 }
 
 /** Atributos que aparecem no card (totem + filtro). */

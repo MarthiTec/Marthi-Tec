@@ -1,4 +1,6 @@
 import {submitTotemLead as sendTotemWhatsApp} from '../services/evolutionWhatsApp.js';
+import {quoteTotemCombination} from '../services/totemCombination.js';
+import {listDayOffers,matchDayOffer} from '../services/dayOffers.js';
 import {validateSaleAttributes} from '../services/saleAttributes.js';
 import {pickupSelection,resolvePickup,recordPickup} from '../services/pickup.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -10,6 +12,8 @@ import { formatStockRow } from './stock.js';
 export const totemRouter = Router();
 
 const defaultTotemSettings = {
+  attractContent:'full',
+  assistant:{enabled:false,name:'Mariana',avatar:null,whatsapp:'',sellerId:'',askIntent:true,askBrand:true,namePrompt:'Oi, meu nome é {vendedor}. Como você prefere ser chamado?',intentPrompt:'Oi, {nome}! O que está buscando hoje?',brandPrompt:'Qual marca te agrada mais, {nome}?',productsPrompt:'{nome}, estes são os produtos disponíveis. Qual faz mais sentido para você?',closingPrompt:'Ótima escolha, {nome}! Você pode finalizar comigo pelo WhatsApp ou na loja.'},
   mode: 'kiosk',
   exitPassword: '1234',
   shareStockWithErp: true,
@@ -20,6 +24,7 @@ const defaultTotemSettings = {
   customGreetingText: '',
   customSubtitleText: '',
   storeName: 'Loja Principal',
+  headerSubtitle: '',
   storeLogo: null,
   attractBackground: null,
   attractGradientColor: '#0f766e',
@@ -36,6 +41,8 @@ const defaultTotemSettings = {
 };
 
 const totemSettingsSchema = z.object({
+  attractContent:z.enum(['full','text','background']).default('full'),
+  assistant:z.object({enabled:z.boolean(),name:z.string().trim().min(1).max(80),avatar:z.string().nullable(),whatsapp:z.string().max(30),sellerId:z.string().max(100),askIntent:z.boolean(),askBrand:z.boolean(),namePrompt:z.string().max(300),intentPrompt:z.string().max(300),brandPrompt:z.string().max(300),productsPrompt:z.string().max(300),closingPrompt:z.string().max(300)}).optional(),
   mode: z.enum(['kiosk', 'catalog']).default('kiosk'),
   exitPassword: z.string().optional(),
   shareStockWithErp: z.boolean().default(true),
@@ -46,6 +53,7 @@ const totemSettingsSchema = z.object({
   customGreetingText: z.string().optional().default(''),
   customSubtitleText: z.string().optional().default(''),
   storeName: z.string().default('Loja Principal'),
+  headerSubtitle: z.string().trim().max(140).default(''),
   storeLogo: z.string().nullable().optional(),
   attractBackground: z.string().nullable().optional(),
   attractGradientColor: z.string().default('#0f766e'),
@@ -130,6 +138,7 @@ async function handleSaveSettings(req: Request, res: Response, next: NextFunctio
   try {
     const storeId = await resolveStoreId(req);
     const parsed = totemSettingsSchema.partial().parse(req.body);
+    if(parsed.assistant?.sellerId && !(await pool.query('SELECT id FROM sellers WHERE id=$1 AND store_id=$2 AND active=true',[parsed.assistant.sellerId,storeId])).rows.length)throw Object.assign(new Error('Escolha um vendedor ativo desta loja.'),{status:400});
 
     const current = await getStoreTotemSettings(storeId);
     const nextExitPassword = (parsed.exitPassword !== undefined && parsed.exitPassword.trim() !== '')
@@ -163,7 +172,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
           FROM stock_items
           WHERE store_id = $1
             AND active = true
@@ -263,6 +272,7 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
 
       let pickup:any;
       if(body.stockId){if(!(await client.query('SELECT id FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',[body.stockId,storeId])).rows.length)throw Object.assign(new Error('Produto não disponível no Totem.'),{status:404});if(!body.pickupMethodId)throw Object.assign(new Error('Escolha o tipo de retirada.'),{status:400});pickup=await resolvePickup(client,storeId,body.stockId,body.pickupMethodId,body.deliveryAddress);if(pickup.kind==='order'&&!body.customerPhone.trim())throw Object.assign(new Error('Informe o telefone para acompanhar a encomenda.'),{status:400});}
+      if(pickup && body.stockId){pickup=await quoteTotemCombination(client,storeId,body.stockId,pickup,body.attributes?.filter(a=>a.id!=='TOTEM-DINE'));const offer=matchDayOffer(await listDayOffers(client,storeId,'totem'),body.stockId,Object.fromEntries((body.attributes??[]).map(a=>[a.id,a.value])),pickup.unitPrice);if(offer){pickup.unitPrice=Number(offer.promoPrice);(body as any).offerId=offer.id;}}
       if(pickup) {
         const money=(amount:number)=>amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
         if(body.payment==='Parcelado') {
@@ -277,7 +287,13 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
          VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7)`,
         [ticketId, storeId, code, body.customerName, body.customerPhone, `${body.productName} · ${body.color || ''} ${body.storage || ''}\n${body.notes}`.trim(),body.requestKey??null],
       );
-      if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
+      if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1,unitPrice:pickup.unitPrice});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
+      const settings=await getStoreTotemSettings(storeId);
+      const assistant=(settings as any).assistant;
+      const seller=assistant?.sellerId?(await client.query('SELECT name,phone FROM sellers WHERE id=$1 AND store_id=$2 AND active=true',[assistant.sellerId,storeId])).rows[0]:null;
+      const whatsapp=String(assistant?.whatsapp||seller?.phone||settings.storeWhatsApp||'').replace(/\D/g,'');
+      if(whatsapp.length>=10){const destination=whatsapp.length<=11?'55'+whatsapp:whatsapp;const message=[`Olá, ${seller?.name||assistant?.name||'equipe'}! Quero finalizar meu pedido ${ticketId}.`,`Cliente: ${body.customerName}`,`Telefone: ${body.customerPhone}`,`Produto: ${body.productName}`,...(body.attributes??[]).map(a=>`${a.name}: ${a.value}`),`Retirada: ${pickup?.name||''}`,`Valor: ${body.priceLabel}`].join('\n');(body as any).whatsappUrl=`https://wa.me/${destination}?text=${encodeURIComponent(message)}`;(body as any).storeWhatsApp=destination;}
+      (body as any).sellerId=assistant?.sellerId||null;
       await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice,whatsappStatus:body.destination==='whatsapp'?'pending':'not_requested'}),storeId]);
       await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
     }
@@ -302,6 +318,7 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
         customerNotified,whatsappStatus,notificationWarning,
         trackingToken:(body as any).trackingToken,
         quotedPrice:(body as any).quotedPrice,
+        whatsappUrl:(body as any).whatsappUrl,
         id: ticketId,
         code,
         customerName: body.customerName,
@@ -331,6 +348,7 @@ totemRouter.put('/totem/settings', requireAuth, handleSaveSettings);
 
 totemRouter.get('/api/v1/totem/catalog', handleGetCatalog);
 totemRouter.get('/totem/catalog', handleGetCatalog);
+totemRouter.get('/api/v1/totem/offers',async(req,res,next)=>{try{const storeId=await resolveStoreId(req);res.json({success:true,data:await listDayOffers(pool,storeId,'totem')});}catch(error){next(error);}});
 
 totemRouter.get('/api/v1/totem/attributes', handleGetAttributes);
 totemRouter.get('/totem/attributes', handleGetAttributes);

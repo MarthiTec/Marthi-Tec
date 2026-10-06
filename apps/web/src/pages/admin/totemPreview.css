@@ -1,0 +1,6 @@
+.totem-preview__toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+.totem-preview__host { width:100%; min-width:0; display:flex; justify-content:center; }
+.totem-preview__frame { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+.totem-preview__frame iframe { position:absolute; top:0; left:0; border:0; transform-origin:top left; }
+.is-theme-dark .totem-preview__frame,.admin--dark .totem-preview__frame { border-color:var(--line); background:var(--card); }
+@media(max-width:768px) { .totem-preview__toolbar > * { width:100%; } }
