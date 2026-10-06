@@ -1849,3 +1849,19 @@ body.totem-html-scroll #root {
 .is-theme-dark .totem-guided,.admin--dark .totem-guided{background:var(--card,#171e27);color:var(--ink,#e8eef4)}
 @media(max-width:480px){.totem-guided{padding:16px;box-sizing:border-box}.totem-guided__choices .totem-btn{width:100%}}
 @media(max-width:480px){.totem .totem__scroll{grid-template-columns:minmax(0,1fr)}}
+
+/* A foto ocupa uma área previsível, independente da resolução do arquivo. */
+.totem__checkout-card > .totem-carousel--hero {
+  width: 100%; min-width: 0; min-height: 0;
+  height: clamp(220px, 32dvh, 520px);
+  align-self: start;
+}
+.totem-carousel__slide { overflow: hidden; }
+.totem-carousel__slide img { min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; }
+@media (orientation: portrait) {
+  .totem__checkout-card { grid-template-columns: minmax(0, 1fr); }
+  .totem__checkout-card > .totem-carousel--hero { height: clamp(200px, 25dvh, 440px); }
+}
+@media (max-width: 480px) {
+  .totem__checkout-card > .totem-carousel--hero { height: min(240px, 28dvh); }
+}

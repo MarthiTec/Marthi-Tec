@@ -103,6 +103,8 @@ export function TotemSettingsPage() {
   );
   const [locationLabel, setLocationLabel] = useState(() => initial.locationLabel);
   const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
+  const [loadingSettings,setLoadingSettings]=useState(true);
+  const [settingsLoadError,setSettingsLoadError]=useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(()=>setSaved(false),[assistant,attractContent]);
@@ -139,8 +141,8 @@ export function TotemSettingsPage() {
         setCardFeePercent(s.cardFeePercent ?? 0);
       })
       .catch((err) => {
-        console.warn('[TotemSettingsPage] Carregando cache local:', err);
-      });
+        if(mounted){setSettingsLoadError(true);setError(err instanceof Error?err.message:'Não foi possível carregar as configurações salvas.');}
+      }).finally(()=>{if(mounted)setLoadingSettings(false);});
     return () => {
       mounted = false;
     };
@@ -216,6 +218,8 @@ export function TotemSettingsPage() {
       setSaved(false);
     }
   }
+
+  if(loadingSettings||settingsLoadError)return <section className="admin-page totem-settings-page"><article className="admin-card"><h1>Configurações do totem</h1><p role="status">{loadingSettings?'Carregando suas configurações salvas…':error}</p>{settingsLoadError?<button className="btn btn--primary" onClick={()=>window.location.reload()}>Tentar novamente</button>:null}</article></section>;
 
   return (
     <section className="admin-page totem-settings-page">

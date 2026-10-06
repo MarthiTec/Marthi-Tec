@@ -1191,7 +1191,7 @@ export function StockPage() {
                                   {maxP.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                 </div>
                                 <div className="empty" style={{ fontSize: '0.78rem' }}>
-                                  12x a partir de {formatInstallment(minP, 12).split('X')[1]?.trim() ?? ''}
+                                  18x a partir de {formatInstallment(minP, 18).split('X')[1]?.trim() ?? ''}
                                 </div>
                               </>
                             );
@@ -1201,7 +1201,7 @@ export function StockPage() {
                           <>
                             {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             <div className="empty" style={{ fontSize: '0.78rem' }}>
-                              12x de {formatInstallment(item.price, 12).split('X')[1]?.trim() ?? ''}
+                              18x de {formatInstallment(item.price, 18).split('X')[1]?.trim() ?? ''}
                             </div>
                           </>
                         );
@@ -1551,7 +1551,7 @@ export function StockPage() {
                     ) : (
                       variations.map((row, index) => {
                         const rowPrice=row.pickupMethodId ? row.pickupPrices?.[row.pickupMethodId]??row.price : row.price;
-                        const installmentText = formatInstallment(rowPrice, 18);
+                        const installmentText = formatInstallment(rowPrice, 18, (row.cardRate??form.cardRate) || undefined);
 
                         return (
                           <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 9) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>

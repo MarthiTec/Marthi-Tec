@@ -1,6 +1,6 @@
 import type {PoolClient} from 'pg';
 export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:string,stockId:string,method:any,attributes:{id:string;value:string}[]=[]){
- const stock=(await db.query('SELECT price,qty,variations,pickup_prices FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true',[stockId,storeId])).rows[0];
+ const stock=(await db.query('SELECT price,qty,variations,pickup_prices,card_rate FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true',[stockId,storeId])).rows[0];
  if(!stock)throw Object.assign(new Error('Produto indisponível.'),{status:404});
  const picked=Object.fromEntries(attributes.map(a=>[a.id,a.value]));
  const variations=Array.isArray(stock.variations)?stock.variations:[];
@@ -13,5 +13,5 @@ export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:
  });
  if(!candidate)throw Object.assign(new Error('Esta combinação de atributos, retirada e preço não está disponível. Escolha uma variação válida.'),{status:400});
  const prices=candidate.pickupPrices??candidate.pickup_prices??stock.pickup_prices??{};
- return {...method,unitPrice:Number(prices[method.id]??candidate.price),qty:Number(candidate.qty)};
+ return {...method,unitPrice:Number(prices[method.id]??candidate.price),qty:Number(candidate.qty),cardRate:candidate.cardRate??candidate.card_rate??stock.card_rate};
 }

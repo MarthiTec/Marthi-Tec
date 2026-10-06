@@ -7,20 +7,21 @@ import ts from 'typescript';
 function setup() {
   const window = new EventTarget();
   const document = {hidden:false};
-  let poll, cleared = false;
-  window.setInterval = callback => {poll=callback;return 1;};
+  let poll, revisionPoll, revision='first', cleared = false;
+  window.setInterval = (callback,ms) => {if(ms===45000)poll=callback;else revisionPoll=callback;return ms;};
   window.clearInterval = () => {cleared=true;};
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync('apps/web/src/data/totemLiveSync.ts','utf8'),{
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},
   }).outputText;
   const stubs = {
+    '../services/nestClient': {nestGet:async()=>({revision})},
     './adminStore': {ADMIN_STATE_EVENT:'admin',STOCK_EVENT:'stock',invalidateAdminMemory(){}},
     './attributeStore': {ATTRIBUTES_EVENT:'attributes'},
     './totemSettings': {TOTEM_SETTINGS_EVENT:'settings',invalidateTotemSettingsMemory(){}},
   };
   vm.runInNewContext(code,{exports,require:path=>stubs[path],window,document,Event,Promise});
-  return {window,document,subscribe:exports.subscribeTotemLive,poll:()=>poll(),cleared:()=>cleared};
+  return {window,document,subscribe:exports.subscribeTotemLive,poll:()=>poll(),cleared:()=>cleared,checkRevision:()=>revisionPoll(),setRevision:value=>{revision=value;}};
 }
 
 test('API hydration events cannot recursively restart refresh or overlap an outstanding request',async()=>{
@@ -49,3 +50,11 @@ test('store scoped storage changes refresh the visible kiosk',()=>{
   const event=new Event('storage');Object.defineProperty(event,'key',{value:'marthi.totem.settings.v1:account:store:a'});
   env.window.dispatchEvent(event);assert.equal(calls,1);stop();
 });
+
+ test('another device changing catalog revision refreshes without reloading the customer page',async()=>{
+  const env=setup();let calls=0;const stop=env.subscribe(()=>{calls++;});
+  await new Promise(setImmediate);
+  await env.checkRevision();assert.equal(calls,0);
+  env.setRevision('updated-price');await env.checkRevision();await new Promise(setImmediate);assert.equal(calls,1);
+  await env.checkRevision();assert.equal(calls,1);stop();
+ });

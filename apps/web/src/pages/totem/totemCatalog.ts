@@ -3,8 +3,7 @@ import {
   type StockItem,
 } from '../../data/adminStore';
 import { ATTR_CAP, ATTR_COR } from '../../data/attributeStore';
-import { formatInstallment } from '../../data/variantQuote';
-import { getTotemSettings } from '../../data/totemSettings';
+import { formatInstallment,totemCardFee } from '../../data/variantQuote';
 import { apiGetTotemCatalog } from '../../services/erpApi';
 import {storeScopedKey} from '../../data/storeCache';
 import { type TotemBrand, type TotemProduct } from './totemData';
@@ -101,10 +100,10 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       .flatMap((row) => stockItemImages(row))
       .filter((url, index, all) => all.indexOf(url) === index);
     const stockFee =
-      primary.cardRate !== undefined && primary.cardRate !== null && Number.isFinite(Number(primary.cardRate))
+      primary.cardRate !== undefined && primary.cardRate !== null && Number.isFinite(Number(primary.cardRate)) && Number(primary.cardRate)>0
         ? Number(primary.cardRate)
         : undefined;
-    const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
+    const cardFeePercent = stockFee !== undefined ? stockFee : totemCardFee(18);
 
     return {
       id: stableId(primary.id),
@@ -114,7 +113,7 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       storages,
       colors,
       cashPrice: bestCashPrice,
-      installmentLabel: formatInstallment(bestCashPrice, 12, cardFeePercent),
+      installmentLabel: formatInstallment(bestCashPrice, 18, cardFeePercent),
       images: images.length ? images : stockItemImages(primary),
       attrs,
       totalQty: rows.reduce((sum, row) => sum + row.qty, 0),

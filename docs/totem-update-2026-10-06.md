@@ -30,3 +30,19 @@ Pacote: marthi-catalog-update.zip, sem credenciais nem arquivos de backup.
 
 
 Refinamento solicitado: configuração com interruptores compactos, envio de avatar/logo/fundo por cards com prévia, mensagens em etapas expansíveis e simulação da conversa. O cliente informa como prefere ser chamado; o nome completo escolhido substitui {nome}, sem limitar ao primeiro nome. Compilação API/web e teste adicional de Ana Paula passaram. Publicação final confirmada pela Discloud (HTTP 200).
+
+
+## Correções para a TV vertical e operação contínua
+- Erro real de produção identificado nos logs: INSERT do pedido omitindo product_name obrigatório no banco legado. Campo preenchido com o nome canônico do estoque e migration 0055 compatibiliza bancos novos.
+- Vitrine, grid e checkout em até 18 parcelas; taxas por parcela da maquininha disponibilizadas na configuração pública sem dados identificadores da máquina. API calcula o preço final com a mesma taxa e respeita a taxa específica da variação.
+- Fotos do checkout com altura limitada ao viewport, object-fit contain e layout de coluna na orientação vertical.
+- Configuração aguarda leitura da API antes de permitir edição; falhas de autenticação/leitura não caem silenciosamente em valores padrão.
+- Revisão pública por loja a cada 5 segundos detecta mudanças de produtos, preços e configurações. Polling completo a cada 45 segundos e retorno à abertura após 5 minutos sem interação. Atualizações de dados preservam o fluxo do cliente e preço final é validado pelo servidor.
+- Não foram criados pedidos ou enviados WhatsApps de teste em produção. Validação de envio realizada em banco local; entrega real depende da conexão WhatsApp da loja.
+
+- Publicação confirmada pela Discloud em 06/10/2026; migration 0055 aplicada com sucesso nos logs.
+- Validação pública: revision HTTP 200, taxa em 18 parcelas 16,8%; vitrine real 7.500,00 / 18 × 486,67.
+- Prévia 1080 × 1920: foto 440 px de altura, sem overflow horizontal, formulário e ações dentro da tela. Evidência: totem-tv-checkout-2026-10-06.png.
+- Para ativar a nova versão já aberta no equipamento, reabrir o totem uma vez. As consultas automáticas atualizam os dados sem depender de recarga manual posterior.
+
+- Integração real de WhatsApp: painel Operações → Comunicação indica ERROR/desconectado. URL configurada https://marthi-tec.discloud.app retorna HTTP 404; aplicativo correspondente offline na Discloud. Endereço correto da Evolution solicitado ao usuário. Pedido preservado na fila em falhas de envio. Nenhuma mensagem de teste enviada.

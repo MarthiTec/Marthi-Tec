@@ -108,9 +108,15 @@ async function getStoreTotemSettings(storeId: string) {
           ? JSON.parse(row.totem_settings) 
           : (row.totem_settings || {});
         
+        const machines=(await pool.query("SELECT data FROM store_module_state WHERE store_id=$1 AND module_key='card-rates'",[storeId])).rows[0]?.data;
+        const active=Array.isArray(machines)?machines.filter((m:any)=>m.active):[];
+        const machine=active.find((m:any)=>m.isDefaultTotem)??active[0];
+        const brand=machine?.brands?.find((b:any)=>b.id===machine.defaultBrandId&&b.active)??machine?.brands?.find((b:any)=>b.active);
+        const cardInstallmentRates=brand?.installments?.length?Object.fromEntries(Array.from({length:18},(_,i)=>[i+1,Number(brand.installments.find((entry:any)=>entry.installment===i+1)?.rate??brand.installments[brand.installments.length-1].rate)])):{};
         return {
           ...defaultTotemSettings,
           ...rawSettings,
+          cardInstallmentRates,
           storeName: rawSettings.storeName || row.trade_name || defaultTotemSettings.storeName,
           exitPassword: row.totem_exit_password || rawSettings.exitPassword || defaultTotemSettings.exitPassword,
         };
@@ -278,14 +284,16 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
         if(body.payment==='Parcelado') {
           const count=Number(String(body.installment??'').replace(/x$/i,''));
           if(!Number.isInteger(count)||count<1||count>18) throw Object.assign(new Error('Parcelamento inválido.'),{status:400});
-          const total=pickup.unitPrice*(1+Math.max(0,Number((body as any).cardFeePercent)||0)/100);
+          const settings=await getStoreTotemSettings(storeId);
+          const fee=Number(pickup.cardRate)>0?Number(pickup.cardRate):settings.cardInstallmentRates?.[count]??(body as any).cardFeePercent;
+          const total=pickup.unitPrice*(1+Math.max(0,Number(fee)||0)/100);
           body.priceLabel=count+'x · '+count+' X '+money(Math.round(total/count*100)/100);
         } else {body.priceLabel=money(pickup.unitPrice);body.installment=null;}
       }
       await client.query(
-        `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes, request_key)
-         VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7)`,
-        [ticketId, storeId, code, body.customerName, body.customerPhone, `${body.productName} · ${body.color || ''} ${body.storage || ''}\n${body.notes}`.trim(),body.requestKey??null],
+        `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes, request_key, product_name)
+         VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7, $8)`,
+        [ticketId, storeId, code, body.customerName, body.customerPhone, `${body.productName} · ${body.color || ''} ${body.storage || ''}\n${body.notes}`.trim(),body.requestKey??null,body.productName],
       );
       if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1,unitPrice:pickup.unitPrice});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
       const settings=await getStoreTotemSettings(storeId);
@@ -346,6 +354,13 @@ totemRouter.get('/totem/settings', handleGetSettings);
 totemRouter.put('/api/v1/totem/settings', requireAuth, handleSaveSettings);
 totemRouter.put('/totem/settings', requireAuth, handleSaveSettings);
 
+totemRouter.get('/api/v1/totem/revision',async(req,res,next)=>{
+  try {
+    const storeId=await resolveStoreId(req);
+    const result=await pool.query(`SELECT md5(COALESCE((SELECT string_agg(id || ':' || updated_at::text, ',' ORDER BY id) FROM stock_items WHERE store_id=$1),'') || ':' || COALESCE((SELECT updated_at::text FROM stores WHERE id=$1),'')) AS revision`,[storeId]);
+    res.set('Cache-Control','no-store').json({success:true,data:{revision:result.rows[0].revision}});
+  }catch(error){next(error);}
+});
 totemRouter.get('/api/v1/totem/catalog', handleGetCatalog);
 totemRouter.get('/totem/catalog', handleGetCatalog);
 totemRouter.get('/api/v1/totem/offers',async(req,res,next)=>{try{const storeId=await resolveStoreId(req);res.json({success:true,data:await listDayOffers(pool,storeId,'totem')});}catch(error){next(error);}});

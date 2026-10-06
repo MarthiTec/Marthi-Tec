@@ -35,7 +35,7 @@ import {
 } from '../../data/totemSettings';
 import { printWaitTicket, ticketSenha } from '../../data/totemTicketPrint';
 import { trackTotemProductClick } from '../../data/totemAnalyticsStore';
-import { formatInstallment, quoteFromPicked, quoteTotemVariant } from '../../data/variantQuote';
+import { formatInstallment, totemCardFee, quoteFromPicked, quoteTotemVariant } from '../../data/variantQuote';
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemAttractScene } from './TotemAttractScene';
@@ -73,6 +73,7 @@ type Selection = {
   cashPrice: number;
   installmentLabel: string;
   cardFeePercent?: number;
+  cardRateOverride?: number;
 };
 
 function uniqueSorted(values: string[]) {
@@ -242,10 +243,11 @@ export function TotemPage() {
   const needsIdleReset =
     step === 'done' ||
     step === 'checkout' ||
+    step === 'catalog' || step === 'guided' ||
     (step === 'welcome' && name.trim() !== '') ||
     Boolean(selection);
 
-  const idleDuration = step === 'done' ? DONE_IDLE_MS : TRANSACTION_IDLE_MS;
+  const idleDuration = step === 'done' ? DONE_IDLE_MS : step==='catalog'||step==='guided' ? 5*60_000 : TRANSACTION_IDLE_MS;
 
   function bumpIdle() {
     setIdleTick((current) => current + 1);
@@ -350,6 +352,7 @@ export function TotemPage() {
     if (!needsIdleReset) return;
     const timer = window.setTimeout(() => {
       resetToHome();
+      window.dispatchEvent(new Event('marthi-totem-live'));
     }, idleDuration);
     return () => window.clearTimeout(timer);
   }, [
@@ -504,6 +507,9 @@ export function TotemPage() {
           setPrintTicket(settings.printTicket);
           setAudioAssist(settings.audioAssist);
           setShowAttractScreen(settings.showAttractScreen);
+          setShowActionButtons(settings.showActionButtons !== false);
+          setCustomGreetingText(settings.customGreetingText || '');
+          setCustomSubtitleText(settings.customSubtitleText || '');
           setStoreName(settings.storeName);
           setHeaderSubtitle(settings.headerSubtitle);
           setGuidedSettings(settings.assistant);setAttractContent(settings.attractContent);
@@ -592,6 +598,22 @@ export function TotemPage() {
     return subscribeTotemLive(refreshLive);
   }, []);
 
+  useEffect(()=>{
+    setSelection(current=>{
+      if(!current)return current;
+      const product=catalog.find(item=>item.stockId===current.stockId);
+      if(!product)return current;
+      const quote=quoteFromPicked(product.name,product.cashPrice,current.picked,listTotemStock().filter(item=>item.id===current.stockId));
+      if(!quote.stock)return current;
+      const baseCashPrice=quote.cashPrice;
+      const pickupPrice=quote.stock.pickupPrices?.[current.pickupMethodId||'']??baseCashPrice;
+      if(!(pickupPrice>0))return current;
+      const cashPrice=dayOfferFor(dayOffers,current.stockId||'',Object.fromEntries(current.picked.map(a=>[a.id,a.value])),pickupPrice)?.promoPrice??pickupPrice;
+      const cardRateOverride=quote.stock.cardRate||undefined;
+      return {...current,product,baseCashPrice,cashPrice,pickupPrices:quote.stock.pickupPrices,cardRateOverride,cardFeePercent:cardRateOverride??totemCardFee(Number.parseInt(current.installment,10)||18)};
+    });
+  },[catalog,dayOffers]);
+
   useEffect(() => {
     if (!collectNameUpFront && step === 'welcome') setStep('catalog');
     if (!showAttractScreen && step === 'attract') {
@@ -657,10 +679,10 @@ export function TotemPage() {
     }
     const quote = quoteFromPicked(product.name, product.cashPrice, picked, listTotemStock().filter(s => s.id === product.stockId));
     const stockFee =
-      quote.stock?.cardRate !== undefined && quote.stock?.cardRate !== null && Number.isFinite(Number(quote.stock.cardRate))
+      quote.stock?.cardRate !== undefined && quote.stock?.cardRate !== null && Number.isFinite(Number(quote.stock.cardRate)) && Number(quote.stock.cardRate)>0
         ? Number(quote.stock.cardRate)
         : undefined;
-    const cardFeePercent = stockFee !== undefined ? stockFee : getTotemSettings().cardFeePercent;
+    const cardFeePercent = stockFee !== undefined ? stockFee : totemCardFee(18);
     setSelection({
       stockId:quote.stock?.id,pickupPrices:quote.stock?.pickupPrices,baseCashPrice:quote.cashPrice,
       pickupAllowedIds:productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]).map(method=>method.id),
@@ -668,10 +690,10 @@ export function TotemPage() {
       product,
       picked,
       payment: PAYMENT_OPTIONS[0],
-      installment: INSTALLMENTS[0],
+      installment: INSTALLMENTS[INSTALLMENTS.length-1],
       cashPrice: dayOfferFor(dayOffers,product.stockId||'',config,quote.stock?.pickupPrices?.[config['pickup-method']]??quote.cashPrice)?.promoPrice ?? quote.stock?.pickupPrices?.[config['pickup-method']] ?? quote.cashPrice,
-      installmentLabel: formatInstallment(dayOfferFor(dayOffers,product.stockId||'',config,quote.stock?.pickupPrices?.[config['pickup-method']]??quote.cashPrice)?.promoPrice ?? quote.stock?.pickupPrices?.[config['pickup-method']] ?? quote.cashPrice, 12, cardFeePercent),
-      cardFeePercent,
+      installmentLabel: formatInstallment(dayOfferFor(dayOffers,product.stockId||'',config,quote.stock?.pickupPrices?.[config['pickup-method']]??quote.cashPrice)?.promoPrice ?? quote.stock?.pickupPrices?.[config['pickup-method']] ?? quote.cashPrice, 18, cardFeePercent),
+      cardFeePercent,cardRateOverride:stockFee,
     });
     setError(null);
     setKeyboardOpen(false);
@@ -772,7 +794,8 @@ export function TotemPage() {
         ? formatBRL(selection.cashPrice)
         : `${selection.installment} · ${formatInstallment(
             selection.cashPrice,
-            Number.parseInt(selection.installment, 10) || 12,
+            Number.parseInt(selection.installment, 10) || 18,
+            selection.cardFeePercent,
           )}`;
     const legacy = toLegacyFields(selection.picked);
     const isToCashier = destination === 'cashier';
@@ -812,6 +835,9 @@ export function TotemPage() {
   return (
     <div
       className={`totem ${step === 'catalog' ? 'totem--page-scroll' : ''} ${step === 'attract' ? 'totem--attract' : ''}`}
+      onPointerDown={bumpIdle}
+      onKeyDown={bumpIdle}
+      onWheel={bumpIdle}
       data-cols={columns}
       data-kb={keyboardPlacement}
       data-vertical={vertical}
@@ -1221,7 +1247,7 @@ export function TotemPage() {
                           {copy.showInstallments ? <span>À Vista</span> : <span>Preço</span>}
                           {offer&&<del>De {formatBRL(normalPrice)}</del>}
                           <strong>{formatBRL(displayedPrice)}</strong>
-                          {copy.showInstallments ? <small>{formatInstallment(displayedPrice, 12, quote.stock?.cardRate ?? undefined)}</small> : null}
+                          {copy.showInstallments ? <small>{formatInstallment(displayedPrice, 18, quote.stock?.cardRate ? quote.stock.cardRate : undefined)}</small> : null}
                           {quote.stock ? (
                             <em className="totem-card__stock">
                               {quote.qty > 0 ? `${quote.qty} un. em estoque` : 'Sob consulta'}
@@ -1437,7 +1463,7 @@ export function TotemPage() {
                   value={selection.installment}
                   options={INSTALLMENTS}
                   disabled={submitting}
-                  onChange={(value) => setSelection({ ...selection, installment: value })}
+                  onChange={(value) => setSelection({ ...selection, installment: value,cardFeePercent:selection.cardRateOverride??totemCardFee(Number.parseInt(value,10)) })}
                 />
               )}
 
@@ -1448,7 +1474,7 @@ export function TotemPage() {
                     {copy.showInstallments && selection.payment === 'Parcelado'
                       ? `${selection.installment} · ${formatInstallment(
                           selection.cashPrice,
-                          Number.parseInt(selection.installment, 10) || 12,
+                          Number.parseInt(selection.installment, 10) || 18,
                           selection.cardFeePercent,
                         )}`
                       : formatBRL(selection.cashPrice)}
