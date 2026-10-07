@@ -1,9 +1,15 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { PresenceStatusControl } from './PresenceStatusControl';
 import { useOperatorProfile } from '../hooks/useOperatorProfile';
 import { useMyPresence } from '../hooks/usePresence';
 import { profileInitials } from '../data/operatorProfile';
-import { getClientAccount, getActiveStore } from '../data/multiStoreStore';
+import {
+  getClientAccount,
+  getActiveStore,
+  MULTI_STORE_CHANGED_EVENT,
+  STORE_CONTEXT_CHANGED_EVENT,
+} from '../data/multiStoreStore';
 import './userChip.css';
 
 type UserChipProps = {
@@ -35,6 +41,19 @@ export function UserChip({
 }: UserChipProps) {
   const { profile, photo } = useOperatorProfile();
   const { mine } = useMyPresence();
+  // getClientAccount()/getActiveStore() leem o cache local de loja/empresa, que só fica
+  // correto depois que a hidratação com a API termina (assíncrona, após o login). Sem essa
+  // assinatura, o cartão congela no primeiro valor lido e nunca reflete a loja real.
+  const [, forceRefresh] = useState(0);
+  useEffect(() => {
+    const onChange = () => forceRefresh((n) => n + 1);
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, onChange);
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, onChange);
+    return () => {
+      window.removeEventListener(MULTI_STORE_CHANGED_EVENT, onChange);
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, onChange);
+    };
+  }, []);
   const account = getClientAccount();
   const store = getActiveStore();
   const companyName = store?.name || account.tradeName || 'Loja';

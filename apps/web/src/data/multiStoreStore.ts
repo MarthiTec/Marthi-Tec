@@ -401,8 +401,7 @@ export function getClientAccount(): ClientAccount {
     account.legalName.includes('Grupo Varejista') ||
     account.document.includes('12.345.678') ||
     account.document === '00.000.000/0001-00' ||
-    !account.document ||
-    account.tradeName === 'Gilvan Teodo'
+    !account.document
   ) {
     const fixed = resolveDefaultClientAccount();
     writeJson(key, fixed);

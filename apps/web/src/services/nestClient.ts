@@ -100,9 +100,10 @@ export async function nestRequest<T>(
   const json = await readJson<ApiOkBody<T> | ApiErrorBody>(response);
 
   if (!response.ok || (json as ApiErrorBody).success === false) {
-    if (response.status === 401) {
-      clearAuthToken();
-    }
+    // Não limpamos o token aqui: o bootstrap do painel dispara dezenas de chamadas em
+    // paralelo, e uma falha isolada em qualquer uma delas não significa que a sessão
+    // como um todo é inválida. Quem decide se a sessão morreu é o AuthContext, através
+    // da verificação explícita em /auth/me — nunca uma chamada de hidratação qualquer.
     const err = json as ApiErrorBody;
     throw new NestApiError(
       err.error?.message ?? `Falha na API (${response.status})`,

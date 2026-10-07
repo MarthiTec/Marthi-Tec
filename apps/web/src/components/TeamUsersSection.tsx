@@ -38,7 +38,7 @@ import {
   setErpUserPassword,
   clearErpUserPassword,
 } from '../data/erpUserPasswords';
-import { getClientAccount, getActiveStore } from '../data/multiStoreStore';
+import { getClientAccount, getActiveStore, MULTI_STORE_CHANGED_EVENT, STORE_CONTEXT_CHANGED_EVENT } from '../data/multiStoreStore';
 import { hasModule } from '../data/storePlan';
 
 export const PRIMARY_MODULE_AREAS: AccessArea[] = [
@@ -128,6 +128,19 @@ export function TeamUsersSection({ variant, id }: Props) {
     ? PRIMARY_MODULE_AREAS.filter((a) => planAreas.includes(a))
     : ALL_ACCESS_AREAS;
 
+  // getClientAccount()/getActiveStore() leem o cache local, que só fica correto depois que
+  // a hidratação com a API termina (assíncrona, após o login) — sem essa assinatura, o
+  // cabeçalho "Empresa Vinculada" pode congelar no valor padrão de demonstração.
+  const [, forceAccountRefresh] = useState(0);
+  useEffect(() => {
+    const onChange = () => forceAccountRefresh((n) => n + 1);
+    window.addEventListener(MULTI_STORE_CHANGED_EVENT, onChange);
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, onChange);
+    return () => {
+      window.removeEventListener(MULTI_STORE_CHANGED_EVENT, onChange);
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, onChange);
+    };
+  }, []);
   const account = getClientAccount();
   const store = getActiveStore();
   const [items, setItems] = useState(() => listEmployees());
