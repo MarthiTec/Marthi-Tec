@@ -3153,6 +3153,36 @@
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
+.os-modal__form .admin-picker {
+  gap: 5px;
+  min-width: 0;
+  width: 100%;
+}
+
+.os-modal__form .admin-picker__caption {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.os-modal__form .admin-picker__trigger {
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 0.84rem;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.os-modal__form .admin-picker.is-open .admin-picker__trigger,
+.os-modal__form .admin-picker:focus-within .admin-picker__trigger {
+  border-color: #0284c7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
 .os-priority-selector {
   display: flex;
   flex-direction: column;
@@ -3416,6 +3446,23 @@
 
 .is-theme-dark .os-modal__form input:focus,
 .is-theme-dark .os-modal__form textarea:focus {
+  border-color: #38bdf8;
+  background: #11151a;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.is-theme-dark .os-modal__form .admin-picker__caption {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-modal__form .admin-picker__trigger {
+  background: #11151a;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-modal__form .admin-picker.is-open .admin-picker__trigger,
+.is-theme-dark .os-modal__form .admin-picker:focus-within .admin-picker__trigger {
   border-color: #38bdf8;
   background: #11151a;
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
