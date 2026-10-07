@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
-import { sendEvolutionText, normalizeBrazilPhone, resolveStoreEvolutionCreds, ensureEvolutionInstance } from '../services/evolutionWhatsApp.js';
+import { sendEvolutionText, normalizeBrazilPhone, resolveStoreEvolutionCreds, ensureEvolutionInstance, resetEvolutionInstance } from '../services/evolutionWhatsApp.js';
 
 import { getStoreWhatsAppConfig, saveStoreCommunication, requireCommunicationAdmin } from '../services/storeCommunication.js';
 export const whatsappRouter = Router();
@@ -214,7 +214,23 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
   const apiKey = resolved.apiKey;
 
   try {
-    if (forceNew) {
+    let currentState = '';
+    try {
+      const stateResponse = await fetch(`${baseUrl}/instance/connectionState/${encodeURIComponent(instance)}`, {
+        headers: { apikey: apiKey }, signal: AbortSignal.timeout(15000), redirect: 'error',
+      });
+      if (stateResponse.ok) currentState = String((await stateResponse.json())?.instance?.state || '');
+    } catch {
+      /* sem estado: tratamos como desconectado */
+    }
+
+    // A chave mestra só vale no nosso servidor Evolution; loja com servidor próprio nunca é recriada.
+    const onPlatformServer = Boolean(env.EVOLUTION_BASE_URL) && baseUrl === env.EVOLUTION_BASE_URL!.replace(/\/$/, '');
+    if (env.EVOLUTION_MASTER_API_KEY && onPlatformServer && (forceNew || currentState !== 'open')) {
+      // Recria a instância limpa antes de mostrar o QR. Reaproveitar uma sessão que o
+      // WhatsApp derrubou deixa o celular preso em "Conectando…" depois da leitura.
+      await resetEvolutionInstance(baseUrl, instance, cfg.apiKey || undefined);
+    } else if (forceNew) {
       try {
         await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {
           method: 'DELETE',

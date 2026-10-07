@@ -49,6 +49,9 @@ test('first QR Code request auto-provisions a store-exclusive Evolution instance
       assert.equal(body.instanceName, 'loja-store-a');
       return new Response(JSON.stringify({ instance: { instanceName: body.instanceName, status: 'close' }, hash: 'issued-instance-token' }), { status: 201, headers: { 'content-type': 'application/json' } });
     }
+    if (/\/instance\/(connectionState|logout|delete)\//.test(String(url))) {
+      return new Response(JSON.stringify({ instance: { state: 'close' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     if (String(url).includes('/instance/connect/')) {
       assert.ok(String(url).includes('loja-store-a'));
       return new Response(JSON.stringify({ instance: { state: 'connecting' }, base64: 'fake-qr-base64' }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -82,6 +85,9 @@ test('a store with an already-configured instance is never re-provisioned', asyn
   const calls = [];
   globalThis.fetch = async (url, init) => {
     calls.push(String(url));
+    if (String(url).includes('/instance/connectionState/')) {
+      return new Response(JSON.stringify({ instance: { state: 'close' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     if (String(url).includes('/instance/connect/')) {
       assert.equal(init.headers.apikey, 'tenant-own-key');
       assert.ok(String(url).startsWith('https://own-server.example.com'));
@@ -93,6 +99,40 @@ test('a store with an already-configured instance is never re-provisioned', asyn
     const res = await fetch(base + '/whatsapp/qrcode', { headers: { authorization: 'Bearer ' + tokenB, 'x-store-id': 'store-b' } });
     assert.equal(res.status, 200);
     assert.ok(!calls.some((u) => u.endsWith('/instance/create')), 'must not call /instance/create for an already-provisioned store');
+    assert.ok(!calls.some((u) => u.includes('/instance/delete/')), 'a store-owned Evolution server is never reset with the platform master key');
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('reading the QR on a disconnected platform instance recreates it clean, keeping the store token', async () => {
+  await query(`UPDATE stores SET whatsapp_settings=$1::jsonb WHERE id='store-a'`, [JSON.stringify({ enabled: true, baseUrl: '', instance: 'marthi', apiKey: 'store-saved-token', storeNumber: '', notifyCustomer: false, locationLabel: '' })]);
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method || 'GET', apikey: init?.headers?.apikey, body: init?.body });
+    if (String(url).includes('/instance/connectionState/')) {
+      return new Response(JSON.stringify({ instance: { instanceName: 'marthi', state: 'close' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (/\/instance\/(logout|delete)\//.test(String(url))) {
+      return new Response(JSON.stringify({ status: 'SUCCESS' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (String(url).endsWith('/instance/create')) {
+      return new Response(JSON.stringify({ instance: { instanceName: 'marthi' } }), { status: 201, headers: { 'content-type': 'application/json' } });
+    }
+    if (String(url).includes('/instance/connect/')) {
+      return new Response(JSON.stringify({ instance: { state: 'connecting' }, base64: 'fresh-qr' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return original(url, init);
+  };
+  try {
+    const res = await get('/whatsapp/qrcode');
+    assert.equal(res.status, 200);
+    const order = calls.filter((c) => c.url.startsWith('https://evolution.example.com')).map((c) => c.url.replace('https://evolution.example.com', ''));
+    assert.deepEqual(order, ['/instance/connectionState/marthi', '/instance/logout/marthi', '/instance/delete/marthi', '/instance/create', '/instance/connect/marthi']);
+    const create = calls.find((c) => c.url.endsWith('/instance/create'));
+    assert.equal(create.apikey, 'test-only-master-key');
+    assert.equal(JSON.parse(create.body).token, 'store-saved-token');
   } finally {
     globalThis.fetch = original;
   }

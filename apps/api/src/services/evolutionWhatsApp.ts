@@ -87,9 +87,44 @@ export function resolveStoreEvolutionCreds(cfg: { baseUrl: string; instance: str
  * não existir. Usa exclusivamente a chave mestra do servidor (nunca a chave da loja), então
  * cada empresa consegue se conectar sem jamais ver ou precisar informar essa chave.
  */
+/**
+ * Apaga e recria a instância do zero. Depois que o WhatsApp desconecta o aparelho (erro 401),
+ * a sessão antiga fica gravada na Evolution e o celular trava em "Conectando…" ao ler o QR;
+ * só uma instância limpa volta a parear. O token salvo pela loja é mantido na recriação, para
+ * que a chave cadastrada no painel continue válida.
+ */
+export async function resetEvolutionInstance(
+  baseUrl: string,
+  instanceName: string,
+  instanceToken?: string,
+): Promise<void> {
+  const masterKey = env.EVOLUTION_MASTER_API_KEY;
+  if (!masterKey) {
+    const error = new Error('Reconexão limpa indisponível: configure EVOLUTION_MASTER_API_KEY no servidor.');
+    (error as Error & { status: number }).status = 501;
+    throw error;
+  }
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+  const name = encodeURIComponent(instanceName);
+  for (const path of [`/instance/logout/${name}`, `/instance/delete/${name}`]) {
+    try {
+      await fetch(`${cleanBaseUrl}${path}`, {
+        method: 'DELETE',
+        headers: { apikey: masterKey },
+        signal: AbortSignal.timeout(15000),
+        redirect: 'error',
+      });
+    } catch {
+      /* instância já desconectada ou inexistente: segue para recriar */
+    }
+  }
+  await ensureEvolutionInstance(cleanBaseUrl, instanceName, instanceToken);
+}
+
 export async function ensureEvolutionInstance(
   baseUrl: string,
   instanceName: string,
+  instanceToken?: string,
 ): Promise<{ created: boolean }> {
   const masterKey = env.EVOLUTION_MASTER_API_KEY;
   if (!masterKey) {
@@ -108,7 +143,11 @@ export async function ensureEvolutionInstance(
       signal: AbortSignal.timeout(15000),
       redirect: 'error',
       headers: { 'Content-Type': 'application/json', apikey: masterKey },
-      body: JSON.stringify({ instanceName, integration: 'WHATSAPP-BAILEYS' }),
+      body: JSON.stringify({
+        instanceName,
+        integration: 'WHATSAPP-BAILEYS',
+        ...(instanceToken ? { token: instanceToken } : {}),
+      }),
     });
   } catch {
     const error = new Error('Não foi possível conectar ao servidor Evolution para criar a instância.');

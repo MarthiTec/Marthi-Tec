@@ -7,7 +7,7 @@ import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { nestRequest } from '../../services/nestClient';
-import { selectAllOnFocus } from '../../utils/inputHelpers';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -85,6 +85,7 @@ export function StockPage() {
   });
   const [items, setItems] = useState(() => getAdminState().stock);
   const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id), totemSurface));
+  const qtyDecimals = form.unit === 'KG' ? 3 : 0;
   // Preferência só de digitação (não é dado de negócio) — por isso fica no navegador, não no banco.
   const [autoUppercase, setAutoUppercase] = useState(() => {
     try { return localStorage.getItem('marthi.stock.autoUppercase') !== 'false'; } catch { return true; }
@@ -1639,18 +1640,14 @@ export function StockPage() {
                               );
                             })}
                             <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
-                            <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onFocus={selectAllOnFocus} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
+                            <td data-label="Custo unitário"><CurrencyInput ariaLabel="Custo unitário da variação" value={row.cost} disabled={readOnly} onChange={value=>updateVariationRow(index,'cost',value)}/></td>
                             <td data-label="Preço à vista">
-                              <input
-                                aria-label="Preço de venda da variação"
-                                type="number"
-                                min={0}
-                                step="0.01"
+                              <CurrencyInput
+                                ariaLabel="Preço de venda da variação"
                                 value={rowPrice}
                                 disabled={readOnly}
-                                onFocus={selectAllOnFocus}
-                                onChange={(e) =>
-                                  row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:Number(e.target.value)}}:r)) : updateVariationRow(index, 'price', Number(e.target.value))
+                                onChange={(value) =>
+                                  row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:value}}:r)) : updateVariationRow(index, 'price', value)
                                 }
                               />
                             </td>
@@ -1663,31 +1660,21 @@ export function StockPage() {
                               </span>
                             </td>
                             <td data-label="Quantidade">
-                              <input
-                                aria-label="Quantidade da variação"
-                                type="number"
-                                min={0}
-                                step={form.unit === 'KG' ? 0.001 : 1}
+                              <CurrencyInput
+                                ariaLabel="Quantidade da variação"
+                                decimals={qtyDecimals}
                                 value={row.qty}
                                 disabled={readOnly}
-                                onFocus={selectAllOnFocus}
-                                onChange={(e) =>
-                                  updateVariationRow(index, 'qty', Number(e.target.value))
-                                }
+                                onChange={(value) => updateVariationRow(index, 'qty', value)}
                               />
                             </td>
                             <td data-label="Estoque mínimo">
-                              <input
-                                aria-label="Estoque mínimo da variação"
-                                type="number"
-                                min={0}
-                                step={form.unit === 'KG' ? 0.001 : 1}
+                              <CurrencyInput
+                                ariaLabel="Estoque mínimo da variação"
+                                decimals={qtyDecimals}
                                 value={row.minQty}
                                 disabled={readOnly}
-                                onFocus={selectAllOnFocus}
-                                onChange={(e) =>
-                                  updateVariationRow(index, 'minQty', Number(e.target.value))
-                                }
+                                onChange={(value) => updateVariationRow(index, 'minQty', value)}
                               />
                             </td>
                             <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
@@ -1775,39 +1762,30 @@ export function StockPage() {
                 <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
                   <label>
                     Quantidade ({form.unit === 'KG' ? 'KG' : 'UN'})
-                    <input
-                      type="number"
-                      min={0}
-                      step={form.unit === 'KG' ? 0.001 : 1}
+                    <CurrencyInput
+                      decimals={qtyDecimals}
                       value={form.qty}
                       disabled={readOnly}
-                      onFocus={selectAllOnFocus}
-                      onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
+                      onChange={(qty) => setForm((current) => ({ ...current, qty }))}
                     />
                   </label>
                   <label>
                     Mínimo
-                    <input
-                      type="number"
-                      min={0}
-                      step={form.unit === 'KG' ? 0.001 : 1}
+                    <CurrencyInput
+                      decimals={qtyDecimals}
                       value={form.minQty}
                       disabled={readOnly}
-                      onFocus={selectAllOnFocus}
-                      onChange={(e) => setForm({ ...form, minQty: Number(e.target.value) })}
+                      onChange={(minQty) => setForm((current) => ({ ...current, minQty }))}
                     />
                   </label>
                   {!lite ? (
                     <label>
                       Máximo
-                      <input
-                        type="number"
-                        min={0}
-                        step={form.unit === 'KG' ? 0.001 : 1}
+                      <CurrencyInput
+                        decimals={qtyDecimals}
                         value={form.maxQty}
                         disabled={readOnly}
-                        onFocus={selectAllOnFocus}
-                        onChange={(e) => setForm({ ...form, maxQty: Number(e.target.value) })}
+                        onChange={(maxQty) => setForm((current) => ({ ...current, maxQty }))}
                       />
                     </label>
                   ) : null}
@@ -1820,46 +1798,36 @@ export function StockPage() {
 
                     <label>
                       Custo unitário de referência
-                      <input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
                         value={form.cost}
                         disabled={readOnly}
-                        onFocus={selectAllOnFocus}
-                        onChange={(e) => {
-                          const cost = Number(e.target.value);
-                          setForm({
-                            ...form,
+                        onChange={(cost) =>
+                          setForm((current) => ({
+                            ...current,
                             cost,
-                            avgCost: form.avgCost || cost,
+                            avgCost: current.avgCost || cost,
                             lastPurchaseCost: cost,
-                          });
-                        }}
+                          }))
+                        }
                       />
                     </label>
 
 
                     <label>
                       Custo médio
-                      <input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
                         value={form.avgCost}
                         disabled={readOnly}
-                        onFocus={selectAllOnFocus}
-                        onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
+                        onChange={(avgCost) => setForm((current) => ({ ...current, avgCost }))}
                       />
                     </label>
 
                   <label>
                     Preço base
-                    <input
-                      type="number"
-                      step="0.01"
+                    <CurrencyInput
                       value={form.price}
                       disabled={readOnly}
-                      onFocus={selectAllOnFocus}
-                      onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                      onChange={(price) => setForm((current) => ({ ...current, price }))}
                     />
                   </label>
                   <div className="span-2"><ProductPriceSuggestion price={form.price} itemLabel={form.name||'Produto'} cost={form.cost} policy={form.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setForm(current=>({...current,pricingPolicy}))} onApply={price=>setForm(current=>({...current,price}))}/></div>

@@ -17,7 +17,11 @@ import {
   hydrateCardMachinesFromApi,
 } from '../../data/cardRatesStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
-import { selectAllOnFocus } from '../../utils/inputHelpers';
+import { CurrencyInput } from '../../components/CurrencyInput';
+
+function formatPercent(rate: number) {
+  return `${(Number(rate) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
 
 export function CardRatesPage() {
   const customization = useStoreCustomization();
@@ -342,7 +346,7 @@ export function CardRatesPage() {
               <strong style={{ color: 'var(--accent, #2dd4bf)' }}>{defaultTotemBrand?.name}</strong>{' '}
               (Taxa 12x:{' '}
               <strong>
-                {defaultTotemBrand?.installments.find((it) => it.installment === 12)?.rate ?? 0}%
+                {formatPercent(defaultTotemBrand?.installments.find((it) => it.installment === 12)?.rate ?? 0)}
               </strong>
               )
             </p>
@@ -599,14 +603,10 @@ export function CardRatesPage() {
                 }}
               >
                 <span>Taxa no Débito (%):</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                <CurrencyInput
                   value={activeBrand.debitRate}
                   style={{ width: 85 }}
-                  onFocus={selectAllOnFocus}
-                  onChange={(e) => updateActiveBrand({ debitRate: Number(e.target.value) })}
+                  onChange={(debitRate) => updateActiveBrand({ debitRate })}
                 />
               </label>
 
@@ -663,17 +663,11 @@ export function CardRatesPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step="0.01"
+                          <CurrencyInput
+                            ariaLabel={`Taxa em ${item.installment}x`}
                             value={item.rate}
                             style={{ width: 95, fontWeight: 700 }}
-                            onFocus={selectAllOnFocus}
-                            onChange={(e) =>
-                              updateInstallmentRate(item.installment, Number(e.target.value))
-                            }
+                            onChange={(rate) => updateInstallmentRate(item.installment, Math.min(100, rate))}
                           />
                           <span style={{ fontSize: '0.85rem', color: 'var(--mute, #94a3b8)' }}>%</span>
                         </div>
@@ -747,14 +741,7 @@ export function CardRatesPage() {
         >
           <label>
             <span className="admin-field-label">Valor da Venda (R$)</span>
-            <input
-              type="number"
-              min={1}
-              step="10"
-              value={simGross}
-              onFocus={selectAllOnFocus}
-              onChange={(e) => setSimGross(Math.max(1, Number(e.target.value) || 0))}
-            />
+            <CurrencyInput value={simGross} onChange={(value) => setSimGross(Math.max(1, value))} />
           </label>
 
           <AdminPicker
@@ -768,10 +755,10 @@ export function CardRatesPage() {
             label="Parcelamento"
             value={String(simParcels)}
             options={[
-              { value: '0', label: `Débito (${activeBrand.debitRate}%)` },
+              { value: '0', label: `Débito (${formatPercent(activeBrand.debitRate)})` },
               ...activeBrand.installments.map((it) => ({
                 value: String(it.installment),
-                label: `${it.installment}x (${it.rate}%)`,
+                label: `${it.installment}x (${formatPercent(it.rate)})`,
               })),
             ]}
             onChange={(val) => setSimParcels(Number(val))}
@@ -793,7 +780,7 @@ export function CardRatesPage() {
           <div>
             <span style={{ fontSize: '0.78rem', color: 'var(--mute, #94a3b8)' }}>Taxa Aplicada</span>
             <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ink, #fff)' }}>
-              {simTotemCalc.rate.toFixed(2).replace('.', ',')}%
+              {formatPercent(simTotemCalc.rate)}
             </div>
             <span style={{ fontSize: '0.75rem', color: 'var(--mute, #94a3b8)' }}>
               {simParcels === 0 ? 'Débito à vista' : `Crédito em ${simParcels} parcelas`}

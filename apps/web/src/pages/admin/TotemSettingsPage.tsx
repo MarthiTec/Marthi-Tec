@@ -311,7 +311,7 @@ export function TotemSettingsPage() {
 
       <article className="admin-card" id="totem-opening">
         <h2>Tela de boas-vindas · logo e propaganda</h2>
-        <AdminPicker label="Conteúdo sobre o fundo" value={attractContent} options={[{value:'full',label:'Logo e textos'},{value:'text',label:'Somente textos'},{value:'background',label:'Somente fundo'}]} onChange={value=>setAttractContent(value as typeof attractContent)}/>
+        <AdminPicker label="Conteúdo sobre o fundo" value={attractContent} options={[{value:'full',label:'Logo no centro + mensagem'},{value:'text',label:'Só a mensagem (sem logo no centro)'},{value:'background',label:'Só a imagem de fundo'}]} onChange={value=>setAttractContent(value as typeof attractContent)}/>
         <p>
           Tela cheia esperando o cliente. Ideal enquanto o mix de produtos ainda é pequeno: destaque
           a logo da loja e uma propaganda de fundo. Depois de 2 minutos sem toque, o totem volta para

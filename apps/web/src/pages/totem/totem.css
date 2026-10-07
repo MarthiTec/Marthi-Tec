@@ -1191,6 +1191,12 @@ body.totem-html-scroll #root {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Em telas curtas (assistente, boas-vindas, ticket) o conteúdo não ocupa a altura toda;
+   a margem automática empurra o rodapé para a base da tela em vez de deixá-lo no meio. */
+.totem > .totem-foot {
+  margin-top: auto;
+}
+
 .totem-foot__hint {
   margin: 0;
   text-align: center;
@@ -1848,7 +1854,7 @@ body.totem-html-scroll #root {
   }
 }
 
-.totem-guided{width:min(760px,calc(100% - 32px));margin:24px auto;padding:24px;background:var(--card,#fff);color:var(--ink,#1d1d1f);border-radius:24px;text-align:center;overflow:auto}
+.totem-guided{width:min(760px,calc(100% - 32px));margin:auto;box-sizing:border-box;padding:24px;background:var(--card,#fff);color:var(--ink,#1d1d1f);border-radius:24px;text-align:center;overflow:auto}
 .totem-guided__avatar{width:96px;height:96px;margin:auto;border-radius:50%;background:var(--accent,#0f766e);display:grid;place-items:center;color:var(--surface,#fff);font-size:40px;overflow:hidden;animation:totem-guided-breathe 3.2s ease-in-out infinite}
 .totem-guided__avatar img{width:100%;height:100%;object-fit:cover}
 .totem-guided__seller{color:var(--mute);margin:10px 0 0}

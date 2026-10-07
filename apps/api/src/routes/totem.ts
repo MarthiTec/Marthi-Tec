@@ -342,6 +342,39 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
   }
 }
 
+// A senha de saída nunca vai para o totem público; ele pergunta ao servidor se a senha
+// digitada confere. Limitamos as tentativas por loja para não virar força bruta.
+const UNLOCK_WINDOW_MS = 5 * 60_000;
+const UNLOCK_MAX_FAILURES = 10;
+const unlockFailures = new Map<string, { count: number; since: number }>();
+
+async function handleUnlock(req: Request, res: Response, next: NextFunction) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const { password } = z.object({ password: z.string().max(64) }).parse(req.body);
+    const now = Date.now();
+    const failures = unlockFailures.get(storeId);
+    if (failures && now - failures.since > UNLOCK_WINDOW_MS) unlockFailures.delete(storeId);
+    const current = unlockFailures.get(storeId);
+    if (current && current.count >= UNLOCK_MAX_FAILURES) {
+      res.status(429).json({ success: false, error: { code: 'TOO_MANY_ATTEMPTS', message: 'Muitas tentativas. Aguarde alguns minutos.' } });
+      return;
+    }
+    const settings = await getStoreTotemSettings(storeId);
+    if (password.trim() !== String(settings.exitPassword)) {
+      unlockFailures.set(storeId, { count: (current?.count ?? 0) + 1, since: current?.since ?? now });
+      res.status(403).json({ success: false, error: { code: 'INVALID_PASSWORD', message: 'Senha incorreta. Só a loja pode fechar o totem.' } });
+      return;
+    }
+    unlockFailures.delete(storeId);
+    res.json({ success: true, data: { unlocked: true } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+totemRouter.post('/api/v1/totem/unlock', handleUnlock);
+
 // ── Rotas do Totem e Configurações da Empresa (/store/totem-settings) ────────
 totemRouter.get('/api/v1/store/totem-settings', requireOrDemoAuth, handleGetSettings);
 totemRouter.get('/store/totem-settings', requireOrDemoAuth, handleGetSettings);

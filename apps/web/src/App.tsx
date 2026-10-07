@@ -1,7 +1,9 @@
 import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
 import {PickupMethodsPage} from './pages/admin/PickupMethodsPage';
 import {PickupTrackingPage} from './pages/PickupTrackingPage';
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/operatorThemeDark.css';
@@ -109,10 +111,21 @@ function LegacyMarthiRedirect() {
   return <Navigate to={`/admin${suffix}${location.search}`} replace />;
 }
 
+/** Com o aparelho travado no totem, nenhuma outra tela (painel, login, site) chega a renderizar. */
+function TotemKioskGate({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const totemUrl = lockedTotemUrl();
+  if (totemUrl && !isAllowedWhileTotemLocked(location.pathname)) {
+    return <Navigate to={totemUrl} replace />;
+  }
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <AuthProvider>
       <ErrorBoundary fallbackTitle="Ocorreu um erro no sistema">
+        <TotemKioskGate>
         <Routes>
         <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/" element={<HomePage />} />
@@ -287,6 +300,7 @@ export function App() {
           <Route path="ajuda" element={<HelpPage />} />
         </Route>
       </Routes>
+        </TotemKioskGate>
       </ErrorBoundary>
     </AuthProvider>
   );

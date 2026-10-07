@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 
-export function parseCurrencyInput(raw: string): number {
+export function parseCurrencyInput(raw: string, decimals = 2): number {
   if (!raw) return 0;
   let clean = raw.replace(/[^\d.,]/g, '').trim();
   if (!clean) return 0;
@@ -14,20 +14,26 @@ export function parseCurrencyInput(raw: string): number {
       clean = clean.replace(/,/g, '');
     }
   } else if (clean.includes(',')) {
-    clean = clean.replace(',', '.');
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(clean) && decimals < 3) {
+    // "1.500" digitado no padrão brasileiro é mil e quinhentos, não 1,5.
+    clean = clean.replace(/\./g, '');
   }
   const num = Number.parseFloat(clean);
-  return Number.isFinite(num) ? Math.max(0, Math.round(num * 100) / 100) : 0;
+  const factor = 10 ** decimals;
+  return Number.isFinite(num) ? Math.max(0, Math.round(num * factor) / factor) : 0;
 }
 
-export function formatCurrencyDisplay(val: number): string {
-  if (!Number.isFinite(val) || val <= 0) return '0,00';
-  return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function formatCurrencyDisplay(val: number, decimals = 2): string {
+  if (!Number.isFinite(val) || val <= 0) return decimals ? `0,${'0'.repeat(decimals)}` : '0';
+  return val.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 export type CurrencyInputProps = {
   value: number;
   onChange: (val: number) => void;
+  /** Casas decimais exibidas e aceitas (2 para dinheiro e taxas, 3 para KG, 0 para unidades). */
+  decimals?: number;
   placeholder?: string;
   className?: string;
   style?: CSSProperties;
@@ -41,7 +47,8 @@ export type CurrencyInputProps = {
 export function CurrencyInput({
   value,
   onChange,
-  placeholder = '0,00',
+  decimals = 2,
+  placeholder,
   className,
   style,
   ariaLabel,
@@ -50,20 +57,21 @@ export function CurrencyInput({
   autoFocus,
   onKeyDown,
 }: CurrencyInputProps) {
+  const format = (amount: number) => (amount > 0 ? formatCurrencyDisplay(amount, decimals) : '');
   const [isFocused, setIsFocused] = useState(false);
-  const [rawText, setRawText] = useState(() => (value > 0 ? formatCurrencyDisplay(value) : ''));
+  const [rawText, setRawText] = useState(() => format(value));
 
   useEffect(() => {
     if (!isFocused) {
-      setRawText(value > 0 ? formatCurrencyDisplay(value) : '');
+      setRawText(format(value));
     }
-  }, [value, isFocused]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, isFocused, decimals]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const nextText = e.target.value;
     setRawText(nextText);
-    const parsed = parseCurrencyInput(nextText);
-    onChange(parsed);
+    onChange(parseCurrencyInput(nextText, decimals));
   }
 
   function handleFocus(e: FocusEvent<HTMLInputElement>) {
@@ -73,18 +81,18 @@ export function CurrencyInput({
 
   function handleBlur() {
     setIsFocused(false);
-    const parsed = parseCurrencyInput(rawText);
+    const parsed = parseCurrencyInput(rawText, decimals);
     onChange(parsed);
-    setRawText(parsed > 0 ? formatCurrencyDisplay(parsed) : '');
+    setRawText(format(parsed));
   }
 
-  const displayVal = isFocused ? rawText : value > 0 ? formatCurrencyDisplay(value) : rawText;
+  const displayVal = isFocused ? rawText : value > 0 ? format(value) : rawText;
 
   return (
     <input
       type="text"
-      inputMode="decimal"
-      placeholder={placeholder}
+      inputMode={decimals ? 'decimal' : 'numeric'}
+      placeholder={placeholder ?? formatCurrencyDisplay(0, decimals)}
       className={className}
       style={style}
       aria-label={ariaLabel}

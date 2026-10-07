@@ -20,7 +20,6 @@ import {
 import { subscribeTotemLive } from '../../data/totemLiveSync';
 import { speakTotem, stopTotemSpeech } from '../../data/totemSpeech';
 import {
-  getTotemExitPassword,
   getTotemSettings,
   hydrateTotemSettingsFromApi,
   storeGreeting,
@@ -44,6 +43,8 @@ import {assistantText} from '../../data/totemAssistant';
 import {loadTotemOffers,dayOfferFor,type DayOffer} from '../../data/dayOffers';
 import QRCode from 'qrcode';
 import { TotemFooter } from './TotemFooter';
+import { lockDeviceToTotem, unlockDeviceFromTotem } from '../../data/totemKioskLock';
+import { apiUnlockTotem } from '../../services/erpApi';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
 import {
@@ -151,6 +152,11 @@ function pickedFromConfig(
 export function TotemPage() {
   const preview = new URLSearchParams(window.location.search).get("preview") === "1";
   const navigate = useNavigate();
+
+  // Abriu o totem neste aparelho: daqui em diante só sai com a senha da loja.
+  useEffect(() => {
+    if (!preview) lockDeviceToTotem(`${window.location.pathname}${window.location.search}`);
+  }, [preview]);
   const listRef = useRef<HTMLDivElement>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>(() => startStep(getTotemSettings()));
@@ -181,6 +187,7 @@ export function TotemPage() {
   const [exitOpen, setExitOpen] = useState(false);
   const [exitPassword, setExitPassword] = useState('');
   const [exitError, setExitError] = useState<string | null>(null);
+  const [exitChecking, setExitChecking] = useState(false);
   const [mode, setMode] = useState<TotemMode>(() => getTotemSettings().mode);
   const [vertical, setVertical] = useState<TotemVertical>(() => getTotemSettings().vertical);
   const [columns, setColumns] = useState<TotemColumns>(() => getTotemSettings().columns);
@@ -211,7 +218,6 @@ export function TotemPage() {
   );
   const [sessionMode, setSessionMode] = useState<TotemMode | null>(null);
   const [voiceOn, setVoiceOn] = useState(() => getTotemSettings().audioAssist);
-  const [requiredExitPassword, setRequiredExitPassword] = useState(() => getTotemExitPassword());
   const [trackingToken,setTrackingToken]=useState<string>();
   const [whatsappUrl,setWhatsappUrl]=useState<string>();
   const [whatsappQr,setWhatsappQr]=useState<string>();
@@ -518,7 +524,6 @@ export function TotemPage() {
           setAttractGradientColor(settings.attractGradientColor);
           setAttractLayout(settings.attractLayout);
           setKeyboardPlacement(settings.keyboardPlacement);
-          setRequiredExitPassword(settings.exitPassword);
           setCardAttrs(totemCardAttributes());
           setFilterAttrs(totemFilterAttributes());
         }
@@ -574,7 +579,6 @@ export function TotemPage() {
       setAttractGradientColor(settings.attractGradientColor);
       setAttractLayout(settings.attractLayout);
       setKeyboardPlacement(settings.keyboardPlacement);
-      setRequiredExitPassword(settings.exitPassword);
       setCardAttrs(totemCardAttributes());
       setFilterAttrs(totemFilterAttributes());
     }
@@ -750,12 +754,26 @@ export function TotemPage() {
     setExitOpen(true);
   }
 
-  function confirmExit(event: FormEvent) {
+  async function confirmExit(event: FormEvent) {
     event.preventDefault();
-    if (exitPassword.trim() !== requiredExitPassword) {
-      setExitError('Senha incorreta. Só a loja pode fechar o totem.');
+    if (exitChecking) return;
+    if (preview) {
+      setExitOpen(false);
       return;
     }
+    setExitChecking(true);
+    setExitError(null);
+    try {
+      // A senha é conferida no servidor: o totem público nem recebe a senha configurada.
+      await apiUnlockTotem(exitPassword);
+    } catch (err) {
+      setExitError(err instanceof Error ? err.message : 'Não foi possível conferir a senha.');
+      setExitPassword('');
+      return;
+    } finally {
+      setExitChecking(false);
+    }
+    unlockDeviceFromTotem();
     setExitOpen(false);
     navigate(user ? '/painel' : '/');
   }
@@ -1675,8 +1693,8 @@ export function TotemPage() {
               >
                 Cancelar
               </button>
-              <button type="submit" className="totem-btn totem-btn--primary">
-                Confirmar saída
+              <button type="submit" className="totem-btn totem-btn--primary" disabled={exitChecking}>
+                {exitChecking ? 'Conferindo…' : 'Confirmar saída'}
               </button>
             </div>
           </form>

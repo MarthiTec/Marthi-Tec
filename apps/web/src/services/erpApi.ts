@@ -615,6 +615,11 @@ export function apiGetTotemPublicSettings() {
   return nestGet<TotemSettings>('/totem/settings');
 }
 
+/** Confere no servidor a senha de saída do totem (a senha não fica no navegador). */
+export function apiUnlockTotem(password: string) {
+  return nestPost<{ unlocked: boolean }>('/totem/unlock', { password });
+}
+
 /** Atributos públicos do totem (sem JWT). */
 export function apiGetTotemPublicAttributes() {
   return nestGet<ProductAttribute[]>('/totem/attributes');
