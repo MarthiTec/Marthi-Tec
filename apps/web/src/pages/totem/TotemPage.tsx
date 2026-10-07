@@ -892,6 +892,11 @@ export function TotemPage() {
             {voiceOn ? 'Ouvir' : 'Mudo'}
           </button>
         ) : null}
+        {step === 'attract' ? (
+          <button type="button" className="totem__catalog-top" onClick={beginCatalogBrowse}>
+            Catálogo
+          </button>
+        ) : null}
         <button type="button" className="totem__exit" onClick={requestExit}>
           Sair
         </button>
@@ -1052,7 +1057,7 @@ export function TotemPage() {
                         {item.label}
                       </button>
                     ))}
-                    <button type="button" className={`totem-chip totem-chip--offer ${shoppingIntent==='offers'?'is-active':''}`} onClick={()=>{bumpIdle();setShoppingIntent(current=>current==='offers'?'all':'offers');}}>OFERTAS DO DIA</button>
+                    <button type="button" className={`totem-chip totem-chip--offer ${shoppingIntent==='offers'?'is-active':''}`} onClick={()=>{bumpIdle();setShoppingIntent(current=>current==='offers'?'all':'offers');}}>🔥 Ofertas do dia</button>
                   </div>
                 </div>
               ) : null}

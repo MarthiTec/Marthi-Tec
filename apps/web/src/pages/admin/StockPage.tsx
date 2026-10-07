@@ -7,6 +7,7 @@ import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { nestRequest } from '../../services/nestClient';
+import { selectAllOnFocus } from '../../utils/inputHelpers';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -84,6 +85,13 @@ export function StockPage() {
   });
   const [items, setItems] = useState(() => getAdminState().stock);
   const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id), totemSurface));
+  // Preferência só de digitação (não é dado de negócio) — por isso fica no navegador, não no banco.
+  const [autoUppercase, setAutoUppercase] = useState(() => {
+    try { return localStorage.getItem('marthi.stock.autoUppercase') !== 'false'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('marthi.stock.autoUppercase', String(autoUppercase)); } catch { /* ignore */ }
+  }, [autoUppercase]);
   const [mode, setMode] = useState<Mode>('new');
   const [formVisible, setFormVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1363,10 +1371,19 @@ export function StockPage() {
                   <input
                     ref={nameRef}
                     value={form.name}
-                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    onChange={e => setForm({ ...form, name: autoUppercase ? e.target.value.toUpperCase() : e.target.value })}
                     disabled={readOnly}
                     placeholder="Nome do produto"
                   />
+                  <label className="stock-uppercase-toggle" title="Converte o que você digitar no nome do produto para maiúsculas automaticamente">
+                    <input
+                      type="checkbox"
+                      checked={autoUppercase}
+                      onChange={e => setAutoUppercase(e.target.checked)}
+                      disabled={readOnly}
+                    />
+                    Sempre em MAIÚSCULAS
+                  </label>
                 </label>
                 <div className="stock-brand-field">
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
@@ -1622,7 +1639,7 @@ export function StockPage() {
                               );
                             })}
                             <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
-                            <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
+                            <td data-label="Custo unitário"><input aria-label="Custo unitário da variação" type="number" min={0} step="0.01" value={row.cost} disabled={readOnly} onFocus={selectAllOnFocus} onChange={e=>updateVariationRow(index,'cost',Number(e.target.value))}/></td>
                             <td data-label="Preço à vista">
                               <input
                                 aria-label="Preço de venda da variação"
@@ -1631,6 +1648,7 @@ export function StockPage() {
                                 step="0.01"
                                 value={rowPrice}
                                 disabled={readOnly}
+                                onFocus={selectAllOnFocus}
                                 onChange={(e) =>
                                   row.pickupMethodId ? setVariations(current=>current.map((r,i)=>i===index?{...r,pickupPrices:{...r.pickupPrices,[row.pickupMethodId!]:Number(e.target.value)}}:r)) : updateVariationRow(index, 'price', Number(e.target.value))
                                 }
@@ -1651,6 +1669,7 @@ export function StockPage() {
                                 min={0}
                                 value={row.qty}
                                 disabled={readOnly}
+                                onFocus={selectAllOnFocus}
                                 onChange={(e) =>
                                   updateVariationRow(index, 'qty', Number(e.target.value))
                                 }
@@ -1663,6 +1682,7 @@ export function StockPage() {
                                 min={0}
                                 value={row.minQty}
                                 disabled={readOnly}
+                                onFocus={selectAllOnFocus}
                                 onChange={(e) =>
                                   updateVariationRow(index, 'minQty', Number(e.target.value))
                                 }
@@ -1759,6 +1779,7 @@ export function StockPage() {
                       step={form.unit === 'KG' ? 0.001 : 1}
                       value={form.qty}
                       disabled={readOnly}
+                      onFocus={selectAllOnFocus}
                       onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
                     />
                   </label>
@@ -1768,6 +1789,7 @@ export function StockPage() {
                       type="number"
                       value={form.minQty}
                       disabled={readOnly}
+                      onFocus={selectAllOnFocus}
                       onChange={(e) => setForm({ ...form, minQty: Number(e.target.value) })}
                     />
                   </label>
@@ -1778,6 +1800,7 @@ export function StockPage() {
                         type="number"
                         value={form.maxQty}
                         disabled={readOnly}
+                        onFocus={selectAllOnFocus}
                         onChange={(e) => setForm({ ...form, maxQty: Number(e.target.value) })}
                       />
                     </label>
@@ -1793,8 +1816,10 @@ export function StockPage() {
                       Custo unitário de referência
                       <input
                         type="number"
+                        step="0.01"
                         value={form.cost}
                         disabled={readOnly}
+                        onFocus={selectAllOnFocus}
                         onChange={(e) => {
                           const cost = Number(e.target.value);
                           setForm({
@@ -1812,8 +1837,10 @@ export function StockPage() {
                       Custo médio
                       <input
                         type="number"
+                        step="0.01"
                         value={form.avgCost}
                         disabled={readOnly}
+                        onFocus={selectAllOnFocus}
                         onChange={(e) => setForm({ ...form, avgCost: Number(e.target.value) })}
                       />
                     </label>
@@ -1822,8 +1849,10 @@ export function StockPage() {
                     Preço base
                     <input
                       type="number"
+                      step="0.01"
                       value={form.price}
                       disabled={readOnly}
+                      onFocus={selectAllOnFocus}
                       onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
                     />
                   </label>

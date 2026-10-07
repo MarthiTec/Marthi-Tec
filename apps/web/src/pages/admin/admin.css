@@ -1074,6 +1074,27 @@
   grid-column: span 2;
 }
 
+.admin-form label .stock-uppercase-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mute);
+  text-transform: none;
+  cursor: pointer;
+}
+
+.admin-form label .stock-uppercase-toggle input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  accent-color: var(--accent, #0f766e);
+  cursor: pointer;
+}
+
 .admin-form .admin-picker.span-2 {
   grid-column: span 2;
 }

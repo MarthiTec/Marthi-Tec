@@ -17,6 +17,7 @@ import {
   hydrateCardMachinesFromApi,
 } from '../../data/cardRatesStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { selectAllOnFocus } from '../../utils/inputHelpers';
 
 export function CardRatesPage() {
   const customization = useStoreCustomization();
@@ -604,6 +605,7 @@ export function CardRatesPage() {
                   step="0.01"
                   value={activeBrand.debitRate}
                   style={{ width: 85 }}
+                  onFocus={selectAllOnFocus}
                   onChange={(e) => updateActiveBrand({ debitRate: Number(e.target.value) })}
                 />
               </label>
@@ -668,6 +670,7 @@ export function CardRatesPage() {
                             step="0.01"
                             value={item.rate}
                             style={{ width: 95, fontWeight: 700 }}
+                            onFocus={selectAllOnFocus}
                             onChange={(e) =>
                               updateInstallmentRate(item.installment, Number(e.target.value))
                             }
@@ -749,6 +752,7 @@ export function CardRatesPage() {
               min={1}
               step="10"
               value={simGross}
+              onFocus={selectAllOnFocus}
               onChange={(e) => setSimGross(Math.max(1, Number(e.target.value) || 0))}
             />
           </label>

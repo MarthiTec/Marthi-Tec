@@ -47,11 +47,31 @@ ALTER TABLE work_orders
   ADD COLUMN IF NOT EXISTS worklogs JSONB NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS lines JSONB NOT NULL DEFAULT '[]'::jsonb;
 
--- Sincronizar colunas legadas se existirem valores
-UPDATE work_orders SET defect = defect_description WHERE (defect = '' OR defect IS NULL) AND defect_description <> '';
-UPDATE work_orders SET diagnosis = technical_report WHERE (diagnosis = '' OR diagnosis IS NULL) AND technical_report <> '';
-UPDATE work_orders SET labor = labor_cost WHERE labor = 0 AND labor_cost <> 0;
-UPDATE work_orders SET parts = parts_cost WHERE parts = 0 AND parts_cost <> 0;
-UPDATE work_orders SET item_brand = device_brand WHERE (item_brand = '' OR item_brand IS NULL) AND device_brand <> '';
-UPDATE work_orders SET item_model = device_model WHERE (item_model = '' OR item_model IS NULL) AND device_model <> '';
-UPDATE work_orders SET item_ref = serial_or_imei WHERE (item_ref = '' OR item_ref IS NULL) AND serial_or_imei <> '';
+-- Sincronizar colunas legadas se existirem valores. Nem todo banco passou pela versao
+-- antiga do schema (algumas instalacoes ja nasceram com os nomes novos), entao cada
+-- bloco so roda se a coluna legada realmente existir -- senao a migration falha e trava
+-- todas as migrations seguintes.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'defect_description') THEN
+    UPDATE work_orders SET defect = defect_description WHERE (defect = '' OR defect IS NULL) AND defect_description <> '';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'technical_report') THEN
+    UPDATE work_orders SET diagnosis = technical_report WHERE (diagnosis = '' OR diagnosis IS NULL) AND technical_report <> '';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'labor_cost') THEN
+    UPDATE work_orders SET labor = labor_cost WHERE labor = 0 AND labor_cost <> 0;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'parts_cost') THEN
+    UPDATE work_orders SET parts = parts_cost WHERE parts = 0 AND parts_cost <> 0;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'device_brand') THEN
+    UPDATE work_orders SET item_brand = device_brand WHERE (item_brand = '' OR item_brand IS NULL) AND device_brand <> '';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'device_model') THEN
+    UPDATE work_orders SET item_model = device_model WHERE (item_model = '' OR item_model IS NULL) AND device_model <> '';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'work_orders' AND column_name = 'serial_or_imei') THEN
+    UPDATE work_orders SET item_ref = serial_or_imei WHERE (item_ref = '' OR item_ref IS NULL) AND serial_or_imei <> '';
+  END IF;
+END $$;
