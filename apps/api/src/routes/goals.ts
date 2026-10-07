@@ -238,7 +238,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
       return;
     }
 
-    await pool.query(
+    const updatedRes = await pool.query(
       `UPDATE sales_goals
        SET name = COALESCE($1, name),
            goal_type = COALESCE($2, goal_type),
@@ -250,7 +250,8 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
            progressive_tiers = COALESCE($8, progressive_tiers),
            commission_rules = COALESCE($9, commission_rules),
            updated_at = now()
-       WHERE id = $10 AND store_id = $11`,
+       WHERE id = $10 AND store_id = $11
+       RETURNING *`,
       [
         body.name,
         body.goalType,
@@ -267,7 +268,6 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
       ],
     );
 
-    const updatedRes = await pool.query('SELECT * FROM sales_goals WHERE id = $1', [id]);
     if (updatedRes.rows.length === 0) {
       res.status(404).json({ success: false, error: { message: 'Meta não encontrada.' } });
       return;

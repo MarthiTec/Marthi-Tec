@@ -1,9 +1,10 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
-import { verifySessionToken } from '../services/authService.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 export const workOrdersRouter = Router();
+workOrdersRouter.use('/api/v1/work-orders', requireAuth);
 
 /* ── Helpers ───────────────────────────────────────────── */
 
@@ -145,69 +146,6 @@ export function rowToWorkOrder(row: any) {
   };
 }
 
-async function resolveStoreContext(req: Request): Promise<{ storeId: string; clientAccountId: string; userId?: string }> {
-  const header = req.header('authorization');
-  if (header?.startsWith('Bearer ') && header.slice(7).trim()) {
-    try {
-      const user = await verifySessionToken(header.slice(7).trim());
-      if (pool && user) {
-        const requestedStore = req.header('x-store-id')?.trim() || null;
-        if (user.role === 'superadmin') {
-          const stores = await pool.query(
-            `SELECT s.id, s.client_account_id FROM stores s 
-             WHERE s.active = true AND ($1::text IS NULL OR s.id = $1)
-             ORDER BY s.is_matrix DESC, s.created_at ASC LIMIT 1`,
-            [requestedStore || null],
-          );
-          if (stores.rows[0]) {
-            return {
-              storeId: stores.rows[0].id,
-              clientAccountId: stores.rows[0].client_account_id,
-              userId: user.id,
-            };
-          }
-        }
-        const stores = await pool.query(
-          `SELECT s.id, s.client_account_id FROM stores s JOIN user_stores us ON us.store_id = s.id
-           WHERE us.user_id = $1 AND s.client_account_id = $2 AND s.active = true
-           AND ($3::text IS NULL OR s.id = $3)
-           ORDER BY us.is_default DESC, s.created_at ASC LIMIT 1`,
-          [user.id, user.clientAccountId, requestedStore || null],
-        );
-        if (stores.rows[0]) {
-          return {
-            storeId: stores.rows[0].id,
-            clientAccountId: stores.rows[0].client_account_id,
-            userId: user.id,
-          };
-        }
-      }
-    } catch {
-      // Ignora erro de token inválido para permitir fallback resiliente de loja
-    }
-  }
-
-  // Fallback: busca loja ativa do banco
-  if (pool) {
-    const requestedStore = req.header('x-store-id')?.trim() || null;
-    const storeRes = await pool.query(
-      `SELECT id, client_account_id FROM stores WHERE active = true AND ($1::text IS NULL OR id = $1) ORDER BY is_matrix DESC, created_at ASC LIMIT 1`,
-      [requestedStore],
-    );
-    if (storeRes.rows[0]) {
-      return {
-        storeId: storeRes.rows[0].id,
-        clientAccountId: storeRes.rows[0].client_account_id,
-      };
-    }
-  }
-
-  return {
-    storeId: req.header('x-store-id') || 'STR-DEMO-01',
-    clientAccountId: 'ACC-MARTHI-DEMO',
-  };
-}
-
 /* ── Schemas ───────────────────────────────────────────── */
 
 const createWorkOrderSchema = z.object({
@@ -242,7 +180,7 @@ const createWorkOrderSchema = z.object({
 workOrdersRouter.get('/api/v1/work-orders', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.json({ success: true, data: [] });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const { status, technician, q } = req.query;
 
     const conditions: string[] = ['store_id = $1'];
@@ -283,7 +221,7 @@ workOrdersRouter.get('/api/v1/work-orders', async (req: Request, res: Response, 
 workOrdersRouter.get('/api/v1/work-orders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const result = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [req.params.id, storeId]);
     if (!result.rows[0]) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
@@ -300,7 +238,7 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
     if (!pool) {
       return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco de dados indisponível.' } });
     }
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const body = createWorkOrderSchema.parse(req.body);
 
     const osId = `OS-${Date.now().toString().slice(-6)}${Math.floor(10 + Math.random() * 90)}`;
@@ -370,7 +308,7 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
 workOrdersRouter.patch('/api/v1/work-orders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const currentRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
@@ -438,7 +376,7 @@ workOrdersRouter.patch('/api/v1/work-orders/:id', async (req: Request, res: Resp
 workOrdersRouter.post('/api/v1/work-orders/:id/parts', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { stockId, qty, unitPrice } = req.body;
 
@@ -493,7 +431,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/parts', async (req: Request, res:
 workOrdersRouter.delete('/api/v1/work-orders/:id/parts/:lineId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const { id: osId, lineId } = req.params;
 
     const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
@@ -531,7 +469,7 @@ workOrdersRouter.delete('/api/v1/work-orders/:id/parts/:lineId', async (req: Req
 workOrdersRouter.post('/api/v1/work-orders/:id/deliver', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
@@ -565,7 +503,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/deliver', async (req: Request, re
 workOrdersRouter.post('/api/v1/work-orders/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
@@ -596,7 +534,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/cancel', async (req: Request, res
 workOrdersRouter.post('/api/v1/work-orders/:id/purchase', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { cost, price, sku, imei, name, kind } = req.body;
 
@@ -655,7 +593,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/purchase', async (req: Request, r
 workOrdersRouter.post('/api/v1/work-orders/:id/photos', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { kind, dataUrl, caption } = req.body;
 
@@ -686,7 +624,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/photos', async (req: Request, res
 workOrdersRouter.delete('/api/v1/work-orders/:id/photos/:photoId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const { id: osId, photoId } = req.params;
 
     const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
@@ -710,7 +648,7 @@ workOrdersRouter.delete('/api/v1/work-orders/:id/photos/:photoId', async (req: R
 workOrdersRouter.patch('/api/v1/work-orders/:id/checklist/:itemId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const { id: osId, itemId } = req.params;
     const { mark, note } = req.body;
 
@@ -737,7 +675,7 @@ workOrdersRouter.patch('/api/v1/work-orders/:id/checklist/:itemId', async (req: 
 workOrdersRouter.post('/api/v1/work-orders/:id/signature', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { dataUrl, signedName } = req.body;
 
@@ -761,7 +699,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/signature', async (req: Request, 
 workOrdersRouter.delete('/api/v1/work-orders/:id/signature', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const updated = await pool.query(
@@ -785,7 +723,7 @@ workOrdersRouter.delete('/api/v1/work-orders/:id/signature', async (req: Request
 workOrdersRouter.post('/api/v1/work-orders/:id/quote/draft', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { notes, validUntil, labor } = req.body;
 
@@ -812,7 +750,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/draft', async (req: Request
 workOrdersRouter.post('/api/v1/work-orders/:id/quote/send', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const updated = await pool.query(
@@ -830,7 +768,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/send', async (req: Request,
 workOrdersRouter.post('/api/v1/work-orders/:id/quote/approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
     const { moveToProgress } = req.body || {};
 
@@ -850,7 +788,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/approve', async (req: Reque
 workOrdersRouter.post('/api/v1/work-orders/:id/quote/reject', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const updated = await pool.query(
@@ -868,7 +806,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/reject', async (req: Reques
 workOrdersRouter.post('/api/v1/work-orders/:id/quote/reopen', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
-    const { storeId } = await resolveStoreContext(req);
+    const storeId = req.storeId!;
     const osId = req.params.id;
 
     const updated = await pool.query(
