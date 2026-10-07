@@ -389,8 +389,9 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
               </div>
             </div>
 
-            <div className="os-form-grid os-form-grid--5" style={{ marginTop: 12 }}>
-              <div>
+            {/* Atribuição: Técnico e Vendedor em 2 colunas proporcionais e equilibradas */}
+            <div className="os-form-grid os-form-grid--2" style={{ marginTop: 12 }}>
+              <div style={{ minWidth: 0 }}>
                 <AdminPicker
                   label="Técnico responsável"
                   value={technician}
@@ -435,7 +436,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
                 ) : null}
               </div>
 
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <AdminPicker
                   label="Vendedor / Atendente"
                   value={sellerId}
@@ -449,7 +450,10 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
                   onChange={setSellerId}
                 />
               </div>
+            </div>
 
+            {/* Prazos e Estimativas em 3 colunas */}
+            <div className="os-form-grid os-form-grid--3" style={{ marginTop: 12 }}>
               <label>
                 <span style={{ whiteSpace: 'nowrap' }}>Previsão de conclusão</span>
                 <input

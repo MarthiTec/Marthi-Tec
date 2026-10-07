@@ -544,10 +544,6 @@ export function normalizePhoneKey(value: string) {
   return value.replace(/\D/g, '');
 }
 
-function uid() {
-  return `OS-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-}
-
 function lineUid() {
   return `OL-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
@@ -761,163 +757,87 @@ export async function createWorkOrder(
     quoteValidUntil?: string;
   },
 ) {
-  if (isNestAuthed()) {
-    try {
-      const created = await apiCreateWorkOrder({
-        customerName: input.customerName,
-        customerPhone: input.customerPhone,
-        customerDocument: input.customerDocument,
-        customerEmail: input.customerEmail,
-        itemName: input.itemName,
-        itemBrand: input.itemBrand,
-        itemModel: input.itemModel,
-        itemColor: input.itemColor,
-        itemRef: input.itemRef,
-        devicePassword: input.devicePassword,
-        accessories: input.accessories,
-        conditionOnEntry: input.conditionOnEntry,
-        defect: input.defect,
-        diagnosis: input.diagnosis,
-        notes: input.notes,
-        estimatedReadyAt: input.estimatedReadyAt,
-        technician: input.technician,
-        sellerId: input.sellerId,
-        priority: input.priority,
-        labor: input.labor,
-      });
-      return upsertLocal(normalizeWorkOrder(created));
-    } catch (error) {
-      throw new Error(osApiError(error, 'Falha ao criar OS.'));
-    }
+  try {
+    const created = await apiCreateWorkOrder({
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerDocument: input.customerDocument,
+      customerEmail: input.customerEmail,
+      itemName: input.itemName,
+      itemBrand: input.itemBrand,
+      itemModel: input.itemModel,
+      itemColor: input.itemColor,
+      itemRef: input.itemRef,
+      devicePassword: input.devicePassword,
+      accessories: input.accessories,
+      conditionOnEntry: input.conditionOnEntry,
+      defect: input.defect,
+      diagnosis: input.diagnosis,
+      notes: input.notes,
+      techNotes: input.techNotes,
+      estimatedReadyAt: input.estimatedReadyAt,
+      technician: input.technician,
+      sellerId: input.sellerId,
+      priority: input.priority,
+      labor: input.labor,
+      parts: input.parts,
+      operationId: input.operationId,
+    });
+    return upsertLocal(normalizeWorkOrder(created));
+  } catch (error) {
+    throw new Error(osApiError(error, 'Falha ao criar OS.'));
   }
-
-  const stamp = now();
-  const lines = input.lines ?? [];
-  const order = normalizeWorkOrder({
-    ...input,
-    id: uid(),
-    status: input.status ?? 'open',
-    lines,
-    photos: input.photos ?? [],
-    checklist: input.checklist ?? buildDefaultChecklist(),
-    customerSignature: input.customerSignature ?? '',
-    customerSignedName: input.customerSignedName ?? '',
-    parts: lines.length ? partsTotalFromLines(lines) : input.parts,
-    assetDisposition: input.assetDisposition ?? 'customer',
-    quoteStatus: input.quoteStatus ?? 'none',
-    quoteNotes: input.quoteNotes ?? '',
-    quoteValidUntil: input.quoteValidUntil ?? '',
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
-  const next = [order, ...load()];
-  save(next);
-  return order;
 }
 
 export async function updateWorkOrder(
   id: string,
   patch: Partial<Omit<WorkOrder, 'id' | 'createdAt'>>,
 ) {
-  if (isNestAuthed()) {
-    try {
-      if (patch.status === 'delivered' || patch.status === 'cancelled') {
-        throw new Error('Use entrega/cancelamento via ledger.');
-      }
-      const body: Record<string, unknown> = {};
-      const keys = [
-        'status',
-        'labor',
-        'notes',
-        'diagnosis',
-        'priority',
-        'technician',
-        'sellerId',
-        'estimatedReadyAt',
-        'assetDisposition',
-        'quoteNotes',
-        'quoteValidUntil',
-        'customerName',
-        'customerPhone',
-        'customerDocument',
-        'customerEmail',
-        'itemName',
-        'itemBrand',
-        'itemModel',
-        'itemColor',
-        'itemRef',
-        'devicePassword',
-        'accessories',
-        'conditionOnEntry',
-      ] as const;
-      for (const key of keys) {
-        if (patch[key] !== undefined) body[key] = patch[key];
-      }
-      const updated = await apiUpdateWorkOrder(id, body);
-      return upsertLocal(normalizeWorkOrder(updated));
-    } catch (error) {
-      throw new Error(osApiError(error, 'Falha ao atualizar OS.'));
+  try {
+    if (patch.status === 'delivered' || patch.status === 'cancelled') {
+      throw new Error('Use entrega/cancelamento via ledger.');
     }
+    const body: Record<string, unknown> = {};
+    const keys = [
+      'status',
+      'labor',
+      'notes',
+      'diagnosis',
+      'priority',
+      'technician',
+      'sellerId',
+      'estimatedReadyAt',
+      'assetDisposition',
+      'quoteNotes',
+      'quoteValidUntil',
+      'customerName',
+      'customerPhone',
+      'customerDocument',
+      'customerEmail',
+      'itemName',
+      'itemBrand',
+      'itemModel',
+      'itemColor',
+      'itemRef',
+      'devicePassword',
+      'accessories',
+      'conditionOnEntry',
+      'defect',
+      'techNotes',
+      'lines',
+      'photos',
+      'checklist',
+      'comments',
+      'history',
+    ] as const;
+    for (const key of keys) {
+      if ((patch as any)[key] !== undefined) body[key] = (patch as any)[key];
+    }
+    const updated = await apiUpdateWorkOrder(id, body);
+    return upsertLocal(normalizeWorkOrder(updated));
+  } catch (error) {
+    throw new Error(osApiError(error, 'Falha ao atualizar OS.'));
   }
-
-  const next = load().map((item) => {
-    if (item.id !== id) return item;
-    const stamp = now();
-    const merged = normalizeWorkOrder({ ...item, ...patch, id: item.id, createdAt: item.createdAt });
-    if (patch.status === 'progress' && item.status !== 'progress' && !merged.progressStartedAt) {
-      merged.progressStartedAt = stamp;
-    }
-    if (patch.status !== undefined) {
-      if (patch.status === 'delivered') {
-        merged.deliveredAt = item.deliveredAt || stamp;
-      } else {
-        merged.deliveredAt = undefined;
-      }
-    }
-    if (!patch.history) {
-      const historyEntries: WorkOrderHistoryEntry[] = [];
-      const author = (patch as any).authorName || 'Operador';
-      if (patch.status !== undefined && patch.status !== item.status) {
-        historyEntries.push({
-          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: author,
-          field: 'Status',
-          action: 'alterou',
-          fromValue: STATUS_LABEL[item.status] ?? item.status,
-          toValue: STATUS_LABEL[patch.status] ?? patch.status,
-          createdAt: stamp,
-        });
-      }
-      if (patch.priority !== undefined && patch.priority !== item.priority) {
-        historyEntries.push({
-          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: author,
-          field: 'Prioridade',
-          action: 'alterou',
-          fromValue: PRIORITY_LABEL[item.priority] ?? item.priority,
-          toValue: PRIORITY_LABEL[patch.priority] ?? patch.priority,
-          createdAt: stamp,
-        });
-      }
-      if (patch.technician !== undefined && patch.technician !== item.technician) {
-        historyEntries.push({
-          id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: author,
-          field: 'Técnico Responsável',
-          action: 'alterou',
-          fromValue: item.technician || 'Nenhum',
-          toValue: patch.technician || 'Não atribuído',
-          createdAt: stamp,
-        });
-      }
-      if (historyEntries.length > 0) {
-        merged.history = [...(item.history ?? []), ...historyEntries];
-      }
-    }
-    return { ...merged, updatedAt: stamp };
-  });
-  save(next);
-  return next.find((item) => item.id === id) ?? null;
 }
 
 export function workOrderTotal(order: Pick<WorkOrder, 'labor' | 'parts' | 'lines'>) {

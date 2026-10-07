@@ -34,6 +34,7 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
+import { workOrdersRouter } from './routes/workOrders.js';
 
 const app = express();
 
@@ -90,6 +91,7 @@ app.use(moduleStateRouter);
 app.use(totemRouter);
 app.use(whatsappRouter);
 app.use(communicationRouter);
+app.use(workOrdersRouter);
 
 // Proxy residual para qualquer rota externa legada
 app.use(proxyUnmatchedApi);

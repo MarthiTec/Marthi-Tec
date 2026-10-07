@@ -7,10 +7,21 @@ const AUTH_TOKEN_KEY = 'marthi.auth.token';
 
 export function getAuthToken(): string | null {
   try {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    return token || null;
+    const token = localStorage.getItem(AUTH_TOKEN_KEY)?.trim();
+    if (!token || token === 'null' || token === 'undefined' || token === 'marthi-demo-token') {
+      return null;
+    }
+    return token;
   } catch {
     return null;
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // ignore
   }
 }
 
@@ -89,6 +100,9 @@ export async function nestRequest<T>(
   const json = await readJson<ApiOkBody<T> | ApiErrorBody>(response);
 
   if (!response.ok || (json as ApiErrorBody).success === false) {
+    if (response.status === 401) {
+      clearAuthToken();
+    }
     const err = json as ApiErrorBody;
     throw new NestApiError(
       err.error?.message ?? `Falha na API (${response.status})`,
