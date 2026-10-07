@@ -446,11 +446,23 @@ body.totem-html-scroll #root {
   max-height: none;
   min-height: auto;
   flex: none;
-  padding-bottom: 24px;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   padding-right: 0;
   overscroll-behavior: auto;
   touch-action: pan-y;
   cursor: auto;
+}
+
+/* No modo de página rolável (catálogo), o rodapé fica fora do fluxo flex que o mantinha
+   grudado embaixo — "sticky" só gruda quando há conteúdo suficiente para rolar. Com poucos
+   produtos, ele subia e deixava um vão em branco abaixo. Fixo ao viewport resolve nos dois
+   casos (pouco ou muito conteúdo); o padding-bottom acima evita que ele cubra o último card. */
+.totem--page-scroll .totem-foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .totem__top {
