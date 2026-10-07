@@ -396,6 +396,31 @@ export function TotemSettingsPage() {
               <strong>Abertura padrão</strong>
               <span>Nome da loja, saudação e lavagem colorida por cima do fundo.</span>
             </button>
+            <button
+              type="button"
+              className={`plan-picker__card plan-picker__card--with-thumb ${attractLayout === 'greeting' ? 'is-active' : ''}`}
+              onClick={() => {
+                setAttractLayout('greeting');
+                markDirty();
+              }}
+            >
+              <div className="totem-attract-thumb" aria-hidden>
+                <TotemAttractScene
+                  preview
+                  storeName={storeName}
+                  storeLogo={storeLogo}
+                  greeting={storeGreeting()}
+                  gradientColor={attractGradientColor}
+                  backgroundImage={attractBackground}
+                  layout="greeting"
+                  showActionButtons={showActionButtons}
+                  customGreetingText={customGreetingText}
+                  customSubtitleText={customSubtitleText}
+                />
+              </div>
+              <strong>Só saudação</strong>
+              <span>Sem logo e sem nome da loja: só a saudação por cima da arte de fundo.</span>
+            </button>
           </div>
         ) : null}
 
@@ -488,7 +513,7 @@ export function TotemSettingsPage() {
         </div>
         <div className="totem-settings-brand-media">
           <TotemSettingsImage label="Logo da loja" hint="Prefira uma imagem quadrada com fundo transparente." value={storeLogo} convert={fileToStoreLogo} onChange={value=>{setStoreLogo(value);markDirty();}}/>
-          <TotemSettingsImage label="Imagem de abertura" hint="Uma foto ou arte vertical funciona melhor no totem. Confira o resultado na prévia abaixo." value={attractBackground} convert={fileToAttractBackground} onChange={value=>{setAttractBackground(value);if(value)setAttractLayout('logoPromo');markDirty();}}/>
+          <TotemSettingsImage label="Imagem de abertura" hint="Uma foto ou arte vertical funciona melhor no totem. Confira o resultado na prévia abaixo." value={attractBackground} convert={fileToAttractBackground} onChange={value=>{setAttractBackground(value);if(value&&attractLayout==='standard')setAttractLayout('logoPromo');markDirty();}}/>
         </div>
         <div className="totem-color-field">
           <p>Cor do gradiente</p>
@@ -533,7 +558,9 @@ export function TotemSettingsPage() {
                 {showAttractScreen
                   ? attractLayout === 'logoPromo'
                     ? 'Tela de abertura · Logo + propaganda'
-                    : 'Tela de abertura · Padrão'
+                    : attractLayout === 'greeting'
+                      ? 'Tela de abertura · Só saudação'
+                      : 'Tela de abertura · Padrão'
                   : 'Sem abertura · vai direto ao catálogo'}
               </strong>
             </div>

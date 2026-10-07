@@ -145,6 +145,19 @@ body.totem-html-scroll #root {
   gap: 18px;
 }
 
+/* Só saudação: sem logo, a arte de fundo aparece quase inteira e a saudação fica por cima. */
+.totem-attract--greeting.totem-attract--photo .totem-attract__wash {
+  background: linear-gradient(180deg, rgba(5, 6, 10, 0.1) 0%, rgba(5, 6, 10, 0.05) 40%, rgba(5, 6, 10, 0.7) 100%);
+}
+
+.totem-attract--greeting .totem-attract__brand {
+  gap: 14px;
+}
+
+.totem-attract--greeting .totem-attract__greeting {
+  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
+}
+
 .totem-attract--logo-promo .totem-attract__hint--soft {
   margin-top: 4px;
   opacity: 0.9;

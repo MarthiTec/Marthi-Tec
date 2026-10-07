@@ -9,7 +9,7 @@ export type TotemKeyboardPlacement = 'top' | 'bottom';
  * standard = abertura completa com lavagens coloridas.
  * logoPromo = destaque na logo da loja + propaganda de fundo (ideal sem mix grande).
  */
-export type TotemAttractLayout = 'standard' | 'logoPromo';
+export type TotemAttractLayout = 'standard' | 'logoPromo' | 'greeting';
 
 export const TOTEM_DINE_ID = 'TOTEM-DINE';
 export const TOTEM_DINE_OPTIONS = ['Consumir no local', 'Retirada'] as const;
@@ -392,7 +392,7 @@ function normalizeExitPassword(value: unknown): string {
 }
 
 export function normalizeAttractLayout(value: unknown): TotemAttractLayout {
-  return value === 'logoPromo' ? 'logoPromo' : 'standard';
+  return value === 'logoPromo' || value === 'greeting' ? value : 'standard';
 }
 
 export function normalizeKeyboardPlacement(value: unknown): TotemKeyboardPlacement {

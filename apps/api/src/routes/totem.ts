@@ -57,7 +57,7 @@ const totemSettingsSchema = z.object({
   storeLogo: z.string().nullable().optional(),
   attractBackground: z.string().nullable().optional(),
   attractGradientColor: z.string().default('#0f766e'),
-  attractLayout: z.enum(['standard', 'logoPromo']).default('standard'),
+  attractLayout: z.enum(['standard', 'logoPromo', 'greeting']).default('standard'),
   keyboardPlacement: z.enum(['top', 'bottom']).default('bottom'),
   askCustomerName: z.boolean().default(false),
   offerFulfillment: z.boolean().default(true),

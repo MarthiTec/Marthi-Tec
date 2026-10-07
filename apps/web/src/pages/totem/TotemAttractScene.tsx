@@ -38,6 +38,7 @@ export function TotemAttractScene({
   const color = normalizeHexColor(gradientColor);
   const hasPhoto = Boolean(backgroundImage);
   const logoPromo = layout === 'logoPromo';
+  const greetingOnly = layout === 'greeting';
   const name = storeName.trim() || 'Sua Loja';
   const effectiveHello = (customGreetingText && customGreetingText.trim()) || greeting || 'Olá';
   const hasCustomText = Boolean(customSubtitleText && customSubtitleText.trim());
@@ -56,6 +57,7 @@ export function TotemAttractScene({
         'totem-attract',
         hasPhoto ? 'totem-attract--photo' : '',
         logoPromo ? 'totem-attract--logo-promo' : '',
+        greetingOnly ? 'totem-attract--greeting' : '',
         preview ? 'totem-attract--preview' : '',
         !showActionButtons ? 'totem-attract--no-buttons' : '',
       ]
@@ -71,7 +73,7 @@ export function TotemAttractScene({
     >
       <div className="totem-attract__photo" aria-hidden />
       <div className="totem-attract__wash" aria-hidden />
-      {!logoPromo ? (
+      {!logoPromo && !greetingOnly ? (
         <>
           <div className="totem-attract__glow" aria-hidden />
           <div className="totem-attract__glow totem-attract__glow--two" aria-hidden />
@@ -79,7 +81,19 @@ export function TotemAttractScene({
       ) : null}
       <div className="totem-attract__grain" aria-hidden />
 
-      {content !== 'background' && <div className="totem-attract__brand">
+      {/* Só a saudação: sem logo e sem nome da loja, a arte de fundo fica em destaque. */}
+      {content !== 'background' && greetingOnly ? (
+        <div className="totem-attract__brand">
+          <h1 className="totem-attract__greeting">{effectiveHello}</h1>
+          {hasCustomText ? <p className="totem-attract__custom-text">{customSubtitleText!.trim()}</p> : null}
+          <p className="totem-attract__hint">
+            Toque para começar
+            <span className="totem-attract__pulse" aria-hidden />
+          </p>
+        </div>
+      ) : null}
+
+      {content !== 'background' && !greetingOnly && <div className="totem-attract__brand">
         {content === 'full' && <div className="totem-attract__mark">
           {storeLogo ? (
             <img src={storeLogo} alt={name} className="totem-attract__logo" />
