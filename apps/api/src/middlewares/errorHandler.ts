@@ -35,14 +35,19 @@ export function errorHandler(
     message.includes('ECONNREFUSED') ||
     message.includes('ETIMEDOUT') ||
     message.includes('connection timeout') ||
-    message.includes('Connection terminated');
+    message.includes('Connection terminated') ||
+    message.includes('ECONNRESET') ||
+    message.includes('recovery mode') ||
+    message.includes('Falha ao consultar MarthiDB') ||
+    // 57P0x = banco reiniciando/desligando (ex.: "the database system is in recovery mode").
+    (typeof err === 'object' && err !== null && /^57P0/.test(String((err as { code?: unknown }).code ?? '')));
 
   if (status >= 500) {
     console.error('[marthi-api] unhandled error:', err);
   }
 
   const userFacingMessage = status >= 500
-    ? (isDbConnError || status === 503 ? 'MarthiDB ou serviço externo indisponível. Tente novamente.' : 'Erro interno do servidor.')
+    ? (isDbConnError || status === 503 ? 'O sistema está se reconectando. Aguarde alguns segundos e tente novamente.' : 'Erro interno do servidor.')
     : message || 'Erro interno do servidor.';
 
   res.status(status).json({
