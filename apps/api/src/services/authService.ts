@@ -505,7 +505,7 @@ export async function adminResendActivationLink(
   clientName: string,
   planName: string,
   actorName: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; activationUrl: string; emailSent: boolean }> {
   const normEmail = email.trim().toLowerCase();
   const { rawToken } = await createSecureToken({
     type: 'activation',
@@ -513,19 +513,32 @@ export async function adminResendActivationLink(
     name: clientName,
     ttlHours: 48,
   });
+  const activationUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/criar-senha?token=${encodeURIComponent(rawToken)}`;
 
-  await sendWelcomeEmail({
-    toEmail: normEmail,
-    contactName: clientName,
-    companyName: clientName,
-    planName: planName || 'Plano Marthi',
-    activationToken: rawToken,
-  });
+  let emailSent = false;
+  let emailError: unknown;
+  try {
+    await sendWelcomeEmail({
+      toEmail: normEmail,
+      contactName: clientName,
+      companyName: clientName,
+      planName: planName || 'Plano Marthi',
+      activationToken: rawToken,
+    });
+    emailSent = true;
+  } catch (err) {
+    emailError = err;
+    console.error(`[authService] Falha ao enviar e-mail de ativação para ${normEmail}:`, err);
+  }
 
-  console.log(`[auditLog] [${actorName}] Reenviou link de ativação para ${normEmail}`);
+  console.log(`[auditLog] [${actorName}] Reenviou link de ativação para ${normEmail} (e-mail ${emailSent ? 'enviado' : 'falhou'})`);
   return {
     success: true,
-    message: `Link de ativação reenviado com sucesso para ${normEmail}.`,
+    message: emailSent
+      ? `Link de ativação reenviado com sucesso para ${normEmail}.`
+      : `Não foi possível enviar o e-mail (${emailError instanceof Error ? emailError.message : 'falha no SMTP'}). Copie o link abaixo e envie manualmente ao cliente.`,
+    activationUrl,
+    emailSent,
   };
 }
 
@@ -533,7 +546,7 @@ export async function adminForcePasswordReset(
   email: string,
   clientName: string,
   actorName: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; resetUrl: string; emailSent: boolean }> {
   const normEmail = email.trim().toLowerCase();
   const { rawToken } = await createSecureToken({
     type: 'password_reset',
@@ -541,17 +554,30 @@ export async function adminForcePasswordReset(
     name: clientName,
     ttlHours: 2,
   });
+  const resetUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/redefinir-senha?token=${encodeURIComponent(rawToken)}`;
 
-  await sendPasswordResetEmail({
-    toEmail: normEmail,
-    userName: clientName,
-    resetToken: rawToken,
-  });
+  let emailSent = false;
+  let emailError: unknown;
+  try {
+    await sendPasswordResetEmail({
+      toEmail: normEmail,
+      userName: clientName,
+      resetToken: rawToken,
+    });
+    emailSent = true;
+  } catch (err) {
+    emailError = err;
+    console.error(`[authService] Falha ao enviar e-mail de redefinição para ${normEmail}:`, err);
+  }
 
-  console.log(`[auditLog] [${actorName}] Forçou envio de redefinição de senha para ${normEmail}`);
+  console.log(`[auditLog] [${actorName}] Forçou envio de redefinição de senha para ${normEmail} (e-mail ${emailSent ? 'enviado' : 'falhou'})`);
   return {
     success: true,
-    message: `E-mail de redefinição de senha enviado para ${normEmail}.`,
+    message: emailSent
+      ? `E-mail de redefinição de senha enviado para ${normEmail}.`
+      : `Não foi possível enviar o e-mail (${emailError instanceof Error ? emailError.message : 'falha no SMTP'}). Copie o link abaixo e envie manualmente ao cliente. Válido por 2 horas.`,
+    resetUrl,
+    emailSent,
   };
 }
 
@@ -591,8 +617,14 @@ export async function identifyUserAccess(email: string): Promise<UserIdentificat
         `SELECT u.id, u.email, u.name, u.global_role, u.password_hash, u.active, u.client_account_id,
                 s.id as store_id, s.trade_name as store_name
          FROM users u
-         LEFT JOIN user_stores us ON us.user_id = u.id AND us.is_default = true
-         LEFT JOIN stores s ON (s.id = us.store_id OR s.client_account_id = u.client_account_id)
+         LEFT JOIN LATERAL (
+           SELECT s2.id, s2.trade_name
+           FROM stores s2
+           LEFT JOIN user_stores us2 ON us2.store_id = s2.id AND us2.user_id = u.id
+           WHERE s2.client_account_id = u.client_account_id AND s2.active = true
+           ORDER BY us2.is_default DESC NULLS LAST, s2.is_matrix DESC, s2.created_at ASC
+           LIMIT 1
+         ) s ON true
          WHERE lower(u.email) = $1
          LIMIT 1`,
         [normEmail],

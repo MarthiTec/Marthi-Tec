@@ -601,7 +601,7 @@ export async function identifyClientPaymentAndActivate(
 export async function resendClientActivationEmail(
   client: MarthiClient,
   actorName: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; activationUrl?: string }> {
   const timestamp = now();
   const state = load();
   const hit = state.clients.find((c) => c.clientId === client.clientId);
@@ -611,29 +611,24 @@ export async function resendClientActivationEmail(
   }
 
   try {
-    const apiUrl = nestApiUrl();
-    const res = await fetch(`${apiUrl}/api/v1/admin/clients/resend-activation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-actor-name': actorName,
+    const data = await nestRequest<{ message: string; activationUrl?: string; emailSent?: boolean }>(
+      '/admin/clients/resend-activation',
+      {
+        method: 'POST',
+        headers: { 'x-actor-name': actorName },
+        body: JSON.stringify({
+          email: client.email,
+          clientName: client.tradeName,
+          planName: getPlanById(client.planId).name,
+        }),
       },
-      body: JSON.stringify({
-        email: client.email,
-        clientName: client.tradeName,
-        planName: getPlanById(client.planId).name,
-      }),
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) {
-      return {
-        success: false,
-        message: json?.error?.message || `Falha ao reenviar e-mail para ${client.email}.`,
-      };
-    }
+    );
     return {
       success: true,
-      message: json?.data?.message || `Link de ativação reenviado para ${client.email}.`,
+      message: data.emailSent === false && data.activationUrl
+        ? `${data.message}\n\nLink: ${data.activationUrl}`
+        : data.message || `Link de ativação reenviado para ${client.email}.`,
+      activationUrl: data.activationUrl,
     };
   } catch (err) {
     return {
@@ -649,30 +644,25 @@ export async function resendClientActivationEmail(
 export async function forceClientPasswordReset(
   client: MarthiClient,
   actorName: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; resetUrl?: string }> {
   try {
-    const apiUrl = nestApiUrl();
-    const res = await fetch(`${apiUrl}/api/v1/admin/clients/force-reset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-actor-name': actorName,
+    const data = await nestRequest<{ message: string; resetUrl?: string; emailSent?: boolean }>(
+      '/admin/clients/force-reset',
+      {
+        method: 'POST',
+        headers: { 'x-actor-name': actorName },
+        body: JSON.stringify({
+          email: client.email,
+          clientName: client.tradeName,
+        }),
       },
-      body: JSON.stringify({
-        email: client.email,
-        clientName: client.tradeName,
-      }),
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) {
-      return {
-        success: false,
-        message: json?.error?.message || `Falha ao enviar e-mail de redefinição para ${client.email}.`,
-      };
-    }
+    );
     return {
       success: true,
-      message: json?.data?.message || `E-mail de redefinição de senha enviado para ${client.email}.`,
+      message: data.emailSent === false && data.resetUrl
+        ? `${data.message}\n\nLink: ${data.resetUrl}`
+        : data.message || `E-mail de redefinição de senha enviado para ${client.email}.`,
+      resetUrl: data.resetUrl,
     };
   } catch (err) {
     return {

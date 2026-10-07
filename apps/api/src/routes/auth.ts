@@ -288,7 +288,7 @@ authRouter.post('/api/v1/auth/otp/verify', async (req, res, next) => {
 /**
  * Ações Administrativas de Acesso e Credenciais (/admin)
  */
-authRouter.post('/api/v1/admin/clients/resend-activation', async (req, res, next) => {
+authRouter.post('/api/v1/admin/clients/resend-activation', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
     const actor = req.user?.name || req.header('x-actor-name') || 'Administrador Marthi';

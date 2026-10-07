@@ -669,7 +669,7 @@ export function MarthiClientsPage() {
       </div>
 
       {flash ? (
-        <p className="pdv__ok" role="status" style={{ marginTop: '16px' }}>
+        <p className="pdv__ok" role="status" style={{ marginTop: '16px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
           {flash}
         </p>
       ) : null}
