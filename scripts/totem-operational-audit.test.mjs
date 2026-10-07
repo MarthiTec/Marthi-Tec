@@ -132,3 +132,16 @@ test('customers without phones remain independent; active, address and document 
  const duplicate=await request('/customers','POST',{name:'Duplicate phone',phone:'21988887777'});assert.equal(duplicate.status,409);
  assert.equal((await query("SELECT name FROM customers WHERE phone_digits='21988887777' AND store_id='store-a'")).rows[0].name,'Audit buyer updated');
 });
+test('a legacy production pos_tickets with required payment no longer blocks totem orders',async()=>{
+ // Produção tinha pos_tickets antiga com "payment" obrigatório e sem default.
+ await query('ALTER TABLE pos_tickets ADD COLUMN IF NOT EXISTS payment TEXT');
+ await query("UPDATE pos_tickets SET payment='À vista' WHERE payment IS NULL");
+ await query('ALTER TABLE pos_tickets ALTER COLUMN payment SET NOT NULL');
+ await db.exec(fs.readFileSync('apps/api/src/db/migrations/0057_pos_tickets_legacy_not_null.sql','utf8'));
+ const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
+ const item=(await request('/stock','POST',{name:'Legacy schema device',qty:1,price:4650,showOnTotem:true,pickupPrices:{[method.id]:4650}})).json.data;
+ const lead=await request('/totem/leads','POST',{stockId:item.id,pickupMethodId:method.id,customerName:'Cliente legado',customerPhone:'24981244253',destination:'cashier'});
+ assert.equal(lead.status,201,JSON.stringify(lead.json));
+ const nullable=(await query("SELECT is_nullable FROM information_schema.columns WHERE table_name='pos_tickets' AND column_name='payment'")).rows[0].is_nullable;
+ assert.equal(nullable,'YES');
+});
