@@ -230,8 +230,8 @@ export async function loginWithPassword(email: string, password: string): Promis
     }
   }
 
-  const expectedEmail = process.env.AUTH_DEV_EMAIL || 'teste@marthi.com.br';
-  const expectedPassword = process.env.AUTH_DEV_PASSWORD || '123';
+  const expectedEmail = process.env.AUTH_DEV_EMAIL?.trim();
+  const expectedPassword = process.env.AUTH_DEV_PASSWORD?.trim();
   if (expectedEmail && expectedPassword && normEmail === expectedEmail.toLowerCase() && password === expectedPassword) {
     let devStoreId = 'STR-DEMO-01';
     let devAccountId = 'ACC-MARTHI-DEMO';
