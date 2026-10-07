@@ -1667,6 +1667,7 @@ export function StockPage() {
                                 aria-label="Quantidade da variação"
                                 type="number"
                                 min={0}
+                                step={form.unit === 'KG' ? 0.001 : 1}
                                 value={row.qty}
                                 disabled={readOnly}
                                 onFocus={selectAllOnFocus}
@@ -1680,6 +1681,7 @@ export function StockPage() {
                                 aria-label="Estoque mínimo da variação"
                                 type="number"
                                 min={0}
+                                step={form.unit === 'KG' ? 0.001 : 1}
                                 value={row.minQty}
                                 disabled={readOnly}
                                 onFocus={selectAllOnFocus}
@@ -1787,6 +1789,8 @@ export function StockPage() {
                     Mínimo
                     <input
                       type="number"
+                      min={0}
+                      step={form.unit === 'KG' ? 0.001 : 1}
                       value={form.minQty}
                       disabled={readOnly}
                       onFocus={selectAllOnFocus}
@@ -1798,6 +1802,8 @@ export function StockPage() {
                       Máximo
                       <input
                         type="number"
+                        min={0}
+                        step={form.unit === 'KG' ? 0.001 : 1}
                         value={form.maxQty}
                         disabled={readOnly}
                         onFocus={selectAllOnFocus}
