@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
-import { sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
+import { sendEvolutionText, normalizeBrazilPhone, resolveStoreEvolutionCreds, ensureEvolutionInstance } from '../services/evolutionWhatsApp.js';
 
 import { getStoreWhatsAppConfig, saveStoreCommunication, requireCommunicationAdmin } from '../services/storeCommunication.js';
 export const whatsappRouter = Router();
@@ -57,7 +57,16 @@ whatsappRouter.put('/api/v1/store/whatsapp-settings', async (req: Request, res: 
 
     const current = await getStoreWhatsAppConfig(storeId);
     merged.apiKey = !body.apiKey || body.apiKey.includes('••') ? current.apiKey : body.apiKey.trim();
-    if (merged.enabled && (!merged.baseUrl || !merged.instance || !merged.apiKey)) throw Object.assign(new Error('Informe URL, instância e chave do Evolution.'), { status: 400 });
+    if (merged.enabled) {
+      const effectiveBaseUrl = merged.baseUrl || env.EVOLUTION_BASE_URL || '';
+      if (!effectiveBaseUrl) throw Object.assign(new Error('Evolution não está configurada na plataforma. Contate o suporte.'), { status: 501 });
+      // Instância e chave ficam em branco para conexão automática (a plataforma cria a
+      // instância da loja ao ler o QR Code); se o lojista quiser apontar para um servidor
+      // Evolution próprio, deve preencher os dois campos juntos.
+      const manualFieldsFilled = Boolean(merged.instance || merged.apiKey);
+      const manualFieldsComplete = Boolean(merged.instance && merged.apiKey);
+      if (manualFieldsFilled && !manualFieldsComplete) throw Object.assign(new Error('Preencha Instância e Chave de Autenticação juntas, ou deixe os dois campos em branco para conexão automática.'), { status: 400 });
+    }
     if (merged.baseUrl) {
       const url = new URL(merged.baseUrl);
       if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw Object.assign(new Error('URL do Evolution inválida.'), { status: 400 });
@@ -75,11 +84,22 @@ whatsappRouter.get('/api/v1/whatsapp/status', async (req: Request, res: Response
  try {
   const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
-
-  const baseUrl = cfg.baseUrl;
-  const instance = normalizeInstanceName(cfg.instance);
-  const apiKey = cfg.apiKey;
   const storeNumber = cfg.storeNumber;
+
+  if (!cfg.instance) {
+    res.json({success:true,data:{
+      success: true,
+      connected: false,
+      state: 'unprovisioned',
+      error: 'Nenhum WhatsApp vinculado a esta loja ainda. Clique em "Ler QR Code" para conectar.',
+      instance: '',
+      baseUrl: cfg.baseUrl,
+      storeNumber,
+    }});
+    return;
+  }
+
+  const { baseUrl, instance, apiKey } = resolveStoreEvolutionCreds(cfg);
 
   try {
     const response = await fetch(`${baseUrl}/instance/connectionState/${encodeURIComponent(instance)}`, {
@@ -140,13 +160,14 @@ whatsappRouter.post('/api/v1/whatsapp/test', async (req: Request, res: Response,
     const storeId = req.storeId!;
     const cfg = await getStoreWhatsAppConfig(storeId);
     if (!cfg.enabled) throw Object.assign(new Error('WhatsApp desativado nesta loja.'), {status:400});
-    const instance = normalizeInstanceName(cfg.instance);
+    if (!cfg.instance) throw Object.assign(new Error('Nenhum WhatsApp vinculado a esta loja ainda. Leia o QR Code antes de testar.'), {status:400});
+    const { baseUrl, instance, apiKey } = resolveStoreEvolutionCreds(cfg);
 
     const text = message?.trim() || '✅ *Marthi ERP*: Conexão com Evolution API ativa com sucesso!';
     const result = await sendEvolutionText(number, text, {
-      baseUrl: cfg.baseUrl,
+      baseUrl,
       instance,
-      apiKey: cfg.apiKey, storeId,
+      apiKey, storeId,
     });
 
     if (!result.ok) {
@@ -174,11 +195,23 @@ whatsappRouter.get('/api/v1/whatsapp/qrcode', async (req: Request, res: Response
  try {
   const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
-
-  const baseUrl = cfg.baseUrl;
-  const instance = normalizeInstanceName(cfg.instance);
-  const apiKey = cfg.apiKey;
   const forceNew = req.query.force === 'true' || req.query.forceNew === 'true';
+
+  const resolved = resolveStoreEvolutionCreds(cfg);
+  if (!resolved.baseUrl) throw Object.assign(new Error('Evolution não configurada no servidor (EVOLUTION_BASE_URL).'), { status: 501 });
+
+  // Primeira conexão desta loja: provisiona automaticamente uma instância exclusiva,
+  // própria da empresa, sem expor a chave mestra ao painel.
+  if (!cfg.instance) {
+    const autoInstance = normalizeInstanceName(`loja-${storeId}`);
+    await ensureEvolutionInstance(resolved.baseUrl, autoInstance);
+    await saveStoreCommunication(storeId, 'whatsapp_settings', { ...cfg, instance: autoInstance, enabled: true });
+    resolved.instance = autoInstance;
+  }
+
+  const baseUrl = resolved.baseUrl;
+  const instance = normalizeInstanceName(resolved.instance);
+  const apiKey = resolved.apiKey;
 
   try {
     if (forceNew) {
@@ -221,9 +254,8 @@ whatsappRouter.post('/api/v1/whatsapp/disconnect', async (req: Request, res: Res
  try {
   const storeId = req.storeId!;
   const cfg = await getStoreWhatsAppConfig(storeId);
-  const baseUrl = cfg.baseUrl;
-  const instance = normalizeInstanceName(cfg.instance);
-  const apiKey = cfg.apiKey;
+  if (!cfg.instance) throw Object.assign(new Error('Nenhum WhatsApp vinculado a esta loja.'), {status:400});
+  const { baseUrl, instance, apiKey } = resolveStoreEvolutionCreds(cfg);
 
   try {
     const response = await fetch(`${baseUrl}/instance/logout/${encodeURIComponent(instance)}`, {

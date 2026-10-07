@@ -65,6 +65,75 @@ export function buildTotemLeadMessage(
   ].join('\n');
 }
 
+/**
+ * Resolve as credenciais efetivas da Evolution para uma loja: usa o que foi salvo no banco
+ * para esta loja e, quando algum campo não foi definido, cai para os defaults da plataforma
+ * (variáveis de ambiente do servidor — nunca hardcoded no front).
+ */
+export function resolveStoreEvolutionCreds(cfg: { baseUrl: string; instance: string; apiKey: string }): {
+  baseUrl: string;
+  instance: string;
+  apiKey: string;
+} {
+  return {
+    baseUrl: (cfg.baseUrl || env.EVOLUTION_BASE_URL || '').replace(/\/$/, ''),
+    instance: cfg.instance,
+    apiKey: cfg.apiKey || env.EVOLUTION_MASTER_API_KEY || env.EVOLUTION_API_KEY || '',
+  };
+}
+
+/**
+ * Garante que a loja tenha sua própria instância na Evolution API, criando-a quando ainda
+ * não existir. Usa exclusivamente a chave mestra do servidor (nunca a chave da loja), então
+ * cada empresa consegue se conectar sem jamais ver ou precisar informar essa chave.
+ */
+export async function ensureEvolutionInstance(
+  baseUrl: string,
+  instanceName: string,
+): Promise<{ created: boolean }> {
+  const masterKey = env.EVOLUTION_MASTER_API_KEY;
+  if (!masterKey) {
+    const error = new Error(
+      'Provisionamento automático indisponível: configure EVOLUTION_MASTER_API_KEY no servidor.',
+    );
+    (error as Error & { status: number }).status = 501;
+    throw error;
+  }
+
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+  let response: Response;
+  try {
+    response = await fetch(`${cleanBaseUrl}/instance/create`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(15000),
+      redirect: 'error',
+      headers: { 'Content-Type': 'application/json', apikey: masterKey },
+      body: JSON.stringify({ instanceName, integration: 'WHATSAPP-BAILEYS' }),
+    });
+  } catch {
+    const error = new Error('Não foi possível conectar ao servidor Evolution para criar a instância.');
+    (error as Error & { status: number }).status = 502;
+    throw error;
+  }
+
+  const raw = await response.text();
+  let body: any;
+  try { body = JSON.parse(raw); } catch { body = null; }
+
+  if (response.ok) return { created: true };
+
+  const messages = Array.isArray(body?.response?.message)
+    ? body.response.message.join(' ')
+    : String(body?.response?.message || body?.message || '');
+  if (response.status === 403 && /already in use/i.test(messages)) {
+    return { created: false };
+  }
+
+  const error = new Error(messages || 'Falha ao criar instância na Evolution API.');
+  (error as Error & { status: number }).status = 502;
+  throw error;
+}
+
 export async function sendEvolutionText(
   number: string,
   text: string,

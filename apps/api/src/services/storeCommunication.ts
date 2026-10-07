@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { env } from '../config/env.js';
 import type { Request, Response, NextFunction } from 'express';
 
 export function requireCommunicationAdmin(req: Request, res: Response, next: NextFunction) {
@@ -25,5 +26,7 @@ export async function saveStoreCommunication(storeId: string, column: 'whatsapp_
 
 export async function getStoreWhatsAppConfig(storeId: string) {
   const raw = await readStoreCommunication(storeId, 'whatsapp_settings');
-  return { enabled: false, baseUrl: '', instance: '', apiKey: '', storeNumber: '', notifyCustomer: false, locationLabel: '', ...raw };
+  const merged = { enabled: false, baseUrl: '', instance: '', apiKey: '', storeNumber: '', notifyCustomer: false, locationLabel: '', ...raw };
+  if (!merged.baseUrl) merged.baseUrl = env.EVOLUTION_BASE_URL || '';
+  return merged;
 }

@@ -42,7 +42,7 @@ export function CommunicationSettingsSection() {
   const [whatsappSettings, setWhatsappSettings] = useState<StoreWhatsAppSettings>({
     enabled: true,
     baseUrl: '',
-    instance: 'marthi',
+    instance: '',
     apiKey: '',
     storeNumber: '',
     notifyCustomer: true,
@@ -86,11 +86,7 @@ export function CommunicationSettingsSection() {
     try {
       const res = await apiGetStoreWhatsAppSettings();
       if (res) {
-        setWhatsappSettings((prev) => ({
-          ...prev,
-          ...res,
-          instance: res.instance && !res.instance.includes('discloud.app') ? res.instance : 'marthi',
-        }));
+        setWhatsappSettings((prev) => ({ ...prev, ...res }));
         if (res.storeNumber && !waTestNumber) {
           setWaTestNumber(res.storeNumber);
         }
@@ -119,7 +115,7 @@ export function CommunicationSettingsSection() {
         setWhatsappStatus({
           connected: false,
           state: 'offline',
-          instance: whatsappSettings.instance || 'marthi',
+          instance: whatsappSettings.instance || '',
           baseUrl: whatsappSettings.baseUrl || '',
           storeNumber: whatsappSettings.storeNumber || '',
           error: res?.error || 'Instância offline ou aguardando conexão.',
@@ -129,7 +125,7 @@ export function CommunicationSettingsSection() {
       setWhatsappStatus({
         connected: false,
         state: 'offline',
-        instance: whatsappSettings.instance || 'marthi',
+        instance: whatsappSettings.instance || '',
         baseUrl: whatsappSettings.baseUrl || '',
         storeNumber: whatsappSettings.storeNumber || '',
         error: 'Serviço de WhatsApp inacessível no momento.',
@@ -144,12 +140,7 @@ export function CommunicationSettingsSection() {
     setWhatsappSaving(true);
     setWaFeedback(null);
     try {
-      const sanitized = {
-        ...whatsappSettings,
-        instance: whatsappSettings.instance && !whatsappSettings.instance.includes('discloud.app')
-          ? whatsappSettings.instance.trim()
-          : 'marthi',
-      };
+      const sanitized = { ...whatsappSettings, instance: whatsappSettings.instance.trim() };
       const updated = await apiPutStoreWhatsAppSettings(sanitized);
       setWhatsappSettings(updated);
       // Mantém o teste alinhado ao destino salvo para esta loja. Assim, um
@@ -170,18 +161,20 @@ export function CommunicationSettingsSection() {
     setWaFeedback(null);
     try {
       const res = await apiGetWhatsAppQrCode(forceNew);
+      // O backend pode ter provisionado a instância exclusiva desta loja agora mesmo.
+      void loadWhatsAppConfig();
       if (res.alreadyConnected || res.state === 'open') {
         setQrCodeData(null);
         setWhatsappStatus((prev) => ({
           connected: true,
           state: 'open',
-          instance: prev?.instance || 'marthi',
+          instance: prev?.instance || '',
           baseUrl: prev?.baseUrl || '',
           storeNumber: prev?.storeNumber || whatsappSettings.storeNumber || '',
         }));
         setWaFeedback({
           type: 'success',
-          message: 'O WhatsApp desta instância (marthi) já está conectado e pronto para disparar mensagens!',
+          message: 'O WhatsApp desta loja já está conectado e pronto para disparar mensagens!',
         });
         return;
       }
@@ -224,7 +217,7 @@ export function CommunicationSettingsSection() {
       setWhatsappStatus((prev) => ({
         connected: false,
         state: 'close',
-        instance: prev?.instance || 'marthi',
+        instance: prev?.instance || '',
         baseUrl: prev?.baseUrl || '',
         storeNumber: prev?.storeNumber || '',
       }));
@@ -413,7 +406,7 @@ export function CommunicationSettingsSection() {
                       : 'WhatsApp Desconectado ou Instância Offline'}
                 </div>
                 <div style={{ fontSize: '0.84rem', color: 'var(--mute, #64748b)', marginTop: 2 }}>
-                  Instância: <strong>{whatsappStatus?.instance || whatsappSettings.instance || 'marthi'}</strong> · Servidor:{' '}
+                  Instância: <strong>{whatsappStatus?.instance || whatsappSettings.instance || 'será criada automaticamente'}</strong> · Servidor:{' '}
                   <code>{whatsappStatus?.baseUrl || whatsappSettings.baseUrl}</code> · Estado:{' '}
                   <span style={{ textTransform: 'uppercase', fontWeight: 650 }}>{whatsappStatus?.state || 'verificando'}</span>
                 </div>
@@ -600,8 +593,11 @@ export function CommunicationSettingsSection() {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.84rem' }}
                 >
                   <AdminIcon name="settings" />
-                  <span>{showAdvancedWa ? 'Ocultar Parâmetros Técnicos da API' : 'Configurações Avançadas da Evolution API'}</span>
+                  <span>{showAdvancedWa ? 'Ocultar Parâmetros Técnicos da API' : 'Usar meu próprio servidor Evolution (opcional)'}</span>
                 </button>
+                <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--mute, #64748b)' }}>
+                  Por padrão você não precisa preencher nada aqui: ao clicar em <strong>"Ler QR Code"</strong> abaixo, a plataforma cria automaticamente uma instância exclusiva para esta loja. Só use os campos abaixo se a sua empresa tiver um servidor Evolution próprio.
+                </p>
 
                 {showAdvancedWa && (
                   <div className="comm-form-row comm-form-row--3" style={{ marginTop: 14 }}>
@@ -615,9 +611,9 @@ export function CommunicationSettingsSection() {
                         className="comm-field__input"
                         value={whatsappSettings.baseUrl}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, baseUrl: e.target.value })}
-                        placeholder="https://marthi-tec.discloud.app"
+                        placeholder="Deixe em branco para usar o servidor padrão da plataforma"
                       />
-                      <span className="comm-field__hint">Servidor oficial Evolution na nuvem.</span>
+                      <span className="comm-field__hint">Preencha só se sua empresa tiver um servidor Evolution próprio.</span>
                     </div>
 
                     <div className="comm-field">
@@ -630,9 +626,9 @@ export function CommunicationSettingsSection() {
                         className="comm-field__input"
                         value={whatsappSettings.instance}
                         onChange={(e) => setWhatsappSettings({ ...whatsappSettings, instance: e.target.value })}
-                        placeholder="marthi"
+                        placeholder="Gerado automaticamente para esta loja"
                       />
-                      <span className="comm-field__hint">Instância pareada (padrão: marthi).</span>
+                      <span className="comm-field__hint">Deixe em branco para a plataforma criar e nomear automaticamente.</span>
                     </div>
 
                     <div className="comm-field">

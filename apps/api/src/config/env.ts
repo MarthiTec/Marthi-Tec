@@ -26,6 +26,9 @@ const envSchema = z.object({
   EVOLUTION_BASE_URL: z.string().url().optional(),
   EVOLUTION_INSTANCE: z.string().optional(),
   EVOLUTION_API_KEY: z.string().optional(),
+  /** Chave mestra (AUTHENTICATION_API_KEY) do servidor Evolution. Usada só no backend para
+   *  provisionar automaticamente uma instância exclusiva por loja; nunca é enviada ao front. */
+  EVOLUTION_MASTER_API_KEY: z.string().optional(),
   EVOLUTION_STORE_NUMBER: z.string().optional(),
   EVOLUTION_NOTIFY_CUSTOMER: z
     .enum(['true', 'false'])

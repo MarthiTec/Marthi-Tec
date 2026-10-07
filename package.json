@@ -9,7 +9,7 @@
   "scripts": {
     "test:client-payments": "npm run build:api && node --test scripts/client-payment-activation.test.mjs scripts/client-payment-ui.test.mjs",
     "test:commercial": "npm run build:api && node --test scripts/commercial-orders.test.mjs",
-    "test:security": "npm run build:api && node --test scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs",
+    "test:security": "npm run build:api && node --test scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs scripts/whatsapp-auto-provision.test.mjs",
     "build": "tsc -p apps/api/tsconfig.json && node -e \"const fs=require('fs');const src='apps/api/src/db/migrations',dest='dist/db/migrations';const approved=fs.readdirSync(src).filter(n=>n.endsWith('.sql'));if(!approved.length)throw new Error('Migration source is empty');fs.mkdirSync(dest,{recursive:true});for(const f of fs.readdirSync(dest,{withFileTypes:true}))if(f.isFile()&&f.name.endsWith('.sql')&&!approved.includes(f.name))fs.unlinkSync(dest+'/'+f.name);fs.cpSync(src,dest,{recursive:true});\" && npm --prefix apps/web run build && node -e \"require('fs').accessSync('dist/public/index.html')\"",
     "start": "node index.js",
     "dev:api": "npm run dev --workspace=@marthi/api",
