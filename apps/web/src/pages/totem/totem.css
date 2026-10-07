@@ -518,7 +518,8 @@ body.totem-html-scroll #root {
 
 .totem__back,
 .totem__exit,
-.totem__audio {
+.totem__audio,
+.totem__catalog-top {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -542,12 +543,14 @@ body.totem-html-scroll #root {
 
 .totem__back:hover,
 .totem__exit:hover,
-.totem__audio:hover {
+.totem__audio:hover,
+.totem__catalog-top:hover {
   background: #f5f5f7;
   opacity: 1;
 }
 
-.totem__exit {
+.totem__exit,
+.totem__catalog-top {
   opacity: 0.55;
 }
 
