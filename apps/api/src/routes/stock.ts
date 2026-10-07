@@ -61,6 +61,28 @@ const stockItemSchema = z.object({
   variations: z.array(stockVariationSchema).optional().default([]),
 });
 
+/**
+ * IDs de variações são internos ao banco. Registros antigos podiam chegar do
+ * JSON do produto com valores de apresentação como `var_0`, repetidos entre
+ * produtos. Só preservamos um ID que já pertence ao próprio produto; os demais
+ * recebem um ID novo e globalmente único.
+ */
+function persistableVariations(
+  variations: Array<z.infer<typeof stockVariationSchema>>,
+  existingIds: Iterable<string> = [],
+) {
+  const existing = new Set(existingIds);
+  const kept = new Set<string>();
+  return variations.map((variation) => {
+    const requestedId = variation.id?.trim();
+    const id = requestedId && existing.has(requestedId) && !kept.has(requestedId)
+      ? requestedId
+      : `var_${randomUUID()}`;
+    kept.add(id);
+    return { ...variation, id };
+  });
+}
+
 export function formatStockRow(row: any) {
   let attrs: Record<string, string> = {};
   if (typeof row.attrs === 'string') {
@@ -281,6 +303,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         try {
           await client.query('BEGIN');
           if (body.variations && body.variations.length > 0) {
+            body.variations = persistableVariations(body.variations);
             body.qty = body.variations.reduce((acc, v) => acc + (Number(v.qty) || 0), 0);
             body.minQty = body.variations.reduce((acc, v) => acc + (Number(v.minQty) || 0), 0);
             if (body.cost <= 0 && body.variations[0].cost > 0) body.cost = Number(body.variations[0].cost);
@@ -326,14 +349,13 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
 
           if (body.variations && body.variations.length > 0) {
             for (const v of body.variations) {
-              const varId = v.id || `var_${randomUUID()}`;
               await client.query(
                 `INSERT INTO stock_item_variations (
                   id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
                   card_rate, condition, barcode, imei, pickup_prices, pricing_policy
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
                 [
-                  varId,
+                  v.id,
                   storeId,
                   id,
                   JSON.stringify(v.attrs || {}),
@@ -426,6 +448,14 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
 
           const curr = currentRes.rows[0];
           if (body.variations !== undefined && body.variations.length > 0) {
+            const existingVariations = await client.query(
+              'SELECT id FROM stock_item_variations WHERE store_id = $1 AND stock_item_id = $2',
+              [storeId, id],
+            );
+            body.variations = persistableVariations(
+              body.variations,
+              existingVariations.rows.map((row: { id: string }) => row.id),
+            );
             body.qty = body.variations.reduce((acc, v) => acc + (Number(v.qty) || 0), 0);
             body.minQty = body.variations.reduce((acc, v) => acc + (Number(v.minQty) || 0), 0);
           }
@@ -515,14 +545,13 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           if (body.variations !== undefined) {
             await client.query('DELETE FROM stock_item_variations WHERE store_id = $1 AND stock_item_id = $2', [storeId, id]);
             for (const v of body.variations) {
-              const varId = v.id || `var_${randomUUID()}`;
               await client.query(
                 `INSERT INTO stock_item_variations (
                   id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
                   card_rate, condition, barcode, imei, pickup_prices, pricing_policy
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
                 [
-                  varId,
+                  v.id,
                   storeId,
                   id,
                   JSON.stringify(v.attrs || {}),

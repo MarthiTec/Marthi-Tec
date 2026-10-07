@@ -152,6 +152,9 @@ export function CommunicationSettingsSection() {
       };
       const updated = await apiPutStoreWhatsAppSettings(sanitized);
       setWhatsappSettings(updated);
+      // Mantém o teste alinhado ao destino salvo para esta loja. Assim, um
+      // número usado num teste anterior não fica como destino implícito.
+      setWaTestNumber(updated.storeNumber || '');
       setWaFeedback({ type: 'success', message: 'Configurações de WhatsApp salvas com sucesso no banco de dados!' });
       void checkWhatsAppStatus();
     } catch (err) {
@@ -547,11 +550,14 @@ export function CommunicationSettingsSection() {
                     type="text"
                     className="comm-field__input"
                     value={whatsappSettings.storeNumber}
-                    onChange={(e) => setWhatsappSettings({ ...whatsappSettings, storeNumber: e.target.value })}
+                    onChange={(e) => {
+                      setWhatsappSettings({ ...whatsappSettings, storeNumber: e.target.value });
+                      setWaFeedback(null);
+                    }}
                     placeholder="Ex.: 5524981244253"
                   />
                   <span className="comm-field__hint">
-                    Número que recebe alertas de novos pedidos do totem, orçamentos e fechamento de caixa.
+                    Número que recebe alertas de novos pedidos do totem, orçamentos e fechamento de caixa. O remetente é definido pela instância Evolution conectada abaixo.
                   </span>
                 </div>
 
@@ -682,7 +688,10 @@ export function CommunicationSettingsSection() {
                   type="text"
                   className="comm-field__input"
                   value={waTestNumber}
-                  onChange={(e) => setWaTestNumber(e.target.value)}
+                    onChange={(e) => {
+                      setWaTestNumber(e.target.value);
+                      setWaFeedback(null);
+                    }}
                   placeholder="Ex.: (24) 98124-4253 ou 24981244253"
                 />
                 <span className="comm-field__hint">Destino da mensagem de teste.</span>

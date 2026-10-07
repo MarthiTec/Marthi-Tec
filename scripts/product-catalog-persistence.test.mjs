@@ -45,3 +45,14 @@ test('one product and SKU persist all photos and variations in the correct store
  assert.equal(updated.status,200);const row=(await updated.json()).data;assert.equal(row.sku,'MASTER-ONE');assert.equal(row.images.length,9);assert.equal(row.variations.length,7);
  assert.equal((await query('SELECT count(*)::int n FROM stock_items WHERE id=$1',[id])).rows[0].n,1);
 });
+
+test('legacy display variation IDs cannot collide while editing another product',async()=>{
+ const baseVariation={id:'var_0',attrs:{color:'Preto'},qty:1,cost:100,price:150,pickupPrices:{}};
+ const first=await request('/stock',{name:'Primeiro produto',sku:'FIRST',skuAuto:false,variations:[baseVariation]});
+ const firstResult=await first.json();assert.equal(first.status,201,JSON.stringify(firstResult));
+ const second=await request('/stock',{name:'Segundo produto',sku:'SECOND',skuAuto:false,variations:[baseVariation]});
+ const secondResult=await second.json();assert.equal(second.status,201,JSON.stringify(secondResult));
+ const secondRow=secondResult.data;
+ const update=await fetch(base+'/stock/'+secondRow.id,{method:'PATCH',headers:{authorization:'Bearer '+token,'x-store-id':'store-a','content-type':'application/json'},body:JSON.stringify({variations:[baseVariation]})});
+ const updateResult=await update.json();assert.equal(update.status,200,JSON.stringify(updateResult));
+});

@@ -785,6 +785,31 @@ export function StockPage() {
     setSelectedId(null);
     setMode('new');
     setFormVisible(true);
+    const copiedVariations = (item.variations ?? []).map((variation, index) => ({
+      ...variation,
+      // A cópia precisa nascer como um produto novo: não pode reutilizar a
+      // identidade da variação, nem códigos que devem ser exclusivos.
+      id: undefined,
+      tempKey: `copy_${Date.now()}_${index}`,
+      barcode: '',
+      imei: '',
+      attrs: { ...variation.attrs },
+      pickupPrices: { ...(variation.pickupPrices ?? {}) },
+    }));
+    setUseVariations(copiedVariations.length > 0);
+    setVariations(copiedVariations);
+    setOriginalVariationIds([]);
+    const copiedAttributeIds = new Set<string>();
+    for (const variation of copiedVariations) {
+      for (const [attributeId, value] of Object.entries(variation.attrs)) {
+        if (value) copiedAttributeIds.add(attributeId);
+      }
+    }
+    setSelectedAttrIds(
+      copiedAttributeIds.size > 0
+        ? Array.from(copiedAttributeIds)
+        : attrDefs.slice(0, 2).map((attribute) => attribute.id),
+    );
     setForm({
       name: `${item.name} (cópia)`,
       sku: '',skuAuto:true,pricingPolicy:item.pricingPolicy,lastEntry:null,

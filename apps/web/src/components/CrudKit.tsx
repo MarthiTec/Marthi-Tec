@@ -120,8 +120,12 @@ export function CrudRowActions({
   canDelete,
 }: CrudRowActionsProps) {
   const { user } = useAuth();
-  const allowedEdit = canEdit ?? userCanEdit(user?.email);
-  const allowedDelete = canDelete ?? userCanDelete(user?.email);
+  // A lista local de funcionários pode chegar depois da sessão autenticada.
+  // O papel administrativo emitido pela API é autoritativo nesse intervalo e
+  // evita que os controles fiquem falsamente desabilitados para o administrador.
+  const isAuthenticatedAdmin = user?.role === 'admin';
+  const allowedEdit = canEdit ?? (isAuthenticatedAdmin || userCanEdit(user?.email));
+  const allowedDelete = canDelete ?? (isAuthenticatedAdmin || userCanDelete(user?.email));
 
   return (
     <div className="crud-actions">
