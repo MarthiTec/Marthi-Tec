@@ -1,4 +1,5 @@
-import {useRef,useState} from 'react';
+import {useRef,useState,type ReactNode} from 'react';
+import {AdminIcon} from '../../components/AdminIcons';
 
 export function TotemSettingToggle({label,hint,checked,onChange}:{label:string;hint:string;checked:boolean;onChange:(value:boolean)=>void}) {
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} className="totem-setting-toggle" onClick={()=>onChange(!checked)}><span><strong>{label}</strong><small>{hint}</small></span><span className="totem-setting-toggle__track" aria-hidden="true"><span/></span></button>;
@@ -57,4 +58,25 @@ export function TotemSettingsBanners({value,max,convert,onChange}:{value:string[
     <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden aria-label="Enviar propagandas" onChange={event=>{const files=[...(event.target.files??[])];event.target.value='';if(files.length)void upload(files);}}/>
     {error&&<small role="alert">{error}</small>}
   </div>;
+}
+
+/**
+ * Grupo de configurações que abre e fecha (Exibir / Inibir), no mesmo padrão da OS.
+ * O conteúdo continua no estado da página: inibir um grupo não perde o que foi editado.
+ */
+export function TotemSettingsGroup({id,icon,title,hint,open,onToggle,children}:{id:string;icon:string;title:string;hint:string;open:boolean;onToggle:()=>void;children:ReactNode}) {
+  const bodyId=`${id}-body`;
+  return <section className={`totem-settings-group${open?' is-open':''}`} id={id}>
+    <header className="totem-settings-group__head">
+      <button type="button" className="totem-settings-group__title" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+        <span className="totem-settings-group__icon" aria-hidden="true">{icon}</span>
+        <span><strong>{title}</strong><small>{hint}</small></span>
+      </button>
+      <button type="button" className={`totem-settings-pill${open?' is-active':''}`} aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+        <AdminIcon name={open?'collapse':'expand'}/>
+        <span>{open?'Inibir':'Exibir'}</span>
+      </button>
+    </header>
+    {open?<div className="totem-settings-group__body" id={bodyId}>{children}</div>:null}
+  </section>;
 }
