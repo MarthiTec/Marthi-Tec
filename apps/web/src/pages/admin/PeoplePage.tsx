@@ -1,7 +1,7 @@
 import { HubPage, type HubTab } from '../../components/HubPage';
 import { useAuth } from '../../contexts/AuthContext';
-import { canAccessPath } from '../../data/erpRegistry';
-import type { PeopleTab } from '../../data/hubPaths';
+import { canAccessPath, userIsStoreAdmin } from '../../data/erpRegistry';
+import { hubFullAccess, type PeopleTab } from '../../data/hubPaths';
 import { CustomersPage } from './CustomersPage';
 import { EmployeesPage } from './EmployeesPage';
 import { PermissionsPage } from './PermissionsPage';
@@ -19,7 +19,9 @@ const TABS: Array<HubTab<PeopleTab> & { legacy: string }> = [
 /** Pessoas numa tela só: clientes, fornecedores, vendedores, funcionários e permissões. */
 export function PeoplePage() {
   const { user } = useAuth();
-  const allowed = TABS.filter((tab) => canAccessPath(tab.legacy, user?.email));
+  const full = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
+  // Mesma regra do painel: admin da loja vê tudo; os demais, conforme a permissão de cada tela.
+  const allowed = TABS.filter((tab) => full || canAccessPath(tab.legacy, user?.email));
   if (allowed.length === 0) return <p className="empty">Sem permissão para os cadastros de pessoas.</p>;
   return (
     <HubPage

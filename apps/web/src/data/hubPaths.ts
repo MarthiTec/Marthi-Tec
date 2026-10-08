@@ -22,3 +22,8 @@ export function specificationsPath(pathname: string, tab?: SpecsTab) {
 export function peoplePath(pathname: string, tab?: PeopleTab) {
   return withTab(pathname.startsWith('/erp') ? '/erp/pessoas' : '/painel/pessoas', tab);
 }
+
+/** Dono, gerente e admin (pelo login ou pelo cadastro da loja) veem todas as abas, como no painel. */
+export function hubFullAccess(role: string | undefined, isStoreAdmin: boolean) {
+  return isStoreAdmin || ['admin', 'superadmin', 'manager'].includes(String(role ?? '').toLowerCase());
+}

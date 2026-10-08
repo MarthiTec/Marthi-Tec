@@ -1,8 +1,8 @@
 import { useLocation } from 'react-router-dom';
 import { HubPage, type HubTab } from '../../components/HubPage';
 import { useAuth } from '../../contexts/AuthContext';
-import { canAccessPath } from '../../data/erpRegistry';
-import type { SpecsTab } from '../../data/hubPaths';
+import { canAccessPath, userIsStoreAdmin } from '../../data/erpRegistry';
+import { hubFullAccess, type SpecsTab } from '../../data/hubPaths';
 import { AttributesPage } from './AttributesPage';
 import { BrandsPage } from './BrandsPage';
 import { PickupMethodsPage } from './PickupMethodsPage';
@@ -20,7 +20,9 @@ export function SpecificationsPage() {
     { id: 'atributos', label: 'Atributos', icon: 'sliders', hint: 'Cor, capacidade, tamanho… Os valores viram as variações do produto.', render: () => <AttributesPage /> },
     { id: 'retirada', label: 'Tipos de retirada', icon: 'truck', hint: 'Em mãos, encomenda, entrega: como o cliente recebe o produto e o prazo de cada forma.', render: () => <PickupMethodsPage /> },
   ];
-  const allowed = tabs.filter((tab) => canAccessPath(legacy[tab.id], user?.email));
+  const full = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
+  // Mesma regra do painel: admin da loja vê tudo; os demais, conforme a permissão de cada tela.
+  const allowed = tabs.filter((tab) => full || canAccessPath(legacy[tab.id], user?.email));
   if (allowed.length === 0) return <p className="empty">Sem permissão para as especificações dos produtos.</p>;
   return (
     <HubPage
