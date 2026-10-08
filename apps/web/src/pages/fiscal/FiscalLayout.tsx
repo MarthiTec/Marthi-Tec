@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AreaGuard } from '../../components/AreaGuard';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
@@ -206,7 +207,7 @@ export function FiscalLayout() {
             </div>
           </header>
           <div className="fiscal-app__content">
-            <Outlet />
+            <AreaGuard><Outlet /></AreaGuard>
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { canManageArea } from '../services/employeeAccess.js';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { Router } from 'express';
@@ -15,7 +16,6 @@ const brandSchema = z.object({
   logo: z.string().startsWith('data:image/').max(400_000, 'Imagem do ícone muito grande.').nullable().optional(),
 });
 
-const MANAGER_ROLES = ['admin', 'manager', 'superadmin'];
 
 export function brandSlug(name: string) {
   return name
@@ -64,7 +64,7 @@ brandsRouter.get('/api/v1/brands', requireAuth, async (req, res, next) => {
 
 brandsRouter.post('/api/v1/brands', requireAuth, async (req, res, next) => {
   try {
-    if (!MANAGER_ROLES.includes(req.user!.role ?? '')) return forbidden(res);
+    if (!canManageArea(req)) return forbidden(res);
     const body = brandSchema.parse(req.body);
     const slug = brandSlug(body.name);
     const inserted = await pool.query(
@@ -86,7 +86,7 @@ brandsRouter.post('/api/v1/brands', requireAuth, async (req, res, next) => {
 });
 
 brandsRouter.patch('/api/v1/brands/:id', requireAuth, async (req, res, next) => {
-  if (!MANAGER_ROLES.includes(req.user!.role ?? '')) return forbidden(res);
+  if (!canManageArea(req)) return forbidden(res);
   let client: PoolClient | undefined;
   try {
     const body = brandSchema.partial().parse(req.body);
@@ -120,7 +120,7 @@ brandsRouter.patch('/api/v1/brands/:id', requireAuth, async (req, res, next) => 
 
 brandsRouter.delete('/api/v1/brands/:id', requireAuth, async (req, res, next) => {
   try {
-    if (!MANAGER_ROLES.includes(req.user!.role ?? '')) return forbidden(res);
+    if (!canManageArea(req)) return forbidden(res);
     const row = await pool.query(`${LIST_SQL} AND b.id = $2`, [req.storeId, req.params.id]);
     if (!row.rows[0]) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Marca não encontrada.' } });
@@ -146,7 +146,7 @@ brandsRouter.delete('/api/v1/brands/:id', requireAuth, async (req, res, next) =>
 /** Busca o ícone padrão de uma marca pelo nome (substitui só se a loja ainda não enviou um). */
 brandsRouter.post('/api/v1/brands/:id/logo/auto', requireAuth, async (req, res, next) => {
   try {
-    if (!MANAGER_ROLES.includes(req.user!.role ?? '')) return forbidden(res);
+    if (!canManageArea(req)) return forbidden(res);
     const current = await pool.query('SELECT id, name FROM store_brands WHERE id = $1 AND store_id = $2', [req.params.id, req.storeId]);
     if (!current.rows[0]) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Marca não encontrada.' } });
@@ -168,7 +168,7 @@ brandsRouter.post('/api/v1/brands/:id/logo/auto', requireAuth, async (req, res, 
 /** Preenche de uma vez o ícone de todas as marcas da loja que ainda estão sem ícone. */
 brandsRouter.post('/api/v1/brands/logos/auto', requireAuth, async (req, res, next) => {
   try {
-    if (!MANAGER_ROLES.includes(req.user!.role ?? '')) return forbidden(res);
+    if (!canManageArea(req)) return forbidden(res);
     const pending = await pool.query(`SELECT id, name FROM store_brands WHERE store_id = $1 AND (logo IS NULL OR logo = '') ORDER BY name`, [req.storeId]);
     const found: string[] = [];
     const missing: string[] = [];

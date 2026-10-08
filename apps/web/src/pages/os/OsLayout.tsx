@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { AreaGuard } from '../../components/AreaGuard';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
@@ -352,7 +353,7 @@ export function OsLayout() {
             ) : null}
           </header>
           <div className="os-app__content">
-            <Outlet />
+            <AreaGuard><Outlet /></AreaGuard>
           </div>
         </div>
       </div>

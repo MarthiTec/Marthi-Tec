@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { verifySessionToken, type AuthUser } from '../services/authService.js';
 import { pool } from '../db/pool.js';
+import { checkEmployeeAccess } from '../services/employeeAccess.js';
 
 export type TenantContext = {
   user: AuthUser;
@@ -18,6 +19,8 @@ declare global {
       storeId?: string;
       planId?: 'bronze' | 'silver' | 'golden';
       userLimit?: number;
+      /** Funcionário com esta tela liberada em Pessoas › Permissões. */
+      areaGranted?: boolean;
     }
   }
 }
@@ -105,6 +108,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.storeId = stores.rows[0].id;
     req.planId = rawPlan === 'golden' || rawPlan === 'scale' ? 'golden' : rawPlan === 'silver' || rawPlan === 'growth' ? 'silver' : 'bronze';
     req.userLimit = getPlanUserLimit(req.planId);
+    // Telas e permissões liberadas para o funcionário em Pessoas › Permissões valem aqui, na API.
+    const { denial, granted } = await checkEmployeeAccess(pool, { storeId: stores.rows[0].id, email: user.email ?? '', role: effectiveRole, method: req.method, path: req.originalUrl.split('?')[0] });
+    if (denial) {
+      res.status(denial.status).json({ success: false, error: { code: denial.code, message: denial.message } });
+      return;
+    }
+    req.areaGranted = granted;
     next();
   } catch (error) { next(Object.assign(new Error('Falha ao consultar MarthiDB.'), { status: 503 })); }
 }

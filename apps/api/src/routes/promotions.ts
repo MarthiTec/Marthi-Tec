@@ -1,3 +1,4 @@
+import { canManageArea } from '../services/employeeAccess.js';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -26,7 +27,7 @@ promotionsRouter.get('/api/v1/promotions', requireAuth, async (req, res, next) =
 });
 promotionsRouter.post('/api/v1/promotions', requireAuth, async (req, res, next) => {
   try {
-    if (!['admin', 'manager', 'superadmin'].includes(req.user!.role ?? '')) { res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para configurar campanhas.' } }); return; }
+    if (!canManageArea(req)) { res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para configurar campanhas.' } }); return; }
     const body = schema.parse(req.body); const id = body.id ?? randomUUID();
     if(body.dayOffer && (body.kind!=='promo_price'||!body.promoPrice||!body.endDate||!Number.isFinite(Date.parse(body.endDate))||Date.parse(body.endDate)<=Date.now()||!body.criteria.stockIds.length||!body.channels?.length)) throw Object.assign(new Error('Defina produto, preço positivo, canais e uma validade futura para a oferta.'),{status:400});
     if(body.dayOffer){const targets=await pool.query('SELECT id FROM stock_items WHERE store_id=$1 AND id=ANY($2::text[])',[req.storeId,body.criteria.stockIds]);if(targets.rows.length!==new Set(body.criteria.stockIds).size)throw Object.assign(new Error('Produto de outra loja ou indisponível.'),{status:400});}
@@ -42,7 +43,7 @@ promotionsRouter.post('/api/v1/promotions', requireAuth, async (req, res, next) 
 });
 promotionsRouter.delete('/api/v1/promotions/:id', requireAuth, async (req, res, next) => {
   try {
-    if (!['admin', 'manager', 'superadmin'].includes(req.user!.role ?? '')) { res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para excluir campanhas.' } }); return; }
+    if (!canManageArea(req)) { res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para excluir campanhas.' } }); return; }
     const result = await pool.query('DELETE FROM promo_campaigns WHERE id=$1 AND store_id=$2 RETURNING id', [req.params.id, req.storeId]);
     if (!result.rowCount) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Campanha não encontrada nesta loja.' } }); return; }
     res.json({ success: true, data: { deleted: true } });

@@ -5,6 +5,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AreaGuard } from './components/AreaGuard';
 import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -144,7 +145,7 @@ export function App() {
         <Route path="/recuperar-senha" element={<Navigate to="/login?view=forgot" replace />} />
         <Route path="/perfil" element={<Navigate to="/painel/perfil" replace />} />
         <Route path="/totem" element={<TotemPage />} />
-        <Route path="/caixa" element={<CaixaPage />} />
+        <Route path="/caixa" element={<AreaGuard><CaixaPage /></AreaGuard>} />
         <Route path="/venda-externa" element={<Navigate to="/painel/venda-externa" replace />} />
         <Route path="/metas" element={<Navigate to="/painel/metas" replace />} />
         <Route path="/relatorio-vendas" element={<Navigate to="/painel/relatorio-vendas" replace />} />

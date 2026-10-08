@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { AreaGuard, useCanOpen } from '../../components/AreaGuard';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
@@ -133,8 +134,11 @@ export function ErpLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
 
+  const canOpen = useCanOpen();
+
   function renderNav(items: NavItem[]) {
-    return items.map((item) => (
+    // Só aparece no menu o que a pessoa pode abrir (Pessoas › Permissões).
+    return items.filter((item) => canOpen(item.to)).map((item) => (
       <NavLink
         key={item.to}
         to={item.to}
@@ -271,7 +275,7 @@ export function ErpLayout() {
           </header>
           <div className="erp-app__content">
             <ErrorBoundary fallbackTitle="Erro ao carregar módulo da retaguarda">
-              <Outlet />
+              <AreaGuard><Outlet /></AreaGuard>
             </ErrorBoundary>
           </div>
         </div>

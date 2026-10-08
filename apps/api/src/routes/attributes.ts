@@ -1,3 +1,4 @@
+import { canManageArea } from '../services/employeeAccess.js';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import type { PoolClient } from 'pg';
@@ -31,7 +32,7 @@ async function writeValues(db: PoolClient,id: string,values: string[],deltas: Re
  for(const [sort,value] of unique.entries()) await db.query(`INSERT INTO product_attribute_values(id,attribute_id,value,price_delta,sort) VALUES($1,$2,$3,$4,$5) ON CONFLICT(attribute_id,value) DO UPDATE SET price_delta=excluded.price_delta,sort=excluded.sort`,[`ATV-${randomUUID()}`,id,value,deltas[value] ?? 0,sort]);
 }
 function canEdit(req: any,res: any) {
- if(['admin','manager','superadmin'].includes(req.user?.role)) return true;
+ if(canManageArea(req)) return true;
  res.status(403).json({success:false,error:{code:'FORBIDDEN',message:'Sem permissão para alterar atributos.'}}); return false;
 }
 function missing(res: any) { return res.status(404).json({success:false,error:{code:'NOT_FOUND',message:'Atributo não encontrado nesta loja.'}}); }

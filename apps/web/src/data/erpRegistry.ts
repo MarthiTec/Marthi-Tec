@@ -659,7 +659,12 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   }
   // Catálogo lite do Totem (produtos/atributos) fica sob área totem — não exige erp_stock.
   if (pathname.startsWith('/painel/totem')) return 'totem';
-  if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos')) return 'pdv';
+  if (pathname.startsWith('/painel/pdv') || pathname.startsWith('/painel/pedidos') || pathname.startsWith('/caixa')) return 'pdv';
+  if (pathname.startsWith('/painel/venda-externa') || pathname.startsWith('/painel/metas') || pathname.startsWith('/painel/relatorio-vendas') || pathname.startsWith('/erp/orcamentos') || pathname.startsWith('/painel/orcamentos')) return 'pdv';
+  if (pathname.startsWith('/erp/notas')) return 'erp_invoices';
+  if (pathname.startsWith('/erp/campanhas')) return 'erp_prices';
+  if (pathname.startsWith('/erp/taxas-cartao') || pathname.startsWith('/painel/taxas-cartao')) return 'erp_payments';
+  if (pathname.startsWith('/erp/balanco') || pathname.startsWith('/erp/movimentos') || pathname.startsWith('/erp/api-aparelhos') || pathname.startsWith('/erp/comercial')) return 'erp_stock';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (pathname.startsWith('/erp/clientes') || pathname.startsWith('/painel/clientes')) {
     return 'erp_customers';
@@ -711,8 +716,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
     pathname.startsWith('/erp/auditoria') ||
     pathname.startsWith('/erp/relatorios') ||
     pathname.startsWith('/painel/auditoria') ||
-    pathname.startsWith('/painel/erp') ||
-    pathname === '/erp'
+    pathname.startsWith('/painel/erp')
   ) {
     return 'erp_audit';
   }

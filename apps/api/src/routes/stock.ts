@@ -1,3 +1,4 @@
+import { canManageArea } from '../services/employeeAccess.js';
 import {productSku} from '../services/productSku.js';
 import {stockDetails} from '../services/stockDetails.js';
 import { validatePickupPrices } from '../services/pickup.js';
@@ -679,7 +680,7 @@ stockRouter.post('/api/v1/stock/inventory-adjustments', requireAuth, async (req,
   let db: PoolClient | undefined;
   try {
     db = await pool.connect();
-    if (!['admin','manager','superadmin'].includes(req.user!.role ?? '')) { res.status(403).json({ success:false,error:{code:'FORBIDDEN',message:'Somente a gestão pode aplicar ajustes de estoque.'} }); return; }
+    if (!canManageArea(req)) { res.status(403).json({ success:false,error:{code:'FORBIDDEN',message:'Somente a gestão pode aplicar ajustes de estoque.'} }); return; }
     const body = z.object({ balanceId:z.string().min(1).max(160), items:z.array(z.object({ stockId:z.string().min(1), expectedQty:z.number().nonnegative(), countedQty:z.number().nonnegative() })).min(1).max(10000) }).parse(req.body);
     if (new Set(body.items.map(item=>item.stockId)).size !== body.items.length) throw Object.assign(new Error('Produtos duplicados na conferência.'),{status:400});
     await db.query('BEGIN');

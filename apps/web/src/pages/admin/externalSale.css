@@ -145,3 +145,10 @@
 .xsale .admin-picker__value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xsale-check { display: inline-flex !important; align-items: center; gap: 8px; margin-top: 8px; font-size: .8rem; font-weight: 600; color: var(--mute); cursor: pointer; }
 .xsale-check input { width: 16px; height: 16px; min-height: 0; }
+/* Rótulo + campo com a mesma medida em seletores e caixas de texto (IMEI alinhado com a marca). */
+.xsale .admin-picker { gap: 0; }
+.xsale .admin-picker__caption,
+.xsale .admin-label { display: block; margin: 0 0 7px; font-size: .82rem; font-weight: 650; line-height: 20px; color: var(--ink); }
+.xsale .admin-picker__trigger,
+.xsale .admin-input { min-height: 42px; height: 42px; box-sizing: border-box; }
+.xsale textarea.admin-input { height: auto; }
