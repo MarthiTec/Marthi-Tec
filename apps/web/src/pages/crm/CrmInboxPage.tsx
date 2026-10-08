@@ -188,7 +188,7 @@ export function CrmInboxPage() {
             {unanswered} aguardando você
           </span>
           <span>{threads.length} conversas</span>
-          <Link to="/crm">Ver funil</Link>
+          <Link to="/admin/crm">Ver funil</Link>
         </div>
       </div>
 
@@ -318,7 +318,7 @@ export function CrmInboxPage() {
                   <button
                     type="button"
                     className="crm-inbox__deal-btn"
-                    onClick={() => navigate(`/crm/negocio/${active.leadId}`)}
+                    onClick={() => navigate(`/admin/crm/negocio/${active.leadId}`)}
                   >
                     Negócio
                   </button>

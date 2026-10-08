@@ -74,6 +74,7 @@ export function isTotemCatalogPath(pathname: string) {
   return (
     pathname.startsWith('/painel/totem/produtos') ||
     pathname.startsWith('/painel/totem/marcas') ||
+    pathname.startsWith('/painel/totem/especificacoes') ||
     pathname.startsWith('/painel/totem/atributos')
   );
 }

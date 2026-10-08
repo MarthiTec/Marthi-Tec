@@ -46,7 +46,8 @@ import {
   type StockVariationRow,
 } from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes } from '../../data/attributeStore';
-import { listSuppliers } from '../../data/erpRegistry';
+import { apiListSuppliers } from '../../services/erpApi';
+import { peoplePath as peopleHubPath, specificationsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
 import {
   getFiscalClassification,
   listFiscalClassifications,
@@ -75,6 +76,8 @@ const REFRESH_EVENTS = [
 export function StockPage() {
   const location = useLocation();
   const totemSurface = isTotemCatalogPath(location.pathname);
+  const specsPath = (tab: SpecsTab) => specificationsPath(location.pathname, tab);
+  const peoplePath = (tab: PeopleTab) => peopleHubPath(location.pathname, tab);
   const catalogFull = hasCapability('catalog.full');
   const lite = !catalogFull && !totemSurface;
   const { confirm, dialog } = useConfirmDialog();
@@ -186,8 +189,15 @@ export function StockPage() {
   // Cadastro rápido sem sair do produto: fornecedor, marca e atributo.
   const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute'>(null);
   const [supplierVersion, setSupplierVersion] = useState(0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const suppliers = useMemo(() => listSuppliers(true), [supplierVersion]);
+  // Fornecedores vêm direto do banco (nada de cópia local).
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => void apiListSuppliers(true).then((rows) => { if (alive) setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name }))); }).catch(() => undefined);
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => { alive = false; window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load); };
+  }, [supplierVersion]);
   const readOnly = mode === 'view';
 
 
@@ -1279,7 +1289,7 @@ export function StockPage() {
               {totemSurface
                 ? 'Catálogo da vitrine: nome, preço, foto, quantidade e atributos.'
                 : 'Campos agrupados por tema. Tamanho (roupa/calçado) entra como atributo — cadastre em '}
-              {!totemSurface ? <Link to="/erp/atributos">Atributos</Link> : null}
+              {!totemSurface ? <Link to={specsPath('atributos')}>Especificações</Link> : null}
               {totemSurface && catalogFull ? (
                 <>
                   {' '}
@@ -1397,7 +1407,18 @@ export function StockPage() {
                 </label>
                 <div className="stock-brand-field">
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
-                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={specsPath('marcas')}>Gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
+                </div>
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label="Fornecedor"
+                  value={form.supplierId ?? ''}
+                  placeholder="Nenhum"
+                  disabled={readOnly}
+                  options={[{ value: '', label: 'Nenhum' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, supplierId: value })}
+                />
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} /> : null}<Link to={peoplePath('fornecedores')}>Gerenciar fornecedores</Link></p>
                 </div>
                 {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
                 {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
@@ -1502,7 +1523,7 @@ export function StockPage() {
           <p><Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link></p>
           <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>setForm(current=>({...current,skuAuto:e.target.checked}))}/> Gerar SKU automaticamente com os dados do produto</label>
           {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
-          <p><Link to="/erp/tipos-retirada">Cadastrar tipos de retirada e acompanhar entregas</Link></p>
+          <p><Link to={specsPath('retirada')}>Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -1667,7 +1688,7 @@ export function StockPage() {
                                 </td>
                               );
                             })}
-                            <td data-label="Retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title="Definir onde esta variação é vendida e o preço de cada forma" onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}>{names.length?names.join(' · '):'Nenhuma'} <span aria-hidden>✎</span></button>;})()}</td>
+                            <td data-label="Tipo de retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title="Definir onde esta variação é vendida e o preço de cada forma" onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}>{names.length?names.join(' · '):'Nenhuma'} <span aria-hidden>✎</span></button>;})()}</td>
                             <td data-label="Custo unitário"><CurrencyInput ariaLabel="Custo unitário da variação" value={row.cost} disabled={readOnly} onChange={value=>updateVariationRow(index,'cost',value)}/></td>
                             <td data-label="Preço à vista">
                               <CurrencyInput
@@ -1761,7 +1782,7 @@ export function StockPage() {
                 <h3>Atributos e variações</h3>
                 <p className="empty" style={{ marginTop: 0 }}>
                   Cor, capacidade, tamanho (PP–XG / calçados) e demais variações vêm de{' '}
-                  <Link to={totemSurface ? '/painel/totem/atributos' : '/erp/atributos'}>Atributos</Link>
+                  <Link to={specsPath('atributos')}>Atributos</Link>
                   .
                 </p>
                 {!readOnly ? (
@@ -1890,19 +1911,6 @@ export function StockPage() {
             <article className="admin-card stock-form-card">
               <h3>Fiscal e logística</h3>
               <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-                <AdminPicker
-                  label="Fornecedor"
-                  value={form.supplierId ?? ''}
-                  placeholder="Nenhum"
-                  disabled={readOnly}
-                  options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
-                  onChange={(value) => setForm({ ...form, supplierId: value })}
-                />
-                {!readOnly ? (
-                  <div className="quick-field__actions span-2">
-                    <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} />
-                  </div>
-                ) : null}
                 <AdminPicker
                   label="Classificação fiscal"
                   value={form.fiscalClassificationId ?? ''}

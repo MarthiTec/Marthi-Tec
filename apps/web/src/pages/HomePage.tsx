@@ -804,7 +804,7 @@ export function HomePage() {
                     Abrir mensagem no WhatsApp
                   </button>
                   {user ? (
-                    <Link to="/crm/conversas" className="btn btn--ghost">
+                    <Link to="/admin/crm/conversas" className="btn btn--ghost">
                       Abrir CRM · Conversas
                     </Link>
                   ) : null}

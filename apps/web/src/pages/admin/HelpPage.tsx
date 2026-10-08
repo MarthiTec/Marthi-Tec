@@ -191,7 +191,7 @@ export function HelpPage() {
             <AdminIcon name="plan" />
             Plano da loja
           </Link>
-          <Link to="/painel/permissoes" className="btn btn--ghost">
+          <Link to="/painel/pessoas?aba=permissoes" className="btn btn--ghost">
             <AdminIcon name="people" />
             Permissões
           </Link>

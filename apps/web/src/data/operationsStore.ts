@@ -49,8 +49,6 @@ const DEFAULT_OPS: OperationShortcut[] = [
   { id: 'notas', label: 'Notas emitidas', href: '/painel/notas', color: '#7c3aed', active: true, icon: 'fiscal', sortOrder: 130 },
   { id: 'ecom', label: 'Abrir e-commerce', href: '/ecommerce', color: '#db2777', active: true, icon: 'store', sortOrder: 140 },
   { id: 'ecom-visao', label: 'Visão e-commerce', href: '/painel/ecommerce', color: '#db2777', active: true, icon: 'store', sortOrder: 150 },
-  { id: 'crm', label: 'Abrir CRM', href: '/crm', color: '#0369a1', active: true, icon: 'people', sortOrder: 160 },
-  { id: 'crm-visao', label: 'Visão CRM', href: '/painel/crm', color: '#0369a1', active: true, icon: 'people', sortOrder: 170 },
   { id: 'plano', label: 'Plano', href: '/painel/plano', color: '#334155', active: true, icon: 'plan', sortOrder: 180 },
   { id: 'ajuda', label: 'Ajuda', href: '/painel/ajuda', color: '#334155', active: true, icon: 'help', sortOrder: 190 },
 ];
@@ -95,7 +93,10 @@ function normalize(item: Partial<OperationShortcut>, index: number): OperationSh
   };
 }
 
-function loadRaw(): OperationShortcut[] { return readModuleState('operations', DEFAULT_OPS.map(item => ({ ...item }))).map(normalize).filter((item): item is OperationShortcut => item !== null); }
+/** O CRM é interno da Marthi (fica no /admin): atalhos antigos dele somem do painel da loja. */
+const isInternalCrm = (href: string) => /^\/(painel\/)?crm(\/|\?|$)/i.test(href);
+
+function loadRaw(): OperationShortcut[] { return readModuleState('operations', DEFAULT_OPS.map(item => ({ ...item }))).map(normalize).filter((item): item is OperationShortcut => item !== null && !isInternalCrm(item.href)); }
 
 async function save(state: OperationShortcut[]) { await saveModuleState('operations', state); window.dispatchEvent(new Event(OPERATIONS_EVENT)); }
 

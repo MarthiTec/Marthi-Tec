@@ -47,10 +47,10 @@ export function CrmNetworkPage() {
       </p>
 
       <div className="crm-network__toolbar">
-        <Link className="btn btn--primary" to="/crm/perfil">
+        <Link className="btn btn--primary" to="/admin/crm/perfil">
           {mine ? 'Editar meu perfil' : 'Configurar meu perfil'}
         </Link>
-        <Link className="btn btn--ghost" to="/crm">
+        <Link className="btn btn--ghost" to="/admin/crm">
           Voltar aos negócios
         </Link>
       </div>
@@ -116,7 +116,7 @@ export function CrmNetworkPage() {
                 </span>
                 <em>{lead.interest || 'Negócio fechado'}</em>
               </div>
-              <Link className="btn btn--ghost" to={`/crm/negocio/${lead.id}`}>
+              <Link className="btn btn--ghost" to={`/admin/crm/negocio/${lead.id}`}>
                 Abrir lead
               </Link>
             </article>
@@ -144,7 +144,7 @@ export function CrmNetworkPage() {
                 </span>
                 <em>{lead.interest || 'Cliente Marthi'}</em>
               </div>
-              <Link className="btn btn--ghost" to={`/crm/negocio/${lead.id}`}>
+              <Link className="btn btn--ghost" to={`/admin/crm/negocio/${lead.id}`}>
                 Negócio
               </Link>
             </article>

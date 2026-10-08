@@ -360,7 +360,7 @@ export function CrmProfilePage() {
           </div>
 
           <div className="crm-profile__actions">
-            <Link className="btn btn--ghost" to="/crm/rede">
+            <Link className="btn btn--ghost" to="/admin/crm/rede">
               Ver na rede
             </Link>
           </div>

@@ -775,3 +775,118 @@
     justify-content: center;
   }
 }
+
+/* Responsivo: a página nunca passa da largura da tela; em telas menores cada loja vira um cartão. */
+.multi-store-page,
+.multi-store-section,
+.multi-store-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.multi-store-total-label {
+  font-weight: 700;
+}
+
+/* O modo cartão segue a largura da área da página (com ou sem menu lateral), não a da tela. */
+.multi-store-page {
+  width: 100%;
+  container-type: inline-size;
+}
+
+@container (max-width: 1340px) {
+  .multi-store-table-container {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .is-theme-dark .multi-store-table-container {
+    background: transparent;
+  }
+  .multi-store-table thead {
+    display: none;
+  }
+  .multi-store-table,
+  .multi-store-table tbody,
+  .multi-store-table tfoot {
+    display: grid;
+    gap: 12px;
+  }
+  .multi-store-table tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 2px 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--admin-border, #e2e8f0);
+    border-radius: 12px;
+    background: var(--admin-surface, #ffffff);
+  }
+  .is-theme-dark .multi-store-table tr {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  .multi-store-table tr.is-row-active {
+    border-color: #93c5fd;
+  }
+  .multi-store-table td,
+  .multi-store-table tr:last-child td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--admin-border, #e2e8f0);
+    overflow-wrap: anywhere;
+  }
+  .is-theme-dark .multi-store-table td {
+    border-color: #334155;
+  }
+  .multi-store-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    color: var(--admin-muted, #64748b);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .multi-store-table td:not([data-label])::before,
+  .multi-store-table td[data-label='']::before {
+    display: none;
+  }
+  .multi-store-table td > * {
+    min-width: 0;
+    text-align: right;
+  }
+  .multi-store-table td .multi-store-cell-name {
+    align-items: flex-end;
+  }
+  .multi-store-table td[data-label='Loja / Razão Social'],
+  .multi-store-table td[data-label='Loja / Filial'],
+  .multi-store-table td[data-label='Ações'] {
+    grid-column: 1 / -1;
+  }
+  .multi-store-table td[data-label='Ações'] {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .multi-store-tabs {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 0 12px 2px;
+  }
+  .multi-store-tab {
+    padding: 9px 12px;
+    font-size: 0.82rem;
+  }
+  .multi-store-licensing-overview,
+  .multi-store-isolation-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

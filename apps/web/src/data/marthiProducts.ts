@@ -165,7 +165,7 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
       'Perfil do vendedor na rede interna',
       'Claim exclusivo de lead',
     ],
-    href: '/crm',
+    href: '/admin/crm',
     cta: 'Abrir CRM',
     accent: '#0369a1',
   },

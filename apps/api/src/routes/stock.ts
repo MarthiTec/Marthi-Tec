@@ -310,6 +310,9 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             if (body.price <= 0 && body.variations[0].price > 0) body.price = Number(body.variations[0].price);
           }
           body.sku = await allocateSku(client, storeId, body, id);
+          if (body.supplierId && !(await client.query('SELECT 1 FROM suppliers WHERE id = $1 AND store_id = $2', [body.supplierId, storeId])).rows.length) {
+            throw Object.assign(new Error('Fornecedor não encontrado nesta loja.'), { status: 400 });
+          }
 
           await client.query(
             `INSERT INTO stock_items (
@@ -467,6 +470,13 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           if(reserved>0 && (nextQty<reserved || body.active===false || ['name','brand','capacity','color','condition','attrs','cost'].some(k=>(body as any)[k]!==undefined && JSON.stringify((body as any)[k])!==JSON.stringify(curr[k])))) throw Object.assign(new Error('Produto reservado por encomenda. Libere a reserva antes de alterar sua variante, custo ou saldo.'),{status:409});
 
 
+          if (body.supplierId !== undefined) {
+            const supplierId = body.supplierId || null;
+            if (supplierId && !(await client.query('SELECT 1 FROM suppliers WHERE id = $1 AND store_id = $2', [supplierId, storeId])).rows.length) {
+              throw Object.assign(new Error('Fornecedor não encontrado nesta loja.'), { status: 400 });
+            }
+            await client.query('UPDATE stock_items SET supplier_id = $3 WHERE id = $1 AND store_id = $2', [id, storeId, supplierId]);
+          }
           if(body.pickupPrices!==undefined){await validatePickupPrices(client,storeId,body.pickupPrices);await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);}
           // Se qty mudou, registra movimentação no kardex
           if (body.qty !== undefined && body.qty !== Number(curr.qty)) {

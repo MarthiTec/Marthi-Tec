@@ -2,15 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
-import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
-import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
-import { userIsStoreAdmin } from '../../data/erpRegistry';
+import { isMarthiStaffEmail } from '../../data/marthiStaff';
 import { ensureCrmSellerProfile, resolveCrmSeller, crmInboxUnansweredCount } from '../../data/crmStore';
 import { CrmSellerAlerts } from '../../components/CrmSellerAlerts';
 import { usePresenceSession } from '../../hooks/usePresence';
@@ -19,15 +17,15 @@ import '../admin/admin.css';
 import './crm.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
-  '/crm': { kicker: 'Marthi CRM', title: 'Central · Negócios' },
-  '/crm/conversas': { kicker: 'Marthi CRM', title: 'Conversas' },
-  '/crm/perfil': { kicker: 'Marthi CRM', title: 'Meu perfil' },
-  '/crm/conta': { kicker: 'Marthi CRM', title: 'Meu perfil' },
-  '/crm/rede': { kicker: 'Marthi CRM', title: 'Rede Marthi' },
+  '/admin/crm': { kicker: 'Marthi CRM', title: 'Central · Negócios' },
+  '/admin/crm/conversas': { kicker: 'Marthi CRM', title: 'Conversas' },
+  '/admin/crm/perfil': { kicker: 'Marthi CRM', title: 'Meu perfil' },
+  '/admin/crm/conta': { kicker: 'Marthi CRM', title: 'Meu perfil' },
+  '/admin/crm/rede': { kicker: 'Marthi CRM', title: 'Rede Marthi' },
 };
 
 function resolveTitle(pathname: string) {
-  if (pathname.startsWith('/crm/negocio/')) {
+  if (pathname.startsWith('/admin/crm/negocio/')) {
     return { kicker: 'Marthi CRM', title: 'Detalhe do negócio' };
   }
   return TITLES[pathname] ?? { kicker: 'Marthi CRM', title: 'CRM' };
@@ -107,22 +105,23 @@ export function CrmLayout() {
     return <Navigate to="/login" replace />;
   }
 
+  // CRM é ferramenta interna do time Marthi: só a equipe Marthi abre, pelo painel /admin.
+  if (!isMarthiStaffEmail(user.email)) {
+    return <Navigate to="/painel" replace />;
+  }
+
   return (
     <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="crm-app__top">
-        <OsEcosystemMenu />
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
-        <StoreSwitcher compact />
         <BrandLogo variant="mark" className="crm-app__mark" />
         <div className="crm-app__brand">
           <strong>Marthi CRM</strong>
         </div>
-        {userIsStoreAdmin(user?.email) ? (
-          <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">
-            <AdminIcon name="home" />
-            <span>Painel</span>
-          </Link>
-        ) : null}
+        <Link to="/admin" className="app-to-panel-btn" title="Voltar ao Painel Marthi">
+          <AdminIcon name="home" />
+          <span>Painel Marthi</span>
+        </Link>
         <button type="button" className="crm-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>
@@ -148,7 +147,7 @@ export function CrmLayout() {
               aria-label="Ir para a central do CRM"
               onClick={() => {
                 setNavOpen(false);
-                navigate('/crm');
+                navigate('/admin/crm');
               }}
             >
               <AdminIcon name="home" />
@@ -156,19 +155,19 @@ export function CrmLayout() {
           </div>
 
           <UserChip
-            to="/crm/perfil"
+            to="/admin/crm/perfil"
             onOpen={() => {
               if (isMobileNav()) setNavOpen(false);
             }}
           />
 
-          <NavLink to="/crm" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
+          <NavLink to="/admin/crm" end className={({ isActive }) => (isActive ? 'is-active' : undefined)}>
             <AdminIcon name="home" />
             Central
           </NavLink>
           <p className="crm-app__side-label">CRM</p>
           <NavLink
-            to="/crm/conversas"
+            to="/admin/crm/conversas"
             className={({ isActive }) => (isActive ? 'is-active' : undefined)}
           >
             <AdminIcon name="people" />
@@ -176,7 +175,7 @@ export function CrmLayout() {
             {unanswered > 0 ? <em className="crm-nav-badge">{unanswered}</em> : null}
           </NavLink>
           <NavLink
-            to="/crm/rede"
+            to="/admin/crm/rede"
             className={({ isActive }) => (isActive ? 'is-active' : undefined)}
           >
             <AdminIcon name="people" />
@@ -188,7 +187,7 @@ export function CrmLayout() {
         <div className="crm-app__main">
           <header className="crm-app__heading">
             <div>
-              <ScreenBackButton home="/crm" />
+              <ScreenBackButton home="/admin/crm" />
               <p className="admin__kicker">{title.kicker}</p>
               <h1>{title.title}</h1>
             </div>
@@ -204,7 +203,7 @@ export function CrmLayout() {
         onClose={() => setExitOpen(false)}
         appName="CRM"
         exitActionLabel="Sair do CRM"
-        afterExitTo="/painel"
+        afterExitTo="/admin"
       />
 
       <CrmSellerAlerts />

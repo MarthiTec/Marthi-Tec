@@ -459,7 +459,7 @@ export function AttributesPage() {
           {totemSurface && catalogFull ? (
             <p className="empty">
               Gerencie também na Retaguarda ·{' '}
-              <Link to="/erp/atributos">Abrir atributos na Retaguarda</Link>
+              <Link to="/erp/especificacoes?aba=atributos">Abrir atributos na Retaguarda</Link>
             </p>
           ) : null}
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>

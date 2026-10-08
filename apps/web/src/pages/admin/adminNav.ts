@@ -37,8 +37,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/totem', label: 'Abrir totem', openApp: true, accent: '#0f766e' },
       { to: '/painel/totem', label: 'Dados e insights', end: true },
       { to: '/painel/totem/produtos', label: 'Catálogo do totem' },
-      { to: '/painel/totem/atributos', label: 'Atributos' },
-      { to: '/painel/totem/marcas', label: 'Marcas' },
+      { to: '/painel/totem/especificacoes', label: 'Especificações' },
       { to: '/painel/totem/config', label: 'Configuração' },
     ],
   },
@@ -79,10 +78,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
-      { to: '/painel/atributos', label: 'Atributos & Variações' },
-      { to: '/erp/tipos-retirada', label: 'Tipos de retirada' },
+      { to: '/painel/especificacoes', label: 'Especificações' },
+      { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
-      { to: '/painel/marcas', label: 'Marcas' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },
@@ -123,16 +121,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/ecommerce', label: 'Abrir e-commerce', openApp: true, accent: '#db2777' },
       { to: '/painel/ecommerce', label: 'Visão no painel', end: true },
-    ],
-  },
-  {
-    id: 'crm',
-    label: 'CRM',
-    icon: 'people',
-    module: null,
-    children: [
-      { to: '/crm', label: 'Abrir CRM', openApp: true, accent: '#0369a1' },
-      { to: '/painel/crm', label: 'Visão no painel', end: true },
     ],
   },
   {
@@ -179,6 +167,8 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/estoque') ||
     pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/painel/atributos') ||
+    pathname.startsWith('/painel/especificacoes') ||
+    pathname.startsWith('/painel/pessoas') ||
     pathname.startsWith('/painel/kits') ||
     pathname.startsWith('/painel/lotes') ||
     pathname.startsWith('/painel/almoxarifado') ||
@@ -200,7 +190,6 @@ export function navGroupForPath(pathname: string, search = '') {
   if (pathname.startsWith('/painel/ecommerce') || pathname.startsWith('/ecommerce')) {
     return 'ecommerce';
   }
-  if (pathname.startsWith('/painel/crm') || pathname.startsWith('/crm')) return 'crm';
   if (pathname.startsWith('/painel/ajuda')) return 'help';
   if (pathname === '/painel' && !search) return 'home';
   return null;

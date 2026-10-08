@@ -28,7 +28,14 @@ export type AdminIconName =
   | 'sync'
   | 'dollar'
   | 'sidebar'
-  | 'apps';
+  | 'apps'
+  | 'tag'
+  | 'sliders'
+  | 'truck'
+  | 'user'
+  | 'factory'
+  | 'badge'
+  | 'shield';
 
 type AdminIconProps = {
   name: AdminIconName;
@@ -153,6 +160,60 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
         <svg {...common}>
           <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
           <path d="M9.5 4.5v15" />
+        </svg>
+      );
+    case 'tag':
+      return (
+        <svg {...common}>
+          <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z" />
+          <circle cx="7.5" cy="7.5" r="1.3" />
+        </svg>
+      );
+    case 'sliders':
+      return (
+        <svg {...common}>
+          <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+          <circle cx="16" cy="6" r="2" />
+          <circle cx="10" cy="12" r="2" />
+          <circle cx="18" cy="18" r="2" />
+        </svg>
+      );
+    case 'truck':
+      return (
+        <svg {...common}>
+          <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7" />
+          <circle cx="7" cy="18" r="1.8" />
+          <circle cx="17" cy="18" r="1.8" />
+        </svg>
+      );
+    case 'user':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21a8 8 0 0 1 16 0" />
+        </svg>
+      );
+    case 'factory':
+      return (
+        <svg {...common}>
+          <path d="M3 21V10l6 3V10l6 3V6h6v15zM3 21h18" />
+          <path d="M7 17h2M12 17h2M17 17h1" />
+        </svg>
+      );
+    case 'badge':
+      return (
+        <svg {...common}>
+          <rect x="4" y="5" width="16" height="15" rx="2" />
+          <path d="M9 3h6v4H9z" />
+          <circle cx="12" cy="12" r="2.2" />
+          <path d="M8 17.5a4 4 0 0 1 8 0" />
+        </svg>
+      );
+    case 'shield':
+      return (
+        <svg {...common}>
+          <path d="M12 3 5 6v6c0 4.2 3 7.8 7 9 4-1.2 7-4.8 7-9V6z" />
+          <path d="m9 12 2 2 4-4" />
         </svg>
       );
     case 'apps':

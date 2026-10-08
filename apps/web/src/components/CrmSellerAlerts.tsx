@@ -139,8 +139,8 @@ export function CrmSellerAlerts() {
                 className="btn btn--primary"
                 to={
                   toast.kind === 'message'
-                    ? `/crm/conversas?lead=${encodeURIComponent(toast.leadId)}`
-                    : `/crm/negocio/${encodeURIComponent(toast.leadId)}`
+                    ? `/admin/crm/conversas?lead=${encodeURIComponent(toast.leadId)}`
+                    : `/admin/crm/negocio/${encodeURIComponent(toast.leadId)}`
                 }
                 onClick={() => dismiss(toast.key)}
               >

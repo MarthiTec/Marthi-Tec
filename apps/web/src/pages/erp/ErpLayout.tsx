@@ -26,7 +26,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
   '/erp/balanco': { kicker: 'Estoque', title: 'Balanço de estoque' },
   '/erp/movimentos': { kicker: 'Estoque', title: 'Movimentação de estoque' },
-  '/erp/atributos': { kicker: 'Produtos', title: 'Atributos' },
+  '/erp/especificacoes': { kicker: 'Produtos', title: 'Especificações' },
+  '/erp/pessoas': { kicker: 'Cadastros', title: 'Pessoas' },
   '/erp/api-aparelhos': { kicker: 'Produtos', title: 'Consulta de aparelhos por API' },
   '/erp/tipos-retirada': { kicker: 'Produtos', title: 'Retirada e entrega' },
   '/erp/notas': { kicker: 'Estoque', title: 'Notas de entrada e saída' },
@@ -63,10 +64,9 @@ const NAV_PRODUCTS: NavItem[] = [
   { to: '/erp/produtos', label: 'Cadastro', icon: 'box', end: true },
   { to: '/erp/balanco', label: 'Balanço', icon: 'box' },
   { to: '/erp/movimentos', label: 'Movimentos', icon: 'ops' },
-  { to: '/erp/atributos', label: 'Atributos', icon: 'ops' },
+  { to: '/erp/especificacoes', label: 'Especificações', icon: 'tag' },
   { to: '/erp/api-aparelhos', label: 'API de aparelhos', icon: 'ops' },
   { to: '/erp/notas', label: 'Notas de estoque', icon: 'fiscal' },
-  { to: '/erp/marcas', label: 'Marcas', icon: 'ops' },
   { to: '/erp/kits', label: 'Kits', icon: 'box' },
   { to: '/erp/lotes', label: 'Lotes / Rastro', icon: 'box' },
   { to: '/erp/almoxarifado', label: 'Almoxarifado', icon: 'box' },
@@ -77,11 +77,7 @@ const NAV_PRODUCTS: NavItem[] = [
 ];
 
 const NAV_PEOPLE: NavItem[] = [
-  { to: '/erp/clientes', label: 'Clientes', icon: 'people' },
-  { to: '/erp/funcionarios', label: 'Funcionários', icon: 'people' },
-  { to: '/erp/permissoes', label: 'Permissões', icon: 'ops' },
-  { to: '/erp/vendedores', label: 'Vendedores', icon: 'people' },
-  { to: '/erp/fornecedores', label: 'Fornecedores', icon: 'people' },
+  { to: '/erp/pessoas', label: 'Clientes, fornecedores e equipe', icon: 'people' },
 ];
 
 const NAV_FINANCE: NavItem[] = [

@@ -360,20 +360,20 @@ export function MultiStoreManagementPage() {
                   const isCurrent = s.id === activeStoreId;
                   return (
                     <tr key={s.id} className={isCurrent ? 'is-row-active' : undefined}>
-                      <td>
+                      <td data-label="Cód">
                         <span className="multi-store-code">{s.code}</span>
                       </td>
-                      <td>
+                      <td data-label="Loja / Razão Social">
                         <div className="multi-store-cell-name">
                           <CrudNameButton onClick={() => handleOpenEdit(s)}>{s.name}</CrudNameButton>
                           <span className="multi-store-cell-trade">{s.tradeName}</span>
                           {s.isMatrix && <span className="multi-store-badge-matrix">Matriz</span>}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="CNPJ">
                         <code className="multi-store-cnpj">{s.cnpj}</code>
                       </td>
-                      <td>
+                      <td data-label="Token de Acesso">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <code
                             style={{
@@ -400,31 +400,31 @@ export function MultiStoreManagementPage() {
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Ramo / Segmento">
                         <span className="multi-store-regime" style={{ fontWeight: 650 }}>
                           {STORE_SEGMENT_OPTIONS.find((o) => o.value === (s.segmentId || 'assistencia_tecnica'))?.label || '🔧 Oficina'}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Inscrições (IE / IM)">
                         <div style={{ fontSize: '0.8rem', lineHeight: 1.35 }}>
                           <div><strong>IE:</strong> {s.stateRegistration || 'ISENTO'}</div>
                           <div style={{ color: 'var(--admin-muted, #94a3b8)' }}><strong>IM:</strong> {s.municipalRegistration || '—'}</div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Cidade / UF">
                         {s.city} / {s.state}
                       </td>
-                      <td>
+                      <td data-label="Regime Tributário">
                         <span className="multi-store-regime">
                           {TAX_REGIME_OPTIONS.find((o) => o.value === s.taxRegime)?.label || s.taxRegime}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <span className={`multi-store-status-pill ${s.active ? 'is-active' : 'is-inactive'}`}>
                           {s.active ? 'Ativa' : 'Inativa'}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Contexto">
                         {isCurrent ? (
                           <span className="multi-store-badge-current">✓ Loja Selecionada</span>
                         ) : (
@@ -439,7 +439,7 @@ export function MultiStoreManagementPage() {
                           </button>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Ações">
                         <CrudRowActions
                           onView={() => handleOpenEdit(s)}
                           onEdit={() => handleOpenEdit(s)}
@@ -538,15 +538,15 @@ export function MultiStoreManagementPage() {
                 <tbody>
                   {licensingSummary.items.map((item) => (
                     <tr key={item.store.id}>
-                      <td>
+                      <td data-label="Loja / Filial">
                         <strong>{item.store.name}</strong>
                       </td>
-                      <td>
+                      <td data-label="CNPJ">
                         <code>{item.store.cnpj}</code>
                       </td>
-                      <td>{item.isMatrix ? <span className="multi-store-badge-matrix">Matriz</span> : 'Filial'}</td>
-                      <td>R$ {item.basePrice.toFixed(2).replace('.', ',')}</td>
-                      <td>
+                      <td data-label="Tipo">{item.isMatrix ? <span className="multi-store-badge-matrix">Matriz</span> : 'Filial'}</td>
+                      <td data-label="Valor Base">R$ {item.basePrice.toFixed(2).replace('.', ',')}</td>
+                      <td data-label="Desconto Multi-Loja">
                         {item.discountValue > 0 ? (
                           <span className="multi-store-discount-pill">
                             -{item.discountPercent}% (-R$ {item.discountValue.toFixed(2).replace('.', ',')})
@@ -555,12 +555,12 @@ export function MultiStoreManagementPage() {
                           <span style={{ color: 'var(--admin-muted)' }}>0% (Base)</span>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Valor Mensal Final">
                         <strong style={{ color: '#16a34a' }}>
                           R$ {item.finalPrice.toFixed(2).replace('.', ',')}
                         </strong>
                       </td>
-                      <td>
+                      <td data-label="Status da Licença">
                         <span className="multi-store-status-pill is-active">Ativa / Em Dia</span>
                       </td>
                     </tr>
@@ -568,17 +568,17 @@ export function MultiStoreManagementPage() {
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--admin-surface-subtle)', fontWeight: 'bold' }}>
-                    <td colSpan={3}>TOTAL MENSAL CONSOLIDADO</td>
-                    <td>R$ {licensingSummary.totalBase.toFixed(2).replace('.', ',')}</td>
-                    <td style={{ color: '#dc2626' }}>
+                    <td className="multi-store-total-label" colSpan={3}>TOTAL MENSAL CONSOLIDADO</td>
+                    <td data-label="Valor Base">R$ {licensingSummary.totalBase.toFixed(2).replace('.', ',')}</td>
+                    <td data-label="Desconto Multi-Loja" style={{ color: '#dc2626' }}>
                       {licensingSummary.totalDiscount > 0
                         ? `- R$ ${licensingSummary.totalDiscount.toFixed(2).replace('.', ',')}`
                         : 'R$ 0,00'}
                     </td>
-                    <td style={{ color: '#16a34a', fontSize: '1.05rem' }}>
+                    <td data-label="Valor Mensal Final" style={{ color: '#16a34a', fontSize: '1.05rem' }}>
                       R$ {licensingSummary.totalFinal.toFixed(2).replace('.', ',')}
                     </td>
-                    <td>—</td>
+                    <td data-label="Status da Licença">—</td>
                   </tr>
                 </tfoot>
               </table>
@@ -809,14 +809,14 @@ export function MultiStoreManagementPage() {
                     <tbody>
                       {repLogs.slice(0, 5).map((log) => (
                         <tr key={log.id}>
-                          <td>{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
-                          <td><strong>{log.sourceStoreName}</strong></td>
-                          <td><strong>{log.targetStoreName}</strong></td>
-                          <td>{log.productsCount > 0 ? `+${log.productsCount}` : '—'}</td>
-                          <td>{log.customersCount > 0 ? `+${log.customersCount}` : '—'}</td>
-                          <td>{log.sellersCount > 0 ? `+${log.sellersCount}` : '—'}</td>
-                          <td>{log.campaignsCount > 0 ? `+${log.campaignsCount}` : '—'}</td>
-                          <td>{log.operatorName}</td>
+                          <td data-label="Data / Hora">{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
+                          <td data-label="Loja Origem"><strong>{log.sourceStoreName}</strong></td>
+                          <td data-label="Loja Destino"><strong>{log.targetStoreName}</strong></td>
+                          <td data-label="Produtos">{log.productsCount > 0 ? `+${log.productsCount}` : '—'}</td>
+                          <td data-label="Clientes">{log.customersCount > 0 ? `+${log.customersCount}` : '—'}</td>
+                          <td data-label="Vendedores">{log.sellersCount > 0 ? `+${log.sellersCount}` : '—'}</td>
+                          <td data-label="Campanhas">{log.campaignsCount > 0 ? `+${log.campaignsCount}` : '—'}</td>
+                          <td data-label="Operador">{log.operatorName}</td>
                         </tr>
                       ))}
                     </tbody>

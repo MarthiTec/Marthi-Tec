@@ -322,7 +322,7 @@ export function CrmDealPage() {
     return (
       <section className="admin-page">
         <p className="qty-low">Negócio não encontrado.</p>
-        <Link className="btn btn--ghost" to="/crm">
+        <Link className="btn btn--ghost" to="/admin/crm">
           Voltar ao board
         </Link>
       </section>
@@ -337,7 +337,7 @@ export function CrmDealPage() {
     <section className="crm-deal">
       <div className="crm-deal__top">
         <div className="crm-deal__title-row">
-          <button type="button" className="btn btn--ghost" onClick={() => navigate('/crm')}>
+          <button type="button" className="btn btn--ghost" onClick={() => navigate('/admin/crm')}>
             ← Board
           </button>
           <h2>{lead.name}</h2>

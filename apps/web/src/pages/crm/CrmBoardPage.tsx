@@ -322,7 +322,7 @@ export function CrmBoardPage() {
     );
     setTick((value) => value + 1);
     if (draft.openAfter) {
-      navigate(`/crm/negocio/${result.lead.id}`);
+      navigate(`/admin/crm/negocio/${result.lead.id}`);
     }
   }
 
@@ -350,7 +350,7 @@ export function CrmBoardPage() {
           <h1>Negócios</h1>
           <p>
             Arraste cards entre etapas. Leads do pool podem ser puxados ao soltar. Conversas com
-            clientes ficam em <Link to="/crm/conversas">Canais abertos</Link>.
+            clientes ficam em <Link to="/admin/crm/conversas">Canais abertos</Link>.
           </p>
         </div>
         <div className="crm-board-stats">
@@ -434,7 +434,7 @@ export function CrmBoardPage() {
           <span className="crm-board-bar__hint">
             {filtered.length} visíveis · arraste para mudar etapa
           </span>
-          <Link to="/crm/conversas" className="btn btn--ghost">
+          <Link to="/admin/crm/conversas" className="btn btn--ghost">
             Conversas{boardStats.inbox ? ` (${boardStats.inbox})` : ''}
           </Link>
         </div>
@@ -503,7 +503,7 @@ export function CrmBoardPage() {
                       <button
                         type="button"
                         className="crm-card__identity"
-                        onClick={() => navigate(`/crm/negocio/${lead.id}`)}
+                        onClick={() => navigate(`/admin/crm/negocio/${lead.id}`)}
                       >
                         <span className="crm-card__name">{title}</span>
                         {subtitle ? <span className="crm-card__sub">{subtitle}</span> : null}
@@ -565,7 +565,7 @@ export function CrmBoardPage() {
                         type="button"
                         className="btn btn--ghost"
                         style={{ fontSize: '0.78rem', minHeight: 28, padding: '0 8px' }}
-                        onClick={() => navigate(`/crm/negocio/${lead.id}`)}
+                        onClick={() => navigate(`/admin/crm/negocio/${lead.id}`)}
                       >
                         Abrir
                       </button>

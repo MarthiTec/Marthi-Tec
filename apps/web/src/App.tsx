@@ -1,5 +1,4 @@
 import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
-import {PickupMethodsPage} from './pages/admin/PickupMethodsPage';
 import {PickupTrackingPage} from './pages/PickupTrackingPage';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -52,15 +51,13 @@ import { TotemInsightsPage } from './pages/admin/TotemInsightsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminHomePage } from './pages/admin/AdminHomePage';
 import { OperationsPage } from './pages/admin/OperationsPage';
-import { CrmPanelPage } from './pages/admin/CrmPanelPage';
+import { SpecificationsPage } from './pages/admin/SpecificationsPage';
+import { PeoplePage } from './pages/admin/PeoplePage';
 import { EcommercePanelPage } from './pages/admin/EcommercePanelPage';
 import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
 import { ErpPanelPage } from './pages/admin/ErpPanelPage';
-import { CustomersPage } from './pages/admin/CustomersPage';
 import { StockPage } from './pages/admin/StockPage';
 import { CommercialPage } from './pages/admin/CommercialPage';
-import { BrandsPage } from './pages/admin/BrandsPage';
-import { AttributesPage } from './pages/admin/AttributesPage';
 import { OrdersPage } from './pages/admin/OrdersPage';
 import { FinancePage } from './pages/admin/FinancePage';
 import { PosPage } from './pages/admin/PosPage';
@@ -75,9 +72,6 @@ import { WorkOrderReportPage } from './pages/admin/WorkOrderReportPage';
 import { AgendaPage } from './pages/admin/AgendaPage';
 import { PlanPage } from './pages/admin/PlanPage';
 import { StoreSegmentPage } from './pages/admin/StoreSegmentPage';
-import { SellersPage } from './pages/admin/SellersPage';
-import { SuppliersPage } from './pages/admin/SuppliersPage';
-import { EmployeesPage } from './pages/admin/EmployeesPage';
 import { AuditPage } from './pages/admin/AuditPage';
 import { InvoicesPage } from './pages/admin/InvoicesPage';
 import { FiscalClassPage } from './pages/admin/FiscalClassPage';
@@ -87,7 +81,6 @@ import { FiscalCstPage } from './pages/admin/FiscalCstPage';
 import { KitsPage } from './pages/admin/KitsPage';
 import { LotsPage } from './pages/admin/LotsPage';
 import { WarehousePage } from './pages/admin/WarehousePage';
-import { PermissionsPage } from './pages/admin/PermissionsPage';
 import { HelpPage } from './pages/admin/HelpPage';
 import { OperatorAccountPage } from './pages/shared/OperatorAccountPage';
 import { MarthiLayout } from './pages/marthi/MarthiLayout';
@@ -109,6 +102,13 @@ function LegacyMarthiRedirect() {
   const location = useLocation();
   const suffix = location.pathname.replace(/^\/marthi/, '') || '';
   return <Navigate to={`/admin${suffix}${location.search}`} replace />;
+}
+
+/** O CRM é ferramenta interna da Marthi: os endereços antigos (/crm…) vão para o painel /admin. */
+function LegacyCrmRedirect() {
+  const location = useLocation();
+  const suffix = location.pathname.replace(/^\/crm/i, '');
+  return <Navigate to={`/admin/crm${suffix}${location.search}`} replace />;
 }
 
 /** Com o aparelho travado no totem, nenhuma outra tela (painel, login, site) chega a renderizar. */
@@ -193,16 +193,16 @@ export function App() {
         </Route>
         <Route path="/ecomerce/*" element={<Navigate to="/ecommerce" replace />} />
         <Route path="/ecomerce" element={<Navigate to="/ecommerce" replace />} />
-        <Route path="/crm" element={<CrmLayout />}>
+        <Route path="/admin/crm" element={<CrmLayout />}>
           <Route index element={<CrmBoardPage />} />
           <Route path="conversas" element={<CrmInboxPage />} />
           <Route path="negocio/:id" element={<CrmDealPage />} />
-          <Route path="conta" element={<Navigate to="/crm/perfil" replace />} />
+          <Route path="conta" element={<Navigate to="/admin/crm/perfil" replace />} />
           <Route path="perfil" element={<CrmProfilePage />} />
           <Route path="rede" element={<CrmNetworkPage />} />
         </Route>
-        <Route path="/CRM/*" element={<Navigate to="/crm" replace />} />
-        <Route path="/CRM" element={<Navigate to="/crm" replace />} />
+        <Route path="/crm/*" element={<LegacyCrmRedirect />} />
+        <Route path="/CRM/*" element={<LegacyCrmRedirect />} />
         <Route path="/erp" element={<ErpLayout />}>
           <Route index element={<ErpHomePage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />
@@ -212,9 +212,10 @@ export function App() {
           <Route path="movimentos" element={<StockMovementsPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
-          <Route path="tipos-retirada" element={<PickupMethodsPage />} />
-          <Route path="atributos" element={<AttributesPage />} />
-          <Route path="marcas" element={<BrandsPage />} />
+          <Route path="especificacoes" element={<SpecificationsPage />} />
+          <Route path="tipos-retirada" element={<Navigate to="/erp/especificacoes?aba=retirada" replace />} />
+          <Route path="atributos" element={<Navigate to="/erp/especificacoes?aba=atributos" replace />} />
+          <Route path="marcas" element={<Navigate to="/erp/especificacoes?aba=marcas" replace />} />
           <Route path="kits" element={<KitsPage />} />
           <Route path="lotes" element={<LotsPage />} />
           <Route path="almoxarifado" element={<WarehousePage />} />
@@ -222,11 +223,12 @@ export function App() {
           <Route path="campanhas" element={<PromoCampaignsPage />} />
           <Route path="orcamentos" element={<QuotesManagementPage />} />
           <Route path="comercial" element={<CommercialPage />} />
-          <Route path="clientes" element={<CustomersPage />} />
-          <Route path="funcionarios" element={<EmployeesPage />} />
-          <Route path="permissoes" element={<PermissionsPage />} />
-          <Route path="vendedores" element={<SellersPage />} />
-          <Route path="fornecedores" element={<SuppliersPage />} />
+          <Route path="pessoas" element={<PeoplePage />} />
+          <Route path="clientes" element={<Navigate to="/erp/pessoas?aba=clientes" replace />} />
+          <Route path="funcionarios" element={<Navigate to="/erp/pessoas?aba=funcionarios" replace />} />
+          <Route path="permissoes" element={<Navigate to="/erp/pessoas?aba=permissoes" replace />} />
+          <Route path="vendedores" element={<Navigate to="/erp/pessoas?aba=vendedores" replace />} />
+          <Route path="fornecedores" element={<Navigate to="/erp/pessoas?aba=fornecedores" replace />} />
           <Route path="financeiro" element={<FinancePage />} />
           <Route path="taxas-cartao" element={<CardRatesPage />} />
           <Route path="boletos" element={<ErpBoletosPage />} />
@@ -251,21 +253,25 @@ export function App() {
           <Route path="relatorio-vendas" element={<SalesGoalsReportPage />} />
           <Route path="totem" element={<TotemInsightsPage />} />
           <Route path="totem/produtos" element={<StockPage />} />
-          <Route path="totem/atributos" element={<AttributesPage />} />
-          <Route path="totem/marcas" element={<BrandsPage />} />
+          <Route path="totem/especificacoes" element={<SpecificationsPage />} />
+          <Route path="totem/atributos" element={<Navigate to="/painel/totem/especificacoes?aba=atributos" replace />} />
+          <Route path="totem/marcas" element={<Navigate to="/painel/totem/especificacoes?aba=marcas" replace />} />
+          <Route path="especificacoes" element={<SpecificationsPage />} />
+          <Route path="pessoas" element={<PeoplePage />} />
           <Route path="totem/config" element={<TotemSettingsPage />} />
           <Route path="totem/previa" element={<TotemPreviewPage />} />
           <Route path="pedidos" element={<OrdersPage />} />
-          <Route path="crm" element={<CrmPanelPage />} />
+          <Route path="crm" element={<Navigate to="/painel" replace />} />
           <Route path="ecommerce" element={<EcommercePanelPage />} />
           <Route path="fiscal" element={<FiscalPanelPage />} />
           <Route path="erp" element={<ErpPanelPage />} />
-          <Route path="clientes" element={<Navigate to="/erp/clientes" replace />} />
+          <Route path="clientes" element={<Navigate to="/painel/pessoas?aba=clientes" replace />} />
           <Route path="produtos" element={<Navigate to="/erp/produtos" replace />} />
           <Route path="estoque" element={<Navigate to="/erp/balanco" replace />} />
           <Route path="balanco" element={<Navigate to="/erp/balanco" replace />} />
           <Route path="movimentos" element={<Navigate to="/erp/movimentos" replace />} />
-          <Route path="atributos" element={<Navigate to="/erp/atributos" replace />} />
+          <Route path="atributos" element={<Navigate to="/painel/especificacoes?aba=atributos" replace />} />
+          <Route path="marcas" element={<Navigate to="/painel/especificacoes?aba=marcas" replace />} />
           <Route path="kits" element={<Navigate to="/erp/kits" replace />} />
           <Route path="lotes" element={<Navigate to="/erp/lotes" replace />} />
           <Route path="almoxarifado" element={<Navigate to="/erp/almoxarifado" replace />} />
@@ -275,10 +281,10 @@ export function App() {
           <Route path="pagamentos" element={<PaymentsPage />} />
           <Route path="taxas-cartao" element={<CardRatesPage />} />
           <Route path="financeiro" element={<Navigate to="/erp/financeiro" replace />} />
-          <Route path="vendedores" element={<Navigate to="/erp/vendedores" replace />} />
-          <Route path="fornecedores" element={<Navigate to="/erp/fornecedores" replace />} />
-          <Route path="funcionarios" element={<Navigate to="/painel/operacoes/usuarios" replace />} />
-          <Route path="permissoes" element={<Navigate to="/erp/permissoes" replace />} />
+          <Route path="vendedores" element={<Navigate to="/painel/pessoas?aba=vendedores" replace />} />
+          <Route path="fornecedores" element={<Navigate to="/painel/pessoas?aba=fornecedores" replace />} />
+          <Route path="funcionarios" element={<Navigate to="/painel/pessoas?aba=funcionarios" replace />} />
+          <Route path="permissoes" element={<Navigate to="/painel/pessoas?aba=permissoes" replace />} />
           <Route path="auditoria" element={<Navigate to="/erp/auditoria" replace />} />
           <Route path="classificacao-fiscal" element={<FiscalClassPage />} />
           <Route path="cfop" element={<CfopPage />} />

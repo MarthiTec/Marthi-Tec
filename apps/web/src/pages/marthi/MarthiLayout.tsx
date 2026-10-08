@@ -131,6 +131,15 @@ export function MarthiLayout() {
             <AdminIcon name="payments" />
             <span className="admin__link-label">Recebimentos & Pix</span>
           </NavLink>
+          <NavLink
+            to="/admin/crm"
+            title="CRM comercial"
+            onClick={() => setMenuOpen(false)}
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="badge" />
+            <span className="admin__link-label">CRM comercial</span>
+          </NavLink>
         </nav>
 
         <div className="admin__sidebar-foot">

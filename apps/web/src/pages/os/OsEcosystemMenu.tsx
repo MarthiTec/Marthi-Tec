@@ -78,15 +78,6 @@ const ECOSYSTEM_APPS: EcosystemApp[] = [
     color: '#0284c7',
   },
   {
-    id: 'crm',
-    name: 'CRM & Vendas',
-    desc: 'Funil comercial, gestão de oportunidades e clientes',
-    path: '/crm',
-    icon: 'people',
-    badge: 'Liberado',
-    color: '#ea580c',
-  },
-  {
     id: 'cozinha',
     name: 'Mesas & Comandas',
     desc: 'Controle de pedidos e serviços por comanda',

@@ -129,7 +129,7 @@ export function ProductsPage() {
       product.href === '/erp' ||
       product.href === '/fiscal' ||
       product.href === '/ecommerce' ||
-      product.href === '/crm' ||
+      product.href === '/admin/crm' ||
       product.href === '/painel';
     if (needsLogin && !user && product.href !== '/totem') {
       navigate(`/login?next=${encodeURIComponent(product.href)}`);

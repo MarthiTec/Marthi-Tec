@@ -181,3 +181,22 @@ test('device key is encrypted and full provider specifications are saved only fo
 });
 
 after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));await db.close();});
+test('supplier chosen in the product form is saved on create and on edit, and only from the same store', async () => {
+  await query("INSERT INTO suppliers(id,store_id,name) VALUES('SUP-a1','store-a','Distribuidora A'),('SUP-a2','store-a','Distribuidora B'),('SUP-b1','store-b','Fornecedor da loja B')");
+  const created = await request('/stock', 'POST', { name: 'Produto com fornecedor', qty: 1, cost: 10, price: 20, supplierId: 'SUP-a1' });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  assert.equal(created.json.data.supplierId, 'SUP-a1');
+  const id = created.json.data.id;
+  const changed = await request('/stock/' + id, 'PATCH', { supplierId: 'SUP-a2' });
+  assert.equal(changed.status, 200, JSON.stringify(changed.json));
+  assert.equal(changed.json.data.supplierId, 'SUP-a2');
+  assert.equal((await query('SELECT supplier_id FROM stock_items WHERE id=$1', [id])).rows[0].supplier_id, 'SUP-a2');
+  assert.equal((await request('/stock/' + id, 'PATCH', { supplierId: 'SUP-b1' })).status, 400, 'supplier of another store is refused');
+  const cleared = await request('/stock/' + id, 'PATCH', { supplierId: '' });
+  assert.equal(cleared.status, 200);
+  assert.equal((await query('SELECT supplier_id FROM stock_items WHERE id=$1', [id])).rows[0].supplier_id, null);
+  const untouched = await request('/stock/' + id, 'PATCH', { price: 25 });
+  assert.equal(untouched.status, 200);
+  assert.equal((await query('SELECT supplier_id FROM stock_items WHERE id=$1', [id])).rows[0].supplier_id, null, 'editing other fields keeps the supplier as is');
+  assert.equal((await request('/stock', 'POST', { name: 'Fornecedor errado', qty: 0, cost: 0, price: 0, supplierId: 'SUP-b1' })).status, 400);
+});

@@ -205,8 +205,8 @@ export function ErpPanelPage() {
           <h2>Senhas de usuário</h2>
           <p className="empty">
             Senha local de retaguarda (demo). Também pode definir no cadastro de{' '}
-            <Link to="/erp/funcionarios">Funcionários</Link> ou em{' '}
-            <Link to="/erp/permissoes">Permissões</Link>.
+            <Link to="/erp/pessoas?aba=funcionarios">Funcionários</Link> ou em{' '}
+            <Link to="/erp/pessoas?aba=permissoes">Permissões</Link>.
           </p>
           <form onSubmit={savePassword}>
             <div className="admin-form">
@@ -246,7 +246,7 @@ export function ErpPanelPage() {
               <button type="button" className="btn btn--ghost" onClick={clearPassword}>
                 Remover
               </button>
-              <Link to="/erp/permissoes" className="btn btn--ghost">
+              <Link to="/erp/pessoas?aba=permissoes" className="btn btn--ghost">
                 Permissões na Retaguarda
               </Link>
             </div>
@@ -257,7 +257,7 @@ export function ErpPanelPage() {
       <article className="admin-card" style={{ marginTop: 12 }}>
         <div className="admin-toolbar">
           <h2 style={{ margin: 0 }}>Usuários com acesso</h2>
-          <Link to="/erp/funcionarios" className="btn btn--ghost">
+          <Link to="/erp/pessoas?aba=funcionarios" className="btn btn--ghost">
             Funcionários
           </Link>
         </div>

@@ -1131,7 +1131,7 @@ export function TotemSettingsPage() {
             <Link to="/painel/totem/produtos" className="btn btn--ghost">
               Catálogo do totem
             </Link>
-            <Link to="/painel/totem/atributos" className="btn btn--ghost">
+            <Link to="/painel/totem/especificacoes?aba=atributos" className="btn btn--ghost">
               Atributos
             </Link>
           </div>

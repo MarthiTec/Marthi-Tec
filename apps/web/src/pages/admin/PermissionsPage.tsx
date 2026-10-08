@@ -385,7 +385,7 @@ export function PermissionsPage() {
             <h2>Permissões de acesso</h2>
             <p>
               Atrele áreas e senha de acesso à Retaguarda a uma pessoa já cadastrada em{' '}
-              <Link to="/erp/funcionarios">Funcionários</Link>. Use <strong>Novo vínculo</strong> para
+              <Link to="/erp/pessoas?aba=funcionarios">Funcionários</Link>. Use <strong>Novo vínculo</strong> para
               liberar login a quem ainda não é usuário do sistema.
             </p>
             {me ? (
@@ -690,7 +690,7 @@ export function PermissionsPage() {
 
           {mode === 'new' && linkablePeople.length === 0 ? (
             <p className="qty-low">
-              Cadastre a pessoa em <Link to="/erp/funcionarios">Funcionários</Link> (sem marcar
+              Cadastre a pessoa em <Link to="/erp/pessoas?aba=funcionarios">Funcionários</Link> (sem marcar
               usuário do sistema) e volte aqui para atrelar o acesso — ou marque usuário já no
               cadastro do funcionário.
             </p>

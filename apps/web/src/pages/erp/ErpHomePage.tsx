@@ -36,7 +36,7 @@ const CARDS = [
     text: 'SKUs, preços, kits, lotes e almoxarifado.',
   },
   {
-    to: '/erp/clientes',
+    to: '/erp/pessoas?aba=clientes',
     tag: 'Pessoas',
     title: 'Clientes e equipe',
     text: 'Clientes, funcionários, permissões, vendedores e fornecedores.',

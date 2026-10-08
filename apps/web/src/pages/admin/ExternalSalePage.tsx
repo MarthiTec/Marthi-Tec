@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
+import { CurrencyInput } from '../../components/CurrencyInput';
+import { AdminIcon } from '../../components/AdminIcons';
 import {
   apiCreateExternalSale,
   apiGetSaleReceipt,
@@ -390,670 +392,323 @@ export function ExternalSalePage() {
   }
 
   return (
-    <div className="admin-page external-sale-page" style={{ padding: '16px 20px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Cabeçalho da Página */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '20px',
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.4rem' }}>⚡</span>
-            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--ink)' }}>
-              Venda Externa / Venda sem Caixa
-            </h1>
-            <span className="admin-badge admin-badge--active" style={{ fontSize: '0.75rem' }}>
-              {activeStore?.tradeName || 'Loja ativa'}
+    <div className="admin-page external-sale-page xsale">
+      <header className="xsale-head">
+        <div className="xsale-head__info">
+          <h1>
+            <span className="xsale-head__icon" aria-hidden>
+              <AdminIcon name="cart" />
             </span>
-          </div>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--mute)' }}>
-            Venda ágil e direta sem exigência de abertura de caixa físico. Integração em tempo real com estoque, financeiro e metas.
-          </p>
+            Venda externa
+            <span className="xsale-chip">{activeStore?.tradeName || 'Loja ativa'}</span>
+          </h1>
+          <p>Venda sem abrir o caixa, com baixa no estoque, financeiro e metas na hora.</p>
         </div>
-
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            style={{ fontSize: '0.84rem' }}
-            onClick={() => setHistoryOpen(true)}
-          >
-            🧾 Vendas realizadas
+        <div className="xsale-head__actions">
+          <button type="button" className="btn btn--ghost" onClick={() => setHistoryOpen(true)}>
+            <AdminIcon name="receipt" /> Vendas realizadas
           </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            style={{ fontSize: '0.84rem' }}
-            onClick={() => setShowPendingModal(true)}
-          >
-            📋 Pendências do Dia
+          <button type="button" className="btn btn--ghost" onClick={() => setShowPendingModal(true)}>
+            <AdminIcon name="ops" /> Pendências do dia
           </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            style={{ fontSize: '0.84rem' }}
-            onClick={() => setShowPickupModal(true)}
-          >
-            💰 Recolhimento de valores
+          <button type="button" className="btn btn--ghost" onClick={() => setShowPickupModal(true)}>
+            <AdminIcon name="dollar" /> Recolhimento
           </button>
         </div>
-      </div>
+      </header>
 
-      {error && (
-        <div
-          style={{
-            background: 'rgba(239, 68, 68, 0.15)',
-            color: 'var(--external-danger)' ,
-            border: '1px solid #ef4444',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            marginBottom: '16px',
-            fontSize: '0.9rem',
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ color: 'var(--mute, #94a3b8)', fontSize: '0.85rem', marginBottom: '12px' }}>
-          ⏳ Carregando catálogo e clientes...
-        </div>
-      )}
+      {error ? <div className="xsale-alert" role="alert">{error}</div> : null}
+      {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
 
       <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPaymentMethod(ticket.payment==='Parcelado'?'Cartão de Crédito':'PIX');setInstallments(ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1);requestId.current=crypto.randomUUID();}}/>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '16px', marginBottom: '16px' }}>
-          {/* Card 1: Identificação da Operação (Vendedora & Cliente) */}
-          <div
-            style={{
-              background: 'var(--card, #171e27)',
-              border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-              borderRadius: '10px',
-              padding: '16px',
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 700, color: 'var(--ink)' }}>
-              👤 Vendedor & Cliente
-            </h3>
-
-            <div style={{ marginBottom: '12px' }}>
-              <label className="admin-label">Vendedor responsável</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={sellerName}
-                readOnly
-                placeholder="Nome do responsável pela venda"
-                required
-              />
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <AdminPicker
-                label="Selecionar Cliente Cadastrado"
-                value={selectedCustomerId}
-                options={[
-                  { value: '', label: 'Consumidor Final (Sem Cadastro)' },
-                  ...customers.map((c) => ({
-                    value: c.id,
-                    label: `${c.name} ${c.phone ? `· ${c.phone}` : ''}`,
-                  })),
-                ]}
-                onChange={handleSelectCustomer}
-              />
-              <div className="quick-field__actions" style={{ marginTop: 8 }}>
-                <QuickAddButton label="Novo cliente" onClick={() => setQuickCustomerOpen(true)} />
+      <form onSubmit={handleSubmit} className="xsale-layout">
+        <div className="xsale-main">
+          {/* 1. Cliente */}
+          <section className="xsale-card">
+            <h2 className="xsale-card__title"><span className="xsale-step">1</span> Cliente e vendedor</h2>
+            <div className="xsale-grid">
+              <div className="xsale-field">
+                <label className="admin-label">Vendedor responsável</label>
+                <input type="text" className="admin-input" value={sellerName} readOnly placeholder="Nome do responsável pela venda" required />
               </div>
-              {quickCustomerOpen ? (
-                <QuickCreateCustomer
-                  onClose={() => setQuickCustomerOpen(false)}
-                  onCreated={(customer) => {
-                    setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]);
-                    setSelectedCustomerId(customer.id);
-                    setCustomerName(customer.name);
-                    setCustomerPhone(customer.phone || '');
-                    setCustomerDocument(customer.document || '');
-                  }}
+              <div className="xsale-field">
+                <AdminPicker
+                  label="Cliente cadastrado"
+                  value={selectedCustomerId}
+                  options={[
+                    { value: '', label: 'Consumidor final (sem cadastro)' },
+                    ...customers.map((c) => ({ value: c.id, label: `${c.name}${c.phone ? ` · ${c.phone}` : ''}` })),
+                  ]}
+                  onChange={handleSelectCustomer}
                 />
-              ) : null}
+                <div className="quick-field__actions">
+                  <QuickAddButton label="Novo cliente" onClick={() => setQuickCustomerOpen(true)} />
+                </div>
+                {quickCustomerOpen ? (
+                  <QuickCreateCustomer
+                    onClose={() => setQuickCustomerOpen(false)}
+                    onCreated={(customer) => {
+                      setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]);
+                      setSelectedCustomerId(customer.id);
+                      setCustomerName(customer.name);
+                      setCustomerPhone(customer.phone || '');
+                      setCustomerDocument(customer.document || '');
+                    }}
+                  />
+                ) : null}
+              </div>
+              <div className="xsale-field">
+                <label className="admin-label">Nome do cliente</label>
+                <input type="text" className="admin-input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nome do cliente" required />
+              </div>
+              <div className="xsale-field">
+                <label className="admin-label">WhatsApp / telefone</label>
+                <input type="text" className="admin-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="DDD e número" />
+              </div>
+              <div className="xsale-field">
+                <label className="admin-label">CPF (opcional, para o recibo)</label>
+                <input type="text" className="admin-input" value={customerDocument} onChange={(e) => setCustomerDocument(e.target.value)} placeholder="000.000.000-00" />
+              </div>
             </div>
+          </section>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {/* 2. Produtos */}
+          <section className="xsale-card">
+            <div className="xsale-card__head">
+              <h2 className="xsale-card__title"><span className="xsale-step">2</span> Produtos</h2>
+              <div className="xsale-card__tools">
+                <AdminPicker label="Filtrar por marca" value={brandFilter} options={[{ value: 'all', label: 'Todas as marcas' }, ...brands.map((b) => ({ value: b.slug, label: b.name }))]} onChange={setBrandFilter} />
+                <Link className="xsale-link" to="/painel/especificacoes?aba=marcas">Gerenciar marcas</Link>
+              </div>
+            </div>
+            {brandsError ? <p role="alert" className="xsale-alert">{brandsError}</p> : null}
+            <div className="xsale-lines">
+              {lines.map((line, idx) => (
+                <div key={idx} className="xsale-line external-sale-line">
+                  <div className="xsale-line__head">
+                    <span className="xsale-line__index">Item {idx + 1}</span>
+                    {lines.length > 1 || line.stockId ? (
+                      <button type="button" className="xsale-line__remove" onClick={() => handleRemoveLine(idx)} title="Remover item" aria-label={`Remover item ${idx + 1}`}>
+                        <AdminIcon name="trash" />
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="external-sale-wide-field">
+                    <AdminPicker
+                      label="Produto"
+                      value={line.stockId || ''}
+                      options={[
+                        { value: '', label: 'Selecione um produto do estoque…' },
+                        ...stockItems.filter((p) => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
+                          value: p.id,
+                          label: `${p.name}${p.attrs ? ' · ' + Object.values(p.attrs).filter(Boolean).join(' · ') : ''} · ${formatMoney(p.price)} (disp.: ${p.qty})`,
+                        })),
+                      ]}
+                      onChange={(val) => handleLineProductChange(idx, val)}
+                    />
+                  </div>
+                  <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId, deliveryAddress, price) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, pickupMethodId, deliveryAddress, unitPrice: price ?? entry.unitPrice } : entry)))} />
+                  <SaleAttributeFields surface="external" product={stockItems.find((p) => p.id === line.stockId)} picked={line.attributes} onChange={(attributes) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, attributes } : entry)))} />
+                  <div>
+                    <label className="admin-label">Quantidade</label>
+                    <input type="number" min="1" className="admin-input" value={line.qty} onChange={(e) => handleLineFieldChange(idx, 'qty', Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="admin-label">Preço de venda (R$)</label>
+                    <CurrencyInput className="admin-input" value={line.unitPrice} onChange={(value) => handleLineFieldChange(idx, 'unitPrice', value)} ariaLabel="Preço de venda" />
+                  </div>
+                  <div>
+                    <label className="admin-label">IMEI (se houver)</label>
+                    <input type="text" className="admin-input" placeholder="3542…" value={line.imei || ''} onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn btn--ghost xsale-add" onClick={handleAddLine}>
+              <AdminIcon name="plus" /> Adicionar outro produto
+            </button>
+          </section>
+
+          {/* 3. Troca */}
+          <section className={`xsale-card${hasTradeIn ? ' is-highlight' : ''}`}>
+            <div className="xsale-card__head">
               <div>
-                <label className="admin-label">Nome do Cliente</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Nome do cliente"
-                  required
-                />
+                <h2 className="xsale-card__title"><span className="xsale-step">3</span> Troca de aparelho usado <small>(opcional)</small></h2>
+                <p className="xsale-muted">
+                  Use na entrega imediata: ao concluir, o usado entra no estoque. Se o cliente fica com o usado enquanto
+                  aguarda uma encomenda, não registre a troca aqui.
+                </p>
               </div>
-              <div>
-                <label className="admin-label">WhatsApp / Telefone</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="DDD e número de telefone"
-                />
-              </div>
+              <button type="button" className={hasTradeIn ? 'btn btn--primary' : 'btn btn--ghost'} onClick={() => setHasTradeIn(!hasTradeIn)}>
+                {hasTradeIn ? '✓ Troca incluída' : '+ Incluir aparelho usado'}
+              </button>
             </div>
 
-            <div style={{ marginTop: '10px' }}>
-              <label className="admin-label">CPF (Opcional para recibo)</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={customerDocument}
-                onChange={(e) => setCustomerDocument(e.target.value)}
-                placeholder="000.000.000-00"
-              />
-            </div>
-          </div>
+            {hasTradeIn ? (
+              <>
+                <div className="external-sale-trade-fields">
+                  <div className="external-sale-wide-field">
+                    <label className="admin-label">Aparelho entregue pelo cliente</label>
+                    <input type="text" className="admin-input" placeholder="Ex.: iPhone 15 Pro Max usado" value={tradeIn.deviceName} onChange={(e) => setTradeIn({ ...tradeIn, deviceName: e.target.value })} required={hasTradeIn} />
+                  </div>
+                  <div className="external-sale-wide-field">
+                    <AdminPicker label="Marca do aparelho recebido" value={tradeIn.brand || ''} options={[{ value: '', label: 'Selecionar marca' }, ...brands.filter((b) => b.active).map((b) => ({ value: b.slug, label: b.name }))]} onChange={(brand) => setTradeIn({ ...tradeIn, brand })} />
+                    {tradeLoading ? <p role="status" className="xsale-muted">Consultando modelo…</p> : null}
+                    {tradeError ? <p role="status" className="xsale-muted">{tradeError}</p> : null}
+                    {tradeDevice ? (
+                      <p className="xsale-muted">
+                        Modelo identificado: <strong>{tradeDevice.model}</strong> ·{' '}
+                        <a href={tradeDevice.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a>
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className="admin-label">IMEI do aparelho entregue</label>
+                    <input type="text" className="admin-input" placeholder="3589…" value={tradeIn.imei} onChange={(e) => setTradeIn({ ...tradeIn, imei: e.target.value })} />
+                  </div>
+                  <div>
+                    <AdminPicker
+                      label="Capacidade"
+                      value={tradeIn.capacity || ''}
+                      options={tradeDevice ? tradeDevice.capacities : (attributeDefs.find((a) => /capac|armazen/i.test(a.name))?.values ?? []).map((value) => ({ value, label: value }))}
+                      onChange={(val) => setTradeIn({ ...tradeIn, capacity: val })}
+                    />
+                  </div>
+                  <div>
+                    {tradeDevice ? (
+                      <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={(color) => setTradeIn({ ...tradeIn, color })} />
+                    ) : (
+                      <>
+                        <label className="admin-label" htmlFor="trade-in-color">Cor</label>
+                        <input id="trade-in-color" className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={(e) => setTradeIn({ ...tradeIn, color: e.target.value })} />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <AdminPicker
+                      label="Estado de conservação"
+                      value={tradeIn.conditionState || 'used'}
+                      options={[
+                        { value: 'used', label: 'Usado - excelente estado' },
+                        { value: 'refurbished', label: 'Recondicionado / marcas de uso' },
+                        { value: 'damaged', label: 'Avariado / peças' },
+                      ]}
+                      onChange={(val: any) => setTradeIn({ ...tradeIn, conditionState: val })}
+                    />
+                  </div>
+                  <div className="external-sale-wide-field">
+                    <label className="admin-label xsale-accent">Valor combinado pelo usado / crédito (R$)</label>
+                    <CurrencyInput className="admin-input xsale-input-accent" value={tradeIn.tradeValue || 0} placeholder="Ex.: 4.000,00" onChange={(value) => setTradeIn({ ...tradeIn, tradeValue: value })} ariaLabel="Valor combinado pelo usado" />
+                    <p className="xsale-muted">
+                      Informe o valor depois da avaliação. O preço de um aparelho igual no mercado é só referência.
+                    </p>
+                  </div>
+                </div>
+                <div className="xsale-trade-sum">
+                  <div><small>Produto novo</small><strong>{formatMoney(grossTotal)}</strong></div>
+                  <div><small>Crédito do usado</small><strong className="xsale-accent">- {formatMoney(tradeInCredit)}</strong></div>
+                  <div><small>Saldo a pagar</small><strong className="xsale-accent xsale-big">{formatMoney(netAmountToPay)}</strong></div>
+                </div>
+              </>
+            ) : null}
+          </section>
+        </div>
 
-          {/* Card 2: Pagamento & Condições */}
-          <div
-            style={{
-              background: 'var(--card, #171e27)',
-              border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-              borderRadius: '10px',
-              padding: '16px',
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 700, color: 'var(--ink)' }}>
-              💳 Forma de Pagamento
-            </h3>
-
-            <div style={{ marginBottom: '12px' }}>
+        {/* 4. Pagamento e resumo (fica fixo ao lado no computador) */}
+        <aside className="xsale-side">
+          <section className="xsale-card">
+            <h2 className="xsale-card__title"><span className="xsale-step">4</span> Pagamento</h2>
+            <div className="xsale-stack">
               <AdminPicker
-                label="Meio de Pagamento"
+                label="Meio de pagamento"
                 value={paymentMethod}
                 options={[
-                  { value: 'Cartão de Crédito', label: 'Cartão de Crédito' },
-                  { value: 'Cartão de Débito', label: 'Cartão de Débito' },
-                  { value: 'PIX', label: 'PIX (Chave da Loja)' },
-                  { value: 'Dinheiro', label: 'Dinheiro em Espécie (Sem Caixa)' },
+                  { value: 'Cartão de Crédito', label: 'Cartão de crédito' },
+                  { value: 'Cartão de Débito', label: 'Cartão de débito' },
+                  { value: 'PIX', label: 'PIX (chave da loja)' },
+                  { value: 'Dinheiro', label: 'Dinheiro (sem caixa)' },
                   { value: 'Transferência Bancária', label: 'Transferência / TED' },
                 ]}
                 onChange={(val) => setPaymentMethod(val)}
               />
-            </div>
-
-            {paymentMethod === 'Cartão de Crédito' && (
-              <div style={{ marginBottom: '12px' }}>
+              {paymentMethod === 'Cartão de Crédito' ? (
                 <AdminPicker
-                  label="Parcelamento (Cartão)"
+                  label="Parcelamento"
                   value={String(installments)}
                   options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, index) => {
                     const count = index + 1;
-                    const parcel = netAmountToPay / count;
-                    return {
-                      value: String(count),
-                      label: count === 1 ? `1x à vista (${formatMoney(netAmountToPay)})` : `${count}x de ${formatMoney(parcel)}`,
-                    };
+                    return { value: String(count), label: count === 1 ? `1x à vista (${formatMoney(netAmountToPay)})` : `${count}x de ${formatMoney(netAmountToPay / count)}` };
                   })}
                   onChange={(val) => setInstallments(Number(val))}
                 />
+              ) : null}
+              {paymentMethod === 'Dinheiro' ? (
+                <p className="xsale-warn">
+                  <strong>Recebimento sem caixa:</strong> a venda fica registrada e o dinheiro fica na loja até o recolhimento.
+                </p>
+              ) : null}
+              <div className="xsale-grid xsale-grid--2">
+                <div>
+                  <label className="admin-label">Desconto (R$)</label>
+                  <CurrencyInput className="admin-input" value={generalDiscount} onChange={setGeneralDiscount} ariaLabel="Desconto" />
+                </div>
+                <div>
+                  <label className="admin-label">Acréscimo (R$)</label>
+                  <CurrencyInput className="admin-input" value={generalSurcharge} onChange={setGeneralSurcharge} ariaLabel="Acréscimo" />
+                </div>
               </div>
-            )}
-
-            {paymentMethod === 'Dinheiro' && (
-              <div
-                style={{
-                  background: 'rgba(234, 179, 8, 0.12)',
-                  border: '1px solid rgba(234, 179, 8, 0.35)',
-                  borderRadius: '6px',
-                  padding: '10px 12px',
-                  fontSize: '0.82rem',
-                  color: 'var(--external-warning)' ,
-                  lineHeight: 1.45,
-                  marginBottom: '12px',
-                }}
-              >
-                ⚠️ <strong>Recebimento sem caixa:</strong> Esta venda será registrada no sistema e o dinheiro ficará fisicamente na loja até o recolhimento pelo responsável pelo recolhimento.
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label className="admin-label">Desconto (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="admin-input"
-                  value={generalDiscount}
-                  onChange={(e) => setGeneralDiscount(Number(e.target.value))}
-                />
+              <div className="xsale-grid xsale-grid--2">
+                <div>
+                  <label className="admin-label">Garantia (meses)</label>
+                  <input type="number" min="0" max="24" className="admin-input" value={warrantyMonths} onChange={(e) => setWarrantyMonths(Number(e.target.value))} />
+                </div>
+                <div>
+                  <label className="admin-label">Termos da garantia</label>
+                  <input type="text" className="admin-input" value={warrantyTerms} onChange={(e) => setWarrantyTerms(e.target.value)} />
+                </div>
               </div>
               <div>
-                <label className="admin-label">Acréscimo (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="admin-input"
-                  value={generalSurcharge}
-                  onChange={(e) => setGeneralSurcharge(Number(e.target.value))}
-                />
+                <label className="admin-label">Observações</label>
+                <input type="text" className="admin-input" placeholder="Ex.: entregue com película 3D aplicada" value={saleNotes} onChange={(e) => setSaleNotes(e.target.value)} />
               </div>
             </div>
+          </section>
 
-            <div style={{ marginTop: '10px' }}>
-              <label className="admin-label">Garantia (Meses)</label>
-              <input
-                type="number"
-                min="0"
-                max="24"
-                className="admin-input"
-                value={warrantyMonths}
-                onChange={(e) => setWarrantyMonths(Number(e.target.value))}
-              />
-            </div>
-
-            <div style={{ marginTop: '10px' }}>
-              <label className="admin-label">Termos de Garantia</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={warrantyTerms}
-                onChange={(e) => setWarrantyTerms(e.target.value)}
-              />
-            </div>
-
-            <div style={{ marginTop: '10px' }}>
-              <label className="admin-label">Observações da Venda</label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="Ex: Aparelho entregue com película 3D aplicada"
-                value={saleNotes}
-                onChange={(e) => setSaleNotes(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Produtos da Venda */}
-        <div
-          style={{
-            background: 'var(--card, #171e27)',
-            border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-            borderRadius: '10px',
-            padding: '16px',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--ink)' }}>
-              📦 Produtos da Venda
-            </h3>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              style={{ fontSize: '0.82rem' }}
-              onClick={handleAddLine}
-            >
-              ➕ Adicionar Outro Produto
+          <section className="xsale-card xsale-total">
+            <small>Total da venda</small>
+            <strong className="xsale-total__value">{formatMoney(netAmountToPay)}</strong>
+            <span className="xsale-muted">
+              {paymentMethod} {installments > 1 ? `· ${installments}x de ${formatMoney(installmentValue)}` : '· à vista'}
+            </span>
+            {isPrivileged ? (
+              <div className="xsale-profit" title="Visível só para gerente e dono">
+                <span>🔒 Resultado</span>
+                <span>Custo <strong>{formatMoney(totalCost)}</strong></span>
+                <span>Lucro <strong className="xsale-good">{formatMoney(grossProfit)}</strong></span>
+                <span>Margem <strong className="xsale-good">{marginPercent}%</strong></span>
+              </div>
+            ) : null}
+            <button type="submit" className="btn btn--primary xsale-submit" disabled={submitting || loading || !storeId || Boolean(savedSaleId)}>
+              {submitting ? 'Gravando venda…' : '✓ Concluir venda'}
             </button>
-          </div>
-
-          <div className="admin-toolbar">
-            <AdminPicker label="Filtrar produtos por marca" value={brandFilter} options={[{ value: 'all', label: 'Todas as marcas' }, ...brands.map(b => ({ value: b.slug, label: b.name }))]} onChange={setBrandFilter} />
-            <Link to="/erp/marcas">Gerenciar marcas</Link>
-            {brandsError && <p role="alert">{brandsError}</p>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {lines.map((line, idx) => (
-              <div
-                key={idx}
-                className="external-sale-line"
-                style={{
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  display: 'grid',
-                  gap: '10px',
-                  alignItems: 'end',
-                }}
-              >
-                <div className="external-sale-wide-field">
-                  <AdminPicker
-                    label={`Produto #${idx + 1}`}
-                    value={line.stockId || ''}
-                    options={[
-                      { value: '', label: 'Selecione um produto do estoque...' },
-                      ...stockItems.filter(p => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
-                        value: p.id,
-                        label: `${p.name}${p.attrs ? ' · '+Object.values(p.attrs).filter(Boolean).join(' · ') : ''} · R$ ${p.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Disp: ${p.qty})`,
-                      })),
-                    ]}
-                    onChange={(val) => handleLineProductChange(idx, val)}
-                  />
-                </div>
-
-                <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map((entry,i)=>i===idx?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
-                <SaleAttributeFields surface="external" product={stockItems.find(p=>p.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map((entry,i)=>i===idx ? {...entry,attributes} : entry))}/>
-                <div>
-                  <label className="admin-label">Quantidade</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="admin-input"
-                    value={line.qty}
-                    onChange={(e) => handleLineFieldChange(idx, 'qty', Number(e.target.value))}
-                  />
-                </div>
-
-                <div>
-                  <label className="admin-label">Preço de Venda (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="admin-input"
-                    value={line.unitPrice}
-                    onChange={(e) => handleLineFieldChange(idx, 'unitPrice', Number(e.target.value))}
-                  />
-                </div>
-
-                <div>
-                  <label className="admin-label">IMEI (Se aplicável)</label>
-                  <input
-                    type="text"
-                    className="admin-input"
-                    placeholder="3542..."
-                    value={line.imei || ''}
-                    onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <button
-                    type="button"
-                    className="admin-btn admin-btn--icon"
-                    onClick={() => handleRemoveLine(idx)}
-                    title="Remover Item"
-                    style={{ height: '38px', color: 'var(--external-danger)'  }}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Card 4: UPGRADE / TRADE-IN DE APARELHO USADO */}
-        <div
-          style={{
-            background: hasTradeIn ? 'rgba(45, 212, 191, 0.06)' : 'var(--card, #171e27)',
-            border: hasTradeIn
-              ? '1.5px solid var(--accent, #2dd4bf)'
-              : '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-            borderRadius: '10px',
-            padding: '16px',
-            marginBottom: '16px',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>🔄</span>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--ink)' }}>
-                  Upgrade / Troca de Aparelho Usado
-                </h3>
-              </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--mute)' }}>
-                Use na entrega imediata: ao concluir a venda, o aparelho usado entra no estoque.
-                Se o cliente continuar com o usado enquanto aguarda uma encomenda, não finalize a troca nesta tela.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className={hasTradeIn ? 'admin-btn admin-btn--primary' : 'admin-btn admin-btn--secondary'}
-              onClick={() => setHasTradeIn(!hasTradeIn)}
-              style={{ fontSize: '0.84rem' }}
-            >
-              {hasTradeIn ? '✓ Upgrade Ativado' : '+ Adicionar Aparelho Usado (Upgrade)'}
-            </button>
-          </div>
-
-          {hasTradeIn && (
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--line, rgba(148, 163, 184, 0.22))', paddingTop: '16px' }}>
-              <div className="external-sale-trade-fields">
-                <div className="external-sale-wide-field">
-                  <label className="admin-label">Aparelho Entregue pelo Cliente</label>
-                  <input
-                    type="text"
-                    className="admin-input"
-                    placeholder="Ex: iPhone 15 Pro Max Usado"
-                    value={tradeIn.deviceName}
-                    onChange={(e) => setTradeIn({ ...tradeIn, deviceName: e.target.value })}
-                    required={hasTradeIn}
-                  />
-                </div>
-
-                <div className="external-sale-wide-field">
-                  <AdminPicker label="Marca do aparelho recebido" value={tradeIn.brand || ''} options={[{ value: '', label: 'Selecionar marca' }, ...brands.filter(b => b.active).map(b => ({ value: b.slug, label: b.name }))]} onChange={brand => setTradeIn({ ...tradeIn, brand })} />
-                  {tradeLoading && <p role="status">Consultando modelo…</p>}
-                  {tradeError && <p role="status">{tradeError}</p>}
-                  {tradeDevice && <p>Modelo identificado: <strong>{tradeDevice.model}</strong> · <a href={tradeDevice.sourceUrl} target="_blank" rel="noreferrer">Especificações do fabricante</a></p>}
-                </div>
-                <div>
-                  <label className="admin-label">IMEI do Aparelho Entregue</label>
-                  <input
-                    type="text"
-                    className="admin-input"
-                    placeholder="3589..."
-                    value={tradeIn.imei}
-                    onChange={(e) => setTradeIn({ ...tradeIn, imei: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <AdminPicker
-                    label="Capacidade"
-                    value={tradeIn.capacity || ''}
-                    options={tradeDevice ? tradeDevice.capacities : (attributeDefs.find(a=>/capac|armazen/i.test(a.name))?.values ?? []).map(value=>({value,label:value}))}
-                    onChange={(val) => setTradeIn({ ...tradeIn, capacity: val })}
-                  />
-                </div>
-                <div>
-                  {tradeDevice ? <AdminPicker label="Cor" value={tradeIn.color || ''} options={tradeDevice.colors} onChange={color => setTradeIn({ ...tradeIn, color })} /> : <><label className="admin-label" htmlFor="trade-in-color">Cor</label><input id="trade-in-color" className="admin-input" placeholder="Cor do aparelho recebido" value={tradeIn.color || ''} onChange={e => setTradeIn({ ...tradeIn, color: e.target.value })} /></>}
-                </div>
-
-                <div>
-                  <AdminPicker
-                    label="Estado de Conservação"
-                    value={tradeIn.conditionState || 'used'}
-                    options={[
-                      { value: 'used', label: 'Usado - Excelente Estado' },
-                      { value: 'refurbished', label: 'Recondicionado / Marcas de Uso' },
-                      { value: 'damaged', label: 'Avariado / Peças' },
-                    ]}
-                    onChange={(val: any) => setTradeIn({ ...tradeIn, conditionState: val })}
-                  />
-                </div>
-
-                <div>
-                  <label className="admin-label" style={{ color: 'var(--accent, #2dd4bf)', fontWeight: 700 }}>
-                    Oferta acordada pelo usado / crédito (R$)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="admin-input"
-                    style={{ borderColor: 'var(--accent, #2dd4bf)', fontWeight: 700 }}
-                    placeholder="Ex: 4000,00"
-                    value={tradeIn.tradeValue || ''}
-                    onChange={(e) => setTradeIn({ ...tradeIn, tradeValue: Number(e.target.value) })}
-                    required={hasTradeIn}
-                  />
-                  <p className="empty">
-                    Informe a oferta após a avaliação. O preço de um aparelho equivalente no mercado
-                    é uma referência e não define automaticamente o crédito da troca.
-                  </p>
-                </div>
-              </div>
-
-              {/* CARD DE DEMONSTRAÇÃO DO UPGRADE */}
-              <div
-                style={{
-                  marginTop: '16px',
-                  background: 'var(--card-2, #1c2430)',
-                  border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-                  borderRadius: '8px',
-                  padding: '14px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '12px',
-                }}
-              >
-                <div>
-                  <small style={{ color: 'var(--mute)' }}>Valor do Produto Novo:</small>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700 }}>
-                    R$ {grossTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <small style={{ color: 'var(--mute)' }}>Crédito do Aparelho Usado:</small>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent, #2dd4bf)' }}>
-                    - R$ {tradeInCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <small style={{ color: 'var(--mute)' }}>Saldo Efetivo a Pagar:</small>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent, #2dd4bf)' }}>
-                    R$ {netAmountToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Card 5: RESUMO FINANCEIRO, CUSTO, LUCRO E FINALIZAÇÃO */}
-        <div
-          style={{
-            background: 'var(--card, #171e27)',
-            border: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
-            borderRadius: '10px',
-            padding: '16px',
-            marginBottom: '20px',
-          }}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
-                Resumo da Venda
-              </span>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent, #2dd4bf)', marginTop: '2px' }}>
-                R$ {netAmountToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '0.84rem', color: 'var(--mute)', marginTop: '2px' }}>
-                {paymentMethod} {installments > 1 ? `· ${installments}x de ${formatMoney(installmentValue)}` : 'à vista'}
-              </div>
-            </div>
-
-            {/* ÁREA CONFIDENCIAL DE CUSTO E LUCRO (VISÍVEL APENAS PARA PRIVILEGIADOS) */}
-            {isPrivileged && (
-              <div
-                style={{
-                  background: 'rgba(234, 179, 8, 0.08)',
-                  border: '1px solid rgba(234, 179, 8, 0.25)',
-                  borderRadius: '8px',
-                  padding: '10px 14px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '0.9rem' }}>🔒</span>
-                  <strong style={{ fontSize: '0.82rem', color: 'var(--external-warning)'  }}>
-                    Resultado da venda
-                  </strong>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '0.85rem' }}>
-                  <div>
-                    <span style={{ color: 'var(--mute)' }}>Custo:</span>{' '}
-                    <strong>R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--mute)' }}>Lucro:</span>{' '}
-                    <strong style={{ color: 'var(--external-success)'  }}>
-                      R$ {grossProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--mute)' }}>Margem:</span>{' '}
-                    <strong style={{ color: 'var(--external-success)'  }}>{marginPercent}%</strong>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ textAlign: 'right' }}>
-              <button
-                type="submit"
-                className="admin-btn admin-btn--primary"
-                style={{
-                  padding: '14px 28px',
-                  fontSize: '1.05rem',
-                  fontWeight: 700,
-                  width: '100%',
-
-                }}
-                disabled={submitting || loading || !storeId || Boolean(savedSaleId)}
-              >
-                {submitting ? 'Gravando Venda...' : '✓ Concluir Venda Externa'}
-              </button>
-            </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </form>
 
-      {savedSaleId && !createdReceipt && (
-        <div className="admin-card" style={{padding: '16px', marginTop: '16px'}}>
+      {savedSaleId && !createdReceipt ? (
+        <div className="xsale-card xsale-done">
           <p>Venda {savedSaleId} já gravada.</p>
-          <button type="button" className="admin-btn admin-btn--primary" onClick={handleResetForm}>Iniciar nova venda</button>
+          <button type="button" className="btn btn--primary" onClick={handleResetForm}>Iniciar nova venda</button>
         </div>
-      )}
-      {/* Modais */}
+      ) : null}
       {historyOpen ? <ExternalSalesHistory onClose={() => setHistoryOpen(false)} /> : null}
-      {createdReceipt && (
-        <WarrantyReceiptModal
-          receipt={createdReceipt}
-          onClose={() => setCreatedReceipt(null)}
-          onNewSale={handleResetForm}
-        />
-      )}
-
-      {showPickupModal && (
-        <CashPickupModal
-          onClose={() => setShowPickupModal(false)}
-          onSuccess={() => alert('Recolhimento registrado com sucesso no financeiro!')}
-        />
-      )}
-
-      {showPendingModal && (
-        <DailyPendingModal
-          onClose={() => setShowPendingModal(false)}
-          onOpenPickupModal={() => setShowPickupModal(true)}
-        />
-      )}
+      {createdReceipt ? <WarrantyReceiptModal receipt={createdReceipt} onClose={() => setCreatedReceipt(null)} onNewSale={handleResetForm} /> : null}
+      {showPickupModal ? (
+        <CashPickupModal onClose={() => setShowPickupModal(false)} onSuccess={() => alert('Recolhimento registrado com sucesso no financeiro!')} />
+      ) : null}
+      {showPendingModal ? (
+        <DailyPendingModal onClose={() => setShowPendingModal(false)} onOpenPickupModal={() => setShowPickupModal(true)} />
+      ) : null}
     </div>
   );
 }
