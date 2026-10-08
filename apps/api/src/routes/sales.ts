@@ -8,7 +8,8 @@ import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js
 import { pool } from '../db/pool.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
-import { sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
+import { maskDocument, receiptToken, validReceiptToken } from '../services/receiptToken.js';
+import { resolveStoreEvolutionCreds, sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 import { sendMail, escapeHtml } from '../services/emailService.js';
 
 export const salesRouter = Router();
@@ -491,89 +492,132 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
 /* ── 2. Comprovante / Garantia da Venda (SEM CUSTO NEM LUCRO) ─── */
 
+/** Dados do comprovante (sem custo nem lucro). Null quando a venda não existe (nesta loja, se informada). */
+async function buildReceipt(saleId: string, storeId?: string) {
+  const saleRes = await pool.query(
+    `SELECT s.*, st.trade_name AS store_name, st.legal_name AS store_legal_name, st.document AS store_document,
+            st.state_registration AS store_ie, st.phone AS store_phone, st.email AS store_email,
+            st.street AS store_street, st.number AS store_number, st.district AS store_district,
+            st.city AS store_city, st.state AS store_state, st.zip_code AS store_zip
+       FROM sales_orders s
+       JOIN stores st ON st.id = s.store_id
+      WHERE s.id = $1 AND ($2::text IS NULL OR s.store_id = $2)`,
+    [saleId, storeId ?? null],
+  );
+  const s = saleRes.rows[0];
+  if (!s) return null;
+  const linesRes = await pool.query(
+    `SELECT name, qty, unit_price, total_price, imei, attributes FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1`,
+    [saleId],
+  );
+  const tradeInRes = await pool.query(
+    `SELECT device_name, imei, capacity, color, trade_value FROM sale_trade_ins WHERE sale_id = $1`,
+    [saleId],
+  );
+  const paymentRes = await pool.query(
+    `SELECT COALESCE(NULLIF(method_name, ''), method) AS method, amount, installments FROM sale_payments WHERE sale_id = $1 ORDER BY created_at`,
+    [saleId],
+  );
+  const payment = paymentRes.rows[0];
+  const storeAddress = [
+    s.store_street ? `${s.store_street}${s.store_number ? ', ' + s.store_number : ''}` : '',
+    s.store_district || '',
+    s.store_city ? `${s.store_city}${s.store_state ? '/' + s.store_state : ''}` : '',
+    s.store_zip ? `CEP ${s.store_zip}` : '',
+  ].filter(Boolean).join(' · ');
+  return {
+    store: {
+      id: s.store_id,
+      name: s.store_name || '',
+      legalName: s.store_legal_name || '',
+      document: s.store_document || '',
+      stateRegistration: s.store_ie || '',
+      phone: s.store_phone || '',
+      email: s.store_email || '',
+      address: storeAddress,
+      city: s.store_city || '',
+    },
+    sale: {
+      id: s.id,
+      date: s.created_at,
+      status: s.status,
+      seller: s.seller_name || 'Operador',
+      customer: {
+        name: s.customer_name || 'Consumidor Final',
+        document: s.customer_document || '',
+        phone: s.customer_phone || '',
+      },
+      items: linesRes.rows.map((r) => ({
+        name: r.name,
+        qty: Number(r.qty),
+        unitPrice: Number(r.unit_price),
+        totalPrice: Number(r.total_price),
+        imei: r.imei || '',
+        attributes: Array.isArray(r.attributes)
+          ? r.attributes.map((a: { name: string; value: string }) => `${a.name}: ${a.value}`).join(' · ')
+          : '',
+      })),
+      tradeIn: tradeInRes.rows.length > 0 ? {
+        device: tradeInRes.rows[0].device_name,
+        imei: tradeInRes.rows[0].imei,
+        capacity: tradeInRes.rows[0].capacity,
+        color: tradeInRes.rows[0].color,
+        creditValue: Number(tradeInRes.rows[0].trade_value),
+      } : null,
+      financial: {
+        subtotal: Number(s.subtotal || s.total || 0),
+        discount: Number(s.discount || 0),
+        surcharge: Number(s.surcharge || 0),
+        tradeInCredit: Number(s.trade_in_value || 0),
+        totalPaid: Number(s.final_amount || s.total_amount || s.total || 0),
+        paymentMethod: payment?.method || s.payment_name || 'Não informado',
+        installments: Number(payment?.installments || 1),
+      },
+      warranty: {
+        months: s.warranty_months ?? 3,
+        terms: s.warranty_terms || 'Garantia legal de 90 dias balcão cobrindo exclusivamente defeitos de fabricação.',
+      },
+      notes: s.notes || '',
+    },
+    // QR Code do comprovante: abre a versão pública assinada (sem login).
+    verifyToken: receiptToken(s.id),
+  };
+}
+
 salesRouter.get('/api/v1/sales/:id/receipt', requireOrDemoAuth, async (req, res, next) => {
   try {
-    const storeId = req.storeId || 'STR-DEMO-01';
-    const saleId = req.params.id;
-
     if (!pool) {
       res.status(404).json({ success: false, error: { message: 'Venda não encontrada.' } });
       return;
     }
-
-    const saleRes = await pool.query(
-      `SELECT s.*, st.trade_name as store_name, st.phone as store_phone, st.email as store_email, st.city as store_city
-       FROM sales_orders s
-       JOIN stores st ON st.id = s.store_id
-       WHERE s.id = $1 AND s.store_id = $2`,
-      [saleId, storeId],
-    );
-
-    if (saleRes.rows.length === 0) {
+    const receipt = await buildReceipt(req.params.id, req.storeId || 'STR-DEMO-01');
+    if (!receipt) {
       res.status(404).json({ success: false, error: { message: 'Venda não encontrada.' } });
       return;
     }
+    res.json({ success: true, data: receipt });
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const s = saleRes.rows[0];
-
-    const linesRes = await pool.query(
-      `SELECT name, qty, unit_price, total_price, imei FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1`,
-      [saleId],
-    );
-
-    const tradeInRes = await pool.query(
-      `SELECT device_name, imei, capacity, color, trade_value FROM sale_trade_ins WHERE sale_id = $1`,
-      [saleId],
-    );
-
-    // DADOS PURIFICADOS: NUNCA EXIBE CUSTO, LUCRO OU MARGEM
-    const receiptData = {
-      store: {
-        id: storeId,
-        name: s.store_name || '',
-        phone: s.store_phone || '',
-        email: s.store_email || '',
-        city: s.store_city || '',
-      },
-      sale: {
-        id: s.id,
-        date: s.created_at,
-        seller: s.seller_name || 'Operador',
-        customer: {
-          name: s.customer_name || 'Consumidor Final',
-          document: s.customer_document || '',
-          phone: s.customer_phone || '',
-        },
-        items: linesRes.rows.map((r) => ({
-          name: r.name,
-          qty: Number(r.qty),
-          unitPrice: Number(r.unit_price),
-          totalPrice: Number(r.total_price),
-          imei: r.imei || '',
-        })),
-        tradeIn: tradeInRes.rows.length > 0 ? {
-          device: tradeInRes.rows[0].device_name,
-          imei: tradeInRes.rows[0].imei,
-          capacity: tradeInRes.rows[0].capacity,
-          color: tradeInRes.rows[0].color,
-          creditValue: Number(tradeInRes.rows[0].trade_value),
-        } : null,
-        financial: {
-          subtotal: Number(s.subtotal),
-          discount: Number(s.discount),
-          surcharge: Number(s.surcharge),
-          tradeInCredit: Number(s.trade_in_value || 0),
-          totalPaid: Number(s.total_amount),
-          paymentMethod: s.payment_name || 'Cartão de Crédito',
-        },
-        warranty: {
-          months: s.warranty_months ?? 3,
-          terms: s.warranty_terms || 'Garantia legal de 90 dias balcão cobrindo exclusivamente defeitos de fabricação.',
-        },
-      },
-    };
-
-    res.json({ success: true, data: receiptData });
+/** Versão pública do comprovante (aberta pelo QR Code). CPF e telefone do cliente ficam mascarados. */
+salesRouter.get('/api/v1/public/receipts/:id', async (req, res, next) => {
+  try {
+    const token = typeof req.query.t === 'string' ? req.query.t : '';
+    if (!pool || !validReceiptToken(req.params.id, token)) {
+      res.status(404).json({ success: false, error: { message: 'Comprovante não encontrado.' } });
+      return;
+    }
+    const receipt = await buildReceipt(req.params.id);
+    if (!receipt) {
+      res.status(404).json({ success: false, error: { message: 'Comprovante não encontrado.' } });
+      return;
+    }
+    const phoneDigits = receipt.sale.customer.phone.replace(/\D/g, '');
+    receipt.sale.customer.document = maskDocument(receipt.sale.customer.document);
+    receipt.sale.customer.phone = phoneDigits ? `(••) •••••-${phoneDigits.slice(-4)}` : '';
+    res.json({ success: true, data: receipt });
   } catch (error) {
     next(error);
   }
@@ -641,7 +685,7 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
       tradeInSummary,
       ``,
       `💳 *Forma de Pagamento:* ${s.payment_name}`,
-      `💰 *Total Pago:* R$ ${Number(s.total_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      `💰 *Total Pago:* R$ ${Number(s.final_amount || s.total_amount || s.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       ``,
       `🛡️ *GARANTIA DO APARELHO:*`,
       `• Prazo: *${s.warranty_months || 3} meses*`,
@@ -659,9 +703,8 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
     try {
       const cfg = await getStoreWhatsAppConfig(storeId);
       if (!cfg.enabled) throw new Error('WhatsApp desativado nesta loja.');
-      const baseUrl = cfg.baseUrl || '';
-      const instance = cfg.instance || '';
-      const apiKey = cfg.apiKey || '';
+      // Mesmas credenciais do totem: o WhatsApp conectado pela plataforma (servidor Marthi) também vale.
+      const { baseUrl, instance, apiKey } = resolveStoreEvolutionCreds(cfg);
 
       if (!baseUrl || !instance || !apiKey) throw new Error('Configure o Evolution nas Operações desta loja.');
       if (baseUrl && instance && apiKey) {

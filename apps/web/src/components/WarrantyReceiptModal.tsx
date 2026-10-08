@@ -2,6 +2,7 @@ import '../pages/admin/externalSale.css';
 import { useState } from 'react';
 import { nestRequest } from '../services/nestClient';
 import { apiSendWarrantyWhatsApp } from '../services/erpApi';
+import { PrintableReceipt, type SaleReceipt } from './SaleReceiptDocument';
 
 type Props = {
   receipt: any;
@@ -53,10 +54,19 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
     finally {setSending(false);}
   }
   function handlePrint() {
+    // Só o comprovante (estilo nota, com QR Code) vai para o papel, não a janela da tela.
+    document.body.classList.add('is-printing-receipt');
+    const done = () => {
+      document.body.classList.remove('is-printing-receipt');
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
     window.print();
   }
 
   return (
+    <>
+    {receipt ? <PrintableReceipt receipt={receipt as SaleReceipt} /> : null}
     <div className="admin-modal-backdrop external-sale-backdrop" onClick={onClose}>
       <div
         role="dialog" aria-modal="true" aria-label="Comprovante e garantia" className="admin-modal admin-modal--lg external-sale-modal"
@@ -305,5 +315,6 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
         </div>
       </div>
     </div>
+    </>
   );
 }

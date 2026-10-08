@@ -247,3 +247,23 @@ test('variation written as "128GB" matches the attribute value "128 GB" in sale 
   const variations = (await query('SELECT variations FROM stock_items WHERE id=$1', [created.json.data.id])).rows[0].variations;
   assert.equal(Number(variations[0].qty), 1, 'the 128GB variation was deducted');
 });
+test('sale receipt has the store header and a signed QR link; the public page masks customer data', async () => {
+  await query("UPDATE stores SET legal_name='Loja A Ltda', document='12345678000190', street='Rua Um', number='10', city='Três Rios', state='RJ' WHERE id='store-a'");
+  const stock = (await request('/stock', 'POST', { name: 'Capinha nota', qty: 3, cost: 5, price: 50 })).json.data;
+  const sale = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Ramon', customerPhone: '24992259927', customerDocument: '12345678909', lines: [{ stockId: stock.id, name: 'Capinha nota', qty: 1, unitPrice: 50 }] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const id = sale.json.data.id || sale.json.data.saleId;
+  const receipt = (await request('/sales/' + id + '/receipt')).json.data;
+  assert.equal(receipt.store.legalName, 'Loja A Ltda');
+  assert.match(receipt.store.address, /Rua Um, 10/);
+  assert.ok(receipt.verifyToken && receipt.verifyToken.length >= 16);
+  assert.equal(receipt.sale.customer.document, '12345678909', 'the store sees the full document');
+  const open = await fetch(base + '/public/receipts/' + encodeURIComponent(id) + '?t=' + encodeURIComponent(receipt.verifyToken));
+  assert.equal(open.status, 200);
+  const pub = (await open.json()).data;
+  assert.equal(pub.sale.items[0].name, 'Capinha nota');
+  assert.equal(pub.sale.customer.document, '••••••••909');
+  assert.equal(pub.sale.customer.phone, '(••) •••••-9927');
+  assert.equal((await fetch(base + '/public/receipts/' + encodeURIComponent(id) + '?t=forged-token-123456789')).status, 404);
+  assert.equal((await fetch(base + '/public/receipts/' + encodeURIComponent(id))).status, 404);
+});

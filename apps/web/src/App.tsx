@@ -1,5 +1,6 @@
 import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
 import {PickupTrackingPage} from './pages/PickupTrackingPage';
+import { ReceiptPublicPage } from './pages/ReceiptPublicPage';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
@@ -129,6 +130,7 @@ export function App() {
         <TotemKioskGate>
         <Routes>
         <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
+        <Route path="/comprovante/:id" element={<ReceiptPublicPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
