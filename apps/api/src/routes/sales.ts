@@ -9,6 +9,14 @@ import { pool } from '../db/pool.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
 import { maskDocument, receiptToken, validReceiptToken } from '../services/receiptToken.js';
+
+/** Texto da garantia conforme o tipo escolhido na venda. */
+function warrantyLabel(type: string | null | undefined, months: unknown) {
+  if (type === 'manufacturer') return 'Somente garantia do fabricante';
+  if (type === 'none') return 'Sem garantia';
+  const m = Number(months ?? 3);
+  return `Prazo: ${m} ${m === 1 ? 'mês' : 'meses'} (garantia da loja)`;
+}
 import { resolveStoreEvolutionCreds, sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 import { sendMail, escapeHtml } from '../services/emailService.js';
 
@@ -26,8 +34,8 @@ salesRouter.post('/api/v1/sales/:id/send-receipt-email', requireAuth, async (req
     const terms=sale.warranty_terms || 'Garantia legal conforme condições da venda.';
     const items=lines.rows.map(item=>`<tr><td style="padding:8px;color:#20333d">${escapeHtml(item.name)}</td><td style="padding:8px;color:#20333d">${Number(item.qty)}</td><td style="padding:8px;color:#20333d">${money(item.total_price)}</td></tr>`).join('');
     const sent = await sendMail({storeId:req.storeId,to:recipient,subject:`Comprovante de venda — ${sale.store_name}`,
-      text:`${sale.store_name}\nVenda: ${sale.id}\nCliente: ${sale.customer_name || 'Consumidor Final'}\n${lines.rows.map(item=>`${item.name} × ${item.qty}: ${money(item.total_price)}`).join('\n')}\nTotal: ${money(sale.total_amount)}\nGarantia: ${sale.warranty_months ?? 3} meses\n${terms}`,
-      html:`<!doctype html><html><body style="margin:0;background:#f4f7f9;color:#20333d"><table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="600" bgcolor="#ffffff" style="background:#ffffff;color:#20333d;font-family:Arial,sans-serif;padding:24px"><tr><td><h2 style="color:#0f766e">${escapeHtml(sale.store_name)}</h2><p style="color:#20333d">Venda ${escapeHtml(sale.id)} · ${escapeHtml(sale.customer_name || 'Consumidor Final')}</p><table width="100%"><tr><th align="left">Produto</th><th>Quantidade</th><th>Total</th></tr>${items}</table><p style="color:#20333d">Total: <strong>${money(sale.total_amount)}</strong></p><p style="color:#20333d">Garantia: ${Number(sale.warranty_months ?? 3)} meses</p><p style="color:#20333d">${escapeHtml(terms)}</p><p style="color:#64748b">Comprovante não fiscal.</p></td></tr></table></td></tr></table></body></html>`});
+      text:`${sale.store_name}\nVenda: ${sale.id}\nCliente: ${sale.customer_name || 'Consumidor Final'}\n${lines.rows.map(item=>`${item.name} × ${item.qty}: ${money(item.total_price)}`).join('\n')}\nTotal: ${money(sale.total_amount)}\nGarantia: ${warrantyLabel(sale.warranty_type, sale.warranty_months)}\n${terms}`,
+      html:`<!doctype html><html><body style="margin:0;background:#f4f7f9;color:#20333d"><table role="presentation" width="100%"><tr><td align="center"><table role="presentation" width="600" bgcolor="#ffffff" style="background:#ffffff;color:#20333d;font-family:Arial,sans-serif;padding:24px"><tr><td><h2 style="color:#0f766e">${escapeHtml(sale.store_name)}</h2><p style="color:#20333d">Venda ${escapeHtml(sale.id)} · ${escapeHtml(sale.customer_name || 'Consumidor Final')}</p><table width="100%"><tr><th align="left">Produto</th><th>Quantidade</th><th>Total</th></tr>${items}</table><p style="color:#20333d">Total: <strong>${money(sale.total_amount)}</strong></p><p style="color:#20333d">Garantia: ${escapeHtml(warrantyLabel(sale.warranty_type, sale.warranty_months))}</p><p style="color:#20333d">${escapeHtml(terms)}</p><p style="color:#64748b">Comprovante não fiscal.</p></td></tr></table></td></tr></table></body></html>`});
     res.json({success:true,data:{accepted:sent.success,messageId:sent.messageId}});
   } catch(error) {next(error);}
 });
@@ -75,6 +83,8 @@ const externalSaleSchema = z.object({
   surcharge: z.coerce.number().min(0).default(0),
   notes: z.string().default(''),
   warrantyMonths: z.coerce.number().int().min(0).default(3),
+  /** Da loja (com prazo), somente do fabricante ou sem garantia. */
+  warrantyType: z.enum(['store', 'manufacturer', 'none']).default('store'),
   warrantyTerms: z.string().default('Garantia legal de 90 dias balcão cobrindo defeitos de fabricação. Não cobre quedas ou umidade.'),
   lines: z.array(saleLineSchema).min(1, 'Informe ao menos um produto para a venda.'),
   tradeIn: tradeInSchema.optional().nullable(),
@@ -230,6 +240,10 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           body.warrantyMonths,
           body.notes,
         ],
+      );
+      await client.query(
+        "UPDATE sales_orders SET warranty_type = $2, warranty_months = CASE WHEN $2 = 'store' THEN warranty_months ELSE 0 END WHERE id = $1",
+        [orderId, body.warrantyType],
       );
 
       // 3. Inserir itens da venda e dar BAIXA NO ESTOQUE
@@ -574,7 +588,8 @@ async function buildReceipt(saleId: string, storeId?: string) {
         installments: Number(payment?.installments || 1),
       },
       warranty: {
-        months: s.warranty_months ?? 3,
+        type: (s.warranty_type || 'store') as 'store' | 'manufacturer' | 'none',
+        months: s.warranty_type && s.warranty_type !== 'store' ? 0 : (s.warranty_months ?? 3),
         terms: s.warranty_terms || 'Garantia legal de 90 dias balcão cobrindo exclusivamente defeitos de fabricação.',
       },
       notes: s.notes || '',
@@ -688,7 +703,7 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
       `💰 *Total Pago:* R$ ${Number(s.final_amount || s.total_amount || s.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       ``,
       `🛡️ *GARANTIA DO APARELHO:*`,
-      `• Prazo: *${s.warranty_months || 3} meses*`,
+      `• ${warrantyLabel(s.warranty_type, s.warranty_months)}`,
       `• Termos: ${s.warranty_terms || 'Garantia balcão para defeitos técnicos de fabricação. Não cobre quedas, quebras, contato com líquidos ou violação de lacres.'}`,
       ``,
       `───────────────────────────────`,

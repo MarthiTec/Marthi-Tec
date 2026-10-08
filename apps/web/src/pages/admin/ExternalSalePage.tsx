@@ -24,6 +24,14 @@ import { WarrantyReceiptModal } from '../../components/WarrantyReceiptModal';
 import { CashPickupModal } from '../../components/CashPickupModal';
 import { DailyPendingModal } from '../../components/DailyPendingModal';
 
+type WarrantyType = 'store' | 'manufacturer' | 'none';
+/** Texto padrão de cada tipo de garantia (o vendedor pode editar na venda). */
+const WARRANTY_TERMS: Record<WarrantyType, string> = {
+  store: 'Garantia legal de 90 dias balcão para defeitos de fabricação. Não cobre choques físicos, quedas ou umidade.',
+  manufacturer: 'Garantia somente do fabricante, conforme o manual e a assistência técnica autorizada da marca. A loja não oferece garantia adicional.',
+  none: 'Produto vendido sem garantia.',
+};
+
 type StockOption = {
   pickupPrices?:Record<string,number|null>;
   /** Grade de variações (preço e retirada por cor/capacidade). */
@@ -129,10 +137,9 @@ export function ExternalSalePage() {
   // Forma de Pagamento e Parcelas
   const [paymentMethod, setPaymentMethod] = useState('Cartão de Crédito');
   const [installments, setInstallments] = useState(1);
+  const [warrantyType, setWarrantyType] = useState<WarrantyType>('store');
   const [warrantyMonths, setWarrantyMonths] = useState(3);
-  const [warrantyTerms, setWarrantyTerms] = useState(
-    'Garantia legal de 90 dias balcão para defeitos de fabricação. Não cobre choques físicos, quedas ou umidade.',
-  );
+  const [warrantyTerms, setWarrantyTerms] = useState(WARRANTY_TERMS.store);
   const [saleNotes, setSaleNotes] = useState('');
 
   // Modais de Sucesso, Recolhimento e Pendências
@@ -336,7 +343,8 @@ export function ExternalSalePage() {
         discount: Number(generalDiscount) || 0,
         surcharge: Number(generalSurcharge) || 0,
         notes: saleNotes.trim(),
-        warrantyMonths: Number(warrantyMonths),
+        warrantyType,
+        warrantyMonths: warrantyType === 'store' ? Number(warrantyMonths) : 0,
         warrantyTerms: warrantyTerms.trim(),
         lines: lines.map((l) => ({
           stockId: l.stockId || null,
@@ -666,15 +674,32 @@ export function ExternalSalePage() {
                   <CurrencyInput className="admin-input" value={generalSurcharge} onChange={setGeneralSurcharge} ariaLabel="Acréscimo" />
                 </div>
               </div>
-              <div className="xsale-grid xsale-grid--2">
-                <div>
-                  <label className="admin-label">Garantia (meses)</label>
-                  <input type="number" min="0" max="24" className="admin-input" value={warrantyMonths} onChange={(e) => setWarrantyMonths(Number(e.target.value))} />
-                </div>
-                <div>
-                  <label className="admin-label">Termos da garantia</label>
-                  <input type="text" className="admin-input" value={warrantyTerms} onChange={(e) => setWarrantyTerms(e.target.value)} />
-                </div>
+              <div className={warrantyType === 'store' ? 'xsale-grid xsale-grid--2' : 'xsale-stack'}>
+                <AdminPicker
+                  label="Garantia"
+                  value={warrantyType}
+                  options={[
+                    { value: 'store', label: 'Garantia da loja' },
+                    { value: 'manufacturer', label: 'Somente do fabricante' },
+                    { value: 'none', label: 'Sem garantia' },
+                  ]}
+                  onChange={(value) => {
+                    const next = value as WarrantyType;
+                    // Troca o texto padrão junto, a menos que o vendedor já tenha escrito o dele.
+                    if (Object.values(WARRANTY_TERMS).includes(warrantyTerms) || !warrantyTerms.trim()) setWarrantyTerms(WARRANTY_TERMS[next]);
+                    setWarrantyType(next);
+                  }}
+                />
+                {warrantyType === 'store' ? (
+                  <div>
+                    <label className="admin-label">Prazo (meses)</label>
+                    <input type="number" min="1" max="24" className="admin-input" value={warrantyMonths} onChange={(e) => setWarrantyMonths(Number(e.target.value))} />
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <label className="admin-label">Termos da garantia</label>
+                <input type="text" className="admin-input" value={warrantyTerms} onChange={(e) => setWarrantyTerms(e.target.value)} />
               </div>
               <div>
                 <label className="admin-label">Observações</label>

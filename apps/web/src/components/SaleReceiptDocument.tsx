@@ -14,7 +14,7 @@ export type SaleReceipt = {
     items: Array<{ name: string; qty: number; unitPrice: number; totalPrice: number; imei?: string; attributes?: string }>;
     tradeIn: null | { device: string; imei?: string; capacity?: string; color?: string; creditValue: number };
     financial: { subtotal: number; discount: number; surcharge: number; tradeInCredit: number; totalPaid: number; paymentMethod: string; installments?: number };
-    warranty: { months: number; terms: string };
+    warranty: { type?: 'store' | 'manufacturer' | 'none'; months: number; terms: string };
     notes?: string;
   };
   verifyToken?: string;
@@ -45,7 +45,17 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
   const verifyUrl = receiptVerifyUrl(receipt);
   const issued = new Date(sale.date);
   const cancelled = sale.status === 'cancelled';
-  const warrantyUntil = sale.warranty.months > 0 ? addMonths(sale.date, sale.warranty.months) : '';
+  const warrantyType = sale.warranty.type ?? 'store';
+  const warrantyUntil = warrantyType === 'store' && sale.warranty.months > 0 ? addMonths(sale.date, sale.warranty.months) : '';
+  const warrantyTitle = warrantyType === 'none' ? 'Garantia' : 'Certificado de garantia';
+  const warrantyText =
+    warrantyType === 'manufacturer'
+      ? 'Somente garantia do fabricante'
+      : warrantyType === 'none'
+        ? 'Sem garantia'
+        : sale.warranty.months > 0
+          ? `Garantia da loja: ${sale.warranty.months} ${sale.warranty.months === 1 ? 'mês' : 'meses'}${warrantyUntil ? ` · válida até ${warrantyUntil}` : ''}`
+          : 'Sem garantia da loja';
   const subtotal = f.subtotal || sale.items.reduce((sum, item) => sum + item.totalPrice, 0);
 
   return (
@@ -130,8 +140,8 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
 
       <section className="sale-receipt__box sale-receipt__warranty">
         <div className="sale-receipt__row">
-          <small>Certificado de garantia</small>
-          <strong>{sale.warranty.months > 0 ? `${sale.warranty.months} ${sale.warranty.months === 1 ? 'mês' : 'meses'}${warrantyUntil ? ` · válida até ${warrantyUntil}` : ''}` : 'Sem garantia da loja'}</strong>
+          <small>{warrantyTitle}</small>
+          <strong>{warrantyText}</strong>
         </div>
         <p>{sale.warranty.terms}</p>
         {sale.notes ? <p><strong>Observações:</strong> {sale.notes}</p> : null}

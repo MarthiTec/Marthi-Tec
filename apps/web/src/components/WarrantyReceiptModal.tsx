@@ -222,7 +222,11 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
               <span style={{ fontSize: '1.1rem' }}>🛡️</span>
               <strong style={{ fontSize: '0.92rem' }}>Certificado & Termo de Garantia</strong>
               <span className="admin-badge admin-badge--active" style={{ marginLeft: 'auto' }}>
-                {sale?.warranty?.months || 3} Meses
+                {sale?.warranty?.type === 'manufacturer'
+                  ? 'Só do fabricante'
+                  : sale?.warranty?.type === 'none'
+                    ? 'Sem garantia'
+                    : `${sale?.warranty?.months ?? 3} ${Number(sale?.warranty?.months ?? 3) === 1 ? 'mês' : 'meses'}`}
               </span>
             </div>
             <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--mute)', lineHeight: 1.5 }}>

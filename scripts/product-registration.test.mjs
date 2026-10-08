@@ -267,3 +267,19 @@ test('sale receipt has the store header and a signed QR link; the public page ma
   assert.equal((await fetch(base + '/public/receipts/' + encodeURIComponent(id) + '?t=forged-token-123456789')).status, 404);
   assert.equal((await fetch(base + '/public/receipts/' + encodeURIComponent(id))).status, 404);
 });
+test('sale can have store warranty, manufacturer-only warranty or no warranty', async () => {
+  const stock = (await request('/stock', 'POST', { name: 'Fone garantia', qty: 5, cost: 5, price: 80 })).json.data;
+  const sell = (extra) => request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: stock.id, name: 'Fone garantia', qty: 1, unitPrice: 80 }], ...extra });
+  const cases = [
+    [{ warrantyType: 'manufacturer', warrantyMonths: 6 }, 'manufacturer', 0],
+    [{ warrantyType: 'none' }, 'none', 0],
+    [{ warrantyMonths: 6 }, 'store', 6],
+  ];
+  for (const [extra, type, months] of cases) {
+    const sale = await sell(extra);
+    assert.equal(sale.status, 201, JSON.stringify(sale.json));
+    const receipt = (await request('/sales/' + (sale.json.data.id || sale.json.data.saleId) + '/receipt')).json.data;
+    assert.equal(receipt.sale.warranty.type, type);
+    assert.equal(receipt.sale.warranty.months, months);
+  }
+});
