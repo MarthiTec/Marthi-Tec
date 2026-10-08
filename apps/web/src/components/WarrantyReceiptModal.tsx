@@ -7,9 +7,11 @@ type Props = {
   receipt: any;
   onClose: () => void;
   onNewSale: () => void;
+  /** Reabrindo uma venda antiga (consulta de vendas): muda o título e esconde "Nova Venda". */
+  reprint?: boolean;
 };
 
-export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
+export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = false }: Props) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState(receipt?.sale?.customer?.phone || '');
   const [sending, setSending] = useState(false);
@@ -66,7 +68,7 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '1.4rem' }}>✅</span>
               <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
-                Venda Finalizada com Sucesso!
+                {reprint ? 'Comprovante da venda' : 'Venda Finalizada com Sucesso!'}
               </h3>
             </div>
             <small style={{ color: 'var(--mute, #94a3b8)', marginLeft: '32px' }}>{store?.name || ''}</small>
@@ -287,16 +289,18 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale }: Props) {
             <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>
               Fechar
             </button>
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary"
-              onClick={() => {
-                onClose();
-                onNewSale();
-              }}
-            >
-              ➕ Nova Venda
-            </button>
+            {reprint ? null : (
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                onClick={() => {
+                  onClose();
+                  onNewSale();
+                }}
+              >
+                ➕ Nova Venda
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -2127,6 +2127,27 @@ export function apiCreateExternalSale(body: ExternalSalePayload, storeId?: strin
   return nestRequest<any>('/sales/external', { method: 'POST', body: JSON.stringify(body), headers: storeId ? { 'x-store-id': storeId } : undefined });
 }
 
+export type ApiExternalSaleSummary = {
+  id: string;
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  customerDocument: string;
+  sellerName: string;
+  amount: number;
+  status: string;
+  cancelReason: string;
+  items: string;
+  payment: string;
+};
+
+/** Vendas externas já feitas no período (padrão: últimos 30 dias). */
+export function apiListExternalSales(params: { from?: string; to?: string; search?: string; status?: 'all' | 'completed' | 'cancelled' }) {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value) qs.set(key, value);
+  return nestGet<ApiExternalSaleSummary[]>(`/sales/external${qs.size ? `?${qs}` : ''}`);
+}
+
 export function apiGetSaleReceipt(saleId: string, storeId?: string) {
   return nestRequest<any>(`/sales/${saleId}/receipt`, { headers: storeId ? { 'x-store-id': storeId } : undefined });
 }

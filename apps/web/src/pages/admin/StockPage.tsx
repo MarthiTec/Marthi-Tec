@@ -2,12 +2,15 @@ import {productSku} from '../../data/productSku';
 import {ProductTotemPreview} from '../../components/ProductTotemPreview';
 import {ProductDayOffers} from '../../components/ProductDayOffers';
 import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
-import {ProductPickupPrices} from '../../components/PickupFields';
+import {ProductPickupPrices,PickupPriceList,offeredPickupIds} from '../../components/PickupFields';
+import { QuickModal } from '../../components/QuickModal';
 import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { nestRequest } from '../../services/nestClient';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { QuickAddButton } from '../../components/QuickModal';
+import { QuickCreateAttribute, QuickCreateBrand, QuickCreateSupplier } from '../../components/QuickCreate';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -144,6 +147,8 @@ export function StockPage() {
   const [originalVariationIds, setOriginalVariationIds] = useState<string[]>([]);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
   const {methods:pickupMethods}=usePickupMethods();
+  // Preço por retirada de uma linha da grade de variações (janela rápida).
+  const [pickupEdit, setPickupEdit] = useState<{ index: number; prices: Record<string, number | null>; base: number } | null>(null);
   const saveInProgress = useRef(false);
   const [saving, setSaving] = useState(false);
   const generatedModel=useRef('');
@@ -178,7 +183,11 @@ export function StockPage() {
 
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
-  const suppliers = useMemo(() => listSuppliers(true), []);
+  // Cadastro rápido sem sair do produto: fornecedor, marca e atributo.
+  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute'>(null);
+  const [supplierVersion, setSupplierVersion] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const suppliers = useMemo(() => listSuppliers(true), [supplierVersion]);
   const readOnly = mode === 'view';
 
 
@@ -1388,8 +1397,26 @@ export function StockPage() {
                 </label>
                 <div className="stock-brand-field">
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
-                <p className="empty"><Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Cadastrar ou gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={totemSurface ? '/painel/totem/marcas' : '/erp/marcas'}>Gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
                 </div>
+                {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
+                {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
+                {quickCreate === 'attribute' ? <QuickCreateAttribute onClose={() => setQuickCreate(null)} onCreated={() => undefined} /> : null}
+                {pickupEdit ? (
+                  <QuickModal
+                    title="Preço por tipo de retirada"
+                    subtitle="Marque onde esta variação é vendida e o preço de cada forma (ex.: encomenda mais em conta)."
+                    submitLabel="Aplicar"
+                    onClose={() => setPickupEdit(null)}
+                    onSubmit={() => {
+                      const edit = pickupEdit;
+                      setVariations((current) => current.map((r, i) => (i === edit.index ? { ...r, pickupMethodId: '', pickupPrices: edit.prices } : r)));
+                      setPickupEdit(null);
+                    }}
+                  >
+                    <PickupPriceList methods={pickupMethods} value={pickupEdit.prices} basePrice={pickupEdit.base} onChange={(prices) => setPickupEdit((current) => (current ? { ...current, prices } : current))} />
+                  </QuickModal>
+                ) : null}
                 <label>
                   SKU
                   <input
@@ -1516,6 +1543,7 @@ export function StockPage() {
                 </div>
                 {!readOnly ? (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <QuickAddButton label="Novo atributo" onClick={() => setQuickCreate('attribute')} />
                     <button
                       type="button"
                       className="btn btn--outline btn--sm"
@@ -1639,7 +1667,7 @@ export function StockPage() {
                                 </td>
                               );
                             })}
-                            <td data-label="Retirada"><AdminPicker compact label="Tipo de retirada" value={row.pickupMethodId||''} disabled={readOnly} options={[{value:'',label:'Preço padrão'},...pickupMethods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={id=>setVariations(current=>current.map((r,i)=>i===index?{...r,pickupMethodId:id}:r))}/></td>
+                            <td data-label="Retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title="Definir onde esta variação é vendida e o preço de cada forma" onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}>{names.length?names.join(' · '):'Nenhuma'} <span aria-hidden>✎</span></button>;})()}</td>
                             <td data-label="Custo unitário"><CurrencyInput ariaLabel="Custo unitário da variação" value={row.cost} disabled={readOnly} onChange={value=>updateVariationRow(index,'cost',value)}/></td>
                             <td data-label="Preço à vista">
                               <CurrencyInput
@@ -1736,6 +1764,11 @@ export function StockPage() {
                   <Link to={totemSurface ? '/painel/totem/atributos' : '/erp/atributos'}>Atributos</Link>
                   .
                 </p>
+                {!readOnly ? (
+                  <p className="quick-field__actions" style={{ margin: '0 0 10px' }}>
+                    <QuickAddButton label="Novo atributo" onClick={() => setQuickCreate('attribute')} />
+                  </p>
+                ) : null}
                 <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
                   {visibleAttrs.length === 0 ? (
                     <p className="empty span-2">Nenhum atributo ativo para estoque.</p>
@@ -1865,6 +1898,11 @@ export function StockPage() {
                   options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
                   onChange={(value) => setForm({ ...form, supplierId: value })}
                 />
+                {!readOnly ? (
+                  <div className="quick-field__actions span-2">
+                    <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} />
+                  </div>
+                ) : null}
                 <AdminPicker
                   label="Classificação fiscal"
                   value={form.fiscalClassificationId ?? ''}

@@ -1,7 +1,9 @@
 import {useEffect,useState} from 'react';
 import {nestRequest} from '../services/nestClient';
 import {AdminPicker} from './AdminPicker';
-import {usePickupMethods,type DeliveryAddress} from '../data/pickup';
+import {usePickupMethods,type DeliveryAddress,type PickupMethod} from '../data/pickup';
+import {CurrencyInput} from './CurrencyInput';
+import './pickupPriceList.css';
 export function PickupFields({product,methodId,address,onChange,publicMode=false}:{product?:{id?:string;pickupPrices?:Record<string,number|null>;price?:number;allowedPickupMethodIds?:string[]};methodId?:string;address?:DeliveryAddress;onChange:(methodId:string,address?:DeliveryAddress,price?:number)=>void;publicMode?:boolean}){
  const {methods,error}=usePickupMethods(publicMode);
  const prices=product?.pickupPrices??{};const available=methods.filter(m=>m.active&&(product?.allowedPickupMethodIds?product.allowedPickupMethodIds.includes(m.id):Object.keys(prices).length?Object.hasOwn(prices,m.id)&&prices[m.id]!==null:m.kind==='immediate'));const method=available.find(m=>m.id===methodId);
@@ -15,6 +17,42 @@ export function PickupFields({product,methodId,address,onChange,publicMode=false
  </div>;
 }
 
-export function ProductPickupPrices({value={},basePrice,disabled,onChange}:{value?:Record<string,number|null>;basePrice:number;disabled:boolean;onChange:(prices:Record<string,number|null>)=>void}){
- const {methods,error}=usePickupMethods();const [methodId,setMethodId]=useState('');return <div className="pickup-fields"><AdminPicker label="Tipo de retirada para definir preço" value={methodId} disabled={disabled} options={[{value:'',label:'Selecione a modalidade'},...methods.filter(m=>m.active).map(m=>({value:m.id,label:m.name}))]} onChange={setMethodId}/>{methodId&&<label>Preço da modalidade<input type="number" min={0} step="0.01" disabled={disabled} value={value[methodId]??basePrice} onChange={e=>onChange({...value,[methodId]:Number(e.target.value)})}/></label>}{error&&<p role="alert">{error}</p>}</div>;
+/** Modalidades oferecidas pelo preço: mapa vazio = só pronta entrega pelo preço base. */
+export function offeredPickupIds(methods:PickupMethod[],value:Record<string,number|null>={}){
+ const keys=Object.keys(value);
+ return methods.filter(m=>m.active&&(keys.length?Object.hasOwn(value,m.id)&&value[m.id]!==null:m.kind==='immediate')).map(m=>m.id);
 }
+const KIND_LABEL:Record<PickupMethod['kind'],string>={immediate:'Pronta entrega',order:'Encomenda',delivery:'Entrega'};
+
+/**
+ * Preço por tipo de retirada: todas as modalidades ativas da loja numa lista, cada uma com
+ * "oferece" e o próprio preço (encomenda costuma sair mais em conta que pronta entrega).
+ */
+export function PickupPriceList({methods,value={},basePrice,disabled,onChange}:{methods:PickupMethod[];value?:Record<string,number|null>;basePrice:number;disabled?:boolean;onChange:(prices:Record<string,number|null>)=>void}){
+ const active=methods.filter(m=>m.active);
+ const offered=new Set(offeredPickupIds(active,value));
+ // Mapa vazio vira explícito ao editar, para a pronta entrega não sumir quando outra modalidade é ligada.
+ const materialize=()=>Object.keys(value).length?{...value}:Object.fromEntries(active.filter(m=>m.kind==='immediate').map(m=>[m.id,basePrice])) as Record<string,number|null>;
+ function toggle(method:PickupMethod,on:boolean){
+  const next=materialize();
+  if(on) next[method.id]=value[method.id]??basePrice;
+  else delete next[method.id];
+  onChange(Object.keys(next).length?next:{[method.id]:null});
+ }
+ function setPrice(method:PickupMethod,price:number){const next=materialize();next[method.id]=price;onChange(next);}
+ if(!active.length)return <p className="empty">Nenhuma modalidade de retirada ativa. Cadastre em Configurações › Tipos de retirada.</p>;
+ return <div className="pickup-price-list">
+  {active.map(method=>{const on=offered.has(method.id);return <div key={method.id} className={`pickup-price-list__row${on?' is-on':''}`}>
+   <label className="pickup-price-list__toggle"><input type="checkbox" checked={on} disabled={disabled} onChange={e=>toggle(method,e.target.checked)}/><span><strong>{method.name}</strong><small>{KIND_LABEL[method.kind]}</small></span></label>
+   <CurrencyInput ariaLabel={`Preço ${method.name}`} value={on?Number(value[method.id]??basePrice):0} disabled={disabled||!on} onChange={price=>setPrice(method,price)}/>
+  </div>;})}
+  <small className="pickup-price-list__hint">Marque onde o produto pode ser vendido e o preço de cada forma. Sem marcar nada, vale só a pronta entrega pelo preço base.</small>
+ </div>;
+}
+
+/** Preço por retirada no nível do produto (sem variações). */
+export function ProductPickupPrices({value={},basePrice,disabled,onChange}:{value?:Record<string,number|null>;basePrice:number;disabled:boolean;onChange:(prices:Record<string,number|null>)=>void}){
+ const {methods,error}=usePickupMethods();
+ return <div className="pickup-fields span-2"><p className="pickup-price-list__title">Preço por tipo de retirada</p><PickupPriceList methods={methods} value={value} basePrice={basePrice} disabled={disabled} onChange={onChange}/>{error&&<p role="alert">{error}</p>}</div>;
+}
+

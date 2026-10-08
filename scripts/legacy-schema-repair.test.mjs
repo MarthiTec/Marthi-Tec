@@ -74,3 +74,22 @@ test('external sale fills the legacy amount/payment columns from the current one
   assert.equal(Number(row.amount), Number(row.final_amount));
   assert.ok(row.payment, 'payment copied from payment_name');
 });
+
+test('external sales can be listed, searched and are scoped to the store', async () => {
+  const methods = (await request('/pickup-methods')).json.data;
+  const immediate = methods.find((m) => m.kind === 'immediate');
+  const stock = (await request('/stock', 'POST', { name: 'CAPINHA', kind: 'part', qty: 5, price: 50 })).json.data;
+  const sale = await request('/sales/external', 'POST', { customerName: 'Ana Paula', customerPhone: '24999990000', lines: [{ stockId: stock.id, name: 'CAPINHA', qty: 2, unitPrice: 50, pickupMethodId: immediate.id }], paymentMethod: 'Cartão de Crédito', installments: 18 });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const list = await request('/sales/external');
+  assert.equal(list.status, 200, JSON.stringify(list.json));
+  const row = list.json.data.find((item) => item.id === sale.json.data.id);
+  assert.ok(row, 'new sale is listed');
+  assert.match(row.items, /2x CAPINHA/);
+  assert.match(row.payment, /18x/);
+  assert.equal((await request('/sales/external?search=ana')).json.data.some((item) => item.id === row.id), true);
+  assert.equal((await request('/sales/external?search=99990000')).json.data.some((item) => item.id === row.id), true);
+  assert.equal((await request('/sales/external?search=ninguem')).json.data.length, 0);
+  const receipt = await request(`/sales/${row.id}/receipt`);
+  assert.equal(receipt.status, 200, 'receipt available for reprint');
+});

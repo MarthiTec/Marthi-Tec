@@ -6876,3 +6876,69 @@ select.caixa-mov-input {
   line-height: 1.55;
   resize: vertical;
 }
+
+/* ── Topo do painel: logo + botão do painel lateral (antes ficavam na lateral) ── */
+.admin__top-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.admin__top-mark {
+  width: 34px;
+  height: 34px;
+}
+.admin__sidebar-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  color: var(--ink, #12151a);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.admin__sidebar-toggle:hover {
+  border-color: var(--teal, #0f766e);
+  background: color-mix(in srgb, var(--teal, #0f766e) 10%, var(--card, #fff));
+}
+.admin__sidebar-toggle .admin-ico {
+  width: 20px;
+  height: 20px;
+}
+.admin.admin--dark .admin__sidebar-toggle,
+.admin.admin--dark .panel-apps__btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eef4;
+}
+.admin.admin--dark .panel-apps__popover {
+  background: #1c2430;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.admin.admin--dark .panel-apps__item {
+  color: #e8eef4;
+}
+.admin.admin--dark .panel-apps__item:hover,
+.admin.admin--dark .panel-apps__item.is-current {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+/* No computador a logo e o botão moram no topo; a lateral começa direto nos módulos. */
+@media (min-width: 961px) {
+  .admin__sidebar .admin__brand {
+    display: none;
+  }
+  .admin__sidebar {
+    padding-top: 10px;
+  }
+}
+/* No celular o menu abre pelo botão de três linhas; o botão do painel lateral some. */
+@media (max-width: 960px) {
+  .admin__sidebar-toggle,
+  .admin__top-mark {
+    display: none;
+  }
+}

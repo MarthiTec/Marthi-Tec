@@ -4,6 +4,7 @@ import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
+import { PanelAppsMenu } from '../../components/PanelAppsMenu';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
@@ -259,7 +260,7 @@ export function AdminLayout() {
               }
             }}
           >
-            <AdminIcon name={collapsed ? 'expand' : 'collapse'} />
+            <AdminIcon name="sidebar" />
           </button>
         </div>
 
@@ -268,6 +269,8 @@ export function AdminLayout() {
         <nav className="admin__nav" aria-label="Módulos da Retaguarda">
           {ADMIN_NAV
             .filter((group) => {
+              // Painel, Usuários, Operações, Lojas e Log-out ficam no menu de grade do topo.
+              if (group.id === 'home') return false;
               if (group.id === 'cardapio' && !storeCustom.showCardapioDigital) {
                 return false;
               }
@@ -350,61 +353,23 @@ export function AdminLayout() {
           })}
         </nav>
 
-        <div className="admin__sidebar-foot">
-          {isAdmin ? (
-            <NavLink
-              to="/painel/usuarios"
-              title="Usuários & Acessos"
-              onClick={closeMobileMenu}
-              className={({ isActive }) =>
-                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
-              }
-            >
-              <AdminIcon name="people" />
-              <span className="admin__link-label">Usuários</span>
-            </NavLink>
-          ) : null}
-          {isAdmin ? (
-            <NavLink
-              to="/painel/operacoes"
-              title="Operações"
-              onClick={closeMobileMenu}
-              className={({ isActive }) =>
-                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
-              }
-            >
-              <AdminIcon name="ops" />
-              <span className="admin__link-label">Operações</span>
-            </NavLink>
-          ) : null}
-          {isAdmin ? (
-            <NavLink
-              to="/painel/lojas"
-              title="Lojas & Licenças"
-              onClick={closeMobileMenu}
-              className={({ isActive }) =>
-                `admin__link admin__link--foot-accent ${isActive ? 'is-active' : ''}`
-              }
-            >
-              <AdminIcon name="store" />
-              <span className="admin__link-label">Lojas &amp; Licenças</span>
-            </NavLink>
-          ) : null}
-
-          <button
-            type="button"
-            className="admin__logout"
-            onClick={() => setLogoutOpen(true)}
-            title="Encerrar sessão Marthi"
-          >
-            <AdminIcon name="logout" />
-            <span className="admin__link-label">Log-out</span>
-          </button>
-        </div>
       </aside>
 
       <div className="admin__workspace">
         <header className="admin__top">
+          <div className="admin__top-brand">
+            <BrandLogo variant="mark" className="admin__top-mark" />
+            <button
+              type="button"
+              className="admin__sidebar-toggle"
+              aria-label={collapsed ? 'Expandir painel lateral' : 'Recolher painel lateral'}
+              title={collapsed ? 'Expandir painel lateral' : 'Recolher painel lateral'}
+              aria-pressed={!collapsed}
+              onClick={() => setSidebarCollapsed(!collapsed)}
+            >
+              <AdminIcon name="sidebar" />
+            </button>
+          </div>
           <button
             type="button"
             className="admin__burger-btn admin__burger-btn--top"
@@ -426,6 +391,7 @@ export function AdminLayout() {
             <h1>{page.title}</h1>
           </div>
           <div id="panel-page-actions" className="admin__heading-actions" />
+          <PanelAppsMenu isAdmin={isAdmin} onLogout={() => setLogoutOpen(true)} />
           <StoreSwitcher />
         </header>
 

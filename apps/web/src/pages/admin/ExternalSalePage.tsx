@@ -24,6 +24,8 @@ import { DailyPendingModal } from '../../components/DailyPendingModal';
 
 type StockOption = {
   pickupPrices?:Record<string,number|null>;
+  /** Grade de variações (preço e retirada por cor/capacidade). */
+  variations?: StockVariationRow[];
   attrs?: Record<string,unknown>; color?: string; capacity?: string;
   brand: string;
   id: string;
@@ -34,6 +36,17 @@ type StockOption = {
   imei: string;
   category: string;
 };
+
+import { QuickAddButton } from '../../components/QuickModal';
+import { QuickCreateCustomer } from '../../components/QuickCreate';
+import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
+
+import { selectProductVariation } from '../../data/productPickup';
+import type { StockItem, StockVariationRow } from '../../data/adminStore';
+
+/** Cartão de crédito: até 18 parcelas, como no totem. */
+const MAX_CARD_INSTALLMENTS = 18;
+const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export function ExternalSalePage() {
   const { user } = useAuth();
@@ -63,6 +76,8 @@ export function ExternalSalePage() {
 
   // Cliente
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [customerName, setCustomerName] = useState('Consumidor Final');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerDocument, setCustomerDocument] = useState('');
@@ -154,6 +169,7 @@ export function ExternalSalePage() {
           brand: it.brand || '',
           pickupPrices: it.pickupPrices,
           attrs: it.attrs, color: it.color, capacity: it.capacity,
+          variations: Array.isArray(it.variations) ? it.variations : [],
         }));
 
         setStockItems(mappedStock);
@@ -182,6 +198,19 @@ export function ExternalSalePage() {
     }
     void loadData();
   }, [storeId, user?.id]);
+
+  /**
+   * Retirada da linha: com variações, vale o preço da variação escolhida (cor, capacidade…),
+   * senão só a "pronta entrega" do produto aparecia, mesmo com preço de encomenda cadastrado.
+   */
+  function pickupProductFor(line: { stockId?: string | null; attributes?: { id: string; value: string }[] }) {
+    const stock = stockItems.find((item) => item.id === line.stockId);
+    if (!stock?.variations?.length) return stock;
+    const variation = selectProductVariation(stock as unknown as StockItem, Object.fromEntries((line.attributes ?? []).map((attr) => [attr.id, attr.value])));
+    if (!variation) return stock;
+    const pickupPrices = variation.pickupMethodId ? { [variation.pickupMethodId]: variation.price } : variation.pickupPrices ?? {};
+    return { ...stock, price: variation.price, pickupPrices };
+  }
 
   function handleSelectCustomer(val: string) {
     setSelectedCustomerId(val);
@@ -393,6 +422,14 @@ export function ExternalSalePage() {
             type="button"
             className="admin-btn admin-btn--secondary"
             style={{ fontSize: '0.84rem' }}
+            onClick={() => setHistoryOpen(true)}
+          >
+            🧾 Vendas realizadas
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary"
+            style={{ fontSize: '0.84rem' }}
             onClick={() => setShowPendingModal(true)}
           >
             📋 Pendências do Dia
@@ -471,6 +508,21 @@ export function ExternalSalePage() {
                 ]}
                 onChange={handleSelectCustomer}
               />
+              <div className="quick-field__actions" style={{ marginTop: 8 }}>
+                <QuickAddButton label="Novo cliente" onClick={() => setQuickCustomerOpen(true)} />
+              </div>
+              {quickCustomerOpen ? (
+                <QuickCreateCustomer
+                  onClose={() => setQuickCustomerOpen(false)}
+                  onCreated={(customer) => {
+                    setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]);
+                    setSelectedCustomerId(customer.id);
+                    setCustomerName(customer.name);
+                    setCustomerPhone(customer.phone || '');
+                    setCustomerDocument(customer.document || '');
+                  }}
+                />
+              ) : null}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -542,16 +594,14 @@ export function ExternalSalePage() {
                 <AdminPicker
                   label="Parcelamento (Cartão)"
                   value={String(installments)}
-                  options={[
-                    { value: '1', label: `1x à vista (R$ ${netAmountToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})` },
-                    { value: '2', label: `2x de R$ ${(netAmountToPay / 2).toFixed(2)}` },
-                    { value: '3', label: `3x de R$ ${(netAmountToPay / 3).toFixed(2)}` },
-                    { value: '4', label: `4x de R$ ${(netAmountToPay / 4).toFixed(2)}` },
-                    { value: '5', label: `5x de R$ ${(netAmountToPay / 5).toFixed(2)}` },
-                    { value: '6', label: `6x de R$ ${(netAmountToPay / 6).toFixed(2)}` },
-                    { value: '10', label: `10x de R$ ${(netAmountToPay / 10).toFixed(2)}` },
-                    { value: '12', label: `12x de R$ ${(netAmountToPay / 12).toFixed(2)}` },
-                  ]}
+                  options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, index) => {
+                    const count = index + 1;
+                    const parcel = netAmountToPay / count;
+                    return {
+                      value: String(count),
+                      label: count === 1 ? `1x à vista (${formatMoney(netAmountToPay)})` : `${count}x de ${formatMoney(parcel)}`,
+                    };
+                  })}
                   onChange={(val) => setInstallments(Number(val))}
                 />
               </div>
@@ -693,7 +743,7 @@ export function ExternalSalePage() {
                   />
                 </div>
 
-                <PickupFields product={stockItems.find(p=>p.id===line.stockId)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map((entry,i)=>i===idx?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
+                <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map((entry,i)=>i===idx?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
                 <SaleAttributeFields surface="external" product={stockItems.find(p=>p.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map((entry,i)=>i===idx ? {...entry,attributes} : entry))}/>
                 <div>
                   <label className="admin-label">Quantidade</label>
@@ -916,7 +966,7 @@ export function ExternalSalePage() {
                 R$ {netAmountToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '0.84rem', color: 'var(--mute)', marginTop: '2px' }}>
-                {paymentMethod} {installments > 1 ? `· ${installments}x de R$ ${installmentValue.toFixed(2)}` : 'à vista'}
+                {paymentMethod} {installments > 1 ? `· ${installments}x de ${formatMoney(installmentValue)}` : 'à vista'}
               </div>
             </div>
 
@@ -982,6 +1032,7 @@ export function ExternalSalePage() {
         </div>
       )}
       {/* Modais */}
+      {historyOpen ? <ExternalSalesHistory onClose={() => setHistoryOpen(false)} /> : null}
       {createdReceipt && (
         <WarrantyReceiptModal
           receipt={createdReceipt}

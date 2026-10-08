@@ -26,7 +26,9 @@ export type AdminIconName =
   | 'edit'
   | 'restore'
   | 'sync'
-  | 'dollar';
+  | 'dollar'
+  | 'sidebar'
+  | 'apps';
 
 type AdminIconProps = {
   name: AdminIconName;
@@ -143,6 +145,20 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
       return (
         <svg {...common}>
           <path d="M12 5v14M5 12h14" />
+        </svg>
+      );
+    case 'sidebar':
+      // Painel lateral: moldura com a coluna da esquerda (recolher / expandir o menu).
+      return (
+        <svg {...common}>
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+          <path d="M9.5 4.5v15" />
+        </svg>
+      );
+    case 'apps':
+      return (
+        <svg {...common}>
+          <path d="M5 5h.01M12 5h.01M19 5h.01M5 12h.01M12 12h.01M19 12h.01M5 19h.01M12 19h.01M19 19h.01" strokeWidth={3.2} />
         </svg>
       );
     case 'collapse':

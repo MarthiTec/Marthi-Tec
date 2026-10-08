@@ -694,6 +694,57 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
   }
 });
 
+/* ── Consulta das vendas externas já feitas (reimprimir, reenviar, cancelar) ── */
+
+salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) => {
+  try {
+    const q = z.object({
+      from: z.string().datetime({ offset: true }).optional(),
+      to: z.string().datetime({ offset: true }).optional(),
+      search: z.string().trim().max(80).default(''),
+      status: z.enum(['all', 'completed', 'cancelled']).default('all'),
+    }).parse(req.query);
+    const to = q.to ? new Date(q.to) : new Date();
+    const from = q.from ? new Date(q.from) : new Date(to.getTime() - 30 * 86400000);
+    const term = q.search ? `%${q.search.replace(/[%_\\]/g, (c) => '\\' + c)}%` : '';
+    const digits = q.search.replace(/\D/g, '');
+    const result = await pool.query(
+      `SELECT s.id, s.created_at, s.customer_name, s.customer_phone, s.customer_document, s.seller_name,
+              COALESCE(NULLIF(s.final_amount, 0), s.total_amount, s.total, 0) AS amount, s.status, s.cancel_reason,
+              (SELECT string_agg(l.qty::text || 'x ' || l.name, ', ' ORDER BY l.name) FROM sales_order_lines l WHERE l.sale_id = s.id) AS items,
+              (SELECT p.method_name || CASE WHEN p.installments > 1 THEN ' · ' || p.installments || 'x' ELSE '' END
+                 FROM sale_payments p WHERE p.sale_id = s.id ORDER BY p.created_at LIMIT 1) AS payment
+         FROM sales_orders s
+        WHERE s.store_id = $1 AND s.sale_type = 'external'
+          AND s.created_at >= $2 AND s.created_at < $3
+          AND ($4 = 'all' OR s.status = $4)
+          AND ($5 = '' OR s.id ILIKE $5 OR s.customer_name ILIKE $5 OR s.seller_name ILIKE $5
+               OR ($6 <> '' AND regexp_replace(COALESCE(s.customer_phone, '') || COALESCE(s.customer_document, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'))
+        ORDER BY s.created_at DESC
+        LIMIT 300`,
+      [req.storeId, from.toISOString(), to.toISOString(), q.status, term, digits],
+    );
+    res.json({
+      success: true,
+      data: result.rows.map((row) => ({
+        id: row.id,
+        createdAt: row.created_at,
+        customerName: row.customer_name || 'Consumidor Final',
+        customerPhone: row.customer_phone || '',
+        customerDocument: row.customer_document || '',
+        sellerName: row.seller_name || '',
+        amount: Number(row.amount) || 0,
+        status: row.status,
+        cancelReason: row.cancel_reason || '',
+        items: row.items || '',
+        payment: row.payment || '',
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /* ── 4. Pendências do Dia (Mariana & Gilvan) ─────────────────── */
 
 salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, res, next) => {
