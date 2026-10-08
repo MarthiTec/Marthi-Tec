@@ -239,6 +239,47 @@ export async function sendEvolutionText(
   };
 }
 
+/** Envia um arquivo (ex.: comprovante em PDF) pelo WhatsApp da loja na Evolution. */
+export async function sendEvolutionDocument(
+  number: string,
+  file: { base64: string; fileName: string; mimetype: string; caption?: string },
+  customConfig: { baseUrl?: string; instance?: string; apiKey?: string; storeId?: string },
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const baseUrl = customConfig.baseUrl?.replace(/\/$/, '');
+  const { instance, apiKey } = customConfig;
+  if (!baseUrl || !instance || !apiKey) {
+    throw Object.assign(new Error('Evolution não configurado. Conecte o WhatsApp da loja em Operações.'), { status: 501 });
+  }
+  const recipient = normalizeBrazilPhone(number);
+  if (!/^55\d{10,11}$/.test(recipient)) throw Object.assign(new Error('Telefone brasileiro inválido. Informe DDD e número.'), { status: 400 });
+  const deliveryId = await beginDelivery(customConfig.storeId, 'whatsapp', recipient);
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/message/sendMedia/${encodeURIComponent(instance)}`, {
+      method: 'POST', signal: AbortSignal.timeout(30000), redirect: 'error',
+      headers: { 'Content-Type': 'application/json', apikey: apiKey },
+      body: JSON.stringify({
+        number: recipient,
+        mediatype: 'document',
+        mimetype: file.mimetype,
+        media: file.base64,
+        fileName: file.fileName,
+        caption: file.caption ?? '',
+        delay: 1200,
+      }),
+    });
+  } catch {
+    await finishDelivery(deliveryId, 'unknown');
+    throw Object.assign(new Error('Sem confirmação do Evolution para o PDF. Verifique o histórico antes de repetir.'), { status: 502 });
+  }
+  const raw = await response.text();
+  let body: any;
+  try { body = JSON.parse(raw); } catch { body = null; }
+  const accepted = response.ok && !!body?.key?.id;
+  await finishDelivery(deliveryId, accepted ? 'accepted' : response.ok ? 'unknown' : 'failed', response.status, accepted ? String(body.key.id) : undefined);
+  return { ok: accepted, status: response.status, body };
+}
+
 /**
  * Pedido do totem com "Concluir pelo WhatsApp": a loja (o número conectado na Evolution) manda
  * a mensagem direto para o telefone que o cliente digitou. O cliente não precisa ler QR nem

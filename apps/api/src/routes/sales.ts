@@ -9,6 +9,8 @@ import { pool } from '../db/pool.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
 import { maskDocument, receiptToken, validReceiptToken } from '../services/receiptToken.js';
+import { buildReceiptPdf } from '../services/receiptPdf.js';
+import { getStoreBrandProfile, instagramHandle, instagramUrl, messageSignature, withProtocol } from './storeProfile.js';
 
 /** Texto da garantia conforme o tipo escolhido na venda. */
 function warrantyLabel(type: string | null | undefined, months: unknown) {
@@ -17,7 +19,7 @@ function warrantyLabel(type: string | null | undefined, months: unknown) {
   const m = Number(months ?? 3);
   return `Prazo: ${m} ${m === 1 ? 'mês' : 'meses'} (garantia da loja)`;
 }
-import { resolveStoreEvolutionCreds, sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
+import { resolveStoreEvolutionCreds, sendEvolutionDocument, sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 import { sendMail, escapeHtml } from '../services/emailService.js';
 
 export const salesRouter = Router();
@@ -539,6 +541,9 @@ async function buildReceipt(saleId: string, storeId?: string) {
     s.store_city ? `${s.store_city}${s.store_state ? '/' + s.store_state : ''}` : '',
     s.store_zip ? `CEP ${s.store_zip}` : '',
   ].filter(Boolean).join(' · ');
+  const profile = await getStoreBrandProfile(pool, s.store_id);
+  const instagram = profile?.instagram ? instagramUrl(profile.instagram) : '';
+  const website = profile?.website ? withProtocol(profile.website) : '';
   return {
     store: {
       id: s.store_id,
@@ -546,11 +551,21 @@ async function buildReceipt(saleId: string, storeId?: string) {
       legalName: s.store_legal_name || '',
       document: s.store_document || '',
       stateRegistration: s.store_ie || '',
-      phone: s.store_phone || '',
-      email: s.store_email || '',
+      phone: profile?.phone ?? '',
+      email: profile?.email ?? (s.store_email || ''),
       address: storeAddress,
       city: s.store_city || '',
+      logo: profile?.logo ?? null,
+      instagram: profile?.instagram ? instagramHandle(profile.instagram) || profile.instagram : '',
+      facebook: profile?.facebook ?? '',
+      website: profile?.website ?? '',
     },
+    // O QR Code do comprovante leva para o Instagram da loja; sem ele, para o site.
+    qr: instagram
+      ? { url: instagram, label: `Siga ${instagramHandle(profile!.instagram) || 'a loja'} no Instagram` }
+      : website
+        ? { url: website, label: 'Visite o site da loja' }
+        : null,
     sale: {
       id: s.id,
       date: s.created_at,
@@ -617,6 +632,29 @@ salesRouter.get('/api/v1/sales/:id/receipt', requireOrDemoAuth, async (req, res,
 });
 
 /** Versão pública do comprovante (aberta pelo QR Code). CPF e telefone do cliente ficam mascarados. */
+/** Link público do comprovante (o mesmo do QR Code quando a loja não tem Instagram nem site). */
+function receiptVerifyUrl(req: { get(name: string): string | undefined; protocol: string }, saleId: string, token: string) {
+  const origin = req.get('origin') || `${req.get('x-forwarded-proto') || req.protocol}://${req.get('host')}`;
+  return `${origin}/comprovante/${encodeURIComponent(saleId)}?t=${encodeURIComponent(token)}`;
+}
+
+/** Comprovante em PDF para baixar (o mesmo enviado pelo WhatsApp). */
+salesRouter.get('/api/v1/sales/:id/receipt.pdf', requireAuth, async (req, res, next) => {
+  try {
+    const receipt = await buildReceipt(req.params.id, req.storeId!);
+    if (!receipt) {
+      res.status(404).json({ success: false, error: { message: 'Venda não encontrada.' } });
+      return;
+    }
+    const pdf = await buildReceiptPdf(receipt, receiptVerifyUrl(req, receipt.sale.id, receipt.verifyToken));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Comprovante-${receipt.sale.id}.pdf"`);
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
 salesRouter.get('/api/v1/public/receipts/:id', async (req, res, next) => {
   try {
     const token = typeof req.query.t === 'string' ? req.query.t : '';
@@ -668,6 +706,7 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
     }
 
     const s = saleRes.rows[0];
+    const profile = await getStoreBrandProfile(pool, storeId);
     const linesRes = await pool.query(
       `SELECT name, qty, unit_price, total_price, imei FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1`,
       [saleId],
@@ -706,13 +745,18 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
       `• ${warrantyLabel(s.warranty_type, s.warranty_months)}`,
       `• Termos: ${s.warranty_terms || 'Garantia balcão para defeitos técnicos de fabricação. Não cobre quedas, quebras, contato com líquidos ou violação de lacres.'}`,
       ``,
+      `📎 O comprovante completo em PDF segue logo abaixo.`,
+      ``,
       `───────────────────────────────`,
-      `Qualquer dúvida, estamos à disposição pelo WhatsApp ${s.store_phone || ''}.`,
-      `*${s.store_name || ''}*`,
+      `Qualquer dúvida, é só responder esta mensagem.`,
+      // Assinatura da loja (Operações › Dados da loja) ou nome e contatos da loja.
+      profile ? messageSignature(profile) : `*${s.store_name || ''}*`,
     ].join('\n');
 
     // Tenta envio direto via Evolution API se configurado
     let sentViaEvolution = false;
+    let pdfSent = false;
+    let pdfError: string | null = null;
     let evolutionError: string | null = null;
 
     try {
@@ -730,6 +774,23 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
         });
         if (evoRes.ok) {
           sentViaEvolution = true;
+          // Depois da mensagem, o comprovante em PDF (mesmo desenho do impresso, com QR Code).
+          try {
+            const receipt = await buildReceipt(saleId, storeId);
+            if (receipt) {
+              const pdf = await buildReceiptPdf(receipt, receiptVerifyUrl(req, receipt.sale.id, receipt.verifyToken));
+              const doc = await sendEvolutionDocument(body.phone, {
+                base64: pdf.toString('base64'),
+                fileName: `Comprovante ${receipt.sale.id}.pdf`,
+                mimetype: 'application/pdf',
+                caption: `Comprovante ${receipt.sale.id} · ${receipt.store.name}`,
+              }, { baseUrl, instance, apiKey, storeId });
+              pdfSent = doc.ok;
+              if (!doc.ok) pdfError = 'A mensagem foi enviada, mas o WhatsApp não confirmou o PDF.';
+            }
+          } catch (e: any) {
+            pdfError = `A mensagem foi enviada, mas o PDF não: ${e.message}`;
+          }
         } else {
           evolutionError = 'Evolution não confirmou a aceitação da mensagem. Consulte o histórico antes de repetir.';
         }
@@ -742,6 +803,8 @@ salesRouter.post('/api/v1/sales/:id/send-warranty-whatsapp', requireAuth, async 
       success: true,
       data: {
         sentViaEvolution,
+        pdfSent,
+        pdfError,
         evolutionError,
         messageText,
         directUrl: `https://api.whatsapp.com/send?phone=${normalizeBrazilPhone(body.phone)}&text=${encodeURIComponent(messageText)}`,

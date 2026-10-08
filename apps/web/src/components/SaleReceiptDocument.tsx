@@ -4,7 +4,9 @@ import { formatCpfCnpj } from '../utils/documentUtils';
 import './saleReceipt.css';
 
 export type SaleReceipt = {
-  store: { name: string; legalName?: string; document?: string; stateRegistration?: string; phone?: string; email?: string; address?: string; city?: string };
+  store: { name: string; legalName?: string; document?: string; stateRegistration?: string; phone?: string; email?: string; address?: string; city?: string; logo?: string | null; instagram?: string; facebook?: string; website?: string };
+  /** Para onde o QR Code leva: Instagram (ou site) da loja. */
+  qr?: { url: string; label: string } | null;
   sale: {
     id: string;
     date: string;
@@ -43,6 +45,9 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
   const { store, sale } = receipt;
   const f = sale.financial;
   const verifyUrl = receiptVerifyUrl(receipt);
+  const qrUrl = receipt.qr?.url || verifyUrl;
+  const qrLabel = receipt.qr?.label || 'Consulte este comprovante';
+  const socials = [store.instagram ? `Instagram ${store.instagram}` : '', store.facebook ? `Facebook ${store.facebook}` : '', store.website || ''].filter(Boolean).join('  ·  ');
   const issued = new Date(sale.date);
   const cancelled = sale.status === 'cancelled';
   const warrantyType = sale.warranty.type ?? 'store';
@@ -62,7 +67,8 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
     <article className={`sale-receipt${cancelled ? ' is-cancelled' : ''}`}>
       {cancelled ? <div className="sale-receipt__stamp">CANCELADA</div> : null}
       <header className="sale-receipt__head">
-        <div className="sale-receipt__store">
+        <div className={`sale-receipt__store${store.logo ? ' has-logo' : ''}`}>
+          {store.logo ? <img className="sale-receipt__logo" src={store.logo} alt="" /> : null}
           <strong>{store.name}</strong>
           {store.legalName && store.legalName !== store.name ? <span>{store.legalName}</span> : null}
           {store.document ? <span>CNPJ {formatCpfCnpj(store.document)}{store.stateRegistration ? ` · IE ${store.stateRegistration}` : ''}</span> : null}
@@ -148,13 +154,13 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
       </section>
 
       <footer className="sale-receipt__foot">
-        {verifyUrl ? (
+        {qrUrl ? (
           <div className="sale-receipt__qr">
-            <QrCodeView value={verifyUrl} size={120} />
+            <QrCodeView value={qrUrl} size={120} />
             <div>
-              <strong>Consulte este comprovante</strong>
+              <strong>{qrLabel}</strong>
               <span>Aponte a câmera do celular para o código ou acesse:</span>
-              <code>{verifyUrl}</code>
+              <code>{qrUrl}</code>
             </div>
           </div>
         ) : null}
@@ -162,6 +168,7 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
           <div><i /> <span>Cliente</span></div>
           <div><i /> <span>{store.name}</span></div>
         </div>
+        {socials ? <p className="sale-receipt__socials">{socials}</p> : null}
         <p className="sale-receipt__legal">Este comprovante não substitui a nota fiscal. Guarde-o para usar a garantia.</p>
       </footer>
     </article>

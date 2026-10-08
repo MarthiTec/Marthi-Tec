@@ -132,7 +132,7 @@ async function getStoreTotemSettings(storeId: string) {
   if (pool) {
     try {
       const res = await pool.query(
-        `SELECT id, trade_name, totem_exit_password, totem_settings FROM stores WHERE id = $1`,
+        `SELECT id, trade_name, totem_exit_password, totem_settings, logo FROM stores WHERE id = $1`,
         [storeId],
       );
 
@@ -152,6 +152,8 @@ async function getStoreTotemSettings(storeId: string) {
           ...rawSettings,
           cardInstallmentRates,
           storeName: rawSettings.storeName || row.trade_name || defaultTotemSettings.storeName,
+          // Sem logo própria no totem, vale a logo cadastrada em Operações › Dados da loja.
+          storeLogo: rawSettings.storeLogo || row.logo || null,
           exitPassword: row.totem_exit_password || rawSettings.exitPassword || defaultTotemSettings.exitPassword,
         };
       }

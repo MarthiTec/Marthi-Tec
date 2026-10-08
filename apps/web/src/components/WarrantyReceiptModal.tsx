@@ -1,6 +1,6 @@
 import '../pages/admin/externalSale.css';
 import { useState } from 'react';
-import { nestRequest } from '../services/nestClient';
+import { nestDownload, nestRequest } from '../services/nestClient';
 import { apiSendWarrantyWhatsApp } from '../services/erpApi';
 import { PrintableReceipt, type SaleReceipt } from './SaleReceiptDocument';
 
@@ -30,8 +30,10 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
     setFeedback(null);
     try {
       const res = await apiSendWarrantyWhatsApp(sale.id, { phone }, store.id);
-      if (res?.sentViaEvolution) {
-        setFeedback({ ok: true, msg: 'Comprovante e termo de garantia enviados com sucesso via WhatsApp!' });
+      if (res?.sentViaEvolution && res?.pdfSent) {
+        setFeedback({ ok: true, msg: 'Mensagem e comprovante em PDF enviados para o WhatsApp do cliente!' });
+      } else if (res?.sentViaEvolution) {
+        setFeedback({ ok: false, msg: res?.pdfError || 'Mensagem enviada, mas o PDF não foi confirmado. Use Baixar PDF e envie manualmente.' });
       } else if (res?.directUrl) {
         window.open(res.directUrl, '_blank');
         setFeedback({ ok: false, msg: 'Envio automático não confirmado. Janela do WhatsApp aberta para envio da garantia.' });
@@ -53,6 +55,26 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
     } catch(error) {setFeedback({ok:false,msg:error instanceof Error ? error.message : 'Falha no envio do e-mail.'});}
     finally {setSending(false);}
   }
+  const [downloading, setDownloading] = useState(false);
+  /** Abre o mesmo PDF que vai pelo WhatsApp (para salvar, imprimir ou mandar por outro meio). */
+  async function handleDownloadPdf() {
+    if (!sale?.id || downloading) return;
+    setDownloading(true);
+    try {
+      const blob = await nestDownload(`/sales/${encodeURIComponent(sale.id)}/receipt.pdf`, store.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Comprovante-${sale.id}.pdf`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (err: any) {
+      setFeedback({ ok: false, msg: err.message || 'Não foi possível gerar o PDF.' });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   function handlePrint() {
     // Só o comprovante (estilo nota, com QR Code) vai para o papel, não a janela da tela.
     document.body.classList.add('is-printing-receipt');
@@ -296,9 +318,14 @@ export function WarrantyReceiptModal({ receipt, onClose, onNewSale, reprint = fa
             borderTop: '1px solid var(--line, rgba(148, 163, 184, 0.22))',
           }}
         >
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={handlePrint}>
-            🖨️ Imprimir Comprovante
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={handlePrint}>
+              🖨️ Imprimir Comprovante
+            </button>
+            <button type="button" className="admin-btn admin-btn--secondary" disabled={downloading} onClick={() => void handleDownloadPdf()}>
+              📄 {downloading ? 'Gerando PDF…' : 'Baixar PDF'}
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>
               Fechar

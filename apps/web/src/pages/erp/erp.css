@@ -759,3 +759,12 @@
  .erp-app__heading{flex-wrap:wrap;align-items:stretch;}
  .erp-app__heading-actions{width:100%;}
 }
+
+/* A Retaguarda ocupa sempre a tela inteira e não sai do lugar: quando o navegador rolava a
+   página ao focar um campo (ex.: nome do produto), o topo sumia e aparecia uma faixa branca. */
+.erp-app {
+  position: fixed;
+  inset: 0;
+  height: auto;
+  max-height: none;
+}

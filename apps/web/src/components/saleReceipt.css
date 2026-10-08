@@ -322,3 +322,24 @@
     box-shadow: none;
   }
 }
+
+/* Logo da loja no cabeçalho e redes no rodapé. */
+.sale-receipt__store.has-logo {
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: 12px;
+}
+.sale-receipt__store.has-logo > :not(.sale-receipt__logo) {
+  grid-column: 2;
+}
+.sale-receipt__logo {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.sale-receipt__socials {
+  margin: 0;
+  font-size: 11px;
+  text-align: center;
+}

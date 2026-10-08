@@ -147,3 +147,17 @@ export function nestPatch<T>(path: string, body?: unknown) {
 export function nestDelete<T>(path: string) {
   return nestRequest<T>(path, { method: 'DELETE' });
 }
+
+/** Baixa um arquivo da API (ex.: comprovante em PDF) com a sessão atual. */
+export async function nestDownload(path: string, storeId?: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = getAuthToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (storeId) headers.set('x-store-id', storeId);
+  const response = await fetch(`${apiBase()}${path}`, { headers });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new NestApiError(body?.error?.message || 'Não foi possível baixar o arquivo.', body?.error?.code || 'DOWNLOAD_FAILED', response.status);
+  }
+  return response.blob();
+}

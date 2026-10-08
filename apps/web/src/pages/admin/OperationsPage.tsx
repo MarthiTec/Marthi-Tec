@@ -5,6 +5,7 @@ import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
+import { StoreBrandProfileSection } from '../../components/StoreBrandProfileSection';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
 import { CommunicationSettingsSection } from '../../components/CommunicationSettingsSection';
@@ -40,7 +41,7 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-type OpsTab = 'ramo' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
+type OpsTab = 'ramo' | 'loja' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
 
 /** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
@@ -55,7 +56,7 @@ export function OperationsPage() {
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
   const [tab, setTab] = useState<OpsTab>(() => {
-    if (tabParam === 'ramo' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'usuarios') return tabParam;
+    if (tabParam === 'ramo' || tabParam === 'loja' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'usuarios') return tabParam;
     if (tabParam === 'whatsapp') return 'comunicacao';
     if (location.pathname.endsWith('/usuarios')) return 'usuarios';
     if (location.pathname.endsWith('/comunicacao') || location.pathname.endsWith('/whatsapp')) return 'comunicacao';
@@ -227,6 +228,16 @@ export function OperationsPage() {
 
         <button
           type="button"
+          className={`btn ${tab === 'loja' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('loja')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="store" />
+          <span>Dados da Loja &amp; Redes</span>
+        </button>
+
+        <button
+          type="button"
           className={`btn ${tab === 'atalhos' ? 'btn--primary' : 'btn--ghost'}`}
           onClick={() => switchTab('atalhos')}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
@@ -268,6 +279,9 @@ export function OperationsPage() {
           />
         </article>
       ) : null}
+
+      {/* Dados da loja: logo, contatos, redes e assinatura (comprovante, WhatsApp e totem). */}
+      {tab === 'loja' ? <StoreBrandProfileSection /> : null}
 
       {/* ABA 2: Atalhos Operacionais */}
       {tab === 'atalhos' ? (

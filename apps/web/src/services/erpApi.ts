@@ -2278,3 +2278,26 @@ export function apiListPickups() {
 export function apiCreatePickup(body: { responsibleName: string; amount: number; notes?: string; pickupDate?: string }) {
   return nestPost<any>('/finance/pickups', body);
 }
+
+/* ── Dados da loja (logo, redes e assinatura) usados em comprovantes, mensagens e no totem ── */
+export type ApiStoreBrandProfile = {
+  name: string;
+  legalName: string;
+  phone: string;
+  email: string;
+  logo: string | null;
+  /** A logo mostrada veio do totem (a loja ainda não enviou uma aqui). */
+  logoFromTotem: boolean;
+  instagram: string;
+  facebook: string;
+  website: string;
+  signature: string;
+};
+
+export function apiGetStoreBrandProfile() {
+  return nestGet<ApiStoreBrandProfile>('/store/brand-profile');
+}
+
+export function apiSaveStoreBrandProfile(body: Partial<Omit<ApiStoreBrandProfile, 'name' | 'legalName' | 'logoFromTotem'>>) {
+  return nestRequest<ApiStoreBrandProfile>('/store/brand-profile', { method: 'PUT', body: JSON.stringify(body) });
+}
