@@ -141,3 +141,17 @@
     gap: 4px;
   }
 }
+
+/* Botão de início do painel: só a casinha, no mesmo tamanho do botão de recolher o menu. */
+.screen-back--home {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 12px;
+}
+.screen-back--home .admin-ico {
+  width: 19px;
+  height: 19px;
+}
