@@ -84,10 +84,10 @@ ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS labor_cost NUMERIC(12,2) NOT NU
 ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS parts_cost NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS total_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
 
--- 6) Cadastro de parceiro: "plan" antigo obrigatório; o código atual usa plan_id.
+-- 6) Cadastro de parceiro: "plan" antigo (enum do Prisma) obrigatório; o código atual usa plan_id.
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'partner_signups' AND column_name = 'plan' AND column_default IS NULL) THEN
-    ALTER TABLE partner_signups ALTER COLUMN plan SET DEFAULT '';
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'partner_signups' AND column_name = 'plan' AND is_nullable = 'NO' AND column_default IS NULL) THEN
+    ALTER TABLE partner_signups ALTER COLUMN plan DROP NOT NULL;
   END IF;
 END $$;
