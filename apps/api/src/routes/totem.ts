@@ -562,6 +562,16 @@ totemRouter.get('/api/v1/totem/revision',async(req,res,next)=>{
   }catch(error){next(error);}
 });
 totemRouter.get('/api/v1/totem/catalog', handleGetCatalog);
+// Marcas ativas com o ícone, para a navegação da vitrine (lateral ou abas só com o ícone).
+totemRouter.get('/api/v1/totem/brands', async (req, res, next) => {
+  try {
+    const storeId = await resolveStoreId(req);
+    const result = await pool.query('SELECT slug, name, logo FROM store_brands WHERE store_id = $1 AND active = true ORDER BY name', [storeId]);
+    res.json({ success: true, data: result.rows.map((row) => ({ slug: row.slug, name: row.name, logo: row.logo || null })) });
+  } catch (error) {
+    next(error);
+  }
+});
 totemRouter.get('/totem/catalog', handleGetCatalog);
 totemRouter.get('/api/v1/totem/offers',async(req,res,next)=>{try{const storeId=await resolveStoreId(req);res.json({success:true,data:await listDayOffers(pool,storeId,'totem')});}catch(error){next(error);}});
 

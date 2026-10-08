@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { nestDelete, nestGet, nestPatch, nestPost } from '../services/nestClient';
 import { STORE_CONTEXT_CHANGED_EVENT } from './multiStoreStore';
 
-export type Brand = { id: string; name: string; slug: string; active: boolean; productCount: number };
+export type Brand = { id: string; name: string; slug: string; active: boolean; productCount: number; logo?: string | null; logoSource?: '' | 'upload' | 'auto' };
 export const BRANDS_EVENT = 'marthi-brands-updated';
 export function normalizeBrand(value: string | undefined | null) {
   return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -10,7 +10,11 @@ export function normalizeBrand(value: string | undefined | null) {
 function notify() { window.dispatchEvent(new Event(BRANDS_EVENT)); }
 export function fetchBrands(_force = false) { return nestGet<Brand[]>('/brands'); }
 export async function createBrand(name: string) { const brand = await nestPost<Brand>('/brands', { name: name.trim() }); notify(); return brand; }
-export async function updateBrand(id: string, body: Partial<Pick<Brand, 'name' | 'active'>>) { const brand = await nestPatch<Brand>(`/brands/${id}`, body); notify(); return brand; }
+export async function updateBrand(id: string, body: Partial<Pick<Brand, 'name' | 'active' | 'logo'>>) { const brand = await nestPatch<Brand>(`/brands/${id}`, body); notify(); return brand; }
+/** Busca o ícone padrão da marca pelo nome (Simple Icons) e salva no banco. */
+export async function autoBrandLogo(id: string) { const brand = await nestPost<Brand>(`/brands/${id}/logo/auto`); notify(); return brand; }
+/** Preenche o ícone de todas as marcas sem ícone; devolve quais foram encontradas. */
+export async function autoFillBrandLogos() { const result = await nestPost<{ found: string[]; missing: string[] }>('/brands/logos/auto'); notify(); return result; }
 export async function deleteBrand(id: string) { await nestDelete(`/brands/${id}`); notify(); }
 export function findBrand(brands: Brand[], value: string | undefined | null) {
   const key = normalizeBrand(value);

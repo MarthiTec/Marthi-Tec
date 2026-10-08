@@ -10,7 +10,7 @@ export function TotemGuidedFlow({
   onCancel,
 }: {
   settings: TotemAssistantSettings;
-  brands: { id: string; label: string }[];
+  brands: { id: string; label: string; logo?: string }[];
   hasOffers: boolean;
   onComplete: (name: string, intent: string, brand: string) => void;
   onCancel: () => void;
@@ -91,7 +91,8 @@ export function TotemGuidedFlow({
       ) : (
         <div className="totem-guided__choices">
           {brands.map((brand) => (
-            <button key={brand.id} className="totem-btn totem-btn--primary" onClick={() => onComplete(name.trim(), intent, brand.id)}>
+            <button key={brand.id} className={`totem-btn totem-btn--primary${brand.logo ? ' totem-guided__brand' : ''}`} onClick={() => onComplete(name.trim(), intent, brand.id)}>
+              {brand.logo ? <span className="totem-guided__brand-logo" aria-hidden="true"><img src={brand.logo} alt="" /></span> : null}
               {brand.label}
             </button>
           ))}

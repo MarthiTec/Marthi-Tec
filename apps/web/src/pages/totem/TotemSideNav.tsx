@@ -4,6 +4,8 @@ export type TotemNavItem = {
   count: number;
   /** Foto do primeiro produto do grupo, usada como ícone. */
   image?: string;
+  /** Ícone da marca (Apple, Samsung…): fundo branco para logos escuros aparecerem. */
+  logo?: string;
 };
 
 /**
@@ -45,7 +47,7 @@ export function TotemSideNav({
           aria-pressed={active === item.key}
           onClick={() => onSelect(item.key)}
         >
-          <span className="totem-sidenav__icon" aria-hidden>
+          <span className={`totem-sidenav__icon${item.logo ? ' is-logo' : ''}`} aria-hidden>
             {item.image ? <img src={item.image} alt="" draggable={false} /> : item.label.slice(0, 1)}
           </span>
           <span className="totem-sidenav__label">{item.label}</span>

@@ -611,6 +611,11 @@ export function apiGetTotemCatalog() {
 }
 
 /** Settings públicos do totem (sem JWT). */
+/** Marcas ativas da loja com o ícone, para a vitrine do totem (rota pública). */
+export function apiGetTotemBrands() {
+  return nestGet<{ slug: string; name: string; logo: string | null }[]>('/totem/brands');
+}
+
 export function apiGetTotemPublicSettings() {
   return nestGet<TotemSettings>('/totem/settings');
 }

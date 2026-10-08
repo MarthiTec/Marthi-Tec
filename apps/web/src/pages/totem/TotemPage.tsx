@@ -49,15 +49,14 @@ import { TotemSideNav, type TotemNavItem } from './TotemSideNav';
 import { TotemCartBar } from './TotemCartBar';
 import { TotemCartReview, type TotemCartLine } from './TotemCartReview';
 import { submitTotemCart } from '../../services/totem';
+import { apiGetTotemBrands } from '../../services/erpApi';
 import { apiUnlockTotem } from '../../services/erpApi';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
 import {
   INSTALLMENTS,
-  PAYMENT_OPTIONS,
-  TOTEM_BRANDS,
-  formatBRL,
-  type TotemBrand,
+  PAYMENT_OPTIONS,
+  formatBRL,
   type TotemProduct,
 } from './totemData';
 import { listTotemCatalog, listTotemStock, loadTotemCatalog } from './totemCatalog';
@@ -67,7 +66,6 @@ const TRANSACTION_IDLE_MS = 5 * 60 * 1000;
 const DONE_IDLE_MS = 45 * 1000;
 
 type Step = 'attract' | 'welcome' | 'guided' | 'catalog' | 'checkout' | 'done';
-type BrandFilter = TotemBrand | 'all';
 type CardConfig = Record<string, string>;
 
 type Selection = {
@@ -130,10 +128,18 @@ function visualFrom(settings: TotemSettings) {
   };
 }
 
+type TotemBrandInfo = { slug: string; name: string; logo: string | null };
+const normalizeKey = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 /** Grupo da vitrine (marca ou categoria do estoque). Sem valor, cai em "Outros". */
-function navGroupOf(product: TotemProduct, by: TotemSettings['navGroup']) {
+function navGroupOf(product: TotemProduct, by: TotemSettings['navGroup'], brands: Map<string, TotemBrandInfo>) {
   const raw = ((by === 'category' ? product.category : product.brandName) ?? '').trim();
-  return { key: raw ? raw.toLocaleLowerCase('pt-BR') : 'outros', label: raw || 'Outros' };
+  if (!raw) return { key: 'outros', label: 'Outros', logo: undefined };
+  if (by === 'brand') {
+    const brand = brands.get(normalizeKey(raw));
+    if (brand) return { key: normalizeKey(brand.slug), label: brand.name, logo: brand.logo ?? undefined };
+  }
+  return { key: normalizeKey(raw), label: raw, logo: undefined };
 }
 
 function startStep(settings: TotemSettings): Step {
@@ -183,7 +189,6 @@ export function TotemPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>(() => startStep(getTotemSettings()));
-  const [brand, setBrand] = useState<BrandFilter>('all');
   const [group, setGroup] = useState('all');
   const [visual, setVisual] = useState(() => visualFrom(getTotemSettings()));
   const [cart, setCart] = useState<TotemCartLine[]>([]);
@@ -297,7 +302,6 @@ export function TotemPage() {
 
   function clearCatalogFilters() {
     setSearch('');
-    setBrand('all');
     setFilters({});
     setOpenFilter(null);
     setKeyboardOpen(false);
@@ -350,17 +354,24 @@ export function TotemPage() {
     });
   }
 
-  const totemBrandTabs = useMemo(() => {
-    const hasOther = catalog.some((item) => item.brand === 'other');
-    if (hasOther) {
-      return [...TOTEM_BRANDS, { id: 'other' as const, label: 'Outros' }];
-    }
-    return TOTEM_BRANDS;
-  }, [catalog]);
 
-  // Barra lateral ou agrupamento por categoria usam os grupos reais do estoque; as abas de
-  // marca no topo continuam como sempre foram para quem não mudou a configuração.
-  const genericNav = visual.catalogNav === 'sidebar' || visual.navGroup === 'category';
+  // Marcas ou categorias vêm do cadastro real da loja (com o ícone da marca), nunca de lista fixa.
+  const [totemBrands, setTotemBrands] = useState<TotemBrandInfo[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () => void apiGetTotemBrands().then((rows) => { if (alive) setTotemBrands(rows); }).catch(() => undefined);
+    load();
+    window.addEventListener('marthi-totem-live', load);
+    return () => { alive = false; window.removeEventListener('marthi-totem-live', load); };
+  }, []);
+  const brandIndex = useMemo(() => {
+    const index = new Map<string, TotemBrandInfo>();
+    for (const item of totemBrands) {
+      index.set(normalizeKey(item.slug), item);
+      index.set(normalizeKey(item.name), item);
+    }
+    return index;
+  }, [totemBrands]);
   const availableCatalog = useMemo(
     () => catalog.filter((item) => productAvailableForTotem(pickupMethods, listTotemStock().find((stock) => stock.id === item.stockId))),
     [catalog, pickupMethods],
@@ -368,27 +379,23 @@ export function TotemPage() {
   const navItems = useMemo<TotemNavItem[]>(() => {
     const groups = new Map<string, TotemNavItem>();
     for (const product of availableCatalog) {
-      const { key, label } = navGroupOf(product, visual.navGroup);
+      const { key, label, logo } = navGroupOf(product, visual.navGroup, brandIndex);
       const current = groups.get(key);
       if (current) current.count += 1;
-      else groups.set(key, { key, label, count: 1, image: product.images[0] });
+      else groups.set(key, { key, label, count: 1, image: logo ?? product.images[0], logo });
     }
     return [...groups.values()].sort((a, b) =>
       a.key === 'outros' ? 1 : b.key === 'outros' ? -1 : a.label.localeCompare(b.label, 'pt-BR'),
     );
-  }, [availableCatalog, visual.navGroup]);
+  }, [availableCatalog, visual.navGroup, brandIndex]);
 
   useEffect(() => {
     if (group !== 'all' && !navItems.some((item) => item.key === group)) setGroup('all');
   }, [group, navItems]);
 
   const brandProducts = useMemo(() => {
-    return availableCatalog.filter((item) =>
-      genericNav
-        ? group === 'all' || navGroupOf(item, visual.navGroup).key === group
-        : brand === 'all' || item.brand === brand,
-    );
-  }, [brand, group, genericNav, availableCatalog, visual.navGroup]);
+    return availableCatalog.filter((item) => group === 'all' || navGroupOf(item, visual.navGroup, brandIndex).key === group);
+  }, [group, availableCatalog, visual.navGroup, brandIndex]);
 
   const products = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -419,11 +426,11 @@ export function TotemPage() {
       window.scrollTo({ top: 0 });
     }
     listRef.current?.scrollTo({ top: 0 });
-  }, [step, brand, group, search, filters]);
+  }, [step, group, search, filters]);
 
   useEffect(() => {
     setFilters({});
-  }, [brand, group]);
+  }, [group]);
 
   // Tema escuro também pinta o fundo da página enquanto a vitrine rola.
   useEffect(() => {
@@ -1118,7 +1125,7 @@ export function TotemPage() {
         />
       )}
 
-      {step==='guided'&&<TotemGuidedFlow settings={guidedSettings} brands={totemBrandTabs.filter(item=>item.id!=='all'&&catalog.some(product=>product.brand===item.id&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} hasOffers={dayOffers.some(offer=>Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow)&&catalog.some(product=>offer.criteria.stockIds.includes(product.stockId||'')&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} onCancel={resetTotem} onComplete={(customer,intent,chosenBrand)=>{setName(customer);setShoppingIntent(intent);setBrand(chosenBrand as BrandFilter);setStep('catalog');bumpIdle();}}/>}
+      {step==='guided'&&<TotemGuidedFlow settings={guidedSettings} brands={visual.navGroup==='brand'?navItems.filter(item=>item.key!=='outros').map(item=>({id:item.key,label:item.label,logo:item.logo})):[]} hasOffers={dayOffers.some(offer=>Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow)&&catalog.some(product=>offer.criteria.stockIds.includes(product.stockId||'')&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} onCancel={resetTotem} onComplete={(customer,intent,chosenBrand)=>{setName(customer);setShoppingIntent(intent);setGroup(chosenBrand==='all'?'all':chosenBrand);setStep('catalog');bumpIdle();}}/>}
       {step === 'welcome' && collectNameUpFront && (
         <section className={`totem__welcome totem__welcome--kb-${keyboardPlacement}`}>
           {keyboardPlacement === 'top' ? (
@@ -1248,43 +1255,30 @@ export function TotemPage() {
           <div className="totem__stage" ref={searchPanelRef}>
             {namedWelcome ? <p className="totem__hello">{namedWelcome}</p> : null}
             <div className="totem__search-panel">
-              {copy.showBrandFilters || genericNav ? (
+              {copy.showBrandFilters || navItems.length > 0 ? (
                 <div className="totem__toolbar totem__toolbar--quiet">
                   <div className="totem__brands" role="tablist" aria-label={visual.navGroup === 'category' ? 'Categorias' : 'Marcas'}>
-                    {genericNav && visual.catalogNav === 'top'
-                      ? [{ key: 'all', label: 'Todos' }, ...navItems].map((item) => (
+                    {visual.catalogNav === 'top'
+                      ? [{ key: 'all', label: 'Todos', logo: undefined as string | undefined }, ...navItems].map((item) => (
                           <button
                             key={item.key}
                             type="button"
                             role="tab"
                             aria-selected={group === item.key}
-                            className={`totem-chip ${group === item.key ? 'is-active' : ''}`}
+                            aria-label={item.label}
+                            title={item.label}
+                            className={`totem-chip${item.logo ? ' totem-chip--logo' : ''} ${group === item.key ? 'is-active' : ''}`}
                             onClick={() => {
                               bumpIdle();
                               setGroup(item.key);
                               setKeyboardOpen(false);
                             }}
                           >
-                            {item.label}
+                            {/* Marca com ícone: só o ícone (Apple, Samsung…); sem ícone, o nome. */}
+                            {item.logo ? <img src={item.logo} alt="" draggable={false} /> : item.label}
                           </button>
                         ))
                       : null}
-                    {!genericNav && totemBrandTabs.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={brand === item.id}
-                        className={`totem-chip ${brand === item.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          bumpIdle();
-                          setBrand(item.id);
-                          setKeyboardOpen(false);
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
                     <button type="button" className={`totem-chip totem-chip--offer ${shoppingIntent==='offers'?'is-active':''}`} onClick={()=>{bumpIdle();setShoppingIntent(current=>current==='offers'?'all':'offers');}}>🔥 Ofertas do dia</button>
                   </div>
                 </div>
@@ -1523,7 +1517,7 @@ export function TotemPage() {
               {!catalogLoading && products.length === 0 && (
                 <p className="totem__empty">
                   {catalogError ||
-                    (search || brand !== 'all'
+                    (search || group !== 'all'
                       ? 'Nenhum produto encontrado com esses filtros.'
                       : 'Nenhum produto no totem. Marque “Exibir no totem” no estoque do ERP.')}
                 </p>

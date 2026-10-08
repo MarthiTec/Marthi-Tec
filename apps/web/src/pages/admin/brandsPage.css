@@ -1,0 +1,41 @@
+/* Ícone da marca: fundo branco sempre, para logos pretos (Apple) aparecerem também no tema escuro. */
+.brand-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  color: #0f766e;
+  font-weight: 800;
+  overflow: hidden;
+}
+.brand-icon img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+.brands-page__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.brands-page__icon-edit {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin: 12px 0;
+}
+.brands-page__icon-view {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.brands-page__notice {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--teal, #0f766e) 10%, transparent);
+}
