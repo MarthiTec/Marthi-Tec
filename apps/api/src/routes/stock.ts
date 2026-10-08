@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { pool } from '../db/pool.js';
+import { ensureProductAttributeValues } from '../services/attributeValues.js';
 
 export const stockRouter = Router();
 
@@ -392,6 +393,8 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             );
           }
 
+          // Cor/capacidade sugeridas pelo catálogo que ainda não existiam no atributo são criadas nele.
+          await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
           const createdRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
           const created = formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0]);
           await client.query('COMMIT');
@@ -579,6 +582,9 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
                 ],
               );
             }
+          }
+          if (body.attrs !== undefined || body.variations !== undefined) {
+            await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
           }
 
           await client.query('COMMIT');

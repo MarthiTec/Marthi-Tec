@@ -1,5 +1,17 @@
 import type {PoolClient} from 'pg';
-export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:string,stockId:string,method:any,attributes:{id:string;value:string}[]=[]){
+
+const methodPrice=(prices:Record<string,unknown>|null|undefined,methodId:string)=>{
+ const value=prices?.[methodId];
+ return value===null||value===undefined?null:Number(value);
+};
+
+/**
+ * Preço e disponibilidade de um produto (e da variação escolhida) para um tipo de retirada.
+ * No totem o cliente só escolhe combinações que existem. Na venda do vendedor (`fromSale`), uma
+ * encomenda pode ser de uma cor/capacidade que a loja ainda não tem cadastrada: vale o preço de
+ * encomenda do produto (ou o menor das variações), sem travar a venda.
+ */
+export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:string,stockId:string,method:any,attributes:{id:string;value:string}[]=[],fromSale=false){
  const stock=(await db.query('SELECT price,qty,variations,pickup_prices,card_rate FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true',[stockId,storeId])).rows[0];
  if(!stock)throw Object.assign(new Error('Produto indisponível.'),{status:404});
  const picked=Object.fromEntries(attributes.map(a=>[a.id,a.value]));
@@ -11,7 +23,19 @@ export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:
    const available=explicit?explicit===method.id:Object.keys(prices).length?Object.hasOwn(prices,method.id)&&prices[method.id]!==null:method.kind==='immediate';
    return available && Number(prices[method.id]??v.price)>0 && (method.kind==='order'||Number(v.qty)>0);
  });
- if(!candidate)throw Object.assign(new Error('Esta combinação de atributos, retirada e preço não está disponível. Escolha uma variação válida.'),{status:400});
+ if(!candidate&&fromSale&&method.kind==='order'){
+  const fromProduct=methodPrice(stock.pickup_prices,method.id);
+  const fromVariations=variations.map((v:any)=>methodPrice(v.pickupPrices??v.pickup_prices,method.id)??(Number(v.price)||null)).filter((p:any):p is number=>Number(p)>0);
+  const unitPrice=fromProduct&&fromProduct>0?fromProduct:fromVariations.length?Math.min(...fromVariations):Number(stock.price);
+  if(unitPrice>0)return {...method,unitPrice,qty:0,cardRate:stock.card_rate};
+ }
+ if(!candidate){
+  const wanted=attributes.map(a=>a.value).filter(Boolean).join(' / ');
+  const message=fromSale&&method.kind!=='order'&&candidates.length===0&&wanted
+   ? `Não há ${wanted} em estoque para entrega imediata. Escolha "Sob encomenda" ou cadastre essa variação no produto.`
+   : 'Esta combinação de atributos, retirada e preço não está disponível. Escolha uma variação válida.';
+  throw Object.assign(new Error(message),{status:400});
+ }
  const prices=candidate.pickupPrices??candidate.pickup_prices??stock.pickup_prices??{};
  return {...method,unitPrice:Number(prices[method.id]??candidate.price),qty:Number(candidate.qty),cardRate:candidate.cardRate??candidate.card_rate??stock.card_rate};
 }

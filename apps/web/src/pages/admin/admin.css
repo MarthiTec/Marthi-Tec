@@ -6966,3 +6966,73 @@ select.caixa-mov-input {
   border: 0;
   border-radius: 4px;
 }
+
+/* Celular: tabela cujas células têm rótulo (data-label) vira uma lista de cartões, sem rolagem lateral. */
+@media (max-width: 640px) {
+  .admin-table:has(td[data-label]) thead {
+    display: none;
+  }
+  .admin-table:has(td[data-label]),
+  .admin-table:has(td[data-label]) tbody {
+    display: block;
+    width: 100%;
+  }
+  .admin-table:has(td[data-label]) tr {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line, #e2e8f0);
+    border-radius: 14px;
+    background: var(--card, #fff);
+  }
+  .admin-table:has(td[data-label]) td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .admin-table:has(td[data-label]) td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--mute, #64748b);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: left;
+  }
+  .admin-table:has(td[data-label]) td.admin-table__actions,
+  .admin-table:has(td[data-label]) td.empty {
+    justify-content: flex-end;
+    text-align: center;
+  }
+  .admin-table:has(td[data-label]) td.empty {
+    justify-content: center;
+  }
+}
+@media (max-width: 640px) {
+  .admin-table:has(td.empty) thead {
+    display: none;
+  }
+  .admin-table:has(td.empty),
+  .admin-table:has(td.empty) tbody,
+  .admin-table:has(td.empty) tr,
+  .admin-table:has(td.empty) td.empty {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 640px) {
+  /* Vence a regra antiga de 580px (rolagem lateral) nas tabelas que já têm rótulo por célula ou estão vazias. */
+  .admin-table-container .admin-table:has(td[data-label]),
+  .admin-table-container .admin-table:has(td.empty) {
+    display: block !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+}

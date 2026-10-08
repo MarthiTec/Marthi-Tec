@@ -109,9 +109,8 @@ export function StockPage() {
   const [attrFilterId, setAttrFilterId] = useState('all');
   const [attrFilterValue, setAttrFilterValue] = useState('all');
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
-  const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>(
-    totemSurface ? 'totem' : 'all',
-  );
+  // Todos os filtros começam em "Todos" (inclusive o do totem), para nenhum produto sumir da lista.
+  const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
 

@@ -69,18 +69,24 @@ test('branch replication is explicit, authorized, independent and preserves exis
  const b=(await query("SELECT id FROM product_attributes WHERE store_id='branch'")).rows;
  assert.equal(a.some(x=>b.some(y=>x.id===y.id)),false);
 });
-test('sale selections are stored and foreign or invalid options are rejected transactionally',async()=>{
+test('sale selections are stored, new values are created in the attribute and foreign attributes are rejected',async()=>{
  const capacity=(await request('/attributes')).json.data.find(a=>a.name==='Capacidade');
  await query("INSERT INTO stock_items(id,store_id,name,qty,price,cost,capacity) VALUES('device','store-a','Aparelho',5,100,50,'256GB')");
  const body={paymentMethod:'Pix',lines:[{stockId:'device',name:'Aparelho',qty:1,unitPrice:100,attributes:[{id:capacity.id,name:'forged',value:'256GB'}]}]};
  const sale=await request('/sales/external','POST',body);assert.equal(sale.status,201);
  const stored=(await query('SELECT attributes FROM sales_order_lines WHERE order_id=$1',[sale.json.data.id || sale.json.data.saleId])).rows;
- assert.equal(stored.length,1);assert.deepEqual(stored[0].attributes,[{id:capacity.id,name:'Capacidade',value:'256GB'}]);
- body.lines[0].attributes[0].value='512GB';
- assert.equal((await request('/sales/external','POST',body)).status,400);
+ assert.equal(stored.length,1);assert.deepEqual(stored[0].attributes,[{id:capacity.id,name:'Capacidade',value:'256 GB'}]);
+ // Valor escrito diferente usa o cadastrado; valor que não existe é criado no atributo e a venda passa.
+ body.lines[0].attributes[0].value='256 gb';
+ const same=await request('/sales/external','POST',body);assert.equal(same.status,201,JSON.stringify(same.json));
+ assert.deepEqual((await query('SELECT attributes FROM sales_order_lines WHERE order_id=$1',[same.json.data.id || same.json.data.saleId])).rows[0].attributes,[{id:capacity.id,name:'Capacidade',value:'256 GB'}]);
+ body.lines[0].attributes[0].value='64TB';
+ const created=await request('/sales/external','POST',body);assert.equal(created.status,201,JSON.stringify(created.json));
+ assert.equal((await query('SELECT count(*)::int AS n FROM product_attribute_values WHERE attribute_id=$1 AND value=$2',[capacity.id,'64TB'])).rows[0].n,1);
  body.lines[0].attributes[0].id=(await query("SELECT id FROM product_attributes WHERE store_id='store-b' LIMIT 1")).rows[0].id;
  assert.equal((await request('/sales/external','POST',body)).status,400);
- assert.equal(Number((await query("SELECT qty FROM stock_items WHERE id='device'")).rows[0].qty),4);
+ assert.equal((await query('SELECT count(*)::int AS n FROM product_attribute_values v JOIN product_attributes a ON a.id=v.attribute_id WHERE a.store_id=$1 AND v.value=$2',['store-b','64TB'])).rows[0].n,0,'nothing is created in another store');
+ assert.equal(Number((await query("SELECT qty FROM stock_items WHERE id='device'")).rows[0].qty),2);
 });
 test('disabled automation prevents provisioning on segment changes and can be enabled later',async()=>{
  await query("INSERT INTO stores(id,client_account_id,trade_name,legal_name,document,attribute_automation_enabled) VALUES('optional','a','Optional','Optional','optional',false)");

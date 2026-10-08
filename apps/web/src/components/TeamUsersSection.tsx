@@ -427,19 +427,19 @@ export function TeamUsersSection({ variant, id }: Props) {
                     const email = (item.userEmail || item.email).trim().toLowerCase();
                     return (
                       <tr key={item.id}>
-                        <td>
+                        <td data-label="Nome">
                           <CrudNameButton onClick={() => loadItem(item, 'view')}>
                             {item.name}
                           </CrudNameButton>
                         </td>
-                        <td>{EMPLOYEE_ROLE_LABEL[item.role]}</td>
-                        <td>{item.isSystemUser ? item.userEmail || item.email || '—' : '—'}</td>
-                        <td>
+                        <td data-label="Cargo">{EMPLOYEE_ROLE_LABEL[item.role]}</td>
+                        <td data-label="Login">{item.isSystemUser ? item.userEmail || item.email || '—' : '—'}</td>
+                        <td data-label="Senha">
                           {item.isSystemUser && email
                             ? getErpUserPasswordHint(email)
                             : '—'}
                         </td>
-                        <td>
+                        <td data-label="Módulos liberados">
                           {item.role === 'admin' ? (
                             <span className="marthi-pill marthi-pill--ok" style={{ fontSize: '0.72rem' }}>
                               Todos (Admin)
@@ -488,7 +488,7 @@ export function TeamUsersSection({ variant, id }: Props) {
                             </div>
                           )}
                         </td>
-                        <td>{item.active ? 'Ativo' : 'Inativo'}</td>
+                        <td data-label="Status">{item.active ? 'Ativo' : 'Inativo'}</td>
                         <td className="admin-table__actions">
                           <CrudRowActions
                             onView={() => loadItem(item, 'view')}

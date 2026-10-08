@@ -13,7 +13,7 @@ export async function resolvePickup(db:Pick<PoolClient,'query'>,storeId:string,s
  return {...p,deliveryAddress,estimatedDate:p.kind==='order'?estimatedPickupDate(p.lead_days):null,unitPrice:Number(p.pickup_prices[p.id]??p.price)};
 }
 export async function validatePickupLines(db:PoolClient,storeId:string,lines:any[]){
- for(const l of lines)if(l.pickupMethodId){if(!l.stockId)throw Object.assign(new Error('Escolha o produto da loja.'),{status:400});let p=await resolvePickup(db,storeId,l.stockId,l.pickupMethodId,l.deliveryAddress);const stock=(await db.query('SELECT variations FROM stock_items WHERE id=$1 AND store_id=$2',[l.stockId,storeId])).rows[0];if(stock?.variations?.length)p=await quoteTotemCombination(db,storeId,l.stockId,p,l.attributes);l.unitPrice=p.unitPrice;l.pickupKind=p.kind;l.deliveryAddress=p.deliveryAddress;}
+ for(const l of lines)if(l.pickupMethodId){if(!l.stockId)throw Object.assign(new Error('Escolha o produto da loja.'),{status:400});let p=await resolvePickup(db,storeId,l.stockId,l.pickupMethodId,l.deliveryAddress);const stock=(await db.query('SELECT variations FROM stock_items WHERE id=$1 AND store_id=$2',[l.stockId,storeId])).rows[0];if(stock?.variations?.length)p=await quoteTotemCombination(db,storeId,l.stockId,p,l.attributes,true);l.unitPrice=p.unitPrice;l.pickupKind=p.kind;l.deliveryAddress=p.deliveryAddress;}
 }
 export async function recordPickup(db:Pick<PoolClient,'query'>,storeId:string,reference:string,customer:any,line:any){
  if(!line.pickupMethodId)return;

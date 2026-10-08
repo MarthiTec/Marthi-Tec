@@ -1,0 +1,198 @@
+/* Campos de cadastro de pessoas: tipo de pessoa, contatos múltiplos e endereço com busca. */
+.person-type {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.person-type__switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  background: var(--card-2, #f8fafc);
+}
+
+.person-type__switch button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--mute, #64748b);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.person-type__switch button.is-active {
+  background: var(--accent, #0f766e);
+  color: #fff;
+}
+
+.person-type__switch button:disabled {
+  cursor: default;
+}
+
+.contact-list {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+}
+
+.contact-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+}
+
+.contact-list__remove {
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 10px;
+  background: transparent;
+  color: #dc2626;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.contact-list__add {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent, #0f766e);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.address-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 14px;
+}
+
+.address-fields legend {
+  padding: 0 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--mute, #64748b);
+}
+
+.address-search {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 70px;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb, 15, 118, 110), 0.06);
+}
+
+.address-search__results {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 10px;
+  right: 10px;
+  z-index: 30;
+  max-height: 280px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+}
+
+.address-search__results button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink, #12151a);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.address-search__results button:hover,
+.address-search__results button:focus-visible {
+  background: rgba(var(--accent-rgb, 15, 118, 110), 0.1);
+}
+
+.address-search__results span {
+  color: var(--mute, #64748b);
+  font-size: 0.78rem;
+}
+
+.address-search__hint {
+  grid-column: 1 / -1;
+  color: var(--mute, #64748b);
+}
+
+.address-fields__grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.addr-cep { grid-column: span 2; }
+.addr-street { grid-column: span 4; }
+.addr-number { grid-column: span 1; }
+.addr-complement { grid-column: span 2; }
+.addr-district { grid-column: span 3; }
+.addr-city { grid-column: span 5; }
+.addr-uf { grid-column: span 1; }
+
+.admin--dark .address-search__results,
+.is-theme-dark .address-search__results {
+  background: var(--card, #171e27);
+  color: var(--ink, #e8eef4);
+}
+
+@media (max-width: 640px) {
+  .person-type {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .person-type__switch {
+    justify-self: start;
+  }
+  .address-search {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+  .address-search__street {
+    grid-column: 1 / -1;
+  }
+  .address-fields__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .addr-cep, .addr-number, .addr-uf { grid-column: span 2; }
+  .addr-street, .addr-complement, .addr-district, .addr-city { grid-column: 1 / -1; }
+}
+
+/* Os campos nunca passam da coluna (o input tem largura mínima própria no navegador). */
+.address-search > label,
+.address-fields__grid > label,
+.person-type > label,
+.contact-list > label {
+  min-width: 0;
+}
+.address-fields input,
+.person-type input,
+.contact-list input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

@@ -461,7 +461,71 @@ export type AccessArea =
   | 'ecommerce'
   | 'erp_plan';
 
-export type ApiSeller = {
+/** Endereço, tipo de pessoa e contatos extras (cliente, fornecedor e vendedor). */
+export type ApiPersonDetails = {
+  documentType: 'cpf' | 'cnpj';
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  district: string;
+  city: string;
+  state: string;
+  phones: string[];
+  emails: string[];
+};
+
+export type ApiAddress = { zipCode: string; street: string; district: string; city: string; state: string; complement: string };
+
+export function apiAddressByCep(cep: string) {
+  return nestGet<ApiAddress>(`/address/cep/${cep.replace(/\D/g, '')}`);
+}
+
+export function apiSearchAddress(input: { uf: string; city: string; street: string }) {
+  const qs = new URLSearchParams({ uf: input.uf, city: input.city, street: input.street });
+  return nestGet<ApiAddress[]>(`/address/search?${qs.toString()}`);
+}
+
+export type ApiCustomerRecord = ApiPersonDetails & {
+  id: string;
+  name: string;
+  tradeName: string;
+  document: string;
+  phone: string;
+  email: string;
+  notes: string;
+  active: boolean;
+  sellerId: string;
+  createdAt: string;
+};
+
+export type ApiCustomerInput = Partial<Omit<ApiCustomerRecord, 'id' | 'createdAt' | 'sellerId'>> & { name: string; sellerId?: string | null };
+
+export function apiListCustomerRecords() {
+  return nestGet<ApiCustomerRecord[]>('/customers');
+}
+
+export function apiSaveCustomerRecord(id: string | undefined, body: ApiCustomerInput) {
+  return id ? nestPatch<ApiCustomerRecord>(`/customers/${id}`, body) : nestPost<ApiCustomerRecord>('/customers', body);
+}
+
+export type ApiCustomerSummary = {
+  salesCount: number;
+  cancelledCount: number;
+  totalSpent: number;
+  averageTicket: number;
+  lastPurchaseAt: string | null;
+  sellerName: string;
+  payments: Array<{ method: string; times: number; amount: number }>;
+  products: Array<{ name: string; qty: number; amount: number; lastAt: string }>;
+  services: Array<{ id: string; device: string; status: string; total: number; createdAt: string }>;
+};
+
+export function apiCustomerSummary(id: string) {
+  return nestGet<ApiCustomerSummary>(`/customers/${id}/summary`);
+}
+
+export type ApiSeller = Partial<ApiPersonDetails> & {
   id: string;
   name: string;
   phone: string;
@@ -474,7 +538,7 @@ export type ApiSeller = {
   updatedAt: string;
 };
 
-export type ApiSupplier = {
+export type ApiSupplier = Partial<ApiPersonDetails> & {
   id: string;
   name: string;
   tradeName: string;

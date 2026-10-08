@@ -200,3 +200,35 @@ test('supplier chosen in the product form is saved on create and on edit, and on
   assert.equal((await query('SELECT supplier_id FROM stock_items WHERE id=$1', [id])).rows[0].supplier_id, null, 'editing other fields keeps the supplier as is');
   assert.equal((await request('/stock', 'POST', { name: 'Fornecedor errado', qty: 0, cost: 0, price: 0, supplierId: 'SUP-b1' })).status, 400);
 });
+test('color or capacity suggested by the device catalog is created in the attribute when the product is saved', async () => {
+  await query("INSERT INTO product_attributes(id,store_id,name,active) VALUES('ATTR-cor-a','store-a','Cor',true)");
+  await query("INSERT INTO product_attribute_values(id,attribute_id,value,sort) VALUES('ATV-azul','ATTR-cor-a','Azul',0)");
+  const created = await request('/stock', 'POST', { name: 'iPhone grade', qty: 0, cost: 0, price: 5000, variations: [
+    { attrs: { 'ATTR-cor-a': 'azul' }, qty: 1, price: 5000, cost: 4000 },
+    { attrs: { 'ATTR-cor-a': 'Verde-sálvia' }, qty: 1, price: 5100, cost: 4100 },
+  ] });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  const values = (await query("SELECT value FROM product_attribute_values WHERE attribute_id='ATTR-cor-a' ORDER BY sort")).rows.map((r) => r.value);
+  assert.deepEqual(values, ['Azul', 'Verde-sálvia'], 'existing value reused, new one created once');
+  await request('/stock/' + created.json.data.id, 'PATCH', { attrs: { 'ATTR-cor-a': 'Titânio' } });
+  assert.ok((await query("SELECT 1 FROM product_attribute_values WHERE attribute_id='ATTR-cor-a' AND value='Titânio'")).rows.length);
+});
+test('seller can sell by order a color the product does not have yet; immediate pickup explains what is missing', async () => {
+  await query("INSERT INTO product_attributes(id,store_id,name,active,use_on_external_sale) VALUES('ATTR-cor-sale','store-a','Cor',true,true)");
+  await query("INSERT INTO product_attribute_values(id,attribute_id,value,sort) VALUES('ATV-sale-azul','ATTR-cor-sale','Azul',0)");
+  await query("INSERT INTO pickup_methods(id,store_id,name,kind) VALUES('pm-hand','store-a','Em mãos (teste cor)','immediate'),('pm-order','store-a','Encomenda (teste cor)','order')");
+  const created = await request('/stock', 'POST', { name: 'IPHONE 17', qty: 0, cost: 4000, price: 5600, variations: [
+    { attrs: { 'ATTR-cor-sale': 'Azul' }, qty: 1, price: 5600, cost: 4000, pickupPrices: { 'pm-hand': 5600, 'pm-order': 5200 } },
+  ] });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  const line = { stockId: created.json.data.id, name: 'IPHONE 17', qty: 1, unitPrice: 5600, attributes: [{ id: 'ATTR-cor-sale', name: 'Cor', value: 'Preto' }] };
+  const byOrder = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Ramon', customerPhone: '24992259927', lines: [{ ...line, pickupMethodId: 'pm-order' }] });
+  assert.equal(byOrder.status, 201, JSON.stringify(byOrder.json));
+  const sold = (await query('SELECT unit_price, attributes FROM sales_order_lines WHERE sale_id=$1 OR order_id=$1', [byOrder.json.data.id || byOrder.json.data.saleId])).rows[0];
+  assert.equal(Number(sold.unit_price), 5200, 'order price of the product');
+  assert.equal(sold.attributes[0].value, 'Preto');
+  assert.ok((await query("SELECT 1 FROM product_attribute_values WHERE attribute_id='ATTR-cor-sale' AND value='Preto'")).rows.length, 'new color created in the attribute');
+  const inHand = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Ramon', customerPhone: '24992259927', lines: [{ ...line, attributes: [{ id: 'ATTR-cor-sale', name: 'Cor', value: 'Verde' }], pickupMethodId: 'pm-hand' }] });
+  assert.equal(inHand.status, 400);
+  assert.match(inHand.json.error.message, /Não há Verde em estoque para entrega imediata/);
+});

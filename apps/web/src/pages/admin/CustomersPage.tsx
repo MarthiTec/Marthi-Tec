@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -17,85 +17,144 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
-import {
-  getAdminState,
-  removeCustomer,
-  type Customer,
-  upsertCustomer,
-} from '../../data/adminStore';
-import {
-  listQuotesForCustomer,
-  POS_QUOTES_EVENT,
-  QUOTE_STATUS_COLOR,
-  QUOTE_STATUS_LABEL,
-  type PosQuote,
-} from '../../data/posQuotesStore';
+import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
+import { CustomerSummaryPanel } from '../../components/CustomerSummaryPanel';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { listQuotesForCustomer, POS_QUOTES_EVENT, QUOTE_STATUS_COLOR, QUOTE_STATUS_LABEL, type PosQuote } from '../../data/posQuotesStore';
 import { QuoteCommercialPrintModal } from '../../components/QuoteCommercialPrintModal';
+import {
+  apiDeleteCustomer,
+  apiListCustomerRecords,
+  apiListSellers,
+  apiSaveCustomerRecord,
+  type ApiCustomerRecord,
+} from '../../services/erpApi';
 import { formatCpfCnpj } from '../../utils/documentUtils';
-
-const EMPTY = {
-  name: '',
-  phone: '',
-  document: '',
-  email: '',
-  city: '',
-  zipCode: '',
-  street: '',
-  number: '',
-  complement: '',
-  neighborhood: '',
-  state: '',
-  active: true,
-};
 
 type Mode = 'new' | 'edit' | 'view';
 
-const REFRESH_EVENTS = [
-  'marthi-admin-state',
-  'marthi-os-state',
-  'marthi-erp-bootstrap',
-  'marthi-stock',
-  POS_QUOTES_EVENT,
-] as const;
+type Form = {
+  name: string;
+  tradeName: string;
+  documentType: DocumentType;
+  document: string;
+  phone: string;
+  phones: string[];
+  email: string;
+  emails: string[];
+  address: AddressValue;
+  sellerId: string;
+  notes: string;
+  active: boolean;
+};
 
+const EMPTY: Form = {
+  name: '',
+  tradeName: '',
+  documentType: 'cpf',
+  document: '',
+  phone: '',
+  phones: [],
+  email: '',
+  emails: [],
+  address: EMPTY_ADDRESS,
+  sellerId: '',
+  notes: '',
+  active: true,
+};
+
+function formFrom(customer: ApiCustomerRecord): Form {
+  return {
+    name: customer.name,
+    tradeName: customer.tradeName ?? '',
+    documentType: customer.documentType === 'cnpj' ? 'cnpj' : 'cpf',
+    document: customer.document ? formatCpfCnpj(customer.document) : '',
+    phone: customer.phone ?? '',
+    phones: customer.phones ?? [],
+    email: customer.email ?? '',
+    emails: customer.emails ?? [],
+    address: {
+      zipCode: customer.zipCode ?? '',
+      street: customer.street ?? '',
+      number: customer.number ?? '',
+      complement: customer.complement ?? '',
+      district: customer.district ?? '',
+      city: customer.city ?? '',
+      state: customer.state ?? '',
+    },
+    sellerId: customer.sellerId ?? '',
+    notes: customer.notes ?? '',
+    active: customer.active !== false,
+  };
+}
+
+/** Clientes da loja: tudo lido e gravado direto no banco. */
 export function CustomersPage() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<CrudStatusFilter>('all');
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState<Form>(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
   const [formVisible, setFormVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>();
-  const [customers, setCustomers] = useState(() => getAdminState().customers);
+  const [customers, setCustomers] = useState<ApiCustomerRecord[]>([]);
+  const [sellers, setSellers] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [printQuoteModal, setPrintQuoteModal] = useState<PosQuote | null>(null);
+  const [quotesTick, setQuotesTick] = useState(0);
+
+  const reload = useCallback(async () => {
+    try {
+      const [rows, sellerRows] = await Promise.all([apiListCustomerRecords(), apiListSellers()]);
+      setCustomers(rows);
+      setSellers(sellerRows.filter((seller) => seller.active !== false).map((seller) => ({ id: seller.id, name: seller.name })));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar os clientes.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    function refresh() {
-      setCustomers(getAdminState().customers);
-    }
-    for (const event of REFRESH_EVENTS) window.addEventListener(event, refresh);
-    return () => {
-      for (const event of REFRESH_EVENTS) window.removeEventListener(event, refresh);
+    const load = () => {
+      setLoading(true);
+      setFormVisible(false);
+      void reload();
     };
-  }, []);
+    load();
+    const quotes = () => setQuotesTick((n) => n + 1);
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    window.addEventListener(POS_QUOTES_EVENT, quotes);
+    return () => {
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+      window.removeEventListener(POS_QUOTES_EVENT, quotes);
+    };
+  }, [reload]);
+
+  const sellerName = useMemo(() => new Map(sellers.map((seller) => [seller.id, seller.name])), [sellers]);
 
   const filtered = useMemo(
     () =>
       customers.filter(
         (item) =>
           matchesStatus(item.active !== false, status) &&
-          matchesQuery(`${item.name} ${item.phone} ${item.document} ${item.email} ${item.city}`, query),
+          matchesQuery(
+            `${item.name} ${item.tradeName} ${item.phone} ${(item.phones ?? []).join(' ')} ${item.document} ${item.email} ${item.city} ${sellerName.get(item.sellerId) ?? ''}`,
+            query,
+          ),
       ),
-    [customers, query, status],
+    [customers, query, status, sellerName],
   );
 
   const readOnly = mode === 'view';
 
-  // Orçamentos vinculados ao cliente selecionado
   const customerQuotes = useMemo(() => {
     if (!selectedId) return [];
     return listQuotesForCustomer(selectedId, form.document, form.phone);
-  }, [selectedId, form.document, form.phone, formVisible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, form.document, form.phone, formVisible, quotesTick]);
 
   function resetForm() {
     setForm(EMPTY);
@@ -114,56 +173,59 @@ export function CustomersPage() {
     setFormVisible(true);
   }
 
-  function loadItem(customer: Customer, nextMode: Mode) {
+  function loadItem(customer: ApiCustomerRecord, nextMode: Mode) {
     setSelectedId(customer.id);
     setMode(nextMode);
     setFormVisible(true);
-    setForm({
-      name: customer.name,
-      phone: customer.phone,
-      document: customer.document,
-      email: customer.email,
-      city: customer.city,
-      zipCode: customer.zipCode || '',
-      street: customer.street || '',
-      number: customer.number || '',
-      complement: customer.complement || '',
-      neighborhood: customer.neighborhood || '',
-      state: customer.state || '',
-      active: customer.active !== false,
-    });
+    setError('');
+    setForm(formFrom(customer));
   }
 
-  function duplicateCustomer(customer: Customer) {
+  function duplicateCustomer(customer: ApiCustomerRecord) {
     loadItem(customer, 'new');
     setSelectedId(undefined);
-    setForm((prev) => ({
-      ...prev,
-      name: `${customer.name} (Cópia)`,
-    }));
+    setForm((prev) => ({ ...prev, name: `${customer.name} (cópia)`, phone: '', document: '' }));
   }
 
   async function submit() {
-    if (readOnly) return;
-    if (!form.name.trim() || form.phone.replace(/\D/g, '').length < 8) return;
+    if (readOnly || saving) return;
+    if (!form.name.trim()) {
+      setError(form.documentType === 'cnpj' ? 'Informe a razão social.' : 'Informe o nome do cliente.');
+      return;
+    }
+    setSaving(true);
     setError('');
     try {
-      const next = await upsertCustomer({ ...form, id: mode === 'edit' ? selectedId : undefined });
-      setCustomers(next.customers);
-      resetForm();
-      setFormVisible(false);
+      await apiSaveCustomerRecord(mode === 'edit' ? selectedId : undefined, {
+        name: form.name.trim(),
+        tradeName: form.documentType === 'cnpj' ? form.tradeName.trim() : '',
+        documentType: form.documentType,
+        document: form.document.trim(),
+        phone: form.phone.trim(),
+        phones: form.phones.map((item) => item.trim()).filter(Boolean),
+        email: form.email.trim(),
+        emails: form.emails.map((item) => item.trim()).filter(Boolean),
+        ...form.address,
+        sellerId: form.sellerId || null,
+        notes: form.notes.trim(),
+        active: form.active,
+      });
+      await reload();
+      closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar cliente.');
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function remove(customer: Customer) {
+  async function remove(customer: ApiCustomerRecord) {
     if (!confirmDelete(`o cliente ${customer.name}`)) return;
     setError('');
     try {
-      const next = await removeCustomer(customer.id);
-      setCustomers(next.customers);
+      await apiDeleteCustomer(customer.id);
       if (selectedId === customer.id) closeForm();
+      await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao remover cliente.');
     }
@@ -179,7 +241,7 @@ export function CustomersPage() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [formVisible, readOnly, mode, form, selectedId]);
+  });
 
   const headingActions = (
     <PageHeadingActions>
@@ -199,18 +261,15 @@ export function CustomersPage() {
     </PageHeadingActions>
   );
 
+  const isCompany = form.documentType === 'cnpj';
+
   return (
     <section className="admin-page">
       {headingActions}
+      {error && !formVisible ? <p role="alert" className="qty-low">{error}</p> : null}
       {!formVisible ? (
         <article className="admin-card">
-          <CrudListBar
-            query={query}
-            onQueryChange={setQuery}
-            placeholder="Buscar cliente, telefone, documento…"
-            status={status}
-            onStatusChange={setStatus}
-          />
+          <CrudListBar query={query} onQueryChange={setQuery} placeholder="Buscar nome, telefone, documento, vendedor…" status={status} onStatusChange={setStatus} />
           <div className="admin-table-container">
             <table className="admin-table">
               <thead>
@@ -219,31 +278,34 @@ export function CustomersPage() {
                   <th>Telefone</th>
                   <th>Documento</th>
                   <th>Cidade</th>
+                  <th>Vendedor</th>
                   <th>Status</th>
-                  <th className="admin-table__actions" style={{ textAlign: 'center', width: '130px' }}>
-                    Ações
-                  </th>
+                  <th className="admin-table__actions" style={{ textAlign: 'center', width: '130px' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {loading && customers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="empty">
-                      Nenhum cliente encontrado.
-                    </td>
+                    <td colSpan={7} className="empty">Carregando…</td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty">Nenhum cliente encontrado.</td>
                   </tr>
                 ) : (
                   filtered.map((customer) => (
                     <tr key={customer.id}>
-                      <td>
+                      <td data-label="Nome">
                         <CrudNameButton onClick={() => loadItem(customer, 'view')}>
                           <strong>{customer.name}</strong>
                         </CrudNameButton>
+                        {customer.documentType === 'cnpj' ? <small className="customer-kind">PJ</small> : null}
                       </td>
-                      <td>{customer.phone}</td>
-                      <td>{customer.document ? formatCpfCnpj(customer.document) : '—'}</td>
-                      <td>{customer.city || '—'}</td>
-                      <td>
+                      <td data-label="Telefone">{customer.phone || '—'}</td>
+                      <td data-label="Documento">{customer.document ? formatCpfCnpj(customer.document) : '—'}</td>
+                      <td data-label="Cidade">{customer.city ? `${customer.city}${customer.state ? `/${customer.state}` : ''}` : '—'}</td>
+                      <td data-label="Vendedor">{sellerName.get(customer.sellerId) ?? '—'}</td>
+                      <td data-label="Status">
                         <span className={`status-pill ${customer.active !== false ? 'status-pill--active' : 'status-pill--inactive'}`}>
                           {customer.active !== false ? 'Ativo' : 'Inativo'}
                         </span>
@@ -266,95 +328,79 @@ export function CustomersPage() {
       ) : null}
 
       {formVisible ? (
-        <article className="admin-card">
-          <h2>{crudFormTitle(mode, 'cliente')}</h2>
-          {error ? <p className="qty-low" style={{ color: '#ef4444' }}>{error}</p> : null}
-          <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-            <label>
-              Nome / Razão Social
-              <input
-                value={form.name}
+        <>
+          <article className="admin-card">
+            <h2>{crudFormTitle(mode, 'cliente')}</h2>
+            {error ? <p role="alert" className="qty-low">{error}</p> : null}
+            <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+              <PersonTypeField
+                type={form.documentType}
+                document={form.document}
                 disabled={readOnly}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Nome completo ou Razão Social"
+                onChange={(documentType, document) => setForm({ ...form, documentType, document })}
               />
-            </label>
-            <label>
-              Telefone / WhatsApp
-              <input
-                value={form.phone}
+              <label>
+                {isCompany ? 'Razão social' : 'Nome completo'}
+                <input
+                  value={form.name}
+                  disabled={readOnly}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={isCompany ? 'Razão social da empresa' : 'Nome do cliente'}
+                />
+              </label>
+              {isCompany ? (
+                <label>
+                  Nome fantasia
+                  <input value={form.tradeName} disabled={readOnly} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} />
+                </label>
+              ) : null}
+              <AdminPicker
+                label="Vendedor responsável"
+                value={form.sellerId}
                 disabled={readOnly}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="(00) 00000-0000"
+                options={[{ value: '', label: 'Nenhum' }, ...sellers.map((seller) => ({ value: seller.id, label: seller.name }))]}
+                onChange={(sellerId) => setForm({ ...form, sellerId })}
               />
-            </label>
-            <label>
-              CPF / CNPJ
-              <input
-                value={form.document}
+              <AdminPicker
+                label="Situação"
+                value={form.active ? '1' : '0'}
                 disabled={readOnly}
-                onChange={(e) => setForm({ ...form, document: e.target.value.toUpperCase() })}
-                placeholder="CPF ou CNPJ (inclusive alfanumérico)"
+                options={[
+                  { value: '1', label: 'Ativo' },
+                  { value: '0', label: 'Inativo' },
+                ]}
+                onChange={(value) => setForm({ ...form, active: value === '1' })}
               />
-            </label>
-            <label>
-              E-mail
-              <input
-                type="email"
-                value={form.email}
-                disabled={readOnly}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="cliente@email.com"
-              />
-            </label>
-            <label>
-              Cidade
-              <input
-                value={form.city}
-                disabled={readOnly}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-                placeholder="Cidade"
-              />
-            </label>
-            <AdminPicker
-              label="Situação"
-              value={form.active ? '1' : '0'}
-              disabled={readOnly}
-              options={[
-                { value: '1', label: 'Ativo' },
-                { value: '0', label: 'Inativo' },
-              ]}
-              onChange={(value) => setForm({ ...form, active: value === '1' })}
-            />
-          </div>
+              <ContactListField kind="phone" primary={form.phone} extras={form.phones} disabled={readOnly} onChange={(phone, phones) => setForm({ ...form, phone, phones })} />
+              <ContactListField kind="email" primary={form.email} extras={form.emails} disabled={readOnly} onChange={(email, emails) => setForm({ ...form, email, emails })} />
+              <AddressFields value={form.address} disabled={readOnly} onChange={(address) => setForm({ ...form, address })} />
+              <label className="span-2">
+                Observações
+                <textarea rows={3} value={form.notes} disabled={readOnly} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </label>
+            </div>
+          </article>
 
-          {/* HISTÓRICO DE ORÇAMENTOS COMERCIAIS DO CLIENTE */}
+          {selectedId ? <CustomerSummaryPanel customerId={selectedId} /> : null}
+
           {selectedId ? (
-            <div style={{ marginTop: 28, borderTop: '1px solid var(--line, #e2e8f0)', paddingTop: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  📑 Histórico de Orçamentos Comerciais
-                  <span className="badge badge--subtle" style={{ fontSize: '0.8rem' }}>
-                    {customerQuotes.length}
-                  </span>
-                </h3>
-              </div>
-
+            <article className="admin-card">
+              <h3 className="customer-section-title">
+                Orçamentos comerciais <span className="badge badge--subtle">{customerQuotes.length}</span>
+              </h3>
               {customerQuotes.length === 0 ? (
-                <p className="empty" style={{ margin: '8px 0 0' }}>
-                  Nenhum orçamento comercial emitido para este cliente até o momento.
-                </p>
+                <p className="empty">Nenhum orçamento emitido para este cliente.</p>
               ) : (
                 <div className="admin-table-container">
                   <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>Nº Proposta</th>
+                        <th>Nº</th>
                         <th>Emissão</th>
                         <th>Validade</th>
                         <th>Vendedor</th>
                         <th>Itens</th>
-                        <th>Valor Total</th>
+                        <th>Total</th>
                         <th>Status</th>
                         <th style={{ textAlign: 'center', width: '130px' }}>Ações</th>
                       </tr>
@@ -364,41 +410,19 @@ export function CustomersPage() {
                         const color = QUOTE_STATUS_COLOR[q.status] || { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' };
                         return (
                           <tr key={q.id}>
-                            <td>
-                              <strong>#{q.quoteNumber}</strong>
-                            </td>
-                            <td>{new Date(q.createdAt).toLocaleDateString('pt-BR')}</td>
-                            <td>{new Date(q.expiresAt).toLocaleDateString('pt-BR')}</td>
-                            <td>{q.sellerName || '—'}</td>
-                            <td>{q.lines.length} un.</td>
-                            <td>
-                              <strong style={{ color: 'var(--accent, #10b981)' }}>
-                                R$ {q.total.toFixed(2)}
-                              </strong>
-                            </td>
-                            <td>
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  padding: '2px 8px',
-                                  borderRadius: 999,
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  background: color.bg,
-                                  color: color.text,
-                                  border: `1px solid ${color.border}`,
-                                }}
-                              >
+                            <td data-label="Nº"><strong>#{q.quoteNumber}</strong></td>
+                            <td data-label="Emissão">{new Date(q.createdAt).toLocaleDateString('pt-BR')}</td>
+                            <td data-label="Validade">{new Date(q.expiresAt).toLocaleDateString('pt-BR')}</td>
+                            <td data-label="Vendedor">{q.sellerName || '—'}</td>
+                            <td data-label="Itens">{q.lines.length} un.</td>
+                            <td data-label="Total"><strong>{q.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td>
+                            <td data-label="Status">
+                              <span className="quote-status" style={{ background: color.bg, color: color.text, borderColor: color.border }}>
                                 {QUOTE_STATUS_LABEL[q.status]}
                               </span>
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn--secondary btn--sm"
-                                onClick={() => setPrintQuoteModal(q)}
-                                title="Visualizar e Imprimir proposta timbrada"
-                              >
+                              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPrintQuoteModal(q)}>
                                 📄 Proposta
                               </button>
                             </td>
@@ -409,18 +433,13 @@ export function CustomersPage() {
                   </table>
                 </div>
               )}
-            </div>
+            </article>
           ) : null}
-        </article>
+        </>
       ) : null}
 
-      {/* MODAL DE IMPRESSÃO / VISUALIZAÇÃO COMERCIAL */}
       {printQuoteModal ? (
-        <QuoteCommercialPrintModal
-          quote={printQuoteModal}
-          open={Boolean(printQuoteModal)}
-          onClose={() => setPrintQuoteModal(null)}
-        />
+        <QuoteCommercialPrintModal quote={printQuoteModal} open={Boolean(printQuoteModal)} onClose={() => setPrintQuoteModal(null)} />
       ) : null}
     </section>
   );

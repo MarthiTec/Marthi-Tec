@@ -1,0 +1,120 @@
+.customer-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.customer-kind {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(var(--accent-rgb, 15, 118, 110), 0.12);
+  color: var(--accent, #0f766e);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.quote-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.customer-summary__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.customer-summary__kpis > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-2, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+.customer-summary__kpis small {
+  color: var(--mute, #64748b);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.customer-summary__kpis strong {
+  font-size: 1.25rem;
+}
+
+.customer-summary__kpis span {
+  color: var(--mute, #64748b);
+  font-size: 0.78rem;
+}
+
+.customer-summary__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.customer-summary__cols h4 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.customer-summary__bars,
+.customer-summary__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.customer-summary__bars li {
+  display: grid;
+  gap: 4px;
+}
+
+.customer-summary__bars li > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.customer-summary__bars i {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent, #0f766e);
+}
+
+.customer-summary__bars small,
+.customer-summary__list small {
+  color: var(--mute, #64748b);
+  font-size: 0.76rem;
+}
+
+.customer-summary__list li {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line, #e2e8f0);
+  font-size: 0.86rem;
+}
+
+.customer-summary__list em {
+  margin-left: 6px;
+  color: var(--accent, #0f766e);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 700;
+}

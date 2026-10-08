@@ -626,3 +626,51 @@
 }
 
 
+
+/* Celular: a aba Comunicação não pode passar da largura da tela (rótulos longos quebram a linha). */
+.comm-card,
+.comm-card > *,
+.comm-card form,
+.comm-card form > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.comm-card h2,
+.comm-card h3,
+.comm-card p {
+  overflow-wrap: anywhere;
+}
+.comm-field__label {
+  height: auto;
+  min-height: 22px;
+  white-space: normal;
+}
+@media (max-width: 640px) {
+  .comm-form-row--2,
+  .comm-form-row--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ops-board__head > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media (max-width: 640px) {
+  /* Os blocos da aba Comunicação usam estilos embutidos: no celular tudo vira uma coluna só. */
+  .comm-card {
+    padding: 14px !important;
+  }
+  .comm-card * {
+    min-width: 0 !important;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .comm-card [style*='display: grid'],
+  .comm-card .comm-form-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .comm-card [style*='padding: 20px'],
+  .comm-card [style*='padding: 24px'] {
+    padding: 14px !important;
+  }
+}

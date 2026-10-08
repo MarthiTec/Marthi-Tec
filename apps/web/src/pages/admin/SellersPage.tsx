@@ -1,547 +1,280 @@
-import { useEffect, useMemo, useState } from 'react';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
-
 import {
-
   confirmDelete,
-
   CrudListBar,
-
   CrudNameButton,
-
   CrudRowActions,
-
   crudFormTitle,
-
   matchesQuery,
-
   matchesStatus,
-
   type CrudStatusFilter,
-
 } from '../../components/CrudKit';
-
-import {
-
-  HeadingCancelButton,
-
-  HeadingEditButton,
-
-  HeadingNewButton,
-
-  HeadingSaveButton,
-
-  PageHeadingActions,
-
-} from '../../components/PageHeadingActions';
-
+import { CurrencyInput } from '../../components/CurrencyInput';
+import { HeadingCancelButton, HeadingEditButton, HeadingNewButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
+import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
 import { useAuth } from '../../contexts/AuthContext';
-
 import { logAction } from '../../data/auditLog';
-
-import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
-
-import {
-
-  listSellers,
-
-  removeSeller,
-
-  upsertSeller,
-
-  type Seller,
-
-} from '../../data/erpRegistry';
-
-
-
-const EMPTY = {
-
-  name: '',
-
-  phone: '',
-
-  email: '',
-
-  document: '',
-
-  commissionPercent: 0,
-
-  active: true,
-
-};
-
-
+import { hydrateErpRegistryFromApi } from '../../data/erpRegistry';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { apiCreateSeller, apiDeleteSeller, apiListSellers, apiUpdateSeller, type ApiSeller } from '../../services/erpApi';
+import { formatCpfCnpj } from '../../utils/documentUtils';
 
 type Mode = 'new' | 'edit' | 'view';
+type Form = {
+  name: string;
+  documentType: DocumentType;
+  document: string;
+  phone: string;
+  phones: string[];
+  email: string;
+  emails: string[];
+  address: AddressValue;
+  commissionPercent: number;
+  active: boolean;
+};
 
+const EMPTY: Form = { name: '', documentType: 'cpf', document: '', phone: '', phones: [], email: '', emails: [], address: EMPTY_ADDRESS, commissionPercent: 0, active: true };
 
+function formFrom(item: ApiSeller): Form {
+  return {
+    name: item.name,
+    documentType: item.documentType === 'cnpj' ? 'cnpj' : 'cpf',
+    document: item.document ? formatCpfCnpj(item.document) : '',
+    phone: item.phone ?? '',
+    phones: item.phones ?? [],
+    email: item.email ?? '',
+    emails: item.emails ?? [],
+    address: {
+      zipCode: item.zipCode ?? '',
+      street: item.street ?? '',
+      number: item.number ?? '',
+      complement: item.complement ?? '',
+      district: item.district ?? '',
+      city: item.city ?? '',
+      state: item.state ?? '',
+    },
+    commissionPercent: Number(item.commissionPercent) || 0,
+    active: item.active !== false,
+  };
+}
 
+/** Vendedores da loja (comissão, contatos e endereço), lidos e gravados direto no banco. */
 export function SellersPage() {
-
   const { user } = useAuth();
-
-  const [items, setItems] = useState(() => listSellers());
-
+  const [items, setItems] = useState<ApiSeller[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-
   const [status, setStatus] = useState<CrudStatusFilter>('all');
-
-  const [form, setForm] = useState(EMPTY);
-
+  const [form, setForm] = useState<Form>(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
-
   const [formVisible, setFormVisible] = useState(false);
-
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    function refresh() {
-      setItems(listSellers());
+  const reload = useCallback(async () => {
+    try {
+      setItems(await apiListSellers());
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar os vendedores.');
+    } finally {
+      setLoading(false);
     }
-    window.addEventListener(ERP_BOOTSTRAP_EVENT, refresh);
-    window.addEventListener('marthi-erp-registry-updated', refresh);
-    return () => {
-      window.removeEventListener(ERP_BOOTSTRAP_EVENT, refresh);
-      window.removeEventListener('marthi-erp-registry-updated', refresh);
-    };
   }, []);
 
+  useEffect(() => {
+    const load = () => {
+      setLoading(true);
+      setFormVisible(false);
+      void reload();
+    };
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+  }, [reload]);
+
   const filtered = useMemo(
-
     () =>
-
       items.filter(
-
-        (item) =>
-
-          matchesStatus(item.active, status) &&
-
-          matchesQuery(`${item.name} ${item.phone} ${item.email} ${item.document}`, query),
-
+        (item) => matchesStatus(item.active !== false, status) && matchesQuery(`${item.name} ${item.phone} ${item.email} ${item.document} ${item.city ?? ''}`, query),
       ),
-
     [items, query, status],
-
   );
-
-
 
   const readOnly = mode === 'view';
 
-
-
-  function resetForm() {
-
-    setForm(EMPTY);
-
-    setSelectedId(undefined);
-
-    setMode('new');
-
-  }
-
-
-
   function closeForm() {
-
-    resetForm();
-
+    setForm(EMPTY);
+    setSelectedId(undefined);
+    setMode('new');
+    setError('');
     setFormVisible(false);
-
   }
-
-
 
   function startNew() {
-
-    resetForm();
-
+    setForm(EMPTY);
+    setSelectedId(undefined);
+    setMode('new');
+    setError('');
     setFormVisible(true);
-
   }
 
-
-
-  function loadItem(item: Seller, nextMode: Mode) {
-
+  function loadItem(item: ApiSeller, nextMode: Mode) {
     setSelectedId(item.id);
-
     setMode(nextMode);
-
+    setError('');
+    setForm(formFrom(item));
     setFormVisible(true);
-
-    setForm({
-
-      name: item.name,
-
-      phone: item.phone,
-
-      email: item.email,
-
-      document: item.document,
-
-      commissionPercent: item.commissionPercent,
-
-      active: item.active,
-
-    });
-
   }
-
-
 
   async function submit() {
-
-    if (readOnly || !form.name.trim()) return;
-
-    const next = await upsertSeller({ ...form, id: mode === 'edit' ? selectedId : undefined });
-
-    setItems(next.sellers);
-
-    logAction({
-
-      actorName: user?.name ?? 'Operador',
-
-      actorEmail: user?.email ?? '',
-
-      action: mode === 'edit' ? 'vendedor.atualizar' : 'vendedor.criar',
-
-      detail: form.name,
-
-    });
-
-    resetForm();
-
-    setFormVisible(false);
-
+    if (readOnly || saving) return;
+    if (!form.name.trim()) {
+      setError('Informe o nome do vendedor.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    const body = {
+      name: form.name.trim(),
+      documentType: form.documentType,
+      document: form.document.trim(),
+      phone: form.phone.trim(),
+      phones: form.phones.map((item) => item.trim()).filter(Boolean),
+      email: form.email.trim(),
+      emails: form.emails.map((item) => item.trim()).filter(Boolean),
+      ...form.address,
+      commissionPercent: form.commissionPercent,
+      active: form.active,
+    };
+    try {
+      if (mode === 'edit' && selectedId) await apiUpdateSeller(selectedId, body);
+      else await apiCreateSeller(body);
+      logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: mode === 'edit' ? 'vendedor.atualizar' : 'vendedor.criar', detail: form.name });
+      await reload();
+      void hydrateErpRegistryFromApi().catch(() => undefined);
+      closeForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar vendedor.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-
-
-  async function remove(item: Seller) {
-
+  async function remove(item: ApiSeller) {
     if (!confirmDelete(`o vendedor ${item.name}`)) return;
-
-    const next = await removeSeller(item.id);
-
-    setItems(next.sellers);
-
-    logAction({
-
-      actorName: user?.name ?? 'Operador',
-
-      actorEmail: user?.email ?? '',
-
-      action: 'vendedor.excluir',
-
-      detail: item.name,
-
-    });
-
-    if (selectedId === item.id) closeForm();
-
+    try {
+      await apiDeleteSeller(item.id);
+      logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: 'vendedor.excluir', detail: item.name });
+      if (selectedId === item.id) closeForm();
+      await reload();
+      void hydrateErpRegistryFromApi().catch(() => undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao excluir vendedor.');
+    }
   }
-
-
 
   useEffect(() => {
-
     if (!formVisible || readOnly) return;
-
     function onKey(event: KeyboardEvent) {
-
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-
         event.preventDefault();
-
-        submit();
-
+        void submit();
       }
-
     }
-
     window.addEventListener('keydown', onKey);
-
     return () => window.removeEventListener('keydown', onKey);
-
-  }, [formVisible, readOnly, mode, form, selectedId]);
-
-
-
-  const headingActions = (
-
-    <PageHeadingActions>
-
-      {!formVisible ? (
-
-        <HeadingNewButton onClick={startNew} label="Novo vendedor" />
-
-      ) : readOnly ? (
-
-        <>
-
-          <HeadingCancelButton onClick={closeForm} label="Fechar" />
-
-          <HeadingEditButton onClick={() => setMode('edit')} />
-
-        </>
-
-      ) : (
-
-        <>
-
-          <HeadingCancelButton onClick={closeForm} />
-
-          <HeadingSaveButton onClick={() => submit()} />
-
-        </>
-
-      )}
-
-    </PageHeadingActions>
-
-  );
-
-
+  });
 
   return (
-
     <section className="admin-page">
-
-      {headingActions}
+      <PageHeadingActions>
+        {!formVisible ? (
+          <HeadingNewButton onClick={startNew} label="Novo vendedor" />
+        ) : readOnly ? (
+          <>
+            <HeadingCancelButton onClick={closeForm} label="Fechar" />
+            <HeadingEditButton onClick={() => setMode('edit')} />
+          </>
+        ) : (
+          <>
+            <HeadingCancelButton onClick={closeForm} />
+            <HeadingSaveButton onClick={() => void submit()} />
+          </>
+        )}
+      </PageHeadingActions>
+      {error && !formVisible ? <p role="alert" className="qty-low">{error}</p> : null}
 
       {!formVisible ? (
-
         <article className="admin-card">
-
-          <CrudListBar
-
-            query={query}
-
-            onQueryChange={setQuery}
-
-            placeholder="Buscar vendedor…"
-
-            status={status}
-
-            onStatusChange={setStatus}
-
-          />
-
-          <div className="admin-table-container"><table className="admin-table">
-
-            <thead>
-
-              <tr>
-
-                <th>Nome</th>
-
-                <th>Telefone</th>
-
-                <th>Comissão</th>
-
-                <th>Status</th>
-
-                <th></th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {filtered.length === 0 ? (
-
+          <CrudListBar query={query} onQueryChange={setQuery} placeholder="Buscar vendedor…" status={status} onStatusChange={setStatus} />
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
                 <tr>
-
-                  <td colSpan={5} className="empty">
-
-                    Nenhum vendedor encontrado.
-
-                  </td>
-
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th>Comissão</th>
+                  <th>Cidade</th>
+                  <th>Status</th>
+                  <th className="admin-table__actions">Ações</th>
                 </tr>
-
-              ) : (
-
-                filtered.map((item) => (
-
-                  <tr key={item.id}>
-
-                    <td>
-
-                      <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
-
-                    </td>
-
-                    <td>{item.phone || '—'}</td>
-
-                    <td>{item.commissionPercent}%</td>
-
-                    <td>{item.active ? 'Ativo' : 'Inativo'}</td>
-
-                    <td className="admin-table__actions">
-
-                      <CrudRowActions
-
-                        onView={() => loadItem(item, 'view')}
-
-                        onEdit={() => loadItem(item, 'edit')}
-
-                        onDelete={() => remove(item)}
-
-                      />
-
-                    </td>
-
-                  </tr>
-
-                ))
-
-              )}
-
-            </tbody>
-
-          </table></div>
-
-        </article>
-
-      ) : null}
-
-
-
-      {formVisible ? (
-
-        <article className="admin-card">
-
-          <h2>{crudFormTitle(mode, 'vendedor')}</h2>
-
-          <p>Usado na OS e no PDV para comissão e rastreio de venda.</p>
-
-          <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
-
-            <label>
-
-              Nome
-
-              <input
-
-                value={form.name}
-
-                disabled={readOnly}
-
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-
-              />
-
-            </label>
-
-            <label>
-
-              Telefone
-
-              <input
-
-                value={form.phone}
-
-                disabled={readOnly}
-
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-
-              />
-
-            </label>
-
-            <label>
-
-              E-mail
-
-              <input
-
-                value={form.email}
-
-                disabled={readOnly}
-
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-
-              />
-
-            </label>
-
-            <label>
-
-              CPF / documento
-
-              <input
-
-                value={form.document}
-
-                disabled={readOnly}
-
-                onChange={(e) => setForm({ ...form, document: e.target.value })}
-
-              />
-
-            </label>
-
-            <label>
-
-              Comissão (%)
-
-              <input
-
-                type="number"
-
-                min={0}
-
-                step={0.1}
-
-                value={form.commissionPercent}
-
-                disabled={readOnly}
-
-                onChange={(e) =>
-
-                  setForm({ ...form, commissionPercent: Number(e.target.value) || 0 })
-
-                }
-
-              />
-
-            </label>
-
-            <AdminPicker
-
-              label="Situação"
-
-              value={form.active ? '1' : '0'}
-
-              disabled={readOnly}
-
-              options={[
-
-                { value: '1', label: 'Ativo' },
-
-                { value: '0', label: 'Inativo' },
-
-              ]}
-
-              onChange={(value) => setForm({ ...form, active: value === '1' })}
-
-            />
-
+              </thead>
+              <tbody>
+                {loading && items.length === 0 ? (
+                  <tr><td colSpan={6} className="empty">Carregando…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={6} className="empty">Nenhum vendedor encontrado.</td></tr>
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id}>
+                      <td data-label="Nome">
+                        <CrudNameButton onClick={() => loadItem(item, 'view')}>{item.name}</CrudNameButton>
+                      </td>
+                      <td data-label="Telefone">{item.phone || '—'}</td>
+                      <td data-label="Comissão">{Number(item.commissionPercent || 0).toLocaleString('pt-BR')}%</td>
+                      <td data-label="Cidade">{item.city ? `${item.city}${item.state ? `/${item.state}` : ''}` : '—'}</td>
+                      <td data-label="Status">{item.active !== false ? 'Ativo' : 'Inativo'}</td>
+                      <td className="admin-table__actions">
+                        <CrudRowActions onView={() => loadItem(item, 'view')} onEdit={() => loadItem(item, 'edit')} onDelete={() => void remove(item)} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-
         </article>
-
-      ) : null}
-
+      ) : (
+        <article className="admin-card">
+          <h2>{crudFormTitle(mode, 'vendedor')}</h2>
+          <p className="empty">Usado no PDV, na venda externa e na OS para comissão; pode ficar vinculado aos clientes.</p>
+          {error ? <p role="alert" className="qty-low">{error}</p> : null}
+          <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+            <PersonTypeField type={form.documentType} document={form.document} disabled={readOnly} onChange={(documentType, document) => setForm({ ...form, documentType, document })} />
+            <label>
+              {form.documentType === 'cnpj' ? 'Razão social' : 'Nome completo'}
+              <input value={form.name} disabled={readOnly} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </label>
+            <label>
+              Comissão (%)
+              <CurrencyInput value={form.commissionPercent} decimals={2} disabled={readOnly} ariaLabel="Comissão em porcentagem" onChange={(commissionPercent) => setForm({ ...form, commissionPercent })} />
+            </label>
+            <ContactListField kind="phone" primary={form.phone} extras={form.phones} disabled={readOnly} onChange={(phone, phones) => setForm({ ...form, phone, phones })} />
+            <ContactListField kind="email" primary={form.email} extras={form.emails} disabled={readOnly} onChange={(email, emails) => setForm({ ...form, email, emails })} />
+            <AddressFields value={form.address} disabled={readOnly} onChange={(address) => setForm({ ...form, address })} />
+            <AdminPicker
+              label="Situação"
+              value={form.active ? '1' : '0'}
+              disabled={readOnly}
+              options={[{ value: '1', label: 'Ativo' }, { value: '0', label: 'Inativo' }]}
+              onChange={(value) => setForm({ ...form, active: value === '1' })}
+            />
+          </div>
+        </article>
+      )}
     </section>
-
   );
-
 }
-
-

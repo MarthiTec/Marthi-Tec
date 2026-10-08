@@ -501,7 +501,7 @@ export function ExternalSalePage() {
                         { value: '', label: 'Selecione um produto do estoque…' },
                         ...stockItems.filter((p) => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
                           value: p.id,
-                          label: `${p.name}${p.attrs ? ' · ' + Object.values(p.attrs).filter(Boolean).join(' · ') : ''} · ${formatMoney(p.price)} (disp.: ${p.qty})`,
+                          label: [p.name, ...Object.values(p.attrs ?? {}).filter((value) => typeof value === 'string' && value), `${formatMoney(p.price)} (disp.: ${p.qty})`].join(' · '),
                         })),
                       ]}
                       onChange={(val) => handleLineProductChange(idx, val)}
