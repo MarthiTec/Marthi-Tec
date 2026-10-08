@@ -53,6 +53,7 @@ const defaultTotemSettings = {
   topBanners: [] as string[],
   cartEnabled: false,
   checkoutGesture: 'button',
+  whatsAppCheckout: true,
 };
 
 const totemSettingsSchema = z.object({
@@ -90,6 +91,8 @@ const totemSettingsSchema = z.object({
   topBanners: z.array(z.string().startsWith('data:image/').max(1_500_000)).max(5).default([]),
   cartEnabled: z.boolean().default(false),
   checkoutGesture: z.enum(['button', 'swipe']).default('button'),
+  /** Botão "Concluir pelo WhatsApp" no fim do pedido. Desligado: só caixa (e ticket impresso). */
+  whatsAppCheckout: z.boolean().default(true),
 });
 
 const leadSchema = z.object({
@@ -373,6 +376,7 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
       : [{ stockId: body.stockId!, pickupMethodId: body.pickupMethodId, deliveryAddress: body.deliveryAddress, attributes: body.attributes, qty: 1 }];
 
     // A mensagem vai para o telefone que o cliente digitou; sem ele não há para quem enviar.
+    if(body.destination==='whatsapp'&&(await getStoreTotemSettings(storeId) as any).whatsAppCheckout===false)throw Object.assign(new Error('Esta loja finaliza os pedidos do totem no caixa.'),{status:400});
     if(body.destination==='whatsapp'&&body.customerPhone.replace(/\D/g,'').length<10)throw Object.assign(new Error('Informe um telefone com DDD para receber a mensagem no WhatsApp.'),{status:400});
     let installmentCount = 0;
     if (body.payment === 'Parcelado') {

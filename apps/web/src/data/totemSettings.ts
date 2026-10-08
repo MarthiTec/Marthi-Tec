@@ -98,6 +98,11 @@ export type TotemSettings = {
   topBanners: string[];
   /** Carrinho: o cliente adiciona vários itens e finaliza pelo rodapé. */
   cartEnabled: boolean;
+  /**
+   * Botão "Concluir pelo WhatsApp" no fim do pedido (o vendedor recebe o pedido mesmo ausente).
+   * Desligado: o cliente só encaminha ao caixa e, se ligado, imprime o ticket.
+   */
+  whatsAppCheckout: boolean;
   /** Como finalizar o carrinho: botão ou arrastar para o lado. */
   checkoutGesture: TotemCheckoutGesture;
   cardInstallmentRates?: Record<string,number>;
@@ -402,6 +407,7 @@ export function defaultTotemSettings(): TotemSettings {
     navGroup: 'brand',
     topBanners: [],
     cartEnabled: false,
+    whatsAppCheckout: true,
     checkoutGesture: 'button',
   };
 }
@@ -503,6 +509,7 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
       ? parsed.topBanners.map(normalizeDataImage).filter((item): item is string => Boolean(item)).slice(0, TOTEM_MAX_TOP_BANNERS)
       : [],
     cartEnabled: Boolean(parsed?.cartEnabled),
+    whatsAppCheckout: parsed?.whatsAppCheckout !== false,
     checkoutGesture: parsed?.checkoutGesture === 'swipe' ? 'swipe' : 'button',
   };
 }
@@ -563,6 +570,7 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     navGroup: patch.navGroup ?? base?.navGroup,
     topBanners: patch.topBanners ?? base?.topBanners,
     cartEnabled: patch.cartEnabled ?? base?.cartEnabled,
+    whatsAppCheckout: patch.whatsAppCheckout ?? base?.whatsAppCheckout,
     checkoutGesture: patch.checkoutGesture ?? base?.checkoutGesture,
   });
 }

@@ -112,12 +112,13 @@ export function TotemSettingsPage() {
   const [navGroup, setNavGroup] = useState(() => initial.navGroup);
   const [topBanners, setTopBanners] = useState(() => initial.topBanners);
   const [cartEnabled, setCartEnabled] = useState(() => initial.cartEnabled);
+  const [whatsAppCheckout, setWhatsAppCheckout] = useState(() => initial.whatsAppCheckout);
   const [checkoutGesture, setCheckoutGesture] = useState(() => initial.checkoutGesture);
   const [loadingSettings,setLoadingSettings]=useState(true);
   const [settingsLoadError,setSettingsLoadError]=useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(()=>setSaved(false),[assistant,attractContent,customerWhatsAppMessage,theme,catalogNav,navGroup,topBanners,cartEnabled,checkoutGesture]);
+  useEffect(()=>setSaved(false),[assistant,attractContent,customerWhatsAppMessage,theme,catalogNav,navGroup,topBanners,cartEnabled,checkoutGesture,whatsAppCheckout]);
 
   useEffect(() => {
     let mounted = true;
@@ -155,6 +156,7 @@ export function TotemSettingsPage() {
         setNavGroup(s.navGroup);
         setTopBanners(s.topBanners);
         setCartEnabled(s.cartEnabled);
+        setWhatsAppCheckout(s.whatsAppCheckout);
         setCheckoutGesture(s.checkoutGesture);
       })
       .catch((err) => {
@@ -221,6 +223,7 @@ export function TotemSettingsPage() {
         navGroup,
         topBanners,
         cartEnabled,
+        whatsAppCheckout,
         checkoutGesture,
   };
   // Imagens viram uma impressão curta (tamanho + pontas) para comparar sem copiar megabytes.
@@ -585,6 +588,23 @@ export function TotemSettingsPage() {
               <span>Abre a senha para a impressora térmica ou do navegador.</span>
             </button>
           </div>
+        </article>
+        <article className="admin-card" id="totem-finish">
+          <h2>Fim do pedido</h2>
+          <div className="totem-settings-options">
+            <TotemSettingToggle
+              label="Concluir pelo WhatsApp"
+              hint="Mostra o botão para o cliente concluir pelo WhatsApp: a loja recebe o pedido e o cliente recebe a mensagem, mesmo com o vendedor ausente. Desligado, o pedido vai só para o caixa (ligue Imprimir ticket para entregar o comprovante)."
+              checked={whatsAppCheckout}
+              onChange={(value) => {
+                setWhatsAppCheckout(value);
+                markDirty();
+              }}
+            />
+          </div>
+          {!whatsAppCheckout && !printTicket ? (
+            <p className="empty" style={{ marginTop: 10 }}>Dica: ligue <strong>Imprimir ticket no fim</strong> para o cliente sair com o comprovante do pedido.</p>
+          ) : null}
         </article>
         <article className="admin-card" id="totem-cart">
           <h2>Carrinho</h2>

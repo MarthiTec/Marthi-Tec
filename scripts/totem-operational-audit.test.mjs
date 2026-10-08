@@ -195,3 +195,20 @@ test('a cart order quotes every item on the server, shares one ticket code and s
  const forged=await request('/totem/leads','POST',{destination:'cashier',customerName:'Teste',items:[{stockId:'nao-existe',pickupMethodId:method.id,qty:1}]});
  assert.equal(forged.status,404);
 });
+
+test('store can turn off "Concluir pelo WhatsApp": totem orders then go only to the cashier', async () => {
+  const current = (await request('/totem/settings')).json.data;
+  assert.notEqual(current.whatsAppCheckout, false, 'on by default, like before');
+  const off = await request('/totem/settings', 'PUT', { ...current, whatsAppCheckout: false });
+  assert.ok([200, 201].includes(off.status), JSON.stringify(off.json));
+  assert.equal((await request('/totem/settings')).json.data.whatsAppCheckout, false);
+  const method = (await request('/pickup-methods')).json.data.find((m) => m.kind === 'immediate');
+  const item = (await request('/stock', 'POST', { name: 'Caixa only device', qty: 2, price: 900, showOnTotem: true, pickupPrices: { [method.id]: 900 } })).json.data;
+  const order = { stockId: item.id, pickupMethodId: method.id, customerName: 'Cliente caixa', customerPhone: '24999990000' };
+  const viaWhatsApp = await request('/totem/leads', 'POST', { ...order, destination: 'whatsapp' });
+  assert.equal(viaWhatsApp.status, 400);
+  assert.match(viaWhatsApp.json.error.message, /caixa/);
+  const viaCashier = await request('/totem/leads', 'POST', { ...order, destination: 'cashier' });
+  assert.equal(viaCashier.status, 201, JSON.stringify(viaCashier.json));
+  await request('/totem/settings', 'PUT', { ...current, whatsAppCheckout: true });
+});

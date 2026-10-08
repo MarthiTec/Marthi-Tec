@@ -229,6 +229,8 @@ export function TotemPage() {
   const [askCustomerName, setAskCustomerName] = useState(() => getTotemSettings().askCustomerName);
   const [offerFulfillment, setOfferFulfillment] = useState(() => getTotemSettings().offerFulfillment);
   const [printTicket, setPrintTicket] = useState(() => getTotemSettings().printTicket);
+  // Loja pode desligar o fechamento pelo WhatsApp e finalizar só no caixa (com ticket impresso).
+  const [whatsAppCheckout, setWhatsAppCheckout] = useState(() => getTotemSettings().whatsAppCheckout);
   const [audioAssist, setAudioAssist] = useState(() => getTotemSettings().audioAssist);
   const [showAttractScreen, setShowAttractScreen] = useState(() => getTotemSettings().showAttractScreen);
   const [showActionButtons, setShowActionButtons] = useState(
@@ -600,6 +602,7 @@ export function TotemPage() {
           setAskCustomerName(settings.askCustomerName);
           setOfferFulfillment(settings.offerFulfillment);
           setPrintTicket(settings.printTicket);
+          setWhatsAppCheckout(settings.whatsAppCheckout);
           setAudioAssist(settings.audioAssist);
           setShowAttractScreen(settings.showAttractScreen);
           setShowActionButtons(settings.showActionButtons !== false);
@@ -656,6 +659,7 @@ export function TotemPage() {
       setAskCustomerName(settings.askCustomerName);
       setOfferFulfillment(settings.offerFulfillment);
       setPrintTicket(settings.printTicket);
+          setWhatsAppCheckout(settings.whatsAppCheckout);
       setAudioAssist(settings.audioAssist);
       setShowAttractScreen(settings.showAttractScreen);
       setShowActionButtons(settings.showActionButtons !== false);
@@ -1799,6 +1803,7 @@ export function TotemPage() {
                   <span>{submitting ? 'Encaminhando ao Caixa…' : 'Encaminhar Venda para o Caixa'}</span>
                 </button>
 
+                {whatsAppCheckout ? (
                 <button
                   type="button"
                   className="totem-btn totem-btn--ghost totem-btn--block"
@@ -1819,6 +1824,7 @@ export function TotemPage() {
                   <span aria-hidden>📱</span>
                   <span>{submitting ? copy.sendingButton : 'Concluir pelo WhatsApp'}</span>
                 </button>
+                ) : null}
               </div>
             </div>
           </div>
