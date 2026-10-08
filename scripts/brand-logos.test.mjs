@@ -31,16 +31,23 @@ await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;
 const realFetch = globalThis.fetch;
 const iconCalls = [];
-// Simple Icons simulado: conhece apple e samsung.
+const ICON_HOSTS = ['cdn.simpleicons.org', 'cdn.jsdelivr.net', 'unpkg.com', 'www.google.com', 'icons.duckduckgo.com'];
+const svg = (slug) => new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title><path d="M0 0h24v24H0z"/></svg>`, { status: 200, headers: { 'content-type': 'image/svg+xml' } });
+const png = new Uint8Array(400);
+png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// Fontes simuladas: o Simple Icons conhece apple e samsung; o espelho (jsDelivr) conhece xiaomi,
+// como se o endereço principal estivesse bloqueado para ela; realme só tem o ícone do site.
 globalThis.fetch = async (url, init) => {
   const u = String(url);
-  if (u.startsWith('https://cdn.simpleicons.org/')) {
-    iconCalls.push(u);
-    const slug = u.split('/').pop();
-    if (['apple', 'samsung'].includes(slug)) return new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title><path d="M0 0h24v24H0z"/></svg>`, { status: 200, headers: { 'content-type': 'image/svg+xml' } });
-    return new Response('not found', { status: 404 });
-  }
-  return realFetch(url, init);
+  const host = new URL(u).host;
+  if (!ICON_HOSTS.includes(host)) return realFetch(url, init);
+  iconCalls.push(u);
+  const slug = u.match(/(?:simpleicons\.org\/|icons\/)([a-z0-9]+)/)?.[1];
+  if (host === 'cdn.simpleicons.org' && slug === 'xiaomi') throw new TypeError('fetch failed');
+  if (host === 'cdn.simpleicons.org' && ['apple', 'samsung'].includes(slug)) return svg(slug);
+  if (host === 'cdn.jsdelivr.net' && slug === 'xiaomi') return svg(slug);
+  if (host === 'www.google.com' && u.includes('domain=realme.com')) return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } });
+  return new Response('not found', { status: 404 });
 };
 async function request(path, method = 'GET', body, auth = true) {
   const response = await realFetch(base + path, { method, headers: { ...(auth ? { authorization: 'Bearer ' + token } : {}), 'x-store-id': 'store-a', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -72,11 +79,15 @@ test('unknown brands stay without icon; the store can upload one and fill the re
   const uploaded = await request(`/brands/${unknown.id}`, 'PATCH', { logo: 'data:image/png;base64,iVBORw0KGgo=' });
   assert.equal(uploaded.status, 200, JSON.stringify(uploaded.json));
   assert.equal(uploaded.json.data.logoSource, 'upload');
-  await query(`INSERT INTO store_brands(id,store_id,slug,name) VALUES('BRD-old','store-a','apple','Apple')`);
+  await query(`INSERT INTO store_brands(id,store_id,slug,name) VALUES('BRD-old','store-a','apple','Apple'),('BRD-x','store-a','xiaomi','Xiaomi'),('BRD-r','store-a','realme','Realme'),('BRD-z','store-a','zzz','Zzz Sem Site')`);
   const bulk = await request('/brands/logos/auto', 'POST');
   assert.equal(bulk.status, 200, JSON.stringify(bulk.json));
-  assert.deepEqual(bulk.json.data.found, ['Apple']);
+  assert.deepEqual(bulk.json.data.found, ['Apple', 'Realme', 'Xiaomi']);
+  assert.deepEqual(bulk.json.data.missing, ['Zzz Sem Site']);
+  const logos = Object.fromEntries((await query(`SELECT name, logo FROM store_brands WHERE store_id='store-a'`)).rows.map((r) => [r.name, r.logo]));
+  assert.match(logos.Xiaomi, /^data:image\/svg\+xml;base64,/, 'icon comes from the mirror when the main host fails');
+  assert.match(logos.Realme, /^data:image\/png;base64,/, 'brand outside the library gets its site icon');
   const removed = await request(`/brands/${unknown.id}`, 'PATCH', { logo: null });
   assert.equal(removed.json.data.logo, null);
-  assert.ok(iconCalls.every((u) => /^https:\/\/cdn\.simpleicons\.org\/[a-z0-9]+$/.test(u)), 'only the fixed icon host with a sanitized slug is called');
+  assert.ok(iconCalls.every((u) => ICON_HOSTS.includes(new URL(u).host) && !/[^a-z0-9./:?=&@-]/i.test(u)), 'only fixed icon hosts with a sanitized slug are called');
 });

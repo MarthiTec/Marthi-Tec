@@ -172,8 +172,10 @@ brandsRouter.post('/api/v1/brands/logos/auto', requireAuth, async (req, res, nex
     const pending = await pool.query(`SELECT id, name FROM store_brands WHERE store_id = $1 AND (logo IS NULL OR logo = '') ORDER BY name`, [req.storeId]);
     const found: string[] = [];
     const missing: string[] = [];
-    for (const brand of pending.rows) {
-      const logo = await fetchBrandLogo(brand.name);
+    // Busca em paralelo: cada marca pode tentar várias fontes até achar o ícone.
+    const logos = await Promise.all(pending.rows.map((brand) => fetchBrandLogo(brand.name)));
+    for (const [index, brand] of pending.rows.entries()) {
+      const logo = logos[index];
       if (!logo) { missing.push(brand.name); continue; }
       await pool.query(`UPDATE store_brands SET logo = $3, logo_source = 'auto', updated_at = now() WHERE id = $1 AND store_id = $2`, [brand.id, req.storeId, logo]);
       found.push(brand.name);
