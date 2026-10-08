@@ -235,3 +235,41 @@ button.user-chip {
     border-radius: 999px;
   }
 }
+
+/* Status (ativo/ausente) como ícone dentro do cartão do perfil, no canto superior direito. */
+.user-chip-stack.has-status {
+  position: relative;
+}
+.user-chip.has-status {
+  padding-right: 40px;
+}
+.user-chip.has-status .user-chip__presence {
+  display: none;
+}
+.user-chip-stack .presence-ctl.user-chip__status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: auto;
+  margin: 0;
+  z-index: 1;
+}
+.presence-ctl--icon .presence-ctl__trigger {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+}
+.presence-ctl--icon .presence-ctl__dot {
+  width: 10px;
+  height: 10px;
+}
+/* Menu lateral recolhido: o cartão vira só a foto; o ícone de status fica logo abaixo dela. */
+.admin.is-collapsed .user-chip.has-status {
+  padding-right: 6px;
+}
+.admin.is-collapsed .user-chip-stack .presence-ctl.user-chip__status {
+  position: static;
+}

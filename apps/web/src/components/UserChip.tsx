@@ -68,6 +68,7 @@ export function UserChip({
       compact ? 'user-chip--compact' : '',
       isActive ? 'is-active' : '',
       away ? 'is-away' : '',
+      showPresence && !compact ? 'has-status' : '',
       className,
     ]
       .filter(Boolean)
@@ -118,9 +119,11 @@ export function UserChip({
   if (!showPresence || compact) return chip;
 
   return (
-    <div className="user-chip-stack">
+    // O status fica dentro do cartão (canto de cima), só como ícone; ao clicar abre as opções.
+    // É irmão do link, não filho: botão dentro de link não é permitido.
+    <div className="user-chip-stack has-status">
       {chip}
-      <PresenceStatusControl compact />
+      <PresenceStatusControl iconOnly className="user-chip__status" />
     </div>
   );
 }

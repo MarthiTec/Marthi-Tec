@@ -11,13 +11,15 @@ import './presenceControls.css';
 
 type PresenceStatusControlProps = {
   compact?: boolean;
+  /** Só o ícone (verde ativo / laranja ausente), para ficar dentro do cartão do perfil. */
+  iconOnly?: boolean;
   className?: string;
 };
 
 type MenuPos = { top: number; left: number };
 
 /** Seletor de disponibilidade — ativo ou ausente (almoço, reunião…). */
-export function PresenceStatusControl({ compact = false, className = '' }: PresenceStatusControlProps) {
+export function PresenceStatusControl({ compact = false, iconOnly = false, className = '' }: PresenceStatusControlProps) {
   const { mine, setActive, setAway } = useMyPresence();
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
@@ -124,18 +126,19 @@ export function PresenceStatusControl({ compact = false, className = '' }: Prese
   return (
     <div
       ref={rootRef}
-      className={`presence-ctl ${compact ? 'presence-ctl--compact' : ''} ${isAway ? 'is-away' : 'is-active'} ${open ? 'is-open' : ''} ${className}`}
+      className={`presence-ctl ${iconOnly ? 'presence-ctl--icon' : compact ? 'presence-ctl--compact' : ''} ${isAway ? 'is-away' : 'is-active'} ${open ? 'is-open' : ''} ${className}`}
     >
       <button
         type="button"
         className="presence-ctl__trigger"
         aria-expanded={open}
         aria-controls={menuId}
-        title={`${label} — ${detail}`}
+        title={`${label} — ${detail}${iconOnly ? ' (clique para trocar)' : ''}`}
+        aria-label={iconOnly ? `Seu status: ${label}. Trocar status` : undefined}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="presence-ctl__dot" aria-hidden />
-        {!compact ? (
+        {iconOnly ? null : !compact ? (
           <span className="presence-ctl__copy">
             <strong>{label}</strong>
             <em>{detail}</em>
