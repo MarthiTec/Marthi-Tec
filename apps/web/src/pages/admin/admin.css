@@ -6854,3 +6854,25 @@ select.caixa-mov-input {
 @media(max-width:768px){.day-offers__actions .btn{width:100%;min-height:44px;}}
 @media(max-width:720px){.stock-photo-picker{width:100%;}.stock-photo-picker__preview,.stock-photo-url .btn{width:auto;}}
 
+
+/* Modelo da mensagem automática de WhatsApp do totem */
+.totem-settings-whatsapp-message {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+.totem-settings-whatsapp-message textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 240px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.35));
+  background: var(--card-2, #f8fafc);
+  color: var(--ink, inherit);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.55;
+  resize: vertical;
+}

@@ -1,4 +1,12 @@
-import {submitTotemLead as sendTotemWhatsApp} from '../services/evolutionWhatsApp.js';
+import {submitTotemLead as sendTotemWhatsApp,renderTotemCustomerMessage,DEFAULT_TOTEM_CUSTOMER_MESSAGE} from '../services/evolutionWhatsApp.js';
+
+/** "MATHEUS SILVA" (teclado do totem em maiúsculas) vira "Matheus Silva" na mensagem. */
+function titleCase(value: string) {
+  return value.trim().toLocaleLowerCase('pt-BR').replace(/(^|\s)(\p{L})/gu, (_, space: string, letter: string) => space + letter.toLocaleUpperCase('pt-BR'));
+}
+function customerFirstName(value: string) {
+  return titleCase(value).split(/\s+/)[0] || '';
+}
 import {quoteTotemCombination} from '../services/totemCombination.js';
 import {listDayOffers,matchDayOffer} from '../services/dayOffers.js';
 import {validateSaleAttributes} from '../services/saleAttributes.js';
@@ -38,6 +46,7 @@ const defaultTotemSettings = {
   notifyCustomerOnLead: false,
   locationLabel: 'Loja Principal',
   cardFeePercent: 0,
+  customerWhatsAppMessage: DEFAULT_TOTEM_CUSTOMER_MESSAGE,
 };
 
 const totemSettingsSchema = z.object({
@@ -67,6 +76,7 @@ const totemSettingsSchema = z.object({
   notifyCustomerOnLead: z.boolean().default(false),
   locationLabel: z.string().optional().default(''),
   cardFeePercent: z.coerce.number().default(0),
+  customerWhatsAppMessage: z.string().trim().max(1500).optional(),
 });
 
 const leadSchema = z.object({
@@ -263,6 +273,10 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
 
 
 
+    // A mensagem vai para o telefone que o cliente digitou; sem ele não há para quem enviar.
+    if(body.destination==='whatsapp'&&body.customerPhone.replace(/\D/g,'').length<10)throw Object.assign(new Error('Informe um telefone com DDD para receber a mensagem no WhatsApp.'),{status:400});
+    let customerMessage='';
+
     if (pool) {
       const client=await pool.connect();
       try{await client.query('BEGIN');
@@ -302,6 +316,23 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
       const whatsapp=String(assistant?.whatsapp||seller?.phone||settings.storeWhatsApp||'').replace(/\D/g,'');
       if(whatsapp.length>=10){const destination=whatsapp.length<=11?'55'+whatsapp:whatsapp;const message=[`Olá, ${seller?.name||assistant?.name||'equipe'}! Quero finalizar meu pedido ${ticketId}.`,`Cliente: ${body.customerName}`,`Telefone: ${body.customerPhone}`,`Produto: ${body.productName}`,...(body.attributes??[]).map(a=>`${a.name}: ${a.value}`),`Retirada: ${pickup?.name||''}`,`Valor: ${body.priceLabel}`].join('\n');(body as any).whatsappUrl=`https://wa.me/${destination}?text=${encodeURIComponent(message)}`;(body as any).storeWhatsApp=destination;}
       (body as any).sellerId=assistant?.sellerId||null;
+      if(body.destination==='whatsapp'){
+        const productAttributes=(body.attributes??[]).filter(a=>a.id!=='TOTEM-DINE'&&a.value.trim());
+        const count=Number(String(body.installment??'').replace(/x$/i,''));
+        customerMessage=renderTotemCustomerMessage(String((settings as any).customerWhatsAppMessage||DEFAULT_TOTEM_CUSTOMER_MESSAGE),{
+          ...Object.fromEntries(productAttributes.map(a=>[a.name,a.value])),
+          nome:customerFirstName(body.customerName),
+          cliente:titleCase(body.customerName),
+          vendedor:seller?.name||assistant?.name||settings.storeName,
+          loja:settings.storeName,
+          produto:body.productName,
+          atributos:productAttributes.length?productAttributes.map(a=>`${a.name}: ${a.value}`).join(' · '):[body.color,body.storage].filter(Boolean).join(' · '),
+          pagamento:body.payment==='Parcelado'&&count>0?`Parcelado em ${count}x`:'À vista',
+          valor:body.priceLabel||'',
+          retirada:pickup?.name||'',
+          pedido:ticketId,
+        });
+      }
       await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice,whatsappStatus:body.destination==='whatsapp'?'pending':'not_requested'}),storeId]);
       await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
     }
@@ -311,12 +342,12 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
     let notificationWarning:string|undefined;
     if(body.destination==='whatsapp'){
       try {
-        const settings=await getStoreTotemSettings(storeId);
-        const result=await sendTotemWhatsApp({...body,storeId,installment:body.installment??null,priceLabel:body.priceLabel||'',locationLabel:settings.locationLabel});
+        const result=await sendTotemWhatsApp({storeId,customerName:body.customerName,customerPhone:body.customerPhone,customerMessage});
         customerNotified=result.customerNotified;whatsappStatus='accepted';
-      } catch {
+      } catch (error) {
+        console.warn('[totem] WhatsApp automático não confirmado:', error instanceof Error ? error.message : error);
         whatsappStatus='unconfirmed';
-        notificationWarning='Pedido registrado na fila do caixa. O WhatsApp não confirmou o envio; procure o atendente.';
+        notificationWarning='Pedido registrado na fila da loja. Não conseguimos enviar a mensagem no seu WhatsApp agora; um atendente vai te chamar.';
       }
       await pool.query(`UPDATE pos_tickets SET configuration=configuration || $2::jsonb WHERE id=$1 AND store_id=$3`,[ticketId,JSON.stringify({customerNotified,whatsappStatus,notificationWarning}),storeId]);
     }

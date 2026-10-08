@@ -78,6 +78,11 @@ export type TotemSettings = {
    * 0 = sem taxa (padrão).
    */
   cardFeePercent: number;
+  /**
+   * Mensagem que a loja envia sozinha, pelo WhatsApp conectado na Evolution, ao telefone que o
+   * cliente digitou ao concluir pelo WhatsApp. O modelo padrão vem do servidor.
+   */
+  customerWhatsAppMessage: string;
   cardInstallmentRates?: Record<string,number>;
 };
 
@@ -374,6 +379,7 @@ export function defaultTotemSettings(): TotemSettings {
     notifyCustomerOnLead: false,
     locationLabel: '',
     cardFeePercent: 0,
+    customerWhatsAppMessage: '',
   };
 }
 
@@ -465,6 +471,8 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     locationLabel: typeof parsed?.locationLabel === 'string' ? parsed.locationLabel.trim().slice(0, 80) : '',
     cardInstallmentRates: parsed?.cardInstallmentRates,
     cardFeePercent: Math.max(0, Math.min(100, Number(parsed?.cardFeePercent) || 0)),
+    customerWhatsAppMessage:
+      typeof parsed?.customerWhatsAppMessage === 'string' ? parsed.customerWhatsAppMessage.slice(0, 1500) : '',
   };
 }
 
@@ -518,6 +526,7 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     notifyCustomerOnLead: patch.notifyCustomerOnLead ?? base?.notifyCustomerOnLead,
     locationLabel: patch.locationLabel ?? base?.locationLabel,
     cardFeePercent: patch.cardFeePercent ?? base?.cardFeePercent,
+    customerWhatsAppMessage: patch.customerWhatsAppMessage ?? base?.customerWhatsAppMessage,
   });
 }
 

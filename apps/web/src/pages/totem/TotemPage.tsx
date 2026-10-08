@@ -227,6 +227,7 @@ export function TotemPage() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [sentToCashierDone, setSentToCashierDone] = useState(false);
+  const [customerNotified, setCustomerNotified] = useState(false);
   const effectiveMode = sessionMode ?? mode;
   const catalogOnly = effectiveMode === 'catalog';
   const showDineIn = vertical === 'food' && offerFulfillment && !catalogOnly;
@@ -284,6 +285,7 @@ export function TotemPage() {
     setTicketId(null);
     setShoppingIntent('all');setWhatsappUrl(undefined);setTrackingToken(undefined);
     setSentToCashierDone(false);
+    setCustomerNotified(false);
     setSessionMode(null);
     stopTotemSpeech();
     window.scrollTo({ top: 0 });
@@ -797,8 +799,12 @@ export function TotemPage() {
       setCheckoutKb('name');
       return;
     }
-    if (phoneRequired && onlyDigits(phone).length < 10) {
-      setError('Informe um telefone com DDD para confirmar o pedido.');
+    if ((phoneRequired || destination === 'whatsapp') && onlyDigits(phone).length < 10) {
+      setError(
+        destination === 'whatsapp'
+          ? 'Informe seu WhatsApp com DDD: é para esse número que vamos mandar a mensagem.'
+          : 'Informe um telefone com DDD para confirmar o pedido.',
+      );
       setCheckoutKb('phone');
       return;
     }
@@ -837,6 +843,7 @@ export function TotemPage() {
       setNotificationWarning(result.notificationWarning);
       setTrackingToken(result.trackingToken);
       setWhatsappUrl(result.whatsappUrl);
+      setCustomerNotified(result.customerNotified);
       setTicketId(result.ticketId);
       setSentToCashierDone(isToCashier);
       setStep('done');
@@ -1560,7 +1567,17 @@ export function TotemPage() {
       {step === 'done' && selection && (
         <section className="totem__done">
           {guidedSettings.enabled&&<h2>{assistantText(guidedSettings.closingPrompt,name,guidedSettings.name)}</h2>}
-          {!sentToCashierDone&&whatsappUrl&&<div className="totem-whatsapp-handoff">{whatsappQr&&<img src={whatsappQr} alt="QR Code para continuar este pedido com o vendedor no WhatsApp"/>}<p>Leia o QR Code com seu celular ou toque no botão para continuar com {guidedSettings.name||'o vendedor'}.</p><a className="totem-btn totem-btn--primary" href={whatsappUrl} target="_blank" rel="noreferrer">Continuar no WhatsApp</a></div>}
+          {!sentToCashierDone&&customerNotified&&(
+            <div className="totem-whatsapp-sent" role="status">
+              <span aria-hidden>💬</span>
+              <strong>Mensagem enviada no seu WhatsApp!</strong>
+              <p>
+                {guidedSettings.name||'A loja'} já te mandou uma mensagem no {phone}. É só
+                responder por lá para continuar.
+              </p>
+            </div>
+          )}
+          {!sentToCashierDone&&!customerNotified&&whatsappUrl&&<div className="totem-whatsapp-handoff">{whatsappQr&&<img src={whatsappQr} alt="QR Code para continuar este pedido com o vendedor no WhatsApp"/>}<p>Leia o QR Code com seu celular ou toque no botão para continuar com {guidedSettings.name||'o vendedor'}.</p><a className="totem-btn totem-btn--primary" href={whatsappUrl} target="_blank" rel="noreferrer">Continuar no WhatsApp</a></div>}
           {notificationWarning&&<p role="status">{notificationWarning}</p>}
           <h1>{notificationWarning?'Pedido registrado':sentToCashierDone ? 'Pedido Encaminhado para o Caixa!' : copy.doneTitle}</h1>
           {senha ? (

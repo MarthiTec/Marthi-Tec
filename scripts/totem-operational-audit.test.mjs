@@ -145,3 +145,26 @@ test('a legacy production pos_tickets with required payment no longer blocks tot
  const nullable=(await query("SELECT is_nullable FROM information_schema.columns WHERE table_name='pos_tickets' AND column_name='payment'")).rows[0].is_nullable;
  assert.equal(nullable,'YES');
 });
+test('concluding on WhatsApp sends the configured message from the store number straight to the customer phone',async()=>{
+ await query(`UPDATE stores SET whatsapp_settings=$1::jsonb WHERE id='store-a'`,[JSON.stringify({enabled:true,baseUrl:'https://evo.test',instance:'loja-a',apiKey:'store-key',storeNumber:'',notifyCustomer:false,locationLabel:''})]);
+ const current=(await request('/store/totem-settings')).json.data;
+ const template='Oi, {nome}! 🎉\nAqui é *{vendedor}*, da *{loja}*.\n📱 *{produto}*\n✨ {atributos}\n💳 Pagamento: *{pagamento}*\n📦 Retirada: {retirada}\n🎟️ Cupom: {cupom}';
+ assert.equal((await request('/store/totem-settings','PUT',{...current,storeName:'Cell Ponto',assistant:{...current.assistant,name:'Mariana'},customerWhatsAppMessage:template})).status,200);
+ const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
+ const item=(await request('/stock','POST',{name:'IPHONE 16',qty:1,price:4650,showOnTotem:true,pickupPrices:{[method.id]:4650}})).json.data;
+ const original=globalThis.fetch;const sent=[];
+ globalThis.fetch=async(url,init)=>{if(String(url).startsWith('https://evo.test/message/sendText/')){sent.push({url:String(url),apikey:init.headers.apikey,body:JSON.parse(init.body)});return new Response(JSON.stringify({key:{id:'MSG-1'}}),{status:201,headers:{'content-type':'application/json'}});}return original(url,init);};
+ try{
+  const lead=await request('/totem/leads','POST',{destination:'whatsapp',stockId:item.id,pickupMethodId:method.id,customerName:'MATHEUS SILVA',customerPhone:'(24) 98124-4253',productName:item.name});
+  assert.equal(lead.status,201,JSON.stringify(lead.json));
+  assert.equal(lead.json.data.customerNotified,true);assert.equal(lead.json.data.whatsappStatus,'accepted');
+ }finally{globalThis.fetch=original;}
+ assert.equal(sent.length,1,'only the customer receives a message');
+ assert.equal(sent[0].url,'https://evo.test/message/sendText/loja-a');assert.equal(sent[0].apikey,'store-key');
+ assert.equal(sent[0].body.number,'5524981244253');
+ const text=sent[0].body.text;
+ assert.match(text,/^Oi, Matheus! 🎉/);assert.match(text,/\*Mariana\*, da \*Cell Ponto\*/);assert.match(text,/📱 \*IPHONE 16\*/);
+ assert.match(text,/Pagamento: \*À vista\*/);assert.match(text,/Retirada: /);
+ assert.ok(!text.includes('{'),'no raw placeholder reaches the customer');assert.ok(!text.includes('Cupom'),'a line whose placeholders are all empty is dropped');
+ assert.equal((await request('/totem/leads','POST',{destination:'whatsapp',stockId:item.id,pickupMethodId:method.id,customerName:'Sem telefone',customerPhone:''})).status,400);
+});

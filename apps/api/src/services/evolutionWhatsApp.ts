@@ -2,22 +2,61 @@ import { env } from '../config/env.js';
 import { getStoreWhatsAppConfig } from './storeCommunication.js';
 import { beginDelivery, finishDelivery } from './communicationAudit.js';
 
+/** Pedido do totem que vira mensagem automática da loja para o cliente. */
 export type TotemLeadPayload = {
   storeId?: string;
   customerName: string;
   customerPhone: string;
-  productName: string;
-  color: string;
-  storage: string;
-  fulfillment: string;
-  payment: string;
-  installment: string | null;
-  priceLabel: string;
-  /** Número da loja (painel). Tem prioridade sobre EVOLUTION_STORE_NUMBER. */
-  storeWhatsApp?: string;
-  notifyCustomer?: boolean;
-  locationLabel?: string;
+  /** Mensagem já montada a partir do modelo das Configurações do Totem. */
+  customerMessage: string;
 };
+
+/** Modelo padrão da mensagem que a loja envia ao cliente depois do pedido no totem. */
+export const DEFAULT_TOTEM_CUSTOMER_MESSAGE = [
+  'Oi, {nome}! 🎉 Tudo bem?',
+  '',
+  'Aqui é *{vendedor}*, da *{loja}*! Acabei de receber o pedido que você fez no nosso Totem e já vim correndo falar com você 😄',
+  '',
+  'Que escolha incrível! Olha só o que você separou:',
+  '',
+  '📱 *{produto}*',
+  '✨ {atributos}',
+  '💳 Pagamento: *{pagamento}*',
+  '💰 Valor: *{valor}*',
+  '📦 Retirada: {retirada}',
+  '',
+  'Já estou cuidando de tudo por aqui. Posso confirmar o seu pedido? Qualquer dúvida é só me chamar, estou à disposição! 🙌',
+].join('\n');
+
+/**
+ * Troca os marcadores do modelo pelos dados do pedido. Além dos marcadores fixos, cada atributo
+ * do produto vira um marcador com o próprio nome, ex.: {Cor} e {Capacidade}. Marcador sem valor
+ * some da mensagem em vez de aparecer cru para o cliente; uma linha cujos marcadores ficaram
+ * todos vazios (ex.: "📦 Retirada: {retirada}" sem retirada) é removida inteira.
+ */
+export function renderTotemCustomerMessage(template: string, values: Record<string, string>): string {
+  const lookup = new Map(
+    Object.entries(values).map(([key, value]) => [key.trim().toLocaleLowerCase('pt-BR'), value.trim()]),
+  );
+  const placeholder = /\{([^{}]{1,60})\}/g;
+  return template
+    .split('\n')
+    .flatMap((line) => {
+      const keys = [...line.matchAll(placeholder)].map((match) => match[1].trim().toLocaleLowerCase('pt-BR'));
+      if (keys.length && keys.every((key) => !lookup.get(key))) return [];
+      const filled = line
+        .replace(placeholder, (_, key: string) => lookup.get(key.trim().toLocaleLowerCase('pt-BR')) ?? '')
+        .replace(/\*\s*\*/g, '')
+        .replace(/\(\s*\)/g, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/ +([,.!?])/g, '$1')
+        .trimEnd();
+      return [filled];
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, '');
@@ -33,36 +72,6 @@ export function normalizeBrazilPhone(phone: string): string {
     return `55${digits}`;
   }
   return digits;
-}
-
-export function buildTotemLeadMessage(
-  lead: TotemLeadPayload,
-  locationLabel?: string,
-): string {
-  const location = (locationLabel ?? env.TOTEM_LOCATION_LABEL)?.trim() || '';
-  const paymentLine =
-    lead.payment === 'Parcelado' && lead.installment
-      ? `${lead.payment} (${lead.installment})`
-      : lead.payment;
-
-  return [
-    'Olá! Tudo bem? 😊',
-    '',
-    `Meu nome é *${lead.customerName}*.`,
-    `Acabei de escolher um produto no Totem${location ? ` (${location})` : ''} e gostaria de confirmar o pedido.`,
-    '',
-    'Aqui estão os detalhes:',
-    '',
-    `📱 *Modelo*: ${lead.productName}`,
-    `🎨 *Cor*: ${lead.color}`,
-    `💾 *Capacidade*: ${lead.storage}`,
-    `📦 *Retirada*: ${lead.fulfillment}`,
-    `💰 *Forma de pagamento*: ${paymentLine}`,
-    `💵 *Preço*: ${lead.priceLabel}`,
-    `📞 *Telefone do cliente*: ${lead.customerPhone}`,
-    '',
-    'Poderíamos formalizar o pedido?',
-  ].join('\n');
 }
 
 /**
@@ -230,52 +239,30 @@ export async function sendEvolutionText(
   };
 }
 
+/**
+ * Pedido do totem com "Concluir pelo WhatsApp": a loja (o número conectado na Evolution) manda
+ * a mensagem direto para o telefone que o cliente digitou. O cliente não precisa ler QR nem
+ * abrir o WhatsApp; a conversa já começa no celular do vendedor.
+ */
 export async function submitTotemLead(lead: TotemLeadPayload): Promise<{
-  storeMessageId: unknown;
+  messageId: unknown;
   customerNotified: boolean;
 }> {
   const config = lead.storeId ? await getStoreWhatsAppConfig(lead.storeId) : undefined;
   if (config && !config.enabled) throw Object.assign(new Error('WhatsApp desativado nesta loja.'), {status:400});
-  const storeNumber = lead.storeWhatsApp?.trim() || (config ? config.storeNumber : env.EVOLUTION_STORE_NUMBER);
-  if (!storeNumber) {
-    const error = new Error(
-      'Número da loja não configurado. Informe o WhatsApp em Painel → Totem → WhatsApp, ou EVOLUTION_STORE_NUMBER.',
-    );
-    (error as Error & { status: number }).status = 501;
-    throw error;
+  if (config && !config.instance) {
+    throw Object.assign(new Error('Nenhum WhatsApp conectado a esta loja. Leia o QR Code em Configurações › Comunicação.'), {status:501});
   }
-
-  const message = buildTotemLeadMessage(lead, lead.locationLabel);
-  const storeResult = await sendEvolutionText(storeNumber, message, config ? {...config, storeId:lead.storeId} : undefined);
-
-  if (!storeResult.ok) {
-    const error = new Error('Falha ao enviar WhatsApp via Evolution para a loja.');
+  const result = await sendEvolutionText(
+    lead.customerPhone,
+    lead.customerMessage,
+    config ? { ...resolveStoreEvolutionCreds(config), storeId: lead.storeId } : undefined,
+  );
+  if (!result.ok) {
+    const error = new Error('A Evolution não confirmou o envio da mensagem ao cliente.');
     (error as Error & { status: number; details: unknown }).status = 502;
-    (error as Error & { details: unknown }).details = storeResult.body;
+    (error as Error & { details: unknown }).details = result.body;
     throw error;
   }
-
-  const shouldNotify = config?.notifyCustomer ?? lead.notifyCustomer ?? Boolean(env.EVOLUTION_NOTIFY_CUSTOMER);
-
-  let customerNotified = false;
-  if (shouldNotify) {
-    const customerMsg = [
-      `Olá, ${lead.customerName}! 👋`,
-      '',
-      'Recebemos sua escolha no Totem Marthi.',
-      `Produto: *${lead.productName}* (${lead.color} · ${lead.storage}).`,
-      '',
-      'Em breve a loja entrará em contato para confirmar o pedido.',
-    ].join('\n');
-
-    try {
-      const customerResult = await sendEvolutionText(lead.customerPhone, customerMsg, config ? {...config, storeId:lead.storeId} : undefined);
-      customerNotified = customerResult.ok;
-    } catch { /* Store delivery was accepted; do not repeat it because customer acknowledgement failed. */ }
-  }
-
-  return {
-    storeMessageId: storeResult.body,
-    customerNotified,
-  };
+  return { messageId: result.body, customerNotified: true };
 }

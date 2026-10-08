@@ -103,11 +103,12 @@ export function TotemSettingsPage() {
   );
   const [locationLabel, setLocationLabel] = useState(() => initial.locationLabel);
   const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
+  const [customerWhatsAppMessage, setCustomerWhatsAppMessage] = useState(() => initial.customerWhatsAppMessage);
   const [loadingSettings,setLoadingSettings]=useState(true);
   const [settingsLoadError,setSettingsLoadError]=useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(()=>setSaved(false),[assistant,attractContent]);
+  useEffect(()=>setSaved(false),[assistant,attractContent,customerWhatsAppMessage]);
 
   useEffect(() => {
     let mounted = true;
@@ -139,6 +140,7 @@ export function TotemSettingsPage() {
         setNotifyCustomerOnLead(s.notifyCustomerOnLead);
         setLocationLabel(s.locationLabel);
         setCardFeePercent(s.cardFeePercent ?? 0);
+        setCustomerWhatsAppMessage(s.customerWhatsAppMessage);
       })
       .catch((err) => {
         if(mounted){setSettingsLoadError(true);setError(err instanceof Error?err.message:'Não foi possível carregar as configurações salvas.');}
@@ -210,6 +212,7 @@ export function TotemSettingsPage() {
         notifyCustomerOnLead,
         locationLabel,
         cardFeePercent,
+        customerWhatsAppMessage,
       });
       setError(null);
       setSaved(true);
@@ -307,6 +310,35 @@ export function TotemSettingsPage() {
           </aside>
         </div>
         <p className="totem-settings-note">Configure o WhatsApp de quem recebe a venda para gerar o QR Code. O vendedor conclui o pagamento.</p>
+      </article>
+
+      <article className="admin-card" id="totem-whatsapp-message">
+        <h2>Mensagem automática no WhatsApp do cliente</h2>
+        <p>
+          Quando o cliente toca em <strong>Concluir pelo WhatsApp</strong>, a loja envia esta mensagem
+          sozinha, pelo WhatsApp conectado em Configurações › Comunicação, para o telefone que ele
+          digitou no totem. O cliente não precisa ler QR Code nem abrir o WhatsApp.
+        </p>
+        <label className="totem-settings-whatsapp-message">
+          Mensagem
+          <textarea
+            rows={12}
+            maxLength={1500}
+            value={customerWhatsAppMessage}
+            onChange={(event) => {
+              setCustomerWhatsAppMessage(event.target.value);
+              markDirty();
+            }}
+          />
+        </label>
+        <p className="totem-settings-note">
+          Marcadores: <code>{'{nome}'}</code> primeiro nome do cliente · <code>{'{vendedor}'}</code> ·{' '}
+          <code>{'{loja}'}</code> · <code>{'{produto}'}</code> · <code>{'{atributos}'}</code> (ex.: Cor: preto ·
+          Capacidade: 128GB) · <code>{'{pagamento}'}</code> · <code>{'{valor}'}</code> ·{' '}
+          <code>{'{retirada}'}</code> · <code>{'{pedido}'}</code>. Cada atributo também vira marcador com o
+          próprio nome, como <code>{'{Cor}'}</code> e <code>{'{Capacidade}'}</code>. No WhatsApp,{' '}
+          <code>*texto*</code> fica em negrito. Linhas com marcador sem informação somem da mensagem.
+        </p>
       </article>
 
       <article className="admin-card" id="totem-opening">
