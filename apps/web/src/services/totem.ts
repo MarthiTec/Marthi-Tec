@@ -4,7 +4,7 @@ import type { PickedAttribute } from '../data/attributeStore';
 import { formatPicked } from '../data/attributeStore';
 import { enqueueTotemLead } from '../data/posQueueStore';
 import { getTotemSettings } from '../data/totemSettings';
-import { apiSubmitTotemLead } from './erpApi';
+import { apiSubmitTotemLead, type ApiTotemCartItem } from './erpApi';
 
 export type TotemLeadRequest = {
   destination?:'cashier'|'whatsapp';
@@ -86,4 +86,61 @@ export async function submitTotemLead(payload: TotemLeadRequest) {
   }
 
   return { ticketId, notificationWarning:result.notificationWarning,customerNotified,trackingToken:result.trackingToken,quotedPrice:result.quotedPrice,whatsappUrl:result.whatsappUrl };
+}
+
+export type TotemCartRequest = {
+  destination: 'cashier' | 'whatsapp';
+  customerName: string;
+  customerPhone: string;
+  payment: string;
+  installment: string | null;
+  items: (ApiTotemCartItem & { productName: string })[];
+};
+
+/** Carrinho do totem: o servidor cota cada item e grava tudo com a mesma senha. */
+export async function submitTotemCart(payload: TotemCartRequest) {
+  const signature = JSON.stringify(payload);
+  const requestKey = pendingRequests.get(signature) ?? crypto.randomUUID();
+  pendingRequests.set(signature, requestKey);
+  const result = await apiSubmitTotemLead({
+    requestKey,
+    destination: payload.destination,
+    items: payload.items.map(({ productName: _name, ...item }) => item),
+    customerName: payload.customerName,
+    customerPhone: payload.customerPhone,
+    productName: payload.items[0]?.productName ?? 'Produto',
+    color: '',
+    storage: '',
+    fulfillment: '',
+    payment: payload.payment,
+    installment: payload.installment,
+    priceLabel: '',
+  });
+  pendingRequests.delete(signature);
+
+  if (shouldSendToKitchen()) {
+    try {
+      enqueueKitchenOrder({
+        channel: 'totem',
+        customerName: payload.customerName,
+        sourceTicketId: result.id,
+        lines: payload.items.map((item) => ({
+          name: item.productName,
+          qty: item.qty,
+          detail: formatPicked((item.attributes ?? []) as PickedAttribute[]),
+        })),
+      });
+    } catch {
+      /* fila local não deve bloquear o pedido do totem */
+    }
+  }
+
+  return {
+    ticketId: result.id,
+    notificationWarning: result.notificationWarning,
+    customerNotified: Boolean(result.customerNotified),
+    trackingToken: result.trackingToken,
+    whatsappUrl: result.whatsappUrl,
+    total: result.total ?? 0,
+  };
 }

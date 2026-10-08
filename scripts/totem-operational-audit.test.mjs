@@ -168,3 +168,30 @@ test('concluding on WhatsApp sends the configured message from the store number 
  assert.ok(!text.includes('{'),'no raw placeholder reaches the customer');assert.ok(!text.includes('Cupom'),'a line whose placeholders are all empty is dropped');
  assert.equal((await request('/totem/leads','POST',{destination:'whatsapp',stockId:item.id,pickupMethodId:method.id,customerName:'Sem telefone',customerPhone:''})).status,400);
 });
+test('a cart order quotes every item on the server, shares one ticket code and sends a single WhatsApp listing all items',async()=>{
+ const current=(await request('/store/totem-settings')).json.data;
+ assert.equal((await request('/store/totem-settings','PUT',{...current,customerWhatsAppMessage:['Oi, {nome}!','📱 *{produto}*','{itens}','💰 Total: *{valor}*'].join('\n')})).status,200);
+ const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
+ const burger=(await request('/stock','POST',{name:'X-Burger',qty:10,price:30,showOnTotem:true,pickupPrices:{[method.id]:30}})).json.data;
+ const soda=(await request('/stock','POST',{name:'Refrigerante',qty:10,price:8,showOnTotem:true,pickupPrices:{[method.id]:8}})).json.data;
+ const original=globalThis.fetch;const sent=[];
+ globalThis.fetch=async(url,init)=>{if(String(url).startsWith('https://evo.test/message/sendText/')){sent.push(JSON.parse(init.body));return new Response(JSON.stringify({key:{id:'MSG-CART'}}),{status:201,headers:{'content-type':'application/json'}});}return original(url,init);};
+ let lead;
+ try{
+  lead=await request('/totem/leads','POST',{destination:'whatsapp',customerName:'ana paula',customerPhone:'24999990000',payment:'À vista',
+   items:[{stockId:burger.id,pickupMethodId:method.id,qty:2},{stockId:soda.id,pickupMethodId:method.id,qty:1}]});
+ }finally{globalThis.fetch=original;}
+ assert.equal(lead.status,201,JSON.stringify(lead.json));
+ assert.equal(lead.json.data.total,68,'2 × 30 + 8, priced by the server');
+ assert.equal(lead.json.data.ticketIds.length,2);
+ const rows=(await query('SELECT id,code,product_name,configuration FROM pos_tickets WHERE id = ANY($1::text[]) ORDER BY id',[lead.json.data.ticketIds])).rows;
+ assert.equal(new Set(rows.map(r=>r.code)).size,1,'every cart line shares the same ticket code');
+ assert.deepEqual(rows.map(r=>r.configuration.qty).sort(),[1,2]);
+ assert.ok(rows.every(r=>r.configuration.cartId===lead.json.data.id&&r.configuration.whatsappStatus==='accepted'));
+ assert.equal(sent.length,1,'one message for the whole cart');
+ assert.match(sent[0].text,/Oi, Ana!/);
+ assert.match(sent[0].text,/2x X-Burger \+ 1x Refrigerante/);
+ assert.match(sent[0].text,/R\$\s?68,00/);
+ const forged=await request('/totem/leads','POST',{destination:'cashier',customerName:'Teste',items:[{stockId:'nao-existe',pickupMethodId:method.id,qty:1}]});
+ assert.equal(forged.status,404);
+});

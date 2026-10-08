@@ -625,9 +625,19 @@ export function apiGetTotemPublicAttributes() {
   return nestGet<ProductAttribute[]>('/totem/attributes');
 }
 
+export type ApiTotemCartItem = {
+  stockId: string;
+  pickupMethodId?: string;
+  deliveryAddress?: DeliveryAddress;
+  attributes?: Array<{ id: string; name: string; value: string }>;
+  qty: number;
+};
+
 export function apiSubmitTotemLead(body: {
   requestKey?:string;destination?:'cashier'|'whatsapp';
   stockId?:string;pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
+  /** Carrinho: vários itens num pedido só (uma senha, uma mensagem no WhatsApp). */
+  items?: ApiTotemCartItem[];
   customerName: string;
   customerPhone: string;
   productName: string;
@@ -639,7 +649,7 @@ export function apiSubmitTotemLead(body: {
   installment: string | null;
   priceLabel: string;
 }) {
-  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number;whatsappUrl?:string }>('/totem/leads', body);
+  return nestPost<{ id: string; notificationWarning?:string;whatsappStatus?:string; customerNotified?: boolean;trackingToken?:string;quotedPrice?:number;whatsappUrl?:string;total?:number;ticketIds?:string[] }>('/totem/leads', body);
 }
 
 export function apiListPosTickets(status?: ApiPosTicket['status']) {

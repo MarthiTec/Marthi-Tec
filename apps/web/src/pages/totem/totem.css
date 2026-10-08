@@ -17,10 +17,15 @@ body.totem-html-scroll,
 body.totem-html-scroll #root {
   height: auto;
   min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* clip (e não hidden/auto) para body e #root não virarem contêiner de rolagem:
+     senão o cabeçalho, a busca e a barra lateral perdem o position: sticky. */
+  overflow-x: clip;
+  overflow-y: visible;
   background: #f5f5f7;
   overscroll-behavior: auto;
+}
+html.totem-html-scroll {
+  overflow-y: auto;
 }
 
 .totem--page-scroll {
@@ -1934,4 +1939,569 @@ body.totem-html-scroll #root {
 .totem-whatsapp-sent p {
   margin: 0;
   line-height: 1.45;
+}
+
+/* ───────────── Propaganda / imagem em destaque no topo da vitrine ───────────── */
+.totem-banner {
+  position: relative;
+  overflow: hidden;
+  margin: 12px clamp(12px, 2vw, 24px) 4px;
+  border-radius: 22px;
+  /* Faixa larga (16:6) que ocupa a largura toda; em telas baixas limita a altura. */
+  height: min(34vw, 32vh);
+  min-height: 120px;
+  background: #e8e8ed;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  touch-action: pan-y;
+  user-select: none;
+}
+.totem-banner__track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.totem-banner__slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.totem-banner__dots {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+.totem-banner__dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.totem-banner__dots button.is-active {
+  width: 26px;
+  background: #fff;
+}
+
+/* ───────────── Navegação lateral (marcas ou categorias) ───────────── */
+.totem--page-scroll .totem__floor.totem__floor--sidebar {
+  display: grid;
+  grid-template-columns: clamp(92px, 15vw, 150px) minmax(0, 1fr);
+  column-gap: clamp(10px, 1.6vw, 18px);
+  align-items: start;
+  padding-left: clamp(8px, 1.2vw, 16px);
+}
+.totem__floor--sidebar > .totem-banner {
+  grid-column: 1 / -1;
+  margin-left: 0;
+}
+.totem-sidenav {
+  position: sticky;
+  top: 76px;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  padding: 10px 4px 16px;
+  scrollbar-width: none;
+}
+.totem-sidenav::-webkit-scrollbar {
+  display: none;
+}
+.totem-sidenav__item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: transparent;
+  color: #6e6e73;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.totem-sidenav__item:active {
+  transform: scale(0.96);
+}
+.totem-sidenav__item.is-active {
+  background: #fff;
+  border-color: rgba(var(--accent-rgb), 0.35);
+  color: #1d1d1f;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.totem-sidenav__item.is-active::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 22%;
+  bottom: 22%;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.totem-sidenav__icon {
+  display: grid;
+  place-items: center;
+  width: clamp(48px, 7vw, 64px);
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  color: var(--accent);
+  font-size: 1.3rem;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.totem-sidenav__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.totem-sidenav__icon--all {
+  background: rgba(var(--accent-rgb), 0.12);
+}
+.totem-sidenav__label {
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.totem-sidenav__count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .totem--page-scroll .totem__floor.totem__floor--sidebar {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+  .totem-sidenav__count {
+    display: none;
+  }
+}
+
+/* ───────────── Carrinho: botão do card, barra do rodapé, arrastar para finalizar ───────────── */
+.totem-card__add {
+  transition: transform 0.15s ease, background 0.25s ease;
+}
+.totem-card__add:active {
+  transform: scale(0.95);
+}
+.totem-card__add.is-added,
+.totem--dark .totem-card__add.is-added {
+  background: #16a34a;
+  animation: totem-added-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes totem-added-pop {
+  0% { transform: scale(0.92); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.totem-foot--cart {
+  gap: 0;
+  padding-top: 10px;
+}
+.totem-cartbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  animation: totem-guided-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.totem-cartbar__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.totem-cartbar__badge {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  height: 46px;
+  padding: 0 8px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 800;
+  animation: totem-added-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.totem-cartbar__text {
+  display: grid;
+  min-width: 0;
+}
+.totem-cartbar__text small {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.82rem;
+}
+.totem-cartbar__text strong {
+  font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+  letter-spacing: -0.02em;
+}
+.totem-cartbar__finish {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 26px;
+  border: none;
+  border-radius: 16px;
+  background: #16a34a;
+  color: #fff;
+  font: inherit;
+  font-size: 1.08rem;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.35);
+}
+.totem-cartbar__finish:active {
+  transform: scale(0.97);
+}
+
+.totem-swipe {
+  position: relative;
+  flex: 1;
+  max-width: 440px;
+  margin-left: auto;
+  height: 64px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.totem-swipe__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(22, 163, 74, 0.25), rgba(22, 163, 74, 0.55));
+}
+.totem-swipe__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-left: 56px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.totem-swipe__chevrons {
+  letter-spacing: -2px;
+  animation: totem-swipe-hint 1.6s ease-in-out infinite;
+}
+@keyframes totem-swipe-hint {
+  0%, 100% { opacity: 0.35; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(6px); }
+}
+.totem-swipe__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 60px;
+  height: 58px;
+  border: none;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+  cursor: grab;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.totem-swipe__knob:active {
+  cursor: grabbing;
+}
+@media (max-width: 560px) {
+  .totem-cartbar {
+    flex-wrap: wrap;
+  }
+  .totem-cartbar__finish,
+  .totem-swipe {
+    flex: 1 1 100%;
+    max-width: none;
+    margin-left: 0;
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .totem-swipe__chevrons,
+  .totem-card__add.is-added,
+  .totem-cartbar__badge {
+    animation: none;
+  }
+}
+
+/* Com o carrinho aberto o rodapé fica mais alto: a vitrine ganha espaço extra no fim. */
+.totem--has-cart.totem--page-scroll .totem__scroll {
+  padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Lista do carrinho na finalização */
+.totem__cart-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.totem-cart {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 52dvh;
+  overflow-y: auto;
+}
+.totem-cart__line {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  animation: totem-guided-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.totem-cart__thumb {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f5f5f7;
+  font-weight: 800;
+}
+.totem-cart__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.totem-cart__info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.totem-cart__info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.totem-cart__info small {
+  color: #6e6e73;
+}
+.totem-cart__info em {
+  font-style: normal;
+  font-weight: 750;
+}
+.totem-cart__qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.totem-cart__qty button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: #e8e8ed;
+  color: #1d1d1f;
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.totem-cart__qty output {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.totem__done-items {
+  display: grid;
+  gap: 4px;
+  margin: 0 auto 8px;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+/* ───────────── Tema escuro ───────────── */
+html.totem-html-dark,
+body.totem-html-dark,
+body.totem-html-scroll.totem-html-dark #root {
+  background: #0b0d12;
+}
+.totem.totem--dark {
+  --tk-bg: #0b0d12;
+  --tk-surface: #151922;
+  --tk-surface-2: #1e2430;
+  --tk-line: rgba(255, 255, 255, 0.09);
+  --tk-ink: #eef1f6;
+  --tk-mute: #9aa3b2;
+  background:
+    radial-gradient(900px 420px at 100% -5%, rgba(var(--accent-rgb), 0.16), transparent 55%),
+    var(--tk-bg);
+  color: var(--tk-ink);
+}
+.totem--dark .totem__top {
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb), 0.16), transparent 42%),
+    rgba(14, 17, 23, 0.86);
+  border-bottom-color: var(--tk-line);
+}
+.totem--dark .totem__top-meta strong,
+.totem--dark .totem__hello,
+.totem--dark .totem-card h2,
+.totem--dark .totem__checkout-form h1,
+.totem--dark .totem__done h1,
+.totem--dark .totem__summary-name strong {
+  color: var(--tk-ink);
+}
+.totem--dark .totem__top-meta span,
+.totem--dark .totem-card__price span,
+.totem--dark .totem-card__stock,
+.totem--dark .totem__welcome p,
+.totem--dark .totem__summary-name,
+.totem--dark .totem-cart__info small,
+.totem--dark .totem-picker__caption {
+  color: var(--tk-mute);
+}
+.totem--dark .totem__exit,
+.totem--dark .totem__audio,
+.totem--dark .totem__back,
+.totem--dark .totem__catalog-top {
+  background: var(--tk-surface-2);
+  border-color: var(--tk-line);
+  color: var(--tk-ink);
+}
+.totem--dark.totem--page-scroll .totem__search-panel {
+  background: linear-gradient(var(--tk-bg) 70%, rgba(11, 13, 18, 0.92));
+}
+.totem--dark .totem-chip {
+  color: var(--tk-mute);
+}
+.totem--dark .totem-chip.is-active,
+.totem--dark .totem-btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+.totem--dark .totem-card,
+.totem--dark .totem-card__media,
+.totem--dark .totem-carousel,
+.totem--dark .totem-carousel__slide,
+.totem--dark .totem__checkout-card,
+.totem--dark .totem-cart__line,
+.totem--dark .totem-foot-sheet__card,
+.totem--dark .totem-lock__card,
+.totem--dark .totem-guided {
+  background: var(--tk-surface);
+  color: var(--tk-ink);
+  border-color: var(--tk-line);
+}
+.totem--dark .totem__search-trigger,
+.totem--dark .totem-filter__label,
+.totem--dark .totem-filter__menu,
+.totem--dark .totem-picker__trigger,
+.totem--dark .totem-picker__menu,
+.totem--dark .totem__prices,
+.totem--dark .totem__summary p,
+.totem--dark .totem-cart__thumb,
+.totem--dark .totem-cart__qty button,
+.totem--dark .totem-foot-sheet__block,
+.totem--dark .totem-guided__bubble,
+.totem--dark .totem__search-query,
+.totem--dark .totem__checkout-kb {
+  background: var(--tk-surface-2);
+  color: var(--tk-ink);
+  border-color: var(--tk-line);
+}
+.totem--dark .totem-guided__bubble::before {
+  background: var(--tk-surface-2);
+}
+.totem--dark .totem-filter__label strong,
+.totem--dark .totem-filter__menu button,
+.totem--dark .totem-picker__menu button {
+  color: var(--tk-ink);
+}
+.totem--dark .totem-filter__menu button:hover,
+.totem--dark .totem-picker__menu button:hover,
+.totem--dark .totem-picker__menu button.is-active {
+  background: rgba(var(--accent-rgb), 0.22);
+}
+.totem--dark .totem-field {
+  color: var(--tk-mute);
+}
+.totem--dark .totem-field input,
+.totem--dark .totem-guided input {
+  background: var(--tk-surface-2);
+  border-color: var(--tk-line);
+  color: var(--tk-ink);
+}
+.totem--dark .totem-field--focus input {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.3);
+}
+.totem--dark .totem-btn--ghost,
+.totem--dark .totem-link {
+  background: transparent;
+  color: var(--tk-ink);
+  border-color: var(--tk-line);
+}
+.totem--dark .totem-banner {
+  background: var(--tk-surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.totem--dark .totem-sidenav__item {
+  color: var(--tk-mute);
+}
+.totem--dark .totem-sidenav__item.is-active {
+  background: var(--tk-surface);
+  color: var(--tk-ink);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.totem--dark .totem-sidenav__icon {
+  background: var(--tk-surface-2);
+  box-shadow: inset 0 0 0 1px var(--tk-line);
+}
+.totem--dark .totem-sidenav__count {
+  background: rgba(255, 255, 255, 0.08);
+}
+.totem--dark .totem__senha {
+  color: var(--tk-ink);
+}
+.totem__cart-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.4vw, 2.2rem);
+  letter-spacing: -0.03em;
 }

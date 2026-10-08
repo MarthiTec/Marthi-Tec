@@ -110,6 +110,8 @@ function groupStockForTotem(items: StockItem[]): (TotemProduct & { totalQty: num
       stockId: primary.id,
       name,
       brand: resolveTotemBrand(primary.brand, name),
+      brandName: primary.brand?.trim() || '',
+      category: primary.category?.trim() || '',
       storages,
       colors,
       cashPrice: bestCashPrice,

@@ -47,6 +47,12 @@ const defaultTotemSettings = {
   locationLabel: 'Loja Principal',
   cardFeePercent: 0,
   customerWhatsAppMessage: DEFAULT_TOTEM_CUSTOMER_MESSAGE,
+  theme: 'light',
+  catalogNav: 'top',
+  navGroup: 'brand',
+  topBanners: [] as string[],
+  cartEnabled: false,
+  checkoutGesture: 'button',
 };
 
 const totemSettingsSchema = z.object({
@@ -77,13 +83,28 @@ const totemSettingsSchema = z.object({
   locationLabel: z.string().optional().default(''),
   cardFeePercent: z.coerce.number().default(0),
   customerWhatsAppMessage: z.string().trim().max(1500).optional(),
+  // Visual e navegação: cada loja monta o totem do seu jeito; o padrão é o totem de sempre.
+  theme: z.enum(['light', 'dark']).default('light'),
+  catalogNav: z.enum(['top', 'sidebar']).default('top'),
+  navGroup: z.enum(['brand', 'category']).default('brand'),
+  topBanners: z.array(z.string().startsWith('data:image/').max(1_500_000)).max(5).default([]),
+  cartEnabled: z.boolean().default(false),
+  checkoutGesture: z.enum(['button', 'swipe']).default('button'),
 });
 
 const leadSchema = z.object({
   pickupMethodId:pickupSelection.pickupMethodId,deliveryAddress:pickupSelection.deliveryAddress,
   requestKey:z.string().min(8).max(100).optional(),
   destination:z.enum(['cashier','whatsapp']).default('cashier'),
-  stockId:z.string().min(1),
+  stockId:z.string().min(1).optional(),
+  /** Carrinho: vários itens no mesmo pedido. Sem items, vale o produto único de stockId. */
+  items:z.array(z.object({
+    stockId:z.string().min(1),
+    pickupMethodId:pickupSelection.pickupMethodId,
+    deliveryAddress:pickupSelection.deliveryAddress,
+    attributes:z.array(z.object({ id: z.string(), name: z.string(), value: z.string() })).optional(),
+    qty:z.coerce.number().int().min(1).max(99).default(1),
+  })).min(1).max(30).optional(),
   payment:z.enum(['À vista','Parcelado']).default('À vista'),installment:z.string().nullable().optional(),priceLabel:z.string().optional(),
   customerName: z.string().trim().min(1).max(100),
   customerPhone: z.string().max(30).default(''),
@@ -93,7 +114,7 @@ const leadSchema = z.object({
   storage: z.string().optional().default(''),
   fulfillment: z.string().optional().default(''),
   notes: z.string().optional().default(''),
-});
+}).refine(body=>Boolean(body.stockId||body.items?.length),{message:'Escolha um produto.',path:['stockId']});
 
 async function resolveStoreId(req: Request): Promise<string> {
   if (req.storeId) return req.storeId;
@@ -264,78 +285,188 @@ async function handleGetAttributes(req: Request, res: Response, next: NextFuncti
   }
 }
 
+type LeadItem = {
+  stockId: string;
+  pickupMethodId?: string;
+  deliveryAddress?: any;
+  attributes?: { id: string; name: string; value: string }[];
+  qty: number;
+};
+
+type PreparedLeadItem = LeadItem & {
+  productName: string;
+  color: string;
+  storage: string;
+  cardFeePercent: number;
+  pickup: any;
+  offerId?: string;
+  unitPrice: number;
+  priceLabel: string;
+  /** Total da linha já com a taxa do parcelamento, quando parcelado. */
+  lineTotal: number;
+};
+
+const money = (amount: number) => amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Valida e cota um item do totem no banco: produto, atributos, retirada, oferta do dia e parcelamento. */
+async function prepareTotemItem(
+  client: any,
+  storeId: string,
+  settings: any,
+  offers: any[],
+  item: LeadItem,
+  payment: string,
+  installmentCount: number,
+  customerPhone: string,
+): Promise<PreparedLeadItem> {
+  const serviceOptions = item.attributes?.filter(a => a.id === 'TOTEM-DINE') ?? [];
+  if (serviceOptions.length && (settings.vertical !== 'food' || serviceOptions.some(a => !['Consumir no local', 'Retirada'].includes(a.value)))) {
+    throw Object.assign(new Error('Opção de atendimento indisponível.'), { status: 400 });
+  }
+  const productAttributes = item.attributes?.filter(a => a.id !== 'TOTEM-DINE');
+  await validateSaleAttributes(client, storeId, [{ stockId: item.stockId, attributes: productAttributes }], 'totem');
+  const stock = (await client.query(
+    'SELECT name,color,capacity,card_rate FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',
+    [item.stockId, storeId],
+  )).rows[0];
+  if (!stock) throw Object.assign(new Error('Produto não disponível no Totem.'), { status: 404 });
+  if (!item.pickupMethodId) throw Object.assign(new Error('Escolha o tipo de retirada.'), { status: 400 });
+  let pickup = await resolvePickup(client, storeId, item.stockId, item.pickupMethodId, item.deliveryAddress);
+  if (pickup.kind === 'order' && !customerPhone.trim()) throw Object.assign(new Error('Informe o telefone para acompanhar a encomenda.'), { status: 400 });
+  pickup = await quoteTotemCombination(client, storeId, item.stockId, pickup, productAttributes);
+  const offer = matchDayOffer(offers, item.stockId, Object.fromEntries((item.attributes ?? []).map(a => [a.id, a.value])), pickup.unitPrice);
+  if (offer) pickup.unitPrice = Number(offer.promoPrice);
+  const cardFeePercent = stock.card_rate === null || stock.card_rate === undefined ? settings.cardFeePercent : Number(stock.card_rate);
+
+  let priceLabel = money(pickup.unitPrice);
+  let lineTotal = pickup.unitPrice * item.qty;
+  if (payment === 'Parcelado') {
+    const fee = Number(pickup.cardRate) > 0 ? Number(pickup.cardRate) : settings.cardInstallmentRates?.[installmentCount] ?? cardFeePercent;
+    const total = pickup.unitPrice * (1 + Math.max(0, Number(fee) || 0) / 100);
+    priceLabel = installmentCount + 'x · ' + installmentCount + ' X ' + money(Math.round(total / installmentCount * 100) / 100);
+    lineTotal = total * item.qty;
+  }
+  return {
+    ...item,
+    productName: stock.name,
+    color: stock.color || '',
+    storage: stock.capacity || '',
+    cardFeePercent,
+    pickup,
+    offerId: offer?.id,
+    unitPrice: pickup.unitPrice,
+    priceLabel,
+    lineTotal,
+  };
+}
+
 async function handleCreateLead(req: Request, res: Response, next: NextFunction) {
   try {
     const body = leadSchema.parse(req.body);
     const storeId = await resolveStoreId(req);
     const ticketId = `TCK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const code = Math.floor(100 + Math.random() * 900);
-
-
+    const isCart = Boolean(body.items?.length);
+    const { items: _cartItems, ...leadBase } = body;
+    const items: LeadItem[] = isCart
+      ? body.items!
+      : [{ stockId: body.stockId!, pickupMethodId: body.pickupMethodId, deliveryAddress: body.deliveryAddress, attributes: body.attributes, qty: 1 }];
 
     // A mensagem vai para o telefone que o cliente digitou; sem ele não há para quem enviar.
     if(body.destination==='whatsapp'&&body.customerPhone.replace(/\D/g,'').length<10)throw Object.assign(new Error('Informe um telefone com DDD para receber a mensagem no WhatsApp.'),{status:400});
-    let customerMessage='';
+    let installmentCount = 0;
+    if (body.payment === 'Parcelado') {
+      installmentCount = Number(String(body.installment ?? '').replace(/x$/i, ''));
+      if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 18) throw Object.assign(new Error('Parcelamento inválido.'), { status: 400 });
+    }
+    const installment = body.payment === 'Parcelado' ? body.installment ?? null : null;
 
-    if (pool) {
-      const client=await pool.connect();
-      try{await client.query('BEGIN');
+    let customerMessage = '';
+    let prepared: PreparedLeadItem[] = [];
+    const ticketIds: string[] = [];
+    let first: Record<string, any> = {};
+
+    const client=await pool.connect();
+    try{await client.query('BEGIN');
       if(body.requestKey){
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[storeId+':totem:'+body.requestKey]);
         const existing=(await client.query('SELECT * FROM pos_tickets WHERE store_id=$1 AND request_key=$2',[storeId,body.requestKey])).rows[0];
         if(existing){await client.query('COMMIT');res.status(200).json({success:true,data:{...existing.configuration,notificationWarning:existing.configuration.whatsappStatus==='pending'?'Pedido registrado. O envio do WhatsApp ainda não foi confirmado; procure o atendente.':existing.configuration.notificationWarning,id:existing.id,code:existing.code,status:existing.status}});return;}
       }
-      const serviceOptions=body.attributes?.filter(a=>a.id==='TOTEM-DINE')??[];
-      if(serviceOptions.length){const settings=await getStoreTotemSettings(storeId);if(settings.vertical!=='food'||serviceOptions.some(a=>!['Consumir no local','Retirada'].includes(a.value)))throw Object.assign(new Error('Opção de atendimento indisponível.'),{status:400});}
-      await validateSaleAttributes(client,storeId,[{stockId:body.stockId,attributes:body.attributes?.filter(a=>a.id!=='TOTEM-DINE')}],'totem');
-      if(body.stockId){const stock=(await client.query('SELECT name,color,capacity,card_rate FROM stock_items WHERE id=$1 AND store_id=$2 AND active=true',[body.stockId,storeId])).rows[0];if(stock){body.productName=stock.name;body.color=stock.color||body.color;body.storage=stock.capacity||body.storage;(body as any).cardFeePercent=stock.card_rate===null||stock.card_rate===undefined?(await getStoreTotemSettings(storeId)).cardFeePercent:Number(stock.card_rate);}}
-
-      let pickup:any;
-      if(body.stockId){if(!(await client.query('SELECT id FROM stock_items WHERE id=$1 AND store_id=$2 AND show_on_totem=true AND active=true',[body.stockId,storeId])).rows.length)throw Object.assign(new Error('Produto não disponível no Totem.'),{status:404});if(!body.pickupMethodId)throw Object.assign(new Error('Escolha o tipo de retirada.'),{status:400});pickup=await resolvePickup(client,storeId,body.stockId,body.pickupMethodId,body.deliveryAddress);if(pickup.kind==='order'&&!body.customerPhone.trim())throw Object.assign(new Error('Informe o telefone para acompanhar a encomenda.'),{status:400});}
-      if(pickup && body.stockId){pickup=await quoteTotemCombination(client,storeId,body.stockId,pickup,body.attributes?.filter(a=>a.id!=='TOTEM-DINE'));const offer=matchDayOffer(await listDayOffers(client,storeId,'totem'),body.stockId,Object.fromEntries((body.attributes??[]).map(a=>[a.id,a.value])),pickup.unitPrice);if(offer){pickup.unitPrice=Number(offer.promoPrice);(body as any).offerId=offer.id;}}
-      if(pickup) {
-        const money=(amount:number)=>amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-        if(body.payment==='Parcelado') {
-          const count=Number(String(body.installment??'').replace(/x$/i,''));
-          if(!Number.isInteger(count)||count<1||count>18) throw Object.assign(new Error('Parcelamento inválido.'),{status:400});
-          const settings=await getStoreTotemSettings(storeId);
-          const fee=Number(pickup.cardRate)>0?Number(pickup.cardRate):settings.cardInstallmentRates?.[count]??(body as any).cardFeePercent;
-          const total=pickup.unitPrice*(1+Math.max(0,Number(fee)||0)/100);
-          body.priceLabel=count+'x · '+count+' X '+money(Math.round(total/count*100)/100);
-        } else {body.priceLabel=money(pickup.unitPrice);body.installment=null;}
+      const settings: any = await getStoreTotemSettings(storeId);
+      const offers = await listDayOffers(client, storeId, 'totem');
+      for (const item of items) {
+        prepared.push(await prepareTotemItem(client, storeId, settings, offers, item, body.payment, installmentCount, body.customerPhone));
       }
-      await client.query(
-        `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes, request_key, product_name)
-         VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7, $8)`,
-        [ticketId, storeId, code, body.customerName, body.customerPhone, `${body.productName} · ${body.color || ''} ${body.storage || ''}\n${body.notes}`.trim(),body.requestKey??null,body.productName],
-      );
-      if(pickup){const token=await recordPickup(client,storeId,ticketId,body,{...body,qty:1,unitPrice:pickup.unitPrice});(body as any).trackingToken=token;(body as any).quotedPrice=pickup.unitPrice;}
-      const settings=await getStoreTotemSettings(storeId);
-      const assistant=(settings as any).assistant;
+
+      const assistant=settings.assistant;
       const seller=assistant?.sellerId?(await client.query('SELECT name,phone FROM sellers WHERE id=$1 AND store_id=$2 AND active=true',[assistant.sellerId,storeId])).rows[0]:null;
+      const pickupNames = [...new Set(prepared.map(line => line.pickup?.name).filter(Boolean))].join(' / ');
+      const cashTotal = prepared.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+      const chargedTotal = prepared.reduce((sum, line) => sum + line.lineTotal, 0);
+      const lineText = (line: PreparedLeadItem) => {
+        const attrs = (line.attributes ?? []).filter(a => a.value.trim()).map(a => `${a.name}: ${a.value}`).join(' · ');
+        return `${line.qty > 1 ? `${line.qty}x ` : ''}${line.productName}${attrs ? ` (${attrs})` : ''}`;
+      };
+
+      let whatsappUrl: string | undefined;
+      let storeWhatsApp: string | undefined;
       const whatsapp=String(assistant?.whatsapp||seller?.phone||settings.storeWhatsApp||'').replace(/\D/g,'');
-      if(whatsapp.length>=10){const destination=whatsapp.length<=11?'55'+whatsapp:whatsapp;const message=[`Olá, ${seller?.name||assistant?.name||'equipe'}! Quero finalizar meu pedido ${ticketId}.`,`Cliente: ${body.customerName}`,`Telefone: ${body.customerPhone}`,`Produto: ${body.productName}`,...(body.attributes??[]).map(a=>`${a.name}: ${a.value}`),`Retirada: ${pickup?.name||''}`,`Valor: ${body.priceLabel}`].join('\n');(body as any).whatsappUrl=`https://wa.me/${destination}?text=${encodeURIComponent(message)}`;(body as any).storeWhatsApp=destination;}
-      (body as any).sellerId=assistant?.sellerId||null;
+      if(whatsapp.length>=10){
+        storeWhatsApp=whatsapp.length<=11?'55'+whatsapp:whatsapp;
+        const message=[`Olá, ${seller?.name||assistant?.name||'equipe'}! Quero finalizar meu pedido ${ticketId}.`,`Cliente: ${body.customerName}`,`Telefone: ${body.customerPhone}`,...prepared.map(line=>`Produto: ${lineText(line)} · ${line.priceLabel}`),`Retirada: ${pickupNames}`,...(isCart?[`Total: ${money(cashTotal)}`]:[])].join('\n');
+        whatsappUrl=`https://wa.me/${storeWhatsApp}?text=${encodeURIComponent(message)}`;
+      }
+
+      for (const [index, line] of prepared.entries()) {
+        const lineTicketId = index === 0 ? ticketId : `${ticketId}-${index + 1}`;
+        ticketIds.push(lineTicketId);
+        await client.query(
+          `INSERT INTO pos_tickets (id, store_id, code, customer_name, customer_phone, status, source, notes, request_key, product_name)
+           VALUES ($1, $2, $3, $4, $5, 'open', 'totem', $6, $7, $8)`,
+          [lineTicketId, storeId, code, body.customerName, body.customerPhone, `${line.productName} · ${line.color || ''} ${line.storage || ''}\n${body.notes}`.trim(), index === 0 ? body.requestKey ?? null : null, line.productName],
+        );
+        const lineData = {
+          ...leadBase,
+          stockId: line.stockId, pickupMethodId: line.pickupMethodId, deliveryAddress: line.deliveryAddress, attributes: line.attributes,
+          productName: line.productName,
+          color: line.color || body.color,
+          storage: line.storage || body.storage,
+          cardFeePercent: line.cardFeePercent,
+          offerId: line.offerId,
+          installment,
+          priceLabel: line.priceLabel,
+          qty: line.qty,
+          whatsappUrl, storeWhatsApp,
+          sellerId: assistant?.sellerId || null,
+          ...(isCart ? { cartId: ticketId, cartIndex: index + 1, cartSize: prepared.length } : {}),
+        };
+        const trackingToken = await recordPickup(client, storeId, lineTicketId, body, { ...lineData, unitPrice: line.unitPrice });
+        const config = { ...lineData, trackingToken, quotedPrice: line.unitPrice, cashPrice: line.unitPrice, whatsappStatus: body.destination === 'whatsapp' ? 'pending' : 'not_requested' };
+        await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3', [lineTicketId, JSON.stringify(config), storeId]);
+        if (index === 0) first = config;
+      }
+
       if(body.destination==='whatsapp'){
-        const productAttributes=(body.attributes??[]).filter(a=>a.id!=='TOTEM-DINE'&&a.value.trim());
-        const count=Number(String(body.installment??'').replace(/x$/i,''));
-        customerMessage=renderTotemCustomerMessage(String((settings as any).customerWhatsAppMessage||DEFAULT_TOTEM_CUSTOMER_MESSAGE),{
+        const single = prepared[0];
+        const productAttributes=isCart?[]:(single.attributes??[]).filter(a=>a.id!=='TOTEM-DINE'&&a.value.trim());
+        customerMessage=renderTotemCustomerMessage(String(settings.customerWhatsAppMessage||DEFAULT_TOTEM_CUSTOMER_MESSAGE),{
           ...Object.fromEntries(productAttributes.map(a=>[a.name,a.value])),
           nome:customerFirstName(body.customerName),
           cliente:titleCase(body.customerName),
           vendedor:seller?.name||assistant?.name||settings.storeName,
           loja:settings.storeName,
-          produto:body.productName,
-          atributos:productAttributes.length?productAttributes.map(a=>`${a.name}: ${a.value}`).join(' · '):[body.color,body.storage].filter(Boolean).join(' · '),
-          pagamento:body.payment==='Parcelado'&&count>0?`Parcelado em ${count}x`:'À vista',
-          valor:body.priceLabel||'',
-          retirada:pickup?.name||'',
+          produto:isCart?prepared.map(line=>`${line.qty}x ${line.productName}`).join(' + '):single.productName,
+          atributos:isCart?'':productAttributes.length?productAttributes.map(a=>`${a.name}: ${a.value}`).join(' · '):[single.color,single.storage].filter(Boolean).join(' · '),
+          itens:prepared.map(line=>`• ${lineText(line)} — ${line.priceLabel}`).join('\n'),
+          pagamento:installmentCount>0?`Parcelado em ${installmentCount}x`:'À vista',
+          valor:isCart?(installmentCount>0?`${installmentCount}x de ${money(Math.round(chargedTotal/installmentCount*100)/100)}`:money(cashTotal)):single.priceLabel,
+          total:money(isCart?cashTotal:single.unitPrice),
+          retirada:pickupNames,
           pedido:ticketId,
         });
       }
-      await client.query('UPDATE pos_tickets SET configuration=$2 WHERE id=$1 AND store_id=$3',[ticketId,JSON.stringify({...body,cashPrice:pickup?.unitPrice,whatsappStatus:body.destination==='whatsapp'?'pending':'not_requested'}),storeId]);
       await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
-    }
 
     let customerNotified=false;
     let whatsappStatus=body.destination==='whatsapp'?'pending':'not_requested';
@@ -349,23 +480,28 @@ async function handleCreateLead(req: Request, res: Response, next: NextFunction)
         whatsappStatus='unconfirmed';
         notificationWarning='Pedido registrado na fila da loja. Não conseguimos enviar a mensagem no seu WhatsApp agora; um atendente vai te chamar.';
       }
-      await pool.query(`UPDATE pos_tickets SET configuration=configuration || $2::jsonb WHERE id=$1 AND store_id=$3`,[ticketId,JSON.stringify({customerNotified,whatsappStatus,notificationWarning}),storeId]);
+      await pool.query(`UPDATE pos_tickets SET configuration=configuration || $2::jsonb WHERE id = ANY($1::text[]) AND store_id=$3`,[ticketIds,JSON.stringify({customerNotified,whatsappStatus,notificationWarning}),storeId]);
     }
     res.status(201).json({
       success: true,
       data: {
         customerNotified,whatsappStatus,notificationWarning,
-        trackingToken:(body as any).trackingToken,
-        quotedPrice:(body as any).quotedPrice,
-        whatsappUrl:(body as any).whatsappUrl,
+        trackingToken:first.trackingToken,
+        quotedPrice:first.quotedPrice,
+        whatsappUrl:first.whatsappUrl,
         id: ticketId,
         code,
         customerName: body.customerName,
         customerPhone: body.customerPhone,
-        productName: body.productName,
-        priceLabel: body.priceLabel,
+        productName: first.productName,
+        priceLabel: first.priceLabel,
         status: 'open',
         source: 'totem',
+        ...(isCart ? {
+          ticketIds,
+          total: prepared.reduce((sum, line) => sum + line.unitPrice * line.qty, 0),
+          items: prepared.map(line => ({ stockId: line.stockId, productName: line.productName, qty: line.qty, unitPrice: line.unitPrice, priceLabel: line.priceLabel })),
+        } : {}),
       },
     });
   } catch (error) {

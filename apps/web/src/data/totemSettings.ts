@@ -10,6 +10,11 @@ export type TotemKeyboardPlacement = 'top' | 'bottom';
  * logoPromo = destaque na logo da loja + propaganda de fundo (ideal sem mix grande).
  */
 export type TotemAttractLayout = 'standard' | 'logoPromo' | 'greeting';
+export type TotemTheme = 'light' | 'dark';
+export type TotemCatalogNav = 'top' | 'sidebar';
+export type TotemNavGroup = 'brand' | 'category';
+export type TotemCheckoutGesture = 'button' | 'swipe';
+export const TOTEM_MAX_TOP_BANNERS = 5;
 
 export const TOTEM_DINE_ID = 'TOTEM-DINE';
 export const TOTEM_DINE_OPTIONS = ['Consumir no local', 'Retirada'] as const;
@@ -83,6 +88,18 @@ export type TotemSettings = {
    * cliente digitou ao concluir pelo WhatsApp. O modelo padrão vem do servidor.
    */
   customerWhatsAppMessage: string;
+  /** Tema do totem. */
+  theme: TotemTheme;
+  /** Onde ficam as marcas/categorias: abas no topo (padrão) ou barra lateral. */
+  catalogNav: TotemCatalogNav;
+  /** Como agrupar a vitrine: marca (celulares) ou categoria (ex.: tipos de prato). */
+  navGroup: TotemNavGroup;
+  /** Propagandas / imagens em destaque no topo da vitrine (data URL), em carrossel. */
+  topBanners: string[];
+  /** Carrinho: o cliente adiciona vários itens e finaliza pelo rodapé. */
+  cartEnabled: boolean;
+  /** Como finalizar o carrinho: botão ou arrastar para o lado. */
+  checkoutGesture: TotemCheckoutGesture;
   cardInstallmentRates?: Record<string,number>;
 };
 
@@ -380,6 +397,12 @@ export function defaultTotemSettings(): TotemSettings {
     locationLabel: '',
     cardFeePercent: 0,
     customerWhatsAppMessage: '',
+    theme: 'light',
+    catalogNav: 'top',
+    navGroup: 'brand',
+    topBanners: [],
+    cartEnabled: false,
+    checkoutGesture: 'button',
   };
 }
 
@@ -473,6 +496,14 @@ export function normalizeTotemSettings(parsed: Partial<TotemSettings> | null | u
     cardFeePercent: Math.max(0, Math.min(100, Number(parsed?.cardFeePercent) || 0)),
     customerWhatsAppMessage:
       typeof parsed?.customerWhatsAppMessage === 'string' ? parsed.customerWhatsAppMessage.slice(0, 1500) : '',
+    theme: parsed?.theme === 'dark' ? 'dark' : 'light',
+    catalogNav: parsed?.catalogNav === 'sidebar' ? 'sidebar' : 'top',
+    navGroup: parsed?.navGroup === 'category' ? 'category' : 'brand',
+    topBanners: Array.isArray(parsed?.topBanners)
+      ? parsed.topBanners.map(normalizeDataImage).filter((item): item is string => Boolean(item)).slice(0, TOTEM_MAX_TOP_BANNERS)
+      : [],
+    cartEnabled: Boolean(parsed?.cartEnabled),
+    checkoutGesture: parsed?.checkoutGesture === 'swipe' ? 'swipe' : 'button',
   };
 }
 
@@ -527,6 +558,12 @@ function mergeTotemSettings(base: Partial<TotemSettings> | null, patch: Partial<
     locationLabel: patch.locationLabel ?? base?.locationLabel,
     cardFeePercent: patch.cardFeePercent ?? base?.cardFeePercent,
     customerWhatsAppMessage: patch.customerWhatsAppMessage ?? base?.customerWhatsAppMessage,
+    theme: patch.theme ?? base?.theme,
+    catalogNav: patch.catalogNav ?? base?.catalogNav,
+    navGroup: patch.navGroup ?? base?.navGroup,
+    topBanners: patch.topBanners ?? base?.topBanners,
+    cartEnabled: patch.cartEnabled ?? base?.cartEnabled,
+    checkoutGesture: patch.checkoutGesture ?? base?.checkoutGesture,
   });
 }
 

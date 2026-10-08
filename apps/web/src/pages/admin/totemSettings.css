@@ -53,3 +53,18 @@
 @media(max-width:900px) {.totem-settings-identity,.totem-settings-conversation {grid-template-columns:minmax(0,1fr);}.totem-settings-chat {max-width:none;}}
 @media(max-width:600px) {.totem-settings-options,.totem-settings-brand-media {grid-template-columns:minmax(0,1fr);}.totem-settings-media {padding:14px;gap:12px;}.totem-settings-media__preview {width:72px;flex-basis:72px;height:90px;}.totem-settings-chat {padding:16px;}.totem-settings-page .totem-setting-toggle {padding:14px;}.totem-settings-page .admin-card {padding:16px;}}
 @media(prefers-reduced-motion:reduce) {.totem-setting-toggle__track,.totem-setting-toggle__track > span {transition:none;}}
+
+/* Propagandas do topo do totem */
+.totem-settings-banners {display:grid;gap:8px;margin-top:10px;}
+.totem-settings-banners__grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.totem-settings-banners__item {margin:0;display:grid;gap:8px;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--settings-soft);}
+.totem-settings-banners__item img {width:100%;aspect-ratio:16/6;object-fit:cover;border-radius:10px;}
+.totem-settings-banners__item figcaption {display:flex;align-items:center;gap:6px;font-size:.85rem;}
+.totem-settings-banners__item figcaption span {font-weight:700;margin-right:auto;}
+.totem-settings-banners__item button {min-height:34px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.totem-settings-banners__item button:disabled {opacity:.4;cursor:default;}
+.totem-settings-banners__remove {color:#dc2626 !important;}
+.totem-settings-banners__add {display:grid;place-items:center;gap:6px;min-height:120px;border:2px dashed var(--line);border-radius:14px;background:transparent;color:inherit;font:inherit;font-weight:650;cursor:pointer;}
+.totem-settings-banners__add span {font-size:1.6rem;}
+.totem-settings-banners small[role=alert] {color:#dc2626;}
+.totem-settings-subtitle {margin:22px 0 8px;font-size:1rem;font-weight:700;}

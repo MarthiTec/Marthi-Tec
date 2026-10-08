@@ -1,17 +1,19 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import { MARTHI_COMPANY } from '../../data/companyContact';
 
 type TotemFooterProps = {
   hint: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Conteúdo acima do rodapé (ex.: barra do carrinho). Com ele, a dica some para dar espaço. */
+  children?: ReactNode;
 };
 
 /**
  * Rodapé do totem — um botão Contato abre painel central com texto sobre a Marthi
  * e contatos (sem links, para o quiosque não abrir navegador externo).
  */
-export function TotemFooter({ hint, open, onOpenChange }: TotemFooterProps) {
+export function TotemFooter({ hint, open, onOpenChange, children }: TotemFooterProps) {
   const titleId = useId();
 
   useEffect(() => {
@@ -25,8 +27,9 @@ export function TotemFooter({ hint, open, onOpenChange }: TotemFooterProps) {
 
   return (
     <>
-      <footer className="totem-foot">
-        <p className="totem-foot__hint">{hint}</p>
+      <footer className={`totem-foot${children ? ' totem-foot--cart' : ''}`}>
+        {children}
+        {children ? null : <p className="totem-foot__hint">{hint}</p>}
         <div className="totem-foot__actions">
           <button
             type="button"

@@ -11,6 +11,10 @@ export type TotemProduct = {
   installmentLabel: string;
   images: string[];
   attrs: Record<string, string[]>;
+  /** Marca como cadastrada no estoque (ex.: Samsung), usada na navegação lateral. */
+  brandName?: string;
+  /** Categoria do estoque (ex.: Lanches, Bebidas), usada para agrupar a vitrine. */
+  category?: string;
 };
 
 export const TOTEM_BRANDS: { id: TotemBrand | 'all'; label: string }[] = [

@@ -1,4 +1,4 @@
-import {TotemSettingToggle,TotemSettingsImage} from './TotemSettingsControls';
+import {TotemSettingToggle,TotemSettingsImage,TotemSettingsBanners} from './TotemSettingsControls';
 import {assistantText} from '../../data/totemAssistant';
 import './totemSettings.css';
 import { useState, useEffect } from 'react';
@@ -18,6 +18,7 @@ import {
   totemCopy,
   verticalPreset,
   TOTEM_VERTICALS,
+  TOTEM_MAX_TOP_BANNERS,
   type TotemAttractLayout,
   type TotemColumns,
   type TotemKeyboardPlacement,
@@ -104,11 +105,17 @@ export function TotemSettingsPage() {
   const [locationLabel, setLocationLabel] = useState(() => initial.locationLabel);
   const [cardFeePercent, setCardFeePercent] = useState(() => initial.cardFeePercent ?? 0);
   const [customerWhatsAppMessage, setCustomerWhatsAppMessage] = useState(() => initial.customerWhatsAppMessage);
+  const [theme, setTheme] = useState(() => initial.theme);
+  const [catalogNav, setCatalogNav] = useState(() => initial.catalogNav);
+  const [navGroup, setNavGroup] = useState(() => initial.navGroup);
+  const [topBanners, setTopBanners] = useState(() => initial.topBanners);
+  const [cartEnabled, setCartEnabled] = useState(() => initial.cartEnabled);
+  const [checkoutGesture, setCheckoutGesture] = useState(() => initial.checkoutGesture);
   const [loadingSettings,setLoadingSettings]=useState(true);
   const [settingsLoadError,setSettingsLoadError]=useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(()=>setSaved(false),[assistant,attractContent,customerWhatsAppMessage]);
+  useEffect(()=>setSaved(false),[assistant,attractContent,customerWhatsAppMessage,theme,catalogNav,navGroup,topBanners,cartEnabled,checkoutGesture]);
 
   useEffect(() => {
     let mounted = true;
@@ -141,6 +148,12 @@ export function TotemSettingsPage() {
         setLocationLabel(s.locationLabel);
         setCardFeePercent(s.cardFeePercent ?? 0);
         setCustomerWhatsAppMessage(s.customerWhatsAppMessage);
+        setTheme(s.theme);
+        setCatalogNav(s.catalogNav);
+        setNavGroup(s.navGroup);
+        setTopBanners(s.topBanners);
+        setCartEnabled(s.cartEnabled);
+        setCheckoutGesture(s.checkoutGesture);
       })
       .catch((err) => {
         if(mounted){setSettingsLoadError(true);setError(err instanceof Error?err.message:'Não foi possível carregar as configurações salvas.');}
@@ -213,6 +226,12 @@ export function TotemSettingsPage() {
         locationLabel,
         cardFeePercent,
         customerWhatsAppMessage,
+        theme,
+        catalogNav,
+        navGroup,
+        topBanners,
+        cartEnabled,
+        checkoutGesture,
       });
       setError(null);
       setSaved(true);
@@ -335,10 +354,129 @@ export function TotemSettingsPage() {
           Marcadores: <code>{'{nome}'}</code> primeiro nome do cliente · <code>{'{vendedor}'}</code> ·{' '}
           <code>{'{loja}'}</code> · <code>{'{produto}'}</code> · <code>{'{atributos}'}</code> (ex.: Cor: preto ·
           Capacidade: 128GB) · <code>{'{pagamento}'}</code> · <code>{'{valor}'}</code> ·{' '}
-          <code>{'{retirada}'}</code> · <code>{'{pedido}'}</code>. Cada atributo também vira marcador com o
+          <code>{'{retirada}'}</code> · <code>{'{pedido}'}</code> · <code>{'{itens}'}</code> (lista do
+          carrinho, um item por linha) · <code>{'{total}'}</code>. Cada atributo também vira marcador com o
           próprio nome, como <code>{'{Cor}'}</code> e <code>{'{Capacidade}'}</code>. No WhatsApp,{' '}
           <code>*texto*</code> fica em negrito. Linhas com marcador sem informação somem da mensagem.
         </p>
+      </article>
+
+      <article className="admin-card" id="totem-visual">
+        <h2>Visual e navegação da vitrine</h2>
+        <p>
+          Monte o totem do jeito da sua loja. Tudo aqui é opcional: sem mudar nada, o totem continua
+          exatamente como está hoje.
+        </p>
+
+        <h3 className="totem-settings-subtitle">Tema</h3>
+        <div className="plan-picker">
+          {([
+            { value: 'light', title: 'Claro', hint: 'Fundo claro e limpo, ótimo para lojas bem iluminadas.' },
+            { value: 'dark', title: 'Escuro', hint: 'Fundo escuro elegante; as fotos dos produtos ganham destaque.' },
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`plan-picker__card ${theme === option.value ? 'is-active' : ''}`}
+              onClick={() => {
+                setTheme(option.value);
+                markDirty();
+              }}
+            >
+              <strong>{option.title}</strong>
+              <span>{option.hint}</span>
+            </button>
+          ))}
+        </div>
+
+        <h3 className="totem-settings-subtitle">Navegação da vitrine</h3>
+        <div className="plan-picker">
+          {([
+            { value: 'top', title: 'Abas no topo', hint: 'Marcas ou categorias em botões acima dos produtos (como hoje).' },
+            { value: 'sidebar', title: 'Barra lateral', hint: 'Lista fixa à esquerda com foto de cada grupo, como nos totens de lanchonete.' },
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`plan-picker__card ${catalogNav === option.value ? 'is-active' : ''}`}
+              onClick={() => {
+                setCatalogNav(option.value);
+                markDirty();
+              }}
+            >
+              <strong>{option.title}</strong>
+              <span>{option.hint}</span>
+            </button>
+          ))}
+        </div>
+        <div className="plan-picker" style={{ marginTop: 12 }}>
+          {([
+            { value: 'brand', title: 'Agrupar por marca', hint: 'Ideal para celulares e eletrônicos: Apple, Samsung, Xiaomi…' },
+            { value: 'category', title: 'Agrupar por categoria', hint: 'Usa a categoria do estoque: lanches, bebidas, sobremesas, acessórios…' },
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`plan-picker__card ${navGroup === option.value ? 'is-active' : ''}`}
+              onClick={() => {
+                setNavGroup(option.value);
+                markDirty();
+              }}
+            >
+              <strong>{option.title}</strong>
+              <span>{option.hint}</span>
+            </button>
+          ))}
+        </div>
+
+        <h3 className="totem-settings-subtitle">Propaganda / imagem em destaque no topo</h3>
+        <p className="totem-settings-note">
+          Até {TOTEM_MAX_TOP_BANNERS} imagens no topo da vitrine. Com mais de uma, elas giram sozinhas e o
+          cliente pode arrastar para o lado. Use imagens largas (formato faixa, ex.: 1600 × 600).
+        </p>
+        <TotemSettingsBanners
+          value={topBanners}
+          max={TOTEM_MAX_TOP_BANNERS}
+          convert={fileToAttractBackground}
+          onChange={(next) => {
+            setTopBanners(next);
+            markDirty();
+          }}
+        />
+
+        <h3 className="totem-settings-subtitle">Carrinho</h3>
+        <div className="totem-settings-options">
+          <TotemSettingToggle
+            label="Carrinho com vários itens"
+            hint="O cliente toca em Adicionar em cada produto e finaliza tudo junto pelo rodapé. Desligado: um produto por pedido."
+            checked={cartEnabled}
+            onChange={(value) => {
+              setCartEnabled(value);
+              markDirty();
+            }}
+          />
+        </div>
+        {cartEnabled ? (
+          <div className="plan-picker" style={{ marginTop: 12 }}>
+            {([
+              { value: 'button', title: 'Botão Finalizar', hint: 'Um toque no botão do rodapé abre a finalização.' },
+              { value: 'swipe', title: 'Arrastar para finalizar', hint: 'O cliente arrasta para o lado: evita finalizar sem querer.' },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`plan-picker__card ${checkoutGesture === option.value ? 'is-active' : ''}`}
+                onClick={() => {
+                  setCheckoutGesture(option.value);
+                  markDirty();
+                }}
+              >
+                <strong>{option.title}</strong>
+                <span>{option.hint}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </article>
 
       <article className="admin-card" id="totem-opening">
