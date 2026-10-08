@@ -107,6 +107,8 @@ export function ExternalSalePage() {
 
   // Upgrade / Trade-in
   const [hasTradeIn, setHasTradeIn] = useState(false);
+  // Nome do aparelho do upgrade em caixa alta, igual ao cadastro de produtos.
+  const [tradeUppercase, setTradeUppercase] = useState(true);
   const [tradeIn, setTradeIn] = useState<TradeInPayload>({
     deviceName: '',
     imei: '',
@@ -176,22 +178,8 @@ export function ExternalSalePage() {
 
         setStockItems(mappedStock);
 
-        // Se houver produtos no estoque, pré-seleciona o primeiro
-        if (mappedStock.length > 0) {
-          const first = mappedStock[0];
-          setLines([
-            {
-              stockId: first.id,
-              name: first.name,
-              qty: 1,
-              unitPrice: first.price,
-              unitCost: first.cost,
-              discount: 0,
-              surcharge: 0,
-              imei: first.imei,
-            },
-          ]);
-        }
+        // A venda começa sem produto escolhido: ao escolher, a linha puxa preço, cor, capacidade e IMEI do estoque.
+        setLines([{ name: '', qty: 1, unitPrice: 0, stockId: '' }]);
       } catch (err) {
         if (storeRef.current === storeId) setError(err instanceof Error ? err.message : 'Não foi possível carregar os dados da loja.');
       } finally {
@@ -251,18 +239,46 @@ export function ExternalSalePage() {
     setLines((prev) => prev.filter((_, idx) => idx !== index));
   }
 
+  /**
+   * Dados do produto do estoque já na linha: cor/capacidade quando só há uma opção (ou só uma
+   * variação com estoque), com o preço dessa variação.
+   */
+  function autoFillFromProduct(prod: StockOption) {
+    const variations = prod.variations ?? [];
+    const inStock = variations.filter((v) => Number(v.qty) > 0);
+    const chosen = inStock.length === 1 ? inStock[0] : variations.length === 1 ? variations[0] : undefined;
+    const attributes: Array<{ id: string; name: string; value: string }> = [];
+    for (const attr of attributeDefs.filter((item) => item.active && item.useOnExternalSale !== false)) {
+      let values: string[] = [];
+      if (chosen) {
+        const value = chosen.attrs?.[attr.id];
+        if (value) values = [String(value)];
+      } else if (variations.length) {
+        values = variations.map((v) => v.attrs?.[attr.id]).filter((v): v is string => Boolean(v));
+      } else {
+        const configured = prod.attrs?.[attr.id];
+        const legacy = /^cor$/i.test(attr.name) ? prod.color : /^capacidade$/i.test(attr.name) ? prod.capacity : '';
+        values = Array.isArray(configured) ? configured.map(String) : typeof configured === 'string' && configured ? [configured] : legacy ? [legacy] : [];
+      }
+      const unique = [...new Set(values.filter(Boolean))];
+      if (unique.length === 1) attributes.push({ id: attr.id, name: attr.name, value: unique[0] });
+    }
+    return { attributes, price: chosen && Number(chosen.price) > 0 ? Number(chosen.price) : undefined };
+  }
+
   function handleLineProductChange(index: number, stockId: string) {
     const prod = stockItems.find((p) => p.id === stockId);
     setLines((prev) =>
       prev.map((l, idx) => {
         if (idx !== index) return l;
         if (!prod) return { ...l, attributes: [],pickupMethodId:undefined,deliveryAddress:undefined, stockId: '', name: '', unitPrice: 0, unitCost: 0, imei: '' };
+        const auto = autoFillFromProduct(prod);
         return {
           ...l,
           stockId: prod.id,
-          attributes: [],pickupMethodId:undefined,deliveryAddress:undefined,
+          attributes: auto.attributes,pickupMethodId:undefined,deliveryAddress:undefined,
           name: prod.name,
-          unitPrice: prod.price,
+          unitPrice: auto.price ?? prod.price,
           unitCost: prod.cost,
           imei: prod.imei || '',
         };
@@ -358,18 +374,7 @@ export function ExternalSalePage() {
   function handleResetForm() {
     requestId.current = crypto.randomUUID();
     setSavedSaleId(null);
-    setLines([
-      {
-        stockId: stockItems[0]?.id || '',
-        name: stockItems[0]?.name || '',
-        qty: 1,
-        unitPrice: stockItems[0]?.price || 0,
-        unitCost: stockItems[0]?.cost || 0,
-        discount: 0,
-        surcharge: 0,
-        imei: stockItems[0]?.imei || '',
-      },
-    ]);
+    setLines([{ name: '', qty: 1, unitPrice: 0, stockId: '' }]);
     setSelectedCustomerId('');
     setCustomerName('Consumidor Final');
     setCustomerPhone('');
@@ -549,7 +554,11 @@ export function ExternalSalePage() {
                 <div className="external-sale-trade-fields">
                   <div className="external-sale-wide-field">
                     <label className="admin-label">Aparelho entregue pelo cliente</label>
-                    <input type="text" className="admin-input" placeholder="Ex.: iPhone 15 Pro Max usado" value={tradeIn.deviceName} onChange={(e) => setTradeIn({ ...tradeIn, deviceName: e.target.value })} required={hasTradeIn} />
+                    <input type="text" className="admin-input" placeholder="Ex.: IPHONE 15 PRO MAX USADO" value={tradeIn.deviceName} onChange={(e) => setTradeIn({ ...tradeIn, deviceName: tradeUppercase ? e.target.value.toUpperCase() : e.target.value })} required={hasTradeIn} />
+                    <label className="xsale-check">
+                      <input type="checkbox" checked={tradeUppercase} onChange={(e) => { setTradeUppercase(e.target.checked); if (e.target.checked) setTradeIn({ ...tradeIn, deviceName: tradeIn.deviceName.toUpperCase() }); }} />
+                      Sempre em MAIÚSCULAS
+                    </label>
                   </div>
                   <div className="external-sale-wide-field">
                     <AdminPicker label="Marca do aparelho recebido" value={tradeIn.brand || ''} options={[{ value: '', label: 'Selecionar marca' }, ...brands.filter((b) => b.active).map((b) => ({ value: b.slug, label: b.name }))]} onChange={(brand) => setTradeIn({ ...tradeIn, brand })} />

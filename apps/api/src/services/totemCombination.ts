@@ -1,4 +1,7 @@
 import type {PoolClient} from 'pg';
+import {attributeValueKey} from './attributeValues.js';
+/** Mesma cor/capacidade mesmo escrita diferente ("128GB" x "128 GB"). */
+const sameAttributeValue=(a:unknown,b:unknown)=>attributeValueKey(a==null?'':String(a))===attributeValueKey(b==null?'':String(b));
 
 const methodPrice=(prices:Record<string,unknown>|null|undefined,methodId:string)=>{
  const value=prices?.[methodId];
@@ -16,7 +19,7 @@ export async function quoteTotemCombination(db:Pick<PoolClient,'query'>,storeId:
  if(!stock)throw Object.assign(new Error('Produto indisponível.'),{status:404});
  const picked=Object.fromEntries(attributes.map(a=>[a.id,a.value]));
  const variations=Array.isArray(stock.variations)?stock.variations:[];
- const candidates=variations.length?variations.filter((v:any)=>Object.entries(v.attrs??{}).every(([id,value])=>picked[id]===value)):[stock];
+ const candidates=variations.length?variations.filter((v:any)=>Object.entries(v.attrs??{}).every(([id,value])=>sameAttributeValue(picked[id],value))):[stock];
  const candidate=candidates.find((v:any)=>{
    const explicit=v.pickupMethodId ?? v.pickup_method_id;
    const prices=v.pickupPrices ?? v.pickup_prices ?? stock.pickup_prices ?? {};

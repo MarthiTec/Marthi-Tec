@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   CrudListBar,
@@ -33,6 +33,7 @@ import {
   type EmployeePermissions,
   type EmployeeRole,
 } from '../../data/erpRegistry';
+import { hubFullAccess } from '../../data/hubPaths';
 import {
   getErpUserPasswordHint,
   setErpUserPassword,
@@ -89,7 +90,8 @@ function areasSummary(item: Employee) {
 
 export function PermissionsPage() {
   const { user } = useAuth();
-  const isAdmin = userIsStoreAdmin(user?.email);
+  // Mesma regra do painel: admin/gerente pelo login ou dono pelo cadastro da loja.
+  const isAdmin = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
   const [tick, setTick] = useState(0);
   const employees = useMemo(() => listEmployees(), [tick]);
   const systemUsers = useMemo(
@@ -358,7 +360,7 @@ export function PermissionsPage() {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/painel" replace />;
+    return <p className="empty">Somente o administrador ou gerente da loja define as permissões de acesso.</p>;
   }
 
   return (

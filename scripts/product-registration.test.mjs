@@ -232,3 +232,18 @@ test('seller can sell by order a color the product does not have yet; immediate 
   assert.equal(inHand.status, 400);
   assert.match(inHand.json.error.message, /Não há Verde em estoque para entrega imediata/);
 });
+test('variation written as "128GB" matches the attribute value "128 GB" in sale and stock deduction', async () => {
+  await query("INSERT INTO product_attributes(id,store_id,name,active,use_on_external_sale,use_on_totem) VALUES('ATTR-cap-sp','store-a','Capacidade',true,true,true)");
+  await query("INSERT INTO product_attribute_values(id,attribute_id,value,sort) VALUES('ATV-cap-128','ATTR-cap-sp','128 GB',0)");
+  await query("INSERT INTO pickup_methods(id,store_id,name,kind) VALUES('pm-hand-sp','store-a','Em mãos (teste espaço)','immediate')");
+  const created = await request('/stock', 'POST', { name: 'IPHONE 16', qty: 0, cost: 3000, price: 4650, variations: [
+    { attrs: { 'ATTR-cap-sp': '128GB' }, qty: 2, price: 4650, cost: 3000, pickupPrices: { 'pm-hand-sp': 4650 } },
+  ] });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  const sale = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Gilvan', customerPhone: '24999663631', lines: [
+    { stockId: created.json.data.id, name: 'IPHONE 16', qty: 1, unitPrice: 4650, pickupMethodId: 'pm-hand-sp', attributes: [{ id: 'ATTR-cap-sp', name: 'Capacidade', value: '128GB' }] },
+  ] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const variations = (await query('SELECT variations FROM stock_items WHERE id=$1', [created.json.data.id])).rows[0].variations;
+  assert.equal(Number(variations[0].qty), 1, 'the 128GB variation was deducted');
+});

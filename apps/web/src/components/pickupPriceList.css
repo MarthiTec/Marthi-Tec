@@ -15,3 +15,46 @@
 .pickup-price-list__toggle {min-width:0;}
 .pickup-price-list__toggle strong {overflow-wrap:anywhere;}
 @media (max-width:560px) {.pickup-price-list__row {grid-template-columns:minmax(0,1fr);}}
+
+/* Dica da encomenda: um selo pequeno; o texto completo aparece ao passar o mouse ou tocar. */
+.pickup-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb, 15, 118, 110), 0.1);
+  color: var(--accent, #0f766e);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: help;
+  outline: none;
+}
+.pickup-hint__bubble {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.pickup-hint:hover .pickup-hint__bubble,
+.pickup-hint:focus .pickup-hint__bubble,
+.pickup-hint:focus-within .pickup-hint__bubble {
+  opacity: 1;
+  transform: translateY(0);
+}

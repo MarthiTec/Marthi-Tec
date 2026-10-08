@@ -2560,3 +2560,10 @@ body.totem-html-scroll.totem-html-dark #root {
   height: 70%;
   object-fit: contain;
 }
+
+/* Foto do cartão: o carrossel herda o fundo da área da foto. Com fundo próprio (cinza), a
+   suavização do canto arredondado deixava um fio visível nos quatro cantos. */
+.totem-card__media .totem-carousel,
+.totem-card__media .totem-carousel__slide {
+  background: transparent !important;
+}
