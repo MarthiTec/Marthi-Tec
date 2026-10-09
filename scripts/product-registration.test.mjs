@@ -297,3 +297,69 @@ test('sale can have store warranty, manufacturer-only warranty or no warranty', 
     assert.equal(receipt.sale.warranty.months, months);
   }
 });
+
+test('product types, groups/subgroups with store labels, entry date, DUN-14 and unit conversion are saved on the product', async () => {
+  const type = await request('/product-types', 'POST', { name: 'Smartphone' });
+  assert.equal(type.status, 201, JSON.stringify(type.json));
+  assert.equal((await request('/product-types', 'POST', { name: 'smartphone' })).status, 409);
+  const group = (await request('/product-groups', 'POST', { name: 'Bebidas' })).json.data;
+  const sub = await request('/product-groups', 'POST', { name: 'Cerveja', parentId: group.id });
+  assert.equal(sub.status, 201, JSON.stringify(sub.json));
+  assert.equal((await request('/product-groups', 'POST', { name: 'Lata', parentId: sub.json.data.id })).status, 400, 'only one sublevel');
+  const other = (await request('/product-groups', 'POST', { name: 'Eletrônicos' })).json.data;
+
+  const labels = await request('/product-groups/labels', 'PUT', { group: 'Família', subgroup: 'Linha' });
+  assert.deepEqual(labels.json.data, { group: 'Família', subgroup: 'Linha' });
+  const listed = (await request('/product-groups')).json.data;
+  assert.equal(listed.labels.group, 'Família');
+  assert.equal(listed.groups.find((g) => g.id === sub.json.data.id).parentId, group.id);
+
+  const created = await request('/stock', 'POST', {
+    name: 'Cerveja Lata 350', qty: 24, cost: 3, price: 5, productTypeId: type.json.data.id, groupId: group.id, subgroupId: sub.json.data.id,
+    entryDate: '2026-10-01', dun14: '17891234567895', purchaseUnit: 'cx', purchaseFactor: 12,
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  const row = created.json.data;
+  assert.equal(row.productTypeId, type.json.data.id);
+  assert.equal(row.subgroupId, sub.json.data.id);
+  assert.equal(row.entryDate, '2026-10-01');
+  assert.equal(row.dun14, '17891234567895');
+  assert.equal(row.purchaseUnit, 'CX');
+  assert.equal(row.purchaseFactor, 12);
+  const fromList = (await request('/stock')).json.data.find((item) => item.id === row.id);
+  assert.equal(fromList.entryDate, '2026-10-01');
+  assert.equal(fromList.groupId, group.id);
+
+  assert.equal((await request('/stock/' + row.id, 'PATCH', { groupId: other.id, subgroupId: sub.json.data.id })).status, 400, 'subgroup must belong to the group');
+  assert.equal((await request('/stock/' + row.id, 'PATCH', { dun14: '123' })).status, 400);
+  const cleared = await request('/stock/' + row.id, 'PATCH', { groupId: '' });
+  assert.equal(cleared.status, 200, JSON.stringify(cleared.json));
+  assert.equal(cleared.json.data.groupId, '');
+  assert.equal(cleared.json.data.subgroupId, '');
+
+  const today = await request('/stock', 'POST', { name: 'Sem data informada', qty: 0 });
+  assert.match(today.json.data.entryDate, /^\d{4}-\d{2}-\d{2}$/);
+
+  assert.equal((await request('/product-types', 'GET', undefined, 'store-b')).status, 403, 'other store is not reachable');
+  assert.equal((await request('/stock/' + row.id, 'PATCH', { productTypeId: 'PTY-missing' })).status, 400);
+});
+
+test('product movements show entries with supplier and invoice and exits with the customer', async () => {
+  const supplier = (await request('/suppliers', 'POST', { name: 'Fornecedor Movimento LTDA', tradeName: 'Mov Distrib' })).json.data;
+  const product = (await request('/stock', 'POST', { name: 'Produto com histórico', qty: 0, cost: 10, price: 20 })).json.data;
+  await query(`INSERT INTO stock_invoices(id,store_id,supplier_id,number,series) VALUES('INV-MOV','store-a',$1,'1234','1')`, [supplier.id]);
+  await query(`INSERT INTO stock_movements(id,store_id,stock_id,type,qty,previous_qty,new_qty,unit_cost,ref_type,ref_id,operator_name,notes,created_at) VALUES('MOV-IN','store-a',$1,'in',5,0,5,10,'invoice','INV-MOV','Ana','',now()-interval '1 day')`, [product.id]);
+  await query(`INSERT INTO sales_orders(id,store_id,customer_name) VALUES('SALE-MOV','store-a','Cliente Movimento')`).catch(async () => {
+    await query(`INSERT INTO sales_orders(id,store_id,customer_name,product_name) VALUES('SALE-MOV','store-a','Cliente Movimento','x')`);
+  });
+  await query(`INSERT INTO stock_movements(id,store_id,stock_id,type,qty,previous_qty,new_qty,unit_cost,ref_type,ref_id,operator_name,notes) VALUES('MOV-OUT','store-a',$1,'sale',2,5,3,10,'sale','SALE-MOV','Ana','')`, [product.id]);
+  const res = await request('/stock/' + product.id + '/movements');
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const [out, entry] = res.json.data;
+  assert.equal(out.direction, 'out');
+  assert.equal(out.customer.name, 'Cliente Movimento');
+  assert.equal(entry.direction, 'in');
+  assert.equal(entry.supplier.name, 'Mov Distrib');
+  assert.equal(entry.invoice.number, '1234');
+  assert.equal((await request('/stock/' + product.id + '/movements', 'GET', undefined, 'store-b')).status, 403);
+});

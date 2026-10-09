@@ -1,9 +1,9 @@
 /**
- * Telas agrupadas em abas: Especificações (marcas, atributos e tipos de retirada) e Pessoas
+ * Telas agrupadas em abas: Especificações (marcas, atributos, tipos de produto, grupos e tipos de retirada) e Pessoas
  * (clientes, fornecedores, vendedores, funcionários e permissões). O endereço segue o app em
  * que a pessoa está (painel, totem ou Retaguarda) para não tirar ninguém do contexto.
  */
-export type SpecsTab = 'marcas' | 'atributos' | 'retirada';
+export type SpecsTab = 'marcas' | 'atributos' | 'tipos' | 'grupos' | 'retirada';
 export type PeopleTab = 'clientes' | 'fornecedores' | 'vendedores' | 'funcionarios' | 'permissoes';
 
 function withTab(base: string, tab?: string) {

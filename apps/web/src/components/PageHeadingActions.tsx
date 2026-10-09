@@ -1,18 +1,25 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 const HEADING_SLOT_ID = 'panel-page-actions';
 
+/**
+ * Tela aberta dentro de outra (ex.: cadastro de kit aberto no cadastro do produto): os botões
+ * ficam na própria janela em vez de irem para o título da página de fundo.
+ */
+export const InlineHeadingActions = createContext(false);
+
 /** Injeta ações no canto direito do título da página (ERP / Painel). */
 export function PageHeadingActions({ children }: { children: ReactNode }) {
+  const inline = useContext(InlineHeadingActions);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    setSlot(document.getElementById(HEADING_SLOT_ID));
-  }, []);
+    if (!inline) setSlot(document.getElementById(HEADING_SLOT_ID));
+  }, [inline]);
 
   const body = <div className="page-heading-actions">{children}</div>;
-  if (!slot) return body;
+  if (!slot || inline) return body;
   return createPortal(body, slot);
 }
 

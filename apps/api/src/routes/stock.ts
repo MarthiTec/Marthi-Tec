@@ -38,6 +38,13 @@ const stockItemSchema = z.object({
   sku: z.string().max(200).default(''),
   skuAuto: z.boolean().optional(),
   skuWithSupplier: z.boolean().optional(),
+  productTypeId: z.string().nullable().optional(),
+  groupId: z.string().nullable().optional(),
+  subgroupId: z.string().nullable().optional(),
+  entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de entrada inválida.').nullable().optional().or(z.literal('')),
+  dun14: z.string().trim().regex(/^(\d{14})?$/, 'O DUN-14 tem 14 números.').optional(),
+  purchaseUnit: z.string().trim().max(10).optional(),
+  purchaseFactor: z.coerce.number().finite().positive('A quantidade por embalagem deve ser maior que zero.').optional(),
   avgCost: z.coerce.number().finite().nonnegative().optional(),
   pricingPolicy: z.object({basis:z.enum(['markup','margin']),percent:z.number().finite().nonnegative()}).refine(p=>p.basis!=='margin'||p.percent<100,'A margem deve ser menor que 100%.').nullable().optional(),
   barcode: z.string().default(''),
@@ -84,6 +91,52 @@ function persistableVariations(
     kept.add(id);
     return { ...variation, id };
   });
+}
+
+/** DATE do banco (Date ou texto) como AAAA-MM-DD, sem fuso deslocando o dia. */
+function dateOnly(value: unknown) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    // Alguns drivers entregam o DATE à meia-noite UTC, outros à meia-noite local.
+    const utc = value.getUTCHours() === 0 && value.getUTCMinutes() === 0;
+    const [y, m, d] = utc ? [value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()] : [value.getFullYear(), value.getMonth(), value.getDate()];
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return String(value).slice(0, 10);
+}
+
+/**
+ * Campos do cadastro completo (tipo, grupo/subgrupo, data de entrada, DUN-14 e conversão de unidade).
+ * Só grava o que veio no corpo; tipo e grupos precisam ser da mesma loja e o subgrupo, do grupo escolhido.
+ */
+async function saveProductDetails(db: PoolClient, storeId: string, id: string, body: any) {
+  const own = async (table: string, value: string | null | undefined, message: string) => {
+    if (value && !(await db.query(`SELECT 1 FROM ${table} WHERE id = $1 AND store_id = $2`, [value, storeId])).rows.length) {
+      throw Object.assign(new Error(message), { status: 400 });
+    }
+  };
+  await own('product_types', body.productTypeId, 'Tipo de produto não encontrado nesta loja.');
+  await own('product_groups', body.groupId, 'Grupo não encontrado nesta loja.');
+  const groupCleared = body.groupId !== undefined && !body.groupId;
+  if (body.subgroupId && !groupCleared) {
+    const sub = (await db.query('SELECT parent_id FROM product_groups WHERE id = $1 AND store_id = $2', [body.subgroupId, storeId])).rows[0];
+    const groupId = body.groupId !== undefined ? body.groupId : (await db.query('SELECT group_id FROM stock_items WHERE id = $1', [id])).rows[0]?.group_id;
+    if (!sub || !sub.parent_id || sub.parent_id !== groupId) throw Object.assign(new Error('O subgrupo não pertence ao grupo escolhido.'), { status: 400 });
+  }
+  const fields: Array<[string, unknown]> = [];
+  if (body.productTypeId !== undefined) fields.push(['product_type_id', body.productTypeId || null]);
+  if (body.groupId !== undefined) fields.push(['group_id', body.groupId || null]);
+  if (groupCleared) fields.push(['subgroup_id', null]);
+  else if (body.subgroupId !== undefined) fields.push(['subgroup_id', body.subgroupId || null]);
+  if (body.entryDate !== undefined) fields.push(['entry_date', body.entryDate || null]);
+  if (body.dun14 !== undefined) fields.push(['dun14', body.dun14]);
+  if (body.purchaseUnit !== undefined) fields.push(['purchase_unit', body.purchaseUnit.toUpperCase()]);
+  if (body.purchaseFactor !== undefined) fields.push(['purchase_factor', body.purchaseFactor]);
+  if (!fields.length) return;
+  await db.query(
+    `UPDATE stock_items SET ${fields.map(([column], index) => `${column} = $${index + 3}`).join(', ')} WHERE id = $1 AND store_id = $2`,
+    [id, storeId, ...fields.map(([, value]) => value)],
+  );
 }
 
 export function formatStockRow(row: any) {
@@ -133,6 +186,13 @@ export function formatStockRow(row: any) {
     brand: row.brand || '',
     supplierId: row.supplier_id || row.supplierId || undefined,
     skuWithSupplier: (row.sku_with_supplier ?? row.skuWithSupplier) !== false,
+    productTypeId: row.product_type_id ?? row.productTypeId ?? '',
+    groupId: row.group_id ?? row.groupId ?? '',
+    subgroupId: row.subgroup_id ?? row.subgroupId ?? '',
+    entryDate: dateOnly(row.entry_date ?? row.entryDate),
+    dun14: row.dun14 ?? '',
+    purchaseUnit: row.purchase_unit ?? row.purchaseUnit ?? '',
+    purchaseFactor: Number(row.purchase_factor ?? row.purchaseFactor) || 1,
     trackLot: Boolean(row.track_lot ?? row.trackLot),
     isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
@@ -211,7 +271,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, product_type_id, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -260,7 +320,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, product_type_id, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
           FROM stock_items
           WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
           LIMIT 1
@@ -354,6 +414,9 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             ],
           );
           if (body.skuWithSupplier === false) await client.query('UPDATE stock_items SET sku_with_supplier = false WHERE id = $1 AND store_id = $2', [id, storeId]);
+          await saveProductDetails(client, storeId, id, body);
+          // Data de entrada: a escolhida no cadastro ou, sem ela, o dia de hoje.
+          await client.query('UPDATE stock_items SET entry_date = COALESCE(entry_date, CURRENT_DATE) WHERE id = $1 AND store_id = $2', [id, storeId]);
 
           if (body.variations && body.variations.length > 0) {
             for (const v of body.variations) {
@@ -485,6 +548,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
             await client.query('UPDATE stock_items SET supplier_id = $3 WHERE id = $1 AND store_id = $2', [id, storeId, supplierId]);
           }
           if (body.skuWithSupplier !== undefined) await client.query('UPDATE stock_items SET sku_with_supplier = $3 WHERE id = $1 AND store_id = $2', [id, storeId, body.skuWithSupplier]);
+          await saveProductDetails(client, storeId, id, body);
           if(body.pickupPrices!==undefined){await validatePickupPrices(client,storeId,body.pickupPrices);await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);}
           // Se qty mudou, registra movimentação no kardex
           if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
@@ -659,7 +723,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, product_type_id, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,

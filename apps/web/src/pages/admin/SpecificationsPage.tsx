@@ -6,6 +6,8 @@ import { hubFullAccess, type SpecsTab } from '../../data/hubPaths';
 import { AttributesPage } from './AttributesPage';
 import { BrandsPage } from './BrandsPage';
 import { PickupMethodsPage } from './PickupMethodsPage';
+import { ProductGroupsPage } from './ProductGroupsPage';
+import { ProductTypesPage } from './ProductTypesPage';
 
 /** Especificações dos produtos numa tela só: marcas, atributos (cor, capacidade…) e tipos de retirada. */
 export function SpecificationsPage() {
@@ -13,11 +15,13 @@ export function SpecificationsPage() {
   const { pathname } = useLocation();
   // Cada aba respeita a permissão da tela que existia antes dela.
   const legacy = pathname.startsWith('/painel/totem')
-    ? { marcas: '/painel/totem/marcas', atributos: '/painel/totem/atributos', retirada: '/painel/totem' }
-    : { marcas: '/erp/marcas', atributos: '/erp/atributos', retirada: '/erp/tipos-retirada' };
+    ? { marcas: '/painel/totem/marcas', atributos: '/painel/totem/atributos', tipos: '/painel/totem/marcas', grupos: '/painel/totem/marcas', retirada: '/painel/totem' }
+    : { marcas: '/erp/marcas', atributos: '/erp/atributos', tipos: '/erp/marcas', grupos: '/erp/marcas', retirada: '/erp/tipos-retirada' };
   const tabs: HubTab<SpecsTab>[] = [
     { id: 'marcas', label: 'Marcas', icon: 'tag', hint: 'Marcas dos produtos, com o ícone que aparece na vitrine do totem.', render: () => <BrandsPage /> },
     { id: 'atributos', label: 'Atributos', icon: 'sliders', hint: 'Cor, capacidade, tamanho… Os valores viram as variações do produto.', render: () => <AttributesPage /> },
+    { id: 'tipos', label: 'Tipos de produto', icon: 'box', hint: 'Smartphone, Acessório, Bebida… Como a loja separa os produtos no cadastro.', render: () => <ProductTypesPage /> },
+    { id: 'grupos', label: 'Grupos', icon: 'apps', hint: 'Grupos e subgrupos (ex.: Bebidas › Cerveja). Você escolhe como chamar cada nível.', render: () => <ProductGroupsPage /> },
     { id: 'retirada', label: 'Tipos de retirada', icon: 'truck', hint: 'Em mãos, encomenda, entrega: como o cliente recebe o produto e o prazo de cada forma.', render: () => <PickupMethodsPage /> },
   ];
   const full = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
@@ -28,7 +32,7 @@ export function SpecificationsPage() {
     <HubPage
       icon="tag"
       title="Especificações"
-      subtitle="Tudo o que descreve os produtos num lugar só: marcas, atributos e tipos de retirada."
+      subtitle="Tudo o que descreve os produtos num lugar só: marcas, atributos, tipos, grupos e tipos de retirada."
       tabs={allowed}
     />
   );

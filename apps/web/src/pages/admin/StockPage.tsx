@@ -61,8 +61,45 @@ import { formatInstallment } from '../../data/variantQuote';
 import { getTotemCardRate } from '../../data/cardRatesStore';
 import { isNestAuthed } from '../../services/nestClient';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { ProductMovementsPanel } from '../../components/ProductMovementsPanel';
+import { RegistryDrawer } from '../../components/RegistryDrawer';
+import {
+  apiCreateProductGroup,
+  apiCreateProductType,
+  apiListProductGroups,
+  apiListProductTypes,
+  type ProductGroup,
+  type ProductGroupLabels,
+  type ProductType,
+} from '../../services/productCatalogApi';
+import { KitsPage } from './KitsPage';
+import { WarehousePage } from './WarehousePage';
+import { LotsPage } from './LotsPage';
+import { FiscalClassPage } from './FiscalClassPage';
+import { PriceTablesPage } from './PriceTablesPage';
+import { PromoCampaignsPage } from '../erp/PromoCampaignsPage';
 
 type Mode = 'new' | 'edit' | 'view';
+type FormTab = 'principal' | 'config' | 'ofertas' | 'fiscal' | 'movimentos';
+type RegistryPanel = 'kit' | 'warehouse' | 'lot' | 'fiscal' | 'campaign' | 'prices';
+
+/** Cadastros que podem ser abertos de dentro do produto, sem perder o que já foi preenchido. */
+const REGISTRY_SHORTCUTS: Array<{ id: RegistryPanel; label: string; hint: string }> = [
+  { id: 'kit', label: 'Kit', hint: 'Montar um kit com este e outros produtos' },
+  { id: 'warehouse', label: 'Almoxarifado', hint: 'Locais de estoque e transferências' },
+  { id: 'lot', label: 'Lote', hint: 'Lote, validade e rastro' },
+  { id: 'fiscal', label: 'Classificação fiscal', hint: 'NCM, CST e alíquotas' },
+  { id: 'campaign', label: 'Campanha', hint: 'Promoções e descontos por regra' },
+  { id: 'prices', label: 'Tabela de preços', hint: 'Preços por canal ou cliente' },
+];
+
+/** Data de hoje (AAAA-MM-DD) no fuso do navegador, para o campo de data de entrada. */
+function todayIso() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+const formatQty = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 export type { StockVariationRow };
 
@@ -84,6 +121,33 @@ export function StockPage() {
 
   const nameRef = useRef<HTMLInputElement>(null);
   const formAnchorRef = useRef<HTMLDivElement>(null);
+  const [formTab, setFormTab] = useState<FormTab>('principal');
+  const [registryPanel, setRegistryPanel] = useState<RegistryPanel | null>(null);
+  const [unitConversionOpen, setUnitConversionOpen] = useState(false);
+  // Tipos de produto e grupos/subgrupos vêm do banco da loja.
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [groupLabels, setGroupLabels] = useState<ProductGroupLabels>({ group: 'Grupo', subgroup: 'Subgrupo' });
+  const [catalogVersion, setCatalogVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      void apiListProductTypes().then((rows) => alive && setProductTypes(rows)).catch(() => undefined);
+      void apiListProductGroups()
+        .then((data) => {
+          if (!alive) return;
+          setProductGroups(data.groups);
+          setGroupLabels(data.labels);
+        })
+        .catch(() => undefined);
+    };
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => {
+      alive = false;
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    };
+  }, [catalogVersion]);
 
   const [attrDefs, setAttrDefs] = useState(() => {
     const stock = stockAttributes();
@@ -186,7 +250,11 @@ export function StockPage() {
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   // Cadastro rápido sem sair do produto: fornecedor, marca e atributo.
-  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute'>(null);
+  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute' | 'type' | 'group' | 'subgroup'>(null);
+  const [quickName, setQuickName] = useState('');
+  const [quickBusy, setQuickBusy] = useState(false);
+  const [quickError, setQuickError] = useState('');
+  const [conversion, setConversion] = useState({ unit: '', factor: 1 });
   const [supplierVersion, setSupplierVersion] = useState(0);
   // Fornecedores vêm direto do banco (nada de cópia local).
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; skuName: string }>>([]);
@@ -198,6 +266,44 @@ export function StockPage() {
     return () => { alive = false; window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load); };
   }, [supplierVersion]);
   const readOnly = mode === 'view';
+  const formTabs: Array<{ id: FormTab; label: string }> = [
+    { id: 'principal', label: 'Cadastro' },
+    { id: 'config', label: 'Configurações' },
+    { id: 'ofertas', label: 'Ofertas do dia' },
+    ...(!lite || totemSurface ? [{ id: 'fiscal' as const, label: 'Fiscal e logística' }] : []),
+    { id: 'movimentos', label: 'Entradas e saídas' },
+  ];
+
+  function openQuick(kind: 'type' | 'group' | 'subgroup') {
+    setQuickName('');
+    setQuickError('');
+    setQuickCreate(kind);
+  }
+
+  /** Cadastro rápido de tipo, grupo ou subgrupo direto no banco, já selecionando no produto. */
+  async function saveQuick() {
+    const name = quickName.trim();
+    if (!name || quickBusy) return;
+    setQuickBusy(true);
+    setQuickError('');
+    try {
+      if (quickCreate === 'type') {
+        const created = await apiCreateProductType({ name });
+        setProductTypes((current) => [...current, created]);
+        setForm((current) => ({ ...current, productTypeId: created.id }));
+      } else if (quickCreate === 'group' || quickCreate === 'subgroup') {
+        const created = await apiCreateProductGroup({ name, parentId: quickCreate === 'subgroup' ? form.groupId || null : null });
+        setProductGroups((current) => [...current, created]);
+        setForm((current) => (quickCreate === 'group' ? { ...current, groupId: created.id, subgroupId: '' } : { ...current, subgroupId: created.id }));
+      }
+      setQuickCreate(null);
+      setCatalogVersion((v) => v + 1);
+    } catch (err) {
+      setQuickError(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setQuickBusy(false);
+    }
+  }
 
 
   const corAttrDef = useMemo(() => {
@@ -296,6 +402,7 @@ export function StockPage() {
 
   function startNewProduct() {
     resetForm();
+    setFormTab('principal');
     setFormVisible(true);
     focusNameField();
   }
@@ -496,6 +603,7 @@ export function StockPage() {
   function openForm(item: StockItem, nextMode: Mode) {
     setSelectedId(item.id);
     setMode(nextMode);
+    setFormTab('principal');
     setFormVisible(true);
 
     const corId = corAttrDef?.id || 'ATTR-COR';
@@ -633,6 +741,13 @@ export function StockPage() {
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
       skuWithSupplier: item.skuWithSupplier !== false,
+      productTypeId: item.productTypeId ?? '',
+      groupId: item.groupId ?? '',
+      subgroupId: item.subgroupId ?? '',
+      entryDate: item.entryDate ?? '',
+      dun14: item.dun14 ?? '',
+      purchaseUnit: item.purchaseUnit ?? '',
+      purchaseFactor: item.purchaseFactor ?? 1,
       fiscalClassificationId: item.fiscalClassificationId ?? '',
       warehouseId: item.warehouseId ?? '',
       trackLot: item.trackLot ?? false,
@@ -814,6 +929,7 @@ export function StockPage() {
     if (!ok) return;
     setSelectedId(null);
     setMode('new');
+    setFormTab('principal');
     setFormVisible(true);
     const copiedVariations = (item.variations ?? []).map((variation, index) => ({
       ...variation,
@@ -863,6 +979,14 @@ export function StockPage() {
       showOnTotem: item.showOnTotem,
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
+      skuWithSupplier: item.skuWithSupplier !== false,
+      productTypeId: item.productTypeId ?? '',
+      groupId: item.groupId ?? '',
+      subgroupId: item.subgroupId ?? '',
+      entryDate: todayIso(),
+      dun14: '',
+      purchaseUnit: item.purchaseUnit ?? '',
+      purchaseFactor: item.purchaseFactor ?? 1,
       fiscalClassificationId: item.fiscalClassificationId ?? '',
       warehouseId: item.warehouseId ?? '',
       trackLot: item.trackLot ?? false,
@@ -1301,6 +1425,23 @@ export function StockPage() {
             </p>
           </div>
 
+          <nav className="stock-form-tabs" role="tablist" aria-label="Partes do cadastro do produto">
+            {formTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={formTab === tab.id}
+                className={`stock-form-tab ${formTab === tab.id ? 'is-active' : ''}`}
+                onClick={() => setFormTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          {formTab === 'principal' ? (
+          <>
           <article className="admin-card stock-form-card">
             <h3>Identificação</h3>
             <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
@@ -1308,7 +1449,6 @@ export function StockPage() {
                 <span className="stock-photo-picker__title">
                   Fotos do produto ({form.images.length})
                 </span>
-                <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
                 <div className="stock-photos-gallery">
                   {form.images.map((imgSrc, index) => (
                     <div
@@ -1370,16 +1510,13 @@ export function StockPage() {
                     catch {setError('Informe uma URL HTTPS válida para a foto.');}
                   }}>Adicionar URL</button>
                 </div>}
+                <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
                 <p className="empty stock-photo-picker__help">
                   A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.
                 </p>
               </div>
 
               <div className="stock-id-content">
-          {automationState.eligible && <label className="stock-automation-toggle">
-            <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
-            Receber ajuda para criar todas as variações do produto
-          </label>}
               {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
               {deviceError && <p role="status" className="empty">{deviceError}</p>}
               {device && <div className="device-reference">
@@ -1388,8 +1525,9 @@ export function StockPage() {
                 <a href={device.sourceUrl} target="_blank" rel="noreferrer">Fonte das especificações</a>{device.stale&&<p className="empty">Dados salvos anteriormente; a API está indisponível para atualizar.</p>}
               </div>}
               <div className={`admin-form stock-id-fields ${readOnly ? 'is-readonly' : ''}`}>
-                <label className="span-2">
-                  Produto
+                <div className="span-2 stock-name-field">
+                <label className="stock-name-field__label">
+                  Nome do produto
                   <input
                     ref={nameRef}
                     value={form.name}
@@ -1397,6 +1535,14 @@ export function StockPage() {
                     disabled={readOnly}
                     placeholder="Nome do produto"
                   />
+                </label>
+                <div className="stock-name-field__options">
+                  {automationState.eligible ? (
+                    <label className="stock-name-help" title="Com a ajuda ligada, o sistema consulta o modelo e monta a grade de cores e capacidades para você.">
+                      <input type="checkbox" checked={automationState.enabled} disabled={readOnly || automationBusy} onChange={e=>void toggleAutomation(e.target.checked)} />
+                      Receber ajuda no cadastro
+                    </label>
+                  ) : null}
                   <label className="stock-uppercase-toggle" title="Converte o que você digitar no nome do produto para maiúsculas automaticamente">
                     <input
                       type="checkbox"
@@ -1406,7 +1552,8 @@ export function StockPage() {
                     />
                     Sempre em MAIÚSCULAS
                   </label>
-                </label>
+                </div>
+                </div>
                 <div className="stock-brand-field">
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
                 <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={specsPath('marcas')}>Gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
@@ -1437,6 +1584,44 @@ export function StockPage() {
                 {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
                 {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
                 {quickCreate === 'attribute' ? <QuickCreateAttribute onClose={() => setQuickCreate(null)} onCreated={() => undefined} /> : null}
+                {quickCreate === 'type' || quickCreate === 'group' || quickCreate === 'subgroup' ? (
+                  <QuickModal
+                    title={quickCreate === 'type' ? 'Novo tipo de produto' : `Novo ${(quickCreate === 'group' ? groupLabels.group : groupLabels.subgroup).toLowerCase()}`}
+                    subtitle={
+                      quickCreate === 'subgroup'
+                        ? `Dentro de ${productGroups.find((item) => item.id === form.groupId)?.name ?? ''}.`
+                        : quickCreate === 'group'
+                          ? 'Ex.: Bebidas, Eletrônicos, Acessórios.'
+                          : 'Ex.: Smartphone, Capinha, Película.'
+                    }
+                    busy={quickBusy}
+                    error={quickError}
+                    onClose={() => setQuickCreate(null)}
+                    onSubmit={saveQuick}
+                  >
+                    <label className="admin-field">
+                      Nome
+                      <input value={quickName} maxLength={80} required onChange={(e) => setQuickName(e.target.value)} />
+                    </label>
+                  </QuickModal>
+                ) : null}
+                {unitConversionOpen ? (
+                  <QuickModal
+                    title="Conversão de unidade"
+                    subtitle={`Para quem compra em embalagem e vende por ${form.unit ?? 'UN'}: o estoque e a venda continuam em ${form.unit ?? 'UN'}.`}
+                    submitLabel="Aplicar"
+                    onClose={() => setUnitConversionOpen(false)}
+                    onSubmit={() => {
+                      const unit = conversion.unit.trim().toUpperCase();
+                      const factor = Number(conversion.factor);
+                      if (unit && !(factor > 0)) return;
+                      setForm((current) => ({ ...current, purchaseUnit: unit, purchaseFactor: unit ? factor : 1 }));
+                      setUnitConversionOpen(false);
+                    }}
+                  >
+                    <ConversionFields unit={form.unit ?? 'UN'} value={conversion} onChange={setConversion} />
+                  </QuickModal>
+                ) : null}
                 {pickupEdit ? (
                   <QuickModal
                     title="Preço por tipo de retirada"
@@ -1453,6 +1638,16 @@ export function StockPage() {
                   </QuickModal>
                 ) : null}
                 <label>
+                  Data de entrada
+                  <input
+                    type="date"
+                    value={form.entryDate ?? ''}
+                    max={todayIso()}
+                    onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
+                    disabled={readOnly}
+                  />
+                </label>
+                <label>
                   SKU
                   <input
                     value={form.skuAuto?skuPreview(form.attrs):form.sku}
@@ -1460,17 +1655,17 @@ export function StockPage() {
                     disabled={readOnly}
                   />
                 </label>
+                <div className="stock-brand-field">
                 <AdminPicker
-                  label="Tipo"
-                  value={form.kind}
+                  label="Tipo de produto"
+                  value={form.productTypeId ?? ''}
+                  placeholder="Sem tipo"
                   disabled={readOnly}
-                  options={[
-                    { value: 'device', label: STOCK_KIND_LABEL.device },
-                    { value: 'part', label: STOCK_KIND_LABEL.part },
-                    { value: 'supply', label: STOCK_KIND_LABEL.supply },
-                  ]}
-                  onChange={(value) => setForm({ ...form, kind: value as StockKind })}
+                  options={[{ value: '', label: 'Sem tipo' }, ...productTypes.filter((item) => item.active || item.id === form.productTypeId).map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, productTypeId: value })}
                 />
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo tipo" onClick={() => openQuick('type')} /> : null}<Link to={specsPath('tipos')}>Gerenciar tipos</Link></p>
+                </div>
                 <AdminPicker
                   label="Condição"
                   value={form.condition}
@@ -1482,8 +1677,9 @@ export function StockPage() {
                   ]}
                   onChange={(value) => setForm({ ...form, condition: value as StockCondition })}
                 />
+                <div className="stock-brand-field">
                 <AdminPicker
-                  label="Unidade"
+                  label="Unidade de medida"
                   value={form.unit ?? 'UN'}
                   disabled={readOnly}
                   options={[
@@ -1492,6 +1688,37 @@ export function StockPage() {
                   ]}
                   onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
                 />
+                <p className="empty quick-field__actions">
+                  <button type="button" className="quick-add-btn" disabled={readOnly} onClick={() => { setConversion({ unit: form.purchaseUnit ?? '', factor: Number(form.purchaseFactor) || 1 }); setUnitConversionOpen(true); }}>
+                    ⇄ Conversão de unidade
+                  </button>
+                  {form.purchaseUnit && Number(form.purchaseFactor) > 1 ? (
+                    <span className="stock-unit-conversion-chip">1 {form.purchaseUnit} = {formatQty(Number(form.purchaseFactor))} {form.unit ?? 'UN'}</span>
+                  ) : null}
+                </p>
+                </div>
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label={groupLabels.group}
+                  value={form.groupId ?? ''}
+                  placeholder="Nenhum"
+                  disabled={readOnly}
+                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => !item.parentId && (item.active || item.id === form.groupId)).map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, groupId: value, subgroupId: '' })}
+                />
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label={`Novo ${groupLabels.group.toLowerCase()}`} onClick={() => openQuick('group')} /> : null}<Link to={specsPath('grupos')}>Gerenciar</Link></p>
+                </div>
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label={groupLabels.subgroup}
+                  value={form.subgroupId ?? ''}
+                  placeholder={form.groupId ? 'Nenhum' : `Escolha o ${groupLabels.group.toLowerCase()} antes`}
+                  disabled={readOnly || !form.groupId}
+                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => item.parentId === form.groupId && (item.active || item.id === form.subgroupId)).map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, subgroupId: value })}
+                />
+                <p className="empty quick-field__actions">{!readOnly && form.groupId ? <QuickAddButton label={`Novo ${groupLabels.subgroup.toLowerCase()}`} onClick={() => openQuick('subgroup')} /> : null}</p>
+                </div>
                 <label className="span-2 stock-id-totem">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
@@ -1510,12 +1737,24 @@ export function StockPage() {
 
           <article className="admin-card stock-form-card">
             <h3>Códigos</h3>
-            <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+            <div className={`admin-form stock-codes-form ${readOnly ? 'is-readonly' : ''}`}>
               <label>
                 Código de barras
                 <input
                   value={form.barcode}
+                  inputMode="numeric"
                   onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                  disabled={readOnly}
+                />
+              </label>
+              <label>
+                DUN-14
+                <input
+                  value={form.dun14 ?? ''}
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="Código da caixa (14 números)"
+                  onChange={(e) => setForm({ ...form, dun14: e.target.value.replace(/\D/g, '').slice(0, 14) })}
                   disabled={readOnly}
                 />
               </label>
@@ -1532,12 +1771,6 @@ export function StockPage() {
               ) : null}
             </div>
           </article>
-
-
-          <p><Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link></p>
-          <label className="stock-sku-automation"><input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>setForm(current=>({...current,skuAuto:e.target.checked}))}/> Gerar SKU automaticamente com os dados do produto</label>
-          {!useVariations&&<ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>}
-          <p><Link to={specsPath('retirada')}>Cadastrar tipos de retirada e acompanhar entregas</Link></p>
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -1916,12 +2149,46 @@ export function StockPage() {
                   <div className="span-2"><h4>Última entrada de estoque</h4><LastStockEntry entry={form.lastEntry}/></div>
                 </div>
               </article>
+              <ProductPickupPrices value={form.pickupPrices} basePrice={form.price} disabled={readOnly} onChange={pickupPrices=>setForm(current=>({...current,pickupPrices}))}/>
             </>
           )}
+          </>
+          ) : null}
 
-          <ProductDayOffers stockId={selectedId} name={form.name} variations={useVariations ? variations : []} basePrice={form.price}/>
+          {formTab === 'config' ? (
+            <article className="admin-card stock-form-card">
+              <h3>Configurações</h3>
+              <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+                <AdminPicker
+                  label="Controle no sistema"
+                  value={form.kind}
+                  disabled={readOnly}
+                  options={[
+                    { value: 'device', label: `${STOCK_KIND_LABEL.device} — com IMEI e consulta de modelo` },
+                    { value: 'part', label: STOCK_KIND_LABEL.part },
+                    { value: 'supply', label: STOCK_KIND_LABEL.supply },
+                  ]}
+                  onChange={(value) => setForm({ ...form, kind: value as StockKind })}
+                />
+                <label className="span-2 stock-sku-automation">
+                  <input type="checkbox" checked={Boolean(form.skuAuto)} disabled={readOnly} onChange={e=>setForm(current=>({...current,skuAuto:e.target.checked}))}/>
+                  Gerar SKU automaticamente com os dados do produto (marca, fornecedor, nome e variações)
+                </label>
+              </div>
+              <div className="stock-config-links">
+                <Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link>
+                <Link to={specsPath('retirada')}>Cadastrar tipos de retirada e acompanhar entregas</Link>
+                <Link to={specsPath('tipos')}>Cadastrar tipos de produto</Link>
+                <Link to={specsPath('grupos')}>Cadastrar {groupLabels.group.toLowerCase()} e {groupLabels.subgroup.toLowerCase()}</Link>
+              </div>
+            </article>
+          ) : null}
 
-          {!lite || totemSurface ? (
+          {formTab === 'ofertas' ? (
+            <ProductDayOffers stockId={selectedId} name={form.name} variations={useVariations ? variations : []} basePrice={form.price}/>
+          ) : null}
+
+          {formTab === 'fiscal' ? (
             <article className="admin-card stock-form-card">
               <h3>Fiscal e logística</h3>
               <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
@@ -1971,12 +2238,37 @@ export function StockPage() {
                       const fis = getFiscalClassification(form.fiscalClassificationId);
                       if (!fis) return '—';
                       return `NCM ${fis.ncm} · CST ${fis.cstIcms} · ICMS ${fis.icmsRate}% · IBS ${fis.ibsRate}% · CBS ${fis.cbsRate}%`;
-                    })()}{' '}
-                    · <Link to="/painel/classificacao-fiscal">editar tabelas</Link>
+                    })()}
                   </p>
                 ) : null}
               </div>
+              <h4 className="stock-registry-shortcuts__title">Cadastrar sem sair do produto</h4>
+              <div className="stock-registry-shortcuts">
+                {REGISTRY_SHORTCUTS.map((item) => (
+                  <button key={item.id} type="button" className="stock-registry-shortcut" onClick={() => setRegistryPanel(item.id)}>
+                    <strong>{item.label}</strong>
+                    <small>{item.hint}</small>
+                  </button>
+                ))}
+              </div>
             </article>
+          ) : null}
+
+          {formTab === 'movimentos' ? <ProductMovementsPanel stockId={selectedId} /> : null}
+
+          {registryPanel ? (
+            <RegistryDrawer
+              title={REGISTRY_SHORTCUTS.find((item) => item.id === registryPanel)?.label ?? ''}
+              subtitle={`O que você cadastrar aqui já aparece no produto "${form.name || 'novo'}".`}
+              onClose={() => setRegistryPanel(null)}
+            >
+              {registryPanel === 'kit' ? <KitsPage /> : null}
+              {registryPanel === 'warehouse' ? <WarehousePage /> : null}
+              {registryPanel === 'lot' ? <LotsPage /> : null}
+              {registryPanel === 'fiscal' ? <FiscalClassPage /> : null}
+              {registryPanel === 'campaign' ? <PromoCampaignsPage /> : null}
+              {registryPanel === 'prices' ? <PriceTablesPage /> : null}
+            </RegistryDrawer>
           ) : null}
         </div>
       ) : null}
@@ -2011,10 +2303,59 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     showOnTotem: true,
     images: [],
     supplierId: '',
+    skuWithSupplier: true,
+    productTypeId: '',
+    groupId: '',
+    subgroupId: '',
+    // Padrão: entrou hoje; o usuário pode escolher outra data.
+    entryDate: todayIso(),
+    dun14: '',
+    purchaseUnit: '',
+    purchaseFactor: 1,
     fiscalClassificationId: '',
     warehouseId: '',
     trackLot: false,
     isKit: false,
     ...(preferTotem ? { showOnTotem: true } : {}),
   };
+}
+
+const PURCHASE_UNITS = ['CX', 'FD', 'PCT', 'DZ', 'KIT', 'BD', 'GL'];
+
+/** Embalagem de compra (caixa, fardo, pacote…) e quantas unidades de venda vêm nela. */
+function ConversionFields({ unit, value, onChange }: { unit: string; value: { unit: string; factor: number }; onChange: (next: { unit: string; factor: number }) => void }) {
+  return (
+    <div className="stock-conversion">
+      <label className="admin-field">
+        Compra em
+        <input
+          value={value.unit}
+          maxLength={10}
+          list="stock-purchase-units"
+          placeholder="Ex.: CX"
+          onChange={(e) => onChange({ ...value, unit: e.target.value.toUpperCase() })}
+        />
+        <datalist id="stock-purchase-units">
+          {PURCHASE_UNITS.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+      </label>
+      <label className="admin-field">
+        Quantidade de {unit} na embalagem
+        <input
+          type="number"
+          min={0.001}
+          step="any"
+          value={value.factor}
+          onChange={(e) => onChange({ ...value, factor: Number(e.target.value) })}
+        />
+      </label>
+      <p className="empty stock-conversion__preview">
+        {value.unit.trim() && value.factor > 0
+          ? `1 ${value.unit.trim().toUpperCase()} = ${value.factor.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${unit}. O estoque e a venda continuam em ${unit}.`
+          : 'Deixe "Compra em" vazio se o produto é comprado e vendido na mesma unidade.'}
+      </p>
+    </div>
+  );
 }

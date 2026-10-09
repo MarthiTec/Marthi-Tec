@@ -7039,3 +7039,113 @@ select.caixa-mov-input {
     width: 100% !important;
   }
 }
+
+/* Grupos e subgrupos de produtos */
+.product-groups__name {display:inline-flex;align-items:center;gap:6px;}
+.product-groups__branch {color:var(--mute);padding-left:10px;}
+.product-groups__child td {background:rgba(var(--accent-rgb,14,116,144),.03);}
+.product-groups__actions {display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;}
+
+/* ── Cadastro de produto em abas ─────────────────────────── */
+.stock-form-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 14px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #e2e8f0);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stock-form-tab {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--mute, #64748b);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stock-form-tab:hover { color: var(--ink, #0f172a); background: rgba(var(--accent-rgb, 14, 116, 144), 0.06); }
+.stock-form-tab.is-active { background: rgba(var(--accent-rgb, 14, 116, 144), 0.14); color: var(--accent, #0e7490); }
+.is-theme-dark .stock-form-tabs, .admin--dark .stock-form-tabs { background: #171e27; border-color: rgba(255, 255, 255, 0.08); }
+.is-theme-dark .stock-form-tab.is-active, .admin--dark .stock-form-tab.is-active { color: #67e8f9; }
+
+/* Nome do produto com "receber ajuda" e maiúsculas ao lado */
+.stock-name-field { display: grid; gap: 6px; min-width: 0; }
+.stock-name-field__label { min-width: 0; }
+.stock-name-field__options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.stock-name-field__options .stock-uppercase-toggle,
+.stock-name-field__options .stock-name-help {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: var(--mute);
+  text-transform: none;
+  cursor: pointer;
+}
+.stock-name-field__options .stock-name-help { color: var(--accent, #0e7490); }
+.stock-name-field__options input[type='checkbox'] { width: 15px; height: 15px; min-height: 0; margin: 0; accent-color: var(--accent, #0f766e); cursor: pointer; }
+@media (min-width: 900px) {
+  .stock-name-field { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+  .stock-name-field__options { flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 8px; }
+}
+
+.stock-unit-conversion-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb, 14, 116, 144), 0.1);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.stock-conversion { display: grid; gap: 12px; }
+.stock-conversion__preview { margin: 0; }
+
+.stock-codes-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 860px) { .stock-codes-form { grid-template-columns: 1fr; } }
+
+.stock-config-links { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; }
+.stock-config-links a { color: var(--accent, #0e7490); font-weight: 650; }
+
+.stock-registry-shortcuts__title { margin: 18px 0 8px; font-size: 0.9rem; }
+.stock-registry-shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.stock-registry-shortcut {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--line, #d8dde3);
+  background: var(--card, #fff);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.stock-registry-shortcut:hover { border-style: solid; border-color: var(--accent, #0e7490); }
+.stock-registry-shortcut strong::before { content: '＋ '; color: var(--accent, #0e7490); }
+.stock-registry-shortcut small { color: var(--mute); font-size: 0.76rem; }
+.is-theme-dark .stock-registry-shortcut, .admin--dark .stock-registry-shortcut { background: #171e27; border-color: rgba(255, 255, 255, 0.12); }
+
+/* Entradas e saídas do produto */
+.product-movements__summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.product-movements__summary > div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line, #e2e8f0); }
+.product-movements__summary span { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mute); }
+.product-movements__summary small { color: var(--mute); }
+.product-movements__filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.product-movements__dir { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; }
+.product-movements__dir.is-in { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+.product-movements__dir.is-out { background: rgba(215, 0, 21, 0.1); color: #b91c1c; }
+.product-movements__dir.is-adjustment { background: rgba(100, 116, 139, 0.14); color: var(--mute); }
+.product-movements__origin { display: block; color: var(--mute); font-size: 0.74rem; }
+@media (max-width: 600px) { .product-movements__summary { grid-template-columns: 1fr; } }

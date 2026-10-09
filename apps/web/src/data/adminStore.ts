@@ -71,6 +71,18 @@ export type StockItem = {
   skuAuto?:boolean;
   /** Fornecedor entra na formação automática do SKU (padrão: sim). */
   skuWithSupplier?: boolean;
+  /** Tipo de produto cadastrado em Especificações. */
+  productTypeId?: string;
+  /** Grupo e subgrupo (nomes configuráveis pela loja). */
+  groupId?: string;
+  subgroupId?: string;
+  /** Data de entrada do produto (AAAA-MM-DD). */
+  entryDate?: string;
+  /** Código da caixa de embarque (14 dígitos). */
+  dun14?: string;
+  /** Conversão de unidade: compra em purchaseUnit com purchaseFactor unidades. */
+  purchaseUnit?: string;
+  purchaseFactor?: number;
   pricingPolicy?:PricingPolicy|null;
   lastEntry?:{movementId:string;enteredAt:string;origin:string;qty:number;unitCost:number;notes:string;invoice:{id:string;number:string;series:string;issuedAt:string;movementAt?:string;status:string}|null}|null;
   pickupPrices?: Record<string,number|null>;
@@ -316,6 +328,13 @@ function normalizeStock(item: StockItem): StockItem {
     variations,
     supplierId: item.supplierId ?? '',
     skuWithSupplier: item.skuWithSupplier !== false,
+    productTypeId: item.productTypeId ?? '',
+    groupId: item.groupId ?? '',
+    subgroupId: item.subgroupId ?? '',
+    entryDate: item.entryDate ?? '',
+    dun14: item.dun14 ?? '',
+    purchaseUnit: item.purchaseUnit ?? '',
+    purchaseFactor: Number(item.purchaseFactor) > 0 ? Number(item.purchaseFactor) : 1,
     fiscalClassificationId: item.fiscalClassificationId ?? '',
     warehouseId: item.warehouseId ?? '',
     trackLot: item.trackLot ?? false,
@@ -549,6 +568,13 @@ function toNestStockBody(item: StockItem) {
     pickupPrices: item.pickupPrices ?? {},
     skuAuto: item.skuAuto,
     skuWithSupplier: item.skuWithSupplier !== false,
+    productTypeId: item.productTypeId ?? undefined,
+    groupId: item.groupId ?? undefined,
+    subgroupId: item.subgroupId ?? undefined,
+    entryDate: item.entryDate ?? undefined,
+    dun14: item.dun14 ?? undefined,
+    purchaseUnit: item.purchaseUnit ?? undefined,
+    purchaseFactor: Number(item.purchaseFactor) > 0 ? Number(item.purchaseFactor) : undefined,
     avgCost: item.avgCost,
     pricingPolicy: item.pricingPolicy?.basis ? item.pricingPolicy : null,
     name: item.name,

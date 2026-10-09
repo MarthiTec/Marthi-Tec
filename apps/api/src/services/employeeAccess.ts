@@ -20,7 +20,7 @@ const RULES: Rule[] = [
   { group: /^customers$/, areas: ['erp_customers', 'pdv', 'os'], registry: true },
   { group: /^suppliers$/, areas: ['erp_suppliers', 'erp_stock', 'erp_invoices'], registry: true },
   { group: /^sellers$/, areas: ['erp_sellers'], registry: true },
-  { group: /^(stock|brands|products|device-reference)$/, areas: ['erp_stock', 'totem'], registry: true },
+  { group: /^(stock|brands|products|device-reference|product-types|product-groups)$/, areas: ['erp_stock', 'totem'], registry: true },
   { group: /^attributes$/, areas: ['erp_attrs', 'erp_stock', 'totem'], registry: true },
   { group: /^pickup-methods$/, areas: ['erp_stock', 'totem'], registry: true },
   { group: /^(price-tables|promotions)$/, areas: ['erp_prices'], registry: true },
