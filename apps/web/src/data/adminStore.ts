@@ -46,6 +46,18 @@ export type StockCondition = 'new' | 'used' | 'refurbished';
 /** UN = inteiro; KG = pesado (aceita qty fracionada / balança). */
 export type StockUnit = 'UN' | 'KG';
 
+/** Compra do produto em um fornecedor: data, quantidade, custo e IMEIs. Não muda o preço de venda. */
+export type SupplierEntry = {
+  id?: string;
+  supplierId: string;
+  supplierName?: string;
+  entryDate: string;
+  qty: number;
+  unitCost: number;
+  imeis: string[];
+  notes?: string;
+};
+
 export type StockVariationRow = {
   id?: string;
   tempKey?: string;
@@ -63,9 +75,13 @@ export type StockVariationRow = {
   imei?: string;
   pickupMethodId?: string;
   pickupPrices?: Record<string, number | null>;
+  /** Entradas desta variação por fornecedor. */
+  supplierEntries?: SupplierEntry[];
 };
 
 export type StockItem = {
+  /** Entradas do produto simples por fornecedor. */
+  supplierEntries?: SupplierEntry[];
   createdAt?:string;
   active?: boolean;
   skuAuto?:boolean;
@@ -274,6 +290,7 @@ function normalizeStock(item: StockItem): StockItem {
         imei: v.imei || '',
         pickupMethodId: v.pickupMethodId,
         pickupPrices: v.pickupPrices ?? {},
+        supplierEntries: Array.isArray(v.supplierEntries) ? v.supplierEntries : undefined,
       }))
     : [];
 
@@ -326,6 +343,7 @@ function normalizeStock(item: StockItem): StockItem {
     variations,
     supplierId: item.supplierId ?? '',
     skuWithSupplier: item.skuWithSupplier !== false,
+    supplierEntries: Array.isArray(item.supplierEntries) ? item.supplierEntries : undefined,
     groupId: item.groupId ?? '',
     subgroupId: item.subgroupId ?? '',
     entryDate: item.entryDate ?? '',
@@ -565,6 +583,8 @@ function toNestStockBody(item: StockItem) {
     pickupPrices: item.pickupPrices ?? {},
     skuAuto: item.skuAuto,
     skuWithSupplier: item.skuWithSupplier !== false,
+    // Só vai quando a tela carregou as entradas (undefined = não mexe nelas no banco).
+    supplierEntries: item.supplierEntries,
     groupId: item.groupId ?? undefined,
     subgroupId: item.subgroupId ?? undefined,
     entryDate: item.entryDate ?? undefined,

@@ -4,6 +4,7 @@ import { apiListProductMovements, type ProductMovement } from '../services/produ
 
 const ORIGIN_LABEL: Record<string, string> = {
   invoice: 'Nota de entrada',
+  supplier_entry: 'Entrada de fornecedor',
   invoice_reversal: 'Estorno de nota',
   sale: 'Venda (PDV)',
   sale_external: 'Venda externa',

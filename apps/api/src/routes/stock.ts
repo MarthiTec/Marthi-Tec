@@ -1,5 +1,6 @@
 import { canManageArea } from '../services/employeeAccess.js';
 import {productSku,supplierSkuName} from '../services/productSku.js';
+import { attachSupplierEntries, saveSupplierEntries, supplierEntrySchema, type SupplierEntryInput } from '../services/supplierEntries.js';
 import {stockDetails} from '../services/stockDetails.js';
 import { validatePickupPrices } from '../services/pickup.js';
 import type { PoolClient } from 'pg';
@@ -29,9 +30,13 @@ const stockVariationSchema = z.object({
   imei: z.string().optional().default(''),
   pickupMethodId: z.string().optional().nullable(),
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).optional().default({}),
+  /** Entradas desta variação por fornecedor (custo, quantidade, IMEIs). */
+  supplierEntries: z.array(supplierEntrySchema).optional(),
 });
 
 const stockItemSchema = z.object({
+  /** Entradas do produto simples por fornecedor. */
+  supplierEntries: z.array(supplierEntrySchema).optional(),
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
@@ -90,6 +95,22 @@ function persistableVariations(
     kept.add(id);
     return { ...variation, id };
   });
+}
+
+/**
+ * Separa as entradas por fornecedor do corpo (produto simples + cada variação, já com o id final da
+ * variação) e tira essas listas do JSON das variações. Sem entradas no corpo, nada muda (null).
+ */
+function supplierEntryGroups(body: any): Array<{ variationId: string | null; entries: SupplierEntryInput[] }> | null {
+  const variations: any[] = Array.isArray(body.variations) ? body.variations : [];
+  const provided = body.supplierEntries !== undefined || variations.some((v) => v.supplierEntries !== undefined);
+  const groups = [
+    { variationId: null, entries: (body.supplierEntries ?? []) as SupplierEntryInput[] },
+    ...variations.map((v) => ({ variationId: String(v.id), entries: (v.supplierEntries ?? []) as SupplierEntryInput[] })),
+  ];
+  for (const v of variations) delete v.supplierEntries;
+  delete body.supplierEntries;
+  return provided ? groups : null;
 }
 
 /** DATE do banco (Date ou texto) como AAAA-MM-DD, sem fuso deslocando o dia. */
@@ -274,7 +295,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         `;
 
         const result = await pool.query(sql, values);
-        res.json({ success: true, data: (await stockDetails(pool,storeId,result.rows)).map(formatStockRow) });
+        res.json({ success: true, data: await attachSupplierEntries(pool, storeId, (await stockDetails(pool,storeId,result.rows)).map(formatStockRow)) });
         return;
       } catch (dbErr) {
         throw dbErr;
@@ -369,6 +390,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
             if (body.cost <= 0 && body.variations[0].cost > 0) body.cost = Number(body.variations[0].cost);
             if (body.price <= 0 && body.variations[0].price > 0) body.price = Number(body.variations[0].price);
           }
+          const entryGroups = supplierEntryGroups(body);
           body.sku = await allocateSku(client, storeId, body, id);
           if (body.supplierId && !(await client.query('SELECT 1 FROM suppliers WHERE id = $1 AND store_id = $2', [body.supplierId, storeId])).rows.length) {
             throw Object.assign(new Error('Fornecedor não encontrado nesta loja.'), { status: 400 });
@@ -445,21 +467,25 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           await client.query('UPDATE stock_items SET avg_cost=$3,pricing_policy=$4 WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost??body.cost,JSON.stringify(body.pricingPolicy??{})]);
           await validatePickupPrices(client,storeId,body.pickupPrices);
           await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);
+          // Entradas por fornecedor lançam a própria movimentação; o restante do saldo inicial vai como "manual".
+          const entryQty = entryGroups
+            ? await saveSupplierEntries(client, storeId, id, entryGroups, { defaultSupplierId: body.supplierId || null, operator: req.user?.name || 'Operador', previousQty: 0 })
+            : 0;
           // Se qty inicial > 0, registra kardex
-          if (body.qty > 0) {
+          if (body.qty - entryQty > 0) {
             const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
             await client.query(
               `INSERT INTO stock_movements (
                 id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes
-              ) VALUES ($1, $2, $3, 'in', $4, 0, $4, $5, 'manual', $6, 'Saldo inicial no cadastro')`,
-              [movId, storeId, id, body.qty, body.cost, req.user?.name || 'Operador'],
+              ) VALUES ($1, $2, $3, 'in', $4, $5, $6, $7, 'manual', $8, 'Saldo inicial no cadastro')`,
+              [movId, storeId, id, body.qty - entryQty, entryQty, body.qty, body.cost, req.user?.name || 'Operador'],
             );
           }
 
           // Cor/capacidade sugeridas pelo catálogo que ainda não existiam no atributo são criadas nele.
           await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
           const createdRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
-          const created = formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0]);
+          const [created] = await attachSupplierEntries(client, storeId, [formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0])]);
           await client.query('COMMIT');
           res.status(201).json({ success: true, data: created });
           return;
@@ -528,6 +554,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
             body.qty = body.variations.reduce((acc, v) => acc + (Number(v.qty) || 0), 0);
             body.minQty = body.variations.reduce((acc, v) => acc + (Number(v.minQty) || 0), 0);
           }
+          const entryGroups = supplierEntryGroups(body);
           if(body.skuAuto||body.sku!==undefined&&body.sku!==curr.sku)body.sku=await allocateSku(client,storeId,{...curr,...body},id);
           if(body.avgCost!==undefined||body.pricingPolicy!==undefined)await client.query('UPDATE stock_items SET avg_cost=COALESCE($3,avg_cost),pricing_policy=COALESCE($4,pricing_policy) WHERE id=$1 AND store_id=$2',[id,storeId,body.avgCost,body.pricingPolicy!==undefined?JSON.stringify(body.pricingPolicy??{}):null]);
           const nextQty = body.qty !== undefined ? body.qty : Number(curr.qty);
@@ -546,9 +573,12 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           if (body.skuWithSupplier !== undefined) await client.query('UPDATE stock_items SET sku_with_supplier = $3 WHERE id = $1 AND store_id = $2', [id, storeId, body.skuWithSupplier]);
           await saveProductDetails(client, storeId, id, body);
           if(body.pickupPrices!==undefined){await validatePickupPrices(client,storeId,body.pickupPrices);await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);}
-          // Se qty mudou, registra movimentação no kardex
-          if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
-            const delta = body.qty - Number(curr.qty);
+          const entryQty = entryGroups
+            ? await saveSupplierEntries(client, storeId, id, entryGroups, { defaultSupplierId: body.supplierId !== undefined ? body.supplierId || null : curr.supplier_id, operator: req.user?.name || 'Operador', previousQty: Number(curr.qty) })
+            : 0;
+          // Se qty mudou além do que entrou pelas entradas de fornecedor, registra o ajuste no kardex
+          if (body.qty !== undefined && body.qty - entryQty !== Number(curr.qty)) {
+            const delta = body.qty - entryQty - Number(curr.qty);
             const movId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
             await client.query(
               `INSERT INTO stock_movements (
@@ -560,7 +590,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
                 id,
                 delta > 0 ? 'in' : 'out',
                 Math.abs(delta),
-                Number(curr.qty),
+                Number(curr.qty) + entryQty,
                 nextQty,
                 body.cost !== undefined ? body.cost : Number(curr.cost),
                 req.user?.name || 'Operador',
@@ -655,7 +685,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           await client.query('COMMIT');
 
           const updatedRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
-          res.json({ success: true, data: formatStockRow((await stockDetails(pool,storeId,updatedRes.rows))[0]) });
+          res.json({ success: true, data: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool,storeId,updatedRes.rows))[0])]))[0] });
           return;
         } catch (err) {
           await client.query('ROLLBACK');

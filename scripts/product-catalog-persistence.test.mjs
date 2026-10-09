@@ -37,7 +37,9 @@ test('one product and SKU persist all photos and variations in the correct store
  const reread=await (await request('/stock')).json();assert.deepEqual(reread.data.find(p=>p.id===id).images,images);
  const catalog=await (await fetch(base+'/totem/catalog?storeId=store-a')).json();
  const publicProduct=catalog.data.find(p=>p.id===id);
- assert.deepEqual(publicProduct.variations,result.data.variations);
+ // O catálogo público não leva as entradas por fornecedor (custo e IMEIs são internos).
+ assert.ok(publicProduct.variations.every(v=>v.supplierEntries===undefined));
+ assert.deepEqual(publicProduct.variations,result.data.variations.map(({supplierEntries,...v})=>v));
  assert.deepEqual(publicProduct.images,images);
  assert.equal((await request('/stock',undefined,'store-b')).status,403);
  assert.equal((await request('/stock',{name:'Duplicate',sku:'MASTER-ONE',skuAuto:false})).status,409);

@@ -140,7 +140,8 @@ productCatalogRouter.get('/api/v1/stock/:id/movements', requireAuth, async (req,
               o.id AS sale_id, o.customer_id, o.customer_name
          FROM stock_movements m
          LEFT JOIN stock_invoices i ON i.id = m.ref_id AND i.store_id = m.store_id
-         LEFT JOIN suppliers sup ON sup.id = i.supplier_id AND sup.store_id = m.store_id
+         LEFT JOIN stock_supplier_entries se ON se.id = m.ref_id AND se.store_id = m.store_id AND m.ref_type = 'supplier_entry'
+         LEFT JOIN suppliers sup ON sup.id = COALESCE(i.supplier_id, se.supplier_id) AND sup.store_id = m.store_id
          LEFT JOIN sales_orders o ON o.id = m.ref_id AND o.store_id = m.store_id
         WHERE m.store_id = $1 AND m.stock_id = $2
         ORDER BY m.created_at DESC, m.id DESC

@@ -424,3 +424,59 @@ test('deleting a product without history removes it; with sales it is deactivate
   assert.equal((await query('SELECT count(*)::int AS n FROM sales_order_lines WHERE stock_id = $1', [sold.id])).rows[0].n, 1, 'sale history kept');
   assert.equal((await request('/stock/STK-nao-existe', 'DELETE')).status, 404);
 });
+
+test('same product from different suppliers: entries per variation with cost, quantity and IMEIs; sale price stays the variation price', async () => {
+  const supA = (await request('/suppliers', 'POST', { name: 'Fornecedor A LTDA', tradeName: 'Forn A' })).json.data;
+  const supB = (await request('/suppliers', 'POST', { name: 'Fornecedor B LTDA', tradeName: 'Forn B' })).json.data;
+  const variation = (attrs, price, entries) => ({ attrs, price, cost: 0, qty: entries.reduce((s, e) => s + e.qty, 0), minQty: 0, condition: 'new', supplierEntries: entries });
+  const created = await request('/stock', 'POST', {
+    name: 'IPHONE 17 PRO MAX', kind: 'device', supplierId: supA.id, qty: 0, price: 9000,
+    variations: [
+      variation({ 'ATTR-COR': 'Preto', 'ATTR-CAP': '256GB' }, 9000, [
+        { supplierId: supA.id, entryDate: '2026-10-01', qty: 2, unitCost: 7000, imeis: ['350000000000001', '350000000000002'] },
+        { supplierId: supB.id, entryDate: '2026-10-05', qty: 1, unitCost: 6800, imeis: ['350000000000003'] },
+      ]),
+      variation({ 'ATTR-COR': 'Prata', 'ATTR-CAP': '512GB' }, 10500, [{ qty: 1, unitCost: 8200, imeis: ['350000000000004'] }]),
+    ],
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  const row = created.json.data;
+  assert.equal(row.qty, 4);
+  const black = row.variations.find((v) => v.attrs['ATTR-COR'] === 'Preto');
+  assert.equal(black.price, 9000, 'sale price is the variation price, not per supplier');
+  assert.equal(black.supplierEntries.length, 2);
+  assert.deepEqual(black.supplierEntries.map((e) => [e.supplierName, e.qty, e.unitCost, e.entryDate]), [['Forn A', 2, 7000, '2026-10-01'], ['Forn B', 1, 6800, '2026-10-05']]);
+  const silver = row.variations.find((v) => v.attrs['ATTR-COR'] === 'Prata');
+  assert.equal(silver.supplierEntries[0].supplierId, supA.id, 'without supplier the entry takes the product supplier');
+
+  const movements = (await request('/stock/' + row.id + '/movements')).json.data;
+  assert.equal(movements.filter((m) => m.origin === 'supplier_entry').length, 3);
+  assert.equal(movements.filter((m) => m.origin === 'manual').length, 0, 'no double count of the initial quantity');
+  assert.ok(movements.some((m) => m.supplier?.name === 'Forn B'));
+
+  // Listagem traz as entradas; reenviar as mesmas entradas não gera movimentação nova.
+  const listed = (await request('/stock')).json.data.find((item) => item.id === row.id);
+  const keep = listed.variations.map((v) => ({ ...v, supplierEntries: v.supplierEntries }));
+  const same = await request('/stock/' + row.id, 'PATCH', { variations: keep, supplierEntries: [] });
+  assert.equal(same.status, 200, JSON.stringify(same.json));
+  assert.equal((await request('/stock/' + row.id + '/movements')).json.data.length, movements.length);
+
+  // Nova compra do fornecedor B: entra 1 unidade com o custo dele.
+  const more = keep.map((v) => v.attrs['ATTR-COR'] === 'Preto'
+    ? { ...v, qty: v.qty + 1, supplierEntries: [...v.supplierEntries, { supplierId: supB.id, qty: 1, unitCost: 6700, imeis: ['350000000000005'] }] }
+    : v);
+  const added = await request('/stock/' + row.id, 'PATCH', { variations: more, supplierEntries: [] });
+  assert.equal(added.status, 200, JSON.stringify(added.json));
+  assert.equal(added.json.data.qty, 5);
+  const after = (await request('/stock/' + row.id + '/movements')).json.data;
+  assert.equal(after.length, movements.length + 1);
+  assert.equal(after[0].origin, 'supplier_entry');
+  assert.equal(after[0].unitCost, 6700);
+
+  // IMEI repetido é recusado.
+  const dupe = keep.map((v) => v.attrs['ATTR-COR'] === 'Prata' ? { ...v, supplierEntries: [...v.supplierEntries, { qty: 1, unitCost: 1, imeis: ['350000000000001'] }] } : v);
+  assert.equal((await request('/stock/' + row.id, 'PATCH', { variations: dupe, supplierEntries: [] })).status, 400);
+  const other = await request('/stock', 'POST', { name: 'Outro aparelho', qty: 1, supplierEntries: [{ qty: 1, unitCost: 1, imeis: ['350000000000004'] }] });
+  assert.equal(other.status, 409);
+  assert.equal((await request('/stock', 'POST', { name: 'IMEI demais', qty: 1, supplierEntries: [{ qty: 1, unitCost: 1, imeis: ['1', '2'] }] })).status, 400);
+});

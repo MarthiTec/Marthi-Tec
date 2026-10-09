@@ -4,6 +4,8 @@ import {ProductDayOffers} from '../../components/ProductDayOffers';
 import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
 import {ProductPickupPrices,PickupPriceList,offeredPickupIds} from '../../components/PickupFields';
 import { QuickModal } from '../../components/QuickModal';
+import { SupplierEntriesModal, supplierEntriesLabel, supplierEntriesSummary } from '../../components/SupplierEntriesModal';
+import type { SupplierEntry } from '../../data/adminStore';
 import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
 import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -211,6 +213,36 @@ export function StockPage() {
   const {methods:pickupMethods}=usePickupMethods();
   // Preço por retirada de uma linha da grade de variações (janela rápida).
   const [pickupEdit, setPickupEdit] = useState<{ index: number; prices: Record<string, number | null>; base: number } | null>(null);
+  // Entradas por fornecedor sendo editadas: de uma variação da grade ou do produto simples.
+  const [entriesEdit, setEntriesEdit] = useState<{ index: number | 'simple' } | null>(null);
+
+  /**
+   * Aplica as entradas: o que entrou a mais (ou saiu) soma no estoque e o custo vira o custo médio
+   * das compras. O preço de venda não muda.
+   */
+  function applySupplierEntries(target: number | 'simple', entries: SupplierEntry[]) {
+    const next = supplierEntriesSummary(entries);
+    if (target === 'simple') {
+      setForm((current) => {
+        const delta = next.qty - supplierEntriesSummary(current.supplierEntries).qty;
+        return {
+          ...current,
+          supplierEntries: entries,
+          qty: Math.max(0, (Number(current.qty) || 0) + delta),
+          ...(entries.length ? { cost: next.avgCost, avgCost: next.avgCost, lastPurchaseCost: entries[entries.length - 1].unitCost } : {}),
+        };
+      });
+    } else {
+      setVariations((current) =>
+        current.map((row, i) => {
+          if (i !== target) return row;
+          const delta = next.qty - supplierEntriesSummary(row.supplierEntries).qty;
+          return { ...row, supplierEntries: entries, qty: Math.max(0, (Number(row.qty) || 0) + delta), ...(entries.length ? { cost: next.avgCost, avgCost: next.avgCost } : {}) };
+        }),
+      );
+    }
+    setEntriesEdit(null);
+  }
   const saveInProgress = useRef(false);
   const [saving, setSaving] = useState(false);
   const generatedModel=useRef('');
@@ -619,6 +651,7 @@ export function StockPage() {
         minQty: v.minQty,
         cost: v.cost,
         condition: v.condition,
+        supplierEntries: v.supplierEntries,
       }));
       setVariations(rows);
       setOriginalVariationIds(item.id ? [item.id] : []);
@@ -733,6 +766,7 @@ export function StockPage() {
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
       skuWithSupplier: item.skuWithSupplier !== false,
+      supplierEntries: item.supplierEntries,
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       entryDate: item.entryDate ?? '',
@@ -817,6 +851,7 @@ export function StockPage() {
             pickupPrices: row.pickupPrices ?? {},
             pickupMethodId: row.pickupMethodId || undefined,
             pricingPolicy: row.pricingPolicy ?? null,
+            supplierEntries: row.supplierEntries,
           }))
         : [];
 
@@ -848,6 +883,7 @@ export function StockPage() {
         images: [...form.images],
         supplierId: form.supplierId || '',
         skuWithSupplier: form.skuWithSupplier !== false,
+        supplierEntries: useVariations ? undefined : form.supplierEntries,
         fiscalClassificationId: form.fiscalClassificationId || '',
         warehouseId: form.warehouseId || '',
         trackLot: Boolean(form.trackLot),
@@ -1617,6 +1653,16 @@ export function StockPage() {
                     <ConversionFields unit={form.unit ?? 'UN'} value={conversion} onChange={setConversion} />
                   </QuickModal>
                 ) : null}
+                {entriesEdit ? (
+                  <SupplierEntriesModal
+                    title={entriesEdit.index === 'simple' ? 'Entradas por fornecedor · ' + (form.name || 'produto') : 'Entradas por fornecedor · ' + (Object.values(variations[entriesEdit.index]?.attrs ?? {}).filter(Boolean).join(' · ') || form.name)}
+                    entries={(entriesEdit.index === 'simple' ? form.supplierEntries : variations[entriesEdit.index]?.supplierEntries) ?? []}
+                    suppliers={suppliers}
+                    defaultSupplierId={form.supplierId || ''}
+                    onClose={() => setEntriesEdit(null)}
+                    onApply={(entries) => (readOnly ? setEntriesEdit(null) : applySupplierEntries(entriesEdit.index, entries))}
+                  />
+                ) : null}
                 {pickupEdit ? (
                   <QuickModal
                     title="Preço por tipo de retirada"
@@ -1860,6 +1906,7 @@ export function StockPage() {
                         return <th key={attrId}>{def?.name || attrId}</th>;
                       })}
                       <th>Tipo de retirada</th>
+                      <th>Fornecedores</th>
                       <th>Custo unitário</th>
                       <th>Preço à vista</th>
                       <th>Parcelado (18x)</th>
@@ -1874,7 +1921,7 @@ export function StockPage() {
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 9 + (readOnly ? 0 : 1)} className="empty">
+                        <td colSpan={selectedAttrIds.length + 10 + (readOnly ? 0 : 1)} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
@@ -1884,7 +1931,7 @@ export function StockPage() {
                         const installmentText = formatInstallment(rowPrice, 18, (row.cardRate??form.cardRate) || undefined);
 
                         return (
-                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 9) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
+                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
                             {selectedAttrIds.map((attrId, attrIdx) => {
                               const def = attrDefs.find((a) => a.id === attrId);
                               const options = referenceValues(def).map((v) => ({
@@ -1927,6 +1974,11 @@ export function StockPage() {
                               );
                             })}
                             <td data-label="Tipo de retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title="Definir onde esta variação é vendida e o preço de cada forma" onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}>{names.length?names.join(' · '):'Nenhuma'} <span aria-hidden>✎</span></button>;})()}</td>
+                            <td data-label="Fornecedores">
+                              <button type="button" className="pickup-price-summary" disabled={readOnly && !row.supplierEntries?.length} title="Compras desta variação por fornecedor: data, quantidade, custo e IMEIs" onClick={() => setEntriesEdit({ index })}>
+                                {supplierEntriesLabel(row.supplierEntries)} <span aria-hidden>✎</span>
+                              </button>
+                            </td>
                             <td data-label="Custo unitário"><CurrencyInput ariaLabel="Custo unitário da variação" value={row.cost} disabled={readOnly} onChange={value=>updateVariationRow(index,'cost',value)}/></td>
                             <td data-label="Preço à vista">
                               <CurrencyInput
@@ -2051,6 +2103,15 @@ export function StockPage() {
 
               <article className="admin-card stock-form-card">
                 <h3>Estoque</h3>
+                <p className="stock-entries-line">
+                  <span>
+                    <strong>Entradas por fornecedor:</strong> {supplierEntriesLabel(form.supplierEntries)}
+                    {form.supplierEntries?.length ? ' · custo médio ' + supplierEntriesSummary(form.supplierEntries).avgCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}
+                  </span>
+                  <button type="button" className="quick-add-btn" disabled={readOnly && !form.supplierEntries?.length} onClick={() => setEntriesEdit({ index: 'simple' })}>
+                    {readOnly ? 'Ver entradas' : '＋ Entradas por fornecedor'}
+                  </button>
+                </p>
                 <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
                   <label>
                     Quantidade ({form.unit === 'KG' ? 'KG' : 'UN'})
