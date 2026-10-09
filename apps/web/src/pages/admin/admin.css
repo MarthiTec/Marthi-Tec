@@ -7152,3 +7152,13 @@ select.caixa-mov-input {
 .product-movements__dir.is-adjustment { background: rgba(100, 116, 139, 0.14); color: var(--mute); }
 .product-movements__origin { display: block; color: var(--mute); font-size: 0.74rem; }
 @media (max-width: 600px) { .product-movements__summary { grid-template-columns: 1fr; } }
+
+/* Botões (Salvar, Cancelar, Salvar nomes) afastados dos campos acima */
+.product-groups .admin-form + .admin-toolbar,
+.product-types .admin-form + .admin-toolbar {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, #e2e8f0);
+  gap: 10px;
+}
+.product-groups .admin-card > h3 + .empty { margin-bottom: 12px; }

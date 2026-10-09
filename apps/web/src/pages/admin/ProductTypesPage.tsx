@@ -80,7 +80,7 @@ export function ProductTypesPage() {
 
   const visible = types.filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
-    <section className="admin-page">
+    <section className="admin-page product-types">
       <div className="admin-card">
         <div className="admin-toolbar">
           <input aria-label="Buscar tipos de produto" placeholder="Buscar tipo" value={query} onChange={(e) => setQuery(e.target.value)} />
