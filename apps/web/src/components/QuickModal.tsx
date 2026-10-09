@@ -28,14 +28,23 @@ export function QuickModal({
   const titleId = useId();
   const form = useRef<HTMLFormElement>(null);
 
+  // Foco no primeiro campo só ao abrir. Antes isso rodava a cada digitação (onClose muda a cada
+  // render) e o cursor pulava para o primeiro campo, ex.: do preço para a caixa "Delivery".
+  useEffect(() => {
+    form.current?.querySelector<HTMLElement>('input, textarea, select')?.focus();
+  }, []);
+
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  closeRef.current = onClose;
+  busyRef.current = busy;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onClose();
+      if (event.key === 'Escape' && !busyRef.current) closeRef.current();
     };
     window.addEventListener('keydown', onKey);
-    form.current?.querySelector<HTMLElement>('input, textarea, select')?.focus();
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
+  }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();

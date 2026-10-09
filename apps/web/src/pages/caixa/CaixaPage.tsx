@@ -1,4 +1,5 @@
 import {PickupFields} from '../../components/PickupFields';
+import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
 import type {DeliveryAddress} from '../../data/pickup';
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -2359,8 +2360,8 @@ export function CaixaPage() {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <strong className="pdv__item">{line.name}</strong>
-                                <PickupFields product={stock.find(item=>item.id===line.stockId)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map(entry=>entry.key===line.key?{...entry,pickupMethodId,deliveryAddress,unitPrice:price??entry.unitPrice}:entry))}/>
-                                <SaleAttributeFields surface="pdv" product={stock.find(item=>item.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map(entry=>entry.key===line.key ? {...entry,attributes} : entry))}/>
+                                <PickupFields product={saleLinePickupProduct(stock.find(item=>item.id===line.stockId),line.attributes??[])} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId,deliveryAddress,price)=>setLines(current=>current.map(entry=>entry.key===line.key?{...entry,pickupMethodId,deliveryAddress,unitPrice:saleLineUnitPrice(stock.find(item=>item.id===entry.stockId),entry.attributes??[],pickupMethodId)??price??entry.unitPrice}:entry))}/>
+                                <SaleAttributeFields surface="pdv" product={stock.find(item=>item.id===line.stockId)} picked={line.attributes} onChange={attributes=>setLines(current=>current.map(entry=>entry.key===line.key ? {...entry,attributes,unitPrice:saleLineUnitPrice(stock.find(item=>item.id===entry.stockId),attributes,entry.pickupMethodId)??entry.unitPrice} : entry))}/>
                                 {line.isAdHoc ? (
                                   <span
                                     style={{

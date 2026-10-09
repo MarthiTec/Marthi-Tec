@@ -51,8 +51,8 @@ import { QuickAddButton } from '../../components/QuickModal';
 import { QuickCreateCustomer } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
 
-import { selectProductVariation } from '../../data/productPickup';
-import type { StockItem, StockVariationRow } from '../../data/adminStore';
+import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
+import type { StockVariationRow } from '../../data/adminStore';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -201,12 +201,7 @@ export function ExternalSalePage() {
    * senão só a "pronta entrega" do produto aparecia, mesmo com preço de encomenda cadastrado.
    */
   function pickupProductFor(line: { stockId?: string | null; attributes?: { id: string; value: string }[] }) {
-    const stock = stockItems.find((item) => item.id === line.stockId);
-    if (!stock?.variations?.length) return stock;
-    const variation = selectProductVariation(stock as unknown as StockItem, Object.fromEntries((line.attributes ?? []).map((attr) => [attr.id, attr.value])));
-    if (!variation) return stock;
-    const pickupPrices = variation.pickupMethodId ? { [variation.pickupMethodId]: variation.price } : variation.pickupPrices ?? {};
-    return { ...stock, price: variation.price, pickupPrices };
+    return saleLinePickupProduct(stockItems.find((item) => item.id === line.stockId), line.attributes ?? []);
   }
 
   function handleSelectCustomer(val: string) {
@@ -520,8 +515,8 @@ export function ExternalSalePage() {
                       onChange={(val) => handleLineProductChange(idx, val)}
                     />
                   </div>
-                  <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId, deliveryAddress, price) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, pickupMethodId, deliveryAddress, unitPrice: price ?? entry.unitPrice } : entry)))} />
-                  <SaleAttributeFields surface="external" product={stockItems.find((p) => p.id === line.stockId)} picked={line.attributes} onChange={(attributes) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, attributes } : entry)))} />
+                  <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId, deliveryAddress, price) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, pickupMethodId, deliveryAddress, unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), entry.attributes ?? [], pickupMethodId) ?? price ?? entry.unitPrice } : entry)))} />
+                  <SaleAttributeFields surface="external" product={stockItems.find((p) => p.id === line.stockId)} picked={line.attributes} onChange={(attributes) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, attributes, unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), attributes, entry.pickupMethodId) ?? entry.unitPrice } : entry)))} />
                   <div>
                     <label className="admin-label">Quantidade</label>
                     <input type="number" min="1" className="admin-input" value={line.qty} onChange={(e) => handleLineFieldChange(idx, 'qty', Number(e.target.value))} />
