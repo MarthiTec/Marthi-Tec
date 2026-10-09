@@ -408,6 +408,7 @@ export function StockPage() {
   }
 
   function resetForm() {
+    duplicateCheck.current = null;
     generatedModel.current='';
     setForm(emptyForm(attrDefs.map((item) => item.id), totemSurface));
     setSelectedId(null);
@@ -625,6 +626,7 @@ export function StockPage() {
   }
 
   function openForm(item: StockItem, nextMode: Mode) {
+    duplicateCheck.current = null;
     setSelectedId(item.id);
     setMode(nextMode);
     setFormTab('principal');
@@ -803,6 +805,8 @@ export function StockPage() {
 
   async function submit() {
     if (readOnly || !form.name.trim() || saveInProgress.current) return;
+    // Produto novo com nome repetido: primeiro a pergunta (alterar o existente ou numerar o nome).
+    if (!(await checkDuplicateName())) return;
     saveInProgress.current = true;
     setSaving(true);
     setError('');
@@ -949,6 +953,51 @@ export function StockPage() {
       cancelLabel: 'Não',
       danger,
     });
+  }
+
+  /** Nome comparável: sem acento, sem diferença de maiúsculas e espaços repetidos. */
+  const productNameKey = (value: string) =>
+    value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Conferência do nome em andamento ou já feita (o Salvar espera a mesma conferência do campo).
+  const duplicateCheck = useRef<{ key: string; result: Promise<boolean> } | null>(null);
+
+  /**
+   * Cadastro novo com o mesmo nome de um produto que já existe: pergunta se quer alterar o que já
+   * existe (abre em edição) ou, se não, coloca um número no fim do nome para não duplicar.
+   * Devolve true quando pode salvar com o nome atual.
+   */
+  function checkDuplicateName(): Promise<boolean> {
+    if (mode !== 'new' || readOnly) return Promise.resolve(true);
+    const key = productNameKey(form.name);
+    if (!key) return Promise.resolve(true);
+    if (duplicateCheck.current?.key === key) return duplicateCheck.current.result;
+    const typed = form.name.trim();
+    const result = (async () => {
+      // Confere no banco (outra pessoa pode ter cadastrado agora há pouco).
+      await refreshAdminSlices(['stock']).catch(() => undefined);
+      const fresh = getAdminState().stock;
+      setItems(fresh);
+      const existing = fresh.find((item) => productNameKey(item.name) === key);
+      if (!existing) return true;
+      const edit = await askYesNo(
+        'Produto já cadastrado',
+        `Existe um produto cadastrado com o nome "${existing.name}". Deseja alterar esse registro? A mesma descrição vai criar um registro duplicado.`,
+      );
+      if (edit) {
+        openForm(existing, 'edit');
+        return false;
+      }
+      const names = new Set(fresh.map((item) => productNameKey(item.name)));
+      let n = 2;
+      while (names.has(productNameKey(`${typed} ${n}`))) n += 1;
+      const next = `${typed} ${n}`;
+      duplicateCheck.current = { key: productNameKey(next), result: Promise.resolve(true) };
+      setForm((current) => ({ ...current, name: next }));
+      // O usuário vê o nome novo antes de salvar.
+      return false;
+    })();
+    duplicateCheck.current = { key, result };
+    return result;
   }
 
   async function duplicateProduct(item: StockItem) {
@@ -1565,6 +1614,7 @@ export function StockPage() {
                     ref={nameRef}
                     value={form.name}
                     onChange={e => setForm({ ...form, name: autoUppercase ? e.target.value.toUpperCase() : e.target.value })}
+                    onBlur={() => void checkDuplicateName()}
                     disabled={readOnly}
                     placeholder="Nome do produto"
                   />

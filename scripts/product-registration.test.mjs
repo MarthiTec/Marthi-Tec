@@ -494,3 +494,47 @@ test('help center: Marthi contacts come from the database, store requests are sa
   assert.equal(list[0].message, 'Preciso de ajuda no cadastro');
   assert.equal((await request('/support/tickets', 'GET', undefined, 'store-b')).status, 403);
 });
+
+test('trade-in device with the name of an existing product enters that product stock; cancelling removes only that unit', async () => {
+  // Produto simples com o mesmo nome (escrito diferente): soma 1 no estoque e o custo vira a média.
+  const used = (await request('/stock', 'POST', { name: 'IPHONE 11 USADO', kind: 'device', condition: 'used', qty: 2, cost: 1000, price: 1800 })).json.data;
+  const item = (await request('/stock', 'POST', { name: 'Capinha troca', qty: 5, cost: 5, price: 50 })).json.data;
+  const sell = (tradeIn) => request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente Troca', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 50 }], discount: 0, tradeIn });
+  const sale = await sell({ deviceName: 'iPhone 11 Usado', imei: '359000000000101', tradeValue: 40, conditionState: 'used' });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const saleId = sale.json.data.id || sale.json.data.saleId;
+  const after = (await request('/stock')).json.data.find((p) => p.id === used.id);
+  assert.equal(after.qty, 3);
+  assert.equal((await query("SELECT count(*)::int n FROM stock_items WHERE store_id = 'store-a' AND id LIKE 'STK-USED-%' AND name ILIKE '%iphone 11%'")).rows[0].n, 0, 'no duplicate product');
+  assert.equal((await query('SELECT stock_item_id, stock_merged FROM sale_trade_ins WHERE sale_id = $1', [saleId])).rows[0].stock_merged, true);
+  const cancel = await request('/sales/' + saleId + '/cancel', 'POST', { reason: 'Teste' });
+  assert.equal(cancel.status, 200, JSON.stringify(cancel.json));
+  const back = (await query('SELECT qty, active FROM stock_items WHERE id = $1', [used.id])).rows[0];
+  assert.equal(back.qty, 2);
+  assert.equal(back.active, true, 'existing product stays active');
+
+  // Produto com grade: entra na variação de mesma cor/capacidade.
+  await query("INSERT INTO product_attributes(id,store_id,name,active) VALUES('ATTR-cor-ti','store-a','Cor',true),('ATTR-cap-ti','store-a','Capacidade',true)");
+  const grid = (await request('/stock', 'POST', {
+    name: 'GALAXY S21 SEMINOVO', kind: 'device', qty: 0, price: 1500,
+    variations: [
+      { attrs: { 'ATTR-cor-ti': 'Preto', 'ATTR-cap-ti': '128 GB' }, price: 1500, cost: 900, qty: 1, minQty: 0, condition: 'used' },
+      { attrs: { 'ATTR-cor-ti': 'Branco', 'ATTR-cap-ti': '256 GB' }, price: 1700, cost: 1000, qty: 1, minQty: 0, condition: 'used' },
+    ],
+  })).json.data;
+  const sale2 = await sell({ deviceName: 'Galaxy S21 Seminovo', color: 'preto', capacity: '128GB', imei: '359000000000102', tradeValue: 45, conditionState: 'used' });
+  assert.equal(sale2.status, 201, JSON.stringify(sale2.json));
+  const g = (await request('/stock')).json.data.find((p) => p.id === grid.id);
+  assert.equal(g.qty, 3);
+  assert.equal(g.variations.find((v) => v.attrs['ATTR-cor-ti'] === 'Preto').qty, 2);
+  assert.equal(g.variations.find((v) => v.attrs['ATTR-cor-ti'] === 'Branco').qty, 1);
+  const cancel2 = await request('/sales/' + (sale2.json.data.id || sale2.json.data.saleId) + '/cancel', 'POST', { reason: 'Teste' });
+  assert.equal(cancel2.status, 200, JSON.stringify(cancel2.json));
+  const g2 = (await request('/stock')).json.data.find((p) => p.id === grid.id);
+  assert.equal(g2.variations.find((v) => v.attrs['ATTR-cor-ti'] === 'Preto').qty, 1);
+
+  // Nome que não existe: cadastro próprio do usado, como antes.
+  const sale3 = await sell({ deviceName: 'Moto G Antigo', tradeValue: 10, conditionState: 'used' });
+  assert.equal(sale3.status, 201, JSON.stringify(sale3.json));
+  assert.equal((await query("SELECT count(*)::int n FROM stock_items WHERE store_id = 'store-a' AND name = 'Moto G Antigo (Trade-in)'")).rows[0].n, 1);
+});

@@ -667,6 +667,21 @@ export function ExternalSalePage() {
                       <input type="checkbox" checked={tradeUppercase} onChange={(e) => { setTradeUppercase(e.target.checked); if (e.target.checked) setTradeIn({ ...tradeIn, deviceName: tradeIn.deviceName.toUpperCase() }); }} />
                       Sempre em MAIÚSCULAS
                     </label>
+                    {(() => {
+                      // Mesma regra do servidor: produto com o mesmo nome recebe o aparelho no estoque dele.
+                      const key = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\(\s*trade-?in\s*\)/gi, '').toLowerCase().replace(/\s+/g, ' ').trim();
+                      const typed = key(tradeIn.deviceName);
+                      const existing = typed ? stockItems.find((item) => key(item.name) === typed) : undefined;
+                      return existing ? (
+                        <p role="status" className="xsale-promo">
+                          <span className="xsale-promo__tag">Já cadastrado</span>
+                          <span className="xsale-promo__text">
+                            O aparelho entra no estoque de <strong>{existing.name}</strong> (sem criar outro cadastro)
+                            {existing.variations?.length ? ', na variação de mesma cor e capacidade.' : '.'}
+                          </span>
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="external-sale-wide-field">
                     <AdminPicker label="Marca do aparelho recebido" value={tradeIn.brand || ''} options={[{ value: '', label: 'Selecionar marca' }, ...brands.filter((b) => b.active).map((b) => ({ value: b.slug, label: b.name }))]} onChange={(brand) => setTradeIn({ ...tradeIn, brand })} />

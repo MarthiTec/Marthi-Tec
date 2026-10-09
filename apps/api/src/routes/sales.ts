@@ -1,6 +1,7 @@
 import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
 import {applyDayOffersToLines} from '../services/dayOffers.js';
 import {changeVariationQuantity} from '../services/variationInventory.js';
+import { receiveTradeInIntoExistingProduct } from '../services/tradeInStock.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -330,16 +331,18 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       // 4. Se houver UPGRADE / TRADE-IN: dar ENTRADA no estoque do aparelho usado
       let createdTradeInStockId: string | null = null;
       if (body.tradeIn && body.tradeIn.tradeValue > 0) {
-        const tradeInItemId = `STK-USED-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-        createdTradeInStockId = tradeInItemId;
-
         if (body.tradeIn.brand) {
           const brand = await client.query('SELECT 1 FROM store_brands WHERE store_id = $1 AND slug = $2 AND active = true', [storeId, body.tradeIn.brand]);
           if (!brand.rows[0]) throw Object.assign(new Error('Selecione uma marca ativa cadastrada nesta loja.'), { status: 400 });
         }
 
-        // Cria o aparelho usado no estoque com custo = tradeValue e quantidade 1
-        await client.query(
+        // Já existe produto com esse nome? O aparelho entra no estoque dele (sem cadastro duplicado).
+        const merged = await receiveTradeInIntoExistingProduct(client, storeId, body.tradeIn);
+        const tradeInItemId = merged?.stockId ?? `STK-USED-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        createdTradeInStockId = tradeInItemId;
+
+        // Senão, cria o aparelho usado no estoque com custo = tradeValue e quantidade 1
+        if (!merged) await client.query(
           `INSERT INTO stock_items (
             id, store_id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
             kind, condition, category, brand, active, color, capacity, attrs, images
@@ -370,7 +373,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         await client.query(
           `INSERT INTO stock_movements (
             id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes
-          ) VALUES ($1, $2, $3, 'in', 1, 0, 1, $4, 'trade_in', $5, $6, $7)`,
+          ) VALUES ($1, $2, $3, 'in', 1, $8, $8 + 1, $4, 'trade_in', $5, $6, $7)`,
           [
             tradeMovId,
             storeId,
@@ -379,6 +382,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
             orderId,
             body.sellerName || req.user?.name || 'Operador',
             `Entrada Aparelho Usado (Trade-in / Upgrade) - Venda #${orderId}`,
+            merged?.previousQty ?? 0,
           ],
         );
 
@@ -405,6 +409,9 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
             body.customerId || null,
           ],
         );
+        if (merged) {
+          await client.query('UPDATE sale_trade_ins SET stock_merged = true, stock_attributes = $2::jsonb WHERE id = $1', [tradeInRecordId, JSON.stringify(merged.attributes)]);
+        }
       }
 
       // 5. Registrar Formas de Pagamento em sale_payments
@@ -1039,7 +1046,21 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         [saleId],
       );
       for (const trade of tradeRes.rows) {
-        if (trade.stock_item_id) {
+        if (trade.stock_item_id && trade.stock_merged) {
+          // Aparelho que entrou num produto já existente: sai só a unidade da troca.
+          const item = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [trade.stock_item_id, storeId]);
+          if (!item.rows.length || Number(item.rows[0].qty) < 1 || trade.status === 'resold') throw Object.assign(new Error('Aparelho da troca já movimentado; cancelamento exige conferência do estoque.'), {status: 409});
+          const attributes = Array.isArray(trade.stock_attributes) ? trade.stock_attributes : [];
+          if (attributes.length) await changeVariationQuantity(client, storeId, trade.stock_item_id, attributes, -1);
+          const previous = Number(item.rows[0].qty);
+          await client.query('UPDATE stock_items SET qty = qty - 1, updated_at = now() WHERE id = $1 AND store_id = $2', [trade.stock_item_id, storeId]);
+          await client.query(
+            `INSERT INTO stock_movements (id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes)
+             VALUES ($1, $2, $3, 'out', 1, $4, $5, $6, 'trade_in_reversal', $7, $8, 'Estorno do aparelho da troca (venda cancelada)')`,
+            [`MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, storeId, trade.stock_item_id, previous, previous - 1, Number(trade.trade_value) || 0, saleId, req.user?.name || 'Operador'],
+          );
+          await client.query(`UPDATE sale_trade_ins SET status = 'cancelled', updated_at = now() WHERE id = $1`, [trade.id]);
+        } else if (trade.stock_item_id) {
           const item = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [trade.stock_item_id, storeId]);
           if (!item.rows.length || Number(item.rows[0].qty) !== 1 || trade.status === 'resold') throw Object.assign(new Error('Aparelho da troca já movimentado; cancelamento exige conferência do estoque.'), {status: 409});
           // Remove ou inativa o item usado cadastrado
