@@ -57,6 +57,8 @@ const supplierSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do fornecedor é obrigatório.'),
   tradeName: z.string().default(''),
+  /** Nome curto do fornecedor no SKU dos produtos; vazio = nome fantasia ou primeiro nome. */
+  skuName: z.string().max(32).default(''),
   document: z.string().default(''),
   phone: z.string().default(''),
   email: z.string().default(''),
@@ -709,8 +711,8 @@ registryRouter.post('/api/v1/suppliers', requireAuth, async (req, res, next) => 
 
     if (pool) {
       await pool.query(
-        `INSERT INTO suppliers (id, store_id, name, trade_name, document, phone, email, city, notes, active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO suppliers (id, store_id, name, trade_name, document, phone, email, city, notes, active, sku_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           id,
           storeId,
@@ -722,6 +724,7 @@ registryRouter.post('/api/v1/suppliers', requireAuth, async (req, res, next) => 
           body.city.trim(),
           body.notes.trim(),
           body.active,
+          body.skuName.trim(),
         ],
       );
       await savePersonDetails(pool, 'suppliers', id, storeId, personDetailsSchema.parse(req.body));
@@ -749,9 +752,9 @@ registryRouter.patch('/api/v1/suppliers/:id', requireAuth, async (req, res, next
         `UPDATE suppliers
          SET name = COALESCE($1, name), trade_name = COALESCE($2, trade_name), document = COALESCE($3, document),
              phone = COALESCE($4, phone), email = COALESCE($5, email), city = COALESCE($6, city),
-             notes = COALESCE($7, notes), active = COALESCE($8, active), updated_at = now()
+             notes = COALESCE($7, notes), active = COALESCE($8, active), sku_name = COALESCE($11, sku_name), updated_at = now()
          WHERE id = $9 AND store_id = $10`,
-        [body.name, body.tradeName, body.document, body.phone, body.email, body.city, body.notes, body.active, id, storeId],
+        [body.name, body.tradeName, body.document, body.phone, body.email, body.city, body.notes, body.active, id, storeId, body.skuName?.trim()],
       );
       await savePersonDetails(pool, 'suppliers', id, storeId, personDetailsSchema.parse(req.body));
       const updated = await pool.query(`SELECT * FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);

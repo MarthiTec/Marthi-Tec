@@ -69,6 +69,8 @@ export type StockItem = {
   createdAt?:string;
   active?: boolean;
   skuAuto?:boolean;
+  /** Fornecedor entra na formação automática do SKU (padrão: sim). */
+  skuWithSupplier?: boolean;
   pricingPolicy?:PricingPolicy|null;
   lastEntry?:{movementId:string;enteredAt:string;origin:string;qty:number;unitCost:number;notes:string;invoice:{id:string;number:string;series:string;issuedAt:string;movementAt?:string;status:string}|null}|null;
   pickupPrices?: Record<string,number|null>;
@@ -313,6 +315,7 @@ function normalizeStock(item: StockItem): StockItem {
     images,
     variations,
     supplierId: item.supplierId ?? '',
+    skuWithSupplier: item.skuWithSupplier !== false,
     fiscalClassificationId: item.fiscalClassificationId ?? '',
     warehouseId: item.warehouseId ?? '',
     trackLot: item.trackLot ?? false,
@@ -545,6 +548,7 @@ function toNestStockBody(item: StockItem) {
   return {
     pickupPrices: item.pickupPrices ?? {},
     skuAuto: item.skuAuto,
+    skuWithSupplier: item.skuWithSupplier !== false,
     avgCost: item.avgCost,
     pricingPolicy: item.pricingPolicy?.basis ? item.pricingPolicy : null,
     name: item.name,
@@ -564,7 +568,8 @@ function toNestStockBody(item: StockItem) {
     condition: item.condition,
     showOnTotem: item.showOnTotem,
     images: item.images?.length ? item.images : undefined,
-    supplierId: item.supplierId || undefined,
+    // Vazio limpa o fornecedor no banco (undefined manteria o anterior).
+    supplierId: item.supplierId ?? undefined,
     fiscalClassificationId: item.fiscalClassificationId || undefined,
     warehouseId: item.warehouseId || undefined,
     trackLot: item.trackLot,

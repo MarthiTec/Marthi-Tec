@@ -56,6 +56,20 @@ test('automatic SKU collision, manual SKU and true entry history persist',async(
  assert.equal((await request('/stock','POST',{...body,skuAuto:false,sku:row.sku})).status,409);
  assert.equal((await request('/stock/'+row.id,'PATCH',{pricingPolicy:{basis:'margin',percent:100}})).status,400);
 });
+test('supplier enters the automatic SKU by SKU name, trade name or first name, and can be left out',async()=>{
+ const supplier=async(body)=>{const res=await request('/suppliers','POST',body);assert.equal(res.status,201,JSON.stringify(res.json));return res.json.data;};
+ const byTrade=await supplier({name:'Distribuidora Paulista de Celulares LTDA',tradeName:'Cel Paulista'});
+ const byFirst=await supplier({name:'Joaquim Ferreira'});
+ const bySku=await supplier({name:'Atacado Brasil',tradeName:'Atacadão',skuName:'atb'});
+ assert.equal(bySku.skuName,'atb');
+ const body={name:'Redmi 13',brand:'Xiaomi',qty:1,cost:10,price:20,skuAuto:true,capacity:'128GB'};
+ const sku=async(extra)=>{const res=await request('/stock','POST',{...body,...extra});assert.equal(res.status,201,JSON.stringify(res.json));return res.json.data;};
+ assert.equal((await sku({supplierId:byTrade.id})).sku,'XIAOMI-CELPAULISTA-REDMI13-128GB-NEW');
+ assert.equal((await sku({supplierId:byFirst.id})).sku,'XIAOMI-JOAQUIM-REDMI13-128GB-NEW');
+ const withSku=await sku({supplierId:bySku.id});assert.equal(withSku.sku,'XIAOMI-ATB-REDMI13-128GB-NEW');assert.equal(withSku.skuWithSupplier,true);
+ const without=await sku({supplierId:bySku.id,skuWithSupplier:false});assert.equal(without.sku,'XIAOMI-REDMI13-128GB-NEW');assert.equal(without.skuWithSupplier,false);
+ const back=await request('/stock/'+without.id,'PATCH',{skuAuto:true,skuWithSupplier:true});assert.equal(back.status,200,JSON.stringify(back.json));assert.equal(back.json.data.sku,'XIAOMI-ATB-REDMI13-128GB-NEW-2');
+});
 test('product without a pricing calculation stays editable after reload',async()=>{
  const created=await request('/stock','POST',{name:'No pricing policy',qty:0,cost:0,price:0});
  assert.equal(created.status,201,JSON.stringify(created.json));

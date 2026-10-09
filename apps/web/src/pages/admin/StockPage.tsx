@@ -1,4 +1,4 @@
-import {productSku} from '../../data/productSku';
+import {productSku,supplierSkuName} from '../../data/productSku';
 import {ProductTotemPreview} from '../../components/ProductTotemPreview';
 import {ProductDayOffers} from '../../components/ProductDayOffers';
 import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
@@ -189,10 +189,10 @@ export function StockPage() {
   const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute'>(null);
   const [supplierVersion, setSupplierVersion] = useState(0);
   // Fornecedores vêm direto do banco (nada de cópia local).
-  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; skuName: string }>>([]);
   useEffect(() => {
     let alive = true;
-    const load = () => void apiListSuppliers(true).then((rows) => { if (alive) setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name }))); }).catch(() => undefined);
+    const load = () => void apiListSuppliers(true).then((rows) => { if (alive) setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name, skuName: supplierSkuName(row) }))); }).catch(() => undefined);
     load();
     window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
     return () => { alive = false; window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load); };
@@ -632,6 +632,7 @@ export function StockPage() {
       showOnTotem: item.showOnTotem,
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
+      skuWithSupplier: item.skuWithSupplier !== false,
       fiscalClassificationId: item.fiscalClassificationId ?? '',
       warehouseId: item.warehouseId ?? '',
       trackLot: item.trackLot ?? false,
@@ -651,6 +652,7 @@ export function StockPage() {
       ? productSku({
           ...form,
           brand: findBrand(brands, form.brand ?? '')?.name ?? form.brand,
+          supplier: form.skuWithSupplier !== false ? suppliers.find((item) => item.id === form.supplierId)?.skuName : '',
           attrs,
           color: attrs[attrDefs.find((a) => a.name.toLowerCase() === 'cor')?.id ?? ''] ?? '',
           capacity: attrs[attrDefs.find((a) => a.name.toLowerCase() === 'capacidade')?.id ?? ''] ?? '',
@@ -739,6 +741,7 @@ export function StockPage() {
         showOnTotem: form.showOnTotem,
         images: [...form.images],
         supplierId: form.supplierId || '',
+        skuWithSupplier: form.skuWithSupplier !== false,
         fiscalClassificationId: form.fiscalClassificationId || '',
         warehouseId: form.warehouseId || '',
         trackLot: Boolean(form.trackLot),
@@ -1417,6 +1420,18 @@ export function StockPage() {
                   options={[{ value: '', label: 'Nenhum' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
                   onChange={(value) => setForm({ ...form, supplierId: value })}
                 />
+                {form.supplierId ? (
+                  <label className="stock-sku-supplier">
+                    <input
+                      type="checkbox"
+                      checked={form.skuWithSupplier !== false}
+                      disabled={readOnly}
+                      onChange={(e) => setForm((current) => ({ ...current, skuWithSupplier: e.target.checked }))}
+                    />
+                    Incluir no SKU
+                    {suppliers.find((item) => item.id === form.supplierId)?.skuName ? <code>{suppliers.find((item) => item.id === form.supplierId)?.skuName}</code> : null}
+                  </label>
+                ) : null}
                 <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} /> : null}<Link to={peoplePath('fornecedores')}>Gerenciar fornecedores</Link></p>
                 </div>
                 {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}

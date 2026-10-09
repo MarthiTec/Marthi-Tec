@@ -6701,6 +6701,9 @@ select.caixa-mov-input {
 .pickup-fields > label {display:grid;gap:8px;flex:1 1 180px;font-size:.75rem;font-weight:600;color:var(--mute);}
 .pickup-fields input {min-height:40px;border-radius:12px;font:inherit;font-size:.84rem;width:100%;}
 .stock-sku-automation input[type="checkbox"] {width:16px;height:16px;flex-shrink:0;accent-color:var(--accent);}
+.stock-sku-supplier {display:flex !important;flex-direction:row !important;align-items:center;gap:8px;margin-top:6px;font-size:.8rem;font-weight:600;color:var(--mute);}
+.stock-sku-supplier input[type="checkbox"] {width:16px;height:16px;min-height:0;margin:0;flex-shrink:0;accent-color:var(--accent);}
+.stock-sku-supplier code {padding:1px 6px;border-radius:6px;background:rgba(var(--accent-rgb,14,116,144),.1);color:var(--ink);font-size:.75rem;}
 
 @media(max-width:768px){.erp-app #panel-page-actions .page-heading-actions > .btn{min-height:44px !important;font-size:.84rem !important;padding:10px 12px !important;}}
 

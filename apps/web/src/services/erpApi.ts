@@ -542,6 +542,8 @@ export type ApiSupplier = Partial<ApiPersonDetails> & {
   id: string;
   name: string;
   tradeName: string;
+  /** Nome curto no SKU dos produtos; vazio = nome fantasia ou primeiro nome. */
+  skuName?: string;
   document: string;
   phone: string;
   email: string;

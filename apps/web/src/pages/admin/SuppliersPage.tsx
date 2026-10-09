@@ -18,11 +18,13 @@ import { hydrateErpRegistryFromApi } from '../../data/erpRegistry';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { apiCreateSupplier, apiDeleteSupplier, apiListSuppliers, apiUpdateSupplier, type ApiSupplier } from '../../services/erpApi';
 import { formatCpfCnpj } from '../../utils/documentUtils';
+import { supplierSkuName } from '../../data/productSku';
 
 type Mode = 'new' | 'edit' | 'view';
 type Form = {
   name: string;
   tradeName: string;
+  skuName: string;
   documentType: DocumentType;
   document: string;
   phone: string;
@@ -34,12 +36,13 @@ type Form = {
   active: boolean;
 };
 
-const EMPTY: Form = { name: '', tradeName: '', documentType: 'cnpj', document: '', phone: '', phones: [], email: '', emails: [], address: EMPTY_ADDRESS, notes: '', active: true };
+const EMPTY: Form = { name: '', tradeName: '', skuName: '', documentType: 'cnpj', document: '', phone: '', phones: [], email: '', emails: [], address: EMPTY_ADDRESS, notes: '', active: true };
 
 function formFrom(item: ApiSupplier): Form {
   return {
     name: item.name,
     tradeName: item.tradeName ?? '',
+    skuName: item.skuName ?? '',
     documentType: item.documentType === 'cpf' ? 'cpf' : 'cnpj',
     document: item.document ? formatCpfCnpj(item.document) : '',
     phone: item.phone ?? '',
@@ -143,6 +146,7 @@ export function SuppliersPage() {
     const body = {
       name: form.name.trim(),
       tradeName: form.tradeName.trim(),
+      skuName: form.skuName.trim(),
       documentType: form.documentType,
       document: form.document.trim(),
       phone: form.phone.trim(),
@@ -270,6 +274,19 @@ export function SuppliersPage() {
             <label>
               Nome fantasia
               <input value={form.tradeName} disabled={readOnly} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} />
+            </label>
+            <label>
+              Nome no SKU
+              <input
+                value={form.skuName}
+                maxLength={32}
+                disabled={readOnly}
+                placeholder={supplierSkuName({ tradeName: form.tradeName, name: form.name }) || 'Ex.: DISTRIB'}
+                onChange={(e) => setForm({ ...form, skuName: e.target.value.toUpperCase() })}
+              />
+              <small className="empty">
+                Entra no SKU dos produtos deste fornecedor. Em branco, usa o nome fantasia (ou só o primeiro nome).
+              </small>
             </label>
             <ContactListField kind="phone" primary={form.phone} extras={form.phones} disabled={readOnly} onChange={(phone, phones) => setForm({ ...form, phone, phones })} />
             <ContactListField kind="email" primary={form.email} extras={form.emails} disabled={readOnly} onChange={(email, emails) => setForm({ ...form, email, emails })} />

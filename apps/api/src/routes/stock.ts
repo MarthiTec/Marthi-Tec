@@ -1,5 +1,5 @@
 import { canManageArea } from '../services/employeeAccess.js';
-import {productSku} from '../services/productSku.js';
+import {productSku,supplierSkuName} from '../services/productSku.js';
 import {stockDetails} from '../services/stockDetails.js';
 import { validatePickupPrices } from '../services/pickup.js';
 import type { PoolClient } from 'pg';
@@ -37,6 +37,7 @@ const stockItemSchema = z.object({
   name: z.string().min(1, 'Nome do item é obrigatório.'),
   sku: z.string().max(200).default(''),
   skuAuto: z.boolean().optional(),
+  skuWithSupplier: z.boolean().optional(),
   avgCost: z.coerce.number().finite().nonnegative().optional(),
   pricingPolicy: z.object({basis:z.enum(['markup','margin']),percent:z.number().finite().nonnegative()}).refine(p=>p.basis!=='margin'||p.percent<100,'A margem deve ser menor que 100%.').nullable().optional(),
   barcode: z.string().default(''),
@@ -131,6 +132,7 @@ export function formatStockRow(row: any) {
     category: row.category || 'Geral',
     brand: row.brand || '',
     supplierId: row.supplier_id || row.supplierId || undefined,
+    skuWithSupplier: (row.sku_with_supplier ?? row.skuWithSupplier) !== false,
     trackLot: Boolean(row.track_lot ?? row.trackLot),
     isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
@@ -351,6 +353,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
               JSON.stringify(body.variations || []),
             ],
           );
+          if (body.skuWithSupplier === false) await client.query('UPDATE stock_items SET sku_with_supplier = false WHERE id = $1 AND store_id = $2', [id, storeId]);
 
           if (body.variations && body.variations.length > 0) {
             for (const v of body.variations) {
@@ -481,6 +484,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
             }
             await client.query('UPDATE stock_items SET supplier_id = $3 WHERE id = $1 AND store_id = $2', [id, storeId, supplierId]);
           }
+          if (body.skuWithSupplier !== undefined) await client.query('UPDATE stock_items SET sku_with_supplier = $3 WHERE id = $1 AND store_id = $2', [id, storeId, body.skuWithSupplier]);
           if(body.pickupPrices!==undefined){await validatePickupPrices(client,storeId,body.pickupPrices);await client.query('UPDATE stock_items SET pickup_prices=$1 WHERE id=$2 AND store_id=$3',[JSON.stringify(body.pickupPrices),id,storeId]);}
           // Se qty mudou, registra movimentação no kardex
           if (body.qty !== undefined && body.qty !== Number(curr.qty)) {
@@ -710,7 +714,14 @@ stockRouter.post('/api/v1/stock/inventory-adjustments', requireAuth, async (req,
 async function allocateSku(db:PoolClient,storeId:string,body:any,id:string){
  await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['sku:'+storeId]);
  const automatic=body.skuAuto===true||!body.sku?.trim();
- const base=automatic?productSku(body):body.sku.trim();
+ let supplier='';
+ const supplierId=body.supplierId!==undefined?body.supplierId:body.supplier_id;
+ const withSupplier=(body.skuWithSupplier??body.sku_with_supplier)!==false;
+ if(automatic&&withSupplier&&supplierId){
+  const row=(await db.query('SELECT name,trade_name,sku_name FROM suppliers WHERE id=$1 AND store_id=$2',[supplierId,storeId])).rows[0];
+  supplier=supplierSkuName(row&&{name:row.name,tradeName:row.trade_name,skuName:row.sku_name});
+ }
+ const base=automatic?productSku({...body,supplier}):body.sku.trim();
  const existing=await db.query('SELECT sku FROM stock_items WHERE store_id=$1 AND id<>$2 AND (sku=$3 OR sku LIKE $4)',[storeId,id,base,base+'-%']);
  const used=new Set(existing.rows.map(r=>r.sku));
  if(!automatic&&used.has(base))throw Object.assign(new Error('Este SKU já pertence a outro produto da loja.'),{status:409});

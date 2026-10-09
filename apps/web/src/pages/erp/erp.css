@@ -761,10 +761,18 @@
 }
 
 /* A Retaguarda ocupa sempre a tela inteira e não sai do lugar: quando o navegador rolava a
-   página ao focar um campo (ex.: nome do produto), o topo sumia e aparecia uma faixa branca. */
+   página ao focar um campo (ex.: nome do produto), o topo sumia e aparecia uma faixa branca.
+   "clip" (e não "hidden") porque uma caixa com overflow hidden ainda pode ser rolada pelo foco
+   ou por scrollIntoView; com clip só a área de conteúdo rola. */
 .erp-app {
   position: fixed;
   inset: 0;
   height: auto;
   max-height: none;
+  overflow: clip;
+}
+
+.erp-app__shell,
+.erp-app__main {
+  overflow: clip;
 }
