@@ -1679,26 +1679,6 @@ export function StockPage() {
                 />
                 <div className="stock-brand-field">
                 <AdminPicker
-                  label="Unidade de medida"
-                  value={form.unit ?? 'UN'}
-                  disabled={readOnly}
-                  options={[
-                    { value: 'UN', label: 'UN · inteiro' },
-                    { value: 'KG', label: 'KG · pesado' },
-                  ]}
-                  onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
-                />
-                <p className="empty quick-field__actions">
-                  <button type="button" className="quick-add-btn" disabled={readOnly} onClick={() => { setConversion({ unit: form.purchaseUnit ?? '', factor: Number(form.purchaseFactor) || 1 }); setUnitConversionOpen(true); }}>
-                    ⇄ Conversão de unidade
-                  </button>
-                  {form.purchaseUnit && Number(form.purchaseFactor) > 1 ? (
-                    <span className="stock-unit-conversion-chip">1 {form.purchaseUnit} = {formatQty(Number(form.purchaseFactor))} {form.unit ?? 'UN'}</span>
-                  ) : null}
-                </p>
-                </div>
-                <div className="stock-brand-field">
-                <AdminPicker
                   label={groupLabels.group}
                   value={form.groupId ?? ''}
                   placeholder="Nenhum"
@@ -1717,9 +1697,36 @@ export function StockPage() {
                   options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => item.parentId === form.groupId && (item.active || item.id === form.subgroupId)).map((item) => ({ value: item.id, label: item.name }))]}
                   onChange={(value) => setForm({ ...form, subgroupId: value })}
                 />
-                <p className="empty quick-field__actions">{!readOnly && form.groupId ? <QuickAddButton label={`Novo ${groupLabels.subgroup.toLowerCase()}`} onClick={() => openQuick('subgroup')} /> : null}</p>
+                <p className="empty quick-field__actions">
+                  {!readOnly ? (
+                    <span title={form.groupId ? undefined : `Escolha o ${groupLabels.group.toLowerCase()} para cadastrar o ${groupLabels.subgroup.toLowerCase()} dentro dele`}>
+                      <QuickAddButton label={`Novo ${groupLabels.subgroup.toLowerCase()}`} disabled={!form.groupId} onClick={() => openQuick('subgroup')} />
+                    </span>
+                  ) : null}
+                  <Link to={specsPath('grupos')}>Gerenciar</Link>
+                </p>
                 </div>
-                <label className="span-2 stock-id-totem">
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label="Unidade de medida"
+                  value={form.unit ?? 'UN'}
+                  disabled={readOnly}
+                  options={[
+                    { value: 'UN', label: 'UN · inteiro' },
+                    { value: 'KG', label: 'KG · pesado' },
+                  ]}
+                  onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
+                />
+                <p className="empty quick-field__actions">
+                  <button type="button" className="quick-add-btn" disabled={readOnly} onClick={() => { setConversion({ unit: form.purchaseUnit ?? '', factor: Number(form.purchaseFactor) || 1 }); setUnitConversionOpen(true); }}>
+                    ⇄ Conversão de unidade
+                  </button>
+                  {form.purchaseUnit && Number(form.purchaseFactor) > 1 ? (
+                    <span className="stock-unit-conversion-chip">1 {form.purchaseUnit} = {formatQty(Number(form.purchaseFactor))} {form.unit ?? 'UN'}</span>
+                  ) : null}
+                </p>
+                </div>
+                <label className="stock-id-totem">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type="checkbox"
