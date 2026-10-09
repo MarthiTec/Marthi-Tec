@@ -16,6 +16,7 @@ import {
   apiCreateExternalSale,
   apiGetSaleReceipt,
   apiListCustomers,
+  apiListSellers,
   apiListStock,
   type ExternalSaleLine,
   type TradeInPayload,
@@ -78,6 +79,9 @@ export function ExternalSalePage() {
 
   // Estados Base
   const [customers, setCustomers] = useState<any[]>([]);
+  // Vendedores cadastrados (Pessoas › Vendedores). Vazio = quem está logado.
+  const [sellers, setSellers] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState('');
   const [stockItems, setStockItems] = useState<StockOption[]>([]);
   const [attributeDefs,setAttributeDefs]=useState<ProductAttribute[]>([]);
   useEffect(()=>{let disposed=false;setAttributeDefs([]);void hydrateAttributesFromApi().then(()=>{if(!disposed)setAttributeDefs(getAttributes().filter(a=>a.active&&a.useOnStock));});return()=>{disposed=true;};},[storeId]);
@@ -172,6 +176,9 @@ export function ExternalSalePage() {
 
         if (storeRef.current !== storeId) return;
         setCustomers(Array.isArray(custRes) ? custRes : []);
+        void apiListSellers(true)
+          .then((rows) => storeRef.current === storeId && setSellers(rows.map((row) => ({ id: row.id, name: row.name }))))
+          .catch(() => undefined);
 
         const mappedStock: StockOption[] = (Array.isArray(stkRes) ? stkRes : []).map((it: any) => ({
           id: it.id,
@@ -224,6 +231,8 @@ export function ExternalSalePage() {
       setCustomerName(found.name);
       setCustomerPhone(found.phone || '');
       setCustomerDocument(found.document || '');
+      // Cliente com vendedor vinculado: a venda já vem com ele (pode trocar).
+      if (found.sellerId && sellers.some((seller) => seller.id === found.sellerId)) setSelectedSellerId(found.sellerId);
     }
   }
 
@@ -393,8 +402,8 @@ export function ExternalSalePage() {
         customerName: customerName.trim() || 'Consumidor Final',
         customerPhone: customerPhone.trim(),
         customerDocument: customerDocument.trim(),
-        sellerId: null,
-        sellerName: sellerName.trim(),
+        sellerId: selectedSellerId || null,
+        sellerName: (sellers.find((seller) => seller.id === selectedSellerId)?.name ?? sellerName).trim(),
         paymentMethod,
         installments: Number(installments) || 1,
         discount: Number(generalDiscount) || 0,
@@ -443,6 +452,7 @@ export function ExternalSalePage() {
     setSavedSaleId(null);
     setLines([{ name: '', qty: 1, unitPrice: 0, stockId: '' }]);
     setSelectedCustomerId('');
+    setSelectedSellerId('');
     setCustomerName('Consumidor Final');
     setCustomerPhone('');
     setCustomerDocument('');
@@ -500,8 +510,20 @@ export function ExternalSalePage() {
             <h2 className="xsale-card__title"><span className="xsale-step">1</span> Cliente e vendedor</h2>
             <div className="xsale-grid">
               <div className="xsale-field">
-                <label className="admin-label">Vendedor responsável</label>
-                <input type="text" className="admin-input" value={sellerName} readOnly placeholder="Nome do responsável pela venda" required />
+                <AdminPicker
+                  label="Vendedor responsável"
+                  value={selectedSellerId}
+                  options={[
+                    { value: '', label: sellerName ? `${sellerName} (você)` : 'Quem está logado' },
+                    ...sellers.map((seller) => ({ value: seller.id, label: seller.name })),
+                  ]}
+                  onChange={setSelectedSellerId}
+                />
+                {sellers.length === 0 ? (
+                  <small className="xsale-muted">
+                    Nenhum vendedor cadastrado. <Link to="/erp/pessoas?aba=vendedores">Cadastrar vendedores</Link>
+                  </small>
+                ) : null}
               </div>
               <div className="xsale-field">
                 <AdminPicker

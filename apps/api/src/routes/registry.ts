@@ -99,15 +99,18 @@ registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
 
     if (pool) {
       const sql = `
-        SELECT id, name, phone, email, document, role, is_system_user, user_email,
-               access_areas, permissions, active, seller_id, created_at, updated_at
-        FROM employees
-        WHERE (store_id = $1 OR store_id IN (SELECT id FROM stores WHERE client_account_id = $2))
-        ${activeOnly ? 'AND active = true' : ''}
-        ORDER BY name ASC
+        SELECT e.id, e.name, e.phone, e.email, e.document, e.role, e.is_system_user, e.user_email,
+               e.access_areas, e.permissions, e.active, e.seller_id, e.created_at, e.updated_at,
+               -- Funcionário com login: vale a situação do login (login desativado = inativo).
+               (SELECT u.active FROM users u WHERE lower(u.email) = lower(COALESCE(NULLIF(e.user_email, ''), e.email)) LIMIT 1) AS login_active
+        FROM employees e
+        WHERE (e.store_id = $1 OR e.store_id IN (SELECT id FROM stores WHERE client_account_id = $2))
+        ORDER BY e.name ASC
       `;
       const result = await pool.query(sql, [storeId, clientAccountId]);
-      const rows = [...result.rows];
+      const rows = result.rows
+        .map((r) => ({ ...r, active: Boolean(r.active) && !(r.is_system_user && r.login_active === false) }))
+        .filter((r) => !activeOnly || r.active);
 
 
       res.json({

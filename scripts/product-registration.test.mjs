@@ -480,3 +480,17 @@ test('same product from different suppliers: entries per variation with cost, qu
   assert.equal(other.status, 409);
   assert.equal((await request('/stock', 'POST', { name: 'IMEI demais', qty: 1, supplierEntries: [{ qty: 1, unitCost: 1, imeis: ['1', '2'] }] })).status, 400);
 });
+
+test('help center: Marthi contacts come from the database, store requests are saved, only the platform admin edits contacts', async () => {
+  const contacts = await request('/support/contacts');
+  assert.equal(contacts.status, 200, JSON.stringify(contacts.json));
+  assert.equal(contacts.json.data.email, 'marthi.tecnologia@gmail.com');
+  assert.equal(contacts.json.data.instagram, 'marthi.tecnologia');
+  assert.match(contacts.json.data.whatsappUrl, /^https:\/\/wa\.me\/55\d+$/);
+  assert.equal((await request('/support/contacts', 'PUT', { email: 'x@y.com', instagram: 'x', whatsapp: '24999999999' })).status, 403);
+  const ticket = await request('/support/tickets', 'POST', { topic: 'ajuste', message: 'Preciso de ajuda no cadastro' });
+  assert.equal(ticket.status, 201, JSON.stringify(ticket.json));
+  const list = (await request('/support/tickets')).json.data;
+  assert.equal(list[0].message, 'Preciso de ajuda no cadastro');
+  assert.equal((await request('/support/tickets', 'GET', undefined, 'store-b')).status, 403);
+});

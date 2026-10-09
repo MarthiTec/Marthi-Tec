@@ -7166,3 +7166,16 @@ select.caixa-mov-input {
 
 /* Entradas por fornecedor no produto simples */
 .stock-entries-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line, #d8dde3); font-size: 0.88rem; }
+
+/* O painel ocupa sempre a tela inteira e não sai do lugar: quando o navegador rolava a página
+   (foco num campo, janela aberta por cima), o painel subia e aparecia uma faixa branca embaixo.
+   "clip" não deixa o foco/scrollIntoView rolar a caixa; só a área de trabalho rola. */
+@media screen {
+  .admin:not(.admin--loading) {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    min-height: 0;
+    overflow: clip;
+  }
+}

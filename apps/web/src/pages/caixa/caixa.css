@@ -2846,3 +2846,14 @@
 
 
 
+
+/* Menu lateral com a mesma medida e tipografia da Retaguarda (268px, itens 0,9rem/650). */
+.caixa-app__ops-nav { padding: 8px 10px 14px; }
+.caixa-app__ops-nav button,
+.caixa-app__ops-nav a.caixa-app__ops-central {
+  min-height: 42px;
+  padding: 0 12px;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}

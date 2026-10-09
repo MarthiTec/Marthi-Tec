@@ -9679,3 +9679,14 @@
     page-break-inside: avoid !important;
   }
 }
+
+/* Menu lateral com a mesma medida e tipografia da Retaguarda (268px, itens 0,9rem/650). */
+.os-app__ops-nav { padding: 8px 10px 14px; gap: 4px; }
+.os-app__ops-nav button,
+.os-app__ops-nav a.os-app__ops-central {
+  min-height: 42px;
+  padding: 0 12px;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
