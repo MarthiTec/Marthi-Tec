@@ -174,6 +174,8 @@ export function StockPage() {
   const [conditionFilter, setConditionFilter] = useState<'all' | StockCondition>('all');
   // Todos os filtros começam em "Todos" (inclusive o do totem), para nenhum produto sumir da lista.
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
+  // Produto excluído com histórico fica inativo: por padrão a lista mostra só os ativos.
+  const [statusFilter, setStatusFilter] = useState<CrudStatusFilter>('active');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -386,6 +388,8 @@ export function StockPage() {
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
       if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
       if (brandFilter !== 'all' && normalizeBrand(item.brand) !== normalizeBrand(brandFilter)) return false;
+      if (statusFilter === 'active' && item.active === false) return false;
+      if (statusFilter === 'inactive' && item.active !== false) return false;
       if (totemFilter === 'totem' && !item.showOnTotem) return false;
       if (totemFilter === 'hidden' && item.showOnTotem) return false;
       if (attrFilterId !== 'all') {
@@ -402,7 +406,7 @@ export function StockPage() {
         query,
       );
     });
-  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, attrFilterId, attrFilterValue, codeQuery, query]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, attrFilterId, attrFilterValue, codeQuery, query]);
 
   function focusNameField() {
     requestAnimationFrame(() => {
@@ -1275,6 +1279,20 @@ export function StockPage() {
                     </label>
                   ) : null}
                   <label className="admin-field crud-filter-field">
+                    Situação
+                    <AdminPicker
+                      compact
+                      label="Situação"
+                      value={statusFilter}
+                      options={[
+                        { value: 'active', label: 'Ativos' },
+                        { value: 'inactive', label: 'Inativos' },
+                        { value: 'all', label: 'Todos' },
+                      ]}
+                      onChange={(value) => setStatusFilter(value as CrudStatusFilter)}
+                    />
+                  </label>
+                  <label className="admin-field crud-filter-field">
                     Totem
                     <AdminPicker
                       compact
@@ -1372,6 +1390,7 @@ export function StockPage() {
                         {item.brand ? (
                           <span className="stock-brand-badge">{findBrand(brands, item.brand)?.name ?? item.brand}</span>
                         ) : null}
+                        {item.active === false ? <span className="stock-inactive-badge" title="Produto inativo: não aparece no PDV, no totem nem nas vendas">Inativo</span> : null}
                         {item.condition === 'refurbished' ? (
                           <span className="empty" style={{ fontSize: '0.75rem' }}>
                             Recondicionado

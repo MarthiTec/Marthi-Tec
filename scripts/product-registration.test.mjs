@@ -574,3 +574,20 @@ test('condition and battery per variation: new is 100%, used keeps its level; sa
   const hidden = await request('/stock/' + row.id, 'PATCH', { showConditionOnTotem: false });
   assert.equal(hidden.json.data.showConditionOnTotem, false);
 });
+
+test('a product whose only movements are its own registration (opening balance, supplier entries) is really deleted', async () => {
+  const sup = (await request('/suppliers', 'POST', { name: 'Fornecedor Exclusao' })).json.data;
+  const created = (await request('/stock', 'POST', { name: 'Para excluir de verdade', qty: 3, cost: 10, price: 20, supplierEntries: [{ supplierId: sup.id, qty: 2, unitCost: 10, imeis: [] }] })).json.data;
+  assert.ok((await query('SELECT count(*)::int n FROM stock_movements WHERE stock_id = $1', [created.id])).rows[0].n >= 2);
+  const res = await request('/stock/' + created.id, 'DELETE');
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  assert.equal(res.json.data.deactivated, undefined);
+  assert.equal((await query('SELECT count(*)::int n FROM stock_items WHERE id = $1', [created.id])).rows[0].n, 0);
+  assert.equal((await query('SELECT count(*)::int n FROM stock_movements WHERE stock_id = $1', [created.id])).rows[0].n, 0);
+
+  // Já inativado antes pela regra antiga: excluir de novo apaga.
+  const old = (await request('/stock', 'POST', { name: 'Inativado pela regra antiga', qty: 1, price: 5 })).json.data;
+  await query('UPDATE stock_items SET active = false WHERE id = $1', [old.id]);
+  assert.equal((await request('/stock/' + old.id, 'DELETE')).json.data.deactivated, undefined);
+  assert.equal((await query('SELECT count(*)::int n FROM stock_items WHERE id = $1', [old.id])).rows[0].n, 0);
+});

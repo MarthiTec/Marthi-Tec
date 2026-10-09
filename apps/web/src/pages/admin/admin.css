@@ -7210,3 +7210,5 @@ select.caixa-mov-input {
 .stock-qty-desc__edit:hover { background: rgba(14, 116, 144, 0.1); }
 .stock-variation-container .stock-qty-desc { width: 100%; box-sizing: border-box; text-align: left; }
 .stock-variation-container .stock-qty-desc__text { align-items: flex-start; }
+
+.stock-inactive-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: rgba(100, 116, 139, 0.16); color: var(--mute, #64748b); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
