@@ -538,3 +538,39 @@ test('trade-in device with the name of an existing product enters that product s
   assert.equal(sale3.status, 201, JSON.stringify(sale3.json));
   assert.equal((await query("SELECT count(*)::int n FROM stock_items WHERE store_id = 'store-a' AND name = 'Moto G Antigo (Trade-in)'")).rows[0].n, 1);
 });
+
+test('condition and battery per variation: new is 100%, used keeps its level; sale must pick the condition when new and used share color/capacity', async () => {
+  await query("INSERT INTO product_attributes(id,store_id,name,active,use_on_external_sale) VALUES('ATTR-cor-cd','store-a','Cor',true,true),('ATTR-cap-cd','store-a','Capacidade',true,true)");
+  const row = (await request('/stock', 'POST', {
+    name: 'IPHONE 15 CONDICAO', kind: 'device', qty: 0, price: 5000, showOnTotem: true,
+    variations: [
+      { attrs: { 'ATTR-cor-cd': 'Preto', 'ATTR-cap-cd': '128 GB' }, price: 5000, cost: 4000, qty: 2, minQty: 0, condition: 'new', batteryLevel: 70 },
+      { attrs: { 'ATTR-cor-cd': 'Preto', 'ATTR-cap-cd': '128 GB' }, price: 3500, cost: 2500, qty: 1, minQty: 0, condition: 'used', batteryLevel: 87 },
+    ],
+  })).json.data;
+  const news = row.variations.find((v) => v.condition === 'new');
+  const used = row.variations.find((v) => v.condition === 'used');
+  assert.equal(news.batteryLevel, 100, 'new is always 100%');
+  assert.equal(used.batteryLevel, 87);
+  assert.equal(row.showConditionOnTotem, true, 'shown on the totem by default');
+
+  const catalog = await (await fetch(base.replace('/api/v1', '') + '/api/v1/totem/catalog?storeId=store-a')).json();
+  const pub = catalog.data.find((p) => p.id === row.id);
+  assert.equal(pub.variations.find((v) => v.condition === 'used').batteryLevel, 87);
+
+  const attrs = [{ id: 'ATTR-cor-cd', name: 'Cor', value: 'Preto' }, { id: 'ATTR-cap-cd', name: 'Capacidade', value: '128 GB' }];
+  const sell = (extra) => request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: row.id, name: row.name, qty: 1, unitPrice: 3500, attributes: [...attrs, ...extra] }] });
+  const noCondition = await sell([]);
+  assert.equal(noCondition.status, 400);
+  assert.match(noCondition.json.error.message, /condição/i);
+  const sold = await sell([{ id: '__condition', name: 'Condição', value: 'Usado' }]);
+  assert.equal(sold.status, 201, JSON.stringify(sold.json));
+  const after = (await request('/stock')).json.data.find((p) => p.id === row.id);
+  assert.equal(after.variations.find((v) => v.condition === 'used').qty, 0, 'the used one was sold');
+  assert.equal(after.variations.find((v) => v.condition === 'new').qty, 2);
+  const line = (await query('SELECT attributes FROM sales_order_lines WHERE sale_id = $1', [sold.json.data.id || sold.json.data.saleId])).rows[0];
+  assert.ok(line.attributes.some((a) => a.id === '__condition' && a.value === 'Usado'));
+
+  const hidden = await request('/stock/' + row.id, 'PATCH', { showConditionOnTotem: false });
+  assert.equal(hidden.json.data.showConditionOnTotem, false);
+});

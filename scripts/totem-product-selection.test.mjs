@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-const exports={};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('apps/web/src/data/productPickup.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports});
+const cjs=(file,ctx)=>{const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,...ctx});return exports;};
+const condition=cjs('apps/web/src/data/productCondition.ts');
+const exports=cjs('apps/web/src/data/productPickup.ts',{require:(name)=>name==='./productCondition'?condition:{}});
 const methods=[{id:'hand',kind:'immediate',active:true},{id:'order',kind:'order',active:true},{id:'delivery',kind:'delivery',active:true}];
 test('only configured positive pickup prices appear, with immediate collection for legacy rows',()=>{
  assert.deepEqual(Array.from(exports.productPickupMethods(methods,{price:7500}),m=>m.id),['hand']);

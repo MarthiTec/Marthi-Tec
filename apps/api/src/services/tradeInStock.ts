@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { attributeValueKey } from './attributeValues.js';
+import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode } from './productCondition.js';
 
 type Db = Pick<PoolClient, 'query'>;
 
@@ -57,7 +58,10 @@ export async function receiveTradeInIntoExistingProduct(
     // Sem cor/capacidade não dá para saber em qual grade entra: cadastro próprio, como antes.
     if (!Object.keys(wanted).length) return null;
     attributes = Object.entries(wanted).map(([id, v]) => ({ id, value: v }));
-    const index = variations.findIndex((variation) => Object.entries(wanted).every(([id, val]) => same(variation.attrs?.[id], val)));
+    // Aparelho da troca é usado: entra na variação usada/recondicionada da mesma cor/capacidade (nunca na "novo").
+    const index = variations.findIndex(
+      (variation) => Object.entries(wanted).every(([id, val]) => same(variation.attrs?.[id], val)) && (conditionCode(variation.condition) || 'new') !== 'new',
+    );
     if (index >= 0) {
       const variation = variations[index];
       const vQty = Number(variation.qty) || 0;
@@ -65,6 +69,7 @@ export async function receiveTradeInIntoExistingProduct(
       variations[index] = { ...variation, qty: vQty + 1, cost: vCost, avgCost: vCost };
       // A grade usa os valores já cadastrados (ex.: "128 GB" do produto, não "128GB" da troca).
       attributes = Object.keys(wanted).map((id) => ({ id, value: String(variation.attrs?.[id] ?? wanted[id]) }));
+      attributes.push({ id: CONDITION_ATTR_ID, value: CONDITION_LABEL[conditionCode(variation.condition) || 'used'] });
       if (variation.id) {
         await db.query('UPDATE stock_item_variations SET qty = $4, cost = $5, avg_cost = $5, updated_at = now() WHERE store_id = $1 AND stock_item_id = $2 AND id = $3', [storeId, product.id, variation.id, vQty + 1, vCost]);
       }
@@ -83,6 +88,7 @@ export async function receiveTradeInIntoExistingProduct(
         pickupPrices: {},
       };
       variations.push(created);
+      attributes.push({ id: CONDITION_ATTR_ID, value: CONDITION_LABEL.used });
       await db.query(
         `INSERT INTO stock_item_variations (id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty, condition, imei)
          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $6, 1, 0, 'used', $7)`,

@@ -214,7 +214,8 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at,
+                 battery_level, show_condition_on_totem
           FROM stock_items
           WHERE store_id = $1
             AND active = true
@@ -222,7 +223,15 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
           ORDER BY name ASC
         `;
         const result = await pool.query(sql, [storeId]);
-        res.json({ success: true, data: result.rows.map(formatStockRow) });
+        // Catálogo público: sem custo, fornecedor e dados de compra (só o que a vitrine mostra).
+        const publicRow = (row: ReturnType<typeof formatStockRow>) => {
+          const { cost: _c, avgCost: _a, pricingPolicy: _p, lastEntry: _l, lastPurchaseAt: _la, lastPurchaseCost: _lc, supplierId: _s, ...rest } = row;
+          return {
+            ...rest,
+            variations: rest.variations.map(({ cost: _vc, avgCost: _va, pricingPolicy: _vp, lastEntry: _vl, ...variation }: any) => variation),
+          };
+        };
+        res.json({ success: true, data: result.rows.map((row) => publicRow(formatStockRow(row))) });
         return;
       } catch (dbErr) {
         throw dbErr;

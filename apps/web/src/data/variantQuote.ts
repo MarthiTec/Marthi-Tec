@@ -1,4 +1,5 @@
 import type { StockItem } from './adminStore';
+import { CONDITION_ATTR_ID, conditionCode } from './productCondition';
 import {
   getAttributes,
   stockAttributes,
@@ -66,7 +67,9 @@ export function findStockVariant(
     const ranked = master.variations
       .map((v) => {
         let score = 0;
-        let miss = false;
+        // Condição escolhida (novo/usado) quando a grade tem as duas para a mesma cor/capacidade.
+        const wantedCondition = conditionCode(config[CONDITION_ATTR_ID]);
+        let miss = Boolean(wantedCondition) && (conditionCode(v.condition) || 'new') !== wantedCondition;
         for (const attr of matchAttrs) {
           const selected = config[attr.id];
           const stored = v.attrs?.[attr.id];
@@ -89,6 +92,7 @@ export function findStockVariant(
         qty: bestVar.qty,
         minQty: bestVar.minQty,
         condition: bestVar.condition,
+        batteryLevel: bestVar.batteryLevel ?? null,
         cardRate: bestVar.cardRate ?? master.cardRate,
         attrs: { ...master.attrs, ...bestVar.attrs },
         barcode: bestVar.barcode || master.barcode,

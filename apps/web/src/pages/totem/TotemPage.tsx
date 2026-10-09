@@ -53,6 +53,7 @@ import { apiGetTotemBrands } from '../../services/erpApi';
 import { apiUnlockTotem } from '../../services/erpApi';
 import { TotemKeyboard } from './TotemKeyboard';
 import { TotemPicker } from './TotemPicker';
+import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode, conditionText, productConditionChoices, type ProductConditionCode } from '../../data/productCondition';
 import {
   INSTALLMENTS,
   PAYMENT_OPTIONS,
@@ -151,12 +152,19 @@ function catalogFingerprint(items: { id: number; name: string; cashPrice: number
   return items.map((item) => `${item.id}:${item.name}:${item.cashPrice}:${item.totalQty ?? ''}`).join('|');
 }
 
+/** Condições que o cliente pode escolher no card (só quando o produto tem mais de uma). */
+function totemConditionChoices(product: TotemProduct): ProductConditionCode[] {
+  return productConditionChoices(listTotemStock().find((item) => item.id === product.stockId));
+}
+
 function defaultConfig(product: TotemProduct, attrs: ProductAttribute[]): CardConfig {
   const next: CardConfig = {};
   for (const attr of attrs) {
     const values = resolveTotemAttrOptions(product, attr);
     if (values[0]) next[attr.id] = values[0];
   }
+  const conditions = totemConditionChoices(product);
+  if (conditions[0]) next[CONDITION_ATTR_ID] = conditions[0];
   return next;
 }
 
@@ -175,7 +183,16 @@ function pickedFromConfig(
         value: values.includes(config[attr.id]) ? config[attr.id] : values[0],
       };
     })
-    .filter((item): item is PickedAttribute => Boolean(item));
+    .filter((item): item is PickedAttribute => Boolean(item))
+    .concat(
+      (() => {
+        const conditions = totemConditionChoices(product);
+        if (!conditions.length) return [];
+        const chosen = conditionCode(config[CONDITION_ATTR_ID]);
+        const code = chosen && conditions.includes(chosen) ? chosen : conditions[0];
+        return [{ id: CONDITION_ATTR_ID, name: 'Condição', value: CONDITION_LABEL[code] }];
+      })(),
+    );
 }
 
 export function TotemPage() {
@@ -1431,8 +1448,18 @@ export function TotemPage() {
                     <div className="totem-card__body">
                       {offer&&<div className="totem-card__offer"><strong>OFERTA DO DIA</strong><span>{offer.name}</span><small>Termina em {Math.max(1,Math.ceil((Date.parse(offer.endDate)-offerNow)/60000))} min</small></div>}
                       <h2 title={product.name}>{product.name}</h2>
+                      {(() => {
+                        // Condição e bateria da opção escolhida (a loja pode esconder no cadastro do produto).
+                        const master = listTotemStock().find((item) => item.id === product.stockId);
+                        if (!master || master.showConditionOnTotem === false) return null;
+                        const chosen = quote.stock?.variations?.[0] ?? quote.stock ?? master;
+                        const code = conditionCode(chosen?.condition) || 'new';
+                        return (
+                          <p className={`totem-card__condition is-${code}`}>{conditionText(code, chosen?.batteryLevel ?? (code === 'new' ? 100 : null))}{code === 'new' ? ' · bateria 100%' : ''}</p>
+                        );
+                      })()}
 
-                      <div className="totem-card__fields" data-count={pickers.length + 1 + (showDineIn ? 1 : 0)}>
+                      <div className="totem-card__fields" data-count={pickers.length + 1 + (showDineIn ? 1 : 0) + (totemConditionChoices(product).length ? 1 : 0)}>
                         {pickers.map((attr) => {
                           const options = resolveTotemAttrOptions(product, attr);
                           return (
@@ -1450,6 +1477,23 @@ export function TotemPage() {
                             />
                           );
                         })}
+                        {(() => {
+                          const conditions = totemConditionChoices(product);
+                          if (!conditions.length) return null;
+                          const chosen = conditionCode(config[CONDITION_ATTR_ID]) || conditions[0];
+                          return (
+                            <TotemPicker
+                              label="Condição"
+                              value={CONDITION_LABEL[chosen]}
+                              options={conditions.map((code) => CONDITION_LABEL[code])}
+                              onChange={(value) => {
+                                bumpIdle();
+                                const code = conditionCode(value);
+                                if (code) patchConfig(product.id, CONDITION_ATTR_ID, code);
+                              }}
+                            />
+                          );
+                        })()}
                         <TotemPicker
                           label="Tipo de retirada"
                           value={availablePickup.find(method => method.id === config['pickup-method'])?.name || 'Selecionar'}

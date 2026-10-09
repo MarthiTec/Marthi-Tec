@@ -2567,3 +2567,19 @@ body.totem-html-scroll.totem-html-dark #root {
 .totem-card__media .totem-carousel__slide {
   background: transparent !important;
 }
+
+/* Condição e bateria da opção escolhida no card */
+.totem-card__condition {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: -2px 0 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+.totem-card__condition.is-used { background: rgba(234, 88, 12, 0.12); color: #c2410c; }
+.totem-card__condition.is-refurbished { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }

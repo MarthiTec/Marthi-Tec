@@ -5,6 +5,8 @@ import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../c
 import {ProductPickupPrices,PickupPriceList,offeredPickupIds} from '../../components/PickupFields';
 import { QuickModal } from '../../components/QuickModal';
 import { SupplierEntriesModal, supplierEntriesLabel, supplierEntriesSummary } from '../../components/SupplierEntriesModal';
+import { conditionCode } from '../../data/productCondition';
+import { AdjustableValue } from '../../components/AdjustableValue';
 import type { SupplierEntry } from '../../data/adminStore';
 import { usePickupMethods } from '../../data/pickup';
 import { buildVariationCombinations } from '../../data/variationCombinations';
@@ -213,6 +215,9 @@ export function StockPage() {
   const {methods:pickupMethods}=usePickupMethods();
   // Preço por retirada de uma linha da grade de variações (janela rápida).
   const [pickupEdit, setPickupEdit] = useState<{ index: number; prices: Record<string, number | null>; base: number } | null>(null);
+  // Custo e quantidade da grade vêm das entradas por fornecedor; o usuário destrava para ajustar à mão.
+  const [manualAdjust, setManualAdjust] = useState<Set<string>>(() => new Set());
+  const unlock = (key: string) => setManualAdjust((current) => new Set(current).add(key));
   // Entradas por fornecedor sendo editadas: de uma variação da grade ou do produto simples.
   const [entriesEdit, setEntriesEdit] = useState<{ index: number | 'simple' } | null>(null);
 
@@ -415,7 +420,7 @@ export function StockPage() {
     setMode('new');
     setError('');
     setUseVariations(automationState.eligible && automationState.enabled);
-    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:1,minQty:1,cost:0,condition:'new'}] : []);
+    setVariations(automationState.eligible && automationState.enabled ? [{tempKey:`auto_${Date.now()}`,barcode:'',imei:'',attrs:{},price:0,cardRate:0,qty:0,minQty:1,cost:0,condition:'new'}] : []);
     setOriginalVariationIds([]);
     setSelectedAttrIds((automationState.enabled ? attrDefs : attrDefs.slice(0, 2)).map((a) => a.id));
   }
@@ -527,7 +532,8 @@ export function StockPage() {
       attrs: newAttrs,
       price: lastRow?.price || form.price || 0,
       cardRate: lastRow?.cardRate ?? form.cardRate,
-      qty: 1,
+      // Quantidade entra pelas entradas de fornecedor.
+      qty: 0,
       minQty: 1,
       cost: lastRow?.cost || form.cost || 0,
       condition: lastRow?.condition || form.condition || 'new',
@@ -614,7 +620,7 @@ export function StockPage() {
         attrs: comboAttrs,
         price: form.price || 0,
         cardRate: form.cardRate,
-        qty: 1,
+        qty: 0,
         minQty: 1,
         cost: form.cost || 0,
         condition: form.condition || 'new',
@@ -653,6 +659,7 @@ export function StockPage() {
         minQty: v.minQty,
         cost: v.cost,
         condition: v.condition,
+        batteryLevel: v.batteryLevel ?? null,
         supplierEntries: v.supplierEntries,
       }));
       setVariations(rows);
@@ -769,6 +776,8 @@ export function StockPage() {
       supplierId: item.supplierId ?? '',
       skuWithSupplier: item.skuWithSupplier !== false,
       supplierEntries: item.supplierEntries,
+      batteryLevel: item.batteryLevel ?? null,
+      showConditionOnTotem: item.showConditionOnTotem !== false,
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       entryDate: item.entryDate ?? '',
@@ -855,6 +864,7 @@ export function StockPage() {
             pickupPrices: row.pickupPrices ?? {},
             pickupMethodId: row.pickupMethodId || undefined,
             pricingPolicy: row.pricingPolicy ?? null,
+            batteryLevel: (conditionCode(row.condition || form.condition) || 'new') === 'new' ? 100 : row.batteryLevel ?? null,
             supplierEntries: row.supplierEntries,
           }))
         : [];
@@ -1784,8 +1794,23 @@ export function StockPage() {
                     { value: 'used', label: STOCK_CONDITION_LABEL.used },
                     { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
                   ]}
-                  onChange={(value) => setForm({ ...form, condition: value as StockCondition })}
+                  onChange={(value) => setForm({ ...form, condition: value as StockCondition, batteryLevel: value === 'new' ? 100 : form.condition === 'new' ? null : form.batteryLevel ?? null })}
                 />
+                {form.condition !== 'new' ? (
+                  <label>
+                    Nível de bateria (%)
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      inputMode="numeric"
+                      value={form.batteryLevel ?? ''}
+                      placeholder="Ex.: 87"
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
+                    />
+                  </label>
+                ) : null}
                 <div className="stock-brand-field">
                 <AdminPicker
                   label="Unidade de medida"
@@ -1816,6 +1841,17 @@ export function StockPage() {
                     />
                     Exibir no totem
                   </span>
+                  {form.showOnTotem ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={form.showConditionOnTotem !== false}
+                        disabled={readOnly}
+                        onChange={(e) => setForm({ ...form, showConditionOnTotem: e.target.checked })}
+                      />
+                      Mostrar condição (novo/usado) e bateria no totem
+                    </span>
+                  ) : null}
                 </label>
               </div>
               </div>
@@ -1955,13 +1991,16 @@ export function StockPage() {
                         const def = attrDefs.find((a) => a.id === attrId);
                         return <th key={attrId}>{def?.name || attrId}</th>;
                       })}
-                      <th>Tipo de retirada</th>
-                      <th>Fornecedores</th>
-                      <th>Custo unitário</th>
+                      {selectedAttrIds.length % 2 ? <th aria-hidden="true" /> : null}
+                      <th>Condição</th>
+                      <th>Bateria (%)</th>
                       <th>Preço à vista</th>
-                      <th>Parcelado (18x)</th>
+                      <th>Tipo de retirada</th>
+                      <th>Custo unitário</th>
+                      <th>Fornecedores</th>
                       <th>Qtd</th>
                       <th>Mín</th>
+                      <th>Parcelado (18x)</th>
                       <th>Margem / markup</th>
                       <th>Sugestão de venda</th>
                       <th>Última entrada / nota</th>
@@ -1971,7 +2010,7 @@ export function StockPage() {
                   <tbody>
                     {variations.length === 0 ? (
                       <tr>
-                        <td colSpan={selectedAttrIds.length + 10 + (readOnly ? 0 : 1)} className="empty">
+                        <td colSpan={selectedAttrIds.length + (selectedAttrIds.length % 2) + 12 + (readOnly ? 0 : 1)} className="empty">
                           Nenhuma linha na grade. Clique em "+ Nova Linha de Variação" para adicionar.
                         </td>
                       </tr>
@@ -1981,7 +2020,7 @@ export function StockPage() {
                         const installmentText = formatInstallment(rowPrice, 18, (row.cardRate??form.cardRate) || undefined);
 
                         return (
-                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil((selectedAttrIds.length + 10) / 2)}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
+                          <tr key={row.tempKey} className="stock-variation-row" style={{ gridTemplateColumns: `repeat(${Math.ceil(selectedAttrIds.length / 2) + 6}, minmax(0, 1fr))${readOnly ? "" : " minmax(64px, 0.65fr)"}` }}>
                             {selectedAttrIds.map((attrId, attrIdx) => {
                               const def = attrDefs.find((a) => a.id === attrId);
                               const options = referenceValues(def).map((v) => ({
@@ -2023,13 +2062,43 @@ export function StockPage() {
                                 </td>
                               );
                             })}
-                            <td data-label="Tipo de retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title="Definir onde esta variação é vendida e o preço de cada forma" onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}>{names.length?names.join(' · '):'Nenhuma'} <span aria-hidden>✎</span></button>;})()}</td>
-                            <td data-label="Fornecedores">
-                              <button type="button" className="pickup-price-summary" disabled={readOnly && !row.supplierEntries?.length} title="Compras desta variação por fornecedor: data, quantidade, custo e IMEIs" onClick={() => setEntriesEdit({ index })}>
-                                {supplierEntriesLabel(row.supplierEntries)} <span aria-hidden>✎</span>
-                              </button>
+                            {selectedAttrIds.length % 2 ? <td className="stock-variation-spacer" aria-hidden="true" /> : null}
+                            <td data-label="Condição">
+                              <AdminPicker
+                                compact
+                                label="Condição"
+                                value={conditionCode(row.condition) || 'new'}
+                                disabled={readOnly}
+                                options={[
+                                  { value: 'new', label: STOCK_CONDITION_LABEL.new },
+                                  { value: 'used', label: STOCK_CONDITION_LABEL.used },
+                                  { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
+                                ]}
+                                onChange={(value) =>
+                                  setVariations((current) =>
+                                    current.map((r, i) => (i === index ? { ...r, condition: value as StockCondition, batteryLevel: value === 'new' ? 100 : r.condition === 'new' || !r.condition ? null : r.batteryLevel ?? null } : r)),
+                                  )
+                                }
+                              />
                             </td>
-                            <td data-label="Custo unitário"><CurrencyInput ariaLabel="Custo unitário da variação" value={row.cost} disabled={readOnly} onChange={value=>updateVariationRow(index,'cost',value)}/></td>
+                            <td data-label="Bateria (%)">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                inputMode="numeric"
+                                aria-label="Nível de bateria da variação"
+                                value={(conditionCode(row.condition) || 'new') === 'new' ? 100 : row.batteryLevel ?? ''}
+                                placeholder="Ex.: 87"
+                                disabled={readOnly || (conditionCode(row.condition) || 'new') === 'new'}
+                                title={(conditionCode(row.condition) || 'new') === 'new' ? 'Aparelho novo: bateria 100%' : 'Nível de bateria do aparelho'}
+                                onChange={(e) =>
+                                  setVariations((current) =>
+                                    current.map((r, i) => (i === index ? { ...r, batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) } : r)),
+                                  )
+                                }
+                              />
+                            </td>
                             <td data-label="Preço à vista">
                               <CurrencyInput
                                 ariaLabel="Preço de venda da variação"
@@ -2040,20 +2109,35 @@ export function StockPage() {
                                 }
                               />
                             </td>
-                            <td data-label="Parcelado (18x)">
-                              <span
-                                className="stock-installment-badge"
-                                title="Simulação de 18x com as taxas cadastradas"
-                              >
-                                {installmentText}
-                              </span>
+                            <td data-label="Tipo de retirada">{(()=>{const prices=row.pickupMethodId?{[row.pickupMethodId]:rowPrice}:row.pickupPrices??{};const names=offeredPickupIds(pickupMethods,prices).map(id=>pickupMethods.find(m=>m.id===id)?.name).filter(Boolean);return <button type="button" className="pickup-price-summary" disabled={readOnly} title={(names.length?names.join(' · '):'Nenhuma')+' — definir onde esta variação é vendida e o preço de cada forma'} onClick={()=>setPickupEdit({index,prices,base:Number(rowPrice)||0})}><span className="pickup-price-summary__text">{names.length?names.join(' · '):'Nenhuma'}</span> <span aria-hidden>✎</span></button>;})()}</td>
+                            <td data-label="Custo unitário">
+                              <AdjustableValue
+                                ariaLabel="Custo unitário da variação"
+                                value={Number(row.cost) || 0}
+                                display={(Number(row.cost) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                hint={row.supplierEntries?.length ? 'média das entradas' : 'informe em Fornecedores'}
+                                editing={manualAdjust.has(`${row.tempKey}:cost`)}
+                                disabled={readOnly}
+                                onEdit={() => unlock(`${row.tempKey}:cost`)}
+                                onChange={(value) => updateVariationRow(index, 'cost', value)}
+                              />
+                            </td>
+                            <td data-label="Fornecedores">
+                              <button type="button" className="pickup-price-summary" disabled={readOnly && !row.supplierEntries?.length} title="Compras desta variação por fornecedor: data, quantidade, custo e IMEIs" onClick={() => setEntriesEdit({ index })}>
+                                <span className="pickup-price-summary__text">{supplierEntriesLabel(row.supplierEntries)}</span> <span aria-hidden>✎</span>
+                              </button>
                             </td>
                             <td data-label="Quantidade">
-                              <CurrencyInput
+                              {/* A quantidade vem das entradas por fornecedor (cada compra soma); ✎ ajusta à mão. */}
+                              <AdjustableValue
                                 ariaLabel="Quantidade da variação"
                                 decimals={qtyDecimals}
-                                value={row.qty}
+                                value={Number(row.qty) || 0}
+                                display={`${formatQty(Number(row.qty) || 0)} un`}
+                                hint={row.supplierEntries?.length ? 'soma das entradas' : Number(row.qty) > 0 ? 'saldo atual' : 'lance em Fornecedores'}
+                                editing={manualAdjust.has(`${row.tempKey}:qty`)}
                                 disabled={readOnly}
+                                onEdit={() => unlock(`${row.tempKey}:qty`)}
                                 onChange={(value) => updateVariationRow(index, 'qty', value)}
                               />
                             </td>
@@ -2065,6 +2149,14 @@ export function StockPage() {
                                 disabled={readOnly}
                                 onChange={(value) => updateVariationRow(index, 'minQty', value)}
                               />
+                            </td>
+                            <td data-label="Parcelado (18x)">
+                              <span
+                                className="stock-installment-badge"
+                                title="Simulação de 18x com as taxas cadastradas"
+                              >
+                                {installmentText}
+                              </span>
                             </td>
                             <td data-label="Margem / markup"><ProductPriceMetrics cost={row.cost} price={rowPrice}/></td>
                             <td data-label="Sugestão de venda"><ProductPriceSuggestion compact price={rowPrice} itemLabel={[form.name,...Object.values(row.attrs??{}),pickupMethods.find(method=>method.id===row.pickupMethodId)?.name].filter(Boolean).join(' · ')} cost={row.cost} policy={row.pricingPolicy} disabled={readOnly} onChange={pricingPolicy=>setVariations(current=>current.map((r,i)=>i===index?{...r,pricingPolicy}:r))} onApply={price=>setVariations(current=>current.map((r,i)=>i===index?(r.pickupMethodId?{...r,pickupPrices:{...r.pickupPrices,[r.pickupMethodId]:price}}:{...r,price}):r))}/></td>
@@ -2405,6 +2497,8 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     images: [],
     supplierId: '',
     skuWithSupplier: true,
+    batteryLevel: 100,
+    showConditionOnTotem: true,
     groupId: '',
     subgroupId: '',
     // Padrão: entrou hoje; o usuário pode escolher outra data.

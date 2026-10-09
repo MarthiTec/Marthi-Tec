@@ -77,11 +77,17 @@ export type StockVariationRow = {
   pickupPrices?: Record<string, number | null>;
   /** Entradas desta variação por fornecedor. */
   supplierEntries?: SupplierEntry[];
+  /** Nível de bateria (%) — novo é 100. */
+  batteryLevel?: number | null;
 };
 
 export type StockItem = {
   /** Entradas do produto simples por fornecedor. */
   supplierEntries?: SupplierEntry[];
+  /** Nível de bateria (%) do produto simples — novo é 100. */
+  batteryLevel?: number | null;
+  /** Mostra condição e bateria no totem (padrão: sim). */
+  showConditionOnTotem?: boolean;
   createdAt?:string;
   active?: boolean;
   skuAuto?:boolean;
@@ -291,6 +297,7 @@ function normalizeStock(item: StockItem): StockItem {
         pickupMethodId: v.pickupMethodId,
         pickupPrices: v.pickupPrices ?? {},
         supplierEntries: Array.isArray(v.supplierEntries) ? v.supplierEntries : undefined,
+        batteryLevel: v.batteryLevel ?? null,
       }))
     : [];
 
@@ -344,6 +351,8 @@ function normalizeStock(item: StockItem): StockItem {
     supplierId: item.supplierId ?? '',
     skuWithSupplier: item.skuWithSupplier !== false,
     supplierEntries: Array.isArray(item.supplierEntries) ? item.supplierEntries : undefined,
+    batteryLevel: item.batteryLevel ?? null,
+    showConditionOnTotem: item.showConditionOnTotem !== false,
     groupId: item.groupId ?? '',
     subgroupId: item.subgroupId ?? '',
     entryDate: item.entryDate ?? '',
@@ -585,6 +594,8 @@ function toNestStockBody(item: StockItem) {
     skuWithSupplier: item.skuWithSupplier !== false,
     // Só vai quando a tela carregou as entradas (undefined = não mexe nelas no banco).
     supplierEntries: item.supplierEntries,
+    batteryLevel: item.batteryLevel ?? null,
+    showConditionOnTotem: item.showConditionOnTotem !== false,
     groupId: item.groupId ?? undefined,
     subgroupId: item.subgroupId ?? undefined,
     entryDate: item.entryDate ?? undefined,

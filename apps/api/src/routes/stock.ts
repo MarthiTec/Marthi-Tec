@@ -32,11 +32,17 @@ const stockVariationSchema = z.object({
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).optional().default({}),
   /** Entradas desta variação por fornecedor (custo, quantidade, IMEIs). */
   supplierEntries: z.array(supplierEntrySchema).optional(),
+  /** Nível de bateria (%) — novo é sempre 100. */
+  batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
 });
 
 const stockItemSchema = z.object({
   /** Entradas do produto simples por fornecedor. */
   supplierEntries: z.array(supplierEntrySchema).optional(),
+  /** Nível de bateria (%) do produto simples — novo é sempre 100. */
+  batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  /** Mostra condição e bateria no totem (padrão: sim). */
+  showConditionOnTotem: z.boolean().optional(),
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
@@ -81,13 +87,18 @@ const stockItemSchema = z.object({
  * produtos. Só preservamos um ID que já pertence ao próprio produto; os demais
  * recebem um ID novo e globalmente único.
  */
+/** Variações com a bateria coerente com a condição (novo = 100%). */
+function withBattery<T extends { condition?: string; batteryLevel?: number | null }>(variations: T[]): T[] {
+  return variations.map((variation) => ({ ...variation, batteryLevel: batteryFor(variation.condition, variation.batteryLevel) }));
+}
+
 function persistableVariations(
   variations: Array<z.infer<typeof stockVariationSchema>>,
   existingIds: Iterable<string> = [],
 ) {
   const existing = new Set(existingIds);
   const kept = new Set<string>();
-  return variations.map((variation) => {
+  return withBattery(variations).map((variation) => {
     const requestedId = variation.id?.trim();
     const id = requestedId && existing.has(requestedId) && !kept.has(requestedId)
       ? requestedId
@@ -111,6 +122,13 @@ function supplierEntryGroups(body: any): Array<{ variationId: string | null; ent
   for (const v of variations) delete v.supplierEntries;
   delete body.supplierEntries;
   return provided ? groups : null;
+}
+
+/** Bateria: aparelho novo é 100%; usado/recondicionado usa o nível informado (ou nenhum). */
+function batteryFor(condition: unknown, level: unknown): number | null {
+  if (!condition || condition === 'new') return 100;
+  const value = Number(level);
+  return level === null || level === undefined || level === '' || !Number.isFinite(value) ? null : Math.max(0, Math.min(100, Math.round(value)));
 }
 
 /** DATE do banco (Date ou texto) como AAAA-MM-DD, sem fuso deslocando o dia. */
@@ -150,6 +168,11 @@ async function saveProductDetails(db: PoolClient, storeId: string, id: string, b
   if (body.dun14 !== undefined) fields.push(['dun14', body.dun14]);
   if (body.purchaseUnit !== undefined) fields.push(['purchase_unit', body.purchaseUnit.toUpperCase()]);
   if (body.purchaseFactor !== undefined) fields.push(['purchase_factor', body.purchaseFactor]);
+  if (body.batteryLevel !== undefined || body.condition !== undefined) {
+    const condition = body.condition ?? (await db.query('SELECT condition FROM stock_items WHERE id = $1', [id])).rows[0]?.condition;
+    fields.push(['battery_level', batteryFor(condition, body.batteryLevel)]);
+  }
+  if (body.showConditionOnTotem !== undefined) fields.push(['show_condition_on_totem', body.showConditionOnTotem]);
   if (!fields.length) return;
   await db.query(
     `UPDATE stock_items SET ${fields.map(([column], index) => `${column} = $${index + 3}`).join(', ')} WHERE id = $1 AND store_id = $2`,
@@ -210,6 +233,8 @@ export function formatStockRow(row: any) {
     dun14: row.dun14 ?? '',
     purchaseUnit: row.purchase_unit ?? row.purchaseUnit ?? '',
     purchaseFactor: Number(row.purchase_factor ?? row.purchaseFactor) || 1,
+    batteryLevel: batteryFor(row.condition, row.battery_level ?? row.batteryLevel),
+    showConditionOnTotem: (row.show_condition_on_totem ?? row.showConditionOnTotem) !== false,
     trackLot: Boolean(row.track_lot ?? row.trackLot),
     isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
@@ -232,6 +257,7 @@ export function formatStockRow(row: any) {
       qty: Number(v.qty) || 0,
       minQty: Number(v.minQty ?? v.min_qty) || 0,
       condition: v.condition || 'new',
+      batteryLevel: batteryFor(v.condition, v.batteryLevel ?? v.battery_level),
       barcode: v.barcode || '',
       imei: v.imei || '',
       pickupMethodId: v.pickupMethodId ?? v.pickup_method_id,
@@ -288,7 +314,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -337,7 +363,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
           FROM stock_items
           WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
           LIMIT 1
@@ -441,8 +467,8 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
               await client.query(
                 `INSERT INTO stock_item_variations (
                   id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
-                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy, battery_level
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
                 [
                   v.id,
                   storeId,
@@ -459,6 +485,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
                   v.imei || '',
                   JSON.stringify(v.pickupPrices || {}),
                   v.pricingPolicy ? JSON.stringify(v.pricingPolicy) : null,
+                  v.batteryLevel ?? null,
                 ],
               );
             }
@@ -656,8 +683,8 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
               await client.query(
                 `INSERT INTO stock_item_variations (
                   id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty,
-                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                  card_rate, condition, barcode, imei, pickup_prices, pricing_policy, battery_level
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
                 [
                   v.id,
                   storeId,
@@ -674,6 +701,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
                   v.imei || '',
                   JSON.stringify(v.pickupPrices || {}),
                   v.pricingPolicy ? JSON.stringify(v.pricingPolicy) : null,
+                  v.batteryLevel ?? null,
                 ],
               );
             }
@@ -764,7 +792,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,

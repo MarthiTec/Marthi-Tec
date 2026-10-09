@@ -7179,3 +7179,34 @@ select.caixa-mov-input {
     overflow: clip;
   }
 }
+
+/* Grade: botões de Tipo de retirada e Fornecedores do mesmo tamanho dos campos, numa linha só. */
+.stock-variation-container .pickup-price-summary {
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  justify-content: space-between;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.stock-variation-container .pickup-price-summary__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stock-variation-container td.stock-variation-spacer::before { content: none; }
+.stock-variation-container input[aria-label="Nível de bateria da variação"]:disabled { opacity: 0.7; }
+
+.stock-variation-container .stock-qty-desc { display: flex; flex-direction: column; justify-content: center; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px dashed var(--line, #d8dde3); line-height: 1.15; }
+.stock-variation-container .stock-qty-desc strong { font-size: 0.95rem; }
+.stock-variation-container .stock-qty-desc small { color: var(--mute); font-size: 0.7rem; }
+
+.stock-variation-container .stock-qty-desc { flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
+.stock-qty-desc__text { display: flex; flex-direction: column; min-width: 0; }
+.stock-qty-desc__edit { flex-shrink: 0; border: 0; background: transparent; color: var(--accent, #0e7490); font: inherit; font-size: 0.9rem; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+.stock-qty-desc__edit:hover { background: rgba(14, 116, 144, 0.1); }
+.stock-variation-container .stock-qty-desc { width: 100%; box-sizing: border-box; text-align: left; }
+.stock-variation-container .stock-qty-desc__text { align-items: flex-start; }

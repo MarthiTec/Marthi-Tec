@@ -1,5 +1,6 @@
 import type {StockItem,StockVariationRow} from './adminStore';
 import type {PickupMethod} from './pickup';
+import {CONDITION_ATTR_ID,conditionCode} from './productCondition';
 
 /** Empty legacy price maps mean the base price for immediate collection only. */
 export function productPickupMethods(methods:PickupMethod[],stock:StockItem|null,variation?:StockVariationRow) {
@@ -13,11 +14,16 @@ export function productPickupMethods(methods:PickupMethod[],stock:StockItem|null
 const valueKey=(value:unknown)=>String(value??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,'');
 const sameValue=(a:unknown,b:unknown)=>valueKey(a)===valueKey(b);
 
-/** Preserve the changed attribute while completing a real, priced combination. */
+/**
+ * Preserve the changed attribute while completing a real, priced combination. A condição escolhida
+ * (novo/usado) conta como mais um atributo quando a grade tem condições diferentes.
+ */
 export function selectProductVariation(stock:StockItem|undefined,config:Record<string,string>,changedId?:string) {
   const valid=stock?.variations?.filter(v=>Number(v.price)>0 || Object.values(v.pickupPrices??{}).some(price=>Number(price)>0)) ?? [];
-  const candidates=changedId?valid.filter(v=>sameValue(v.attrs[changedId],config[changedId])):valid;
-  return candidates.map(v=>({v,score:Object.entries(v.attrs).filter(([id,value])=>sameValue(config[id],value)).length}))
+  const wantedCondition=conditionCode(config[CONDITION_ATTR_ID]);
+  const sameCondition=(v:StockVariationRow)=>!wantedCondition||(conditionCode(v.condition)||'new')===wantedCondition;
+  const candidates=changedId===CONDITION_ATTR_ID?valid.filter(sameCondition):changedId?valid.filter(v=>sameValue(v.attrs[changedId],config[changedId])):valid;
+  return candidates.map(v=>({v,score:Object.entries(v.attrs).filter(([id,value])=>sameValue(config[id],value)).length+(wantedCondition&&sameCondition(v)?1:0)}))
     .sort((a,b)=>b.score-a.score)[0]?.v ?? valid[0];
 }
 

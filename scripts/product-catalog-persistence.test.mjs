@@ -39,7 +39,10 @@ test('one product and SKU persist all photos and variations in the correct store
  const publicProduct=catalog.data.find(p=>p.id===id);
  // O catálogo público não leva as entradas por fornecedor (custo e IMEIs são internos).
  assert.ok(publicProduct.variations.every(v=>v.supplierEntries===undefined));
- assert.deepEqual(publicProduct.variations,result.data.variations.map(({supplierEntries,...v})=>v));
+ // Nem custo nem dados de compra no catálogo público.
+ assert.ok(publicProduct.cost===undefined&&publicProduct.avgCost===undefined&&publicProduct.supplierId===undefined);
+ assert.ok(publicProduct.variations.every(v=>v.cost===undefined&&v.avgCost===undefined));
+ assert.deepEqual(publicProduct.variations,result.data.variations.map(({supplierEntries,cost,avgCost,pricingPolicy,lastEntry,...v})=>v));
  assert.deepEqual(publicProduct.images,images);
  assert.equal((await request('/stock',undefined,'store-b')).status,403);
  assert.equal((await request('/stock',{name:'Duplicate',sku:'MASTER-ONE',skuAuto:false})).status,409);
