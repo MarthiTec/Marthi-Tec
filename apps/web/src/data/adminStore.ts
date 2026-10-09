@@ -71,8 +71,6 @@ export type StockItem = {
   skuAuto?:boolean;
   /** Fornecedor entra na formação automática do SKU (padrão: sim). */
   skuWithSupplier?: boolean;
-  /** Tipo de produto cadastrado em Especificações. */
-  productTypeId?: string;
   /** Grupo e subgrupo (nomes configuráveis pela loja). */
   groupId?: string;
   subgroupId?: string;
@@ -328,7 +326,6 @@ function normalizeStock(item: StockItem): StockItem {
     variations,
     supplierId: item.supplierId ?? '',
     skuWithSupplier: item.skuWithSupplier !== false,
-    productTypeId: item.productTypeId ?? '',
     groupId: item.groupId ?? '',
     subgroupId: item.subgroupId ?? '',
     entryDate: item.entryDate ?? '',
@@ -568,7 +565,6 @@ function toNestStockBody(item: StockItem) {
     pickupPrices: item.pickupPrices ?? {},
     skuAuto: item.skuAuto,
     skuWithSupplier: item.skuWithSupplier !== false,
-    productTypeId: item.productTypeId ?? undefined,
     groupId: item.groupId ?? undefined,
     subgroupId: item.subgroupId ?? undefined,
     entryDate: item.entryDate ?? undefined,

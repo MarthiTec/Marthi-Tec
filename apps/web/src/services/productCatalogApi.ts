@@ -1,7 +1,6 @@
 import { nestDelete, nestGet, nestPatch, nestPost, nestPut } from './nestClient';
 
-/** Tipos de produto, grupos/subgrupos e movimentações do produto — tudo no banco da loja. */
-export type ProductType = { id: string; name: string; active: boolean; productCount: number };
+/** Grupos/subgrupos e movimentações do produto — tudo no banco da loja. */
 export type ProductGroup = { id: string; name: string; parentId: string | null; active: boolean; productCount: number };
 export type ProductGroupLabels = { group: string; subgroup: string };
 export type ProductMovement = {
@@ -19,11 +18,6 @@ export type ProductMovement = {
   customer: { id: string | null; name: string } | null;
   saleId: string | null;
 };
-
-export const apiListProductTypes = () => nestGet<ProductType[]>('/product-types');
-export const apiCreateProductType = (body: { name: string; active?: boolean }) => nestPost<ProductType>('/product-types', body);
-export const apiUpdateProductType = (id: string, body: { name?: string; active?: boolean }) => nestPatch<ProductType>(`/product-types/${encodeURIComponent(id)}`, body);
-export const apiDeleteProductType = (id: string) => nestDelete<{ ok: true }>(`/product-types/${encodeURIComponent(id)}`);
 
 export const apiListProductGroups = () => nestGet<{ labels: ProductGroupLabels; groups: ProductGroup[] }>('/product-groups');
 export const apiCreateProductGroup = (body: { name: string; parentId?: string | null; active?: boolean }) => nestPost<ProductGroup>('/product-groups', body);

@@ -65,12 +65,9 @@ import { ProductMovementsPanel } from '../../components/ProductMovementsPanel';
 import { RegistryDrawer } from '../../components/RegistryDrawer';
 import {
   apiCreateProductGroup,
-  apiCreateProductType,
   apiListProductGroups,
-  apiListProductTypes,
   type ProductGroup,
   type ProductGroupLabels,
-  type ProductType,
 } from '../../services/productCatalogApi';
 import { KitsPage } from './KitsPage';
 import { WarehousePage } from './WarehousePage';
@@ -124,15 +121,13 @@ export function StockPage() {
   const [formTab, setFormTab] = useState<FormTab>('principal');
   const [registryPanel, setRegistryPanel] = useState<RegistryPanel | null>(null);
   const [unitConversionOpen, setUnitConversionOpen] = useState(false);
-  // Tipos de produto e grupos/subgrupos vêm do banco da loja.
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  // Grupos e subgrupos vêm do banco da loja.
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [groupLabels, setGroupLabels] = useState<ProductGroupLabels>({ group: 'Grupo', subgroup: 'Subgrupo' });
   const [catalogVersion, setCatalogVersion] = useState(0);
   useEffect(() => {
     let alive = true;
     const load = () => {
-      void apiListProductTypes().then((rows) => alive && setProductTypes(rows)).catch(() => undefined);
       void apiListProductGroups()
         .then((data) => {
           if (!alive) return;
@@ -250,7 +245,7 @@ export function StockPage() {
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   // Cadastro rápido sem sair do produto: fornecedor, marca e atributo.
-  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute' | 'type' | 'group' | 'subgroup'>(null);
+  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute' | 'group' | 'subgroup'>(null);
   const [quickName, setQuickName] = useState('');
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickError, setQuickError] = useState('');
@@ -274,24 +269,20 @@ export function StockPage() {
     { id: 'movimentos', label: 'Entradas e saídas' },
   ];
 
-  function openQuick(kind: 'type' | 'group' | 'subgroup') {
+  function openQuick(kind: 'group' | 'subgroup') {
     setQuickName('');
     setQuickError('');
     setQuickCreate(kind);
   }
 
-  /** Cadastro rápido de tipo, grupo ou subgrupo direto no banco, já selecionando no produto. */
+  /** Cadastro rápido de grupo ou subgrupo direto no banco, já selecionando no produto. */
   async function saveQuick() {
     const name = quickName.trim();
     if (!name || quickBusy) return;
     setQuickBusy(true);
     setQuickError('');
     try {
-      if (quickCreate === 'type') {
-        const created = await apiCreateProductType({ name });
-        setProductTypes((current) => [...current, created]);
-        setForm((current) => ({ ...current, productTypeId: created.id }));
-      } else if (quickCreate === 'group' || quickCreate === 'subgroup') {
+      if (quickCreate === 'group' || quickCreate === 'subgroup') {
         const created = await apiCreateProductGroup({ name, parentId: quickCreate === 'subgroup' ? form.groupId || null : null });
         setProductGroups((current) => [...current, created]);
         setForm((current) => (quickCreate === 'group' ? { ...current, groupId: created.id, subgroupId: '' } : { ...current, subgroupId: created.id }));
@@ -741,7 +732,6 @@ export function StockPage() {
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
       skuWithSupplier: item.skuWithSupplier !== false,
-      productTypeId: item.productTypeId ?? '',
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       entryDate: item.entryDate ?? '',
@@ -980,7 +970,6 @@ export function StockPage() {
       images: [...(item.images ?? [])],
       supplierId: item.supplierId ?? '',
       skuWithSupplier: item.skuWithSupplier !== false,
-      productTypeId: item.productTypeId ?? '',
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       entryDate: todayIso(),
@@ -1584,15 +1573,13 @@ export function StockPage() {
                 {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
                 {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
                 {quickCreate === 'attribute' ? <QuickCreateAttribute onClose={() => setQuickCreate(null)} onCreated={() => undefined} /> : null}
-                {quickCreate === 'type' || quickCreate === 'group' || quickCreate === 'subgroup' ? (
+                {quickCreate === 'group' || quickCreate === 'subgroup' ? (
                   <QuickModal
-                    title={quickCreate === 'type' ? 'Novo tipo de produto' : `Novo ${(quickCreate === 'group' ? groupLabels.group : groupLabels.subgroup).toLowerCase()}`}
+                    title={`Novo ${(quickCreate === 'group' ? groupLabels.group : groupLabels.subgroup).toLowerCase()}`}
                     subtitle={
                       quickCreate === 'subgroup'
                         ? `Dentro de ${productGroups.find((item) => item.id === form.groupId)?.name ?? ''}.`
-                        : quickCreate === 'group'
-                          ? 'Ex.: Bebidas, Eletrônicos, Acessórios.'
-                          : 'Ex.: Smartphone, Capinha, Película.'
+                        : 'Ex.: Bebidas, Eletrônicos, Acessórios.'
                     }
                     busy={quickBusy}
                     error={quickError}
@@ -1657,28 +1644,6 @@ export function StockPage() {
                 </label>
                 <div className="stock-brand-field">
                 <AdminPicker
-                  label="Tipo de produto"
-                  value={form.productTypeId ?? ''}
-                  placeholder="Sem tipo"
-                  disabled={readOnly}
-                  options={[{ value: '', label: 'Sem tipo' }, ...productTypes.filter((item) => item.active || item.id === form.productTypeId).map((item) => ({ value: item.id, label: item.name }))]}
-                  onChange={(value) => setForm({ ...form, productTypeId: value })}
-                />
-                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo tipo" onClick={() => openQuick('type')} /> : null}<Link to={specsPath('tipos')}>Gerenciar tipos</Link></p>
-                </div>
-                <AdminPicker
-                  label="Condição"
-                  value={form.condition}
-                  disabled={readOnly}
-                  options={[
-                    { value: 'new', label: STOCK_CONDITION_LABEL.new },
-                    { value: 'used', label: STOCK_CONDITION_LABEL.used },
-                    { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
-                  ]}
-                  onChange={(value) => setForm({ ...form, condition: value as StockCondition })}
-                />
-                <div className="stock-brand-field">
-                <AdminPicker
                   label={groupLabels.group}
                   value={form.groupId ?? ''}
                   placeholder="Nenhum"
@@ -1706,6 +1671,17 @@ export function StockPage() {
                   <Link to={specsPath('grupos')}>Gerenciar</Link>
                 </p>
                 </div>
+                <AdminPicker
+                  label="Condição"
+                  value={form.condition}
+                  disabled={readOnly}
+                  options={[
+                    { value: 'new', label: STOCK_CONDITION_LABEL.new },
+                    { value: 'used', label: STOCK_CONDITION_LABEL.used },
+                    { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
+                  ]}
+                  onChange={(value) => setForm({ ...form, condition: value as StockCondition })}
+                />
                 <div className="stock-brand-field">
                 <AdminPicker
                   label="Unidade de medida"
@@ -1726,7 +1702,7 @@ export function StockPage() {
                   ) : null}
                 </p>
                 </div>
-                <label className="stock-id-totem">
+                <label className="span-2 stock-id-totem">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type="checkbox"
@@ -2185,7 +2161,6 @@ export function StockPage() {
               <div className="stock-config-links">
                 <Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link>
                 <Link to={specsPath('retirada')}>Cadastrar tipos de retirada e acompanhar entregas</Link>
-                <Link to={specsPath('tipos')}>Cadastrar tipos de produto</Link>
                 <Link to={specsPath('grupos')}>Cadastrar {groupLabels.group.toLowerCase()} e {groupLabels.subgroup.toLowerCase()}</Link>
               </div>
             </article>
@@ -2311,7 +2286,6 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     images: [],
     supplierId: '',
     skuWithSupplier: true,
-    productTypeId: '',
     groupId: '',
     subgroupId: '',
     // Padrão: entrou hoje; o usuário pode escolher outra data.

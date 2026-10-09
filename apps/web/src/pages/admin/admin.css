@@ -7154,8 +7154,7 @@ select.caixa-mov-input {
 @media (max-width: 600px) { .product-movements__summary { grid-template-columns: 1fr; } }
 
 /* Botões (Salvar, Cancelar, Salvar nomes) afastados dos campos acima */
-.product-groups .admin-form + .admin-toolbar,
-.product-types .admin-form + .admin-toolbar {
+.product-groups .admin-form + .admin-toolbar {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line, #e2e8f0);

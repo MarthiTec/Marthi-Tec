@@ -298,10 +298,7 @@ test('sale can have store warranty, manufacturer-only warranty or no warranty', 
   }
 });
 
-test('product types, groups/subgroups with store labels, entry date, DUN-14 and unit conversion are saved on the product', async () => {
-  const type = await request('/product-types', 'POST', { name: 'Smartphone' });
-  assert.equal(type.status, 201, JSON.stringify(type.json));
-  assert.equal((await request('/product-types', 'POST', { name: 'smartphone' })).status, 409);
+test('groups/subgroups with store labels, entry date, DUN-14 and unit conversion are saved on the product', async () => {
   const group = (await request('/product-groups', 'POST', { name: 'Bebidas' })).json.data;
   const sub = await request('/product-groups', 'POST', { name: 'Cerveja', parentId: group.id });
   assert.equal(sub.status, 201, JSON.stringify(sub.json));
@@ -315,12 +312,11 @@ test('product types, groups/subgroups with store labels, entry date, DUN-14 and 
   assert.equal(listed.groups.find((g) => g.id === sub.json.data.id).parentId, group.id);
 
   const created = await request('/stock', 'POST', {
-    name: 'Cerveja Lata 350', qty: 24, cost: 3, price: 5, productTypeId: type.json.data.id, groupId: group.id, subgroupId: sub.json.data.id,
+    name: 'Cerveja Lata 350', qty: 24, cost: 3, price: 5, groupId: group.id, subgroupId: sub.json.data.id,
     entryDate: '2026-10-01', dun14: '17891234567895', purchaseUnit: 'cx', purchaseFactor: 12,
   });
   assert.equal(created.status, 201, JSON.stringify(created.json));
   const row = created.json.data;
-  assert.equal(row.productTypeId, type.json.data.id);
   assert.equal(row.subgroupId, sub.json.data.id);
   assert.equal(row.entryDate, '2026-10-01');
   assert.equal(row.dun14, '17891234567895');
@@ -340,8 +336,8 @@ test('product types, groups/subgroups with store labels, entry date, DUN-14 and 
   const today = await request('/stock', 'POST', { name: 'Sem data informada', qty: 0 });
   assert.match(today.json.data.entryDate, /^\d{4}-\d{2}-\d{2}$/);
 
-  assert.equal((await request('/product-types', 'GET', undefined, 'store-b')).status, 403, 'other store is not reachable');
-  assert.equal((await request('/stock/' + row.id, 'PATCH', { productTypeId: 'PTY-missing' })).status, 400);
+  assert.equal((await request('/product-groups', 'GET', undefined, 'store-b')).status, 403, 'other store is not reachable');
+  assert.equal((await request('/stock/' + row.id, 'PATCH', { groupId: 'PGR-missing' })).status, 400);
 });
 
 test('product movements show entries with supplier and invoice and exits with the customer', async () => {

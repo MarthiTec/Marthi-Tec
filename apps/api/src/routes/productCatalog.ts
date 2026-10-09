@@ -6,13 +6,12 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { canManageArea } from '../services/employeeAccess.js';
 
 /**
- * Cadastros de apoio do produto: tipos de produto, grupos/subgrupos (com o nome que a loja preferir,
+ * Cadastros de apoio do produto: grupos/subgrupos (com o nome que a loja preferir,
  * ex.: Família) e o histórico de entradas e saídas de cada produto.
  */
 export const productCatalogRouter = Router();
 
 const nameSchema = z.string().trim().min(1, 'Informe o nome.').max(80, 'Nome muito longo.');
-const typeSchema = z.object({ name: nameSchema, active: z.boolean().optional() });
 const groupSchema = z.object({ name: nameSchema, parentId: z.string().nullable().optional(), active: z.boolean().optional() });
 const labelsSchema = z.object({
   group: z.string().trim().min(1, 'Informe como chamar o grupo.').max(30),
@@ -23,66 +22,6 @@ const forbidden = (res: any) => res.status(403).json({ success: false, error: { 
 const notFound = (res: any) => res.status(404).json({ success: false, error: { message: 'Registro não encontrado nesta loja.' } });
 const isDuplicate = (error: any) => error?.code === '23505';
 const duplicate = (res: any, what: string) => res.status(409).json({ success: false, error: { code: 'DUPLICATE', message: `Já existe ${what} com esse nome.` } });
-
-/* ── Tipos de produto ─────────────────────────────────────── */
-
-const toType = (row: any) => ({ id: row.id, name: row.name, active: Boolean(row.active), productCount: Number(row.product_count ?? 0) });
-
-productCatalogRouter.get('/api/v1/product-types', requireAuth, async (req, res, next) => {
-  try {
-    const result = await pool.query(
-      `SELECT t.*, (SELECT count(*) FROM stock_items s WHERE s.store_id = t.store_id AND s.product_type_id = t.id) AS product_count
-         FROM product_types t WHERE t.store_id = $1 ORDER BY lower(t.name)`,
-      [req.storeId],
-    );
-    res.json({ success: true, data: result.rows.map(toType) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-productCatalogRouter.post('/api/v1/product-types', requireAuth, async (req, res, next) => {
-  try {
-    if (!canManageArea(req)) return forbidden(res);
-    const body = typeSchema.parse(req.body);
-    const result = await pool.query(
-      `INSERT INTO product_types (id, store_id, name, active) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [`PTY-${randomUUID()}`, req.storeId, body.name, body.active ?? true],
-    );
-    res.status(201).json({ success: true, data: toType(result.rows[0]) });
-  } catch (error) {
-    if (isDuplicate(error)) return duplicate(res, 'um tipo de produto');
-    next(error);
-  }
-});
-
-productCatalogRouter.patch('/api/v1/product-types/:id', requireAuth, async (req, res, next) => {
-  try {
-    if (!canManageArea(req)) return forbidden(res);
-    const body = typeSchema.partial().parse(req.body);
-    const result = await pool.query(
-      `UPDATE product_types SET name = COALESCE($3, name), active = COALESCE($4, active), updated_at = now()
-        WHERE id = $1 AND store_id = $2 RETURNING *`,
-      [req.params.id, req.storeId, body.name ?? null, body.active ?? null],
-    );
-    if (!result.rows[0]) return notFound(res);
-    res.json({ success: true, data: toType(result.rows[0]) });
-  } catch (error) {
-    if (isDuplicate(error)) return duplicate(res, 'um tipo de produto');
-    next(error);
-  }
-});
-
-productCatalogRouter.delete('/api/v1/product-types/:id', requireAuth, async (req, res, next) => {
-  try {
-    if (!canManageArea(req)) return forbidden(res);
-    const result = await pool.query('DELETE FROM product_types WHERE id = $1 AND store_id = $2', [req.params.id, req.storeId]);
-    if (!result.rowCount) return notFound(res);
-    res.json({ success: true, data: { ok: true } });
-  } catch (error) {
-    next(error);
-  }
-});
 
 /* ── Grupos e subgrupos ───────────────────────────────────── */
 
