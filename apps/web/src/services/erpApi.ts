@@ -115,7 +115,7 @@ export function apiUpdateStock(id: string, body: Record<string, unknown>) {
 }
 
 export function apiDeleteStock(id: string) {
-  return nestDelete<{ ok: true }>(`/stock/${id}`);
+  return nestDelete<{ ok: true; deactivated?: boolean; message?: string }>(`/stock/${id}`);
 }
 
 /* ── Pricing ───────────────────────────────────────────── */
@@ -2133,6 +2133,10 @@ export type ExternalSaleLine = {
   imei?: string;
   isAdHoc?: boolean;
   itemType?: string;
+  /** Campanha aplicada na linha (o desconto vai em discount). */
+  campaignId?: string;
+  /** O vendedor pode tirar a campanha desta linha. */
+  campaignOff?: boolean;
 };
 
 export type TradeInPayload = {

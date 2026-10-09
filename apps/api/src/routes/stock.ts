@@ -692,6 +692,21 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
       try {
         const linked=await pool.query("SELECT id FROM commercial_orders WHERE store_id=$1 AND (stock_id=$2 OR used_stock_id=$2) LIMIT 1",[storeId,id]);
         if(linked.rows[0])throw Object.assign(new Error('Produto vinculado ao histórico de encomenda. Utilize inativação após liberar reservas.'),{status:409});
+        const exists = await pool.query('SELECT 1 FROM stock_items WHERE id = $1 AND store_id = $2', [id, storeId]);
+        if (!exists.rows.length) throw Object.assign(new Error('Produto não encontrado nesta loja.'), { status: 404 });
+        // Produto com vendas, entradas ou ajustes não some do banco: o histórico (notas, vendas,
+        // relatórios) depende dele. Ele é inativado e sai do PDV, do totem e das vendas.
+        const history = await pool.query(
+          `SELECT 1 FROM stock_movements WHERE store_id = $1 AND stock_id = $2
+           UNION ALL SELECT 1 FROM sales_order_lines l JOIN sales_orders o ON o.id = l.sale_id WHERE o.store_id = $1 AND l.stock_id = $2
+           LIMIT 1`,
+          [storeId, id],
+        );
+        if (history.rows.length) {
+          await pool.query('UPDATE stock_items SET active = false, show_on_totem = false, updated_at = now() WHERE id = $1 AND store_id = $2', [id, storeId]);
+          res.json({ success: true, data: { ok: true, deactivated: true, message: 'O produto tem vendas ou movimentações, então foi inativado (some do PDV, do totem e das vendas) e o histórico foi mantido.' } });
+          return;
+        }
         await pool.query(`DELETE FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
         res.json({ success: true, data: { ok: true } });
         return;

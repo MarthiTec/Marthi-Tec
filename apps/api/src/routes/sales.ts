@@ -66,6 +66,8 @@ const saleLineSchema = z.object({
   unitCost: z.coerce.number().min(0).optional(),
   discount: z.coerce.number().min(0).default(0),
   surcharge: z.coerce.number().min(0).default(0),
+  /** Campanha que deu o desconto da linha (conferida no servidor). */
+  campaignId: z.string().optional().nullable(),
   imei: z.string().default(''),
   isAdHoc: z.boolean().default(false),
   itemType: z.string().default('product'),
@@ -179,6 +181,24 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           lineCost = Number(line.unitCost) || 0;
         }
 
+        // Campanha da linha: precisa ser desta loja, estar ativa, na vigência e valer na venda externa.
+        let campaignName = '';
+        if (line.campaignId) {
+          const campaign = (await client.query('SELECT name, active, rules FROM promo_campaigns WHERE id = $1 AND store_id = $2', [line.campaignId, storeId])).rows[0];
+          const rules = campaign?.rules ?? {};
+          const today = new Date().toISOString().slice(0, 10);
+          const channels: string[] = Array.isArray(rules.channels) ? rules.channels : [];
+          if (
+            !campaign || !campaign.active || rules.dayOffer ||
+            (channels.length && !channels.includes('external')) ||
+            (rules.startDate && String(rules.startDate).slice(0, 10) > today) ||
+            (rules.endDate && String(rules.endDate).slice(0, 10) < today)
+          ) {
+            throw Object.assign(new Error(`A campanha aplicada em "${line.name}" não vale mais na venda externa. Atualize a tela e tente de novo.`), { status: 409 });
+          }
+          campaignName = campaign.name;
+        }
+
         const lineTotal = Math.round((line.qty * line.unitPrice - line.discount + line.surcharge) * 100) / 100;
         if (lineTotal < 0) throw Object.assign(new Error('Desconto superior ao valor do produto.'), {status: 400});
         subtotal += lineTotal;
@@ -189,6 +209,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           unitCost: lineCost,
           totalCost: lineCost * line.qty,
           lineTotal,
+          campaignName,
         });
       }
 
@@ -272,7 +293,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           ],
         );
 
-        await client.query('UPDATE sales_order_lines SET pickup_kind=$2 WHERE id=$1',[lineId,line.pickupKind||'']);
+        await client.query('UPDATE sales_order_lines SET pickup_kind=$2, campaign_id=$3, campaign_name=$4, discount_amount=$5 WHERE id=$1',[lineId,line.pickupKind||'',line.campaignId||null,line.campaignName||'',line.discount||0]);
         await recordPickup(client,storeId,orderId,body,line);
         if (line.stockId && line.pickupKind!=='order') {
           await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);

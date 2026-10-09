@@ -7161,3 +7161,5 @@ select.caixa-mov-input {
   gap: 10px;
 }
 .product-groups .admin-card > h3 + .empty { margin-bottom: 12px; }
+
+.stock-list-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(14, 116, 144, 0.3); background: rgba(14, 116, 144, 0.08); color: var(--ink); font-size: 0.88rem; }

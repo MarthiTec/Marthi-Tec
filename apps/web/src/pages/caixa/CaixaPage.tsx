@@ -1,4 +1,6 @@
 import {PickupFields} from '../../components/PickupFields';
+import { refreshAdminSlices } from '../../data/erpBootstrap';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
 import type {DeliveryAddress} from '../../data/pickup';
 import { SaleAttributeFields } from '../../components/SaleAttributeFields';
@@ -224,6 +226,28 @@ export function CaixaPage() {
   const initial = getAdminState();
   const [customers, setCustomers] = useState(initial.customers);
   const [stock, setStock] = useState(initial.stock);
+  // Ao abrir o PDV (e ao trocar de loja), estoque, tabelas de preço, formas de pagamento e clientes
+  // vêm do banco: o que ficou em memória desde o login pode estar velho (ex.: venda feita em outra tela).
+  const [, setAdminVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      void refreshAdminSlices(['stock', 'pricing', 'customers'])
+        .then(() => {
+          if (!alive) return;
+          const state = getAdminState();
+          setStock(state.stock);
+          setCustomers(state.customers);
+          setAdminVersion((v) => v + 1);
+        })
+        .catch(() => undefined);
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => {
+      alive = false;
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    };
+  }, []);
   const tables = initial.priceTables.filter((item) => item.active);
   const payments = useMemo(() => {
     const list = getAdminState().payments.filter((item) => item.active);
@@ -261,6 +285,19 @@ export function CaixaPage() {
   ]);
   /** Enquanto o operador não rateia, a única forma acompanha o total sozinha. */
   const [splitTouched, setSplitTouched] = useState(false);
+  // As formas de pagamento chegam do banco depois de abrir o PDV: se a forma padrão ainda é a
+  // provisória (ou nenhuma), passa para a primeira forma real da loja. Escolha do operador fica.
+  const firstRealPaymentId = payments.find((item) => item.id !== 'PAY-VC' && !isVoucherPayment(item))?.id;
+  const paymentDefaultDone = useRef(false);
+  useEffect(() => {
+    if (paymentDefaultDone.current || splitTouched || !firstRealPaymentId) return;
+    paymentDefaultDone.current = true;
+    setSplits((current) =>
+      current.length === 1 && (!current[0].methodId || current[0].methodId === 'PAY-VC') && current[0].methodId !== firstRealPaymentId
+        ? [{ ...current[0], methodId: firstRealPaymentId }]
+        : current,
+    );
+  }, [firstRealPaymentId, splitTouched]);
   const [defaultTableId, setDefaultTableId] = useState(
     defaultPayment?.priceTableId && tables.some((item) => item.id === defaultPayment.priceTableId)
       ? defaultPayment.priceTableId
@@ -767,12 +804,16 @@ export function CaixaPage() {
               name: line.name,
               sku: line.sku,
               supplierId: stk?.supplierId,
+              groupId: stk?.groupId,
+              subgroupId: stk?.subgroupId,
               category: stk?.attrs?.categoria || stk?.kind,
-              brand: stk?.attrs?.marca,
+              brand: stk?.brand || stk?.attrs?.marca,
               attrs: stk?.attrs,
             },
             line.qty,
             tableUnitPrice,
+            undefined,
+            'pdv',
           );
 
           // Hard guard: A promoção NUNCA pode encarecer o produto nem igualar sem brinde.
@@ -1091,12 +1132,16 @@ export function CaixaPage() {
         name: item.name,
         sku: item.sku,
         supplierId: item.supplierId,
+        groupId: item.groupId,
+        subgroupId: item.subgroupId,
         category: item.attrs?.categoria || item.kind,
-        brand: item.attrs?.marca,
+        brand: item.brand || item.attrs?.marca,
         attrs: item.attrs,
       },
       nextQty,
       unitPrice,
+      undefined,
+      'pdv',
     );
     const standardAddTotal = Math.round(unitPrice * nextQty * 100) / 100;
     const hasPromoBenefit =

@@ -18,7 +18,10 @@ import {
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
 import { getAdminState } from '../../data/adminStore';
-import { listSuppliers } from '../../data/erpRegistry';
+import { useBrands } from '../../data/brandStore';
+import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
+import { apiListSuppliers } from '../../services/erpApi';
+import { apiListProductGroups, type ProductGroup, type ProductGroupLabels } from '../../services/productCatalogApi';
 import {
   listPromoCampaigns,
   hydratePromoCampaigns,
@@ -27,10 +30,17 @@ import {
   removePromoCampaign,
   upsertPromoCampaign,
   type PromoCampaign,
+  type PromoCampaignChannel,
   type PromoKind,
   type PromoTier,
 } from '../../data/promoCampaignStore';
 import './promoCampaigns.css';
+
+const CHANNELS: Array<{ id: PromoCampaignChannel; label: string }> = [
+  { id: 'pdv', label: 'PDV (caixa)' },
+  { id: 'external', label: 'Venda externa' },
+  { id: 'totem', label: 'Totem' },
+];
 
 const PROMO_KIND_SHORT_LABEL: Record<PromoKind, string> = {
   percent: '% Desconto',
@@ -67,8 +77,11 @@ type FormState = {
   giftStockId: string;
   giftMinQty: number;
   supplierId: string;
+  groupId: string;
+  subgroupId: string;
   category: string;
   brand: string;
+  channels: PromoCampaignChannel[];
   stockIds: string[];
   minQty: number;
   customerGroup: string;
@@ -115,8 +128,11 @@ function emptyForm(): FormState {
     giftStockId: '',
     giftMinQty: 10,
     supplierId: '',
+    groupId: '',
+    subgroupId: '',
     category: '',
     brand: '',
+    channels: ['pdv', 'external', 'totem'],
     stockIds: [],
     minQty: 1,
     customerGroup: '',
@@ -130,24 +146,22 @@ function emptyForm(): FormState {
 
 export function PromoCampaignsPage() {
   const stock = useMemo(() => getAdminState().stock, []);
-  const suppliers = useMemo(() => listSuppliers(), []);
-
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    stock.forEach((s) => {
-      if (s.attrs?.categoria) set.add(s.attrs.categoria);
-      if (s.kind) set.add(s.kind);
-    });
-    return Array.from(set).filter(Boolean).sort();
-  }, [stock]);
-
-  const brands = useMemo(() => {
-    const set = new Set<string>();
-    stock.forEach((s) => {
-      if (s.attrs?.marca) set.add(s.attrs.marca);
-    });
-    return Array.from(set).filter(Boolean).sort();
-  }, [stock]);
+  // Fornecedores, marcas e grupos vêm do banco da loja.
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [groups, setGroups] = useState<ProductGroup[]>([]);
+  const [groupLabels, setGroupLabels] = useState<ProductGroupLabels>({ group: 'Grupo', subgroup: 'Subgrupo' });
+  const { brands } = useBrands();
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      void apiListSuppliers().then((rows) => alive && setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name })))).catch(() => undefined);
+      void apiListProductGroups().then((data) => { if (!alive) return; setGroups(data.groups); setGroupLabels(data.labels); }).catch(() => undefined);
+    };
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => { alive = false; window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load); };
+  }, []);
+  const groupName = (id?: string) => groups.find((item) => item.id === id)?.name ?? id ?? '';
 
   const [items, setItems] = useState(() => listPromoCampaigns());
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -222,8 +236,11 @@ export function PromoCampaignsPage() {
       giftStockId: item.giftStockId || '',
       giftMinQty: item.giftMinQty || 10,
       supplierId: item.criteria?.supplierId || '',
+      groupId: item.criteria?.groupId || '',
+      subgroupId: item.criteria?.subgroupId || '',
       category: item.criteria?.category || '',
       brand: item.criteria?.brand || '',
+      channels: item.channels?.length ? [...item.channels] : ['pdv', 'external', 'totem'],
       stockIds: [...(item.criteria?.stockIds || item.stockIds || [])],
       minQty: item.criteria?.minQty || 1,
       customerGroup: item.criteria?.customerGroup || '',
@@ -277,9 +294,13 @@ export function PromoCampaignsPage() {
       return;
     }
     const requiresTarget = ['tier', 'promo_price', 'buy_x_pay_y', 'gift'].includes(form.kind);
-    const hasTarget = form.stockIds.length > 0 || Boolean(form.supplierId) || Boolean(form.category.trim()) || Boolean(form.brand.trim());
+    const hasTarget = form.stockIds.length > 0 || Boolean(form.supplierId) || Boolean(form.groupId) || Boolean(form.subgroupId) || Boolean(form.category.trim()) || Boolean(form.brand.trim());
+    if (!form.channels.length) {
+      setError('Marque ao menos um canal onde a campanha vale (PDV, venda externa ou totem).');
+      return;
+    }
     if (requiresTarget && !hasTarget) {
-      setError('Para promoções com Preço Fixo, Faixas de Volume, Leve X Pague Y ou Brinde, é obrigatório vincular ao menos um produto, fornecedor, categoria ou marca para proteger os preços da loja.');
+      setError(`Para promoções com Preço Fixo, Faixas de Volume, Leve X Pague Y ou Brinde, é obrigatório vincular ao menos um produto, fornecedor, marca, ${groupLabels.group.toLowerCase()} ou ${groupLabels.subgroup.toLowerCase()} para proteger os preços da loja.`);
       return;
     }
 
@@ -304,8 +325,11 @@ export function PromoCampaignsPage() {
       name: form.name.trim(),
       active: form.active,
       kind: form.kind,
+      channels: form.channels,
       criteria: {
         supplierId: form.supplierId || undefined,
+        groupId: form.groupId || undefined,
+        subgroupId: form.subgroupId || undefined,
         category: form.category.trim() || undefined,
         brand: form.brand.trim() || undefined,
         stockIds: form.stockIds,
@@ -377,6 +401,8 @@ export function PromoCampaignsPage() {
       const sup = suppliers.find((s) => s.id === item.criteria.supplierId);
       parts.push(`Fornecedor: ${sup ? sup.name : item.criteria.supplierId}`);
     }
+    if (item.criteria?.groupId) parts.push(`${groupLabels.group}: ${groupName(item.criteria.groupId)}`);
+    if (item.criteria?.subgroupId) parts.push(`${groupLabels.subgroup}: ${groupName(item.criteria.subgroupId)}`);
     if (item.criteria?.category) parts.push(`Cat: ${item.criteria.category}`);
     if (item.criteria?.brand) parts.push(`Marca: ${item.criteria.brand}`);
     if (item.stockIds && item.stockIds.length > 0) parts.push(`${item.stockIds.length} produto(s)`);
@@ -679,53 +705,85 @@ export function PromoCampaignsPage() {
             <div className="span-2" style={{ borderTop: '1px solid var(--line, rgba(148, 163, 184, 0.2))', paddingTop: 16, marginTop: 8 }}>
               <h3 className="promo-form-section-title">Condições e Alvo da Promoção</h3>
               <p className="promo-form-section-desc">
-                Defina em quais produtos a promoção será ativada. Você pode escolher por Fornecedor, Categoria, Marca ou Produtos específicos.
+                Escolha onde a promoção vale e em quais produtos: por {groupLabels.group.toLowerCase()}, {groupLabels.subgroup.toLowerCase()}, fornecedor, marca ou produtos específicos. Combinando mais de um, o produto precisa atender a todos.
               </p>
             </div>
 
+            <div className="span-2 promo-channels" role="group" aria-label="Canais da campanha">
+              <span className="promo-channels__label">Vale em</span>
+              {CHANNELS.map((channel) => (
+                <label key={channel.id} className="promo-channel">
+                  <input
+                    type="checkbox"
+                    disabled={readOnly}
+                    checked={form.channels.includes(channel.id)}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        channels: e.target.checked ? [...form.channels, channel.id] : form.channels.filter((item) => item !== channel.id),
+                      })
+                    }
+                  />
+                  {channel.label}
+                </label>
+              ))}
+            </div>
+
             <AdminPicker
-              label="Fornecedor Alvo (Opcional)"
+              label={`${groupLabels.group} (opcional)`}
+              value={form.groupId}
+              disabled={readOnly}
+              placeholder={`Qualquer ${groupLabels.group.toLowerCase()}`}
+              options={[
+                { value: '', label: `Qualquer ${groupLabels.group.toLowerCase()}` },
+                ...groups.filter((item) => !item.parentId && (item.active || item.id === form.groupId)).map((item) => ({ value: item.id, label: item.name })),
+              ]}
+              onChange={(value) => setForm({ ...form, groupId: value, subgroupId: '' })}
+            />
+
+            <AdminPicker
+              label={`${groupLabels.subgroup} (opcional)`}
+              value={form.subgroupId}
+              disabled={readOnly || !form.groupId}
+              placeholder={form.groupId ? `Todos os ${groupLabels.subgroup.toLowerCase()}s` : `Escolha o ${groupLabels.group.toLowerCase()} antes`}
+              options={[
+                { value: '', label: `Todos os ${groupLabels.subgroup.toLowerCase()}s` },
+                ...groups.filter((item) => item.parentId === form.groupId && (item.active || item.id === form.subgroupId)).map((item) => ({ value: item.id, label: item.name })),
+              ]}
+              onChange={(value) => setForm({ ...form, subgroupId: value })}
+            />
+
+            <AdminPicker
+              label="Fornecedor (opcional)"
               value={form.supplierId}
               disabled={readOnly}
               placeholder="Qualquer fornecedor"
               options={[
-                { value: '', label: 'Qualquer fornecedor (Geral)' },
+                { value: '', label: 'Qualquer fornecedor' },
                 ...suppliers.map((s) => ({ value: s.id, label: s.name })),
               ]}
               onChange={(value) => setForm({ ...form, supplierId: value })}
             />
 
-            <label>
-              Categoria Alvo (Opcional)
-              <input
-                list="campaign-categories"
-                value={form.category}
-                disabled={readOnly}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder="Ex: Cimento, Tintas, Tubos..."
-              />
-              <datalist id="campaign-categories">
-                {categories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </label>
+            <AdminPicker
+              label="Marca (opcional)"
+              value={form.brand}
+              disabled={readOnly}
+              placeholder="Qualquer marca"
+              options={[
+                { value: '', label: 'Qualquer marca' },
+                ...brands.filter((b) => b.active || b.name === form.brand).map((b) => ({ value: b.name, label: b.name })),
+                ...(form.brand && !brands.some((b) => b.name === form.brand) ? [{ value: form.brand, label: form.brand }] : []),
+              ]}
+              onChange={(value) => setForm({ ...form, brand: value })}
+            />
 
-            <label>
-              Marca Alvo (Opcional)
-              <input
-                list="campaign-brands"
-                value={form.brand}
-                disabled={readOnly}
-                onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                placeholder="Ex: Tigre, Coral, Votoran..."
-              />
-              <datalist id="campaign-brands">
-                {brands.map((b) => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
-            </label>
+            {form.category ? (
+              <label>
+                Categoria (campanha antiga)
+                <input value={form.category} disabled={readOnly} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              </label>
+            ) : null}
 
             <label>
               Qtd Mínima do Produto para Disparar
@@ -801,11 +859,13 @@ export function PromoCampaignsPage() {
             {/* PRODUTOS ESPECÍFICOS */}
             <div className="span-2" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               <strong style={{ color: 'var(--ink, #e8eef4)' }}>
-                Vincular Produtos Específicos (Opcional se fornecedor/categoria/marca estiver definido)
+                Vincular Produtos Específicos (opcional se fornecedor, marca ou grupo estiver definido)
               </strong>
               {['tier', 'promo_price', 'buy_x_pay_y', 'gift'].includes(form.kind) &&
               form.stockIds.length === 0 &&
               !form.supplierId &&
+              !form.groupId &&
+              !form.subgroupId &&
               !form.category.trim() &&
               !form.brand.trim() ? (
                 <div
@@ -839,7 +899,7 @@ export function PromoCampaignsPage() {
 
               {form.stockIds.length === 0 ? (
                 <p className="empty" style={{ margin: '4px 0' }}>
-                  {form.supplierId || form.category || form.brand
+                  {form.supplierId || form.groupId || form.subgroupId || form.category || form.brand
                     ? 'A regra será aplicada para todos os produtos correspondentes às condições acima.'
                     : 'Nenhum produto individual vinculado ainda.'}
                 </p>

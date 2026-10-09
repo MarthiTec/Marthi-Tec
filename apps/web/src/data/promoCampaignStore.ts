@@ -1,6 +1,5 @@
 import { nestGet, nestPost, nestDelete } from '../services/nestClient';
 import { getActiveStoreId } from './multiStoreStore';
-import {storeScopedKey} from './storeCache';
 /**
  * Motor de Campanhas de Desconto e Promoções Comerciais (ERP → PDV & Orçamentos).
  *
@@ -8,6 +7,8 @@ import {storeScopedKey} from './storeCache';
  * SE:
  *   - Produto(s) específico(s)
  *   - Fornecedor específico
+ *   - Marca
+ *   - Grupo e subgrupo de produtos
  *   - Categoria / Atributo
  *   - Quantidade mínima / faixas progressivas
  *   - Grupo de clientes
@@ -27,7 +28,6 @@ import {storeScopedKey} from './storeCache';
  */
 
 export const PROMO_EVENT = 'marthi-promo-campaigns';
-const STORAGE_KEY = 'marthi.promo.campaigns.v1';
 
 export type PromoKind =
   | 'tier'
@@ -52,10 +52,16 @@ export type PromoTier = {
   totalPrice: number;
 };
 
+export type PromoCampaignChannel = 'totem' | 'pdv' | 'external';
+
 export type PromoRuleCriteria = {
   attributes?:Record<string,string>;
   /** Se vazio, aplica a qualquer fornecedor */
   supplierId?: string;
+  /** Grupo de produtos (ex.: Bebidas) — vale para todos os subgrupos dele */
+  groupId?: string;
+  /** Subgrupo de produtos (ex.: Cerveja) */
+  subgroupId?: string;
   /** Nome ou ID da categoria / departamento */
   category?: string;
   /** Marca / Fabricante */
@@ -72,7 +78,8 @@ export type PromoRuleCriteria = {
 
 export type PromoCampaign = {
   dayOffer?:boolean;
-  channels?:('totem'|'pdv'|'external')[];
+  /** Onde a campanha vale. Vazio = em todos os canais. */
+  channels?: PromoCampaignChannel[];
   id: string;
   name: string;
   active: boolean;
@@ -157,6 +164,8 @@ function normalize(item: any): PromoCampaign {
     criteria: {
       attributes:item.criteria?.attributes??{},
       supplierId: item.criteria?.supplierId ? String(item.criteria.supplierId).trim() : undefined,
+      groupId: item.criteria?.groupId ? String(item.criteria.groupId).trim() : undefined,
+      subgroupId: item.criteria?.subgroupId ? String(item.criteria.subgroupId).trim() : undefined,
       category: item.criteria?.category ? String(item.criteria.category).trim() : undefined,
       brand: item.criteria?.brand ? String(item.criteria.brand).trim() : undefined,
       stockIds: criteriaStockIds,
@@ -195,7 +204,9 @@ function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
       (camp.criteria?.stockIds && camp.criteria.stockIds.length > 0) ||
       Boolean(camp.criteria?.category) ||
       Boolean(camp.criteria?.brand) ||
-      Boolean(camp.criteria?.supplierId);
+      Boolean(camp.criteria?.supplierId) ||
+      Boolean(camp.criteria?.groupId) ||
+      Boolean(camp.criteria?.subgroupId);
 
     if (camp.id === 'PROMO-DEMO-TIER' && camp.active) {
       return {
@@ -222,43 +233,16 @@ function sanitizeCampaigns(campaigns: PromoCampaign[]): PromoCampaign[] {
   });
 }
 
+/** Campanhas ficam só em memória: a fonte é o banco (carregadas por hydratePromoCampaigns). */
 function load(): Store {
   const storeId = getActiveStoreId();
   if (memoryStoreId !== storeId) { memory = null; memoryStoreId = storeId; }
-  if (memory) return memory;
-  try {
-    const raw = localStorage.getItem(storeScopedKey(STORAGE_KEY));
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Store>;
-      const rawCampaigns = Array.isArray(parsed.campaigns) ? parsed.campaigns.map(normalize) : [];
-      const loaded = rawCampaigns.filter(
-        (c) => c.id && !c.id.startsWith('PROMO-DEMO') && !c.id.startsWith('PROMO-CIMENTO') && !c.id.startsWith('PROMO-TINTAS')
-      );
-      const sanitized = sanitizeCampaigns(loaded);
-      memory = { campaigns: sanitized };
-      if (JSON.stringify(sanitized) !== JSON.stringify(rawCampaigns)) {
-        try {
-          localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(memory));
-        } catch {
-          /* ignore */
-        }
-      }
-      return memory;
-    }
-  } catch {
-    /* ignore */
-  }
-  memory = seed();
+  if (!memory) memory = seed();
   return memory;
 }
 
 function save(next: Store) {
-  memory = next;
-  try {
-    localStorage.setItem(storeScopedKey(STORAGE_KEY), JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  memory = { campaigns: sanitizeCampaigns(next.campaigns) };
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(PROMO_EVENT));
   }
@@ -382,6 +366,8 @@ export type StockItemEvaluationInput = {
   name: string;
   sku?: string;
   supplierId?: string;
+  groupId?: string;
+  subgroupId?: string;
   category?: string;
   brand?: string;
   attrs?: Record<string, string>;
@@ -398,6 +384,8 @@ export function evaluateCampaignForLine(
   qty: number,
   baseUnitPrice: number,
   customerGroup?: string,
+  /** Canal da venda: a campanha só vale nos canais marcados nela. */
+  channel?: PromoCampaignChannel,
 ): EvaluatedLinePromo {
   const originalUnitPrice = baseUnitPrice;
   const standardTotal = Math.round(originalUnitPrice * qty * 100) / 100;
@@ -416,6 +404,7 @@ export function evaluateCampaignForLine(
   const activeCampaigns = listPromoCampaigns(true);
   const eligibleCampaigns = activeCampaigns.filter((camp) => {
     if(camp.dayOffer)return false; // Day offers are applied once by the server for the selected combination.
+    if (channel && camp.channels?.length && !camp.channels.includes(channel)) return false;
     const { criteria } = camp;
 
     // 1. Filtro de Grupo de Cliente (se a campanha exige grupo específico, cliente precisa pertencer)
@@ -431,7 +420,9 @@ export function evaluateCampaignForLine(
       (criteria.stockIds && criteria.stockIds.length > 0) ||
       Boolean(criteria.category) ||
       Boolean(criteria.brand) ||
-      Boolean(criteria.supplierId);
+      Boolean(criteria.supplierId) ||
+      Boolean(criteria.groupId) ||
+      Boolean(criteria.subgroupId);
 
     if (
       (camp.kind === 'tier' || camp.kind === 'promo_price' || camp.kind === 'buy_x_pay_y' || camp.kind === 'gift') &&
@@ -452,6 +443,10 @@ export function evaluateCampaignForLine(
       }
     }
 
+    // 4b. Grupo e subgrupo de produtos
+    if (criteria.groupId && item.groupId !== criteria.groupId) return false;
+    if (criteria.subgroupId && item.subgroupId !== criteria.subgroupId) return false;
+
     // 5. Filtro de Categoria
     if (criteria.category) {
       const catNeedle = criteria.category.toLowerCase().trim();
@@ -465,9 +460,9 @@ export function evaluateCampaignForLine(
 
     // 6. Filtro de Marca
     if (criteria.brand) {
-      const brandNeedle = criteria.brand.toLowerCase().trim();
+      const brandNeedle = criteria.brand.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
       const matchBrand =
-        (item.brand && item.brand.toLowerCase().includes(brandNeedle)) ||
+        (item.brand && item.brand.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(brandNeedle)) ||
         (item.attrs?.marca && item.attrs.marca.toLowerCase().includes(brandNeedle)) ||
         (item.attrs?.brand && item.attrs.brand.toLowerCase().includes(brandNeedle)) ||
         (item.name && item.name.toLowerCase().includes(brandNeedle));

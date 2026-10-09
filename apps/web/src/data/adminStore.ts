@@ -880,10 +880,12 @@ export async function removeCustomer(id: string): Promise<AdminState> {
   return state;
 }
 
-export async function removeStockItem(id: string): Promise<AdminState> {
+/** Exclui o produto. Com histórico, o servidor só inativa e manda o aviso em onNotice. */
+export async function removeStockItem(id: string, onNotice?: (message: string) => void): Promise<AdminState> {
   if (isNestAuthed()) {
     try {
-      await apiDeleteStock(id);
+      const result = await apiDeleteStock(id);
+      if (result?.deactivated && result.message) onNotice?.(result.message);
     } catch (error) {
       throw error;
     }

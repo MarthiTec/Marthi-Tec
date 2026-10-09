@@ -359,3 +359,68 @@ test('product movements show entries with supplier and invoice and exits with th
   assert.equal(entry.invoice.number, '1234');
   assert.equal((await request('/stock/' + product.id + '/movements', 'GET', undefined, 'store-b')).status, 403);
 });
+
+test('campaigns by group, subgroup, supplier and brand are saved, listed and deleted; external sale records the campaign', async () => {
+  const group = (await request('/product-groups', 'POST', { name: 'Acessórios' })).json.data;
+  const sub = (await request('/product-groups', 'POST', { name: 'Fones', parentId: group.id })).json.data;
+  const supplier = (await request('/suppliers', 'POST', { name: 'Distribuidora Som LTDA', tradeName: 'Som Distrib' })).json.data;
+  const product = (await request('/stock', 'POST', { name: 'Fone Bluetooth', brand: 'jbl', qty: 10, cost: 50, price: 100, groupId: group.id, subgroupId: sub.id, supplierId: supplier.id })).json.data;
+  const base = { active: true, kind: 'percent', discountPercent: 10, tiers: [], giftStockId: '', giftMinQty: 1, priority: 1, accumulative: false, stockIds: [], note: '' };
+  const targets = [
+    ['Grupo', { groupId: group.id }],
+    ['Subgrupo', { groupId: group.id, subgroupId: sub.id }],
+    ['Fornecedor', { supplierId: supplier.id }],
+    ['Marca', { brand: 'JBL' }],
+  ];
+  const ids = [];
+  for (const [name, criteria] of targets) {
+    const saved = await request('/promotions', 'POST', { ...base, name: `Campanha por ${name}`, channels: ['external'], criteria: { stockIds: [], ...criteria } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.deepEqual(saved.json.data.criteria, { stockIds: [], ...criteria });
+    ids.push(saved.json.data.id);
+  }
+  const listed = (await request('/promotions')).json.data;
+  for (const id of ids) assert.ok(listed.some((row) => row.id === id), 'campaign listed after save');
+
+  const foreignGroup = await request('/product-groups', 'POST', { name: 'Grupo da outra loja' }, 'store-b');
+  assert.equal(foreignGroup.status, 403);
+  assert.equal((await request('/promotions', 'POST', { ...base, name: 'Grupo inexistente', criteria: { stockIds: [], groupId: 'PGR-nao-existe' } })).status, 400);
+
+  // Venda externa com a campanha por grupo: 10% de 2 x 100 = 20 de desconto.
+  const sell = (line) => request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente Campanha', lines: [{ stockId: product.id, name: product.name, qty: 2, unitPrice: 100, ...line }] });
+  const sale = await sell({ discount: 20, campaignId: ids[0] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const saleId = sale.json.data.id || sale.json.data.saleId;
+  const line = (await query('SELECT campaign_id, campaign_name, discount_amount, total_price FROM sales_order_lines WHERE sale_id = $1', [saleId])).rows[0];
+  assert.equal(line.campaign_id, ids[0]);
+  assert.equal(line.campaign_name, 'Campanha por Grupo');
+  assert.equal(Number(line.discount_amount), 20);
+  assert.equal(Number(line.total_price), 180);
+
+  // Campanha só do PDV não vale na venda externa; campanha excluída também não.
+  const pdvOnly = (await request('/promotions', 'POST', { ...base, name: 'Só no PDV', channels: ['pdv'], criteria: { stockIds: [], groupId: group.id } })).json.data;
+  assert.equal((await sell({ discount: 20, campaignId: pdvOnly.id })).status, 409);
+  for (const id of [...ids, pdvOnly.id]) assert.equal((await request('/promotions/' + id, 'DELETE')).status, 200);
+  assert.equal((await request('/promotions')).json.data.filter((row) => ids.includes(row.id)).length, 0, 'deleted from the database');
+  assert.equal((await sell({ discount: 20, campaignId: ids[0] })).status, 409);
+});
+
+test('deleting a product without history removes it; with sales it is deactivated and keeps the history', async () => {
+  const clean = (await request('/stock', 'POST', { name: 'Sem historico', qty: 0, price: 10 })).json.data;
+  const removed = await request('/stock/' + clean.id, 'DELETE');
+  assert.equal(removed.status, 200, JSON.stringify(removed.json));
+  assert.equal(removed.json.data.deactivated, undefined);
+  assert.equal((await query('SELECT count(*)::int AS n FROM stock_items WHERE id = $1', [clean.id])).rows[0].n, 0);
+
+  const sold = (await request('/stock', 'POST', { name: 'Com venda', qty: 3, cost: 5, price: 20, showOnTotem: true })).json.data;
+  const sale = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: sold.id, name: sold.name, qty: 1, unitPrice: 20 }] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const res = await request('/stock/' + sold.id, 'DELETE');
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  assert.equal(res.json.data.deactivated, true);
+  const row = (await query('SELECT active, show_on_totem FROM stock_items WHERE id = $1', [sold.id])).rows[0];
+  assert.equal(row.active, false);
+  assert.equal(row.show_on_totem, false);
+  assert.equal((await query('SELECT count(*)::int AS n FROM sales_order_lines WHERE stock_id = $1', [sold.id])).rows[0].n, 1, 'sale history kept');
+  assert.equal((await request('/stock/STK-nao-existe', 'DELETE')).status, 404);
+});

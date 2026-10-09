@@ -172,6 +172,7 @@ export function StockPage() {
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   // ── Estado da Grade de Variações de Produto ────────────────────────
   const [useVariations, setUseVariations] = useState(false);
@@ -993,7 +994,7 @@ export function StockPage() {
     if (!ok) return;
     setError('');
     try {
-      const state = await removeStockItem(item.id);
+      const state = await removeStockItem(item.id, setNotice);
       setItems(state.stock);
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -1019,7 +1020,7 @@ export function StockPage() {
     try {
       let next = items;
       for (const id of ids) {
-        const state = await removeStockItem(id);
+        const state = await removeStockItem(id, setNotice);
         next = state.stock;
       }
       setItems(next);
@@ -1079,6 +1080,13 @@ export function StockPage() {
               </p>
             </div>
           </div>
+          {error ? <p role="alert" className="qty-low">{error}</p> : null}
+          {notice ? (
+            <p role="status" className="stock-list-notice">
+              {notice}{' '}
+              <button type="button" className="quick-add-btn" onClick={() => setNotice('')}>Ok</button>
+            </p>
+          ) : null}
 
           <article className="admin-card stock-list-card">
             <CrudListBar

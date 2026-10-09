@@ -239,3 +239,9 @@
 .promo-stock-item-remove:hover {
   transform: scale(1.2);
 }
+
+/* Canais onde a campanha vale */
+.promo-channels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.promo-channels__label { font-size: 0.82rem; font-weight: 700; color: var(--mute, #64748b); }
+.admin-form .promo-channel { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-weight: 650; cursor: pointer; }
+.admin-form .promo-channel input[type='checkbox'] { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--accent, #0e7490); }

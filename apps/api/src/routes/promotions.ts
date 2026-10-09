@@ -10,6 +10,7 @@ const schema = z.object({
   dayOffer:z.boolean().optional(),channels:z.array(z.enum(['totem','pdv','external'])).optional(),
   kind: z.enum(['tier', 'gift', 'percent', 'fixed', 'promo_price', 'buy_x_pay_y']),
   criteria: z.object({ stockIds: z.array(z.string()), supplierId: z.string().optional(),
+    groupId: z.string().optional(), subgroupId: z.string().optional(),
     category: z.string().optional(), brand: z.string().optional(), minQty: z.number().positive().optional(),
     minAmount: z.number().nonnegative().optional(), customerGroup: z.string().optional(),attributes:z.record(z.string()).optional() }),
   discountPercent: z.number().min(0).max(100).optional(), discountAmount: z.number().nonnegative().optional(),
@@ -30,6 +31,10 @@ promotionsRouter.post('/api/v1/promotions', requireAuth, async (req, res, next) 
     if (!canManageArea(req)) { res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para configurar campanhas.' } }); return; }
     const body = schema.parse(req.body); const id = body.id ?? randomUUID();
     if(body.dayOffer && (body.kind!=='promo_price'||!body.promoPrice||!body.endDate||!Number.isFinite(Date.parse(body.endDate))||Date.parse(body.endDate)<=Date.now()||!body.criteria.stockIds.length||!body.channels?.length)) throw Object.assign(new Error('Defina produto, preço positivo, canais e uma validade futura para a oferta.'),{status:400});
+    // Alvo da campanha (fornecedor, grupo, subgrupo) precisa ser desta loja.
+    for (const [table, value, label] of [['suppliers', body.criteria.supplierId, 'Fornecedor'], ['product_groups', body.criteria.groupId, 'Grupo'], ['product_groups', body.criteria.subgroupId, 'Subgrupo']] as const) {
+      if (value && !(await pool.query(`SELECT 1 FROM ${table} WHERE id=$1 AND store_id=$2`, [value, req.storeId])).rows.length) throw Object.assign(new Error(`${label} da campanha não encontrado nesta loja.`), { status: 400 });
+    }
     if(body.dayOffer){const targets=await pool.query('SELECT id FROM stock_items WHERE store_id=$1 AND id=ANY($2::text[])',[req.storeId,body.criteria.stockIds]);if(targets.rows.length!==new Set(body.criteria.stockIds).size)throw Object.assign(new Error('Produto de outra loja ou indisponível.'),{status:400});}
     const result = await pool.query(
       `INSERT INTO promo_campaigns(id, store_id, name, active, rules) VALUES ($1,$2,$3,$4,$5::jsonb)

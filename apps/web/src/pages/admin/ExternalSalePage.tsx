@@ -45,6 +45,9 @@ type StockOption = {
   qty: number;
   imei: string;
   category: string;
+  supplierId?: string;
+  groupId?: string;
+  subgroupId?: string;
 };
 
 import { QuickAddButton } from '../../components/QuickModal';
@@ -52,6 +55,7 @@ import { QuickCreateCustomer } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
 
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
+import { evaluateCampaignForLine, hydratePromoCampaigns, PROMO_EVENT, type EvaluatedLinePromo } from '../../data/promoCampaignStore';
 import type { StockVariationRow } from '../../data/adminStore';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
@@ -178,6 +182,9 @@ export function ExternalSalePage() {
           imei: it.imei || '',
           category: it.category || 'Geral',
           brand: it.brand || '',
+          supplierId: it.supplierId || undefined,
+          groupId: it.groupId || undefined,
+          subgroupId: it.subgroupId || undefined,
           pickupPrices: it.pickupPrices,
           attrs: it.attrs, color: it.color, capacity: it.capacity,
           variations: Array.isArray(it.variations) ? it.variations : [],
@@ -297,10 +304,65 @@ export function ExternalSalePage() {
     );
   }
 
+  // Campanhas da loja (do banco), aplicadas automaticamente nos produtos que se encaixam.
+  const [promoVersion, setPromoVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => setPromoVersion((v) => v + 1);
+    void hydratePromoCampaigns().catch(() => undefined);
+    window.addEventListener(PROMO_EVENT, changed);
+    return () => window.removeEventListener(PROMO_EVENT, changed);
+  }, [storeId]);
+
+  /** Campanha que vale para a linha na venda externa (ou null). */
+  const linePromos = useMemo<Array<EvaluatedLinePromo | null>>(
+    () =>
+      lines.map((line) => {
+        const prod = stockItems.find((p) => p.id === line.stockId);
+        const qty = Number(line.qty) || 0;
+        const price = Number(line.unitPrice) || 0;
+        if (!prod || line.campaignOff || qty <= 0 || price <= 0) return null;
+        const result = evaluateCampaignForLine(
+          {
+            id: prod.id,
+            name: prod.name,
+            supplierId: prod.supplierId,
+            groupId: prod.groupId,
+            subgroupId: prod.subgroupId,
+            category: prod.category,
+            brand: prod.brand,
+            attrs: (prod.attrs ?? {}) as Record<string, string>,
+          },
+          qty,
+          price,
+          undefined,
+          'external',
+        );
+        return result.appliedCampaign && result.discountAmount > 0 ? result : null;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines, stockItems, promoVersion],
+  );
+  const campaignDiscount = linePromos.reduce((sum, promo) => sum + (promo?.discountAmount ?? 0), 0);
+  // Campanha que existe para o produto mas o vendedor tirou da linha (para poder voltar).
+  const campaignAvailable = (idx: number) => {
+    const line = lines[idx];
+    if (!line?.campaignOff) return false;
+    const prod = stockItems.find((p) => p.id === line.stockId);
+    if (!prod) return false;
+    const result = evaluateCampaignForLine(
+      { id: prod.id, name: prod.name, supplierId: prod.supplierId, groupId: prod.groupId, subgroupId: prod.subgroupId, category: prod.category, brand: prod.brand, attrs: (prod.attrs ?? {}) as Record<string, string> },
+      Number(line.qty) || 0,
+      Number(line.unitPrice) || 0,
+      undefined,
+      'external',
+    );
+    return Boolean(result.appliedCampaign && result.discountAmount > 0);
+  };
+
   // Cálculos Financeiros
   const subtotal = useMemo(() => {
-    return lines.reduce((sum, l) => sum + (Number(l.qty) || 1) * (Number(l.unitPrice) || 0), 0);
-  }, [lines]);
+    return lines.reduce((sum, l) => sum + (Number(l.qty) || 1) * (Number(l.unitPrice) || 0), 0) - campaignDiscount;
+  }, [lines, campaignDiscount]);
 
   const totalCost = useMemo(() => {
     return lines.reduce((sum, l) => sum + (Number(l.qty) || 1) * (Number(l.unitCost) || 0), 0);
@@ -341,8 +403,10 @@ export function ExternalSalePage() {
         warrantyType,
         warrantyMonths: warrantyType === 'store' ? Number(warrantyMonths) : 0,
         warrantyTerms: warrantyTerms.trim(),
-        lines: lines.map((l) => ({
+        lines: lines.map((l, idx) => ({
           stockId: l.stockId || null,
+          discount: linePromos[idx]?.discountAmount ?? 0,
+          campaignId: linePromos[idx]?.appliedCampaign?.id,
           pickupMethodId:l.pickupMethodId,deliveryAddress:l.deliveryAddress,
           sourceTicketId:l.sourceTicketId,
           attributes: l.attributes ?? [],
@@ -529,6 +593,25 @@ export function ExternalSalePage() {
                     <label className="admin-label">IMEI (se houver)</label>
                     <input type="text" className="admin-input" placeholder="3542…" value={line.imei || ''} onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value)} />
                   </div>
+                  {linePromos[idx] ? (
+                    <div className="external-sale-wide-field xsale-promo" role="status">
+                      <span className="xsale-promo__tag">Campanha</span>
+                      <span className="xsale-promo__text">
+                        <strong>{linePromos[idx]!.explanation || linePromos[idx]!.promoLabel}</strong>
+                        {' '}— de {formatMoney((Number(line.qty) || 0) * (Number(line.unitPrice) || 0))} por <strong>{formatMoney(linePromos[idx]!.lineBaseTotal)}</strong>
+                      </span>
+                      <button type="button" className="xsale-promo__remove" onClick={() => handleLineFieldChange(idx, 'campaignOff', true)}>
+                        Não aplicar
+                      </button>
+                    </div>
+                  ) : campaignAvailable(idx) ? (
+                    <div className="external-sale-wide-field xsale-promo is-off">
+                      <span className="xsale-promo__text">Campanha disponível para este produto, mas fora desta venda.</span>
+                      <button type="button" className="xsale-promo__remove" onClick={() => handleLineFieldChange(idx, 'campaignOff', false)}>
+                        Aplicar campanha
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -617,6 +700,7 @@ export function ExternalSalePage() {
                   </div>
                 </div>
                 <div className="xsale-trade-sum">
+                  {campaignDiscount > 0 ? <div><small>Desconto de campanha</small><strong>- {formatMoney(campaignDiscount)}</strong></div> : null}
                   <div><small>Produto novo</small><strong>{formatMoney(grossTotal)}</strong></div>
                   <div><small>Crédito do usado</small><strong className="xsale-accent">- {formatMoney(tradeInCredit)}</strong></div>
                   <div><small>Saldo a pagar</small><strong className="xsale-accent xsale-big">{formatMoney(netAmountToPay)}</strong></div>
