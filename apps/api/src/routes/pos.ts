@@ -471,7 +471,7 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           if (line.stockId && line.pickupKind!=='order') {
             const soldVariationId = await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
             // Marca o aparelho vendido (IMEI lido no PDV ou a entrada mais antiga).
-            await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId });
+            await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId, unitPrice: line.unitPrice, operator: req.user!.name });
             const stockCheck = await client.query(
               `SELECT qty, cost FROM stock_items WHERE id = $1 AND store_id = $2`,
               [line.stockId, storeId],

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { assertSoldUnitsKept, soldByEntry } from './soldUnits.js';
+import { cancelEntryPayables, postEntryPayable, syncEntryPayable } from './entryFinance.js';
 
 /**
  * Entradas do mesmo produto por fornecedor (ex.: iPhone 17 Pro Max comprado de vários fornecedores).
@@ -19,6 +20,10 @@ export const supplierEntrySchema = z
     notes: z.string().max(500).default(''),
     /** Bateria (%) do aparelho desta entrada (usados). */
     batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
+    /** Só na criação: compra já paga, a pagar (contas a pagar) ou sem lançamento no financeiro. */
+    payment: z.enum(['paid', 'pending', 'none']).optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
+    accountId: z.string().nullable().optional(),
   })
   .refine((entry) => entry.imeis.length <= entry.qty, 'Há mais IMEIs do que unidades em uma entrada.');
 
@@ -71,6 +76,7 @@ export async function saveSupplierEntries(
   // Aparelho já vendido não sai da entrada (nem a entrada some).
   await assertSoldUnitsKept(db, storeId, stockId, all.map((entry) => ({ id: entry.id, qty: entry.qty, imeis: entry.imeis })));
 
+  const productName = (await db.query('SELECT name FROM stock_items WHERE id = $1 AND store_id = $2', [stockId, storeId])).rows[0]?.name ?? '';
   const kept = new Set<string>();
   let newQty = 0;
   let runningQty = options.previousQty;
@@ -86,6 +92,7 @@ export async function saveSupplierEntries(
           WHERE id = $1 AND store_id = $2`,
         [current.id, storeId, entry.variationId, current.origin === 'trade_in' ? current.supplier_id : supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
       );
+      if (current.origin !== 'trade_in') await syncEntryPayable(db, storeId, current.id, entry.qty, entry.unitCost);
       continue;
     }
     const id = `SEN-${randomUUID()}`;
@@ -97,6 +104,21 @@ export async function saveSupplierEntries(
     );
     newQty += entry.qty;
     const supplierName = supplierId ? names.get(supplierId) ?? '' : '';
+    await postEntryPayable(db, {
+      storeId,
+      entryId: id,
+      payment: entry.payment,
+      dueDate: entry.dueDate || null,
+      accountId: entry.accountId || null,
+      supplierId,
+      supplierName,
+      productName,
+      qty: entry.qty,
+      unitCost: entry.unitCost,
+      imeis: entry.imeis,
+      entryDate,
+      operator: options.operator,
+    });
     await db.query(
       `INSERT INTO stock_movements (id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes)
        VALUES ($1, $2, $3, 'in', $4, $5, $6, $7, 'supplier_entry', $8, $9, $10)`,
@@ -116,7 +138,10 @@ export async function saveSupplierEntries(
     runningQty += entry.qty;
   }
   const removed = [...existing.keys()].filter((id) => !kept.has(id));
-  if (removed.length) await db.query('DELETE FROM stock_supplier_entries WHERE store_id = $1 AND id = ANY($2::text[])', [storeId, removed]);
+  if (removed.length) {
+    await cancelEntryPayables(db, storeId, removed);
+    await db.query('DELETE FROM stock_supplier_entries WHERE store_id = $1 AND id = ANY($2::text[])', [storeId, removed]);
+  }
   return newQty;
 }
 

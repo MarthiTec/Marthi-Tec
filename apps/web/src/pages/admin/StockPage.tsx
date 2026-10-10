@@ -82,7 +82,7 @@ import {
   type StockMode,
 } from '../../services/productCatalogApi';
 import { useAuth } from '../../contexts/AuthContext';
-import { stockSearchText } from '../../data/stockSearch';
+import { entryImeis, stockSearchText } from '../../data/stockSearch';
 import { KitsPage } from './KitsPage';
 import { WarehousePage } from './WarehousePage';
 import { LotsPage } from './LotsPage';
@@ -112,8 +112,8 @@ function todayIso() {
 
 const formatQty = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
-/** Todos os códigos do produto: SKU, barras, IMEI, DUN-14, e os das variações e das entradas por fornecedor. */
-function productCodes(item: StockItem) {
+/** Todos os códigos do produto: SKU, barras, IMEI, DUN-14, e os das variações e das entradas (IMEIs vendidos só se pedido). */
+function productCodes(item: StockItem, includeSoldImeis = false) {
   const variations = item.variations ?? [];
   return [
     item.sku,
@@ -121,8 +121,8 @@ function productCodes(item: StockItem) {
     item.imei,
     item.dun14,
     ...variations.flatMap((v) => [v.barcode, v.imei]),
-    ...(item.supplierEntries ?? []).flatMap((entry) => entry.imeis ?? []),
-    ...variations.flatMap((v) => (v.supplierEntries ?? []).flatMap((entry) => entry.imeis ?? [])),
+    ...(item.supplierEntries ?? []).flatMap((entry) => entryImeis(entry, includeSoldImeis)),
+    ...variations.flatMap((v) => (v.supplierEntries ?? []).flatMap((entry) => entryImeis(entry, includeSoldImeis))),
   ]
     .filter(Boolean)
     .join(' ');
@@ -217,6 +217,8 @@ export function StockPage() {
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
   // Produto excluído com histórico fica inativo: por padrão a lista mostra só os ativos.
   const [statusFilter, setStatusFilter] = useState<CrudStatusFilter>('active');
+  // Controle por IMEI: o que já foi vendido (ou baixado) some da busca; aparece só marcando a opção.
+  const [showSoldImeis, setShowSoldImeis] = useState(false);
   const [listSort, setListSort] = useState<'name' | 'name-desc' | 'recent' | 'oldest' | 'price-desc' | 'price-asc' | 'qty-desc' | 'qty-asc'>('name');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
@@ -363,7 +365,12 @@ export function StockPage() {
 
   // Cores e capacidades do modelo escolhidas na ajuda (estoque simplificado): só elas viram variações.
   const [helpPick, setHelpPick] = useState<{ colors: string[]; capacities: string[] }>({ colors: [], capacities: [] });
-  useEffect(() => setHelpPick({ colors: [], capacities: [] }), [device?.model]);
+  // A janela da ajuda pode ser fechada (X) e fecha sozinha depois de criar as variações; outro modelo reabre.
+  const [helpClosed, setHelpClosed] = useState(false);
+  useEffect(() => {
+    setHelpPick({ colors: [], capacities: [] });
+    setHelpClosed(false);
+  }, [device?.model]);
   const toggleHelp = (kind: 'colors' | 'capacities', value: string) =>
     setHelpPick((current) => ({ ...current, [kind]: current[kind].includes(value) ? current[kind].filter((item) => item !== value) : [...current[kind], value] }));
 
@@ -409,6 +416,7 @@ export function StockPage() {
     setUseVariations(true);
     setSelectedAttrIds((current) => [...new Set([...current, ...(colors.length && colorDef ? [colorDef.id] : []), ...(capacities.length && capDef ? [capDef.id] : [])])]);
     setHelpPick({ colors: [], capacities: [] });
+    setHelpClosed(true);
   }
 
   function referenceValues(attr: { name: string; values: string[] } | undefined) {
@@ -548,11 +556,11 @@ export function StockPage() {
       }
       if (codeQuery.trim()) {
         // Também os IMEIs/códigos das variações e das entradas por fornecedor.
-        const codeHay = productCodes(item);
+        const codeHay = productCodes(item, showSoldImeis);
         if (!matchesQuery(codeHay, codeQuery)) return false;
       }
       return matchesQuery(
-        `${stockSearchText(item, supplierNames)} ${findBrand(brands, item.brand)?.name ?? ''} ${item.dun14 ?? ''} ${item.color} ${item.capacity}`,
+        `${stockSearchText(item, supplierNames, { includeSoldImeis: showSoldImeis })} ${findBrand(brands, item.brand)?.name ?? ''} ${item.dun14 ?? ''} ${item.color} ${item.capacity}`,
         query,
       );
     });
@@ -571,7 +579,7 @@ export function StockPage() {
       'qty-asc': (a, b) => (Number(a.qty) || 0) - (Number(b.qty) || 0) || byName(a, b),
     };
     return [...filtered].sort(sorters[listSort]);
-  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query, supplierNames, brands]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query, supplierNames, brands, showSoldImeis]);
 
   /** Totais da lista filtrada: unidades em estoque, custo total e valor de venda total. */
   const listTotals = useMemo(() => {
@@ -1748,8 +1756,16 @@ export function StockPage() {
         <div className="stock-id-content">
           {automationState.enabled && deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
           {automationState.enabled && deviceError && <p role="status" className="empty">{deviceError}</p>}
-          {automationState.enabled && !readOnly && device ? (
+          {automationState.enabled && !readOnly && device && helpClosed ? (
+            <button type="button" className="quick-add-btn stock-help-pick__reopen" onClick={() => setHelpClosed(false)}>
+              ＋ Mais cores e capacidades do {device.model}
+            </button>
+          ) : null}
+          {automationState.enabled && !readOnly && device && !helpClosed ? (
             <div className="stock-help-pick">
+              <button type="button" className="stock-help-pick__close" aria-label="Fechar a ajuda" title="Fechar" onClick={() => setHelpClosed(true)}>
+                ✕
+              </button>
               <p className="stock-help-pick__title">
                 Ajuda do <strong>{device.model}</strong>: marque as cores e capacidades que você vende — só elas entram na grade.
               </p>
@@ -2027,6 +2043,10 @@ export function StockPage() {
                       ]}
                       onChange={(value) => setTotemFilter(value as typeof totemFilter)}
                     />
+                  </label>
+                  <label className="stock-sold-imei-toggle" title="Controle por IMEI: aparelho vendido ou baixado sai do estoque e some da busca">
+                    <input type="checkbox" checked={showSoldImeis} onChange={(e) => setShowSoldImeis(e.target.checked)} />
+                    Exibir IMEIs vendidos
                   </label>
                 </>
               }
@@ -2583,7 +2603,7 @@ export function StockPage() {
                                 ariaLabel="Custo unitário da variação"
                                 value={Number(row.cost) || 0}
                                 display={(Number(row.cost) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                hint={row.supplierEntries?.length ? 'média das entradas' : 'informe em Fornecedores'}
+                                hint={row.supplierEntries?.length ? 'média das entradas' : 'via Fornecedores'}
                                 editing={manualAdjust.has(`${row.tempKey}:cost`)}
                                 disabled={readOnly}
                                 onEdit={() => unlock(`${row.tempKey}:cost`)}
@@ -2602,7 +2622,7 @@ export function StockPage() {
                                 decimals={qtyDecimals}
                                 value={Number(row.qty) || 0}
                                 display={`${formatQty(Number(row.qty) || 0)} un`}
-                                hint={row.supplierEntries?.length ? 'soma das entradas' : Number(row.qty) > 0 ? 'saldo atual' : 'lance em Fornecedores'}
+                                hint={row.supplierEntries?.length ? 'soma das entradas' : Number(row.qty) > 0 ? 'saldo atual' : 'via Fornecedores'}
                                 editing={manualAdjust.has(`${row.tempKey}:qty`)}
                                 disabled={readOnly}
                                 onEdit={() => unlock(`${row.tempKey}:qty`)}

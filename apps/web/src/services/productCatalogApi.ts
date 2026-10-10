@@ -45,7 +45,7 @@ export const apiSaveStockMode = (mode: StockMode) => nestPut<{ mode: StockMode }
 /* Entrada de estoque (tela de entrada). */
 export type StockEntryRequest = {
   variation?: { id?: string; attrs: Record<string, string>; condition: 'new' | 'used' | 'refurbished'; price?: number };
-  entry: { supplierId?: string | null; entryDate?: string; qty: number; unitCost: number; imeis: string[]; notes?: string; batteryLevel?: number | null };
+  entry: { supplierId?: string | null; entryDate?: string; qty: number; unitCost: number; imeis: string[]; notes?: string; batteryLevel?: number | null; payment?: 'paid' | 'pending' | 'none'; dueDate?: string; accountId?: string | null };
 };
 export const apiCreateStockEntry = (stockId: string, body: StockEntryRequest) =>
-  nestPost<{ product: import('../data/adminStore').StockItem; entryId: string; variationId: string | null }>(`/stock/${encodeURIComponent(stockId)}/entries`, body);
+  nestPost<{ product: import('../data/adminStore').StockItem; entryId: string; variationId: string | null; payableId: string | null }>(`/stock/${encodeURIComponent(stockId)}/entries`, body);

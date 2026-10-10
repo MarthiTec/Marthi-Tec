@@ -303,7 +303,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         if (line.stockId && line.pickupKind!=='order') {
           const soldVariationId = await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
           // Marca o aparelho vendido (IMEI informado ou a entrada mais antiga): ele deixa de estar em estoque.
-          await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId });
+          await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId, unitPrice: line.unitPrice, operator: req.user?.name || 'Operador' });
           const prevRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`, [line.stockId, storeId]);
           const prevQty = Number(prevRes.rows[0].qty);
           const newQty = prevQty - line.qty;
@@ -1030,7 +1030,7 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         [body.reason, req.user?.name || 'Operador', saleId],
       );
       // Os aparelhos desta venda voltam a ficar em estoque.
-      await unmarkSaleUnits(client, storeId, saleId);
+      await unmarkSaleUnits(client, storeId, saleId, req.user?.name || 'Operador');
 
       // 2. Estorna itens vendidos devolvendo para o estoque
       const linesRes = await client.query(

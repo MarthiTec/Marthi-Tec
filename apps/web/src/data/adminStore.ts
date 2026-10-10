@@ -19,7 +19,7 @@ import {
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
 import { isRealClientTenant } from './tenantContext';
-import { stockMatches } from './stockSearch';
+import { entryImeis, stockMatches } from './stockSearch';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
@@ -66,7 +66,10 @@ export type SupplierEntry = {
   /** Unidades desta entrada já vendidas (vêm do banco; não são editadas na tela). */
   soldQty?: number;
   /** IMEIs desta entrada que já saíram numa venda. */
-  soldImeis?: Array<{ imei: string; saleId: string; soldAt: string }>;
+  soldImeis?: Array<{ imei: string; saleId: string; soldAt: string; kind?: string }>;
+  /** Só na criação: compra paga, a pagar (contas a pagar) ou sem lançamento no financeiro. */
+  payment?: 'paid' | 'pending' | 'none';
+  dueDate?: string;
 };
 
 export type StockVariationRow = {
@@ -677,8 +680,8 @@ export function findStockByCode(code: string) {
   const clean = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, '');
   const byUnit = stock.find(
     (item) =>
-      (item.variations ?? []).some((v) => clean(v.imei) === needle || clean(v.barcode) === needle || (v.supplierEntries ?? []).some((entry) => (entry.imeis ?? []).some((imei) => clean(imei) === needle))) ||
-      (item.supplierEntries ?? []).some((entry) => (entry.imeis ?? []).some((imei) => clean(imei) === needle)),
+      (item.variations ?? []).some((v) => clean(v.imei) === needle || clean(v.barcode) === needle || (v.supplierEntries ?? []).some((entry) => entryImeis(entry).some((imei) => clean(imei) === needle))) ||
+      (item.supplierEntries ?? []).some((entry) => entryImeis(entry).some((imei) => clean(imei) === needle)),
   );
   if (byUnit) return byUnit;
   const named = stock.filter((item) => item.name.toLowerCase().includes(needle));

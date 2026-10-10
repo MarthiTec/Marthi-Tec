@@ -7288,3 +7288,25 @@ select.caixa-mov-input {
 .stock-help-pick__group > span { font-size: 0.78rem; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 0.04em; }
 .stock-help-pick__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .stock-help-pick > .btn { justify-self: start; }
+
+/* Grade de variações alinhada: rótulo em uma linha e caixas com a mesma altura dos campos. */
+.stock-variation-container tbody td::before { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em; }
+.stock-variation-container tbody td { justify-content: flex-start; }
+.stock-variation-container .stock-qty-desc { height: 40px; min-height: 40px; padding: 0 8px 0 12px; overflow: hidden; }
+.stock-variation-container .stock-qty-desc,
+.stock-variation-container .stock-qty-desc * { overflow-wrap: normal; }
+.stock-variation-container .stock-qty-desc strong { white-space: nowrap; font-size: 0.9rem; }
+.stock-variation-container .stock-qty-desc small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.stock-variation-container .stock-qty-desc__text { overflow: hidden; }
+.stock-variation-container .product-last-entry { font-size: 0.75rem; }
+
+/* Ajuda de cores/capacidades: botão de fechar. */
+.stock-help-pick { position: relative; padding-right: 40px; }
+.stock-help-pick__close {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 0.95rem; line-height: 1; cursor: pointer;
+}
+.stock-help-pick__close:hover { border-color: #b91c1c; color: #b91c1c; }
+.stock-help-pick__reopen { margin: 0 0 12px; }
+.stock-sold-imei-toggle { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; align-self: end; min-height: 40px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.stock-sold-imei-toggle input { width: 16px; height: 16px; min-height: 0; margin: 0; }

@@ -27,12 +27,20 @@ export function supplierEntriesLabel(entries: SupplierEntry[] | undefined) {
   const { qty, suppliers, count } = supplierEntriesSummary(entries);
   if (!count) return 'Nenhuma';
   const sold = (entries ?? []).reduce((sum, entry) => sum + (entry.soldQty ?? 0), 0);
-  return `${suppliers} ${suppliers === 1 ? 'fornecedor' : 'fornecedores'} · ${qty} un${sold ? ` · ${sold} ${sold === 1 ? 'vendida' : 'vendidas'}` : ''}`;
+  return `${suppliers} ${suppliers === 1 ? 'fornecedor' : 'fornecedores'} · ${qty} un${sold ? ` · ${sold} ${sold === 1 ? 'saiu' : 'saíram'}` : ''}`;
 }
 
 const dateTimeBr = (iso: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
+const OUT_LABEL: Record<string, string> = { sale: 'Vendido', bonus: 'Bonificação', internal: 'Uso interno', loss: 'Perda' };
 
-type Draft = SupplierEntry & { key: string; imeisText: string; supplierOrigin: SupplierOrigin };
+/** Os IMEIs que já saíram ficam fora da caixa de texto (não somem da entrada: voltam no Aplicar). */
+type Draft = SupplierEntry & { key: string; imeisText: string; outImeis: string[]; supplierOrigin: SupplierOrigin };
+
+const PAYMENT_OPTIONS = [
+  { value: 'pending', label: 'A pagar (contas a pagar)' },
+  { value: 'paid', label: 'Já pago (sai do caixa)' },
+  { value: 'none', label: 'Não lançar no financeiro' },
+];
 
 export type SupplierOrigin = 'company' | 'upgrade';
 export type SupplierOption = { id: string; name: string; origin?: SupplierOrigin };
@@ -45,12 +53,16 @@ export const SUPPLIER_ORIGIN_OPTIONS: Array<{ value: SupplierOrigin; label: stri
 const originOf = (suppliers: SupplierOption[], supplierId: string | undefined): SupplierOrigin =>
   suppliers.find((item) => item.id === supplierId)?.origin === 'upgrade' ? 'upgrade' : 'company';
 
-const toDraft = (entry: SupplierEntry, index: number, suppliers: SupplierOption[]): Draft => ({
-  ...entry,
-  key: entry.id || `new_${index}_${Date.now()}`,
-  imeisText: (entry.imeis ?? []).join('\n'),
-  supplierOrigin: originOf(suppliers, entry.supplierId),
-});
+const toDraft = (entry: SupplierEntry, index: number, suppliers: SupplierOption[]): Draft => {
+  const outImeis = (entry.soldImeis ?? []).map((item) => item.imei);
+  return {
+    ...entry,
+    key: entry.id || `new_${index}_${Date.now()}`,
+    imeisText: (entry.imeis ?? []).filter((imei) => !outImeis.includes(imei)).join('\n'),
+    outImeis,
+    supplierOrigin: originOf(suppliers, entry.supplierId),
+  };
+};
 
 /**
  * Entradas do mesmo produto (ou da variação) por fornecedor: cada compra com fornecedor, data,
@@ -79,15 +91,21 @@ export function SupplierEntriesModal({
   const allSuppliers = [...suppliers, ...created.filter((item) => !suppliers.some((s) => s.id === item.id))];
   const [rows, setRows] = useState<Draft[]>(() => entries.map((entry, index) => toDraft(entry, index, suppliers)));
   const [error, setError] = useState('');
+  // Aparelhos que já saíram (venda, bonificação…) só aparecem quando o usuário pede.
+  const [showOut, setShowOut] = useState(false);
+  const anyOut = rows.some((row) => (row.soldQty ?? 0) > 0);
 
   const update = (key: string, patch: Partial<Draft>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const add = () =>
     setRows((current) => [
       ...current,
-      toDraft({ supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: current[current.length - 1]?.unitCost ?? 0, imeis: [] }, current.length, suppliers),
+      toDraft({ supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: current[current.length - 1]?.unitCost ?? 0, imeis: [], payment: 'pending' }, current.length, suppliers),
     ]);
 
-  const parsed = rows.map((row) => ({ ...row, imeis: row.imeisText.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean) }));
+  const parsed = rows.map((row) => {
+    const typed = row.imeisText.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
+    return { ...row, typed, imeis: [...row.outImeis, ...typed.filter((imei) => !row.outImeis.includes(imei))] };
+  });
   const summary = supplierEntriesSummary(parsed);
 
   function apply() {
@@ -99,7 +117,7 @@ export function SupplierEntriesModal({
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
     if (dup) return setError(`O IMEI ${dup} está repetido.`);
     onApply(
-      parsed.map(({ key: _key, imeisText: _text, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
+      parsed.map(({ key: _key, imeisText: _text, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
@@ -117,6 +135,12 @@ export function SupplierEntriesModal({
       onSubmit={apply}
     >
       <div className="supplier-entries">
+        {anyOut ? (
+          <label className="supplier-entries__show-out">
+            <input type="checkbox" checked={showOut} onChange={(e) => setShowOut(e.target.checked)} />
+            Exibir aparelhos que já saíram (vendidos, bonificação, uso interno)
+          </label>
+        ) : null}
         {rows.length === 0 ? <p className="empty">Nenhuma entrada ainda. Use “+ Entrada de fornecedor”.</p> : null}
         {rows.map((row, index) => (
           <fieldset key={row.key} className="supplier-entry">
@@ -124,7 +148,7 @@ export function SupplierEntriesModal({
               Entrada {index + 1}
               {row.soldQty ? (
                 <span className="supplier-entry__sold-count">
-                  {row.soldQty} de {row.qty} {row.soldQty === 1 ? 'vendida' : 'vendidas'}
+                  {Number(row.qty) - row.soldQty} em estoque · {row.soldQty} {row.soldQty === 1 ? 'saiu' : 'saíram'}
                 </span>
               ) : null}
               {row.soldQty ? null : (
@@ -185,23 +209,36 @@ export function SupplierEntriesModal({
                 <CurrencyInput value={row.unitCost} ariaLabel="Custo unitário da entrada" onChange={(unitCost) => update(row.key, { unitCost })} />
               </label>
               <label className="admin-field supplier-entry__imeis">
-                IMEIs ({parsed[index].imeis.length}/{Number(row.qty) || 0})
+                IMEIs em estoque ({parsed[index].typed.length})
                 <textarea rows={2} value={row.imeisText} placeholder="Um IMEI por linha (opcional)" onChange={(e) => update(row.key, { imeisText: e.target.value })} />
               </label>
-              {parsed[index].imeis.length || row.soldQty ? (
+              {showOut && row.soldQty ? (
                 <div className="supplier-entry__units">
-                  {parsed[index].imeis.map((imei) => {
-                    const sold = row.soldImeis?.find((item) => item.imei === imei);
-                    return (
-                      <span key={imei} className={`supplier-entry__unit ${sold ? 'is-sold' : 'is-stock'}`} title={sold ? `Vendido em ${dateTimeBr(sold.soldAt)} · venda ${sold.saleId}` : 'Ainda no estoque'}>
-                        {imei} · {sold ? `Vendido ${dateTimeBr(sold.soldAt)}` : 'Em estoque'}
-                      </span>
-                    );
-                  })}
+                  {(row.soldImeis ?? []).map((item) => (
+                    <span key={item.imei} className="supplier-entry__unit is-sold" title={item.saleId ? `Venda ${item.saleId}` : undefined}>
+                      {item.imei} · {OUT_LABEL[item.kind ?? 'sale'] ?? 'Saiu'} {dateTimeBr(item.soldAt)}
+                    </span>
+                  ))}
                   {(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0) > 0 ? (
                     <span className="supplier-entry__unit is-sold">{(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0)} un sem IMEI vendida(s)</span>
                   ) : null}
                 </div>
+              ) : null}
+              {!row.id && row.origin !== 'trade_in' ? (
+                <>
+                  <AdminPicker
+                    label="Financeiro"
+                    value={row.payment ?? 'pending'}
+                    options={PAYMENT_OPTIONS}
+                    onChange={(value) => update(row.key, { payment: value === 'paid' || value === 'none' ? value : 'pending' })}
+                  />
+                  {(row.payment ?? 'pending') === 'pending' ? (
+                    <label className="admin-field">
+                      Vencimento
+                      <input type="date" value={row.dueDate || row.entryDate} onChange={(e) => update(row.key, { dueDate: e.target.value })} />
+                    </label>
+                  ) : null}
+                </>
               ) : null}
               <label className="admin-field">
                 Bateria (%)

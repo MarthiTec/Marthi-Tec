@@ -97,3 +97,16 @@
 @media print {
   .stock-report__status { padding: 0; background: none !important; color: #111 !important; }
 }
+
+/* Relatório por IMEI */
+.imei-report__link { border: 0; background: none; padding: 0; color: #0e7490; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.imei-report__notice { margin: 0 0 10px; color: #0e7490; font-weight: 600; }
+.imei-history { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line, #e2e8f0); display: grid; gap: 12px; }
+.imei-history__item { position: relative; }
+.imei-history__item::before { content: ''; position: absolute; left: -21px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; }
+.imei-history__item.is-entry::before { background: #16a34a; }
+.imei-history__item.is-sale::before, .imei-history__item.is-bonus::before, .imei-history__item.is-internal::before, .imei-history__item.is-loss::before { background: #dc2626; }
+.imei-history__item.is-reverted::before { background: #0e7490; }
+.imei-history__item > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.imei-history__item small { color: var(--mute); }
+.imei-history__item p { margin: 2px 0 6px; font-size: 0.86rem; color: var(--mute); }

@@ -1,6 +1,7 @@
 import { canManageArea } from '../services/employeeAccess.js';
 import {productSku,supplierSkuName} from '../services/productSku.js';
 import { attachSupplierEntries, saveSupplierEntries, supplierEntrySchema, type SupplierEntryInput } from '../services/supplierEntries.js';
+import { cancelEntryPayables } from '../services/entryFinance.js';
 import {stockDetails} from '../services/stockDetails.js';
 import { validatePickupPrices } from '../services/pickup.js';
 import type { PoolClient } from 'pg';
@@ -393,7 +394,8 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
             -- IMEI ou código de barras de uma variação da grade
             OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(variations, '[]'::jsonb)) v WHERE v->>'imei' = $2 OR v->>'barcode' = $2)
             -- IMEI lançado nas entradas por fornecedor (ou no aparelho da troca)
-            OR EXISTS (SELECT 1 FROM stock_supplier_entries e WHERE e.store_id = $1 AND e.stock_item_id = stock_items.id AND e.imeis ? $2)
+            OR (EXISTS (SELECT 1 FROM stock_supplier_entries e WHERE e.store_id = $1 AND e.stock_item_id = stock_items.id AND e.imeis ? $2)
+                AND NOT EXISTS (SELECT 1 FROM stock_sold_units u WHERE u.store_id = $1 AND u.imei = $2 AND u.reverted_at IS NULL))
           )
           ORDER BY active DESC
           LIMIT 1
@@ -804,6 +806,8 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
         const db = await pool.connect();
         try {
           await db.query('BEGIN');
+          // Compras ainda abertas no contas a pagar saem junto com o produto.
+          await cancelEntryPayables(db, storeId, (await db.query('SELECT id FROM stock_supplier_entries WHERE store_id = $1 AND stock_item_id = $2', [storeId, id])).rows.map((row) => row.id));
           await db.query('DELETE FROM stock_movements WHERE store_id = $1 AND stock_id = $2', [storeId, id]);
           await db.query('DELETE FROM stock_items WHERE id = $1 AND store_id = $2', [id, storeId]);
           await db.query('COMMIT');

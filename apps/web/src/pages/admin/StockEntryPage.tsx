@@ -10,7 +10,7 @@ import { findBrand, useBrands } from '../../data/brandStore';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { CONDITION_LABEL, conditionCode, type ProductConditionCode } from '../../data/productCondition';
 import { stockMatches } from '../../data/stockSearch';
-import { apiListStock, apiListSuppliers } from '../../services/erpApi';
+import { apiListBankAccounts, apiListStock, apiListSuppliers } from '../../services/erpApi';
 import { apiCreateStockEntry } from '../../services/productCatalogApi';
 import '../../components/supplierEntries.css';
 import './stockEntry.css';
@@ -37,6 +37,10 @@ type Form = {
   imeisText: string;
   batteryLevel: number | null;
   notes: string;
+  /** Financeiro da compra: a pagar (com vencimento), já paga (sai do caixa/conta) ou sem lançamento. */
+  payment: 'pending' | 'paid' | 'none';
+  dueDate: string;
+  accountId: string;
 };
 
 const emptyForm = (): Form => ({
@@ -52,6 +56,9 @@ const emptyForm = (): Form => ({
   imeisText: '',
   batteryLevel: 100,
   notes: '',
+  payment: 'pending',
+  dueDate: '',
+  accountId: '',
 });
 
 /** Preço de venda: o do produto ou a faixa das variações. */
@@ -82,6 +89,12 @@ function variationLabel(v: StockVariationRow) {
 export function StockEntryPage() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    apiListBankAccounts(true)
+      .then((rows) => setAccounts(rows.map((row) => ({ id: row.id, name: row.name }))))
+      .catch(() => undefined);
+  }, []);
   const [attributes, setAttributes] = useState<ProductAttribute[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -185,10 +198,14 @@ export function StockEntryPage() {
           imeis,
           notes: form.notes.trim(),
           batteryLevel: effectiveCondition === 'new' ? 100 : form.batteryLevel,
+          payment: form.payment,
+          dueDate: form.payment === 'pending' ? form.dueDate || form.entryDate : undefined,
+          accountId: form.payment === 'paid' ? form.accountId || null : null,
         },
       });
       setItems((current) => current.map((item) => (item.id === result.product.id ? result.product : item)));
-      setNotice(`Entrada lançada: ${qty} un de ${product.name}${imeis.length ? ` (${imeis.length} IMEI${imeis.length > 1 ? 's' : ''})` : ''}.`);
+      const finance = !result.payableId ? '' : form.payment === 'paid' ? ' Compra lançada como paga no financeiro.' : ' Compra lançada no contas a pagar.';
+      setNotice(`Entrada lançada: ${qty} un de ${product.name}${imeis.length ? ` (${imeis.length} IMEI${imeis.length > 1 ? 's' : ''})` : ''}.${finance}`);
       setForm((current) => ({
         ...current,
         variationKey: result.variationId ?? current.variationKey,
@@ -346,6 +363,31 @@ export function StockEntryPage() {
                 onChange={(e) => update({ batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
               />
             </label>
+            <AdminPicker
+              label="Financeiro"
+              value={form.payment}
+              options={[
+                { value: 'pending', label: 'A pagar (contas a pagar)' },
+                { value: 'paid', label: 'Já pago (sai do caixa)' },
+                { value: 'none', label: 'Não lançar no financeiro' },
+              ]}
+              onChange={(value) => update({ payment: value === 'paid' || value === 'none' ? value : 'pending' })}
+            />
+            {form.payment === 'pending' ? (
+              <label>
+                Vencimento
+                <input type="date" value={form.dueDate || form.entryDate} onChange={(e) => update({ dueDate: e.target.value })} />
+              </label>
+            ) : null}
+            {form.payment === 'paid' ? (
+              <AdminPicker
+                label="Pago com a conta"
+                value={form.accountId}
+                placeholder="Só no livro caixa"
+                options={[{ value: '', label: 'Só no livro caixa' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]}
+                onChange={(accountId) => update({ accountId })}
+              />
+            ) : null}
             <label className="stock-entry__wide">
               IMEIs ({imeis.length}/{Number(form.qty) || 0})
               <textarea rows={3} value={form.imeisText} placeholder="Um IMEI por linha (ou separados por espaço/vírgula)" onChange={(e) => update({ imeisText: e.target.value })} />

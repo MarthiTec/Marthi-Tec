@@ -762,3 +762,59 @@ test('sold flag: a sale marks the unit (by IMEI or the oldest entry), the same I
   assert.equal(after.soldQty, 0);
   assert.deepEqual(after.soldImeis, []);
 });
+
+test('IMEI control: write-off (bonus/internal/loss) and revert move stock and keep history; IMEI report; entries post purchases to accounts payable (paid, pending or none)', async () => {
+  const item = (await request('/stock', 'POST', { name: 'IPHONE 11 IMEI TESTE', kind: 'device', qty: 0, price: 1800 })).json.data;
+  const supplier = (await request('/suppliers', 'POST', { name: 'Distribuidora IMEI' })).json.data;
+  const paid = await request('/stock/' + item.id + '/entries', 'POST', { entry: { supplierId: supplier.id, entryDate: '2026-10-01', qty: 2, unitCost: 1000, imeis: ['358100000000001', '358100000000002'], payment: 'paid' } });
+  assert.equal(paid.status, 201, JSON.stringify(paid.json));
+  const pending = await request('/stock/' + item.id + '/entries', 'POST', { entry: { supplierId: supplier.id, entryDate: '2026-10-02', qty: 1, unitCost: 1100, imeis: ['358100000000003'], payment: 'pending', dueDate: '2026-10-30' } });
+  const none = await request('/stock/' + item.id + '/entries', 'POST', { entry: { entryDate: '2026-10-03', qty: 1, unitCost: 900, imeis: ['358100000000004'], payment: 'none' } });
+  assert.equal(none.json.data.payableId, null);
+
+  const payables = (await query("SELECT amount, status, due_date::text AS due, category FROM payables WHERE id = ANY($1::text[]) ORDER BY amount", [[paid.json.data.payableId, pending.json.data.payableId]])).rows;
+  assert.deepEqual(payables.map((p) => [Number(p.amount), p.status, p.category]), [[1100, 'open', 'Compra de mercadorias'], [2000, 'paid', 'Compra de mercadorias']]);
+  assert.equal(payables[0].due, '2026-10-30');
+  const cash = (await query("SELECT type, amount FROM finance_entries WHERE ref_id = $1", [paid.json.data.payableId])).rows;
+  assert.deepEqual(cash.map((c) => [c.type, Number(c.amount)]), [['out', 2000]], 'paid purchase goes out of the cash book');
+
+  // Baixa por bonificação: sai do estoque, aparece no histórico e não pode ser vendida.
+  const off = await request('/imei/358100000000002/write-off', 'POST', { kind: 'bonus', notes: 'Brinde cliente VIP' });
+  assert.equal(off.status, 201, JSON.stringify(off.json));
+  assert.equal(off.json.data.history.status, 'bonus');
+  assert.equal((await request('/stock')).json.data.find((p) => p.id === item.id).qty, 3);
+  assert.equal((await request('/imei/358100000000002/write-off', 'POST', { kind: 'internal' })).status, 409);
+  const sale = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 1800, imei: '358100000000002' }] });
+  assert.equal(sale.status, 409, 'a written-off IMEI cannot be sold');
+
+  // Venda de outro IMEI e relatório por IMEI.
+  const sold = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente Relatorio', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 1750, imei: '358100000000001' }] });
+  assert.equal(sold.status, 201, JSON.stringify(sold.json));
+  const report = (await request('/imei/report')).json.data.filter((row) => row.productId === item.id);
+  const byImei = Object.fromEntries(report.map((row) => [row.imei, row]));
+  assert.equal(byImei['358100000000001'].status, 'sale');
+  assert.equal(byImei['358100000000001'].price, 1750, 'sale price of the line');
+  assert.equal(byImei['358100000000001'].customerName, 'Cliente Relatorio');
+  assert.equal(byImei['358100000000002'].status, 'bonus');
+  assert.equal(byImei['358100000000003'].status, 'in_stock');
+  assert.equal(byImei['358100000000003'].cost, 1100);
+
+  // Estorno da baixa: volta ao estoque e o histórico guarda os dois eventos.
+  const revert = await request('/imei/outputs/' + off.json.data.id + '/revert', 'POST', { reason: 'Brinde cancelado' });
+  assert.equal(revert.status, 200, JSON.stringify(revert.json));
+  const history = (await request('/imei/358100000000002/history')).json.data;
+  assert.equal(history.status, 'in_stock');
+  assert.deepEqual(history.events.map((e) => e.type), ['entry', 'bonus', 'reverted']);
+  assert.equal((await request('/stock')).json.data.find((p) => p.id === item.id).qty, 3);
+
+  // Cancelar a venda: o histórico mostra a venda e o cancelamento.
+  await request('/sales/' + (sold.json.data.id || sold.json.data.saleId) + '/cancel', 'POST', { reason: 'Teste' });
+  assert.deepEqual((await request('/imei/358100000000001/history')).json.data.events.map((e) => e.type), ['entry', 'sale', 'reverted']);
+
+  // Entrada aberta removida pelo cadastro: a conta a pagar é cancelada.
+  const product = (await request('/stock')).json.data.find((p) => p.id === item.id);
+  const keep = product.supplierEntries.filter((e) => e.id !== pending.json.data.entryId);
+  assert.equal((await request('/stock/' + item.id, 'PATCH', { supplierEntries: keep })).status, 200);
+  assert.equal((await query('SELECT status FROM payables WHERE id = $1', [pending.json.data.payableId])).rows[0].status, 'cancelled');
+  assert.equal((await request('/imei/report', 'GET', undefined, 'store-b')).status === 200 ? (await request('/imei/report', 'GET', undefined, 'store-b')).json.data.some((r) => r.productId === item.id) : false, false);
+});

@@ -99,6 +99,7 @@ import { PainelUsersPage } from './pages/admin/PainelUsersPage';
 import { ExternalSalePage } from './pages/admin/ExternalSalePage';
 import { StockReportPage } from './pages/admin/StockReportPage';
 import { StockEntryPage } from './pages/admin/StockEntryPage';
+import { ImeiReportPage } from './pages/admin/ImeiReportPage';
 import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
 import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
@@ -217,6 +218,7 @@ export function App() {
           <Route path="movimentos" element={<StockMovementsPage />} />
           <Route path="relatorio-estoque" element={<StockReportPage />} />
           <Route path="entrada-estoque" element={<StockEntryPage />} />
+          <Route path="relatorio-imei" element={<ImeiReportPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
           <Route path="especificacoes" element={<SpecificationsPage />} />

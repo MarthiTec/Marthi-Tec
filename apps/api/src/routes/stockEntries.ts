@@ -8,6 +8,8 @@ import { attributeValueKey } from '../services/attributeValues.js';
 import { conditionCode } from '../services/productCondition.js';
 import { attachSupplierEntries, supplierEntrySchema } from '../services/supplierEntries.js';
 import { stockDetails } from '../services/stockDetails.js';
+import { postEntryPayable } from '../services/entryFinance.js';
+import { imeiHistory, imeiReport, revertWriteOff, writeOffImei } from '../services/soldUnits.js';
 import { formatStockRow } from './stock.js';
 
 /**
@@ -132,6 +134,22 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
        VALUES ($1, $2, $3, 'in', $4, $5, $6, $7, 'supplier_entry', $8, $9, $10)`,
       [`MOV-${randomUUID()}`, storeId, product.id, qty, previousQty, previousQty + qty, unitCost, entryId, req.user?.name || 'Operador', supplierName ? `Entrada do fornecedor ${supplierName}` : 'Entrada sem fornecedor informado'],
     );
+    // A compra entra no financeiro (paga, a pagar ou sem lançamento, como o usuário escolheu).
+    const payableId = await postEntryPayable(db, {
+      storeId,
+      entryId,
+      payment: entry.payment,
+      dueDate: entry.dueDate || null,
+      accountId: entry.accountId || null,
+      supplierId,
+      supplierName,
+      productName: product.name,
+      qty,
+      unitCost,
+      imeis: entry.imeis,
+      entryDate: entry.entryDate || null,
+      operator: req.user?.name || 'Operador',
+    });
     await db.query('COMMIT');
 
     const fresh = await pool.query(
@@ -141,7 +159,67 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
       [product.id],
     );
     const [data] = await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool, storeId, fresh.rows))[0])]);
-    res.status(201).json({ success: true, data: { product: data, entryId, variationId } });
+    res.status(201).json({ success: true, data: { product: data, entryId, variationId, payableId } });
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    next(error);
+  } finally {
+    db.release();
+  }
+});
+
+/* ── Controle por IMEI: histórico, relatório e baixa manual (bonificação, uso interno, perda) ── */
+
+stockEntriesRouter.get('/api/v1/imei/report', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await imeiReport(pool, req.storeId!) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+stockEntriesRouter.get('/api/v1/imei/:imei/history', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await imeiHistory(pool, req.storeId!, String(req.params.imei).trim()) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const writeOffSchema = z.object({ kind: z.enum(['bonus', 'internal', 'loss']), notes: z.string().trim().max(500).default('') });
+
+stockEntriesRouter.post('/api/v1/imei/:imei/write-off', requireAuth, async (req, res, next) => {
+  const db = await pool.connect();
+  try {
+    if (!canManageArea(req)) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para dar baixa no estoque.' } });
+      return;
+    }
+    const body = writeOffSchema.parse(req.body);
+    await db.query('BEGIN');
+    const result = await writeOffImei(db, { storeId: req.storeId!, imei: String(req.params.imei), kind: body.kind, notes: body.notes, operator: req.user?.name || 'Operador' });
+    await db.query('COMMIT');
+    res.status(201).json({ success: true, data: { ...result, history: await imeiHistory(pool, req.storeId!, String(req.params.imei).trim()) } });
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    next(error);
+  } finally {
+    db.release();
+  }
+});
+
+stockEntriesRouter.post('/api/v1/imei/outputs/:id/revert', requireAuth, async (req, res, next) => {
+  const db = await pool.connect();
+  try {
+    if (!canManageArea(req)) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para estornar baixa do estoque.' } });
+      return;
+    }
+    const body = z.object({ reason: z.string().trim().max(300).default('') }).parse(req.body ?? {});
+    await db.query('BEGIN');
+    await revertWriteOff(db, { storeId: req.storeId!, outputId: req.params.id, reason: body.reason, operator: req.user?.name || 'Operador' });
+    await db.query('COMMIT');
+    res.json({ success: true, data: { ok: true } });
   } catch (error) {
     await db.query('ROLLBACK').catch(() => undefined);
     next(error);
