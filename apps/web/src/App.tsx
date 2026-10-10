@@ -97,6 +97,7 @@ import { CardapioPrintDisplay } from './pages/cardapio/CardapioPrintDisplay';
 import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 import { PainelUsersPage } from './pages/admin/PainelUsersPage';
 import { ExternalSalePage } from './pages/admin/ExternalSalePage';
+import { StockReportPage } from './pages/admin/StockReportPage';
 import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
 import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
@@ -213,6 +214,7 @@ export function App() {
           <Route path="produtos" element={<StockPage />} />
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
+          <Route path="relatorio-estoque" element={<StockReportPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
           <Route path="especificacoes" element={<SpecificationsPage />} />

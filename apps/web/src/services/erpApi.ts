@@ -2140,6 +2140,8 @@ export type ExternalSaleLine = {
 };
 
 export type TradeInPayload = {
+  /** Bateria (%) do aparelho recebido. */
+  batteryLevel?: number | null;
   brand?: string;
   deviceName: string;
   imei?: string;

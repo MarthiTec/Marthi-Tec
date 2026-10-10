@@ -56,6 +56,12 @@ export type SupplierEntry = {
   unitCost: number;
   imeis: string[];
   notes?: string;
+  /** Bateria (%) do aparelho desta entrada. */
+  batteryLevel?: number | null;
+  /** supplier = compra; trade_in = aparelho recebido na troca (cliente como origem). */
+  origin?: 'supplier' | 'trade_in';
+  customerId?: string;
+  customerName?: string;
 };
 
 export type StockVariationRow = {

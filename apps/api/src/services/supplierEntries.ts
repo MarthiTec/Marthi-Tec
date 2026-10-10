@@ -15,7 +15,9 @@ export const supplierEntrySchema = z
     qty: z.coerce.number().int('A quantidade da entrada é em unidades inteiras.').positive('A quantidade da entrada deve ser maior que zero.'),
     unitCost: z.coerce.number().finite().min(0, 'Custo da entrada inválido.'),
     imeis: z.array(z.string().trim().min(1)).default([]),
-    notes: z.string().max(300).default(''),
+    notes: z.string().max(500).default(''),
+    /** Bateria (%) do aparelho desta entrada (usados). */
+    batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
   })
   .refine((entry) => entry.imeis.length <= entry.qty, 'Há mais IMEIs do que unidades em uma entrada.');
 
@@ -76,18 +78,18 @@ export async function saveSupplierEntries(
       kept.add(current.id);
       await db.query(
         `UPDATE stock_supplier_entries
-            SET variation_id = $3, supplier_id = $4, entry_date = COALESCE($5::date, entry_date), qty = $6, unit_cost = $7, imeis = $8::jsonb, notes = $9, updated_at = now()
+            SET variation_id = $3, supplier_id = $4, entry_date = COALESCE($5::date, entry_date), qty = $6, unit_cost = $7, imeis = $8::jsonb, notes = $9, battery_level = $10, updated_at = now()
           WHERE id = $1 AND store_id = $2`,
-        [current.id, storeId, entry.variationId, supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes],
+        [current.id, storeId, entry.variationId, current.origin === 'trade_in' ? current.supplier_id : supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
       );
       continue;
     }
     const id = `SEN-${randomUUID()}`;
     kept.add(id);
     await db.query(
-      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10)`,
-      [id, storeId, stockId, entry.variationId, supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes],
+      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes, battery_level)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10, $11)`,
+      [id, storeId, stockId, entry.variationId, supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
     );
     newQty += entry.qty;
     const supplierName = supplierId ? names.get(supplierId) ?? '' : '';
@@ -114,6 +116,34 @@ export async function saveSupplierEntries(
   return newQty;
 }
 
+/**
+ * Aparelho recebido na troca da venda externa vira uma entrada do produto: o cliente é a origem,
+ * o valor da troca é o custo e as observações da troca entram na observação do estoque.
+ */
+export async function recordTradeInEntry(
+  db: Db,
+  storeId: string,
+  input: { stockId: string; variationId: string | null; customerId?: string | null; customerName: string; tradeValue: number; imei?: string; notes?: string; batteryLevel?: number | null; refId: string },
+) {
+  await db.query(
+    `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, customer_id, customer_name, origin, entry_date, qty, unit_cost, imeis, notes, battery_level, ref_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'trade_in', CURRENT_DATE, 1, $7, $8::jsonb, $9, $10, $11)`,
+    [
+      `SEN-${randomUUID()}`,
+      storeId,
+      input.stockId,
+      input.variationId,
+      input.customerId || null,
+      input.customerName || '',
+      Number(input.tradeValue) || 0,
+      JSON.stringify(input.imei?.trim() ? [input.imei.trim()] : []),
+      input.notes?.trim() ?? '',
+      input.batteryLevel ?? null,
+      input.refId,
+    ],
+  );
+}
+
 /** DATE do banco como AAAA-MM-DD (alguns drivers entregam meia-noite UTC, outros meia-noite local). */
 function dateOnly(value: unknown) {
   if (!value) return '';
@@ -132,6 +162,11 @@ const toEntry = (row: any) => ({
   unitCost: Number(row.unit_cost) || 0,
   imeis: Array.isArray(row.imeis) ? row.imeis.map(String) : [],
   notes: row.notes ?? '',
+  batteryLevel: row.battery_level === null || row.battery_level === undefined ? null : Number(row.battery_level),
+  /** 'supplier' = compra de fornecedor; 'trade_in' = aparelho recebido na troca (o cliente é a origem). */
+  origin: row.origin ?? 'supplier',
+  customerId: row.customer_id ?? '',
+  customerName: row.customer_name_live ?? row.customer_name ?? '',
 });
 
 /** Coloca as entradas por fornecedor nos produtos já formatados (no produto simples ou em cada variação). */
@@ -139,8 +174,10 @@ export async function attachSupplierEntries<T extends { id: string; variations?:
   if (!items.length) return items;
   const rows = (
     await db.query(
-      `SELECT e.*, COALESCE(NULLIF(s.trade_name, ''), s.name) AS supplier_name
-         FROM stock_supplier_entries e LEFT JOIN suppliers s ON s.id = e.supplier_id
+      `SELECT e.*, COALESCE(NULLIF(s.trade_name, ''), s.name) AS supplier_name, COALESCE(c.name, NULLIF(e.customer_name, '')) AS customer_name_live
+         FROM stock_supplier_entries e
+         LEFT JOIN suppliers s ON s.id = e.supplier_id
+         LEFT JOIN customers c ON c.id = e.customer_id
         WHERE e.store_id = $1 AND e.stock_item_id = ANY($2::text[])
         ORDER BY e.entry_date, e.created_at`,
       [storeId, items.map((item) => item.id)],

@@ -28,7 +28,7 @@ export async function receiveTradeInIntoExistingProduct(
   db: Db,
   storeId: string,
   tradeIn: { deviceName: string; color?: string; capacity?: string; imei?: string; tradeValue: number },
-): Promise<{ stockId: string; previousQty: number; attributes: Array<{ id: string; value: string }> } | null> {
+): Promise<{ stockId: string; previousQty: number; attributes: Array<{ id: string; value: string }>; variationId: string | null } | null> {
   const key = productNameKey(tradeIn.deviceName);
   if (!key) return null;
   const candidates = await db.query('SELECT id, name, qty, cost, avg_cost, price, variations FROM stock_items WHERE store_id = $1 AND active = true ORDER BY created_at', [storeId]);
@@ -41,6 +41,7 @@ export async function receiveTradeInIntoExistingProduct(
   const avg = Number(product.avg_cost ?? product.cost) || 0;
   const nextAvg = round2((qty * avg + value) / (qty + 1));
   let attributes: Array<{ id: string; value: string }> = [];
+  let variationId: string | null = null;
 
   const variations: any[] = Array.isArray(product.variations) ? product.variations : [];
   if (variations.length) {
@@ -64,6 +65,7 @@ export async function receiveTradeInIntoExistingProduct(
     );
     if (index >= 0) {
       const variation = variations[index];
+      variationId = variation.id ?? null;
       const vQty = Number(variation.qty) || 0;
       const vCost = round2((vQty * (Number(variation.avgCost ?? variation.cost) || 0) + value) / (vQty + 1));
       variations[index] = { ...variation, qty: vQty + 1, cost: vCost, avgCost: vCost };
@@ -88,6 +90,7 @@ export async function receiveTradeInIntoExistingProduct(
         pickupPrices: {},
       };
       variations.push(created);
+      variationId = created.id;
       attributes.push({ id: CONDITION_ATTR_ID, value: CONDITION_LABEL.used });
       await db.query(
         `INSERT INTO stock_item_variations (id, store_id, stock_item_id, attrs, price, cost, avg_cost, qty, min_qty, condition, imei)
@@ -99,5 +102,5 @@ export async function receiveTradeInIntoExistingProduct(
   }
 
   await db.query('UPDATE stock_items SET qty = qty + 1, avg_cost = $3, updated_at = now() WHERE id = $1 AND store_id = $2', [product.id, storeId, nextAvg]);
-  return { stockId: product.id, previousQty: qty, attributes };
+  return { stockId: product.id, previousQty: qty, attributes, variationId };
 }

@@ -728,6 +728,30 @@ export function ExternalSalePage() {
                       onChange={(val: any) => setTradeIn({ ...tradeIn, conditionState: val })}
                     />
                   </div>
+                  <div>
+                    <label className="admin-label">Bateria (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      inputMode="numeric"
+                      className="admin-input"
+                      placeholder="Ex.: 87"
+                      value={tradeIn.batteryLevel ?? ''}
+                      onChange={(e) => setTradeIn({ ...tradeIn, batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
+                    />
+                  </div>
+                  <div className="external-sale-wide-field">
+                    <label className="admin-label">Observação do aparelho</label>
+                    <textarea
+                      className="admin-input"
+                      rows={2}
+                      maxLength={500}
+                      placeholder="Ex.: troca de tela, risco na lateral… (vai para a observação do estoque)"
+                      value={tradeIn.notes || ''}
+                      onChange={(e) => setTradeIn({ ...tradeIn, notes: e.target.value })}
+                    />
+                  </div>
                   <div className="external-sale-wide-field">
                     <label className="admin-label xsale-accent">Valor combinado pelo usado / crédito (R$)</label>
                     <CurrencyInput className="admin-input xsale-input-accent" value={tradeIn.tradeValue || 0} placeholder="Ex.: 4.000,00" onChange={(value) => setTradeIn({ ...tradeIn, tradeValue: value })} ariaLabel="Valor combinado pelo usado" />

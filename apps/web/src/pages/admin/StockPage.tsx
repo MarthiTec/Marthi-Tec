@@ -176,6 +176,7 @@ export function StockPage() {
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
   // Produto excluído com histórico fica inativo: por padrão a lista mostra só os ativos.
   const [statusFilter, setStatusFilter] = useState<CrudStatusFilter>('active');
+  const [listSort, setListSort] = useState<'name' | 'name-desc' | 'recent' | 'oldest' | 'price-desc' | 'price-asc' | 'qty-desc' | 'qty-asc'>('name');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -384,7 +385,7 @@ export function StockPage() {
   }, [attrDefs, attrFilterId]);
 
   const visible = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
       if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
       if (brandFilter !== 'all' && normalizeBrand(item.brand) !== normalizeBrand(brandFilter)) return false;
@@ -406,7 +407,22 @@ export function StockPage() {
         query,
       );
     });
-  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, attrFilterId, attrFilterValue, codeQuery, query]);
+    // Ordem escolhida na lista (nome, entrada, preço ou estoque).
+    const byName = (a: StockItem, b: StockItem) => a.name.localeCompare(b.name, 'pt-BR');
+    const entered = (item: StockItem) => item.entryDate || item.createdAt || '';
+    const price = (item: StockItem) => (item.variations?.length ? Math.max(...item.variations.map((v) => Number(v.price) || 0)) : Number(item.price) || 0);
+    const sorters: Record<typeof listSort, (a: StockItem, b: StockItem) => number> = {
+      name: byName,
+      'name-desc': (a, b) => byName(b, a),
+      recent: (a, b) => entered(b).localeCompare(entered(a)) || byName(a, b),
+      oldest: (a, b) => entered(a).localeCompare(entered(b)) || byName(a, b),
+      'price-desc': (a, b) => price(b) - price(a) || byName(a, b),
+      'price-asc': (a, b) => price(a) - price(b) || byName(a, b),
+      'qty-desc': (a, b) => (Number(b.qty) || 0) - (Number(a.qty) || 0) || byName(a, b),
+      'qty-asc': (a, b) => (Number(a.qty) || 0) - (Number(b.qty) || 0) || byName(a, b),
+    };
+    return [...filtered].sort(sorters[listSort]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query]);
 
   function focusNameField() {
     requestAnimationFrame(() => {
@@ -1278,6 +1294,25 @@ export function StockPage() {
                       />
                     </label>
                   ) : null}
+                  <label className="admin-field crud-filter-field">
+                    Ordenar por
+                    <AdminPicker
+                      compact
+                      label="Ordenar por"
+                      value={listSort}
+                      options={[
+                        { value: 'name', label: 'Nome (A–Z)' },
+                        { value: 'name-desc', label: 'Nome (Z–A)' },
+                        { value: 'recent', label: 'Entrada mais recente' },
+                        { value: 'oldest', label: 'Entrada mais antiga' },
+                        { value: 'price-desc', label: 'Maior preço' },
+                        { value: 'price-asc', label: 'Menor preço' },
+                        { value: 'qty-desc', label: 'Maior estoque' },
+                        { value: 'qty-asc', label: 'Menor estoque' },
+                      ]}
+                      onChange={(value) => setListSort(value as typeof listSort)}
+                    />
+                  </label>
                   <label className="admin-field crud-filter-field">
                     Situação
                     <AdminPicker

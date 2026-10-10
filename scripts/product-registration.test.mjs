@@ -591,3 +591,36 @@ test('a product whose only movements are its own registration (opening balance, 
   assert.equal((await request('/stock/' + old.id, 'DELETE')).json.data.deactivated, undefined);
   assert.equal((await query('SELECT count(*)::int n FROM stock_items WHERE id = $1', [old.id])).rows[0].n, 0);
 });
+
+test('trade-in becomes a stock entry with the customer as origin, its notes and battery; entries keep notes and battery; cancel removes it', async () => {
+  const customer = (await request('/customers', 'POST', { name: 'Cliente Elaine', phone: '24999998888' })).json.data;
+  const item = (await request('/stock', 'POST', { name: 'Pelicula troca', qty: 5, cost: 5, price: 30 })).json.data;
+  const sale = await request('/sales/external', 'POST', {
+    paymentMethod: 'Pix', customerId: customer.id, customerName: 'Cliente Elaine',
+    lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 30 }],
+    tradeIn: { deviceName: 'IPHONE 14 PRO MAX TROCA', imei: '350813225079732', tradeValue: 20, conditionState: 'used', notes: 'Troca de tela - está no reparo com o João', batteryLevel: 83 },
+  });
+  assert.equal(sale.status, 201, JSON.stringify(sale.json));
+  const product = (await request('/stock')).json.data.find((p) => p.name === 'IPHONE 14 PRO MAX TROCA (Trade-in)');
+  assert.ok(product, 'trade-in product created');
+  const entry = product.supplierEntries[0];
+  assert.equal(entry.origin, 'trade_in');
+  assert.equal(entry.customerName, 'Cliente Elaine');
+  assert.equal(entry.notes, 'Troca de tela - está no reparo com o João');
+  assert.equal(entry.batteryLevel, 83);
+  assert.deepEqual(entry.imeis, ['350813225079732']);
+  assert.equal(entry.unitCost, 20);
+
+  // Salvar o produto pelo cadastro mantém a origem da troca; observação e bateria editáveis.
+  const saved = await request('/stock/' + product.id, 'PATCH', { supplierEntries: [{ ...entry, notes: 'Pronto para venda', batteryLevel: 85 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved.json));
+  const after = saved.json.data.supplierEntries[0];
+  assert.equal(after.origin, 'trade_in');
+  assert.equal(after.customerName, 'Cliente Elaine');
+  assert.equal(after.notes, 'Pronto para venda');
+  assert.equal(after.batteryLevel, 85);
+
+  const cancel = await request('/sales/' + (sale.json.data.id || sale.json.data.saleId) + '/cancel', 'POST', { reason: 'Teste' });
+  assert.equal(cancel.status, 200, JSON.stringify(cancel.json));
+  assert.equal((await query('SELECT count(*)::int n FROM stock_supplier_entries WHERE stock_item_id = $1', [product.id])).rows[0].n, 0);
+});

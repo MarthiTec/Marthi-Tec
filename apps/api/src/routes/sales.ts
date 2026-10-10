@@ -2,6 +2,7 @@ import {pickupSelection,validatePickupLines,recordPickup} from '../services/pick
 import {applyDayOffersToLines} from '../services/dayOffers.js';
 import {changeVariationQuantity} from '../services/variationInventory.js';
 import { receiveTradeInIntoExistingProduct } from '../services/tradeInStock.js';
+import { recordTradeInEntry } from '../services/supplierEntries.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -53,6 +54,8 @@ const tradeInSchema = z.object({
   color: z.string().default(''),
   conditionState: z.enum(['used', 'refurbished', 'damaged']).default('used'),
   notes: z.string().default(''),
+  /** Bateria (%) do aparelho recebido. */
+  batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
   tradeValue: z.coerce.number().min(0, 'Valor de crédito do aparelho não pode ser negativo.'),
 });
 
@@ -412,6 +415,18 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         if (merged) {
           await client.query('UPDATE sale_trade_ins SET stock_merged = true, stock_attributes = $2::jsonb WHERE id = $1', [tradeInRecordId, JSON.stringify(merged.attributes)]);
         }
+        // O aparelho vira uma entrada do estoque: cliente como origem e as observações da troca.
+        await recordTradeInEntry(client, storeId, {
+          stockId: tradeInItemId,
+          variationId: merged?.variationId ?? null,
+          customerId: body.customerId || null,
+          customerName: body.customerName,
+          tradeValue: body.tradeIn.tradeValue,
+          imei: body.tradeIn.imei,
+          notes: body.tradeIn.notes,
+          batteryLevel: body.tradeIn.batteryLevel ?? null,
+          refId: tradeInRecordId,
+        });
       }
 
       // 5. Registrar Formas de Pagamento em sale_payments
@@ -1060,12 +1075,14 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
             [`MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, storeId, trade.stock_item_id, previous, previous - 1, Number(trade.trade_value) || 0, saleId, req.user?.name || 'Operador'],
           );
           await client.query(`UPDATE sale_trade_ins SET status = 'cancelled', updated_at = now() WHERE id = $1`, [trade.id]);
+          await client.query('DELETE FROM stock_supplier_entries WHERE store_id = $1 AND ref_id = $2', [storeId, trade.id]);
         } else if (trade.stock_item_id) {
           const item = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [trade.stock_item_id, storeId]);
           if (!item.rows.length || Number(item.rows[0].qty) !== 1 || trade.status === 'resold') throw Object.assign(new Error('Aparelho da troca já movimentado; cancelamento exige conferência do estoque.'), {status: 409});
           // Remove ou inativa o item usado cadastrado
           await client.query(`UPDATE stock_items SET active = false, qty = 0, updated_at = now() WHERE id = $1 AND store_id = $2`, [trade.stock_item_id, storeId]);
           await client.query(`UPDATE sale_trade_ins SET status = 'cancelled', updated_at = now() WHERE id = $1`, [trade.id]);
+          await client.query('DELETE FROM stock_supplier_entries WHERE store_id = $1 AND ref_id = $2', [storeId, trade.id]);
         }
       }
 

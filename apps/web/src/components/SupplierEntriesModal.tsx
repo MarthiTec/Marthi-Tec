@@ -105,13 +105,20 @@ export function SupplierEntriesModal({
               </button>
             </legend>
             <div className="supplier-entry__grid">
-              <AdminPicker
-                label="Fornecedor"
-                value={row.supplierId}
-                placeholder="O do produto"
-                options={[{ value: '', label: 'O do produto (ou nenhum)' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
-                onChange={(supplierId) => update(row.key, { supplierId })}
-              />
+              {row.origin === 'trade_in' ? (
+                <label className="admin-field">
+                  Origem
+                  <input value={`Troca · ${row.customerName || 'cliente'}`} disabled />
+                </label>
+              ) : (
+                <AdminPicker
+                  label="Fornecedor"
+                  value={row.supplierId}
+                  placeholder="O do produto"
+                  options={[{ value: '', label: 'O do produto (ou nenhum)' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(supplierId) => update(row.key, { supplierId })}
+                />
+              )}
               <label className="admin-field">
                 Data
                 <input type="date" value={row.entryDate} max={today()} onChange={(e) => update(row.key, { entryDate: e.target.value })} />
@@ -127,6 +134,22 @@ export function SupplierEntriesModal({
               <label className="admin-field supplier-entry__imeis">
                 IMEIs ({parsed[index].imeis.length}/{Number(row.qty) || 0})
                 <textarea rows={2} value={row.imeisText} placeholder="Um IMEI por linha (opcional)" onChange={(e) => update(row.key, { imeisText: e.target.value })} />
+              </label>
+              <label className="admin-field">
+                Bateria (%)
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  inputMode="numeric"
+                  value={row.batteryLevel ?? ''}
+                  placeholder="Usado: ex. 87"
+                  onChange={(e) => update(row.key, { batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
+                />
+              </label>
+              <label className="admin-field supplier-entry__imeis">
+                Observação
+                <textarea rows={2} maxLength={500} value={row.notes ?? ''} placeholder="Ex.: troca de bateria, está no reparo com o João…" onChange={(e) => update(row.key, { notes: e.target.value })} />
               </label>
             </div>
           </fieldset>
