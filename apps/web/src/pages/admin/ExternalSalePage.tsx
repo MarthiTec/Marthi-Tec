@@ -56,6 +56,9 @@ import { QuickCreateCustomer } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
 
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
+import { totemCardFee } from '../../data/variantQuote';
+import { hydrateCardMachinesFromApi } from '../../data/cardRatesStore';
+import { hydrateTotemSettingsFromApi } from '../../data/totemSettings';
 import { evaluateCampaignForLine, hydratePromoCampaigns, PROMO_EVENT, type EvaluatedLinePromo } from '../../data/promoCampaignStore';
 import type { StockVariationRow } from '../../data/adminStore';
 
@@ -383,7 +386,22 @@ export function ExternalSalePage() {
 
   const grossProfit = Math.round((grossTotal - totalCost) * 100) / 100;
   const marginPercent = grossTotal > 0 ? Math.round((grossProfit / grossTotal) * 10000) / 100 : 0;
-  const installmentValue = installments > 0 ? Math.round((netAmountToPay / installments) * 100) / 100 : netAmountToPay;
+  // Juros do cartão: a taxa da maquininha por número de parcelas (a mesma do totem), repassada ao cliente.
+  const [, setRatesVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void Promise.allSettled([hydrateCardMachinesFromApi(), hydrateTotemSettingsFromApi()]).then(() => alive && setRatesVersion((v) => v + 1));
+    return () => {
+      alive = false;
+    };
+  }, [storeId]);
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  const cardRateFor = (count: number) => (count <= 1 ? 0 : Math.max(0, Number(totemCardFee(count)) || 0));
+  const isCredit = paymentMethod === 'Cartão de Crédito';
+  const cardRate = isCredit ? cardRateFor(installments) : 0;
+  const cardInterest = round2((netAmountToPay * cardRate) / 100);
+  const totalCharged = round2(netAmountToPay + cardInterest);
+  const installmentValue = installments > 0 ? round2(totalCharged / installments) : totalCharged;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -407,8 +425,9 @@ export function ExternalSalePage() {
         paymentMethod,
         installments: Number(installments) || 1,
         discount: Number(generalDiscount) || 0,
-        surcharge: Number(generalSurcharge) || 0,
-        notes: saleNotes.trim(),
+        // Juros do cartão entram como acréscimo: o total da venda é o que o cliente paga.
+        surcharge: round2((Number(generalSurcharge) || 0) + cardInterest),
+        notes: [saleNotes.trim(), cardInterest > 0 ? `Juros do cartão ${installments}x (${cardRate.toLocaleString('pt-BR')}%): ${formatMoney(cardInterest)}` : ''].filter(Boolean).join(' · '),
         warrantyType,
         warrantyMonths: warrantyType === 'store' ? Number(warrantyMonths) : 0,
         warrantyTerms: warrantyTerms.trim(),
@@ -794,7 +813,14 @@ export function ExternalSalePage() {
                   value={String(installments)}
                   options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, index) => {
                     const count = index + 1;
-                    return { value: String(count), label: count === 1 ? `1x à vista (${formatMoney(netAmountToPay)})` : `${count}x de ${formatMoney(netAmountToPay / count)}` };
+                    const rate = cardRateFor(count);
+                    const total = round2(netAmountToPay * (1 + rate / 100));
+                    return {
+                      value: String(count),
+                      label: count === 1
+                        ? `1x à vista (${formatMoney(netAmountToPay)})`
+                        : `${count}x de ${formatMoney(round2(total / count))} · total ${formatMoney(total)}${rate > 0 ? ` (${rate.toLocaleString('pt-BR')}%)` : ' sem juros'}`,
+                    };
                   })}
                   onChange={(val) => setInstallments(Number(val))}
                 />
@@ -850,10 +876,15 @@ export function ExternalSalePage() {
 
           <section className="xsale-card xsale-total">
             <small>Total da venda</small>
-            <strong className="xsale-total__value">{formatMoney(netAmountToPay)}</strong>
+            <strong className="xsale-total__value">{formatMoney(totalCharged)}</strong>
             <span className="xsale-muted">
-              {paymentMethod} {installments > 1 ? `· ${installments}x de ${formatMoney(installmentValue)}` : '· à vista'}
+              {paymentMethod} {installments > 1 && isCredit ? `· ${installments}x de ${formatMoney(installmentValue)}` : '· à vista'}
             </span>
+            {cardInterest > 0 ? (
+              <span className="xsale-muted">
+                Inclui juros do cartão de {formatMoney(cardInterest)} ({cardRate.toLocaleString('pt-BR')}%) sobre {formatMoney(netAmountToPay)}
+              </span>
+            ) : null}
             {isPrivileged ? (
               <div className="xsale-profit" title="Visível só para gerente e dono">
                 <span>🔒 Resultado</span>
