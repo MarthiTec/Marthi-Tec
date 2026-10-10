@@ -1,6 +1,7 @@
 import {pickupSelection,validatePickupLines,recordPickup} from '../services/pickup.js';
 import {applyDayOffersToLines} from '../services/dayOffers.js';
 import {changeVariationQuantity} from '../services/variationInventory.js';
+import { markUnitsSold } from '../services/soldUnits.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -468,7 +469,9 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           await recordPickup(client,storeId,orderId,body,line);
           // Se tem stockId cadastrado, debita estoque e gera kardex
           if (line.stockId && line.pickupKind!=='order') {
-            await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
+            const soldVariationId = await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
+            // Marca o aparelho vendido (IMEI lido no PDV ou a entrada mais antiga).
+            await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId });
             const stockCheck = await client.query(
               `SELECT qty, cost FROM stock_items WHERE id = $1 AND store_id = $2`,
               [line.stockId, storeId],

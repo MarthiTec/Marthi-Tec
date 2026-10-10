@@ -31,11 +31,13 @@ type ReportRow = {
   entryDate: string;
   notes: string;
   qty: number;
+  /** Aparelho já vendido (não está mais no estoque). */
+  sold?: boolean;
 };
 
 type Mode = 'unit' | 'variation';
 type SortKey = 'name' | 'entry-desc' | 'entry-asc' | 'price-desc' | 'price-asc' | 'cost-desc' | 'battery-desc' | 'battery-asc';
-type Column = 'photo' | 'attrs' | 'condition' | 'battery' | 'imei' | 'origin' | 'cost' | 'price' | 'entry' | 'notes' | 'sku' | 'qty';
+type Column = 'photo' | 'attrs' | 'condition' | 'battery' | 'imei' | 'status' | 'origin' | 'cost' | 'price' | 'entry' | 'notes' | 'sku' | 'qty';
 
 const COLUMN_LABEL: Record<Column, string> = {
   photo: 'Foto',
@@ -43,6 +45,7 @@ const COLUMN_LABEL: Record<Column, string> = {
   condition: 'Condição',
   battery: 'Bateria',
   imei: 'IMEI',
+  status: 'Situação (em estoque / vendido)',
   origin: 'Fornecedor / origem',
   cost: 'Valor de compra',
   price: 'Valor de venda',
@@ -51,7 +54,7 @@ const COLUMN_LABEL: Record<Column, string> = {
   sku: 'SKU',
   qty: 'Quantidade',
 };
-const DEFAULT_COLUMNS: Column[] = ['photo', 'attrs', 'condition', 'battery', 'imei', 'origin', 'cost', 'price', 'entry', 'notes', 'qty'];
+const DEFAULT_COLUMNS: Column[] = ['photo', 'attrs', 'condition', 'battery', 'imei', 'status', 'origin', 'cost', 'price', 'entry', 'notes', 'qty'];
 
 const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
   { value: 'name', label: 'Produto (A–Z)' },
@@ -75,34 +78,42 @@ function entryOrigin(entry: SupplierEntry | undefined) {
 }
 
 /**
- * Linhas por aparelho: o saldo atual da variação é repartido pelas entradas mais recentes (as mais
- * antigas consideradas vendidas primeiro); cada IMEI vira uma linha. O que não tem entrada aparece
- * com os dados da variação.
+ * Linhas por aparelho. Cada unidade das entradas está vendida quando a venda marcou o IMEI dela (ou,
+ * sem IMEI, pela quantidade vendida da entrada). Vendas antigas, de antes da marca, contam como as
+ * unidades mais antigas: só ficam em estoque as mais recentes até o saldo atual da variação.
+ * O saldo que não tem entrada aparece com os dados da variação.
  */
-function unitRows(product: StockItem, slot: { key: string; attrs: Record<string, string>; condition: string; battery: number | null; price: number; cost: number; qty: number; imei: string; entries: SupplierEntry[] }, base: Omit<ReportRow, 'key' | 'attrs' | 'condition' | 'battery' | 'imei' | 'origin' | 'supplierId' | 'cost' | 'price' | 'entryDate' | 'notes' | 'qty'>) {
+function unitRows(product: StockItem, slot: { key: string; attrs: Record<string, string>; condition: string; battery: number | null; price: number; cost: number; qty: number; imei: string; entries: SupplierEntry[] }, base: Omit<ReportRow, 'key' | 'attrs' | 'condition' | 'battery' | 'imei' | 'origin' | 'supplierId' | 'cost' | 'price' | 'entryDate' | 'notes' | 'qty'>, includeSold: boolean) {
   const rows: ReportRow[] = [];
   let remaining = Math.max(0, Math.round(slot.qty));
   const entries = [...slot.entries].sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''));
   for (const entry of entries) {
-    for (let i = 0; i < entry.qty && remaining > 0; i += 1) {
+    const soldImeis = new Set((entry.soldImeis ?? []).map((item) => item.imei));
+    let soldWithoutImei = Math.max(0, (entry.soldQty ?? 0) - soldImeis.size);
+    for (let i = 0; i < entry.qty; i += 1) {
+      const imei = entry.imeis[i] ?? '';
+      let sold = imei ? soldImeis.has(imei) : soldWithoutImei > 0;
+      if (!imei && sold) soldWithoutImei -= 1;
+      if (!sold && remaining <= 0) sold = true;
+      if (!sold) remaining -= 1;
+      if (sold && !includeSold) continue;
       rows.push({
         ...base,
         key: `${slot.key}:${entry.id ?? 'e'}:${i}`,
         attrs: slot.attrs,
         condition: slot.condition,
         battery: entry.batteryLevel ?? slot.battery,
-        imei: entry.imeis[i] ?? '',
+        imei,
         origin: entryOrigin(entry),
         supplierId: entry.origin === 'trade_in' ? `customer:${entry.customerId ?? ''}` : entry.supplierId || product.supplierId || '',
         cost: Number(entry.unitCost) || 0,
         price: slot.price,
         entryDate: entry.entryDate || '',
         notes: entry.notes ?? '',
-        qty: 1,
+        qty: sold ? 0 : 1,
+        sold,
       });
-      remaining -= 1;
     }
-    if (remaining <= 0) break;
   }
   for (let i = 0; i < remaining; i += 1) {
     rows.push({
@@ -246,7 +257,7 @@ export function StockReportPage() {
             qty: slot.qty,
           });
         } else {
-          rows.push(...unitRows(item, slot, base));
+          rows.push(...unitRows(item, slot, base, !onlyInStock));
           if (!onlyInStock && slot.qty <= 0) {
             rows.push({ ...base, key: `${slot.key}:zero`, attrs: slot.attrs, condition: slot.condition, battery: slot.battery, imei: '', origin: '—', supplierId: '', cost: slot.cost, price: slot.price, entryDate: '', notes: 'sem estoque', qty: 0 });
           }
@@ -340,6 +351,7 @@ export function StockReportPage() {
             {has('condition') ? <th>Condição</th> : null}
             {has('battery') ? <th>Bateria</th> : null}
             {has('imei') ? <th>IMEI</th> : null}
+            {has('status') ? <th>Situação</th> : null}
             {has('origin') ? <th>Fornecedor</th> : null}
             {has('cost') ? <th className="is-num">Compra</th> : null}
             {has('price') ? <th className="is-num">Venda</th> : null}
@@ -365,6 +377,7 @@ export function StockReportPage() {
               ) : null}
               {has('battery') ? <td>{row.battery !== null && row.battery !== undefined ? `${row.battery}%` : '—'}</td> : null}
               {has('imei') ? <td className="is-mono">{row.imei || '—'}</td> : null}
+              {has('status') ? <td><span className={`stock-report__status ${row.sold ? 'is-sold' : row.qty > 0 ? 'is-stock' : 'is-empty'}`}>{row.sold ? 'Vendido' : row.qty > 0 ? 'Em estoque' : 'Sem estoque'}</span></td> : null}
               {has('origin') ? <td>{row.origin || '—'}</td> : null}
               {has('cost') ? <td className="is-num">{money(row.cost)}</td> : null}
               {has('price') ? <td className="is-num">{money(row.price)}</td> : null}

@@ -3,6 +3,7 @@ import {applyDayOffersToLines} from '../services/dayOffers.js';
 import {changeVariationQuantity} from '../services/variationInventory.js';
 import { receiveTradeInIntoExistingProduct } from '../services/tradeInStock.js';
 import { recordTradeInEntry } from '../services/supplierEntries.js';
+import { markUnitsSold, unmarkSaleUnits } from '../services/soldUnits.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -173,7 +174,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
           const stockRow = stockCheck.rows[0];
           line.name = stockRow.name;
-          line.imei = stockRow.imei || "";
+          line.imei = String(line.imei ?? '').trim() || stockRow.imei || "";
           const currentQty = Number(stockRow.qty);
           if (currentQty < line.qty && line.pickupKind!=='order') {
             throw new Error(`Estoque insuficiente para o produto "${stockRow.name}". Disponível: ${currentQty}, Solicitado: ${line.qty}`);
@@ -300,7 +301,9 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         await client.query('UPDATE sales_order_lines SET pickup_kind=$2, campaign_id=$3, campaign_name=$4, discount_amount=$5 WHERE id=$1',[lineId,line.pickupKind||'',line.campaignId||null,line.campaignName||'',line.discount||0]);
         await recordPickup(client,storeId,orderId,body,line);
         if (line.stockId && line.pickupKind!=='order') {
-          await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
+          const soldVariationId = await changeVariationQuantity(client,storeId,line.stockId,line.attributes,-line.qty);
+          // Marca o aparelho vendido (IMEI informado ou a entrada mais antiga): ele deixa de estar em estoque.
+          await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId });
           const prevRes = await client.query(`SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`, [line.stockId, storeId]);
           const prevQty = Number(prevRes.rows[0].qty);
           const newQty = prevQty - line.qty;
@@ -1026,6 +1029,8 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
          WHERE id = $3`,
         [body.reason, req.user?.name || 'Operador', saleId],
       );
+      // Os aparelhos desta venda voltam a ficar em estoque.
+      await unmarkSaleUnits(client, storeId, saleId);
 
       // 2. Estorna itens vendidos devolvendo para o estoque
       const linesRes = await client.query(

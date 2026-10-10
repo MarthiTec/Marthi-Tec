@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { InlineSupplierCreate } from '../../components/InlineSupplierCreate';
 import { SUPPLIER_ORIGIN_OPTIONS, type SupplierOrigin } from '../../components/SupplierEntriesModal';
 import type { StockItem, StockVariationRow } from '../../data/adminStore';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
@@ -11,6 +12,7 @@ import { CONDITION_LABEL, conditionCode, type ProductConditionCode } from '../..
 import { stockMatches } from '../../data/stockSearch';
 import { apiListStock, apiListSuppliers } from '../../services/erpApi';
 import { apiCreateStockEntry } from '../../services/productCatalogApi';
+import '../../components/supplierEntries.css';
 import './stockEntry.css';
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -309,7 +311,16 @@ export function StockEntryPage() {
                 update({ origin, supplierId: suppliers.find((s) => s.id === form.supplierId)?.origin === origin ? form.supplierId : '' });
               }}
             />
-            <AdminPicker label="Fornecedor" value={form.supplierId} placeholder="Nenhum / o do produto" options={supplierOptions} onChange={(supplierId) => update({ supplierId })} />
+            <div className="stock-entry__supplier">
+              <AdminPicker label="Fornecedor" value={form.supplierId} placeholder="Nenhum / o do produto" options={supplierOptions} onChange={(supplierId) => update({ supplierId })} />
+              <InlineSupplierCreate
+                origin={form.origin}
+                onCreated={(supplier) => {
+                  setSuppliers((current) => [...current, supplier]);
+                  update({ supplierId: supplier.id });
+                }}
+              />
+            </div>
             <label>
               Data de entrada
               <input type="date" value={form.entryDate} max={today()} onChange={(e) => update({ entryDate: e.target.value })} />

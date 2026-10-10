@@ -7272,3 +7272,19 @@ select.caixa-mov-input {
 }
 /* A descrição do estoque simplificado fica fixa no topo: o recorte lateral não pode virar área de rolagem. */
 .admin-page.admin-page--stock-form { overflow-x: clip !important; overflow-y: visible !important; }
+
+/* Ajuda do estoque simplificado: escolher cores e capacidades do modelo. */
+.stock-help-pick {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(14, 116, 144, 0.45);
+  border-radius: 12px;
+  background: rgba(14, 116, 144, 0.05);
+}
+.stock-help-pick__title { margin: 0; font-size: 0.86rem; color: var(--ink); }
+.stock-help-pick__group { display: grid; gap: 6px; }
+.stock-help-pick__group > span { font-size: 0.78rem; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 0.04em; }
+.stock-help-pick__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.stock-help-pick > .btn { justify-self: start; }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
+import { assertSoldUnitsKept, soldByEntry } from './soldUnits.js';
 
 /**
  * Entradas do mesmo produto por fornecedor (ex.: iPhone 17 Pro Max comprado de vários fornecedores).
@@ -66,6 +67,9 @@ export async function saveSupplierEntries(
     const missing = suppliers.find((id) => !names.has(id));
     if (missing) throw httpError('Fornecedor da entrada não encontrado nesta loja.');
   }
+
+  // Aparelho já vendido não sai da entrada (nem a entrada some).
+  await assertSoldUnitsKept(db, storeId, stockId, all.map((entry) => ({ id: entry.id, qty: entry.qty, imeis: entry.imeis })));
 
   const kept = new Set<string>();
   let newQty = 0;
@@ -153,7 +157,7 @@ function dateOnly(value: unknown) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-const toEntry = (row: any) => ({
+const toEntry = (row: any, sold?: { qty: number; imeis: Array<{ imei: string; saleId: string; soldAt: string }> }) => ({
   id: row.id,
   supplierId: row.supplier_id ?? '',
   supplierName: row.supplier_name ?? '',
@@ -167,6 +171,9 @@ const toEntry = (row: any) => ({
   origin: row.origin ?? 'supplier',
   customerId: row.customer_id ?? '',
   customerName: row.customer_name_live ?? row.customer_name ?? '',
+  /** Unidades desta entrada que já foram vendidas e os IMEIs que saíram (com a venda). */
+  soldQty: sold?.qty ?? 0,
+  soldImeis: sold?.imeis ?? [],
 });
 
 /** Coloca as entradas por fornecedor nos produtos já formatados (no produto simples ou em cada variação). */
@@ -185,18 +192,20 @@ export async function attachSupplierEntries<T extends { id: string; variations?:
   ).rows;
   const byItem = new Map<string, any[]>();
   for (const row of rows) byItem.set(row.stock_item_id, [...(byItem.get(row.stock_item_id) ?? []), row]);
+  const sold = await soldByEntry(db, storeId, rows.map((row) => row.id));
+  const entryOf = (row: any) => toEntry(row, sold.get(row.id));
   return items.map((item) => {
     const list = byItem.get(item.id) ?? [];
     const variations = (item.variations ?? []).map((variation) => ({
       ...variation,
-      supplierEntries: list.filter((row) => row.variation_id === variation.id).map(toEntry),
+      supplierEntries: list.filter((row) => row.variation_id === variation.id).map(entryOf),
     }));
     const variationIds = new Set(variations.map((variation) => variation.id));
     return {
       ...item,
       variations,
       // Entradas sem variação (produto simples) ou de uma variação que não existe mais.
-      supplierEntries: list.filter((row) => !row.variation_id || !variationIds.has(row.variation_id)).map(toEntry),
+      supplierEntries: list.filter((row) => !row.variation_id || !variationIds.has(row.variation_id)).map(entryOf),
     };
   });
 }

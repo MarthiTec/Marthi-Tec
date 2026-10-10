@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { SupplierEntry } from '../data/adminStore';
 import { AdminPicker } from './AdminPicker';
 import { CurrencyInput } from './CurrencyInput';
+import { InlineSupplierCreate } from './InlineSupplierCreate';
 import { QuickModal } from './QuickModal';
 import './supplierEntries.css';
 
@@ -21,12 +22,15 @@ export function supplierEntriesSummary(entries: SupplierEntry[] | undefined) {
   return { qty, avgCost: qty > 0 ? Math.round((total / qty) * 100) / 100 : 0, suppliers, count: list.length };
 }
 
-/** Texto curto para a célula da grade: "2 fornecedores · 3 un". */
+/** Texto curto para a célula da grade: "2 fornecedores · 3 un · 1 vendida". */
 export function supplierEntriesLabel(entries: SupplierEntry[] | undefined) {
   const { qty, suppliers, count } = supplierEntriesSummary(entries);
   if (!count) return 'Nenhuma';
-  return `${suppliers} ${suppliers === 1 ? 'fornecedor' : 'fornecedores'} · ${qty} un`;
+  const sold = (entries ?? []).reduce((sum, entry) => sum + (entry.soldQty ?? 0), 0);
+  return `${suppliers} ${suppliers === 1 ? 'fornecedor' : 'fornecedores'} · ${qty} un${sold ? ` · ${sold} ${sold === 1 ? 'vendida' : 'vendidas'}` : ''}`;
 }
+
+const dateTimeBr = (iso: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
 
 type Draft = SupplierEntry & { key: string; imeisText: string; supplierOrigin: SupplierOrigin };
 
@@ -59,6 +63,7 @@ export function SupplierEntriesModal({
   defaultSupplierId,
   onClose,
   onApply,
+  onSupplierCreated,
 }: {
   title: string;
   entries: SupplierEntry[];
@@ -66,7 +71,12 @@ export function SupplierEntriesModal({
   defaultSupplierId?: string;
   onClose: () => void;
   onApply: (entries: SupplierEntry[]) => void;
+  /** Fornecedor cadastrado aqui dentro (já gravado no banco): a tela de trás atualiza a lista. */
+  onSupplierCreated?: (supplier: SupplierOption) => void;
 }) {
+  // Fornecedores cadastrados nesta janela entram na lista na hora.
+  const [created, setCreated] = useState<SupplierOption[]>([]);
+  const allSuppliers = [...suppliers, ...created.filter((item) => !suppliers.some((s) => s.id === item.id))];
   const [rows, setRows] = useState<Draft[]>(() => entries.map((entry, index) => toDraft(entry, index, suppliers)));
   const [error, setError] = useState('');
 
@@ -89,7 +99,7 @@ export function SupplierEntriesModal({
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
     if (dup) return setError(`O IMEI ${dup} está repetido.`);
     onApply(
-      parsed.map(({ key: _key, imeisText: _text, supplierName: _name, supplierOrigin: _origin, ...row }) => ({
+      parsed.map(({ key: _key, imeisText: _text, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
@@ -112,9 +122,16 @@ export function SupplierEntriesModal({
           <fieldset key={row.key} className="supplier-entry">
             <legend>
               Entrada {index + 1}
-              <button type="button" className="supplier-entry__remove" onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>
-                Remover
-              </button>
+              {row.soldQty ? (
+                <span className="supplier-entry__sold-count">
+                  {row.soldQty} de {row.qty} {row.soldQty === 1 ? 'vendida' : 'vendidas'}
+                </span>
+              ) : null}
+              {row.soldQty ? null : (
+                <button type="button" className="supplier-entry__remove" onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>
+                  Remover
+                </button>
+              )}
             </legend>
             <div className="supplier-entry__grid">
               {row.origin === 'trade_in' ? (
@@ -130,19 +147,29 @@ export function SupplierEntriesModal({
                     options={SUPPLIER_ORIGIN_OPTIONS}
                     onChange={(value) => {
                       const supplierOrigin: SupplierOrigin = value === 'upgrade' ? 'upgrade' : 'company';
-                      update(row.key, { supplierOrigin, supplierId: originOf(suppliers, row.supplierId) === supplierOrigin ? row.supplierId : '' });
+                      update(row.key, { supplierOrigin, supplierId: originOf(allSuppliers, row.supplierId) === supplierOrigin ? row.supplierId : '' });
                     }}
                   />
-                  <AdminPicker
-                    label="Fornecedor"
-                    value={row.supplierId}
-                    placeholder="O do produto"
-                    options={[
-                      { value: '', label: 'O do produto (ou nenhum)' },
-                      ...suppliers.filter((item) => (item.origin === 'upgrade' ? 'upgrade' : 'company') === row.supplierOrigin).map((item) => ({ value: item.id, label: item.name })),
-                    ]}
-                    onChange={(supplierId) => update(row.key, { supplierId })}
-                  />
+                  <div className="supplier-entry__supplier">
+                    <AdminPicker
+                      label="Fornecedor"
+                      value={row.supplierId}
+                      placeholder="O do produto"
+                      options={[
+                        { value: '', label: 'O do produto (ou nenhum)' },
+                        ...allSuppliers.filter((item) => (item.origin === 'upgrade' ? 'upgrade' : 'company') === row.supplierOrigin).map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      onChange={(supplierId) => update(row.key, { supplierId })}
+                    />
+                    <InlineSupplierCreate
+                      origin={row.supplierOrigin}
+                      onCreated={(supplier) => {
+                        setCreated((current) => [...current, supplier]);
+                        update(row.key, { supplierId: supplier.id });
+                        onSupplierCreated?.(supplier);
+                      }}
+                    />
+                  </div>
                 </>
               )}
               <label className="admin-field">
@@ -161,6 +188,21 @@ export function SupplierEntriesModal({
                 IMEIs ({parsed[index].imeis.length}/{Number(row.qty) || 0})
                 <textarea rows={2} value={row.imeisText} placeholder="Um IMEI por linha (opcional)" onChange={(e) => update(row.key, { imeisText: e.target.value })} />
               </label>
+              {parsed[index].imeis.length || row.soldQty ? (
+                <div className="supplier-entry__units">
+                  {parsed[index].imeis.map((imei) => {
+                    const sold = row.soldImeis?.find((item) => item.imei === imei);
+                    return (
+                      <span key={imei} className={`supplier-entry__unit ${sold ? 'is-sold' : 'is-stock'}`} title={sold ? `Vendido em ${dateTimeBr(sold.soldAt)} · venda ${sold.saleId}` : 'Ainda no estoque'}>
+                        {imei} · {sold ? `Vendido ${dateTimeBr(sold.soldAt)}` : 'Em estoque'}
+                      </span>
+                    );
+                  })}
+                  {(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0) > 0 ? (
+                    <span className="supplier-entry__unit is-sold">{(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0)} un sem IMEI vendida(s)</span>
+                  ) : null}
+                </div>
+              ) : null}
               <label className="admin-field">
                 Bateria (%)
                 <input

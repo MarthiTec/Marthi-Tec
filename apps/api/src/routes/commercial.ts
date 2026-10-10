@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
+import { markUnitsSold, unmarkSaleUnits } from "../services/soldUnits.js";
 import { requireAuth } from "../middlewares/authMiddleware.js";
 import {
   amount,
@@ -1066,6 +1067,7 @@ commercialRouter.post(
             "UPDATE stock_items SET qty=qty-$1,updated_at=now() WHERE id=$2 AND store_id=$3",
             [d.qty, stock.id, req.storeId],
           );
+          await markUnitsSold(db, { storeId: req.storeId!, stockId: stock.id, variationId: null, qty: d.qty, imei: stock.imei || input.deliveredImei || "", saleId });
           await db.query(
             "INSERT INTO stock_movements(id,store_id,stock_id,type,qty,previous_qty,new_qty,unit_cost,ref_type,ref_id,operator_name) VALUES($1,$2,$3,'sale',$4,$5,$6,$7,'commercial_delivery',$8,$9)",
             [
@@ -1199,6 +1201,7 @@ commercialRouter.post(
               "UPDATE sales_orders SET status='cancelled',updated_at=now() WHERE id=$1 AND store_id=$2",
               [order.sale_id, req.storeId],
             );
+            await unmarkSaleUnits(db, req.storeId!, order.sale_id);
           }
           if (order.receivable_id)
             await db.query(

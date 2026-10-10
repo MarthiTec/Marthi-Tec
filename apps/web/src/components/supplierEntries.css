@@ -62,3 +62,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Fornecedor + cadastro rápido (Empresa/Upgrade) dentro da entrada. */
+.supplier-entry__supplier,
+.stock-entry__supplier { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.inline-supplier__open { align-self: flex-start; }
+.inline-supplier { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.inline-supplier input { flex: 1 1 160px; min-width: 0; }
+.inline-supplier__error { flex-basis: 100%; margin: 0; color: #b91c1c; font-size: 0.8rem; }
+
+/* Situação de cada aparelho da entrada: em estoque ou vendido. */
+.supplier-entry__units { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.supplier-entry__unit { padding: 2px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; font-family: ui-monospace, monospace; }
+.supplier-entry__unit.is-stock { background: #dcfce7; color: #166534; }
+.supplier-entry__unit.is-sold { background: #fee2e2; color: #991b1b; }
+.supplier-entry__sold-count { padding: 1px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 0.72rem; text-transform: none; letter-spacing: 0; }

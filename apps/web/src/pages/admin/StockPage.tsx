@@ -49,7 +49,7 @@ import {
   type StockKind,
   type StockVariationRow,
 } from '../../data/adminStore';
-import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes } from '../../data/attributeStore';
+import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes, updateAttribute } from '../../data/attributeStore';
 import { apiListSuppliers } from '../../services/erpApi';
 import { peoplePath as peopleHubPath, specificationsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
 import {
@@ -246,7 +246,7 @@ export function StockPage() {
       replaceAttributes(data.attributes);
       setAttrDefs(data.attributes.filter(a=>a.active&&a.useOnStock));
       setAutomationState(data);
-      if(enabled&&mode==='new') {generatedModel.current='';setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
+      if(enabled&&mode==='new'&&!simple) {generatedModel.current='';setSelectedAttrIds(data.attributes.filter(a=>a.active&&a.useOnStock).map(a=>a.id));enableVariations();}
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível salvar a automação.');}
     finally{setAutomationBusy(false);}
   }
@@ -296,7 +296,6 @@ export function StockPage() {
   const [saving, setSaving] = useState(false);
   const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
-  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && (automationState.enabled || simple) ? form.name : '',form.brand??'');
   const brandSlug = findBrand(brands, form.brand)?.slug ?? form.brand ?? '';
   const [catalogTypes, setCatalogTypes] = useState<CatalogType[]>([]);
   const [catalogModels, setCatalogModels] = useState<CatalogModel[]>([]);
@@ -337,6 +336,9 @@ export function StockPage() {
     setQuickCreate(kind);
   }
 
+  // A ajuda consulta pelo tipo + modelo do catálogo (a descrição pode ganhar "2" ou a marca); sem catálogo, pela descrição.
+  const catalogLookupName = simple ? [catalogTypes.find((item) => item.id === form.catalogTypeId)?.name, catalogModels.find((item) => item.id === form.catalogModelId)?.name].filter(Boolean).join(' ') : '';
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? catalogLookupName || form.name : '',form.brand??'');
   const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
   useEffect(() => {
     if (!device || readOnly) return;
@@ -345,7 +347,7 @@ export function StockPage() {
   }, [device, brands, mode]);
 
   useEffect(() => {
-    if (!formVisible || mode !== 'new' || !automationState.enabled || !automationState.eligible || !device) return;
+    if (simple || !formVisible || mode !== 'new' || !automationState.enabled || !automationState.eligible || !device) return;
     const defs=attrDefs.filter(a=>a.active && a.useOnStock && attributeKind(a.name));
     if(!defs.some(a=>attributeKind(a.name)==='color') || !defs.some(a=>attributeKind(a.name)==='capacity'))return;
     const signature=JSON.stringify([automationStoreId,device.model,defs.map(a=>[a.id,referenceValues(a)])]);
@@ -357,7 +359,57 @@ export function StockPage() {
       setVariations(combos.map((attrs,index)=>({tempKey:`help_${Date.now()}_${index}`,barcode:'',imei:'',attrs,price:form.price||0,cardRate:form.cardRate,qty:0,minQty:0,cost:form.cost||0,condition:form.condition||'new'})));
       generatedModel.current=signature;
     }catch(e){setError(e instanceof Error?e.message:'Não foi possível gerar as variações.');}
-  },[device,attrDefs,automationState.enabled,automationState.eligible,formVisible,mode,automationStoreId]);
+  },[device,attrDefs,automationState.enabled,automationState.eligible,formVisible,mode,automationStoreId,simple]);
+
+  // Cores e capacidades do modelo escolhidas na ajuda (estoque simplificado): só elas viram variações.
+  const [helpPick, setHelpPick] = useState<{ colors: string[]; capacities: string[] }>({ colors: [], capacities: [] });
+  useEffect(() => setHelpPick({ colors: [], capacities: [] }), [device?.model]);
+  const toggleHelp = (kind: 'colors' | 'capacities', value: string) =>
+    setHelpPick((current) => ({ ...current, [kind]: current[kind].includes(value) ? current[kind].filter((item) => item !== value) : [...current[kind], value] }));
+
+  /** Cria na grade as combinações escolhidas (sem repetir as que já existem) e grava os valores novos nos atributos da loja. */
+  async function createHelpVariations() {
+    if (readOnly) return;
+    const colorDef = attrDefs.find((a) => attributeKind(a.name) === 'color');
+    const capDef = attrDefs.find((a) => attributeKind(a.name) === 'capacity');
+    const colors = colorDef ? helpPick.colors : [];
+    const capacities = capDef ? helpPick.capacities : [];
+    if (!colors.length && !capacities.length) {
+      setError(colorDef || capDef ? 'Escolha ao menos uma cor ou capacidade.' : 'Cadastre os atributos Cor e Capacidade em Especificações.');
+      return;
+    }
+    setError('');
+    try {
+      for (const [def, picked] of [[colorDef, colors], [capDef, capacities]] as const) {
+        const missing = def ? picked.filter((value) => !def.values.includes(value)) : [];
+        if (def && missing.length) await updateAttribute(def.id, { values: [...def.values, ...missing] });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar as cores/capacidades nos atributos.');
+      return;
+    }
+    const key = (attrs: Record<string, string>) => JSON.stringify(Object.entries(attrs).filter(([, v]) => v).sort());
+    setVariations((current) => {
+      // A linha inicial vazia (sem atributos e sem entradas) dá lugar às escolhidas.
+      const kept = current.filter((row) => Object.values(row.attrs ?? {}).some(Boolean) || (row.supplierEntries?.length ?? 0) > 0 || row.id);
+      const seen = new Set(kept.map((row) => key(row.attrs ?? {})));
+      const added: StockVariationRow[] = [];
+      for (const color of colors.length ? colors : ['']) {
+        for (const capacity of capacities.length ? capacities : ['']) {
+          const attrs: Record<string, string> = {};
+          if (color && colorDef) attrs[colorDef.id] = color;
+          if (capacity && capDef) attrs[capDef.id] = capacity;
+          if (seen.has(key(attrs))) continue;
+          seen.add(key(attrs));
+          added.push({ tempKey: `help_${Date.now()}_${added.length}`, barcode: '', imei: '', attrs, price: form.price || 0, cardRate: form.cardRate, qty: 0, minQty: 0, cost: 0, condition: form.condition || 'new' });
+        }
+      }
+      return [...kept, ...added];
+    });
+    setUseVariations(true);
+    setSelectedAttrIds((current) => [...new Set([...current, ...(colors.length && colorDef ? [colorDef.id] : []), ...(capacities.length && capDef ? [capDef.id] : [])])]);
+    setHelpPick({ colors: [], capacities: [] });
+  }
 
   function referenceValues(attr: { name: string; values: string[] } | undefined) {
     const kind = attr ? attributeKind(attr.name) : null;
@@ -1461,6 +1513,7 @@ export function StockPage() {
                     entries={(entriesEdit.index === 'simple' ? form.supplierEntries : variations[entriesEdit.index]?.supplierEntries) ?? []}
                     suppliers={suppliers}
                     defaultSupplierId={form.supplierId || ''}
+                    onSupplierCreated={() => setSupplierVersion((v) => v + 1)}
                     onClose={() => setEntriesEdit(null)}
                     onApply={(entries) => (readOnly ? setEntriesEdit(null) : applySupplierEntries(entriesEdit.index, entries))}
                   />
@@ -1679,6 +1732,12 @@ export function StockPage() {
           Incluir a marca
         </label>
       ) : null}
+      {!readOnly ? (
+        <label className="stock-simple-description__brand" title="Consulta o modelo e mostra as cores e capacidades para você escolher quais criar na grade">
+          <input type="checkbox" checked={automationState.enabled} disabled={automationBusy} onChange={(e) => void toggleAutomation(e.target.checked)} />
+          Receber ajuda
+        </label>
+      ) : null}
     </div>
   );
 
@@ -1687,8 +1746,44 @@ export function StockPage() {
       <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
         {photoPickerNode}
         <div className="stock-id-content">
-          {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
-          {device && <p className="empty stock-simple__device">Cores e capacidades do {device.model} disponíveis na grade.</p>}
+          {automationState.enabled && deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
+          {automationState.enabled && deviceError && <p role="status" className="empty">{deviceError}</p>}
+          {automationState.enabled && !readOnly && device ? (
+            <div className="stock-help-pick">
+              <p className="stock-help-pick__title">
+                Ajuda do <strong>{device.model}</strong>: marque as cores e capacidades que você vende — só elas entram na grade.
+              </p>
+              {device.colors.length ? (
+                <div className="stock-help-pick__group">
+                  <span>Cores</span>
+                  <div className="stock-help-pick__chips">
+                    {device.colors.map((color) => (
+                      <button key={color} type="button" className={`stock-attr-pill ${helpPick.colors.includes(color) ? 'is-selected' : ''}`} onClick={() => toggleHelp('colors', color)}>
+                        {helpPick.colors.includes(color) ? '✓ ' : ''}
+                        {color}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {device.capacities.length ? (
+                <div className="stock-help-pick__group">
+                  <span>Capacidades</span>
+                  <div className="stock-help-pick__chips">
+                    {device.capacities.map((capacity) => (
+                      <button key={capacity} type="button" className={`stock-attr-pill ${helpPick.capacities.includes(capacity) ? 'is-selected' : ''}`} onClick={() => toggleHelp('capacities', capacity)}>
+                        {helpPick.capacities.includes(capacity) ? '✓ ' : ''}
+                        {capacity}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <button type="button" className="btn btn--primary btn--sm" disabled={!helpPick.colors.length && !helpPick.capacities.length} onClick={() => void createHelpVariations()}>
+                {(() => { const total = Math.max(1, helpPick.colors.length) * Math.max(1, helpPick.capacities.length); return helpPick.colors.length || helpPick.capacities.length ? `Criar ${total} ${total === 1 ? 'variação' : 'variações'} na grade` : 'Marque cores ou capacidades'; })()}
+              </button>
+            </div>
+          ) : null}
           <div className={`admin-form stock-simple__fields ${readOnly ? 'is-readonly' : ''}`}>
             <div className="stock-brand-field">
               <AdminPicker
@@ -2170,8 +2265,10 @@ export function StockPage() {
             <p className="empty">
               {totemSurface
                 ? 'Catálogo da vitrine: nome, preço, foto, quantidade e atributos.'
-                : 'Campos agrupados por tema. Tamanho (roupa/calçado) entra como atributo — cadastre em '}
-              {!totemSurface ? <Link to={specsPath('atributos')}>Especificações</Link> : null}
+                : simple
+                  ? 'Marca, tipo e modelo montam a descrição. Fornecedor, grupo, subgrupo e datas ficam na aba Especificações.'
+                  : 'Campos agrupados por tema. Tamanho (roupa/calçado) entra como atributo — cadastre em '}
+              {!totemSurface && !simple ? <Link to={specsPath('atributos')}>Especificações</Link> : null}
               {totemSurface && catalogFull ? (
                 <>
                   {' '}

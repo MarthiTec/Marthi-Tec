@@ -63,6 +63,10 @@ export type SupplierEntry = {
   origin?: 'supplier' | 'trade_in';
   customerId?: string;
   customerName?: string;
+  /** Unidades desta entrada já vendidas (vêm do banco; não são editadas na tela). */
+  soldQty?: number;
+  /** IMEIs desta entrada que já saíram numa venda. */
+  soldImeis?: Array<{ imei: string; saleId: string; soldAt: string }>;
 };
 
 export type StockVariationRow = {

@@ -722,3 +722,43 @@ test('simple stock: brand/type/model catalog, who registered, supplier origin, s
   assert.equal((await request('/stock/' + id, 'DELETE')).status, 200);
   assert.equal((await request('/stock/lookup?code=351000000000003')).json.data ?? null, null);
 });
+
+test('sold flag: a sale marks the unit (by IMEI or the oldest entry), the same IMEI cannot be sold twice, sold IMEIs stay in the entry and cancel returns them', async () => {
+  const item = (await request('/stock', 'POST', { name: 'IPHONE 12 VENDIDO TESTE', kind: 'device', qty: 0, price: 2000 })).json.data;
+  const older = await request('/stock/' + item.id + '/entries', 'POST', { entry: { entryDate: '2026-09-01', qty: 2, unitCost: 1500, imeis: ['359000000000001', '359000000000002'] } });
+  assert.equal(older.status, 201, JSON.stringify(older.json));
+  const newer = await request('/stock/' + item.id + '/entries', 'POST', { entry: { entryDate: '2026-09-20', qty: 1, unitCost: 1600, imeis: ['359000000000003'] } });
+  assert.equal(newer.status, 201, JSON.stringify(newer.json));
+
+  const sell = (body) => request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente Teste', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 2000, ...body }] });
+  const byImei = await sell({ imei: '359000000000003' });
+  assert.equal(byImei.status, 201, JSON.stringify(byImei.json));
+  const fifo = await sell({});
+  assert.equal(fifo.status, 201, JSON.stringify(fifo.json));
+  const again = await sell({ imei: '359000000000003' });
+  assert.equal(again.status, 409, 'IMEI already sold');
+
+  const line = (await query("SELECT imei FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1", [byImei.json.data.id || byImei.json.data.saleId])).rows[0];
+  assert.equal(line.imei, '359000000000003', 'the sold IMEI is kept on the sale line');
+
+  const product = (await request('/stock')).json.data.find((p) => p.id === item.id);
+  assert.equal(product.qty, 1);
+  const [a, b] = product.supplierEntries;
+  assert.equal(a.soldQty, 1, 'oldest entry gave the unit without IMEI');
+  assert.deepEqual(a.soldImeis.map((s) => s.imei), ['359000000000001']);
+  assert.equal(b.soldQty, 1);
+  assert.deepEqual(b.soldImeis.map((s) => s.imei), ['359000000000003']);
+
+  // Aparelho vendido não sai da entrada, nem a entrada com venda pode ser apagada.
+  const drop = await request('/stock/' + item.id, 'PATCH', { supplierEntries: [{ ...a, imeis: ['359000000000002'] }, b] });
+  assert.equal(drop.status, 409, JSON.stringify(drop.json));
+  const remove = await request('/stock/' + item.id, 'PATCH', { supplierEntries: [a] });
+  assert.equal(remove.status, 409, JSON.stringify(remove.json));
+
+  // Cancelar a venda devolve o aparelho para "em estoque".
+  const cancel = await request('/sales/' + (fifo.json.data.id || fifo.json.data.saleId) + '/cancel', 'POST', { reason: 'Teste' });
+  assert.equal(cancel.status, 200, JSON.stringify(cancel.json));
+  const after = (await request('/stock')).json.data.find((p) => p.id === item.id).supplierEntries[0];
+  assert.equal(after.soldQty, 0);
+  assert.deepEqual(after.soldImeis, []);
+});

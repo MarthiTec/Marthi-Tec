@@ -88,3 +88,12 @@
   .stock-report-print .stock-report__table tr { break-inside: avoid; }
   .stock-report-print * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Situação do aparelho: em estoque ou vendido. */
+.stock-report__status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; }
+.stock-report__status.is-stock { background: #dcfce7; color: #166534; }
+.stock-report__status.is-sold { background: #fee2e2; color: #991b1b; }
+.stock-report__status.is-empty { background: #f1f5f9; color: #475569; }
+@media print {
+  .stock-report__status { padding: 0; background: none !important; color: #111 !important; }
+}
