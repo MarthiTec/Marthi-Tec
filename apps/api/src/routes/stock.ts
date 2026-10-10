@@ -365,7 +365,14 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
           FROM stock_items
-          WHERE store_id = $1 AND (barcode = $2 OR sku = $2 OR imei = $2)
+          WHERE store_id = $1 AND (
+            barcode = $2 OR sku = $2 OR imei = $2
+            -- IMEI ou código de barras de uma variação da grade
+            OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(variations, '[]'::jsonb)) v WHERE v->>'imei' = $2 OR v->>'barcode' = $2)
+            -- IMEI lançado nas entradas por fornecedor (ou no aparelho da troca)
+            OR EXISTS (SELECT 1 FROM stock_supplier_entries e WHERE e.store_id = $1 AND e.stock_item_id = stock_items.id AND e.imeis ? $2)
+          )
+          ORDER BY active DESC
           LIMIT 1
         `;
         const resQuery = await pool.query(sql, [storeId, code]);

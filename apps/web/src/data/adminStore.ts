@@ -654,6 +654,14 @@ export function findStockByCode(code: string) {
     return needle === sku || needle === barcode || needle === imei || needle === id;
   });
   if (exact) return exact;
+  // IMEI/código de uma variação ou das entradas por fornecedor (aparelhos com grade).
+  const clean = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, '');
+  const byUnit = stock.find(
+    (item) =>
+      (item.variations ?? []).some((v) => clean(v.imei) === needle || clean(v.barcode) === needle || (v.supplierEntries ?? []).some((entry) => (entry.imeis ?? []).some((imei) => clean(imei) === needle))) ||
+      (item.supplierEntries ?? []).some((entry) => (entry.imeis ?? []).some((imei) => clean(imei) === needle)),
+  );
+  if (byUnit) return byUnit;
   const named = stock.filter((item) => item.name.toLowerCase().includes(needle));
   return named.length === 1 ? named[0] : null;
 }

@@ -624,3 +624,15 @@ test('trade-in becomes a stock entry with the customer as origin, its notes and 
   assert.equal(cancel.status, 200, JSON.stringify(cancel.json));
   assert.equal((await query('SELECT count(*)::int n FROM stock_supplier_entries WHERE stock_item_id = $1', [product.id])).rows[0].n, 0);
 });
+
+test('lookup finds the product by an IMEI typed in the supplier entries or in a variation', async () => {
+  const created = (await request('/stock', 'POST', {
+    name: 'IMEI NAS ENTRADAS', kind: 'device', qty: 0, price: 100,
+    variations: [{ attrs: { cor: 'Azul' }, price: 100, cost: 0, qty: 1, minQty: 0, condition: 'new', imei: '359000000000777', supplierEntries: [{ qty: 1, unitCost: 50, imeis: ['359000000000888'] }] }],
+  })).json.data;
+  const byEntry = await request('/stock/lookup?code=359000000000888');
+  assert.equal(byEntry.json.data?.id, created.id);
+  const byVariation = await request('/stock/lookup?code=359000000000777');
+  assert.equal(byVariation.json.data?.id, created.id);
+  assert.equal((await request('/stock/lookup?code=000000000000000')).json.data, null);
+});

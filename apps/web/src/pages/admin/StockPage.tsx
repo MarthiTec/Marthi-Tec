@@ -102,6 +102,22 @@ function todayIso() {
 
 const formatQty = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
+/** Todos os códigos do produto: SKU, barras, IMEI, DUN-14, e os das variações e das entradas por fornecedor. */
+function productCodes(item: StockItem) {
+  const variations = item.variations ?? [];
+  return [
+    item.sku,
+    item.barcode,
+    item.imei,
+    item.dun14,
+    ...variations.flatMap((v) => [v.barcode, v.imei]),
+    ...(item.supplierEntries ?? []).flatMap((entry) => entry.imeis ?? []),
+    ...variations.flatMap((v) => (v.supplierEntries ?? []).flatMap((entry) => entry.imeis ?? [])),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export type { StockVariationRow };
 
 const REFRESH_EVENTS = [
@@ -399,11 +415,12 @@ export function StockPage() {
         if (attrFilterValue !== 'all' && value !== attrFilterValue) return false;
       }
       if (codeQuery.trim()) {
-        const codeHay = `${item.sku} ${item.barcode} ${item.imei}`;
+        // Também os IMEIs/códigos das variações e das entradas por fornecedor.
+        const codeHay = productCodes(item);
         if (!matchesQuery(codeHay, codeQuery)) return false;
       }
       return matchesQuery(
-        `${item.name} ${item.brand ?? ''} ${item.sku} ${item.barcode} ${item.imei} ${item.color} ${item.capacity} ${Object.values(item.attrs ?? {}).join(' ')}`,
+        `${item.name} ${item.brand ?? ''} ${productCodes(item)} ${item.color} ${item.capacity} ${Object.values(item.attrs ?? {}).join(' ')} ${(item.variations ?? []).map((v) => Object.values(v.attrs ?? {}).join(' ')).join(' ')}`,
         query,
       );
     });
