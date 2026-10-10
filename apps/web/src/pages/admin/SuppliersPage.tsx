@@ -25,6 +25,7 @@ type Form = {
   name: string;
   tradeName: string;
   skuName: string;
+  origin: 'company' | 'upgrade';
   documentType: DocumentType;
   document: string;
   phone: string;
@@ -36,13 +37,14 @@ type Form = {
   active: boolean;
 };
 
-const EMPTY: Form = { name: '', tradeName: '', skuName: '', documentType: 'cnpj', document: '', phone: '', phones: [], email: '', emails: [], address: EMPTY_ADDRESS, notes: '', active: true };
+const EMPTY: Form = { name: '', tradeName: '', skuName: '', origin: 'company', documentType: 'cnpj', document: '', phone: '', phones: [], email: '', emails: [], address: EMPTY_ADDRESS, notes: '', active: true };
 
 function formFrom(item: ApiSupplier): Form {
   return {
     name: item.name,
     tradeName: item.tradeName ?? '',
     skuName: item.skuName ?? '',
+    origin: item.origin === 'upgrade' ? 'upgrade' : 'company',
     documentType: item.documentType === 'cpf' ? 'cpf' : 'cnpj',
     document: item.document ? formatCpfCnpj(item.document) : '',
     phone: item.phone ?? '',
@@ -104,7 +106,7 @@ export function SuppliersPage() {
       items.filter(
         (item) =>
           matchesStatus(item.active !== false, status) &&
-          matchesQuery(`${item.name} ${item.tradeName} ${item.document} ${item.city} ${item.phone} ${(item.phones ?? []).join(' ')}`, query),
+          matchesQuery(`${item.name} ${item.tradeName} ${item.origin === 'upgrade' ? 'upgrade' : 'empresa'} ${item.document} ${item.city} ${item.phone} ${(item.phones ?? []).join(' ')}`, query),
       ),
     [items, query, status],
   );
@@ -147,6 +149,7 @@ export function SuppliersPage() {
       name: form.name.trim(),
       tradeName: form.tradeName.trim(),
       skuName: form.skuName.trim(),
+      origin: form.origin,
       documentType: form.documentType,
       document: form.document.trim(),
       phone: form.phone.trim(),
@@ -225,6 +228,7 @@ export function SuppliersPage() {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th>Origem</th>
                   <th>Documento</th>
                   <th>Telefone</th>
                   <th>Cidade</th>
@@ -234,9 +238,9 @@ export function SuppliersPage() {
               </thead>
               <tbody>
                 {loading && items.length === 0 ? (
-                  <tr><td colSpan={6} className="empty">Carregando…</td></tr>
+                  <tr><td colSpan={7} className="empty">Carregando…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="empty">Nenhum fornecedor encontrado.</td></tr>
+                  <tr><td colSpan={7} className="empty">Nenhum fornecedor encontrado.</td></tr>
                 ) : (
                   filtered.map((item) => (
                     <tr key={item.id}>
@@ -246,6 +250,7 @@ export function SuppliersPage() {
                           {item.tradeName ? ` · ${item.tradeName}` : ''}
                         </CrudNameButton>
                       </td>
+                      <td data-label="Origem">{item.origin === 'upgrade' ? 'Upgrade' : 'Empresa'}</td>
                       <td data-label="Documento">{item.document ? formatCpfCnpj(item.document) : '—'}</td>
                       <td data-label="Telefone">{item.phone || '—'}</td>
                       <td data-label="Cidade">{item.city ? `${item.city}${item.state ? `/${item.state}` : ''}` : '—'}</td>
@@ -266,6 +271,16 @@ export function SuppliersPage() {
           <p className="empty">Aparece no cadastro do produto e nas notas de entrada de mercadoria.</p>
           {error ? <p role="alert" className="qty-low">{error}</p> : null}
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+            <AdminPicker
+              label="Origem"
+              value={form.origin}
+              disabled={readOnly}
+              options={[
+                { value: 'company', label: 'Empresa (fornecedor)' },
+                { value: 'upgrade', label: 'Upgrade (aparelho recebido em troca)' },
+              ]}
+              onChange={(value) => setForm({ ...form, origin: value === 'upgrade' ? 'upgrade' : 'company' })}
+            />
             <PersonTypeField type={form.documentType} document={form.document} disabled={readOnly} onChange={(documentType, document) => setForm({ ...form, documentType, document })} />
             <label>
               {isCompany ? 'Razão social' : 'Nome completo'}

@@ -170,3 +170,112 @@ productCatalogRouter.get('/api/v1/stock/:id/movements', requireAuth, async (req,
     next(error);
   }
 });
+
+/* ── Catálogo de Tipos e Modelos (Marca → Tipo → Modelo) ───────────────── */
+// Linhas sem loja são o catálogo da plataforma; a loja vê esse catálogo e os que ela cadastrou.
+
+const catalogTypeSchema = z.object({ brandSlug: z.string().trim().min(1).max(80), name: z.string().trim().min(1, 'Informe o tipo.').max(60) });
+const catalogModelSchema = z.object({ typeId: z.string().min(1), name: z.string().trim().min(1, 'Informe o modelo.').max(60) });
+const toCatalogType = (row: any) => ({ id: row.id, brandSlug: row.brand_slug, name: row.name, sort: Number(row.sort) || 0, own: Boolean(row.store_id) });
+const toCatalogModel = (row: any) => ({ id: row.id, typeId: row.type_id, name: row.name, sort: Number(row.sort) || 0, own: Boolean(row.store_id) });
+
+productCatalogRouter.get('/api/v1/catalog/types', requireAuth, async (req, res, next) => {
+  try {
+    const brand = String(req.query.brand ?? '').trim().toLowerCase();
+    const result = await pool.query(
+      `SELECT * FROM catalog_types WHERE active = true AND (store_id IS NULL OR store_id = $1) ${brand ? 'AND brand_slug = $2' : ''}
+        ORDER BY brand_slug, sort, name`,
+      brand ? [req.storeId, brand] : [req.storeId],
+    );
+    res.json({ success: true, data: result.rows.map(toCatalogType) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+productCatalogRouter.post('/api/v1/catalog/types', requireAuth, async (req, res, next) => {
+  try {
+    if (!canManageArea(req)) return forbidden(res);
+    const body = catalogTypeSchema.parse(req.body);
+    const row = (
+      await pool.query(
+        `INSERT INTO catalog_types (id, store_id, brand_slug, name, sort) VALUES ($1, $2, $3, $4, 100) RETURNING *`,
+        [`CT-${randomUUID()}`, req.storeId, body.brandSlug.toLowerCase(), body.name.toUpperCase()],
+      )
+    ).rows[0];
+    res.status(201).json({ success: true, data: toCatalogType(row) });
+  } catch (error) {
+    if (isDuplicate(error)) return duplicate(res, 'um tipo');
+    next(error);
+  }
+});
+
+productCatalogRouter.get('/api/v1/catalog/models', requireAuth, async (req, res, next) => {
+  try {
+    const typeId = String(req.query.typeId ?? '').trim();
+    const result = await pool.query(
+      `SELECT m.* FROM catalog_models m JOIN catalog_types t ON t.id = m.type_id
+        WHERE m.active = true AND (m.store_id IS NULL OR m.store_id = $1) AND (t.store_id IS NULL OR t.store_id = $1) ${typeId ? 'AND m.type_id = $2' : ''}
+        ORDER BY m.type_id, m.sort, m.name`,
+      typeId ? [req.storeId, typeId] : [req.storeId],
+    );
+    res.json({ success: true, data: result.rows.map(toCatalogModel) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+productCatalogRouter.post('/api/v1/catalog/models', requireAuth, async (req, res, next) => {
+  try {
+    if (!canManageArea(req)) return forbidden(res);
+    const body = catalogModelSchema.parse(req.body);
+    const type = (await pool.query('SELECT id FROM catalog_types WHERE id = $1 AND (store_id IS NULL OR store_id = $2)', [body.typeId, req.storeId])).rows[0];
+    if (!type) return notFound(res);
+    const row = (
+      await pool.query(
+        `INSERT INTO catalog_models (id, store_id, type_id, name, sort) VALUES ($1, $2, $3, $4, 100) RETURNING *`,
+        [`CM-${randomUUID()}`, req.storeId, body.typeId, body.name.toUpperCase()],
+      )
+    ).rows[0];
+    res.status(201).json({ success: true, data: toCatalogModel(row) });
+  } catch (error) {
+    if (isDuplicate(error)) return duplicate(res, 'um modelo');
+    next(error);
+  }
+});
+
+/** Só tipos/modelos que a própria loja cadastrou podem ser excluídos (os da plataforma ficam). */
+for (const [path, table] of [['/api/v1/catalog/types/:id', 'catalog_types'], ['/api/v1/catalog/models/:id', 'catalog_models']] as const) {
+  productCatalogRouter.delete(path, requireAuth, async (req, res, next) => {
+    try {
+      if (!canManageArea(req)) return forbidden(res);
+      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1 AND store_id = $2`, [req.params.id, req.storeId]);
+      if (!result.rowCount) return notFound(res);
+      res.json({ success: true, data: { ok: true } });
+    } catch (error) {
+      next(error);
+    }
+  });
+}
+
+/* ── Modo do estoque da loja: simplificado ou padrão ─────────────────── */
+
+productCatalogRouter.get('/api/v1/store/stock-mode', requireAuth, async (req, res, next) => {
+  try {
+    const row = (await pool.query('SELECT stock_mode FROM stores WHERE id = $1', [req.storeId])).rows[0];
+    res.json({ success: true, data: { mode: row?.stock_mode === 'simple' ? 'simple' : 'standard' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+productCatalogRouter.put('/api/v1/store/stock-mode', requireAuth, async (req, res, next) => {
+  try {
+    if (!canManageArea(req)) return forbidden(res);
+    const { mode } = z.object({ mode: z.enum(['simple', 'standard']) }).parse(req.body);
+    await pool.query('UPDATE stores SET stock_mode = $2 WHERE id = $1', [req.storeId, mode]);
+    res.json({ success: true, data: { mode } });
+  } catch (error) {
+    next(error);
+  }
+});

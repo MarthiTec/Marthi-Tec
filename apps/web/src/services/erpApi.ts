@@ -544,6 +544,8 @@ export type ApiSupplier = Partial<ApiPersonDetails> & {
   tradeName: string;
   /** Nome curto no SKU dos produtos; vazio = nome fantasia ou primeiro nome. */
   skuName?: string;
+  /** Empresa (fornecedor) ou Upgrade (aparelho recebido em troca). */
+  origin?: 'company' | 'upgrade';
   document: string;
   phone: string;
   email: string;

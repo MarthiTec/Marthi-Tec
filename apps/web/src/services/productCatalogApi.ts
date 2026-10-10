@@ -28,3 +28,24 @@ export const apiSaveProductGroupLabels = (labels: ProductGroupLabels) => nestPut
 
 export const apiListProductMovements = (stockId: string, limit = 20) =>
   nestGet<ProductMovement[]>(`/stock/${encodeURIComponent(stockId)}/movements?limit=${limit}`);
+
+/* Catálogo Marca → Tipo → Modelo (a descrição do produto sai daqui). */
+export type CatalogType = { id: string; brandSlug: string; name: string; sort: number; own: boolean };
+export type CatalogModel = { id: string; typeId: string; name: string; sort: number; own: boolean };
+export const apiListCatalogTypes = (brandSlug?: string) => nestGet<CatalogType[]>(`/catalog/types${brandSlug ? `?brand=${encodeURIComponent(brandSlug)}` : ''}`);
+export const apiCreateCatalogType = (body: { brandSlug: string; name: string }) => nestPost<CatalogType>('/catalog/types', body);
+export const apiListCatalogModels = (typeId?: string) => nestGet<CatalogModel[]>(`/catalog/models${typeId ? `?typeId=${encodeURIComponent(typeId)}` : ''}`);
+export const apiCreateCatalogModel = (body: { typeId: string; name: string }) => nestPost<CatalogModel>('/catalog/models', body);
+
+/* Modo do estoque da loja. */
+export type StockMode = 'simple' | 'standard';
+export const apiGetStockMode = () => nestGet<{ mode: StockMode }>('/store/stock-mode');
+export const apiSaveStockMode = (mode: StockMode) => nestPut<{ mode: StockMode }>('/store/stock-mode', { mode });
+
+/* Entrada de estoque (tela de entrada). */
+export type StockEntryRequest = {
+  variation?: { id?: string; attrs: Record<string, string>; condition: 'new' | 'used' | 'refurbished'; price?: number };
+  entry: { supplierId?: string | null; entryDate?: string; qty: number; unitCost: number; imeis: string[]; notes?: string; batteryLevel?: number | null };
+};
+export const apiCreateStockEntry = (stockId: string, body: StockEntryRequest) =>
+  nestPost<{ product: import('../data/adminStore').StockItem; entryId: string; variationId: string | null }>(`/stock/${encodeURIComponent(stockId)}/entries`, body);

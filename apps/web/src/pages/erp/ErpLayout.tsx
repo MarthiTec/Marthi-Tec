@@ -24,7 +24,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/lojas': { kicker: 'Retaguarda', title: 'Lojas & Licenciamento por CNPJ' },
   '/erp/perfil': { kicker: 'Retaguarda', title: 'Meu perfil' },
   '/erp/conta': { kicker: 'Retaguarda', title: 'Meu perfil' },
-  '/erp/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
+  '/erp/produtos': { kicker: 'Produtos', title: 'Produtos & Estoque' },
+  '/erp/entrada-estoque': { kicker: 'Estoque', title: 'Entrada de estoque' },
   '/erp/balanco': { kicker: 'Estoque', title: 'Balanço de estoque' },
   '/erp/movimentos': { kicker: 'Estoque', title: 'Movimentação de estoque' },
   '/erp/relatorio-estoque': { kicker: 'Estoque', title: 'Relatório de estoque' },
@@ -63,7 +64,8 @@ const NAV_FOOD: NavItem[] = [
 ];
 
 const NAV_PRODUCTS: NavItem[] = [
-  { to: '/erp/produtos', label: 'Cadastro', icon: 'box', end: true },
+  { to: '/erp/produtos', label: 'Produtos & Estoque', icon: 'box', end: true },
+  { to: '/erp/entrada-estoque', label: 'Entrada de estoque', icon: 'box' },
   { to: '/erp/balanco', label: 'Balanço', icon: 'box' },
   { to: '/erp/movimentos', label: 'Movimentos', icon: 'ops' },
   { to: '/erp/relatorio-estoque', label: 'Relatório de estoque', icon: 'print' },

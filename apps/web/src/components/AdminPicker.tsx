@@ -6,6 +6,8 @@ export type AdminPickerOption = {
   label: string;
   icon?: ReactNode;
   hint?: string;
+  /** Texto extra só para a busca (não aparece): IMEIs, modelo, fornecedor… */
+  keywords?: string;
   disabled?: boolean;
 };
 
@@ -58,11 +60,14 @@ export function AdminPicker({
   const filteredItems = useMemo(() => {
     if (!shouldSearch || !search.trim()) return items;
     const q = search.trim().toLowerCase();
+    const folded = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const terms = folded.split(/\s+/).filter(Boolean);
     return items.filter(
       (opt) =>
         opt.label.toLowerCase().includes(q) ||
         opt.value.toLowerCase().includes(q) ||
-        (opt.hint && opt.hint.toLowerCase().includes(q)),
+        (opt.hint && opt.hint.toLowerCase().includes(q)) ||
+        (opt.keywords ? terms.every((term) => opt.keywords!.includes(term)) : false),
     );
   }, [items, search, shouldSearch]);
 

@@ -240,8 +240,8 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
           `INSERT INTO stores (
             id, client_account_id, trade_name, legal_name, document_type, document,
             state_registration, municipal_registration, email, phone, zip_code, street,
-            number, complement, district, city, state, tax_regime, is_matrix, active, segment
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+            number, complement, district, city, state, tax_regime, is_matrix, active, segment, stock_mode
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CASE WHEN $21 = 'assistencia_tecnica' THEN 'simple' ELSE 'standard' END)
           ON CONFLICT (client_account_id, document) DO UPDATE
           SET trade_name = EXCLUDED.trade_name, segment = EXCLUDED.segment, active = true, updated_at = now()`,
           [

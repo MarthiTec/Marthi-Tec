@@ -98,6 +98,7 @@ import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 import { PainelUsersPage } from './pages/admin/PainelUsersPage';
 import { ExternalSalePage } from './pages/admin/ExternalSalePage';
 import { StockReportPage } from './pages/admin/StockReportPage';
+import { StockEntryPage } from './pages/admin/StockEntryPage';
 import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
 import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
@@ -215,6 +216,7 @@ export function App() {
           <Route path="balanco" element={<StockBalancePage />} />
           <Route path="movimentos" element={<StockMovementsPage />} />
           <Route path="relatorio-estoque" element={<StockReportPage />} />
+          <Route path="entrada-estoque" element={<StockEntryPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
           <Route path="especificacoes" element={<SpecificationsPage />} />

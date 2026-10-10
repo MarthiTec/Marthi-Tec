@@ -35,6 +35,8 @@ const WARRANTY_TERMS: Record<WarrantyType, string> = {
 
 type StockOption = {
   pickupPrices?:Record<string,number|null>;
+  /** Para a busca do produto: SKU, códigos, tipo/modelo do catálogo e entradas (IMEIs, fornecedor). */
+  sku?: string; barcode?: string; catalogTypeName?: string; catalogModelName?: string; supplierEntries?: SupplierEntry[];
   /** Grade de variações (preço e retirada por cor/capacidade). */
   variations?: StockVariationRow[];
   attrs?: Record<string,unknown>; color?: string; capacity?: string;
@@ -60,7 +62,8 @@ import { totemCardFee } from '../../data/variantQuote';
 import { hydrateCardMachinesFromApi } from '../../data/cardRatesStore';
 import { hydrateTotemSettingsFromApi } from '../../data/totemSettings';
 import { evaluateCampaignForLine, hydratePromoCampaigns, PROMO_EVENT, type EvaluatedLinePromo } from '../../data/promoCampaignStore';
-import type { StockVariationRow } from '../../data/adminStore';
+import type { StockVariationRow, SupplierEntry } from '../../data/adminStore';
+import { stockSearchText } from '../../data/stockSearch';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -198,6 +201,11 @@ export function ExternalSalePage() {
           pickupPrices: it.pickupPrices,
           attrs: it.attrs, color: it.color, capacity: it.capacity,
           variations: Array.isArray(it.variations) ? it.variations : [],
+          sku: it.sku || '',
+          barcode: it.barcode || '',
+          catalogTypeName: it.catalogTypeName || '',
+          catalogModelName: it.catalogModelName || '',
+          supplierEntries: Array.isArray(it.supplierEntries) ? it.supplierEntries : [],
         }));
 
         setStockItems(mappedStock);
@@ -609,12 +617,14 @@ export function ExternalSalePage() {
                   <div className="external-sale-wide-field">
                     <AdminPicker
                       label="Produto"
+                      searchable
                       value={line.stockId || ''}
                       options={[
                         { value: '', label: 'Selecione um produto do estoque…' },
                         ...stockItems.filter((p) => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
                           value: p.id,
                           label: [p.name, ...Object.values(p.attrs ?? {}).filter((value) => typeof value === 'string' && value), `${formatMoney(p.price)} (disp.: ${p.qty})`].join(' · '),
+                          keywords: stockSearchText(p),
                         })),
                       ]}
                       onChange={(val) => handleLineProductChange(idx, val)}

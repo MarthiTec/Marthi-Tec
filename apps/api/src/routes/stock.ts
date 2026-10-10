@@ -43,6 +43,9 @@ const stockItemSchema = z.object({
   batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
   /** Mostra condição e bateria no totem (padrão: sim). */
   showConditionOnTotem: z.boolean().optional(),
+  /** Tipo (IPHONE, IPAD…) e Modelo (15 PRO MAX…) do catálogo: com a marca, montam a descrição. */
+  catalogTypeId: z.string().nullable().optional(),
+  catalogModelId: z.string().nullable().optional(),
   pickupPrices: z.record(z.number().finite().nonnegative().nullable()).default({}),
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do item é obrigatório.'),
@@ -173,6 +176,17 @@ async function saveProductDetails(db: PoolClient, storeId: string, id: string, b
     fields.push(['battery_level', batteryFor(condition, body.batteryLevel)]);
   }
   if (body.showConditionOnTotem !== undefined) fields.push(['show_condition_on_totem', body.showConditionOnTotem]);
+  // Tipo e modelo: do catálogo da plataforma ou da própria loja; o modelo tem que ser do tipo escolhido.
+  if (body.catalogTypeId && !(await db.query('SELECT 1 FROM catalog_types WHERE id = $1 AND (store_id IS NULL OR store_id = $2)', [body.catalogTypeId, storeId])).rows.length) {
+    throw Object.assign(new Error('Tipo de produto não encontrado.'), { status: 400 });
+  }
+  if (body.catalogModelId) {
+    const model = (await db.query('SELECT type_id FROM catalog_models WHERE id = $1 AND (store_id IS NULL OR store_id = $2)', [body.catalogModelId, storeId])).rows[0];
+    const typeId = body.catalogTypeId !== undefined ? body.catalogTypeId : (await db.query('SELECT catalog_type_id FROM stock_items WHERE id = $1', [id])).rows[0]?.catalog_type_id;
+    if (!model || model.type_id !== typeId) throw Object.assign(new Error('O modelo não é do tipo escolhido.'), { status: 400 });
+  }
+  if (body.catalogTypeId !== undefined) fields.push(['catalog_type_id', body.catalogTypeId || null]);
+  if (body.catalogModelId !== undefined || (body.catalogTypeId !== undefined && !body.catalogTypeId)) fields.push(['catalog_model_id', body.catalogTypeId === null || body.catalogTypeId === '' ? null : body.catalogModelId || null]);
   if (!fields.length) return;
   await db.query(
     `UPDATE stock_items SET ${fields.map(([column], index) => `${column} = $${index + 3}`).join(', ')} WHERE id = $1 AND store_id = $2`,
@@ -235,6 +249,11 @@ export function formatStockRow(row: any) {
     purchaseFactor: Number(row.purchase_factor ?? row.purchaseFactor) || 1,
     batteryLevel: batteryFor(row.condition, row.battery_level ?? row.batteryLevel),
     showConditionOnTotem: (row.show_condition_on_totem ?? row.showConditionOnTotem) !== false,
+    catalogTypeId: row.catalog_type_id ?? row.catalogTypeId ?? '',
+    catalogModelId: row.catalog_model_id ?? row.catalogModelId ?? '',
+    catalogTypeName: row.catalog_type_name ?? '',
+    catalogModelName: row.catalog_model_name ?? '',
+    createdByName: row.created_by_name ?? row.createdByName ?? '',
     trackLot: Boolean(row.track_lot ?? row.trackLot),
     isKit: Boolean(row.is_kit ?? row.isKit),
     active: Boolean(row.active),
@@ -314,7 +333,9 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -363,7 +384,9 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
           WHERE store_id = $1 AND (
             barcode = $2 OR sku = $2 OR imei = $2
@@ -466,6 +489,8 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           );
           if (body.skuWithSupplier === false) await client.query('UPDATE stock_items SET sku_with_supplier = false WHERE id = $1 AND store_id = $2', [id, storeId]);
           await saveProductDetails(client, storeId, id, body);
+          // Quem cadastrou (o usuário logado).
+          await client.query('UPDATE stock_items SET created_by_id = $3, created_by_name = $4 WHERE id = $1 AND store_id = $2', [id, storeId, req.user?.id ?? null, req.user?.name ?? '']);
           // Data de entrada: a escolhida no cadastro ou, sem ela, o dia de hoje.
           await client.query('UPDATE stock_items SET entry_date = COALESCE(entry_date, CURRENT_DATE) WHERE id = $1 AND store_id = $2', [id, storeId]);
 
@@ -518,7 +543,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
 
           // Cor/capacidade sugeridas pelo catálogo que ainda não existiam no atributo são criadas nele.
           await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
-          const createdRes = await client.query(`SELECT * FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId]);
+          const createdRes = await client.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`, [id, storeId]);
           const [created] = await attachSupplierEntries(client, storeId, [formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0])]);
           await client.query('COMMIT');
           res.status(201).json({ success: true, data: created });
@@ -719,7 +744,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
 
           await client.query('COMMIT');
 
-          const updatedRes = await pool.query(`SELECT * FROM stock_items WHERE id = $1`, [id]);
+          const updatedRes = await pool.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1`, [id]);
           res.json({ success: true, data: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool,storeId,updatedRes.rows))[0])]))[0] });
           return;
         } catch (err) {
@@ -816,7 +841,9 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,

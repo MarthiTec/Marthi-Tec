@@ -7212,3 +7212,63 @@ select.caixa-mov-input {
 .stock-variation-container .stock-qty-desc__text { align-items: flex-start; }
 
 .stock-inactive-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: rgba(100, 116, 139, 0.16); color: var(--mute, #64748b); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+
+/* Totais da lista de produtos (filtrada). */
+.stock-list-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+.stock-list-totals > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card-2, #f8fafc);
+}
+.stock-list-totals span { font-size: 0.78rem; color: var(--mute); font-weight: 600; }
+.stock-list-totals strong { font-size: 1.05rem; color: var(--ink); }
+
+/* Estoque simplificado: descrição em destaque que acompanha o formulário. */
+.stock-simple-description {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 116, 144, 0.35);
+  background: var(--card, #fff);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+.stock-simple-description > label:first-child { flex: 1 1 320px; display: flex; flex-direction: column; gap: 4px; }
+.stock-simple-description > label:first-child > span { font-size: 0.78rem; font-weight: 700; color: #0e7490; text-transform: uppercase; letter-spacing: 0.04em; }
+.stock-simple-description input:not([type='checkbox']) {
+  font-size: 1.35rem;
+  font-weight: 800;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card-2, #f8fafc);
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+}
+.stock-simple-description__brand { display: inline-flex; align-items: center; gap: 6px; font-size: 0.86rem; font-weight: 600; padding-bottom: 12px; cursor: pointer; }
+.stock-simple__fields { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.stock-simple__hint { margin-top: 12px; font-size: 0.84rem; }
+.stock-simple__hint .link-btn { background: none; border: 0; padding: 0; color: #0e7490; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.stock-simple__device { margin: 0 0 8px; }
+.stock-specs-fields { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+@media (max-width: 640px) {
+  .stock-simple-description input:not([type='checkbox']) { font-size: 1.1rem; }
+}
+/* A descrição do estoque simplificado fica fixa no topo: o recorte lateral não pode virar área de rolagem. */
+.admin-page.admin-page--stock-form { overflow-x: clip !important; overflow-y: visible !important; }

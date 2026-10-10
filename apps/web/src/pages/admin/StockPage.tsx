@@ -68,11 +68,21 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { ProductMovementsPanel } from '../../components/ProductMovementsPanel';
 import { RegistryDrawer } from '../../components/RegistryDrawer';
 import {
+  apiCreateCatalogModel,
+  apiCreateCatalogType,
   apiCreateProductGroup,
+  apiGetStockMode,
+  apiListCatalogModels,
+  apiListCatalogTypes,
   apiListProductGroups,
+  type CatalogModel,
+  type CatalogType,
   type ProductGroup,
   type ProductGroupLabels,
+  type StockMode,
 } from '../../services/productCatalogApi';
+import { useAuth } from '../../contexts/AuthContext';
+import { stockSearchText } from '../../data/stockSearch';
 import { KitsPage } from './KitsPage';
 import { WarehousePage } from './WarehousePage';
 import { LotsPage } from './LotsPage';
@@ -81,7 +91,7 @@ import { PriceTablesPage } from './PriceTablesPage';
 import { PromoCampaignsPage } from '../erp/PromoCampaignsPage';
 
 type Mode = 'new' | 'edit' | 'view';
-type FormTab = 'principal' | 'config' | 'ofertas' | 'fiscal' | 'movimentos';
+type FormTab = 'principal' | 'specs' | 'config' | 'ofertas' | 'fiscal' | 'movimentos';
 type RegistryPanel = 'kit' | 'warehouse' | 'lot' | 'fiscal' | 'campaign' | 'prices';
 
 /** Cadastros que podem ser abertos de dentro do produto, sem perder o que já foi preenchido. */
@@ -139,6 +149,21 @@ export function StockPage() {
   const nameRef = useRef<HTMLInputElement>(null);
   const formAnchorRef = useRef<HTMLDivElement>(null);
   const [formTab, setFormTab] = useState<FormTab>('principal');
+  const { user } = useAuth();
+  // Modo do estoque da loja (Operações): simplificado mostra só descrição, marca/tipo/modelo, foto e grade.
+  const [stockMode, setStockMode] = useState<StockMode>('standard');
+  useEffect(() => {
+    let alive = true;
+    const load = () => void apiGetStockMode().then((data) => alive && setStockMode(data.mode)).catch(() => undefined);
+    load();
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    return () => {
+      alive = false;
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    };
+  }, []);
+  const simple = stockMode === 'simple' && !totemSurface;
+  const [includeBrandInName, setIncludeBrandInName] = useState(false);
   const [registryPanel, setRegistryPanel] = useState<RegistryPanel | null>(null);
   const [unitConversionOpen, setUnitConversionOpen] = useState(false);
   // Grupos e subgrupos vêm do banco da loja.
@@ -271,7 +296,47 @@ export function StockPage() {
   const [saving, setSaving] = useState(false);
   const generatedModel=useRef('');
   const { brands, error: brandsError } = useBrands();
-  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && automationState.enabled ? form.name : '',form.brand??'');
+  const { device, loading: deviceLoading, error: deviceError } = useDeviceReference(formVisible && (automationState.enabled || simple) ? form.name : '',form.brand??'');
+  const brandSlug = findBrand(brands, form.brand)?.slug ?? form.brand ?? '';
+  const [catalogTypes, setCatalogTypes] = useState<CatalogType[]>([]);
+  const [catalogModels, setCatalogModels] = useState<CatalogModel[]>([]);
+  useEffect(() => {
+    if (!simple || !formVisible || !brandSlug) return setCatalogTypes([]);
+    let alive = true;
+    apiListCatalogTypes(normalizeBrand(brandSlug)).then((rows) => alive && setCatalogTypes(rows)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [simple, formVisible, brandSlug, catalogVersion]);
+  useEffect(() => {
+    if (!simple || !formVisible || !form.catalogTypeId) return setCatalogModels([]);
+    let alive = true;
+    apiListCatalogModels(form.catalogTypeId).then((rows) => alive && setCatalogModels(rows)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [simple, formVisible, form.catalogTypeId, catalogVersion]);
+
+  /** Descrição montada pelo catálogo: [marca] tipo modelo — ex.: IPHONE 15 PRO MAX. */
+  function applyCatalogName(change: { brand?: string; typeId?: string; modelId?: string; includeBrand?: boolean }) {
+    if (readOnly) return;
+    const typeId = change.typeId ?? form.catalogTypeId ?? '';
+    const modelId = change.modelId ?? form.catalogModelId ?? '';
+    const typeName = catalogTypes.find((item) => item.id === typeId)?.name ?? '';
+    const modelName = catalogModels.find((item) => item.id === modelId)?.name ?? '';
+    if (!typeName && !modelName) return;
+    const brandName = (change.includeBrand ?? includeBrandInName) ? findBrand(brands, change.brand ?? form.brand)?.name ?? '' : '';
+    const name = [brandName, typeName, modelName].filter(Boolean).join(' ').toUpperCase();
+    duplicateCheck.current = null;
+    setForm((current) => ({ ...current, name }));
+  }
+
+  function openCatalogQuick(kind: 'catalogType' | 'catalogModel') {
+    setQuickName('');
+    setQuickError('');
+    setQuickCreate(kind);
+  }
+
   const brandOptions = [{ value: '', label: 'Sem marca definida' }, ...brands.filter(b => b.active || normalizeBrand(b.slug) === normalizeBrand(form.brand)).map(b => ({ value: b.slug, label: b.name })), ...(form.brand && !findBrand(brands, form.brand) ? [{ value: form.brand, label: form.brand }] : [])];
   useEffect(() => {
     if (!device || readOnly) return;
@@ -302,23 +367,30 @@ export function StockPage() {
   const fiscalClasses = useMemo(() => listFiscalClassifications(true), []);
   const warehouses = useMemo(() => listWarehouses(true), []);
   // Cadastro rápido sem sair do produto: fornecedor, marca e atributo.
-  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute' | 'group' | 'subgroup'>(null);
+  const [quickCreate, setQuickCreate] = useState<null | 'supplier' | 'brand' | 'attribute' | 'group' | 'subgroup' | 'catalogType' | 'catalogModel'>(null);
   const [quickName, setQuickName] = useState('');
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickError, setQuickError] = useState('');
   const [conversion, setConversion] = useState({ unit: '', factor: 1 });
   const [supplierVersion, setSupplierVersion] = useState(0);
   // Fornecedores vêm direto do banco (nada de cópia local).
-  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; skuName: string }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; skuName: string; origin: 'company' | 'upgrade' }>>([]);
   useEffect(() => {
     let alive = true;
-    const load = () => void apiListSuppliers(true).then((rows) => { if (alive) setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name, skuName: supplierSkuName(row) }))); }).catch(() => undefined);
+    const load = () => void apiListSuppliers(true).then((rows) => { if (alive) setSuppliers(rows.map((row) => ({ id: row.id, name: row.tradeName || row.name, skuName: supplierSkuName(row), origin: row.origin === 'upgrade' ? 'upgrade' : 'company' }))); }).catch(() => undefined);
     load();
     window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
     return () => { alive = false; window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load); };
   }, [supplierVersion]);
+  const supplierNames = useMemo(() => new Map(suppliers.map((item) => [item.id, item.name])), [suppliers]);
   const readOnly = mode === 'view';
-  const formTabs: Array<{ id: FormTab; label: string }> = [
+  const formTabs: Array<{ id: FormTab; label: string }> = simple
+    ? [
+        { id: 'principal', label: 'Cadastro' },
+        { id: 'specs', label: 'Especificações' },
+        { id: 'movimentos', label: 'Entradas e saídas' },
+      ]
+    : [
     { id: 'principal', label: 'Cadastro' },
     { id: 'config', label: 'Configurações' },
     { id: 'ofertas', label: 'Ofertas do dia' },
@@ -343,6 +415,14 @@ export function StockPage() {
         const created = await apiCreateProductGroup({ name, parentId: quickCreate === 'subgroup' ? form.groupId || null : null });
         setProductGroups((current) => [...current, created]);
         setForm((current) => (quickCreate === 'group' ? { ...current, groupId: created.id, subgroupId: '' } : { ...current, subgroupId: created.id }));
+      } else if (quickCreate === 'catalogType') {
+        const created = await apiCreateCatalogType({ brandSlug: normalizeBrand(brandSlug), name });
+        setCatalogTypes((current) => [...current, created]);
+        setForm((current) => ({ ...current, catalogTypeId: created.id, catalogModelId: '' }));
+      } else if (quickCreate === 'catalogModel' && form.catalogTypeId) {
+        const created = await apiCreateCatalogModel({ typeId: form.catalogTypeId, name });
+        setCatalogModels((current) => [...current, created]);
+        setForm((current) => ({ ...current, catalogModelId: created.id }));
       }
       setQuickCreate(null);
       setCatalogVersion((v) => v + 1);
@@ -420,7 +500,7 @@ export function StockPage() {
         if (!matchesQuery(codeHay, codeQuery)) return false;
       }
       return matchesQuery(
-        `${item.name} ${item.brand ?? ''} ${productCodes(item)} ${item.color} ${item.capacity} ${Object.values(item.attrs ?? {}).join(' ')} ${(item.variations ?? []).map((v) => Object.values(v.attrs ?? {}).join(' ')).join(' ')}`,
+        `${stockSearchText(item, supplierNames)} ${findBrand(brands, item.brand)?.name ?? ''} ${item.dun14 ?? ''} ${item.color} ${item.capacity}`,
         query,
       );
     });
@@ -439,7 +519,32 @@ export function StockPage() {
       'qty-asc': (a, b) => (Number(a.qty) || 0) - (Number(b.qty) || 0) || byName(a, b),
     };
     return [...filtered].sort(sorters[listSort]);
-  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query, supplierNames, brands]);
+
+  /** Totais da lista filtrada: unidades em estoque, custo total e valor de venda total. */
+  const listTotals = useMemo(() => {
+    let units = 0;
+    let cost = 0;
+    let sale = 0;
+    for (const item of visible) {
+      const variations = item.variations ?? [];
+      if (variations.length) {
+        for (const v of variations) {
+          const qty = Math.max(0, Number(v.qty) || 0);
+          units += qty;
+          // Sem custo gravado, vale o custo médio das entradas por fornecedor.
+          cost += qty * (Number(v.avgCost || v.cost) || supplierEntriesSummary(v.supplierEntries).avgCost);
+          sale += qty * (Number(v.price) || 0);
+        }
+      } else {
+        const qty = Math.max(0, Number(item.qty) || 0);
+        units += qty;
+        cost += qty * (Number(item.avgCost || item.cost) || supplierEntriesSummary(item.supplierEntries).avgCost);
+        sale += qty * (Number(item.price) || 0);
+      }
+    }
+    return { units, cost, sale };
+  }, [visible]);
 
   function focusNameField() {
     requestAnimationFrame(() => {
@@ -817,6 +922,10 @@ export function StockPage() {
       showConditionOnTotem: item.showConditionOnTotem !== false,
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
+      catalogTypeId: item.catalogTypeId ?? '',
+      catalogModelId: item.catalogModelId ?? '',
+      createdAt: item.createdAt,
+      createdByName: item.createdByName,
       entryDate: item.entryDate ?? '',
       dun14: item.dun14 ?? '',
       purchaseUnit: item.purchaseUnit ?? '',
@@ -1197,6 +1306,472 @@ export function StockPage() {
     </PageHeadingActions>
   );
 
+  // Blocos do cadastro usados no modo padrão, no simplificado e na aba Especificações.
+  const photoPickerNode = (
+              <div className="stock-photo-picker">
+                <span className="stock-photo-picker__title">
+                  Fotos do produto ({form.images.length})
+                </span>
+                <div className="stock-photos-gallery">
+                  {form.images.map((imgSrc, index) => (
+                    <div
+                      key={index}
+                      className="stock-photo-slot"
+                      title={index === 0 ? 'Foto de capa (Principal)' : 'Clique para tornar foto de capa'}
+                      onClick={() => !readOnly && index > 0 && makePrimaryPhoto(index)}
+                      style={{ cursor: !readOnly && index > 0 ? 'pointer' : 'default' }}
+                    >
+                      <img src={imgSrc} alt={`Foto ${index + 1}`} />
+                      {index === 0 ? (
+                        <span className="stock-photo-slot__badge">Principal</span>
+                      ) : !readOnly ? (
+                        <span
+                          className="stock-photo-slot__badge"
+                          style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                        >
+                          Foto {index + 1}
+                        </span>
+                      ) : null}
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          className="stock-photo-slot__remove"
+                          title="Remover foto"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePhoto(index);
+                          }}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+
+                  {!readOnly ? (
+                    <label
+                      className="stock-photo-slot stock-photo-slot--add"
+                      title="Adicionar fotos"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={onAddPhotos}
+                      />
+                      <span>+ Foto</span>
+                      <small>({form.images.length})</small>
+                    </label>
+                  ) : null}
+                </div>
+                {!readOnly && <div className="stock-photo-url">
+                  <label className="admin-field">Foto hospedada (HTTPS)
+                    <input type="url" value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="https://…" />
+                  </label>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={()=>{
+                    try {const url=new URL(photoUrl.trim());if(url.protocol!=='https:')throw new Error();setForm(current=>({...current,images:[...current.images,url.href]}));setPhotoUrl('');setError('');}
+                    catch {setError('Informe uma URL HTTPS válida para a foto.');}
+                  }}>Adicionar URL</button>
+                </div>}
+                <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
+                <p className="empty stock-photo-picker__help">
+                  A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.
+                </p>
+              </div>
+  );
+  const supplierFieldNode = (
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label="Fornecedor"
+                  value={form.supplierId ?? ''}
+                  placeholder="Nenhum"
+                  disabled={readOnly}
+                  options={[{ value: '', label: 'Nenhum' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, supplierId: value })}
+                />
+                {form.supplierId ? (
+                  <label className="stock-sku-supplier">
+                    <input
+                      type="checkbox"
+                      checked={form.skuWithSupplier !== false}
+                      disabled={readOnly}
+                      onChange={(e) => setForm((current) => ({ ...current, skuWithSupplier: e.target.checked }))}
+                    />
+                    Incluir no SKU
+                    {suppliers.find((item) => item.id === form.supplierId)?.skuName ? <code>{suppliers.find((item) => item.id === form.supplierId)?.skuName}</code> : null}
+                  </label>
+                ) : null}
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} /> : null}<Link to={peoplePath('fornecedores')}>Gerenciar fornecedores</Link></p>
+                </div>
+  );
+  const formModalsNode = (
+<>
+                {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
+                {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
+                {quickCreate === 'attribute' ? <QuickCreateAttribute onClose={() => setQuickCreate(null)} onCreated={() => undefined} /> : null}
+                {quickCreate === 'group' || quickCreate === 'subgroup' || quickCreate === 'catalogType' || quickCreate === 'catalogModel' ? (
+                  <QuickModal
+                    title={
+                      quickCreate === 'catalogType'
+                        ? 'Novo tipo'
+                        : quickCreate === 'catalogModel'
+                          ? 'Novo modelo'
+                          : `Novo ${(quickCreate === 'group' ? groupLabels.group : groupLabels.subgroup).toLowerCase()}`
+                    }
+                    subtitle={
+                      quickCreate === 'catalogType'
+                        ? `Da marca ${findBrand(brands, form.brand)?.name ?? form.brand ?? ''}. Ex.: IPHONE, IPAD, APPLE WATCH.`
+                        : quickCreate === 'catalogModel'
+                          ? `Do tipo ${catalogTypes.find((item) => item.id === form.catalogTypeId)?.name ?? ''}. Ex.: 15 PRO MAX.`
+                          : quickCreate === 'subgroup'
+                            ? `Dentro de ${productGroups.find((item) => item.id === form.groupId)?.name ?? ''}.`
+                            : 'Ex.: Bebidas, Eletrônicos, Acessórios.'
+                    }
+                    busy={quickBusy}
+                    error={quickError}
+                    onClose={() => setQuickCreate(null)}
+                    onSubmit={saveQuick}
+                  >
+                    <label className="admin-field">
+                      Nome
+                      <input value={quickName} maxLength={80} required onChange={(e) => setQuickName(e.target.value)} />
+                    </label>
+                  </QuickModal>
+                ) : null}
+                {unitConversionOpen ? (
+                  <QuickModal
+                    title="Conversão de unidade"
+                    subtitle={`Para quem compra em embalagem e vende por ${form.unit ?? 'UN'}: o estoque e a venda continuam em ${form.unit ?? 'UN'}.`}
+                    submitLabel="Aplicar"
+                    onClose={() => setUnitConversionOpen(false)}
+                    onSubmit={() => {
+                      const unit = conversion.unit.trim().toUpperCase();
+                      const factor = Number(conversion.factor);
+                      if (unit && !(factor > 0)) return;
+                      setForm((current) => ({ ...current, purchaseUnit: unit, purchaseFactor: unit ? factor : 1 }));
+                      setUnitConversionOpen(false);
+                    }}
+                  >
+                    <ConversionFields unit={form.unit ?? 'UN'} value={conversion} onChange={setConversion} />
+                  </QuickModal>
+                ) : null}
+                {entriesEdit ? (
+                  <SupplierEntriesModal
+                    title={entriesEdit.index === 'simple' ? 'Entradas por fornecedor · ' + (form.name || 'produto') : 'Entradas por fornecedor · ' + (Object.values(variations[entriesEdit.index]?.attrs ?? {}).filter(Boolean).join(' · ') || form.name)}
+                    entries={(entriesEdit.index === 'simple' ? form.supplierEntries : variations[entriesEdit.index]?.supplierEntries) ?? []}
+                    suppliers={suppliers}
+                    defaultSupplierId={form.supplierId || ''}
+                    onClose={() => setEntriesEdit(null)}
+                    onApply={(entries) => (readOnly ? setEntriesEdit(null) : applySupplierEntries(entriesEdit.index, entries))}
+                  />
+                ) : null}
+                {pickupEdit ? (
+                  <QuickModal
+                    title="Preço por tipo de retirada"
+                    subtitle="Marque onde esta variação é vendida e o preço de cada forma (ex.: encomenda mais em conta)."
+                    submitLabel="Aplicar"
+                    onClose={() => setPickupEdit(null)}
+                    onSubmit={() => {
+                      const edit = pickupEdit;
+                      setVariations((current) => current.map((r, i) => (i === edit.index ? { ...r, pickupMethodId: '', pickupPrices: edit.prices } : r)));
+                      setPickupEdit(null);
+                    }}
+                  >
+                    <PickupPriceList methods={pickupMethods} value={pickupEdit.prices} basePrice={pickupEdit.base} onChange={(prices) => setPickupEdit((current) => (current ? { ...current, prices } : current))} />
+                  </QuickModal>
+                ) : null}
+</>
+  );
+  const entryDateFieldNode = (
+                <label>
+                  Data de entrada
+                  <input
+                    type="date"
+                    value={form.entryDate ?? ''}
+                    max={todayIso()}
+                    onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
+                    disabled={readOnly}
+                  />
+                </label>
+  );
+  const skuFieldNode = (
+                <label>
+                  SKU
+                  <input
+                    value={form.skuAuto?skuPreview(form.attrs):form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value,skuAuto:false })}
+                    disabled={readOnly}
+                  />
+                </label>
+  );
+  const groupFieldNode = (
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label={groupLabels.group}
+                  value={form.groupId ?? ''}
+                  placeholder="Nenhum"
+                  disabled={readOnly}
+                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => !item.parentId && (item.active || item.id === form.groupId)).map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, groupId: value, subgroupId: '' })}
+                />
+                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label={`Novo ${groupLabels.group.toLowerCase()}`} onClick={() => openQuick('group')} /> : null}<Link to={specsPath('grupos')}>Gerenciar</Link></p>
+                </div>
+  );
+  const subgroupFieldNode = (
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label={groupLabels.subgroup}
+                  value={form.subgroupId ?? ''}
+                  placeholder={form.groupId ? 'Nenhum' : `Escolha o ${groupLabels.group.toLowerCase()} antes`}
+                  disabled={readOnly || !form.groupId}
+                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => item.parentId === form.groupId && (item.active || item.id === form.subgroupId)).map((item) => ({ value: item.id, label: item.name }))]}
+                  onChange={(value) => setForm({ ...form, subgroupId: value })}
+                />
+                <p className="empty quick-field__actions">
+                  {!readOnly ? (
+                    <span title={form.groupId ? undefined : `Escolha o ${groupLabels.group.toLowerCase()} para cadastrar o ${groupLabels.subgroup.toLowerCase()} dentro dele`}>
+                      <QuickAddButton label={`Novo ${groupLabels.subgroup.toLowerCase()}`} disabled={!form.groupId} onClick={() => openQuick('subgroup')} />
+                    </span>
+                  ) : null}
+                  <Link to={specsPath('grupos')}>Gerenciar</Link>
+                </p>
+                </div>
+  );
+  const conditionFieldsNode = (
+<>
+                <AdminPicker
+                  label="Condição"
+                  value={form.condition}
+                  disabled={readOnly}
+                  options={[
+                    { value: 'new', label: STOCK_CONDITION_LABEL.new },
+                    { value: 'used', label: STOCK_CONDITION_LABEL.used },
+                    { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
+                  ]}
+                  onChange={(value) => setForm({ ...form, condition: value as StockCondition, batteryLevel: value === 'new' ? 100 : form.condition === 'new' ? null : form.batteryLevel ?? null })}
+                />
+                {form.condition !== 'new' ? (
+                  <label>
+                    Nível de bateria (%)
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      inputMode="numeric"
+                      value={form.batteryLevel ?? ''}
+                      placeholder="Ex.: 87"
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
+                    />
+                  </label>
+                ) : null}
+</>
+  );
+  const unitFieldNode = (
+                <div className="stock-brand-field">
+                <AdminPicker
+                  label="Unidade de medida"
+                  value={form.unit ?? 'UN'}
+                  disabled={readOnly}
+                  options={[
+                    { value: 'UN', label: 'UN · inteiro' },
+                    { value: 'KG', label: 'KG · pesado' },
+                  ]}
+                  onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
+                />
+                <p className="empty quick-field__actions">
+                  <button type="button" className="quick-add-btn" disabled={readOnly} onClick={() => { setConversion({ unit: form.purchaseUnit ?? '', factor: Number(form.purchaseFactor) || 1 }); setUnitConversionOpen(true); }}>
+                    ⇄ Conversão de unidade
+                  </button>
+                  {form.purchaseUnit && Number(form.purchaseFactor) > 1 ? (
+                    <span className="stock-unit-conversion-chip">1 {form.purchaseUnit} = {formatQty(Number(form.purchaseFactor))} {form.unit ?? 'UN'}</span>
+                  ) : null}
+                </p>
+                </div>
+  );
+  const totemFieldNode = (
+                <label className="span-2 stock-id-totem">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={form.showOnTotem}
+                      disabled={readOnly}
+                      onChange={(e) => setForm({ ...form, showOnTotem: e.target.checked })}
+                    />
+                    Exibir no totem
+                  </span>
+                  {form.showOnTotem ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                      <input
+                        type="checkbox"
+                        checked={form.showConditionOnTotem !== false}
+                        disabled={readOnly}
+                        onChange={(e) => setForm({ ...form, showConditionOnTotem: e.target.checked })}
+                      />
+                      Mostrar condição (novo/usado) e bateria no totem
+                    </span>
+                  ) : null}
+                </label>
+  );
+  const codesCardNode = (
+          <article className="admin-card stock-form-card">
+            <h3>Códigos</h3>
+            <div className={`admin-form stock-codes-form ${readOnly ? 'is-readonly' : ''}`}>
+              <label>
+                Código de barras
+                <input
+                  value={form.barcode}
+                  inputMode="numeric"
+                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                  disabled={readOnly}
+                />
+              </label>
+              <label>
+                DUN-14
+                <input
+                  value={form.dun14 ?? ''}
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="Código da caixa (14 números)"
+                  onChange={(e) => setForm({ ...form, dun14: e.target.value.replace(/\D/g, '').slice(0, 14) })}
+                  disabled={readOnly}
+                />
+              </label>
+              {!lite ? (
+                <label>
+                  IMEI
+                  <input
+                    value={form.imei}
+                    onChange={(e) => setForm({ ...form, imei: e.target.value })}
+                    placeholder="Opcional"
+                    disabled={readOnly}
+                  />
+                </label>
+              ) : null}
+            </div>
+          </article>
+  );
+
+  // ── Estoque simplificado: descrição em destaque, Marca → Tipo → Modelo, foto e grade. ──
+  const descriptionBarNode = (
+    <div className="stock-simple-description">
+      <label>
+        <span>Descrição do produto</span>
+        <input
+          ref={nameRef}
+          value={form.name}
+          disabled={readOnly}
+          placeholder="Escolha a marca, o tipo e o modelo (ou digite)"
+          onChange={(e) => setForm({ ...form, name: e.target.value.toUpperCase() })}
+          onBlur={() => void checkDuplicateName()}
+        />
+      </label>
+      {!readOnly ? (
+        <label className="stock-simple-description__brand">
+          <input
+            type="checkbox"
+            checked={includeBrandInName}
+            onChange={(e) => {
+              setIncludeBrandInName(e.target.checked);
+              applyCatalogName({ includeBrand: e.target.checked });
+            }}
+          />
+          Incluir a marca
+        </label>
+      ) : null}
+    </div>
+  );
+
+  const simpleIdentificationNode = (
+    <article className="admin-card stock-form-card stock-simple">
+      <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
+        {photoPickerNode}
+        <div className="stock-id-content">
+          {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
+          {device && <p className="empty stock-simple__device">Cores e capacidades do {device.model} disponíveis na grade.</p>}
+          <div className={`admin-form stock-simple__fields ${readOnly ? 'is-readonly' : ''}`}>
+            <div className="stock-brand-field">
+              <AdminPicker
+                label="Marca"
+                value={brandSlug}
+                disabled={readOnly}
+                options={brandOptions}
+                onChange={(brand) => {
+                  setForm((current) => ({ ...current, brand, catalogTypeId: '', catalogModelId: '' }));
+                  applyCatalogName({ brand, typeId: '', modelId: '' });
+                }}
+              />
+              <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={specsPath('marcas')}>Gerenciar marcas</Link></p>
+            </div>
+            <div className="stock-brand-field">
+              <AdminPicker
+                label="Tipo"
+                value={form.catalogTypeId ?? ''}
+                placeholder={brandSlug ? 'Escolha o tipo' : 'Escolha a marca antes'}
+                disabled={readOnly || !brandSlug}
+                options={[{ value: '', label: 'Nenhum' }, ...catalogTypes.map((item) => ({ value: item.id, label: item.name }))]}
+                onChange={(typeId) => {
+                  setForm((current) => ({ ...current, catalogTypeId: typeId, catalogModelId: '' }));
+                  applyCatalogName({ typeId, modelId: '' });
+                }}
+              />
+              <p className="empty quick-field__actions">
+                {!readOnly ? <QuickAddButton label="Novo tipo" disabled={!brandSlug} onClick={() => openCatalogQuick('catalogType')} /> : null}
+              </p>
+            </div>
+            <div className="stock-brand-field">
+              <AdminPicker
+                label="Modelo"
+                value={form.catalogModelId ?? ''}
+                placeholder={form.catalogTypeId ? 'Escolha o modelo' : 'Escolha o tipo antes'}
+                disabled={readOnly || !form.catalogTypeId}
+                options={[{ value: '', label: 'Nenhum' }, ...catalogModels.map((item) => ({ value: item.id, label: item.name }))]}
+                onChange={(modelId) => {
+                  setForm((current) => ({ ...current, catalogModelId: modelId }));
+                  applyCatalogName({ modelId });
+                }}
+              />
+              <p className="empty quick-field__actions">
+                {!readOnly ? <QuickAddButton label="Novo modelo" disabled={!form.catalogTypeId} onClick={() => openCatalogQuick('catalogModel')} /> : null}
+              </p>
+            </div>
+          </div>
+          <p className="empty stock-simple__hint">
+            Fornecedor, data de entrada, grupo, subgrupo e códigos ficam na aba <button type="button" className="link-btn" onClick={() => setFormTab('specs')}>Especificações</button>. Compras com IMEI entram pela{' '}
+            <Link to="/erp/entrada-estoque">Entrada de estoque</Link> ou pelo botão Fornecedores da grade.
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+
+  const specsNode = (
+    <>
+      <article className="admin-card stock-form-card">
+        <h3>Especificações</h3>
+        <div className={`admin-form stock-id-fields stock-specs-fields ${readOnly ? 'is-readonly' : ''}`}>
+          {supplierFieldNode}
+          {entryDateFieldNode}
+          {groupFieldNode}
+          {subgroupFieldNode}
+          {skuFieldNode}
+          {conditionFieldsNode}
+          {unitFieldNode}
+          <label>
+            Data de cadastro
+            <input value={form.createdAt ? new Date(form.createdAt).toLocaleString('pt-BR') : 'Registrada ao salvar'} disabled />
+          </label>
+          <label>
+            Cadastrado por
+            <input value={form.createdByName || (mode === 'new' ? user?.name ?? '' : '—')} disabled />
+          </label>
+          {totemFieldNode}
+        </div>
+      </article>
+      {codesCardNode}
+    </>
+  );
+
   return (
     <section className={`admin-page ${formVisible ? 'admin-page--stock-form' : ''}`}>
       {dialog}
@@ -1372,6 +1947,24 @@ export function StockPage() {
               onDeleteSelected={() => void removeSelected()}
               entityLabel="produtos"
             />
+            <div className="stock-list-totals" aria-label="Totais dos produtos listados">
+              <div>
+                <span>Quantidade em estoque</span>
+                <strong>{formatQty(listTotals.units)} un</strong>
+              </div>
+              <div>
+                <span>Custo total</span>
+                <strong>{listTotals.cost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+              </div>
+              <div>
+                <span>Valor de venda total</span>
+                <strong>{listTotals.sale.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+              </div>
+              <div>
+                <span>Lucro bruto previsto</span>
+                <strong>{(listTotals.sale - listTotals.cost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+              </div>
+            </div>
             <div className="admin-table-container">
               <table className="admin-table">
           <thead>
@@ -1588,6 +2181,7 @@ export function StockPage() {
             </p>
           </div>
 
+          {simple ? descriptionBarNode : null}
           <nav className="stock-form-tabs" role="tablist" aria-label="Partes do cadastro do produto">
             {formTabs.map((tab) => (
               <button
@@ -1602,82 +2196,15 @@ export function StockPage() {
               </button>
             ))}
           </nav>
+          {formModalsNode}
 
           {formTab === 'principal' ? (
           <>
+          {simple ? simpleIdentificationNode : (
           <article className="admin-card stock-form-card">
             <h3>Identificação</h3>
             <div className={`stock-id-layout ${readOnly ? 'is-readonly' : ''}`}>
-              <div className="stock-photo-picker">
-                <span className="stock-photo-picker__title">
-                  Fotos do produto ({form.images.length})
-                </span>
-                <div className="stock-photos-gallery">
-                  {form.images.map((imgSrc, index) => (
-                    <div
-                      key={index}
-                      className="stock-photo-slot"
-                      title={index === 0 ? 'Foto de capa (Principal)' : 'Clique para tornar foto de capa'}
-                      onClick={() => !readOnly && index > 0 && makePrimaryPhoto(index)}
-                      style={{ cursor: !readOnly && index > 0 ? 'pointer' : 'default' }}
-                    >
-                      <img src={imgSrc} alt={`Foto ${index + 1}`} />
-                      {index === 0 ? (
-                        <span className="stock-photo-slot__badge">Principal</span>
-                      ) : !readOnly ? (
-                        <span
-                          className="stock-photo-slot__badge"
-                          style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
-                        >
-                          Foto {index + 1}
-                        </span>
-                      ) : null}
-                      {!readOnly ? (
-                        <button
-                          type="button"
-                          className="stock-photo-slot__remove"
-                          title="Remover foto"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removePhoto(index);
-                          }}
-                        >
-                          ×
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
-
-                  {!readOnly ? (
-                    <label
-                      className="stock-photo-slot stock-photo-slot--add"
-                      title="Adicionar fotos"
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={onAddPhotos}
-                      />
-                      <span>+ Foto</span>
-                      <small>({form.images.length})</small>
-                    </label>
-                  ) : null}
-                </div>
-                {!readOnly && <div className="stock-photo-url">
-                  <label className="admin-field">Foto hospedada (HTTPS)
-                    <input type="url" value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="https://…" />
-                  </label>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={()=>{
-                    try {const url=new URL(photoUrl.trim());if(url.protocol!=='https:')throw new Error();setForm(current=>({...current,images:[...current.images,url.href]}));setPhotoUrl('');setError('');}
-                    catch {setError('Informe uma URL HTTPS válida para a foto.');}
-                  }}>Adicionar URL</button>
-                </div>}
-                <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
-                <p className="empty stock-photo-picker__help">
-                  A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.
-                </p>
-              </div>
+              {photoPickerNode}
 
               <div className="stock-id-content">
               {deviceLoading && <p role="status" className="empty">Consultando modelo…</p>}
@@ -1722,249 +2249,22 @@ export function StockPage() {
                 <AdminPicker label="Marca do Produto" value={findBrand(brands, form.brand)?.slug ?? form.brand ?? ''} disabled={readOnly} options={brandOptions} onChange={brand => setForm({ ...form, brand })} />
                 <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Nova marca" onClick={() => setQuickCreate('brand')} /> : null}<Link to={specsPath('marcas')}>Gerenciar marcas</Link>{brandsError && <span role="alert"> · {brandsError}</span>}</p>
                 </div>
-                <div className="stock-brand-field">
-                <AdminPicker
-                  label="Fornecedor"
-                  value={form.supplierId ?? ''}
-                  placeholder="Nenhum"
-                  disabled={readOnly}
-                  options={[{ value: '', label: 'Nenhum' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
-                  onChange={(value) => setForm({ ...form, supplierId: value })}
-                />
-                {form.supplierId ? (
-                  <label className="stock-sku-supplier">
-                    <input
-                      type="checkbox"
-                      checked={form.skuWithSupplier !== false}
-                      disabled={readOnly}
-                      onChange={(e) => setForm((current) => ({ ...current, skuWithSupplier: e.target.checked }))}
-                    />
-                    Incluir no SKU
-                    {suppliers.find((item) => item.id === form.supplierId)?.skuName ? <code>{suppliers.find((item) => item.id === form.supplierId)?.skuName}</code> : null}
-                  </label>
-                ) : null}
-                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label="Novo fornecedor" onClick={() => setQuickCreate('supplier')} /> : null}<Link to={peoplePath('fornecedores')}>Gerenciar fornecedores</Link></p>
-                </div>
-                {quickCreate === 'brand' ? <QuickCreateBrand onClose={() => setQuickCreate(null)} onCreated={(brand) => setForm((current) => ({ ...current, brand: brand.slug }))} /> : null}
-                {quickCreate === 'supplier' ? <QuickCreateSupplier onClose={() => setQuickCreate(null)} onCreated={(supplierId) => { setSupplierVersion((v) => v + 1); setForm((current) => ({ ...current, supplierId })); }} /> : null}
-                {quickCreate === 'attribute' ? <QuickCreateAttribute onClose={() => setQuickCreate(null)} onCreated={() => undefined} /> : null}
-                {quickCreate === 'group' || quickCreate === 'subgroup' ? (
-                  <QuickModal
-                    title={`Novo ${(quickCreate === 'group' ? groupLabels.group : groupLabels.subgroup).toLowerCase()}`}
-                    subtitle={
-                      quickCreate === 'subgroup'
-                        ? `Dentro de ${productGroups.find((item) => item.id === form.groupId)?.name ?? ''}.`
-                        : 'Ex.: Bebidas, Eletrônicos, Acessórios.'
-                    }
-                    busy={quickBusy}
-                    error={quickError}
-                    onClose={() => setQuickCreate(null)}
-                    onSubmit={saveQuick}
-                  >
-                    <label className="admin-field">
-                      Nome
-                      <input value={quickName} maxLength={80} required onChange={(e) => setQuickName(e.target.value)} />
-                    </label>
-                  </QuickModal>
-                ) : null}
-                {unitConversionOpen ? (
-                  <QuickModal
-                    title="Conversão de unidade"
-                    subtitle={`Para quem compra em embalagem e vende por ${form.unit ?? 'UN'}: o estoque e a venda continuam em ${form.unit ?? 'UN'}.`}
-                    submitLabel="Aplicar"
-                    onClose={() => setUnitConversionOpen(false)}
-                    onSubmit={() => {
-                      const unit = conversion.unit.trim().toUpperCase();
-                      const factor = Number(conversion.factor);
-                      if (unit && !(factor > 0)) return;
-                      setForm((current) => ({ ...current, purchaseUnit: unit, purchaseFactor: unit ? factor : 1 }));
-                      setUnitConversionOpen(false);
-                    }}
-                  >
-                    <ConversionFields unit={form.unit ?? 'UN'} value={conversion} onChange={setConversion} />
-                  </QuickModal>
-                ) : null}
-                {entriesEdit ? (
-                  <SupplierEntriesModal
-                    title={entriesEdit.index === 'simple' ? 'Entradas por fornecedor · ' + (form.name || 'produto') : 'Entradas por fornecedor · ' + (Object.values(variations[entriesEdit.index]?.attrs ?? {}).filter(Boolean).join(' · ') || form.name)}
-                    entries={(entriesEdit.index === 'simple' ? form.supplierEntries : variations[entriesEdit.index]?.supplierEntries) ?? []}
-                    suppliers={suppliers}
-                    defaultSupplierId={form.supplierId || ''}
-                    onClose={() => setEntriesEdit(null)}
-                    onApply={(entries) => (readOnly ? setEntriesEdit(null) : applySupplierEntries(entriesEdit.index, entries))}
-                  />
-                ) : null}
-                {pickupEdit ? (
-                  <QuickModal
-                    title="Preço por tipo de retirada"
-                    subtitle="Marque onde esta variação é vendida e o preço de cada forma (ex.: encomenda mais em conta)."
-                    submitLabel="Aplicar"
-                    onClose={() => setPickupEdit(null)}
-                    onSubmit={() => {
-                      const edit = pickupEdit;
-                      setVariations((current) => current.map((r, i) => (i === edit.index ? { ...r, pickupMethodId: '', pickupPrices: edit.prices } : r)));
-                      setPickupEdit(null);
-                    }}
-                  >
-                    <PickupPriceList methods={pickupMethods} value={pickupEdit.prices} basePrice={pickupEdit.base} onChange={(prices) => setPickupEdit((current) => (current ? { ...current, prices } : current))} />
-                  </QuickModal>
-                ) : null}
-                <label>
-                  Data de entrada
-                  <input
-                    type="date"
-                    value={form.entryDate ?? ''}
-                    max={todayIso()}
-                    onChange={(e) => setForm({ ...form, entryDate: e.target.value })}
-                    disabled={readOnly}
-                  />
-                </label>
-                <label>
-                  SKU
-                  <input
-                    value={form.skuAuto?skuPreview(form.attrs):form.sku}
-                    onChange={(e) => setForm({ ...form, sku: e.target.value,skuAuto:false })}
-                    disabled={readOnly}
-                  />
-                </label>
-                <div className="stock-brand-field">
-                <AdminPicker
-                  label={groupLabels.group}
-                  value={form.groupId ?? ''}
-                  placeholder="Nenhum"
-                  disabled={readOnly}
-                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => !item.parentId && (item.active || item.id === form.groupId)).map((item) => ({ value: item.id, label: item.name }))]}
-                  onChange={(value) => setForm({ ...form, groupId: value, subgroupId: '' })}
-                />
-                <p className="empty quick-field__actions">{!readOnly ? <QuickAddButton label={`Novo ${groupLabels.group.toLowerCase()}`} onClick={() => openQuick('group')} /> : null}<Link to={specsPath('grupos')}>Gerenciar</Link></p>
-                </div>
-                <div className="stock-brand-field">
-                <AdminPicker
-                  label={groupLabels.subgroup}
-                  value={form.subgroupId ?? ''}
-                  placeholder={form.groupId ? 'Nenhum' : `Escolha o ${groupLabels.group.toLowerCase()} antes`}
-                  disabled={readOnly || !form.groupId}
-                  options={[{ value: '', label: 'Nenhum' }, ...productGroups.filter((item) => item.parentId === form.groupId && (item.active || item.id === form.subgroupId)).map((item) => ({ value: item.id, label: item.name }))]}
-                  onChange={(value) => setForm({ ...form, subgroupId: value })}
-                />
-                <p className="empty quick-field__actions">
-                  {!readOnly ? (
-                    <span title={form.groupId ? undefined : `Escolha o ${groupLabels.group.toLowerCase()} para cadastrar o ${groupLabels.subgroup.toLowerCase()} dentro dele`}>
-                      <QuickAddButton label={`Novo ${groupLabels.subgroup.toLowerCase()}`} disabled={!form.groupId} onClick={() => openQuick('subgroup')} />
-                    </span>
-                  ) : null}
-                  <Link to={specsPath('grupos')}>Gerenciar</Link>
-                </p>
-                </div>
-                <AdminPicker
-                  label="Condição"
-                  value={form.condition}
-                  disabled={readOnly}
-                  options={[
-                    { value: 'new', label: STOCK_CONDITION_LABEL.new },
-                    { value: 'used', label: STOCK_CONDITION_LABEL.used },
-                    { value: 'refurbished', label: STOCK_CONDITION_LABEL.refurbished },
-                  ]}
-                  onChange={(value) => setForm({ ...form, condition: value as StockCondition, batteryLevel: value === 'new' ? 100 : form.condition === 'new' ? null : form.batteryLevel ?? null })}
-                />
-                {form.condition !== 'new' ? (
-                  <label>
-                    Nível de bateria (%)
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      inputMode="numeric"
-                      value={form.batteryLevel ?? ''}
-                      placeholder="Ex.: 87"
-                      disabled={readOnly}
-                      onChange={(e) => setForm({ ...form, batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
-                    />
-                  </label>
-                ) : null}
-                <div className="stock-brand-field">
-                <AdminPicker
-                  label="Unidade de medida"
-                  value={form.unit ?? 'UN'}
-                  disabled={readOnly}
-                  options={[
-                    { value: 'UN', label: 'UN · inteiro' },
-                    { value: 'KG', label: 'KG · pesado' },
-                  ]}
-                  onChange={(value) => setForm({ ...form, unit: value === 'KG' ? 'KG' : 'UN' })}
-                />
-                <p className="empty quick-field__actions">
-                  <button type="button" className="quick-add-btn" disabled={readOnly} onClick={() => { setConversion({ unit: form.purchaseUnit ?? '', factor: Number(form.purchaseFactor) || 1 }); setUnitConversionOpen(true); }}>
-                    ⇄ Conversão de unidade
-                  </button>
-                  {form.purchaseUnit && Number(form.purchaseFactor) > 1 ? (
-                    <span className="stock-unit-conversion-chip">1 {form.purchaseUnit} = {formatQty(Number(form.purchaseFactor))} {form.unit ?? 'UN'}</span>
-                  ) : null}
-                </p>
-                </div>
-                <label className="span-2 stock-id-totem">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={form.showOnTotem}
-                      disabled={readOnly}
-                      onChange={(e) => setForm({ ...form, showOnTotem: e.target.checked })}
-                    />
-                    Exibir no totem
-                  </span>
-                  {form.showOnTotem ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                      <input
-                        type="checkbox"
-                        checked={form.showConditionOnTotem !== false}
-                        disabled={readOnly}
-                        onChange={(e) => setForm({ ...form, showConditionOnTotem: e.target.checked })}
-                      />
-                      Mostrar condição (novo/usado) e bateria no totem
-                    </span>
-                  ) : null}
-                </label>
-              </div>
-              </div>
-            </div>
-          </article>
+                {supplierFieldNode}
 
-          <article className="admin-card stock-form-card">
-            <h3>Códigos</h3>
-            <div className={`admin-form stock-codes-form ${readOnly ? 'is-readonly' : ''}`}>
-              <label>
-                Código de barras
-                <input
-                  value={form.barcode}
-                  inputMode="numeric"
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                  disabled={readOnly}
-                />
-              </label>
-              <label>
-                DUN-14
-                <input
-                  value={form.dun14 ?? ''}
-                  inputMode="numeric"
-                  maxLength={14}
-                  placeholder="Código da caixa (14 números)"
-                  onChange={(e) => setForm({ ...form, dun14: e.target.value.replace(/\D/g, '').slice(0, 14) })}
-                  disabled={readOnly}
-                />
-              </label>
-              {!lite ? (
-                <label>
-                  IMEI
-                  <input
-                    value={form.imei}
-                    onChange={(e) => setForm({ ...form, imei: e.target.value })}
-                    placeholder="Opcional"
-                    disabled={readOnly}
-                  />
-                </label>
-              ) : null}
+                {entryDateFieldNode}
+                {skuFieldNode}
+                {groupFieldNode}
+                {subgroupFieldNode}
+                {conditionFieldsNode}
+                {unitFieldNode}
+                {totemFieldNode}
+              </div>
+              </div>
             </div>
           </article>
+          )}
+
+          {simple ? null : codesCardNode}
           <div className="stock-variation-tabs">
             <button
               type="button"
@@ -2518,6 +2818,7 @@ export function StockPage() {
             </article>
           ) : null}
 
+          {formTab === 'specs' ? specsNode : null}
           {formTab === 'movimentos' ? <ProductMovementsPanel stockId={selectedId} /> : null}
 
           {registryPanel ? (

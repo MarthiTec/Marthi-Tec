@@ -8,6 +8,7 @@ import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { StoreBrandProfileSection } from '../../components/StoreBrandProfileSection';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
+import { StockModeSettings } from '../../components/StockModeSettings';
 import { CommunicationSettingsSection } from '../../components/CommunicationSettingsSection';
 import {
   deleteOperationShortcut,
@@ -279,6 +280,7 @@ export function OperationsPage() {
           />
         </article>
       ) : null}
+      {tab === 'ramo' ? <StockModeSettings /> : null}
 
       {/* Dados da loja: logo, contatos, redes e assinatura (comprovante, WhatsApp e totem). */}
       {tab === 'loja' ? <StoreBrandProfileSection /> : null}

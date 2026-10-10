@@ -636,3 +636,89 @@ test('lookup finds the product by an IMEI typed in the supplier entries or in a 
   assert.equal(byVariation.json.data?.id, created.id);
   assert.equal((await request('/stock/lookup?code=000000000000000')).json.data, null);
 });
+
+test('simple stock: brand/type/model catalog, who registered, supplier origin, stock mode and entry screen', async () => {
+  const types = (await request('/catalog/types?brand=apple')).json.data;
+  const iphone = types.find((t) => t.name === 'IPHONE');
+  assert.ok(iphone && types.some((t) => t.name === 'AIRPODS'));
+  const models = (await request('/catalog/models?typeId=' + iphone.id)).json.data.map((m) => m.name);
+  for (const name of ['XR', '11', '15 PRO MAX', '17 PRO MAX', '18 PRO MAX']) assert.ok(models.includes(name), name);
+  const own = await request('/catalog/models', 'POST', { typeId: iphone.id, name: '19 ultra' });
+  assert.equal(own.status, 201, JSON.stringify(own.json));
+  assert.equal(own.json.data.name, '19 ULTRA');
+  assert.equal((await request('/catalog/models?typeId=' + iphone.id, 'GET', undefined, 'store-b')).status, 403);
+
+  const model = (await request('/catalog/models?typeId=' + iphone.id)).json.data.find((m) => m.name === '15 PRO MAX');
+  const created = await request('/stock', 'POST', { name: 'IPHONE 15 PRO MAX', brand: 'apple', kind: 'device', qty: 0, price: 6000, catalogTypeId: iphone.id, catalogModelId: model.id });
+  assert.equal(created.status, 201, JSON.stringify(created.json));
+  assert.equal(created.json.data.catalogTypeName, 'IPHONE');
+  assert.equal(created.json.data.catalogModelName, '15 PRO MAX');
+  assert.equal(created.json.data.createdByName, 'user-a');
+  const airpods = types.find((t) => t.name === 'AIRPODS');
+  assert.equal((await request('/stock/' + created.json.data.id, 'PATCH', { catalogTypeId: airpods.id, catalogModelId: model.id })).status, 400, 'model must be of the type');
+
+  const upgrade = (await request('/suppliers', 'POST', { name: 'Cliente Ramon', origin: 'upgrade' })).json.data;
+  assert.equal(upgrade.origin, 'upgrade');
+  const company = (await request('/suppliers', 'POST', { name: 'Jamil Distribuidora' })).json.data;
+  assert.equal(company.origin, 'company');
+
+  assert.equal((await request('/store/stock-mode', 'PUT', { mode: 'simple' })).json.data.mode, 'simple');
+  assert.equal((await request('/store/stock-mode')).json.data.mode, 'simple');
+
+  // Entrada: cria a variação (Preto 256GB usado) e soma; outra entrada na mesma variação soma de novo.
+  const id = created.json.data.id;
+  const first = await request('/stock/' + id + '/entries', 'POST', {
+    variation: { attrs: { cor: 'Preto', cap: '256GB' }, condition: 'used', price: 5000 },
+    entry: { supplierId: upgrade.id, qty: 2, unitCost: 4000, imeis: ['351000000000001', '351000000000002'], batteryLevel: 88, notes: 'Cliente Ramon' },
+  });
+  assert.equal(first.status, 201, JSON.stringify(first.json));
+  const p1 = first.json.data.product;
+  assert.equal(p1.qty, 2);
+  assert.equal(p1.variations.length, 1);
+  assert.equal(p1.variations[0].condition, 'used');
+  assert.equal(p1.variations[0].price, 5000);
+  const second = await request('/stock/' + id + '/entries', 'POST', {
+    variation: { attrs: { cor: 'preto', cap: '256 GB' }, condition: 'used' },
+    entry: { supplierId: company.id, qty: 1, unitCost: 4300, imeis: ['351000000000003'] },
+  });
+  assert.equal(second.status, 201, JSON.stringify(second.json));
+  const p2 = second.json.data.product;
+  assert.equal(p2.qty, 3);
+  assert.equal(p2.variations.length, 1, 'same variation');
+  assert.equal(p2.variations[0].qty, 3);
+  assert.equal(p2.variations[0].cost, 4100);
+  assert.equal(p2.variations[0].supplierEntries.length, 2);
+  assert.equal((await request('/stock/lookup?code=351000000000003')).json.data?.id, id);
+  const dupe = await request('/stock/' + id + '/entries', 'POST', { variation: { attrs: { cor: 'Preto', cap: '256GB' }, condition: 'used' }, entry: { qty: 1, unitCost: 1, imeis: ['351000000000001'] } });
+  assert.equal(dupe.status, 409);
+
+  // Entrada grava a movimentação no banco.
+  const moves = (await request('/stock/' + id + '/movements')).json.data ?? [];
+  assert.ok(moves.filter((m) => m.origin === 'supplier_entry').length >= 2, JSON.stringify(moves).slice(0, 300));
+
+  // Delete: o modelo/tipo da loja sai do banco; o da plataforma não pode ser apagado por uma loja.
+  assert.equal((await request('/catalog/models/' + own.json.data.id, 'DELETE')).status, 200);
+  assert.ok(!(await request('/catalog/models?typeId=' + iphone.id)).json.data.some((m) => m.id === own.json.data.id));
+  assert.equal((await request('/catalog/models/' + model.id, 'DELETE')).status, 404, 'platform model is protected');
+  const ownType = await request('/catalog/types', 'POST', { brandSlug: 'apple', name: 'vision pro' });
+  assert.equal(ownType.status, 201);
+  const ownTypeModel = await request('/catalog/models', 'POST', { typeId: ownType.json.data.id, name: '1a geracao' });
+  assert.equal(ownTypeModel.status, 201);
+  assert.equal((await request('/catalog/types/' + ownType.json.data.id, 'DELETE')).status, 200);
+  assert.ok(!(await request('/catalog/types?brand=apple')).json.data.some((t) => t.id === ownType.json.data.id));
+  assert.equal((await request('/catalog/models?typeId=' + ownType.json.data.id)).json.data.length, 0, 'models go with the type');
+  assert.equal((await request('/catalog/types/' + iphone.id, 'DELETE', undefined, 'store-b')).status, 403);
+
+  // Origem do fornecedor muda e o fornecedor pode ser excluído.
+  const patched = await request('/suppliers/' + company.id, 'PATCH', { origin: 'upgrade' });
+  assert.equal(patched.json.data.origin, 'upgrade', JSON.stringify(patched.json));
+  assert.equal((await request('/suppliers/' + upgrade.id, 'DELETE')).status < 300, true);
+
+  // Modo do estoque volta para o padrão.
+  assert.equal((await request('/store/stock-mode', 'PUT', { mode: 'standard' })).json.data.mode, 'standard');
+  assert.equal((await request('/store/stock-mode', 'PUT', { mode: 'bagunca' })).status, 400);
+
+  // Produto só com entradas é apagado de verdade, com as entradas e os IMEIs.
+  assert.equal((await request('/stock/' + id, 'DELETE')).status, 200);
+  assert.equal((await request('/stock/lookup?code=351000000000003')).json.data ?? null, null);
+});

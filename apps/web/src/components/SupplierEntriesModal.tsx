@@ -28,12 +28,24 @@ export function supplierEntriesLabel(entries: SupplierEntry[] | undefined) {
   return `${suppliers} ${suppliers === 1 ? 'fornecedor' : 'fornecedores'} · ${qty} un`;
 }
 
-type Draft = SupplierEntry & { key: string; imeisText: string };
+type Draft = SupplierEntry & { key: string; imeisText: string; supplierOrigin: SupplierOrigin };
 
-const toDraft = (entry: SupplierEntry, index: number): Draft => ({
+export type SupplierOrigin = 'company' | 'upgrade';
+export type SupplierOption = { id: string; name: string; origin?: SupplierOrigin };
+
+export const SUPPLIER_ORIGIN_OPTIONS: Array<{ value: SupplierOrigin; label: string }> = [
+  { value: 'company', label: 'Empresa' },
+  { value: 'upgrade', label: 'Upgrade' },
+];
+
+const originOf = (suppliers: SupplierOption[], supplierId: string | undefined): SupplierOrigin =>
+  suppliers.find((item) => item.id === supplierId)?.origin === 'upgrade' ? 'upgrade' : 'company';
+
+const toDraft = (entry: SupplierEntry, index: number, suppliers: SupplierOption[]): Draft => ({
   ...entry,
   key: entry.id || `new_${index}_${Date.now()}`,
   imeisText: (entry.imeis ?? []).join('\n'),
+  supplierOrigin: originOf(suppliers, entry.supplierId),
 });
 
 /**
@@ -50,19 +62,19 @@ export function SupplierEntriesModal({
 }: {
   title: string;
   entries: SupplierEntry[];
-  suppliers: Array<{ id: string; name: string }>;
+  suppliers: SupplierOption[];
   defaultSupplierId?: string;
   onClose: () => void;
   onApply: (entries: SupplierEntry[]) => void;
 }) {
-  const [rows, setRows] = useState<Draft[]>(() => entries.map(toDraft));
+  const [rows, setRows] = useState<Draft[]>(() => entries.map((entry, index) => toDraft(entry, index, suppliers)));
   const [error, setError] = useState('');
 
   const update = (key: string, patch: Partial<Draft>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const add = () =>
     setRows((current) => [
       ...current,
-      toDraft({ supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: current[current.length - 1]?.unitCost ?? 0, imeis: [] }, current.length),
+      toDraft({ supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: current[current.length - 1]?.unitCost ?? 0, imeis: [] }, current.length, suppliers),
     ]);
 
   const parsed = rows.map((row) => ({ ...row, imeis: row.imeisText.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean) }));
@@ -77,7 +89,7 @@ export function SupplierEntriesModal({
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
     if (dup) return setError(`O IMEI ${dup} está repetido.`);
     onApply(
-      parsed.map(({ key: _key, imeisText: _text, supplierName: _name, ...row }) => ({
+      parsed.map(({ key: _key, imeisText: _text, supplierName: _name, supplierOrigin: _origin, ...row }) => ({
         ...row,
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
@@ -111,13 +123,27 @@ export function SupplierEntriesModal({
                   <input value={`Troca · ${row.customerName || 'cliente'}`} disabled />
                 </label>
               ) : (
-                <AdminPicker
-                  label="Fornecedor"
-                  value={row.supplierId}
-                  placeholder="O do produto"
-                  options={[{ value: '', label: 'O do produto (ou nenhum)' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
-                  onChange={(supplierId) => update(row.key, { supplierId })}
-                />
+                <>
+                  <AdminPicker
+                    label="Origem"
+                    value={row.supplierOrigin}
+                    options={SUPPLIER_ORIGIN_OPTIONS}
+                    onChange={(value) => {
+                      const supplierOrigin: SupplierOrigin = value === 'upgrade' ? 'upgrade' : 'company';
+                      update(row.key, { supplierOrigin, supplierId: originOf(suppliers, row.supplierId) === supplierOrigin ? row.supplierId : '' });
+                    }}
+                  />
+                  <AdminPicker
+                    label="Fornecedor"
+                    value={row.supplierId}
+                    placeholder="O do produto"
+                    options={[
+                      { value: '', label: 'O do produto (ou nenhum)' },
+                      ...suppliers.filter((item) => (item.origin === 'upgrade' ? 'upgrade' : 'company') === row.supplierOrigin).map((item) => ({ value: item.id, label: item.name })),
+                    ]}
+                    onChange={(supplierId) => update(row.key, { supplierId })}
+                  />
+                </>
               )}
               <label className="admin-field">
                 Data

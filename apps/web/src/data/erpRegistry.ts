@@ -664,7 +664,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   if (pathname.startsWith('/erp/notas')) return 'erp_invoices';
   if (pathname.startsWith('/erp/campanhas')) return 'erp_prices';
   if (pathname.startsWith('/erp/taxas-cartao') || pathname.startsWith('/painel/taxas-cartao')) return 'erp_payments';
-  if (pathname.startsWith('/erp/balanco') || pathname.startsWith('/erp/movimentos') || pathname.startsWith('/erp/relatorio-estoque') || pathname.startsWith('/erp/api-aparelhos') || pathname.startsWith('/erp/comercial')) return 'erp_stock';
+  if (pathname.startsWith('/erp/balanco') || pathname.startsWith('/erp/movimentos') || pathname.startsWith('/erp/relatorio-estoque') || pathname.startsWith('/erp/entrada-estoque') || pathname.startsWith('/erp/api-aparelhos') || pathname.startsWith('/erp/comercial')) return 'erp_stock';
   if (pathname.startsWith('/painel/os') || pathname.startsWith('/os')) return 'os';
   if (pathname.startsWith('/erp/clientes') || pathname.startsWith('/painel/clientes')) {
     return 'erp_customers';

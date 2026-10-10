@@ -19,6 +19,7 @@ import {
 } from '../services/erpApi';
 import { isNestAuthed, NestApiError } from '../services/nestClient';
 import { isRealClientTenant } from './tenantContext';
+import { stockMatches } from './stockSearch';
 
 export const ADMIN_STATE_EVENT = 'marthi-admin-state';
 export const STOCK_EVENT = 'marthi-stock';
@@ -94,6 +95,13 @@ export type StockItem = {
   batteryLevel?: number | null;
   /** Mostra condição e bateria no totem (padrão: sim). */
   showConditionOnTotem?: boolean;
+  /** Tipo e modelo do catálogo (Marca + Tipo + Modelo = descrição). */
+  catalogTypeId?: string;
+  catalogModelId?: string;
+  catalogTypeName?: string;
+  catalogModelName?: string;
+  /** Quem cadastrou o produto. */
+  createdByName?: string;
   createdAt?:string;
   active?: boolean;
   skuAuto?:boolean;
@@ -359,6 +367,11 @@ function normalizeStock(item: StockItem): StockItem {
     supplierEntries: Array.isArray(item.supplierEntries) ? item.supplierEntries : undefined,
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
+    catalogTypeId: item.catalogTypeId ?? '',
+    catalogModelId: item.catalogModelId ?? '',
+    catalogTypeName: item.catalogTypeName ?? '',
+    catalogModelName: item.catalogModelName ?? '',
+    createdByName: item.createdByName ?? '',
     groupId: item.groupId ?? '',
     subgroupId: item.subgroupId ?? '',
     entryDate: item.entryDate ?? '',
@@ -602,6 +615,8 @@ function toNestStockBody(item: StockItem) {
     supplierEntries: item.supplierEntries,
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
+    catalogTypeId: item.catalogTypeId ?? undefined,
+    catalogModelId: item.catalogModelId ?? undefined,
     groupId: item.groupId ?? undefined,
     subgroupId: item.subgroupId ?? undefined,
     entryDate: item.entryDate ?? undefined,
@@ -1450,11 +1465,9 @@ export async function addFinance(
 export function findStockMatches(query: string, limit = 8) {
   const needle = query.trim().toLowerCase();
   if (!needle) return [] as StockItem[];
+  // Descrição, marca, tipo, modelo, SKU, códigos, IMEIs (variações e entradas) e fornecedores.
   return load()
-    .stock.filter((item) => {
-      const hay = `${item.name} ${item.sku} ${item.barcode} ${item.imei}`.toLowerCase();
-      return hay.includes(needle);
-    })
+    .stock.filter((item) => item.active !== false && stockMatches(item, needle))
     .slice(0, limit);
 }
 
