@@ -9,6 +9,7 @@ import { StoreBrandProfileSection } from '../../components/StoreBrandProfileSect
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
 import { StockModeSettings } from '../../components/StockModeSettings';
+import { OrderReminderSettings } from '../../components/OrderReminderSettings';
 import { CommunicationSettingsSection } from '../../components/CommunicationSettingsSection';
 import {
   deleteOperationShortcut,
@@ -454,7 +455,10 @@ export function OperationsPage() {
 
       {/* ABA 3: Comunicação & Mensageria (WhatsApp & E-mail) */}
       {tab === 'comunicacao' || tab === 'whatsapp' ? (
-        <CommunicationSettingsSection key={communicationStoreId} />
+        <>
+          <CommunicationSettingsSection key={communicationStoreId} />
+          <OrderReminderSettings key={`reminder-${communicationStoreId}`} />
+        </>
       ) : null}
 
       {/* ABA 4: Equipe & Usuários da Loja */}

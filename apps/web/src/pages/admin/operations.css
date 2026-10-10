@@ -690,3 +690,15 @@
 .stock-mode-settings__option.is-active strong::after { content: ' ✓'; color: #0e7490; }
 .stock-mode-settings__option:disabled { cursor: default; opacity: 0.75; }
 .stock-mode-settings__message { margin: 10px 0 0; font-size: 0.86rem; color: #0e7490; }
+
+/* Lembrete de chegada da encomenda */
+.order-reminder { margin-top: 14px; }
+.order-reminder h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.order-reminder header p { margin: 0 0 12px; }
+.order-reminder__grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: end; }
+.order-reminder__wide { grid-column: 1 / -1; }
+.order-reminder__check { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 8px; font-weight: 600; min-height: 40px; cursor: pointer; }
+.order-reminder__check input { width: 16px; height: 16px; margin: 0; }
+.order-reminder__actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: #0e7490; font-weight: 600; }
+.order-reminder__log { margin-top: 16px; overflow-x: auto; }
+.order-reminder__log h3 { margin: 0 0 8px; font-size: 0.95rem; }

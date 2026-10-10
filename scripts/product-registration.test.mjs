@@ -818,3 +818,39 @@ test('IMEI control: write-off (bonus/internal/loss) and revert move stock and ke
   assert.equal((await query('SELECT status FROM payables WHERE id = $1', [pending.json.data.payableId])).rows[0].status, 'cancelled');
   assert.equal((await request('/imei/report', 'GET', undefined, 'store-b')).status === 200 ? (await request('/imei/report', 'GET', undefined, 'store-b')).json.data.some((r) => r.productId === item.id) : false, false);
 });
+
+test('order arrival reminder: on the expected day after the configured hour, customer and store get one WhatsApp each (never twice); templates come from the store settings', async () => {
+  const reminders = await import('../dist/services/orderReminders.js');
+  const settings = await request('/order-reminders/settings', 'PUT', { enabled: true, hour: 10, customerTemplate: 'Oi {cliente}, seu {produto} chega hoje na {loja}!', storeTemplate: 'Chega hoje: {produto} de {cliente} ({telefone})' });
+  assert.equal(settings.status, 200, JSON.stringify(settings.json));
+  const item = (await request('/stock', 'POST', { name: 'IPHONE 17 ENCOMENDA', kind: 'device', qty: 0, price: 9000 })).json.data;
+  const method = (await query("SELECT id FROM pickup_methods WHERE store_id = 'store-a' LIMIT 1")).rows[0]?.id ?? null;
+  await query(
+    `INSERT INTO pickup_requests (id, store_id, method_id, stock_id, reference_id, customer_name, customer_phone, price, qty, kind, status, tracking_token, estimated_date)
+     VALUES ('PK-REM-1', 'store-a', $1, $2, 'VND-REM-1', 'Maria Encomenda', '24999990000', 9000, 1, 'order', 'waiting', 'tok-rem-1', '2026-10-12')`,
+    [method, item.id],
+  );
+  const sent = [];
+  // Só as mensagens desta encomenda (outros testes também criam encomendas com chegada no mesmo dia).
+const sender = async (storeId, phone, text) => { if (storeId === 'store-a' && text.includes('IPHONE 17 ENCOMENDA')) sent.push({ phone, text }); };
+  const storeNumber = async (storeId) => (storeId === 'store-a' ? '24988887777' : '');
+
+  // 9h em São Paulo: ainda não manda.
+  await reminders.runOrderReminders({ now: new Date('2026-10-12T12:00:00Z'), sender, storeNumber });
+  assert.equal(sent.length, 0);
+  // 10h05: manda para o cliente e para a loja.
+  await reminders.runOrderReminders({ now: new Date('2026-10-12T13:05:00Z'), sender, storeNumber });
+  assert.deepEqual(sent, [
+    { phone: '24999990000', text: 'Oi Maria Encomenda, seu IPHONE 17 ENCOMENDA chega hoje na ' + sent[0].text.split('na ')[1] },
+    { phone: '24988887777', text: 'Chega hoje: IPHONE 17 ENCOMENDA de Maria Encomenda (24999990000)' },
+  ]);
+  // Rodando de novo não repete.
+  await reminders.runOrderReminders({ now: new Date('2026-10-12T15:00:00Z'), sender, storeNumber });
+  assert.equal(sent.length, 2);
+  const log = (await request('/order-reminders')).json.data;
+  const mine = log.find((row) => row.refId === 'PK-REM-1');
+  assert.equal(mine.customerStatus, 'sent');
+  assert.equal(mine.storeStatus, 'sent');
+  // Outra loja não vê o registro.
+  assert.equal((await request('/order-reminders', 'GET', undefined, 'store-b')).status === 403 || !(await request('/order-reminders', 'GET', undefined, 'store-b')).json.data?.some((r) => r.refId === 'PK-REM-1'), true);
+});

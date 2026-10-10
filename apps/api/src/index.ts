@@ -2,6 +2,7 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { checkDatabaseConnection } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
+import { startOrderReminderWorker } from './services/orderReminders.js';
 
 // Schema is maintained by versioned migrations. Startup must not insert demonstration
 // stock, overwrite customer records or delete registrations based on fixed identifiers.
@@ -13,6 +14,8 @@ async function bootstrapDatabase() {
   }
   await runMigrations();
   console.log('[marthi-api] MarthiDB conectado e migrações concluídas.');
+  // Lembretes de chegada das encomendas (WhatsApp ao cliente e à loja no dia previsto).
+  startOrderReminderWorker();
 }
 
 // Keep health/static serving available while PostgreSQL initialization is in progress.
