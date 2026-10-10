@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { InlineSupplierCreate } from '../../components/InlineSupplierCreate';
+import { filledImeis, ImeiListField } from '../../components/ImeiListField';
 import { SUPPLIER_ORIGIN_OPTIONS, type SupplierOrigin } from '../../components/SupplierEntriesModal';
 import type { StockItem, StockVariationRow } from '../../data/adminStore';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
@@ -34,7 +35,7 @@ type Form = {
   entryDate: string;
   qty: number;
   unitCost: number;
-  imeisText: string;
+  imeiList: string[];
   batteryLevel: number | null;
   notes: string;
   /** Financeiro da compra: a pagar (com vencimento), já paga (sai do caixa/conta) ou sem lançamento. */
@@ -53,7 +54,7 @@ const emptyForm = (): Form => ({
   entryDate: today(),
   qty: 1,
   unitCost: 0,
-  imeisText: '',
+  imeiList: [],
   batteryLevel: 100,
   notes: '',
   payment: 'pending',
@@ -70,7 +71,6 @@ function salePriceText(product: StockItem) {
   return min === max ? money(min) : `${money(min)} a ${money(max)}`;
 }
 
-const parseImeis = (text: string) => text.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
 
 function variationLabel(v: StockVariationRow) {
   const attrs = Object.entries(v.attrs ?? {})
@@ -140,7 +140,7 @@ export function StockEntryPage() {
     return used.size ? attributes.filter((attr) => used.has(attr.id)) : attributes;
   }, [attributes, variations]);
 
-  const imeis = parseImeis(form.imeisText);
+  const imeis = filledImeis(form.imeiList);
   const creatingVariation = form.variationKey === NEW_VARIATION;
   const chosenVariation = !creatingVariation && form.variationKey ? variations.find((v) => (v.id ?? '') === form.variationKey) : undefined;
   const effectiveCondition = chosenVariation ? conditionCode(chosenVariation.condition) || 'new' : form.condition;
@@ -211,7 +211,7 @@ export function StockEntryPage() {
         variationKey: result.variationId ?? current.variationKey,
         newAttrs: {},
         qty: 1,
-        imeisText: '',
+        imeiList: [],
         notes: '',
       }));
     } catch (err) {
@@ -388,10 +388,13 @@ export function StockEntryPage() {
                 onChange={(accountId) => update({ accountId })}
               />
             ) : null}
-            <label className="stock-entry__wide">
-              IMEIs ({imeis.length}/{Number(form.qty) || 0})
-              <textarea rows={3} value={form.imeisText} placeholder="Um IMEI por linha (ou separados por espaço/vírgula)" onChange={(e) => update({ imeisText: e.target.value })} />
-            </label>
+            <div className="stock-entry__wide">
+              <ImeiListField
+                label={`IMEIs (${imeis.length}/${Number(form.qty) || 0})`}
+                value={form.imeiList}
+                onChange={(imeiList) => update({ imeiList, qty: Math.max(Number(form.qty) || 0, filledImeis(imeiList).length) })}
+              />
+            </div>
             <label className="stock-entry__wide">
               Observação
               <textarea rows={2} maxLength={500} value={form.notes} placeholder="Ex.: tela trocada, bateria nova…" onChange={(e) => update({ notes: e.target.value })} />

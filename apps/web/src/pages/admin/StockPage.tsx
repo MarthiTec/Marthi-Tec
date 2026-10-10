@@ -2044,9 +2044,18 @@ export function StockPage() {
                       onChange={(value) => setTotemFilter(value as typeof totemFilter)}
                     />
                   </label>
-                  <label className="stock-sold-imei-toggle" title="Controle por IMEI: aparelho vendido ou baixado sai do estoque e some da busca">
-                    <input type="checkbox" checked={showSoldImeis} onChange={(e) => setShowSoldImeis(e.target.checked)} />
-                    Exibir IMEIs vendidos
+                  <label className="admin-field crud-filter-field" title="Controle por IMEI: aparelho vendido ou baixado sai do estoque e some da busca">
+                    IMEIs
+                    <AdminPicker
+                      compact
+                      label="IMEIs"
+                      value={showSoldImeis ? 'all' : 'stock'}
+                      options={[
+                        { value: 'stock', label: 'Em estoque' },
+                        { value: 'all', label: 'Incluir vendidos' },
+                      ]}
+                      onChange={(value) => setShowSoldImeis(value === 'all')}
+                    />
                   </label>
                 </>
               }

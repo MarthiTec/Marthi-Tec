@@ -3,6 +3,7 @@ import type { SupplierEntry } from '../data/adminStore';
 import { AdminPicker } from './AdminPicker';
 import { CurrencyInput } from './CurrencyInput';
 import { InlineSupplierCreate } from './InlineSupplierCreate';
+import { filledImeis, ImeiListField } from './ImeiListField';
 import { QuickModal } from './QuickModal';
 import './supplierEntries.css';
 
@@ -34,7 +35,7 @@ const dateTimeBr = (iso: string) => (iso ? new Date(iso).toLocaleDateString('pt-
 const OUT_LABEL: Record<string, string> = { sale: 'Vendido', bonus: 'Bonificação', internal: 'Uso interno', loss: 'Perda' };
 
 /** Os IMEIs que já saíram ficam fora da caixa de texto (não somem da entrada: voltam no Aplicar). */
-type Draft = SupplierEntry & { key: string; imeisText: string; outImeis: string[]; supplierOrigin: SupplierOrigin };
+type Draft = SupplierEntry & { key: string; imeiList: string[]; outImeis: string[]; supplierOrigin: SupplierOrigin };
 
 const PAYMENT_OPTIONS = [
   { value: 'pending', label: 'A pagar (contas a pagar)' },
@@ -58,7 +59,7 @@ const toDraft = (entry: SupplierEntry, index: number, suppliers: SupplierOption[
   return {
     ...entry,
     key: entry.id || `new_${index}_${Date.now()}`,
-    imeisText: (entry.imeis ?? []).filter((imei) => !outImeis.includes(imei)).join('\n'),
+    imeiList: (entry.imeis ?? []).filter((imei) => !outImeis.includes(imei)),
     outImeis,
     supplierOrigin: originOf(suppliers, entry.supplierId),
   };
@@ -103,7 +104,7 @@ export function SupplierEntriesModal({
     ]);
 
   const parsed = rows.map((row) => {
-    const typed = row.imeisText.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
+    const typed = filledImeis(row.imeiList);
     return { ...row, typed, imeis: [...row.outImeis, ...typed.filter((imei) => !row.outImeis.includes(imei))] };
   });
   const summary = supplierEntriesSummary(parsed);
@@ -117,7 +118,7 @@ export function SupplierEntriesModal({
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
     if (dup) return setError(`O IMEI ${dup} está repetido.`);
     onApply(
-      parsed.map(({ key: _key, imeisText: _text, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
+      parsed.map(({ key: _key, imeiList: _list, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
@@ -208,10 +209,17 @@ export function SupplierEntriesModal({
                 Custo unitário
                 <CurrencyInput value={row.unitCost} ariaLabel="Custo unitário da entrada" onChange={(unitCost) => update(row.key, { unitCost })} />
               </label>
-              <label className="admin-field supplier-entry__imeis">
-                IMEIs em estoque ({parsed[index].typed.length})
-                <textarea rows={2} value={row.imeisText} placeholder="Um IMEI por linha (opcional)" onChange={(e) => update(row.key, { imeisText: e.target.value })} />
-              </label>
+              <div className="admin-field supplier-entry__imeis">
+                <ImeiListField
+                  label={`IMEIs em estoque (${parsed[index].typed.length})`}
+                  value={row.imeiList}
+                  onChange={(imeiList) => {
+                    // Cada IMEI é um aparelho: com mais IMEIs que unidades, a quantidade acompanha.
+                    const units = row.outImeis.length + filledImeis(imeiList).length;
+                    update(row.key, { imeiList, qty: Math.max(Number(row.qty) || 0, units) });
+                  }}
+                />
+              </div>
               {showOut && row.soldQty ? (
                 <div className="supplier-entry__units">
                   {(row.soldImeis ?? []).map((item) => (

@@ -7308,5 +7308,3 @@ select.caixa-mov-input {
 }
 .stock-help-pick__close:hover { border-color: #b91c1c; color: #b91c1c; }
 .stock-help-pick__reopen { margin: 0 0 12px; }
-.stock-sold-imei-toggle { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; align-self: end; min-height: 40px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.stock-sold-imei-toggle input { width: 16px; height: 16px; min-height: 0; margin: 0; }
