@@ -115,3 +115,26 @@
 .report-share { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .report-share .btn { display: inline-flex; align-items: center; gap: 6px; }
 .report-share .admin-ico { width: 16px; height: 16px; }
+
+/* Tema escuro: a prévia na tela vira uma folha escura legível. A impressão/PDF (.stock-report-print) continua branca. */
+@media screen {
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__sheet { color: #e5e7eb; background: transparent; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__sheet-head { border-bottom-color: #475569; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__sheet-head strong { color: #f8fafc; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__sheet-head span { color: #94a3b8; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table th { color: #cbd5e1; background: #1e293b; border-bottom-color: #334155; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table td { color: #e5e7eb; background: transparent; border-bottom-color: #263241; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table tr:nth-child(even) td { background: rgba(255, 255, 255, 0.025); }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table .is-name strong { color: #f8fafc; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table .is-name small { color: #94a3b8; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__table .is-notes { color: #cbd5e1; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__nophoto { background: #1e293b; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__cond.is-new { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__cond.is-used { background: rgba(244, 63, 94, 0.16); color: #fda4af; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__cond.is-refurbished { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__status.is-stock { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__status.is-sold { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__status.is-empty { background: #1e293b; color: #cbd5e1; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .stock-report__totals { border-top-color: #475569; color: #e5e7eb; }
+  :is(.admin--dark, .is-theme-dark) .stock-report__preview .imei-report__link, :is(.admin--dark, .is-theme-dark) .stock-report__preview .imei-report__notice { color: #22d3ee; }
+}

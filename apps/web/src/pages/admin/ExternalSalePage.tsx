@@ -313,6 +313,8 @@ export function ExternalSalePage() {
     const variation = lineVariation(prod, attributes);
     if (prod.variations?.length && !variation) return '';
     const imeis = availableImeis(prod, variation);
+    // Sem IMEI no cadastro, o IMEI é digitado na tela: mantém o que já foi digitado.
+    if (!imeis.length) return current ?? '';
     if (current && imeis.includes(current)) return current;
     return imeis.length === 1 ? imeis[0] : '';
   }
@@ -728,10 +730,21 @@ export function ExternalSalePage() {
                     const variation = lineVariation(prod, line.attributes ?? []);
                     const imeis = prod && (variation || !prod.variations?.length) ? availableImeis(prod, variation) : [];
                     if (!imeis.length) {
+                      // Sem IMEI no cadastro: o vendedor digita o do aparelho (fica gravado na baixa da venda).
+                      const waitingVariation = Boolean(prod?.variations?.length && !variation);
                       return (
                         <div className="external-sale-wide-field">
-                          <label className="admin-label">IMEI do aparelho</label>
-                          <input type="text" className="admin-input" disabled value={prod?.variations?.length && !variation ? 'Escolha cor e capacidade' : 'Sem IMEI cadastrado'} readOnly />
+                          <label className="admin-label">IMEI do aparelho{waitingVariation ? '' : ' · sem IMEI no cadastro'}</label>
+                          <input
+                            type="text"
+                            className="admin-input"
+                            inputMode="numeric"
+                            maxLength={20}
+                            disabled={waitingVariation}
+                            placeholder={waitingVariation ? 'Escolha cor e capacidade' : 'Digite o IMEI (opcional)'}
+                            value={waitingVariation ? '' : line.imei || ''}
+                            onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value.replace(/[^0-9A-Za-z]/g, ''))}
+                          />
                         </div>
                       );
                     }
