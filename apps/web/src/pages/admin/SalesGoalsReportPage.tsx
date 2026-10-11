@@ -4,10 +4,12 @@ import { getActiveStore } from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
 import { apiGetSalesGoalsReport, apiListCustomers, apiListGoals, apiListSellers, type GoalRow } from '../../services/erpApi';
 import { jsPDF } from 'jspdf';
+import { ReportShareActions } from '../../components/ReportShareActions';
 
 export function SalesGoalsReportPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [loadError, setLoadError] = useState('');
 
   // Filtros
   const [startDate, setStartDate] = useState(() => {
@@ -39,6 +41,7 @@ export function SalesGoalsReportPage() {
 
   async function fetchReport() {
     setLoading(true);
+    setLoadError('');
     try {
       const res = await apiGetSalesGoalsReport({
         startDate,
@@ -49,9 +52,12 @@ export function SalesGoalsReportPage() {
         customerId: customerId !== 'all' ? customerId : undefined,
         goalId: goalId !== 'all' ? goalId : undefined,
       });
-      setData(res.data);
+      // O cliente da API já devolve o conteúdo de "data" (antes lia res.data e o relatório ficava sempre vazio).
+      setData(res && typeof res === 'object' && 'summary' in res ? res : (res as any)?.data ?? null);
     } catch (err) {
-      console.warn('Falha ao carregar relatório:', err);
+      // Mostra o motivo em vez de "nenhuma venda" (ex.: sistema reiniciando).
+      setData(null);
+      setLoadError(err instanceof Error ? err.message : 'Não foi possível carregar o relatório. Tente de novo.');
     } finally {
       setLoading(false);
     }
@@ -114,6 +120,10 @@ export function SalesGoalsReportPage() {
         `Comissão Calculada: R$ ${s.commissionAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       ].join('   |   ');
       doc.text(summaryLine2, 14, y);
+      if (goal) {
+        y += 6;
+        doc.text(`Meta "${goal.name}" · ${goal.sellerName} · ${goalPeriod}${goal.isReached ? ' · batida' : ' · em andamento'}`, 14, y);
+      }
     }
 
     y += 10;
@@ -165,6 +175,24 @@ export function SalesGoalsReportPage() {
 
   const s = data?.summary;
   const canViewProfit = data?.canViewProfit;
+  const goal = data?.goal as
+    | null
+    | { name: string; targetValue: number; realized: number; percent: number; remaining: number; salesCount: number; goalType: string; startDate: string; endDate: string | null; openEnded?: boolean; reachedAt?: string | null; isReached: boolean; sellerName: string; currentTierName?: string; commissionAmount: number | null };
+  const brl = (value: number) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const goalValue = (value: number) => (goal?.goalType === 'sales_count' ? `${Math.round(value)} vendas` : brl(value));
+  const day = (value?: string | null) => (value ? new Date(String(value).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR') : '');
+  const goalPeriod = goal
+    ? goal.endDate
+      ? `${day(goal.startDate)} até ${day(goal.endDate)}`
+      : `Desde ${day(goal.startDate)} · ${goal.reachedAt ? `batida em ${new Date(goal.reachedAt).toLocaleDateString('pt-BR')}` : 'até bater a meta'}`
+    : '';
+  const shareLines = [
+    `Período: ${day(startDate)}${endDate ? ` até ${day(endDate)}` : ' até hoje'}`,
+    s ? `Vendas: ${s.salesCount} · Total vendido: ${brl(s.totalSales)}` : '',
+    goal ? `Meta "${goal.name}" (${goal.sellerName}): ${goalValue(goal.realized)} de ${goalValue(goal.targetValue)} (${goal.percent}%) · ${goalPeriod}` : '',
+    goal && !goal.isReached ? `Faltam ${goalValue(goal.remaining)}` : goal ? 'Meta batida ✅' : '',
+    ...((data?.rows ?? []) as any[]).slice(0, 40).map((row) => `• ${new Date(row.date).toLocaleDateString('pt-BR')} · ${row.customerName} · ${row.sellerName} · ${brl(row.netAmount)}`),
+  ].filter(Boolean);
 
   return (
     <div className="admin-page goals-page" style={{ padding: '16px 20px', maxWidth: '1280px', margin: '0 auto' }}>
@@ -195,6 +223,7 @@ export function SalesGoalsReportPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <ReportShareActions title="Relatório de Vendas & Metas" lines={shareLines} disabled={!data} onPrint={handleExportPdf} />
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
@@ -311,7 +340,44 @@ export function SalesGoalsReportPage() {
         </div>
       </div>
 
-      {/* CARDS DE RESUMO DO GILVAN */}
+      {loadError ? (
+        <p role="alert" className="qty-low" style={{ marginBottom: 16 }}>
+          {loadError}{' '}
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void fetchReport()}>
+            Tentar de novo
+          </button>
+        </p>
+      ) : null}
+
+      {/* Progresso da meta: aparece mesmo sem ter batido, para acompanhar, imprimir e enviar. */}
+      {goal ? (
+        <section className="goals-progress">
+          <div className="goals-progress__head">
+            <div>
+              <span className="goals-progress__kicker">Progresso da meta</span>
+              <h2>{goal.name} · {goal.sellerName}</h2>
+              <small>{goalPeriod}</small>
+            </div>
+            <span className={`admin-badge${goal.isReached ? ' admin-badge--active' : ''}`}>
+              {goal.isReached ? 'Meta batida' : 'Em andamento'}
+              {goal.currentTierName ? ` · ${goal.currentTierName}` : ''}
+            </span>
+          </div>
+          <div className="goals-progress__bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, goal.percent)}>
+            <span style={{ width: `${Math.min(100, Math.max(0, goal.percent))}%` }} />
+          </div>
+          <div className="goals-progress__numbers">
+            <div><small>Realizado</small><strong>{goalValue(goal.realized)}</strong></div>
+            <div><small>Meta</small><strong>{goalValue(goal.targetValue)}</strong></div>
+            <div><small>Atingido</small><strong>{goal.percent}%</strong></div>
+            <div><small>{goal.isReached ? 'Passou da meta' : 'Falta'}</small><strong>{goal.isReached ? goalValue(Math.max(0, goal.realized - goal.targetValue)) : goalValue(goal.remaining)}</strong></div>
+            <div><small>Vendas na meta</small><strong>{goal.salesCount}</strong></div>
+            {goal.commissionAmount !== null ? <div><small>Comissão</small><strong>{brl(goal.commissionAmount)}</strong></div> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* CARDS DE RESUMO */}
       {s && (
         <div style={{ marginBottom: '24px' }}>
           <div
@@ -458,7 +524,7 @@ export function SalesGoalsReportPage() {
                     R$ {(s.commissionAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                   <small style={{ color: 'var(--mute)' }}>
-                    {s.goalPercent >= 100 ? 'Meta Atingida (10%)' : 'Aguardando Meta'}
+                    {s.goalPercent >= 100 ? 'Meta atingida' : 'Aguardando a meta'}
                   </small>
                 </div>
               </>
@@ -467,7 +533,7 @@ export function SalesGoalsReportPage() {
         </div>
       )}
 
-      {/* FECHAMENTO MENSAL DA MARIANA (SECTION 23 DO BRIEFING) */}
+      {/* Fechamento do período */}
       {s && (
         <div
           style={{

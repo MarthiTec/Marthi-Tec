@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { computeGoalMetrics } from './goals.js';
 import * as XLSX from 'xlsx';
 
 export const reportsRouter = Router();
@@ -185,29 +186,16 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
       goalParams,
     );
 
+    // Progresso da meta pelo período da própria meta (ou "até bater"), igual à tela de Metas —
+    // aparece mesmo sem ter batido, para acompanhar, imprimir e enviar.
+    let goal: Awaited<ReturnType<typeof computeGoalMetrics>> | null = null;
     if (goalRes.rows.length > 0) {
-      const g = goalRes.rows[0];
-      goalTarget = Number(g.target_value) || 0;
-      goalRealized = g.goal_type === 'profit' ? grossProfit : totalSales;
-      goalPercent = goalTarget > 0 ? Math.round((goalRealized / goalTarget) * 10000) / 100 : 0;
-      goalRemaining = Math.max(0, goalTarget - goalRealized);
-
-      const commRules = typeof g.commission_rules === 'string'
-        ? JSON.parse(g.commission_rules)
-        : (g.commission_rules || {});
-
-      if (commRules.enabled) {
-        const isReached = goalRealized >= goalTarget;
-        if (!commRules.requiresGoalReached || isReached) {
-          if (commRules.type === 'percent_revenue') {
-            commissionAmount = Math.round(totalSales * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
-          } else if (commRules.type === 'percent_profit') {
-            commissionAmount = Math.round(grossProfit * (Number(commRules.percent ?? 0) / 100) * 100) / 100;
-          } else if (commRules.type === 'fixed_value') {
-            commissionAmount = Number(commRules.fixedValue || 0);
-          }
-        }
-      }
+      goal = await computeGoalMetrics(goalRes.rows[0], storeId);
+      goalTarget = goal.targetValue;
+      goalRealized = goal.realized;
+      goalPercent = goal.percent;
+      goalRemaining = goal.remaining;
+      commissionAmount = goal.commissionAmount;
     }
 
     res.json({
@@ -226,6 +214,26 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
           goalRemaining,
           commissionAmount,
         },
+        goal: goal
+          ? {
+              id: goal.id,
+              name: goal.name,
+              goalType: goal.goalType,
+              targetValue: goal.targetValue,
+              realized: goal.realized,
+              percent: goal.percent,
+              remaining: goal.remaining,
+              salesCount: goal.salesCount,
+              startDate: goal.startDate,
+              endDate: goal.endDate,
+              openEnded: goal.openEnded,
+              reachedAt: goal.reachedAt,
+              isReached: goal.isReached,
+              sellerName: goal.sellerName,
+              currentTierName: goal.currentTierName,
+              commissionAmount: canViewProfit ? goal.commissionAmount : null,
+            }
+          : null,
         rows,
         canViewProfit,
       },

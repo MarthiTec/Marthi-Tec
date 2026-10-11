@@ -67,3 +67,16 @@
 @media (max-width: 640px) {
   .goals-filters, .goals-form__row--name, .goals-form__row--3, .goals-form__row--2 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Progresso da meta no relatório */
+.goals-progress { margin-bottom: 20px; padding: 16px; border: 1px solid var(--line, rgba(148, 163, 184, 0.22)); border-left: 4px solid var(--accent, #2dd4bf); border-radius: 10px; background: var(--card, #171e27); }
+.goals-progress__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.goals-progress__head h2 { margin: 2px 0; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
+.goals-progress__head small { color: var(--mute); }
+.goals-progress__kicker { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mute); }
+.goals-progress__bar { height: 12px; margin: 14px 0; border-radius: 999px; background: rgba(148, 163, 184, 0.2); overflow: hidden; }
+.goals-progress__bar > span { display: block; height: 100%; border-radius: inherit; background: var(--accent, #2dd4bf); transition: width 0.3s ease; }
+.goals-progress__numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.goals-progress__numbers div { display: grid; gap: 2px; }
+.goals-progress__numbers small { color: var(--mute); font-size: 0.76rem; }
+.goals-progress__numbers strong { font-size: 1.05rem; color: var(--ink); }
