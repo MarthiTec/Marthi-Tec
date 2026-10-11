@@ -9,6 +9,7 @@ import { publicOffer } from '../services/ads/adContent.js';
 import { checkImage, checkVideo, dataUrlBytes } from '../services/ads/adMedia.js';
 import {
   audit,
+  connectWithStoreToken,
   disconnectMeta,
   finishMetaConnect,
   getConnection,
@@ -17,6 +18,7 @@ import {
   markNeedsReconnect,
   metaConfig,
   metaHealth,
+  metaStoreTest,
   publicConnection,
   selectMetaAssets,
   startMetaConnect,
@@ -40,6 +42,7 @@ import {
   validateCampaign,
 } from '../services/ads/metaCampaigns.js';
 import { explainMetaError, graph } from '../services/ads/metaGraph.js';
+import { cancelSocialPost, createSocialPost, listSocialPosts, publishSocialPost, readSocialMedia } from '../services/ads/socialPosts.js';
 
 /**
  * Marthi ADS. Quem pode:
@@ -77,7 +80,7 @@ adsRouter.get('/api/v1/ads/status', requireAuth, requireAdsEditor, wrap(async (r
         facebookAds: 'available',
         credits: 'blocked',
         instagramAds: 'blocked',
-        instagramOrganic: 'blocked',
+        instagramOrganic: 'available',
         googleAds: 'blocked',
         youtubeAds: 'blocked',
       },
@@ -110,6 +113,59 @@ adsRouter.put('/api/v1/ads/meta/assets', requireAuth, requireAdsAdmin, wrap(asyn
   const body = z.object({ pageId: z.string().min(1), adAccountId: z.string().min(1) }).parse(req.body);
   await selectMetaAssets(req.storeId!, body, actorOf(req));
   res.json({ success: true, data: await metaHealth(req.storeId!) });
+}));
+
+/* ── Conexão Meta pela loja (token próprio, como na Evolution) ──────────────── */
+
+adsRouter.post('/api/v1/ads/meta/store-connection', requireAuth, requireAdsAdmin, wrap(async (req, res) => {
+  const body = z.object({ token: z.string().trim().min(1, 'Cole o token de acesso.'), pageId: z.string().trim().optional(), adAccountId: z.string().trim().optional() }).parse(req.body);
+  const found = await connectWithStoreToken(req.storeId!, body, actorOf(req));
+  res.json({ success: true, data: { ...found, health: await metaHealth(req.storeId!) } });
+}));
+
+adsRouter.get('/api/v1/ads/meta/store-test', requireAuth, requireAdsAdmin, wrap(async (req, res) => {
+  res.json({ success: true, data: await metaStoreTest(req.storeId!) });
+}));
+
+/* ── Publicações no Instagram (orgânicas) ──────────────────────────────────── */
+
+adsRouter.get('/api/v1/ads/social-posts', requireAuth, requireAdsEditor, wrap(async (req, res) => {
+  res.json({ success: true, data: await listSocialPosts(req.storeId!) });
+}));
+
+adsRouter.post('/api/v1/ads/social-posts', requireAuth, requireAdsEditor, wrap(async (req, res) => {
+  const body = z.object({ caption: z.string().max(2200).default(''), mediaId: z.string().trim().min(1, 'Escolha a foto.'), scheduledAt: z.string().datetime({ offset: true }).nullable().optional() }).parse(req.body);
+  res.status(201).json({ success: true, data: await createSocialPost(req.storeId!, body, actorOf(req)) });
+}));
+
+adsRouter.post('/api/v1/ads/social-posts/:id/cancel', requireAuth, requireAdsEditor, wrap(async (req, res) => {
+  await cancelSocialPost(req.storeId!, req.params.id, actorOf(req));
+  res.json({ success: true, data: { ok: true } });
+}));
+
+/** Tentar de novo uma publicação que falhou (volta a agendar para agora). */
+adsRouter.post('/api/v1/ads/social-posts/:id/retry', requireAuth, requireAdsEditor, wrap(async (req, res) => {
+  const result = await pool.query(
+    `UPDATE ads_social_posts SET status = 'scheduled', scheduled_at = now(), error = '', updated_at = now()
+      WHERE id = $1 AND store_id = $2 AND status = 'failed' RETURNING id`,
+    [req.params.id, req.storeId],
+  );
+  if (!result.rowCount) throw Object.assign(new Error('Só publicações que falharam podem ser tentadas de novo.'), { status: 409 });
+  await audit(pool, req.storeId!, actorOf(req), 'instagram.post_retry', req.params.id);
+  await publishSocialPost(req.params.id);
+  res.json({ success: true, data: (await listSocialPosts(req.storeId!)).find((post) => post.id === req.params.id) ?? null });
+}));
+
+/** Foto da publicação para a Meta buscar (link assinado; só enquanto agendada/publicando). */
+adsRouter.get('/api/v1/public/social-media/:postId/:sig', wrap(async (req, res) => {
+  const file = await readSocialMedia(req.params.postId, req.params.sig);
+  if (!file) {
+    res.status(404).end();
+    return;
+  }
+  res.setHeader('Content-Type', file.mime);
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.end(file.bytes);
 }));
 
 adsRouter.get('/api/v1/ads/meta/health', requireAuth, requireAdsEditor, wrap(async (req, res) => {

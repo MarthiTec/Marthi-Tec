@@ -4,6 +4,7 @@ import { checkDatabaseConnection } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
 import { startOrderReminderWorker } from './services/orderReminders.js';
 import { startAdsSyncWorker } from './services/ads/metaCampaigns.js';
+import { startSocialPostsWorker } from './services/ads/socialPosts.js';
 
 // Schema is maintained by versioned migrations. Startup must not insert demonstration
 // stock, overwrite customer records or delete registrations based on fixed identifiers.
@@ -19,6 +20,8 @@ async function bootstrapDatabase() {
   startOrderReminderWorker();
   // Estado e resultados das campanhas Marthi ADS (consulta periódica na Meta).
   startAdsSyncWorker();
+  // Publicações programadas no Instagram (publica no horário agendado).
+  startSocialPostsWorker();
 }
 
 // Keep health/static serving available while PostgreSQL initialization is in progress.

@@ -11,6 +11,8 @@ export type AdsConnection = {
   instagram: { id: string; username: string } | null;
   lastCheckedAt: string | null;
   connectedBy: string;
+  /** oauth = login pelo app do Marthi; store_token = token da própria loja (Operações › Meta). */
+  mode?: 'oauth' | 'store_token';
 } | null;
 export type AdsStatus = {
   config: { appConfigured: boolean; vaultReady: boolean; loginMode: string; apiVersion: string; environment: 'test' | 'production'; redirectUri: string; scopes: string[] };
@@ -103,7 +105,39 @@ export type AdsMedia = {
   warnings?: AdsIssue[];
 };
 
+export type AdsStoreTest = {
+  user: string;
+  granted: string[];
+  instagram: { username: string; followers: number | null; mediaCount: number | null } | null;
+  canPublishInstagram: boolean;
+  instagramHelp: string;
+  canAdvertise: boolean;
+  adsHelp: string;
+};
+export type SocialPost = {
+  id: string;
+  network: 'instagram';
+  caption: string;
+  mediaId: string | null;
+  mediaName: string;
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+  scheduledAt: string;
+  publishedAt: string | null;
+  permalink: string;
+  error: string;
+  attempts: number;
+  createdBy: string;
+  createdAt: string;
+};
+
 export const adsApi = {
+  storeConnect: (body: { token: string; pageId?: string; adAccountId?: string }) =>
+    nestPost<{ pages: Array<{ id: string; name: string; instagram: string }>; adAccounts: Array<{ id: string; name: string }>; health: AdsHealth }>('/ads/meta/store-connection', body),
+  storeTest: () => nestGet<AdsStoreTest>('/ads/meta/store-test'),
+  socialPosts: () => nestGet<SocialPost[]>('/ads/social-posts'),
+  createSocialPost: (body: { caption: string; mediaId: string; scheduledAt: string | null }) => nestPost<SocialPost>('/ads/social-posts', body),
+  cancelSocialPost: (id: string) => nestPost<{ ok: true }>(`/ads/social-posts/${encodeURIComponent(id)}/cancel`, {}),
+  retrySocialPost: (id: string) => nestPost<SocialPost | null>(`/ads/social-posts/${encodeURIComponent(id)}/retry`, {}),
   status: () => nestGet<AdsStatus>('/ads/status'),
   connect: () => nestPost<{ url: string }>('/ads/meta/connect', {}),
   assets: () => nestGet<AdsAssets>('/ads/meta/assets'),

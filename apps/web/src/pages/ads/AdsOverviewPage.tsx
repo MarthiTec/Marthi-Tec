@@ -7,7 +7,7 @@ const PHASES = [
   { key: 'facebookAds', title: 'Anúncios no Facebook', text: 'Conectar a Meta, criar anúncio de um produto, autorizar orçamento, acompanhar e pausar.', phase: 'Fase 1' },
   { key: 'credits', title: 'Créditos e cobrança pelo Marthi', text: 'Bloqueado até definir o modelo financeiro e o provedor de pagamento. Hoje a Meta cobra direto na sua conta de anúncios.', phase: 'Fase 2' },
   { key: 'instagramAds', title: 'Anúncios no Instagram', text: 'Depois de validar o Facebook, pela mesma conexão Meta.', phase: 'Fase 3' },
-  { key: 'instagramOrganic', title: 'Publicações no Instagram (feed, carrossel, Reels, Stories)', text: 'Publicação e agendamento sem pagar anúncio.', phase: 'Fase 3' },
+  { key: 'instagramOrganic', title: 'Publicações programadas no Instagram', text: 'Foto com legenda, publicada na hora ou agendada, sem pagar anúncio (conexão da loja em Operações › Meta).', phase: 'Fase 1' },
   { key: 'googleAds', title: 'Google Ads e YouTube Ads', text: 'Integrações próprias, em fase posterior.', phase: 'Fase 4' },
 ];
 

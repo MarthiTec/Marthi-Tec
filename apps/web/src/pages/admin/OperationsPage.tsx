@@ -1,3 +1,4 @@
+import { MetaStoreConnectionSection } from '../../components/MetaStoreConnectionSection';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { TeamUsersSection } from '../../components/TeamUsersSection';
@@ -43,7 +44,7 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-type OpsTab = 'ramo' | 'loja' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'usuarios';
+type OpsTab = 'ramo' | 'loja' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'meta' | 'usuarios';
 
 /** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
@@ -58,7 +59,7 @@ export function OperationsPage() {
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
   const [tab, setTab] = useState<OpsTab>(() => {
-    if (tabParam === 'ramo' || tabParam === 'loja' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'usuarios') return tabParam;
+    if (tabParam === 'ramo' || tabParam === 'loja' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'meta' || tabParam === 'usuarios') return tabParam;
     if (tabParam === 'whatsapp') return 'comunicacao';
     if (location.pathname.endsWith('/usuarios')) return 'usuarios';
     if (location.pathname.endsWith('/comunicacao') || location.pathname.endsWith('/whatsapp')) return 'comunicacao';
@@ -257,6 +258,17 @@ export function OperationsPage() {
           <AdminIcon name="whatsapp" />
           <span>Comunicação (WhatsApp &amp; E-mail)</span>
         </button>
+
+        <button
+          type="button"
+          className={`btn ${tab === 'meta' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('meta')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="megaphone" />
+          <span>Meta (Facebook &amp; Instagram)</span>
+        </button>
+
 
         <button
           type="button"
@@ -460,6 +472,9 @@ export function OperationsPage() {
           <OrderReminderSettings key={`reminder-${communicationStoreId}`} />
         </>
       ) : null}
+
+      {/* Conexão Meta da loja (Instagram programado e anúncios) */}
+      {tab === 'meta' ? <MetaStoreConnectionSection key={`meta-${communicationStoreId}`} /> : null}
 
       {/* ABA 4: Equipe & Usuários da Loja */}
       {tab === 'usuarios' ? (

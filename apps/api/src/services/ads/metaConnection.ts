@@ -1,15 +1,19 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { env } from '../../config/env.js';
 import { pool } from '../../db/pool.js';
-import { graph, graphList, META_GRAPH_VERSION, MetaApiError } from './metaGraph.js';
+import { graph, graphList, markStoreProvidedToken, META_GRAPH_VERSION, MetaApiError } from './metaGraph.js';
 import { openToken, sealToken, vaultReady } from './tokenVault.js';
 
 type Db = { query: (sql: string, args?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
 /** Permissões da Fase 1 (Facebook): só o necessário para criar e acompanhar anúncios da Página. */
 export const META_PHASE1_SCOPES = ['ads_management', 'ads_read', 'pages_show_list', 'pages_read_engagement', 'pages_manage_ads'] as const;
+/** Publicação orgânica no Instagram (sem custo): o token da loja precisa destas. */
+export const META_INSTAGRAM_SCOPES = ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'] as const;
 
 const PERMISSION_HELP: Record<string, string> = {
+  instagram_basic: 'ler o perfil do Instagram profissional',
+  instagram_content_publish: 'publicar fotos no Instagram',
   ads_management: 'criar, pausar e retomar campanhas',
   ads_read: 'ler os resultados (gasto, alcance, cliques)',
   pages_show_list: 'listar as suas Páginas do Facebook',
@@ -134,9 +138,113 @@ export async function finishMetaConnect(query: { code?: string; state?: string; 
   return { storeId, ok: true as const };
 }
 
+/**
+ * Conexão pela própria loja: ela gera um token (usuário de sistema do Gerenciador de Negócios, ou token de
+ * longa duração do app Meta dela) e informa aqui. O Marthi confere o token, as permissões, a Página, o
+ * Instagram profissional e a conta de anúncios, e guarda tudo criptografado. Não depende do app do Marthi.
+ */
+export async function connectWithStoreToken(
+  storeId: string,
+  input: { token: string; pageId?: string; adAccountId?: string },
+  actor: string,
+) {
+  const token = input.token.trim();
+  if (token.length < 30) throw Object.assign(new Error('Cole o token de acesso completo gerado na Meta.'), { status: 422 });
+  markStoreProvidedToken(token);
+  let me: any;
+  try {
+    me = await graph('GET', 'me', { token, params: { fields: 'id,name' } });
+  } catch (error) {
+    if (error instanceof MetaApiError) throw Object.assign(new Error(`A Meta recusou o token: ${error.userMessage || error.message}`), { status: 422 });
+    throw error;
+  }
+  const granted = await grantedScopes(token).catch(() => [] as string[]);
+  const pages: any[] = await graphList('me/accounts', { token, params: { fields: 'id,name,tasks,access_token,instagram_business_account{id,username}' } }).catch(() => []);
+  const wantedPage = input.pageId?.trim() ?? '';
+  const page = wantedPage ? pages.find((item) => String(item.id) === wantedPage) : pages.length === 1 ? pages[0] : null;
+  if (wantedPage && !page) throw Object.assign(new Error('Essa Página não está liberada para este token. Confira o ID ou dê acesso à Página ao usuário do token.'), { status: 422 });
+  const accounts: any[] = await graphList('me/adaccounts', { token, params: { fields: 'id,name,account_status,currency,timezone_name' } }).catch(() => []);
+  const wantedAccount = input.adAccountId?.trim() ? (input.adAccountId.trim().startsWith('act_') ? input.adAccountId.trim() : `act_${input.adAccountId.trim()}`) : '';
+  const account = wantedAccount ? accounts.find((item) => String(item.id) === wantedAccount) : accounts.length === 1 ? accounts[0] : null;
+  if (wantedAccount && !account) throw Object.assign(new Error('Essa conta de anúncios não está liberada para este token.'), { status: 422 });
+  await pool.query(
+    `INSERT INTO ads_connections (id, store_id, provider, status, connection_mode, external_user_id, external_user_name, token_enc, token_expires_at, scopes, connected_by, last_error, last_checked_at,
+                                  page_id, page_name, page_token_enc, ad_account_id, ad_account_name, ad_account_currency, ad_account_timezone, ad_account_status, instagram_id, instagram_username)
+     VALUES ($1, $2, 'meta', 'connected', 'store_token', $3, $4, $5, NULL, $6::jsonb, $7, '', now(), $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+     ON CONFLICT (store_id, provider) DO UPDATE SET status = 'connected', connection_mode = 'store_token', external_user_id = EXCLUDED.external_user_id,
+       external_user_name = EXCLUDED.external_user_name, token_enc = EXCLUDED.token_enc, token_expires_at = NULL, scopes = EXCLUDED.scopes,
+       connected_by = EXCLUDED.connected_by, last_error = '', last_checked_at = now(), updated_at = now(),
+       page_id = EXCLUDED.page_id, page_name = EXCLUDED.page_name, page_token_enc = EXCLUDED.page_token_enc,
+       ad_account_id = EXCLUDED.ad_account_id, ad_account_name = EXCLUDED.ad_account_name, ad_account_currency = EXCLUDED.ad_account_currency,
+       ad_account_timezone = EXCLUDED.ad_account_timezone, ad_account_status = EXCLUDED.ad_account_status,
+       instagram_id = EXCLUDED.instagram_id, instagram_username = EXCLUDED.instagram_username`,
+    [
+      `CON-${randomUUID()}`,
+      storeId,
+      String(me.id),
+      String(me.name ?? ''),
+      sealToken(token),
+      JSON.stringify(granted),
+      actor,
+      page ? String(page.id) : null,
+      page ? String(page.name ?? '') : '',
+      page?.access_token ? sealToken(String(page.access_token)) : null,
+      account ? String(account.id) : null,
+      account ? String(account.name ?? '') : '',
+      account ? String(account.currency ?? '') : '',
+      account ? String(account.timezone_name ?? '') : '',
+      account ? Number(account.account_status) : null,
+      page?.instagram_business_account ? String(page.instagram_business_account.id) : null,
+      page?.instagram_business_account ? String(page.instagram_business_account.username ?? '') : '',
+    ],
+  );
+  await audit(pool, storeId, actor, 'meta.store_token_connected', String(me.id), { scopes: granted, pageId: page?.id ?? null, adAccountId: account?.id ?? null });
+  return {
+    pages: pages.map((item) => ({ id: String(item.id), name: String(item.name ?? ''), instagram: item.instagram_business_account ? String(item.instagram_business_account.username ?? '') : '' })),
+    adAccounts: accounts.map((item) => ({ id: String(item.id), name: String(item.name ?? '') })),
+  };
+}
+
+/** Conferência rápida do que a conexão da loja permite: Instagram (publicar) e anúncios (pagos). */
+export async function metaStoreTest(storeId: string) {
+  const { connection, token } = await userToken(storeId);
+  const granted = await grantedScopes(token);
+  let instagram: { username: string; followers: number | null; mediaCount: number | null } | null = null;
+  if (connection.instagram_id) {
+    const profile: any = await graph('GET', connection.instagram_id, { token, params: { fields: 'username,followers_count,media_count' } });
+    instagram = { username: String(profile.username ?? connection.instagram_username), followers: profile.followers_count ?? null, mediaCount: profile.media_count ?? null };
+  }
+  const missingInstagram = META_INSTAGRAM_SCOPES.filter((scope) => !granted.includes(scope));
+  const missingAds = META_PHASE1_SCOPES.filter((scope) => !granted.includes(scope));
+  return {
+    user: connection.external_user_name,
+    granted,
+    instagram,
+    canPublishInstagram: Boolean(connection.instagram_id) && missingInstagram.length === 0,
+    instagramHelp: !connection.instagram_id
+      ? 'Nenhum Instagram profissional ligado à Página. No app do Instagram: Configurações › Conta › mudar para conta profissional e vincular à Página.'
+      : missingInstagram.length
+        ? `Faltam permissões no token: ${missingInstagram.map((scope) => `${scope} (${PERMISSION_HELP[scope] ?? ''})`).join('; ')}.`
+        : '',
+    canAdvertise: Boolean(connection.page_id) && Boolean(connection.ad_account_id) && missingAds.length === 0,
+    adsHelp: !connection.ad_account_id
+      ? 'Nenhuma conta de anúncios liberada para o token. Só é preciso para anúncio pago.'
+      : missingAds.length
+        ? `Para anúncio pago faltam: ${missingAds.join(', ')}.`
+        : '',
+  };
+}
+
 async function grantedScopes(token: string) {
   const list: any[] = await graphList('me/permissions', { token });
   return list.filter((item) => item.status === 'granted').map((item) => String(item.permission));
+}
+
+/** Abre o token guardado; quando foi a loja que informou (app dela), a chamada não usa a prova do app do Marthi. */
+export function connectionToken(connection: any) {
+  const token = openToken(connection.token_enc);
+  if (connection.connection_mode === 'store_token') markStoreProvidedToken(token);
+  return token;
 }
 
 export async function getConnection(db: Db, storeId: string) {
@@ -148,7 +256,7 @@ export async function userToken(storeId: string) {
   const connection = await getConnection(pool, storeId);
   if (!connection || connection.status === 'revoked' || !connection.token_enc) throw Object.assign(new Error('Conecte a conta Meta em Contas conectadas.'), { status: 409 });
   if (connection.status === 'needs_reconnect') throw Object.assign(new Error('A conexão com a Meta expirou. Conecte de novo em Contas conectadas.'), { status: 409 });
-  return { connection, token: openToken(connection.token_enc) };
+  return { connection, token: connectionToken(connection) };
 }
 
 /** Token expirado/revogado: a conexão passa a pedir reconexão (nada é dado como enviado). */
@@ -226,23 +334,29 @@ export type HealthCheck = { id: string; ok: boolean; title: string; help: string
 export async function metaHealth(storeId: string) {
   const config = metaConfig();
   const checks: HealthCheck[] = [];
-  checks.push({
-    id: 'app',
-    ok: config.appConfigured && config.vaultReady,
-    title: 'Integração Meta configurada no Marthi',
-    help: config.appConfigured && config.vaultReady ? '' : 'O app Meta do Marthi ainda não está configurado neste servidor. Fale com o suporte do Marthi.',
-  });
   const connection = await getConnection(pool, storeId);
-  if (!connection || connection.status === 'revoked' || !connection.token_enc) {
-    checks.push({ id: 'connection', ok: false, title: 'Conta Meta conectada', help: 'Clique em "Conectar com a Meta" e entre com a sua conta do Facebook (o Marthi nunca pede a sua senha).' });
+  const storeMode = connection?.connection_mode === 'store_token';
+  const appOk = (config.appConfigured || storeMode) && config.vaultReady;
+  const hasConnection = Boolean(connection && connection.status !== 'revoked' && connection.token_enc);
+  // Sem conexão, o aviso de "Conta Meta conectada" já diz o que fazer (evita dois avisos iguais).
+  if (hasConnection || config.appConfigured) {
+    checks.push({
+      id: 'app',
+      ok: appOk,
+      title: storeMode ? 'Conexão Meta da loja (token próprio)' : 'Integração Meta configurada no Marthi',
+      help: appOk ? '' : 'Conecte a Meta da loja em Operações › Meta (Facebook e Instagram), com o token gerado no Gerenciador de Negócios.',
+    });
+  }
+  if (!hasConnection) {
+    checks.push({ id: 'connection', ok: false, title: 'Conta Meta conectada', help: 'Conecte em Operações › Meta (Facebook e Instagram) com o token da loja, ou em "Conectar com a Meta" quando estiver disponível.' });
     return { connection: publicConnection(connection), checks, canAdvertise: false };
   }
   let granted: string[] = Array.isArray(connection.scopes) ? connection.scopes : [];
   let tokenOk = connection.status !== 'needs_reconnect';
   let account: any = null;
-  if (tokenOk && config.appConfigured && config.vaultReady) {
+  if (tokenOk && appOk) {
     try {
-      const token = openToken(connection.token_enc);
+      const token = connectionToken(connection);
       granted = await grantedScopes(token);
       if (connection.ad_account_id) {
         account = await graph('GET', connection.ad_account_id, { token, params: { fields: 'id,name,account_status,disable_reason,currency' } });
@@ -297,8 +411,8 @@ export async function metaHealth(storeId: string) {
   checks.push({
     id: 'instagram',
     ok: Boolean(connection.instagram_id),
-    title: connection.instagram_id ? `Instagram profissional: @${connection.instagram_username}` : 'Instagram profissional (Fase 3)',
-    help: connection.instagram_id ? 'Identificado. Anúncios e publicações no Instagram chegam na Fase 3.' : 'Nenhum Instagram profissional ligado a esta Página. Não impede anunciar no Facebook.',
+    title: connection.instagram_id ? `Instagram profissional: @${connection.instagram_username}` : 'Instagram profissional',
+    help: connection.instagram_id ? 'Identificado. Publicações programadas no Instagram já funcionam em Publicações e calendário.' : 'Nenhum Instagram profissional ligado a esta Página. Não impede anunciar no Facebook.',
   });
   const blocking = checks.filter((check) => check.id !== 'instagram');
   const fresh = await getConnection(pool, storeId);
@@ -318,6 +432,7 @@ export function publicConnection(row: any) {
     instagram: row.instagram_id ? { id: row.instagram_id, username: row.instagram_username } : null,
     lastCheckedAt: row.last_checked_at,
     connectedBy: row.connected_by,
+    mode: row.connection_mode ?? 'oauth',
   };
 }
 
@@ -326,7 +441,7 @@ export async function disconnectMeta(storeId: string, actor: string) {
   const connection = await getConnection(pool, storeId);
   if (!connection) return;
   let revoked = false;
-  if (connection.token_enc && metaConfig().vaultReady) {
+  if (connection.token_enc && metaConfig().vaultReady && connection.connection_mode !== 'store_token') {
     try {
       await graph('DELETE', 'me/permissions', { token: openToken(connection.token_enc) });
       revoked = true;

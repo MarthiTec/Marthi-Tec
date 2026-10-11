@@ -45,7 +45,14 @@ const TRANSIENT_CODES = new Set([1, 2, 4, 17, 32, 341, 613, 80000, 80003, 80004,
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Prova do segredo do app (recomendada pela Meta para chamadas de servidor). */
+/** Tokens que a própria loja gerou no app Meta dela: não levam a prova do app do Marthi (seria recusada). */
+const storeProvidedTokens = new Set<string>();
+export function markStoreProvidedToken(token: string) {
+  storeProvidedTokens.add(token);
+}
+
 function appSecretProof(token: string) {
+  if (storeProvidedTokens.has(token)) return '';
   return env.META_APP_SECRET ? createHmac('sha256', env.META_APP_SECRET).update(token).digest('hex') : '';
 }
 

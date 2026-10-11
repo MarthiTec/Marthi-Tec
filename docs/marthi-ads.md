@@ -188,3 +188,22 @@ análise/reprovação reais, resultados reais, campos marcados como "validar na 
 - Permissões: https://developers.facebook.com/docs/permissions/
 - Exclusão de dados: https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback/
 - Especificações de anúncio (Tráfego, Feed): https://www.facebook.com/business/ads-guide/update/image/facebook-feed/link-clicks
+
+## Conexão Meta pela loja (token próprio) e publicações no Instagram
+
+Além do login pelo app do Marthi, cada loja pode conectar a Meta com o **token do usuário de sistema** do Gerenciador de Negócios dela (como a Evolution do WhatsApp). Não depende do app do Marthi nem da revisão dele na Meta.
+
+- Tela: **Operações › Meta (Facebook & Instagram)** — colar o token, Página e conta de anúncios opcionais (descobertas sozinhas quando há só uma), **Validar e salvar**, **Testar conexão**, **Desconectar**, e o passo a passo para gerar o token.
+- Rotas: `POST /api/v1/ads/meta/store-connection` (admin), `GET /api/v1/ads/meta/store-test` (admin).
+- O token é guardado criptografado (`ads_connections.token_enc`, `connection_mode = 'store_token'`). Sem `META_TOKEN_KEY` a chave é derivada do `JWT_SECRET` (HKDF, prefixo `v2`); trocar o `JWT_SECRET` exige conectar de novo.
+- Chamadas com token da loja **não** levam `appsecret_proof` do app do Marthi (seria recusado pela Meta).
+- Permissões do token: publicar no Instagram — `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`; anúncio pago — `ads_management`, `ads_read`, `pages_manage_ads`.
+
+### Publicações programadas no Instagram (sem custo)
+
+- Tela: **Anúncios Ads › Publicações e calendário** — foto JPG da biblioteca (4:5 a 1,91:1), legenda (até 2.200 caracteres e 30 hashtags), **Publicar agora** ou **Agendar** (até 75 dias), calendário com Cancelar, Tentar de novo e link da publicação.
+- A API do Instagram não agenda: o Marthi guarda (`ads_social_posts`) e o agendador do servidor publica a cada minuto (`POST /{ig-user}/media` + `/media_publish`), com trava para não publicar duas vezes.
+- A foto vai para a Meta por link público assinado (`/api/v1/public/social-media/:id/:assinatura.jpg`), válido só enquanto a publicação está agendada/publicando.
+- Instabilidade/limite da Meta: tenta de novo em 5 minutos (até 3 vezes). Demora depois de criar o contêiner não repete sozinha (pode ter saído) — fica como falha para conferir.
+- Turbinar (impulsionar) pela API fica para a fase de anúncios no Instagram; pelo app do Instagram continua disponível para a loja.
+

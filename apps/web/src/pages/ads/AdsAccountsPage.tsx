@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { adsApi, type AdsAssets, type AdsHealth } from '../../services/adsApi';
 import { AdsPage, dateTime, useAdsStatus } from './AdsShared';
@@ -120,11 +120,11 @@ export function AdsAccountsPage() {
           <h2 className="ads-card-title">Meta (Facebook e Instagram)</h2>
           {!status ? (
             <p className="empty">Carregando…</p>
-          ) : !configOk ? (
+          ) : !configOk && !connected ? (
             <>
               <p className="empty">
-                O botão de conexão é liberado assim que o Marthi ativar o app oficial da Meta neste servidor. Enquanto isso, deixe pronto o que a
-                conexão vai pedir:
+                Conecte a Meta da loja com o token gerado no seu Gerenciador de Negócios, como na conexão do WhatsApp. O login pelo app do Marthi
+                (botão abaixo) é liberado quando o app oficial estiver ativo. Para qualquer um dos dois, deixe pronto:
               </p>
               <ul className="ads-checks">
                 <li className="is-bad">
@@ -149,9 +149,14 @@ export function AdsAccountsPage() {
                   </div>
                 </li>
               </ul>
-              <button type="button" className="btn btn--primary" disabled title="Aguardando o Marthi ativar o app da Meta neste servidor">
-                Conectar com a Meta
-              </button>
+              <div className="ads-actions">
+                <Link to="/painel/operacoes?tab=meta" className="btn btn--primary">
+                  Conectar com o token da loja
+                </Link>
+                <button type="button" className="btn btn--ghost" disabled title="Aguardando o Marthi ativar o app da Meta neste servidor">
+                  Conectar com a Meta
+                </button>
+              </div>
             </>
           ) : connected ? (
             <>
@@ -160,7 +165,11 @@ export function AdsAccountsPage() {
                 {status.connection?.expiresAt ? ` · autorização até ${new Date(status.connection.expiresAt).toLocaleDateString('pt-BR')}` : ''}
               </p>
               {status.connection?.status === 'needs_reconnect' ? <p className="ads-error">A autorização expirou ou foi removida. Conecte de novo.</p> : null}
-              {status.canAdmin ? (
+              {status.connection?.mode === 'store_token' ? (
+                <p className="ads-note">
+                  Conectada com o token da loja. Para trocar o token, testar ou desconectar, use <Link to="/painel/operacoes?tab=meta">Operações › Meta</Link>.
+                </p>
+              ) : status.canAdmin ? (
                 <div className="ads-actions">
                   <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void connect()}>
                     Conectar de novo
