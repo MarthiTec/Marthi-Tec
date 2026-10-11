@@ -896,6 +896,12 @@
 }
 
 /* Seletores no formulário da loja: mesmo rótulo, altura e borda dos campos de texto. */
+/* O botão do seletor não pode crescer com o texto da opção (empurrava o Ramo para baixo do Regime). */
+.multi-store-form-field .admin-picker,
+.multi-store-form-field .admin-picker__trigger {
+  min-width: 0;
+  max-width: 100%;
+}
 .multi-store-form-field .admin-picker {
   gap: 4px;
 }
@@ -905,6 +911,7 @@
   color: var(--admin-muted, #64748b);
 }
 .multi-store-form-field .admin-picker__value {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
