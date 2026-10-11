@@ -134,30 +134,58 @@ export function MetaStoreConnectionSection() {
         </ul>
       ) : null}
 
-      <div className="meta-store__form">
-        <label className="meta-store__token">
-          <span>{connected ? 'Trocar o token de acesso' : 'Token de acesso da loja *'}</span>
+      {/* Campos no padrão do sistema. O token não é campo de senha: assim o navegador não preenche sozinho
+          (nem coloca o e-mail no ID da Página); ele fica mascarado até clicar em Mostrar. */}
+      <div className="admin-form meta-store__form" role="group" aria-label="Dados da conexão Meta">
+        <label className="span-2">
+          {connected ? 'Trocar o token de acesso' : 'Token de acesso da loja *'}
           <div className="meta-store__token-row">
             <input
-              type={showToken ? 'text' : 'password'}
+              type="text"
+              name="marthi-meta-store-token"
+              className={showToken ? '' : 'meta-store__masked'}
               value={token}
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
               spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-form-type="other"
               placeholder="Cole aqui o token gerado no Gerenciador de Negócios (começa com EAA…)"
               onChange={(e) => setToken(e.target.value)}
             />
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowToken((value) => !value)}>
+            <button type="button" className="btn btn--ghost" onClick={() => setShowToken((value) => !value)}>
               {showToken ? 'Ocultar' : 'Mostrar'}
             </button>
           </div>
         </label>
         <label>
-          <span>ID da Página (opcional)</span>
-          <input value={pageId} inputMode="numeric" placeholder="Só se o token tiver mais de uma Página" onChange={(e) => setPageId(e.target.value)} />
+          ID da Página (opcional)
+          <input
+            type="text"
+            name="marthi-meta-page-id"
+            value={pageId}
+            inputMode="numeric"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            placeholder="Só se o token tiver mais de uma Página"
+            onChange={(e) => setPageId(e.target.value.replace(/[^\d]/g, ''))}
+          />
         </label>
         <label>
-          <span>ID da conta de anúncios (opcional)</span>
-          <input value={adAccountId} placeholder="act_… — só para anúncio pago" onChange={(e) => setAdAccountId(e.target.value)} />
+          ID da conta de anúncios (opcional)
+          <input
+            type="text"
+            name="marthi-meta-ad-account"
+            value={adAccountId}
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            placeholder="act_… — só para anúncio pago"
+            onChange={(e) => setAdAccountId(e.target.value.trim())}
+          />
         </label>
       </div>
 
@@ -172,7 +200,7 @@ export function MetaStoreConnectionSection() {
       {error ? <p className="ads-error">{error}</p> : null}
       {ok ? <p className="ads-ok">{ok}</p> : null}
 
-      <div className="ads-actions">
+      <div className="meta-store__actions">
         <button type="button" className="btn btn--primary" disabled={Boolean(busy) || !token.trim()} onClick={() => void save()}>
           {busy === 'save' ? 'Validando…' : 'Validar e salvar'}
         </button>

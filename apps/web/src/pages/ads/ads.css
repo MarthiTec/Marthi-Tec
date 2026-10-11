@@ -138,18 +138,11 @@
 .meta-store__current div { display: grid; gap: 2px; min-width: 0; }
 .meta-store__current small { color: var(--mute); font-size: 0.74rem; }
 .meta-store__current strong { overflow-wrap: anywhere; }
-.meta-store__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.meta-store__form label { display: grid; gap: 6px; min-width: 0; font-size: 0.82rem; font-weight: 650; color: var(--ink); }
-.meta-store__form input { width: 100%; min-height: 42px; box-sizing: border-box; }
-.meta-store__token { grid-column: 1 / -1; }
-.meta-store__token-row { display: flex; gap: 8px; align-items: center; }
-.meta-store__token-row input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .meta-store__test h3 { margin: 0 0 8px; font-size: 0.95rem; }
 .meta-store__guide { padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; }
 .meta-store__guide summary { cursor: pointer; font-weight: 700; }
 .meta-store__guide ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 0.88rem; line-height: 1.5; }
 .meta-store__guide code { margin: 0 3px; padding: 1px 6px; border-radius: 6px; background: var(--card-2, #f1f5f9); font-size: 0.8rem; }
-@media (max-width: 640px) { .meta-store__form { grid-template-columns: minmax(0, 1fr); } }
 
 /* Publicações no Instagram */
 .ig-posts__form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -174,3 +167,12 @@
 .ads-form-stack label { display: grid; gap: 0; }
 .ads-error-text { display: block; color: #dc2626; }
 :is(.admin--dark, .is-theme-dark) .ads-error-text { color: #fca5a5; }
+
+/* Conexão Meta: campos no padrão .admin-form; token mascarado sem ser campo de senha. */
+.meta-store__form .span-2 { grid-column: 1 / -1; }
+.meta-store__token-row { display: flex; gap: 8px; align-items: center; }
+.meta-store__token-row input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.meta-store__token-row .btn { min-height: 40px; white-space: nowrap; }
+.meta-store__masked { -webkit-text-security: disc; text-security: disc; }
+.meta-store__actions { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 10px; }
+@media (max-width: 640px) { .meta-store__form { grid-template-columns: minmax(0, 1fr); } }
