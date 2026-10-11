@@ -121,7 +121,38 @@ export function AdsAccountsPage() {
           {!status ? (
             <p className="empty">Carregando…</p>
           ) : !configOk ? (
-            <p className="empty">A integração com a Meta ainda não foi configurada no servidor do Marthi. Fale com o suporte — sem isso, não é possível conectar.</p>
+            <>
+              <p className="empty">
+                O botão de conexão é liberado assim que o Marthi ativar o app oficial da Meta neste servidor. Enquanto isso, deixe pronto o que a
+                conexão vai pedir:
+              </p>
+              <ul className="ads-checks">
+                <li className="is-bad">
+                  <span className="ads-checks__icon">1</span>
+                  <div>
+                    <strong>Conta do Facebook administradora da Página da loja</strong>
+                    <small>Quem conecta precisa ser administrador da Página (Configurações da Página › Acesso à Página).</small>
+                  </div>
+                </li>
+                <li className="is-bad">
+                  <span className="ads-checks__icon">2</span>
+                  <div>
+                    <strong>Conta de anúncios no Gerenciador de Anúncios</strong>
+                    <small>Em business.facebook.com › Contas de anúncios, com a Página vinculada.</small>
+                  </div>
+                </li>
+                <li className="is-bad">
+                  <span className="ads-checks__icon">3</span>
+                  <div>
+                    <strong>Forma de pagamento cadastrada na conta de anúncios</strong>
+                    <small>A cobrança dos anúncios é feita pela Meta, no cartão da loja.</small>
+                  </div>
+                </li>
+              </ul>
+              <button type="button" className="btn btn--primary" disabled title="Aguardando o Marthi ativar o app da Meta neste servidor">
+                Conectar com a Meta
+              </button>
+            </>
           ) : connected ? (
             <>
               <p>
