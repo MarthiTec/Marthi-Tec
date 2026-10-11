@@ -31,6 +31,15 @@ export async function markUnitsSold(
     if (entry) {
       await insertOutput(db, { ...input, kind: 'sale' }, entry.variation_id ?? input.variationId, entry.id, imei);
       remaining -= 1;
+    } else {
+      // Produto controlado por IMEI (entradas com IMEI): o IMEI precisa ser dele — o das entradas ou o do
+      // próprio cadastro. Produto sem controle por IMEI aceita o IMEI só como informação da venda.
+      const own = (await db.query(
+        `SELECT 1 FROM stock_items WHERE id = $1 AND store_id = $2 AND (imei = $3 OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(variations, '[]'::jsonb)) v WHERE v->>'imei' = $3)
+                OR NOT EXISTS (SELECT 1 FROM stock_supplier_entries e WHERE e.store_id = $2 AND e.stock_item_id = $1 AND jsonb_array_length(e.imeis) > 0))`,
+        [input.stockId, input.storeId, imei],
+      )).rows[0];
+      if (!own) throw httpError(`O IMEI ${imei} não pertence a este produto. Confira o aparelho vendido.`, 400);
     }
   }
 

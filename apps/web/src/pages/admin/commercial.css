@@ -95,3 +95,26 @@
 /* Abas no padrão do sistema + "Atualizar" ao lado. */
 .commercial-tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .commercial-tabs-row .stock-form-tabs { flex: 1 1 auto; margin: 0; }
+
+/* Regras comerciais: seções no padrão do sistema (campos de 40px, chips para dias/categorias). */
+.commercial-rules { display: grid; gap: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.commercial-rules__section { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.commercial-rules__section h4 { margin: 0; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
+.commercial-rules__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 12px; align-items: end; }
+.commercial-rules__switches { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 4px 14px; }
+.commercial-rules__label { font-size: 0.86rem; font-weight: 700; color: var(--ink); }
+.commercial-rules__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.commercial-rules__actions { display: flex; justify-content: flex-end; }
+.commercial-rules .commercial-field { font-size: 0.86rem; font-weight: 700; }
+.commercial-rules input:not([type="checkbox"]) { min-height: 40px; border-radius: 12px; padding: 0 12px; font-weight: 400; }
+.commercial-rules textarea { border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 400; }
+.commercial-rules .commercial-check { font-size: 0.9rem; }
+.commercial-rules .commercial-check input { width: 18px; height: 18px; margin: 0; accent-color: #0e7490; }
+
+/* Formulários de oferta/encomenda: campos alinhados no topo (sem esticar), botões no tamanho normal. */
+.commercial-form { align-items: start; }
+.commercial-form > .commercial-toolbar { grid-column: 1 / -1; justify-content: flex-end; margin: 4px 0 0; }
+.commercial-form input:not([type="checkbox"]), .commercial-form select { min-height: 40px; border-radius: 12px; padding: 0 12px; }
+.commercial-form textarea { border-radius: 12px; padding: 10px 12px; font: inherit; }
+.commercial-form .commercial-field { font-size: 0.86rem; font-weight: 700; }
+.commercial-toolbar .btn { flex: 0 0 auto; }

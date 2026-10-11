@@ -3,6 +3,7 @@ import { AdminPicker } from './AdminPicker';
 import { ATTRIBUTES_EVENT, getAttributes, hydrateAttributesFromApi, type PickedAttribute, type ProductAttribute } from '../data/attributeStore';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../data/multiStoreStore';
 import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode, productConditionChoices } from '../data/productCondition';
+import { compatibleVariations } from '../data/saleVariation';
 
 const valueKey=(value: string)=>value.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,'');
 function uniqueValues(values: string[]) {
@@ -10,11 +11,14 @@ function uniqueValues(values: string[]) {
  return values.filter(value=>{const key=valueKey(value);if(!key||seen.has(key))return false;seen.add(key);return true;});
 }
 
-export function SaleAttributeFields({ surface, picked = [], product, onChange }: {
+export function SaleAttributeFields({ surface, picked = [], product, onChange, onlyInStock = false }: {
  surface: 'pdv' | 'external'; picked?: PickedAttribute[];
- product?: { attrs?: Record<string, unknown>; color?: string; capacity?: string; variations?: Array<{ attrs?: Record<string, unknown>; condition?: string }> };
+ product?: { attrs?: Record<string, unknown>; color?: string; capacity?: string; variations?: any[] };
  onChange: (picked: PickedAttribute[]) => void;
+ /** Só as cores/capacidades/condições que o produto tem em estoque, filtradas entre si (venda externa). */
+ onlyInStock?: boolean;
 }) {
+ const gridded=onlyInStock && (product?.variations?.length ?? 0) > 0;
  const [attributes,setAttributes]=useState<ProductAttribute[]>(getAttributes);
  const [error,setError]=useState('');
  useEffect(()=>{
@@ -33,10 +37,14 @@ export function SaleAttributeFields({ surface, picked = [], product, onChange }:
    // dá para vender por encomenda uma cor que a loja ainda não tem; o valor novo é criado no atributo.
    const fromVariations=(product?.variations??[]).map(v=>v.attrs?.[attr.id]).filter((v):v is string=>typeof v==='string'&&Boolean(v));
    const fromProduct=Array.isArray(configured) ? configured.map(String) : typeof configured==='string' && configured ? [configured] : legacy ? [legacy] : [];
-   const options=uniqueValues([...fromVariations,...fromProduct,...attr.values]);
+   // Venda externa: só o que existe em estoque neste produto, compatível com o que já foi escolhido.
+   const options=gridded
+     ? uniqueValues(compatibleVariations(product as any,picked,{ignore:attr.id,onlyInStock:true}).map(v=>v.attrs?.[attr.id]).filter((v):v is string=>typeof v==='string'&&Boolean(v)))
+     : onlyInStock ? uniqueValues([...fromVariations,...fromProduct]) : uniqueValues([...fromVariations,...fromProduct,...attr.values]);
+   if(onlyInStock && !options.length && !picked.some(p=>p.id===attr.id)) return null;
    return <div key={attr.id} style={{flex:'1 1 150px',minWidth:0}}><AdminPicker label={attr.name} value={picked.find(p=>p.id===attr.id)?.value || ''} options={[{value:'',label:'Selecionar'},...options.map(value=>({value,label:value}))]} onChange={value=>onChange([...picked.filter(p=>p.id!==attr.id),...(value ? [{id:attr.id,name:attr.name,value}] : [])])}/></div>;
   })}
   {/* Grade com novo e usado da mesma cor/capacidade: a condição escolhe a variação (preço e estoque). */}
-  {productConditionChoices(product).length ? <div style={{flex:'1 1 150px',minWidth:0}}><AdminPicker label="Condição" value={conditionCode(picked.find(p=>p.id===CONDITION_ATTR_ID)?.value) || ''} options={[{value:'',label:'Selecionar'},...productConditionChoices(product).map(code=>({value:code,label:CONDITION_LABEL[code]}))]} onChange={value=>{const code=conditionCode(value);onChange([...picked.filter(p=>p.id!==CONDITION_ATTR_ID),...(code ? [{id:CONDITION_ATTR_ID,name:'Condição',value:CONDITION_LABEL[code]}] : [])]);}}/></div> : null}
+  {productConditionChoices(gridded ? { variations: compatibleVariations(product as any,picked,{ignore:CONDITION_ATTR_ID,onlyInStock:true}) } : product).length ? <div style={{flex:'1 1 150px',minWidth:0}}><AdminPicker label="Condição" value={conditionCode(picked.find(p=>p.id===CONDITION_ATTR_ID)?.value) || ''} options={[{value:'',label:'Selecionar'},...productConditionChoices(gridded ? { variations: compatibleVariations(product as any,picked,{ignore:CONDITION_ATTR_ID,onlyInStock:true}) } : product).map(code=>({value:code,label:CONDITION_LABEL[code]}))]} onChange={value=>{const code=conditionCode(value);onChange([...picked.filter(p=>p.id!==CONDITION_ATTR_ID),...(code ? [{id:CONDITION_ATTR_ID,name:'Condição',value:CONDITION_LABEL[code]}] : [])]);}}/></div> : null}
  </div>;
 }

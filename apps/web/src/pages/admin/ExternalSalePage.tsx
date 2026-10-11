@@ -66,6 +66,7 @@ import type { StockVariationRow, SupplierEntry } from '../../data/adminStore';
 import { StockSearchPicker, type StockPick } from '../../components/StockSearchPicker';
 import { QuickStockRegisterModal, type QuickStockResult } from '../../components/QuickStockRegisterModal';
 import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode } from '../../data/productCondition';
+import { availableImeis, lineVariation } from '../../data/saleVariation';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -306,6 +307,16 @@ export function ExternalSalePage() {
     return { attributes, price: chosen && Number(chosen.price) > 0 ? Number(chosen.price) : undefined };
   }
 
+  /** IMEI da linha: o atual se ainda está em estoque nessa variação; se só há um, ele; senão, vazio. */
+  function imeiFor(prod: StockOption | undefined, attributes: Array<{ id: string; value: string }>, current?: string) {
+    if (!prod) return '';
+    const variation = lineVariation(prod, attributes);
+    if (prod.variations?.length && !variation) return '';
+    const imeis = availableImeis(prod, variation);
+    if (current && imeis.includes(current)) return current;
+    return imeis.length === 1 ? imeis[0] : '';
+  }
+
   /** Produto escolhido na busca: pelo IMEI já vem a variação e o IMEI do aparelho. */
   function handleLinePick(index: number, pick: StockPick<StockOption>, items: StockOption[] = stockItems) {
     const prod = items.find((p) => p.id === pick.product.id) ?? pick.product;
@@ -323,7 +334,7 @@ export function ExternalSalePage() {
               name: prod.name,
               unitPrice: auto.price ?? prod.price,
               unitCost: prod.cost,
-              imei: pick.imei || prod.imei || '',
+              imei: pick.imei || imeiFor(prod, auto.attributes, ''),
             },
       ),
     );
@@ -473,6 +484,25 @@ export function ExternalSalePage() {
     if (lines.length === 0 || lines.some(line => !line.stockId || !line.name || Number(line.qty) <= 0)) {
       setError('Adicione ao menos um produto válido na venda.');
       return;
+    }
+    // Aparelho com IMEI em estoque: a linha precisa do IMEI (um por linha) para a baixa ficar vinculada.
+    for (const [index, line] of lines.entries()) {
+      const prod = stockItems.find((p) => p.id === line.stockId);
+      if (!prod) continue;
+      const variation = lineVariation(prod, line.attributes ?? []);
+      if (prod.variations?.length && !variation) {
+        setError(`Item ${index + 1}: escolha a cor, a capacidade e a condição disponíveis.`);
+        return;
+      }
+      const imeis = availableImeis(prod, variation);
+      if (imeis.length && !imeis.includes(String(line.imei ?? '').trim())) {
+        setError(`Item ${index + 1}: escolha o IMEI do aparelho vendido.`);
+        return;
+      }
+      if (imeis.length && Number(line.qty) !== 1) {
+        setError(`Item ${index + 1}: aparelhos com IMEI são vendidos um por linha. Use "Adicionar outro produto" para o próximo.`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -683,7 +713,7 @@ export function ExternalSalePage() {
                     />
                   </div>
                   <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId, deliveryAddress, price) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, pickupMethodId, deliveryAddress, unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), entry.attributes ?? [], pickupMethodId) ?? price ?? entry.unitPrice } : entry)))} />
-                  <SaleAttributeFields surface="external" product={stockItems.find((p) => p.id === line.stockId)} picked={line.attributes} onChange={(attributes) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, attributes, unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), attributes, entry.pickupMethodId) ?? entry.unitPrice } : entry)))} />
+                  <SaleAttributeFields surface="external" onlyInStock product={stockItems.find((p) => p.id === line.stockId)} picked={line.attributes} onChange={(attributes) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, attributes, imei: imeiFor(stockItems.find((p) => p.id === entry.stockId), attributes, entry.imei), unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), attributes, entry.pickupMethodId) ?? entry.unitPrice } : entry)))} />
                   <div>
                     <label className="admin-label">Quantidade</label>
                     <input type="number" min="1" className="admin-input" value={line.qty} onChange={(e) => handleLineFieldChange(idx, 'qty', Number(e.target.value))} />
@@ -692,10 +722,32 @@ export function ExternalSalePage() {
                     <label className="admin-label">Preço de venda (R$)</label>
                     <CurrencyInput className="admin-input" value={line.unitPrice} onChange={(value) => handleLineFieldChange(idx, 'unitPrice', value)} ariaLabel="Preço de venda" />
                   </div>
-                  <div>
-                    <label className="admin-label">IMEI (se houver)</label>
-                    <input type="text" className="admin-input" placeholder="3542…" value={line.imei || ''} onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value)} />
-                  </div>
+                  {(() => {
+                    // IMEI do aparelho vendido: escolhido entre os que estão em estoque nesta variação (vínculo da baixa).
+                    const prod = stockItems.find((p) => p.id === line.stockId);
+                    const variation = lineVariation(prod, line.attributes ?? []);
+                    const imeis = prod && (variation || !prod.variations?.length) ? availableImeis(prod, variation) : [];
+                    if (!imeis.length) {
+                      return (
+                        <div>
+                          <label className="admin-label">IMEI</label>
+                          <input type="text" className="admin-input" disabled value={prod?.variations?.length && !variation ? 'Escolha cor e capacidade' : 'Sem IMEI cadastrado'} readOnly />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div>
+                        <AdminPicker
+                          label={`IMEI do aparelho (${imeis.length} em estoque)`}
+                          value={line.imei || ''}
+                          searchable
+                          placeholder="Escolha o IMEI"
+                          options={imeis.map((imei) => ({ value: imei, label: imei }))}
+                          onChange={(imei) => handleLineFieldChange(idx, 'imei', imei)}
+                        />
+                      </div>
+                    );
+                  })()}
                   {linePromos[idx] ? (
                     <div className="external-sale-wide-field xsale-promo" role="status">
                       <span className="xsale-promo__tag">Campanha</span>

@@ -854,3 +854,14 @@ const sender = async (storeId, phone, text) => { if (storeId === 'store-a' && te
   // Outra loja não vê o registro.
   assert.equal((await request('/order-reminders', 'GET', undefined, 'store-b')).status === 403 || !(await request('/order-reminders', 'GET', undefined, 'store-b')).json.data?.some((r) => r.refId === 'PK-REM-1'), true);
 });
+
+test('external sale refuses an IMEI that does not belong to the product', async () => {
+  const item = (await request('/stock', 'POST', { name: 'IPHONE 13 IMEI ALHEIO', kind: 'device', qty: 0, price: 2000 })).json.data;
+  await request('/stock/' + item.id + '/entries', 'POST', { entry: { qty: 1, unitCost: 1500, imeis: ['357700000000001'], payment: 'none' } });
+  const wrong = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 2000, imei: '999999999999999' }] });
+  assert.equal(wrong.status, 400, JSON.stringify(wrong.json));
+  assert.match(wrong.json.error?.message ?? '', /não pertence/);
+  assert.equal((await request('/stock')).json.data.find((p) => p.id === item.id).qty, 1, 'nothing left the stock');
+  const right = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 2000, imei: '357700000000001' }] });
+  assert.equal(right.status, 201, JSON.stringify(right.json));
+});

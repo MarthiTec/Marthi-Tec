@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { ReportShareActions } from '../../components/ReportShareActions';
 import { QuickModal } from '../../components/QuickModal';
 import { findBrand, useBrands } from '../../data/brandStore';
 import { getActiveStore, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -274,9 +275,18 @@ export function ImeiReportPage() {
             <h2>Estoque por IMEI</h2>
             <p className="empty">Cada aparelho com modelo, custo, venda, entrada e saída. Clique no IMEI para ver o histórico. Vendido sai do estoque sozinho; bonificação, uso interno e perda pelo botão “Dar baixa”.</p>
           </div>
-          <button type="button" className="btn btn--primary" disabled={loading || !visible.length} onClick={print}>
-            Imprimir
-          </button>
+          <ReportShareActions
+            title={`Estoque por IMEI — ${store?.tradeName || store?.name || ''}`}
+            disabled={loading || !visible.length}
+            onPrint={print}
+            lines={[
+              `Emitido em ${new Date().toLocaleString('pt-BR')} · ${STATUS_OPTIONS.find((o) => o.value === status)?.label ?? ''}`,
+              `${totals.count} ${totals.count === 1 ? 'aparelho' : 'aparelhos'} · custo ${money(totals.cost)} · venda ${money(totals.price)}${totals.sold ? ` · lucro nas vendas ${money(totals.profit)}` : ''}`,
+              '',
+              ...visible.slice(0, 40).map((row) => `${row.imei} · ${modelOf(row)}${attrsOf(row) ? ` · ${attrsOf(row)}` : ''} · ${IMEI_STATUS_LABEL[row.status]} · ${money(row.price)}`),
+              visible.length > 40 ? `… e mais ${visible.length - 40} aparelhos` : '',
+            ]}
+          />
         </div>
         {error ? <p role="alert" className="qty-low">{error}</p> : null}
         {notice ? <p className="imei-report__notice">{notice}</p> : null}

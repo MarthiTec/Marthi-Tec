@@ -110,3 +110,8 @@
 .imei-history__item > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .imei-history__item small { color: var(--mute); }
 .imei-history__item p { margin: 2px 0 6px; font-size: 0.86rem; color: var(--mute); }
+
+/* Enviar o relatório (WhatsApp, e-mail) e imprimir */
+.report-share { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.report-share .btn { display: inline-flex; align-items: center; gap: 6px; }
+.report-share .admin-ico { width: 16px; height: 16px; }

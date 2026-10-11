@@ -398,140 +398,121 @@ export function CommercialPage({
             Nenhuma política é ativada automaticamente: preencha as regras
             desta loja e salve — elas ficam gravadas no banco.
           </p>
-          <fieldset
-            disabled={!state.canConfigure || busy}
-            className="commercial-form"
-          >
-            <AdminPicker
-              label="Ramo vinculado"
-              value={profile.segmentId}
-              options={STORE_SEGMENT_OPTIONS}
-              onChange={(v) => profileField("segmentId", v)}
-            />
-            {checkRow("Ativar operação de encomendas", profile.enabled, (v) =>
-              profileField("enabled", v),
-            )}
-            {checkRow(
-              "Aplicar regras Apple por categoria",
-              profile.appleRules,
-              (v) => profileField("appleRules", v),
-            )}
-            {checkRow(
-              "Permitir upgrade / avaliação de usados",
-              profile.tradeIn,
-              (v) => profileField("tradeIn", v),
-            )}
-            {checkRow(
-              "Exigir menor custo para novos encomendados",
-              profile.supplierComparison,
-              (v) => profileField("supplierComparison", v),
-            )}
-            {checkRow(
-              "Gerar tabela comercial para WhatsApp",
-              profile.catalog,
-              (v) => profileField("catalog", v),
-            )}
-            {(
-              [
-                "readyMarkup",
-                "orderMarkup",
-                "upgradeMarkup",
-                "usedWarrantyMonths",
-                "readyUsedWarrantyMonths",
-              ] as const
-            ).map((k) => (
-              <Field
-                key={k}
-                label={
-                  {
-                    readyMarkup: "Pronta entrega: acréscimo sobre custo (%)",
-                    orderMarkup: "Encomenda: acréscimo sobre custo (%)",
-                    upgradeMarkup: "Upgrade encomendado: acréscimo (%)",
-                    usedWarrantyMonths:
-                      "Garantia mínima do fornecedor para seminovo (meses)",
-                    readyUsedWarrantyMonths:
-                      "Garantia da loja para seminovo pronto (meses)",
-                  }[k]
-                }
-              >
-                <input
-                  type="number"
-                  min="0"
-                  max={k.includes("Warranty") ? 120 : 1000}
-                  step={k.includes("Warranty") ? 1 : 0.01}
-                  value={profile[k]}
-                  onChange={(e) => profileField(k, Number(e.target.value))}
+          <fieldset disabled={!state.canConfigure || busy} className="commercial-rules">
+            <section className="commercial-rules__section">
+              <h4>Operação</h4>
+              <div className="commercial-rules__grid">
+                <AdminPicker
+                  label="Ramo vinculado"
+                  value={profile.segmentId}
+                  options={STORE_SEGMENT_OPTIONS}
+                  onChange={(v) => profileField("segmentId", v)}
                 />
+              </div>
+              <div className="commercial-rules__switches">
+                {checkRow("Ativar operação de encomendas", profile.enabled, (v) => profileField("enabled", v))}
+                {checkRow("Aplicar regras Apple por categoria", profile.appleRules, (v) => profileField("appleRules", v))}
+                {checkRow("Permitir upgrade / avaliação de usados", profile.tradeIn, (v) => profileField("tradeIn", v))}
+                {checkRow("Exigir menor custo para novos encomendados", profile.supplierComparison, (v) => profileField("supplierComparison", v))}
+                {checkRow("Gerar tabela comercial para WhatsApp", profile.catalog, (v) => profileField("catalog", v))}
+              </div>
+            </section>
+
+            <section className="commercial-rules__section">
+              <h4>Preços e garantias</h4>
+              <div className="commercial-rules__grid">
+                {(
+                  [
+                    "readyMarkup",
+                    "orderMarkup",
+                    "upgradeMarkup",
+                    "usedWarrantyMonths",
+                    "readyUsedWarrantyMonths",
+                  ] as const
+                ).map((k) => (
+                  <Field
+                    key={k}
+                    label={
+                      {
+                        readyMarkup: "Pronta entrega: acréscimo sobre custo (%)",
+                        orderMarkup: "Encomenda: acréscimo sobre custo (%)",
+                        upgradeMarkup: "Upgrade encomendado: acréscimo (%)",
+                        usedWarrantyMonths: "Garantia mínima do fornecedor para seminovo (meses)",
+                        readyUsedWarrantyMonths: "Garantia da loja para seminovo pronto (meses)",
+                      }[k]
+                    }
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      max={k.includes("Warranty") ? 120 : 1000}
+                      step={k.includes("Warranty") ? 1 : 0.01}
+                      value={profile[k]}
+                      onChange={(e) => profileField(k, Number(e.target.value))}
+                    />
+                  </Field>
+                ))}
+              </div>
+            </section>
+
+            <section className="commercial-rules__section">
+              <h4>Recebimento</h4>
+              <div className="commercial-rules__grid">
+                <Field label="Horário esperado de chegada">
+                  <input type="time" value={profile.arrivalTime} onChange={(e) => profileField("arrivalTime", e.target.value)} required />
+                </Field>
+                <Field label="Horário de corte de pedido">
+                  <input type="time" value={profile.cutoffTime} onChange={(e) => profileField("cutoffTime", e.target.value)} required />
+                </Field>
+              </div>
+              <span className="commercial-rules__label">Dias de recebimento previstos</span>
+              <div className="commercial-rules__chips">
+                {["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"].map((day, i) => {
+                  const on = profile.receiptDays.includes(i);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      className={`stock-attr-pill ${on ? "is-selected" : ""}`}
+                      aria-pressed={on}
+                      onClick={() => profileField("receiptDays", on ? profile.receiptDays.filter((d) => d !== i) : [...profile.receiptDays, i])}
+                    >
+                      {on ? "✓ " : ""}
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+              <Field label="Rotas / origens (uma por linha)">
+                <textarea rows={3} value={profile.routes.join("\n")} onChange={(e) => profileField("routes", e.target.value.split("\n"))} />
               </Field>
-            ))}
-            <Field label="Horário esperado de chegada">
-              <input
-                type="time"
-                value={profile.arrivalTime}
-                onChange={(e) => profileField("arrivalTime", e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Horário de corte de pedido">
-              <input
-                type="time"
-                value={profile.cutoffTime}
-                onChange={(e) => profileField("cutoffTime", e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Rotas / origens (uma por linha)">
-              <textarea
-                value={profile.routes.join("\n")}
-                onChange={(e) =>
-                  profileField("routes", e.target.value.split("\n"))
-                }
-              />
-            </Field>
-            <div>
-              <strong>Dias de recebimento previstos</strong>
-              {[
-                "Domingo",
-                "Segunda",
-                "Terça",
-                "Quarta",
-                "Quinta",
-                "Sexta",
-                "Sábado",
-              ].map((day, i) => (
-                <span key={day}>
-                  {checkRow(day, profile.receiptDays.includes(i), (v) =>
-                    profileField(
-                      "receiptDays",
-                      v
-                        ? [...profile.receiptDays, i]
-                        : profile.receiptDays.filter((d) => d !== i),
-                    ),
-                  )}
-                </span>
-              ))}
-            </div>
-            <div>
-              <strong>Categorias na tabela</strong>
-              {categories.map((c) => (
-                <span key={c.value}>
-                  {checkRow(
-                    c.label,
-                    profile.categories.includes(c.value),
-                    (v) =>
-                      profileField(
-                        "categories",
-                        v
-                          ? [...profile.categories, c.value]
-                          : profile.categories.filter((k) => k !== c.value),
-                      ),
-                  )}
-                </span>
-              ))}
-            </div>
-            <div className="commercial-toolbar">
+            </section>
+
+            <section className="commercial-rules__section">
+              <h4>Tabela comercial (WhatsApp)</h4>
+              <span className="commercial-rules__label">Categorias que entram na tabela</span>
+              <div className="commercial-rules__chips">
+                {categories.map((c) => {
+                  const on = profile.categories.includes(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className={`stock-attr-pill ${on ? "is-selected" : ""}`}
+                      aria-pressed={on}
+                      onClick={() => profileField("categories", on ? profile.categories.filter((k) => k !== c.value) : [...profile.categories, c.value])}
+                    >
+                      {on ? "✓ " : ""}
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="commercial-rules__actions">
               <button className="btn btn--primary" type="submit">
-                Salvar regras no banco
+                Salvar regras
               </button>
             </div>
           </fieldset>

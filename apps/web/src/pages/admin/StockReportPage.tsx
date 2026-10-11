@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { ReportShareActions } from '../../components/ReportShareActions';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import type { StockItem, StockVariationRow, SupplierEntry } from '../../data/adminStore';
 import { findBrand, useBrands } from '../../data/brandStore';
@@ -410,9 +411,23 @@ export function StockReportPage() {
             <h2>Relatório de estoque</h2>
             <p className="empty">Escolha os filtros, as colunas e a ordem. Por aparelho, cada IMEI vira uma linha com fornecedor, custo, bateria e data de entrada.</p>
           </div>
-          <button type="button" className="btn btn--primary" disabled={loading || !visible.length} onClick={print}>
-            Imprimir relatório
-          </button>
+          <ReportShareActions
+            title={`Relatório de estoque — ${store?.tradeName || store?.name || ''}`}
+            disabled={loading || !visible.length}
+            onPrint={print}
+            lines={[
+              `Emitido em ${new Date().toLocaleString('pt-BR')}`,
+              filtersText ? `Filtros: ${filtersText}` : '',
+              `${totals.units} ${totals.units === 1 ? 'unidade' : 'unidades'} · compra ${money(totals.cost)} · venda ${money(totals.price)}`,
+              '',
+              ...visible.slice(0, 40).map((row) =>
+                [row.name, ...usedAttributes.map((attr) => row.attrs[attr.id]).filter(Boolean), CONDITION_LABEL[row.condition as keyof typeof CONDITION_LABEL] ?? row.condition, row.imei ? `IMEI ${row.imei}` : '', money(row.price)]
+                  .filter(Boolean)
+                  .join(' · '),
+              ),
+              visible.length > 40 ? `… e mais ${visible.length - 40} linhas` : '',
+            ].filter((line, index, list) => line !== '' || (index > 0 && list[index - 1] !== ''))}
+          />
         </div>
         {error ? <p role="alert" className="qty-low">{error}</p> : null}
         <div className="admin-form stock-report__grid">
