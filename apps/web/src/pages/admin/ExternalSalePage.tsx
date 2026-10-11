@@ -57,7 +57,7 @@ type StockOption = {
 };
 
 import { QuickAddButton } from '../../components/QuickModal';
-import { QuickCreateCustomer } from '../../components/QuickCreate';
+import { QuickCreateCustomer, QuickCreateSeller } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
 
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
@@ -107,6 +107,7 @@ export function ExternalSalePage() {
   // Cliente
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+  const [quickSellerOpen, setQuickSellerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [customerName, setCustomerName] = useState('Consumidor Final');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -486,6 +487,10 @@ export function ExternalSalePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting || loading || storeRef.current !== getActiveStoreId()) { setError('Aguarde o carregamento da loja ativa.'); return; }
+    if (!selectedSellerId) {
+      setError(sellers.length ? 'Escolha o vendedor responsável pela venda.' : 'Cadastre o vendedor responsável em "Novo vendedor" antes de concluir a venda.');
+      return;
+    }
     if (lines.length === 0 || lines.some(line => !line.stockId || !line.name || Number(line.qty) <= 0)) {
       setError('Adicione ao menos um produto válido na venda.');
       return;
@@ -631,19 +636,26 @@ export function ExternalSalePage() {
             <h2 className="xsale-card__title"><span className="xsale-step">1</span> Cliente e vendedor</h2>
             <div className="xsale-grid">
               <div className="xsale-field">
+                {/* Vendedor da venda (metas e comissões): só vendedores cadastrados, nunca o usuário logado por padrão. */}
                 <AdminPicker
-                  label="Vendedor responsável"
+                  label="Vendedor responsável *"
                   value={selectedSellerId}
-                  options={[
-                    { value: '', label: sellerName ? `${sellerName} (você)` : 'Quem está logado' },
-                    ...sellers.map((seller) => ({ value: seller.id, label: seller.name })),
-                  ]}
+                  placeholder={sellers.length ? 'Escolha o vendedor' : 'Nenhum vendedor cadastrado'}
+                  searchable={sellers.length > 6}
+                  options={sellers.map((seller) => ({ value: seller.id, label: seller.name }))}
                   onChange={setSelectedSellerId}
                 />
-                {sellers.length === 0 ? (
-                  <small className="xsale-muted">
-                    Nenhum vendedor cadastrado. <Link to="/erp/pessoas?aba=vendedores">Cadastrar vendedores</Link>
-                  </small>
+                <div className="quick-field__actions">
+                  <QuickAddButton label="Novo vendedor" onClick={() => setQuickSellerOpen(true)} />
+                </div>
+                {quickSellerOpen ? (
+                  <QuickCreateSeller
+                    onClose={() => setQuickSellerOpen(false)}
+                    onCreated={(seller) => {
+                      setSellers((current) => [...current.filter((item) => item.id !== seller.id), { id: seller.id, name: seller.name }].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+                      setSelectedSellerId(seller.id);
+                    }}
+                  />
                 ) : null}
               </div>
               <div className="xsale-field">
@@ -1056,7 +1068,7 @@ export function ExternalSalePage() {
         </div>
       ) : null}
       {historyOpen ? <ExternalSalesHistory onClose={() => setHistoryOpen(false)} /> : null}
-      {createdReceipt ? <WarrantyReceiptModal receipt={createdReceipt} onClose={() => setCreatedReceipt(null)} onNewSale={handleResetForm} /> : null}
+      {createdReceipt ? <WarrantyReceiptModal receipt={createdReceipt} onClose={handleResetForm} onNewSale={handleResetForm} /> : null}
       {showPickupModal ? (
         <CashPickupModal onClose={() => setShowPickupModal(false)} onSuccess={() => alert('Recolhimento registrado com sucesso no financeiro!')} />
       ) : null}

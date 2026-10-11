@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import './goalsPages.css';
 import { getActiveStore } from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
-import { apiGetSalesGoalsReport, apiListCustomers, apiListGoals, type GoalRow } from '../../services/erpApi';
+import { apiGetSalesGoalsReport, apiListCustomers, apiListGoals, apiListSellers, type GoalRow } from '../../services/erpApi';
 import { jsPDF } from 'jspdf';
 
 export function SalesGoalsReportPage() {
@@ -18,7 +18,9 @@ export function SalesGoalsReportPage() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
   });
+  // Filtro pelo id do vendedor cadastrado (antes ia o nome e o filtro nunca encontrava vendas).
   const [sellerName, setSellerName] = useState('all');
+  const [sellerOptions, setSellerOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [paymentMethod, setPaymentMethod] = useState('all');
   const [saleType, setSaleType] = useState('all');
   const [customerId, setCustomerId] = useState('all');
@@ -30,6 +32,9 @@ export function SalesGoalsReportPage() {
   useEffect(() => {
     apiListCustomers().then((c) => setCustomers(Array.isArray(c) ? c : [])).catch(() => {});
     apiListGoals().then((g) => setGoals(Array.isArray(g) ? g : [])).catch(() => {});
+    apiListSellers()
+      .then((list) => setSellerOptions(list.map((item) => ({ id: item.id, name: item.name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))))
+      .catch(() => setSellerOptions([]));
   }, []);
 
   async function fetchReport() {
@@ -219,7 +224,7 @@ export function SalesGoalsReportPage() {
           marginBottom: '20px',
         }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+        <div className="goals-filters">
           <div>
             <label className="admin-label">Data Inicial</label>
             <input
@@ -246,7 +251,7 @@ export function SalesGoalsReportPage() {
               value={sellerName}
               options={[
                 { value: 'all', label: 'Todos os Vendedores' },
-                ...Array.from(new Set(goals.map(g => g.sellerName).filter((name): name is string => Boolean(name)))).map(name => ({ value: name, label: name })),
+                ...sellerOptions.map((seller) => ({ value: seller.id, label: seller.name })),
               ]}
               onChange={(val) => setSellerName(val)}
             />

@@ -142,6 +142,9 @@ export function SaleReceiptDocument({ receipt }: { receipt: SaleReceipt }) {
         {f.surcharge > 0 ? <div><span>Acréscimo</span><span>{money(f.surcharge)}</span></div> : null}
         {f.tradeInCredit > 0 ? <div><span>Crédito do aparelho usado</span><span>- {money(f.tradeInCredit)}</span></div> : null}
         <div className="is-total"><span>Total pago</span><span>{money(f.totalPaid)}</span></div>
+        {(f.installments ?? 1) > 1 ? (
+          <div><span>Parcelado em</span><span>{f.installments}x de {money(f.totalPaid / (f.installments || 1))}</span></div>
+        ) : null}
       </section>
 
       <section className="sale-receipt__box sale-receipt__warranty">

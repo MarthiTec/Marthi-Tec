@@ -68,7 +68,7 @@ test('external sale fills the legacy amount/payment columns from the current one
   const methods = (await request('/pickup-methods')).json.data;
   const immediate = methods.find((m) => m.kind === 'immediate');
   const stock = (await request('/stock', 'POST', { name: 'IPHONE 16', kind: 'device', qty: 2, price: 4650 })).json.data;
-  const sale = await request('/sales/external', 'POST', { lines: [{ stockId: stock.id, name: 'IPHONE 16', qty: 1, unitPrice: 4650, pickupMethodId: immediate.id }], paymentMethod: 'Pix' });
+  const sale = await request('/sales/external', 'POST', { sellerId: (await query("SELECT id FROM sellers ORDER BY created_at LIMIT 1")).rows[0].id, lines: [{ stockId: stock.id, name: 'IPHONE 16', qty: 1, unitPrice: 4650, pickupMethodId: immediate.id }], paymentMethod: 'Pix' });
   assert.equal(sale.status, 201, JSON.stringify(sale.json));
   const row = (await query('SELECT amount, payment, final_amount FROM sales_orders WHERE id=$1', [sale.json.data.id])).rows[0];
   assert.equal(Number(row.amount), Number(row.final_amount));
@@ -79,7 +79,7 @@ test('external sales can be listed, searched and are scoped to the store', async
   const methods = (await request('/pickup-methods')).json.data;
   const immediate = methods.find((m) => m.kind === 'immediate');
   const stock = (await request('/stock', 'POST', { name: 'CAPINHA', kind: 'part', qty: 5, price: 50 })).json.data;
-  const sale = await request('/sales/external', 'POST', { customerName: 'Ana Paula', customerPhone: '24999990000', lines: [{ stockId: stock.id, name: 'CAPINHA', qty: 2, unitPrice: 50, pickupMethodId: immediate.id }], paymentMethod: 'Cartão de Crédito', installments: 18 });
+  const sale = await request('/sales/external', 'POST', { sellerId: (await query("SELECT id FROM sellers ORDER BY created_at LIMIT 1")).rows[0].id, customerName: 'Ana Paula', customerPhone: '24999990000', lines: [{ stockId: stock.id, name: 'CAPINHA', qty: 2, unitPrice: 50, pickupMethodId: immediate.id }], paymentMethod: 'Cartão de Crédito', installments: 18 });
   assert.equal(sale.status, 201, JSON.stringify(sale.json));
   const list = await request('/sales/external');
   assert.equal(list.status, 200, JSON.stringify(list.json));

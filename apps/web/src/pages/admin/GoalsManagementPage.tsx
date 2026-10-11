@@ -32,6 +32,7 @@ export function GoalsManagementPage() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
   });
+  const [openEnded, setOpenEnded] = useState(false);
   const [sellerId, setSellerId] = useState('');
   const [sellers, setSellers] = useState<Array<{id: string; name: string}>>([]);
   const [active, setActive] = useState(true);
@@ -76,6 +77,7 @@ export function GoalsManagementPage() {
     const d = new Date();
     setStartDate(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10));
     setEndDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10));
+    setOpenEnded(false);
     setSellerId('');
     setActive(true);
     setProgressiveTiers([]);
@@ -96,18 +98,11 @@ export function GoalsManagementPage() {
     setTargetValue(g.targetValue);
     setStartDate(g.startDate?.slice(0, 10) || '');
     setEndDate(g.endDate?.slice(0, 10) || '');
+    setOpenEnded(!g.endDate);
     setSellerId(g.sellerId || '');
     setActive(g.active);
-    setProgressiveTiers(
-      Array.isArray(g.progressiveTiers) && g.progressiveTiers.length > 0
-        ? g.progressiveTiers
-        : [
-            { name: 'Meta Base', value: 50000 },
-            { name: 'Meta Principal', value: 70000 },
-            { name: 'Alta Performance', value: 90000 },
-            { name: 'Excepcional', value: 120000 },
-          ],
-    );
+    // Níveis vêm só do que foi salvo na meta.
+    setProgressiveTiers(Array.isArray(g.progressiveTiers) ? g.progressiveTiers : []);
     setCommPercent(g.commissionRules?.percent ?? 0);
     setFixedValue(g.commissionRules?.fixedValue ?? 0);
     setCommType(g.commissionRules?.type ?? 'percent_revenue');
@@ -125,6 +120,7 @@ export function GoalsManagementPage() {
     setTargetValue(g.targetValue);
     setStartDate(g.startDate?.slice(0, 10) || '');
     setEndDate(g.endDate?.slice(0, 10) || '');
+    setOpenEnded(!g.endDate);
     setSellerId(g.sellerId || '');
     setActive(true);
     setProgressiveTiers(g.progressiveTiers || []);
@@ -158,7 +154,7 @@ export function GoalsManagementPage() {
         goalType,
         targetValue: Number(targetValue) || 0,
         startDate,
-        endDate,
+        endDate: openEnded ? null : endDate,
         sellerId: sellerId || null,
         active,
         progressiveTiers,
@@ -375,7 +371,7 @@ export function GoalsManagementPage() {
                 padding: '12px',
               }}
             >
-              <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Comissão Mariana</span>
+              <span style={{ fontSize: '0.74rem', color: 'var(--mute)' }}>Comissão · {mainGoal.sellerId ? mainGoal.sellerName : 'equipe'}</span>
               <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--goals-warning)' }}>
                 R$ {mainGoal.commissionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
@@ -449,12 +445,13 @@ export function GoalsManagementPage() {
                     </td>
                     <td>{g.sellerName}</td>
                     <td>
-                      {new Date(g.startDate).toLocaleDateString('pt-BR')} até{' '}
-                      {new Date(g.endDate).toLocaleDateString('pt-BR')}
+                      {g.endDate
+                        ? `${new Date(g.startDate).toLocaleDateString('pt-BR')} até ${new Date(g.endDate).toLocaleDateString('pt-BR')}`
+                        : `Desde ${new Date(g.startDate).toLocaleDateString('pt-BR')} · ${g.reachedAt ? `batida em ${new Date(g.reachedAt).toLocaleDateString('pt-BR')}` : 'até bater a meta'}`}
                     </td>
                     <td>
                       <span className={g.active ? 'admin-badge admin-badge--active' : 'admin-badge'}>
-                        {g.active ? 'Ativa' : 'Inativa'}
+                        {!g.active ? 'Inativa' : !g.endDate && g.reachedAt ? 'Concluída' : 'Ativa'}
                       </span>
                     </td>
                     <td className="admin-table__actions" onClick={(e) => e.stopPropagation()}>
@@ -490,7 +487,7 @@ export function GoalsManagementPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSave}>
+            <form onSubmit={handleSave} className="goals-form">
               <fieldset disabled={readOnly || saving} style={{border:0,padding:0,margin:0,minWidth:0}}>
               <div className="admin-modal__body" style={{ padding: '16px', maxHeight: '76vh', overflowY: 'auto' }}>
                 {error && (
@@ -509,7 +506,7 @@ export function GoalsManagementPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="goals-form__row goals-form__row--name">
                   <div>
                     <label className="admin-label">Nome da Meta</label>
                     <input
@@ -535,7 +532,7 @@ export function GoalsManagementPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                <div className="goals-form__row goals-form__row--3">
                   <div>
                     <label className="admin-label">Valor da Meta (R$)</label>
                     <input
@@ -563,17 +560,25 @@ export function GoalsManagementPage() {
                     <input
                       type="date"
                       className="admin-input"
-                      value={endDate}
+                      value={openEnded ? '' : endDate}
+                      min={startDate}
+                      disabled={openEnded}
                       onChange={(e) => setEndDate(e.target.value)}
-                      required
+                      required={!openEnded}
                     />
                   </div>
                 </div>
+                <label className="goals-form__check">
+                  <input type="checkbox" checked={openEnded} onChange={(e) => setOpenEnded(e.target.checked)} />
+                  <span>
+                    Sem data final: vale até bater a meta
+                    <small>Conta as vendas a partir da data inicial e termina na venda que atingir o valor.</small>
+                  </span>
+                </label>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div className="goals-form__row goals-form__row--2">
                   <div>
-                    <label className="admin-label">Vendedor ou Equipe</label>
-                    <AdminPicker label="Vendedor" value={sellerId}
+                    <AdminPicker label="Vendedor ou equipe" value={sellerId}
                       options={[{value: '', label: 'Toda a equipe'}, ...sellers.map(s => ({value: s.id, label: s.name}))]}
                       onChange={setSellerId} />
                   </div>

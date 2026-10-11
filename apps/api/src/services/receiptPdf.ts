@@ -180,6 +180,12 @@ export async function buildReceiptPdf(receipt: ReceiptData, fallbackQrUrl = ''):
   text('Total pago', tx + 4, ty + 3, { size: 11, bold: true });
   text(money(f.totalPaid), W - M - 4, ty + 3, { size: 11, bold: true, align: 'right' });
   y += totalsH + 4;
+  // Parcelamento combinado com o cliente (sem detalhar juros).
+  if ((f.installments ?? 1) > 1) {
+    ensure(6);
+    text(`Parcelado em ${f.installments}x de ${money(f.totalPaid / (f.installments || 1))}`, W - M - 4, y + 1, { size: 9, bold: true, align: 'right' });
+    y += 6;
+  }
 
   // Garantia.
   doc.setFontSize(8.5);

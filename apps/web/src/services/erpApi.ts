@@ -2181,7 +2181,11 @@ export type GoalRow = {
   goalType: 'revenue' | 'profit' | 'sales_count' | 'products_count';
   targetValue: number;
   startDate: string;
-  endDate: string;
+  /** Vazio = meta "até bater". */
+  endDate: string | null;
+  openEnded?: boolean;
+  /** Meta "até bater": quando a venda atingiu o valor. */
+  reachedAt?: string | null;
   sellerId?: string | null;
   sellerName?: string;
   active: boolean;
@@ -2252,6 +2256,11 @@ export function apiGetDailyPendingTasks() {
 
 export function apiCancelSale(saleId: string, reason?: string) {
   return nestPost<any>(`/sales/${saleId}/cancel`, { reason });
+}
+
+/** Troca o vendedor de uma venda concluída (metas e comissões passam para ele). */
+export function apiChangeSaleSeller(saleId: string, sellerId: string) {
+  return nestPost<{ id: string; sellerId: string; sellerName: string }>(`/sales/${encodeURIComponent(saleId)}/seller`, { sellerId });
 }
 
 export function apiListGoals() {

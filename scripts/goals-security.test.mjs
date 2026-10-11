@@ -70,3 +70,22 @@ test('PATCH /goals/:id never discloses another store\'s goal, even when the id i
   assert.equal(ownPatch.status, 200);
   assert.equal((await ownPatch.json()).data.name, 'Meta renomeada');
 });
+
+test('open-ended goal ("até bater") ends on the sale that reaches the target; later sales do not count', async () => {
+  const sales = [['g-s1', '2026-10-02T10:00:00Z', 600], ['g-s2', '2026-10-05T10:00:00Z', 500], ['g-s3', '2026-10-09T10:00:00Z', 900]];
+  for (const [id, at, amount] of sales) {
+    await query(`INSERT INTO sales_orders(id,local_id,store_id,total_amount,gross_profit,status,created_at,updated_at) VALUES($1,$1,'store-a',$2,0,'completed',$3,$3)`, [id, amount, at]);
+  }
+  const created = await call('/goals', { method: 'POST', token: tokenA, body: { name: 'Até bater', goalType: 'revenue', targetValue: 1000, startDate: '2026-10-01', endDate: null } });
+  const body = await created.json();
+  assert.equal(created.status, 201, JSON.stringify(body));
+  assert.equal(body.data.endDate, null);
+  assert.equal(body.data.openEnded, true);
+  assert.equal(body.data.realized, 1100, 'counts until the sale that crosses 1000 (600 + 500), not the later 900');
+  assert.equal(new Date(body.data.reachedAt).toISOString(), '2026-10-05T10:00:00.000Z');
+  // Data final antes da inicial é recusada; PATCH pode tirar a data final.
+  assert.equal((await call('/goals', { method: 'POST', token: tokenA, body: { name: 'x', goalType: 'revenue', targetValue: 10, startDate: '2026-10-10', endDate: '2026-10-01' } })).status, 422);
+  const fixed = await (await call('/goals', { method: 'POST', token: tokenA, body: { name: 'Com fim', goalType: 'revenue', targetValue: 5000, startDate: '2026-10-01', endDate: '2026-10-31' } })).json();
+  const patched = await (await call(`/goals/${fixed.data.id}`, { method: 'PATCH', token: tokenA, body: { endDate: null } })).json();
+  assert.equal(patched.data.endDate, null);
+});

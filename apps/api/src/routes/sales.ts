@@ -140,6 +140,11 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       await validatePickupLines(client,storeId,body.lines);
       await applyDayOffersToLines(client,storeId,body.lines,'external');
       body.sellerName = req.user!.name;
+      // Loja com vendedores cadastrados: a venda precisa do vendedor (antes caía no usuário logado e ia para a meta errada).
+      if (!body.sellerId) {
+        const active = await client.query('SELECT 1 FROM sellers WHERE store_id = $1 AND active = true LIMIT 1', [storeId]);
+        if (active.rows.length) throw Object.assign(new Error('Escolha o vendedor responsável pela venda.'), { status: 422 });
+      }
       for (const [table, id] of [['customers', body.customerId], ['sellers', body.sellerId]] as const) {
         if (!id) continue;
         const related = await client.query(`SELECT * FROM ${table} WHERE id = $1 AND store_id = $2`, [id, storeId]);
@@ -1001,6 +1006,42 @@ salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, r
 });
 
 /* ── 5. Cancelamento de Venda com Estorno Completo ───────────── */
+
+/** Troca o vendedor de uma venda concluída: metas e comissões leem o vendedor da venda, então passam juntas. */
+salesRouter.post('/api/v1/sales/:id/seller', requireAuth, async (req, res, next) => {
+  try {
+    if (!['admin', 'superadmin', 'manager'].includes(req.user!.role || '')) throw Object.assign(new Error('Sem permissão para trocar o vendedor da venda.'), { status: 403 });
+    if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+    const storeId = req.storeId!;
+    const { sellerId } = z.object({ sellerId: z.string().trim().min(1, 'Escolha o vendedor.') }).parse(req.body);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const sale = (await client.query('SELECT id, seller_id, seller_name, status FROM sales_orders WHERE id = $1 AND store_id = $2 FOR UPDATE', [req.params.id, storeId])).rows[0];
+      if (!sale) throw Object.assign(new Error('Venda não encontrada nesta loja.'), { status: 404 });
+      if (sale.status === 'cancelled') throw Object.assign(new Error('Venda cancelada não muda de vendedor.'), { status: 409 });
+      const seller = (await client.query('SELECT id, name FROM sellers WHERE id = $1 AND store_id = $2', [sellerId, storeId])).rows[0];
+      if (!seller) throw Object.assign(new Error('Vendedor não encontrado nesta loja.'), { status: 422 });
+      if (sale.seller_id !== seller.id) {
+        await client.query('UPDATE sales_orders SET seller_id = $1, seller_name = $2, updated_at = now() WHERE id = $3 AND store_id = $4', [seller.id, seller.name, sale.id, storeId]);
+        await client.query(
+          `INSERT INTO sale_seller_changes (id, store_id, sale_id, from_seller_id, from_seller_name, to_seller_id, to_seller_name, changed_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [`SSC-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, storeId, sale.id, sale.seller_id, sale.seller_name || '', seller.id, seller.name, req.user?.name || req.user?.email || ''],
+        );
+      }
+      await client.query('COMMIT');
+      res.json({ success: true, data: { id: sale.id, sellerId: seller.id, sellerName: seller.name } });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    next(error);
+  }
+});
 
 salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next) => {
   try {

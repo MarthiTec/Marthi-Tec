@@ -138,7 +138,7 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
         id: r.id,
         date: r.created_at,
         productNames: productNames || 'Produto diverso',
-        sellerName: r.seller_name || 'Mariana Marçal',
+        sellerName: r.seller_name || 'Sem vendedor',
         customerName: r.customer_name || 'Consumidor Final',
         itemsCount: (r.items || []).reduce((sum: number, it: any) => sum + Number(it.qty), 0),
         subtotal: Number(r.subtotal),

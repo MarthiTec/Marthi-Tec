@@ -232,3 +232,19 @@ test('card interest stays with the store: customer receipt shows only the agreed
   assert.equal(r.sale.notes,'Cliente pediu película');assert.ok(!/juros/i.test(JSON.stringify(r)));
  }
 });
+test('seller is required when the store has sellers, and a completed sale can move to the right seller with history',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-seller','store-a','stock-seller',5,20,50)");
+ const line=[{stockId:'stock-seller',name:'Vendedor',qty:1,unitPrice:50}];
+ const noSeller=await request('/sales/external',{...payload,sellerId:undefined,lines:line});
+ assert.equal(noSeller.status,422);assert.match((await noSeller.json()).error.message,/vendedor/i);
+ const created=await (await request('/sales/external',{...payload,lines:line})).json();
+ const id=created.data.id||created.data.saleId||created.data.orderId;
+ await query("INSERT INTO sellers(id,store_id,name) VALUES('seller-a2','store-a','Gilvan')");
+ const moved=await request('/sales/'+id+'/seller',{sellerId:'seller-a2'});assert.equal(moved.status,200);
+ const row=(await query('SELECT seller_id,seller_name FROM sales_orders WHERE id=$1',[id])).rows[0];
+ assert.deepEqual(row,{seller_id:'seller-a2',seller_name:'Gilvan'});
+ const hist=(await query('SELECT from_seller_id,to_seller_id FROM sale_seller_changes WHERE sale_id=$1',[id])).rows;
+ assert.deepEqual(hist,[{from_seller_id:'seller-a',to_seller_id:'seller-a2'}]);
+ assert.equal((await request('/sales/'+id+'/seller',{sellerId:'seller-b'})).status,422);
+ assert.equal((await request('/sales/'+id+'/seller',{sellerId:'seller-a2'},'store-b')).status,403);
+});

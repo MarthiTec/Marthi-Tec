@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { apiCancelSale, apiGetSaleReceipt, apiListExternalSales, type ApiExternalSaleSummary } from '../services/erpApi';
+import { apiCancelSale, apiChangeSaleSeller, apiGetSaleReceipt, apiListExternalSales, apiListSellers, type ApiExternalSaleSummary } from '../services/erpApi';
+import { AdminPicker } from './AdminPicker';
 import { QuickModal } from './QuickModal';
 import { WarrantyReceiptModal } from './WarrantyReceiptModal';
 import './quickModal.css';
@@ -42,6 +43,18 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  // Trocar o vendedor de uma venda concluída.
+  const [sellers, setSellers] = useState<Array<{ id: string; name: string }>>([]);
+  const [changingSeller, setChangingSeller] = useState<ApiExternalSaleSummary | null>(null);
+  const [newSellerId, setNewSellerId] = useState('');
+  const [sellerBusy, setSellerBusy] = useState(false);
+  const [sellerError, setSellerError] = useState('');
+
+  useEffect(() => {
+    apiListSellers(true)
+      .then((list) => setSellers(list.map((item) => ({ id: item.id, name: item.name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))))
+      .catch(() => setSellers([]));
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search.trim()), 300);
@@ -66,10 +79,10 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
   }, [load]);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && !receipt && !cancelling && onClose();
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && !receipt && !cancelling && !changingSeller && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, receipt, cancelling]);
+  }, [onClose, receipt, cancelling, changingSeller]);
 
   async function openReceipt(id: string) {
     setOpening(id);
@@ -100,6 +113,22 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function confirmSellerChange() {
+    if (!changingSeller) return;
+    if (!newSellerId) return setSellerError('Escolha o vendedor.');
+    setSellerBusy(true);
+    setSellerError('');
+    try {
+      await apiChangeSaleSeller(changingSeller.id, newSellerId);
+      setChangingSeller(null);
+      await load();
+    } catch (err) {
+      setSellerError(err instanceof Error ? err.message : 'Não foi possível trocar o vendedor.');
+    } finally {
+      setSellerBusy(false);
+    }
+  }
+
   const total = rows.filter((row) => row.status !== 'cancelled').reduce((sum, row) => sum + row.amount, 0);
 
   return createPortal(
@@ -108,7 +137,7 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
         <header className="quick-modal__head">
           <div>
             <h2>Vendas realizadas</h2>
-            <p>Consulte, reimprima ou reenvie o comprovante e cancele vendas externas.</p>
+            <p>Consulte, reimprima ou reenvie o comprovante, troque o vendedor e cancele vendas externas.</p>
           </div>
           <button type="button" className="quick-modal__close" aria-label="Fechar" onClick={onClose}>
             ×
@@ -168,6 +197,11 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
                       {opening === row.id ? 'Abrindo…' : '🖨 Comprovante'}
                     </button>
                     {row.status !== 'cancelled' ? (
+                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setChangingSeller(row); setNewSellerId(''); setSellerError(''); }}>
+                        Trocar vendedor
+                      </button>
+                    ) : null}
+                    {row.status !== 'cancelled' ? (
                       <button type="button" className="btn btn--danger btn--sm" onClick={() => { setCancelling(row); setCancelReason(''); setCancelError(''); }}>
                         Cancelar
                       </button>
@@ -185,6 +219,28 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
       </section>
 
       {receipt ? <WarrantyReceiptModal reprint receipt={receipt as never} onClose={() => setReceipt(null)} onNewSale={() => setReceipt(null)} /> : null}
+
+      {changingSeller ? (
+        <QuickModal
+          title="Trocar vendedor da venda"
+          subtitle={`${changingSeller.customerName} · ${money(changingSeller.amount)} · ${changingSeller.id}`}
+          submitLabel="Salvar vendedor"
+          busy={sellerBusy}
+          error={sellerError}
+          onClose={() => setChangingSeller(null)}
+          onSubmit={confirmSellerChange}
+        >
+          <p className="sales-history__current">Vendedor atual: <strong>{changingSeller.sellerName || 'sem vendedor'}</strong></p>
+          <AdminPicker
+            label="Novo vendedor *"
+            value={newSellerId}
+            placeholder={sellers.length ? 'Escolha o vendedor' : 'Nenhum vendedor cadastrado'}
+            options={sellers.filter((seller) => seller.name !== changingSeller.sellerName).map((seller) => ({ value: seller.id, label: seller.name }))}
+            onChange={setNewSellerId}
+          />
+          <small>A venda, a meta e a comissão passam para o novo vendedor. Só administradores e gerentes podem trocar.</small>
+        </QuickModal>
+      ) : null}
 
       {cancelling ? (
         <QuickModal

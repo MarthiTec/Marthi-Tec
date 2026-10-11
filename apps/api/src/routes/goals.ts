@@ -16,7 +16,8 @@ const goalSchema = z.object({
   goalType: z.enum(['revenue', 'profit', 'sales_count', 'products_count']).default('revenue'),
   targetValue: z.coerce.number().min(0.01, 'Valor da meta deve ser maior que zero.'),
   startDate: z.string().min(4, 'Data inicial é obrigatória.'),
-  endDate: z.string().min(4, 'Data final é obrigatória.'),
+  /** Sem data final = meta "até bater": termina na venda que atinge o valor. */
+  endDate: z.string().min(4, 'Data final inválida.').nullable().optional(),
   sellerId: z.string().optional().nullable(),
   active: z.boolean().default(true),
   progressiveTiers: z.array(tierSchema).optional().default([]),
@@ -62,7 +63,27 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
   }
 
   const sellerFilter = goal.seller_id ? 'AND seller_id = $4' : '';
-  const params: any[] = [storeId, goal.start_date, goal.end_date];
+  const openEnded = !goal.end_date;
+  const goalTarget = Number(goal.target_value) || 0;
+
+  // Meta "até bater": acha a venda em que o acumulado atinge o valor; ela fecha a meta (vendas depois não contam).
+  let reachedAt: Date | null = null;
+  if (openEnded && goalTarget > 0) {
+    const metric = goal.goal_type === 'profit' ? 'gross_profit' : goal.goal_type === 'sales_count' ? '1' : 'total_amount';
+    const reachParams: any[] = [storeId, goal.start_date, goalTarget];
+    if (goal.seller_id) reachParams.push(goal.seller_id);
+    const reach = await pool.query(
+      `SELECT created_at FROM (
+         SELECT created_at, SUM(COALESCE(${metric}, 0)) OVER (ORDER BY created_at, id) AS acc
+           FROM sales_orders
+          WHERE store_id = $1 AND status != 'cancelled' AND created_at::date >= $2::date ${sellerFilter}
+       ) t WHERE acc >= $3 ORDER BY created_at LIMIT 1`,
+      reachParams,
+    );
+    reachedAt = reach.rows[0]?.created_at ?? null;
+  }
+
+  const params: any[] = [storeId, goal.start_date, openEnded ? reachedAt : goal.end_date];
   if (goal.seller_id) params.push(goal.seller_id);
 
   const query = `
@@ -74,7 +95,7 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
     WHERE store_id = $1
       AND status != 'cancelled'
       AND created_at::date >= $2::date
-      AND created_at::date <= $3::date
+      ${openEnded ? 'AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)' : 'AND created_at::date <= $3::date'}
       ${sellerFilter}
   `;
 
@@ -140,7 +161,9 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
     goalType: goal.goal_type,
     targetValue: target,
     startDate: goal.start_date,
-    endDate: goal.end_date,
+    endDate: goal.end_date ?? null,
+    openEnded,
+    reachedAt,
     sellerId: goal.seller_id,
     sellerName,
     active: Boolean(goal.active),
@@ -190,6 +213,7 @@ goalsRouter.post('/api/v1/goals', requireAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
     const body = goalSchema.parse(req.body);
+    if (body.endDate && body.endDate < body.startDate) throw Object.assign(new Error('A data final não pode ser antes da data inicial.'), { status: 422 });
     const id = body.id || `GOL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     if (!pool) {
@@ -209,7 +233,7 @@ goalsRouter.post('/api/v1/goals', requireAuth, async (req, res, next) => {
         body.goalType,
         body.targetValue,
         body.startDate,
-        body.endDate,
+        body.endDate || null,
         body.sellerId || null,
         body.active,
         JSON.stringify(body.progressiveTiers),
@@ -244,7 +268,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
            goal_type = COALESCE($2, goal_type),
            target_value = COALESCE($3, target_value),
            start_date = COALESCE($4, start_date),
-           end_date = COALESCE($5, end_date),
+           end_date = CASE WHEN $13 THEN $5::date ELSE end_date END,
            seller_id = CASE WHEN $12 THEN $6 ELSE seller_id END,
            active = COALESCE($7, active),
            progressive_tiers = COALESCE($8, progressive_tiers),
@@ -257,7 +281,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
         body.goalType,
         body.targetValue,
         body.startDate,
-        body.endDate,
+        body.endDate || null,
         body.sellerId,
         body.active,
         body.progressiveTiers ? JSON.stringify(body.progressiveTiers) : null,
@@ -265,6 +289,7 @@ goalsRouter.patch('/api/v1/goals/:id', requireAuth, async (req, res, next) => {
         id,
         storeId,
         Object.prototype.hasOwnProperty.call(body, 'sellerId'),
+        Object.prototype.hasOwnProperty.call(body, 'endDate'),
       ],
     );
 

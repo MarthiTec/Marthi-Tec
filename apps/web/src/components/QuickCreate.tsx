@@ -3,7 +3,7 @@ import { QuickModal } from './QuickModal';
 import { createBrand, type Brand } from '../data/brandStore';
 import { createAttribute, type ProductAttribute } from '../data/attributeStore';
 import { getErpRegistry, upsertSupplier } from '../data/erpRegistry';
-import { apiCreateCustomer } from '../services/erpApi';
+import { apiCreateCustomer, apiCreateSeller, type ApiSeller } from '../services/erpApi';
 import type { Customer } from '../data/adminStore';
 
 const message = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
@@ -212,6 +212,51 @@ export function QuickCreateCustomer({ onClose, onCreated }: { onClose: () => voi
         <label>
           Cidade
           <input value={city} maxLength={80} onChange={(event) => setCity(event.target.value)} />
+        </label>
+      </div>
+    </QuickModal>
+  );
+}
+
+/** Vendedor direto da venda: nome é o único obrigatório; o cadastro completo fica em Pessoas › Vendedores. */
+export function QuickCreateSeller({ onClose, onCreated }: { onClose: () => void; onCreated: (seller: ApiSeller) => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [commission, setCommission] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    if (!name.trim()) return setError('Informe o nome do vendedor.');
+    const commissionPercent = Number(commission.replace(',', '.')) || 0;
+    if (commissionPercent < 0 || commissionPercent > 100) return setError('Comissão deve ficar entre 0 e 100%.');
+    setBusy(true);
+    setError('');
+    try {
+      const seller = await apiCreateSeller({ name: name.trim(), phone: phone.trim(), email: '', document: '', commissionPercent, active: true });
+      onCreated(seller);
+      onClose();
+    } catch (err) {
+      setError(message(err, 'Não foi possível salvar o vendedor.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <QuickModal title="Novo vendedor" subtitle="Cadastro rápido. Os demais dados podem ser completados em Pessoas › Vendedores." busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar vendedor">
+      <label>
+        Nome do vendedor *
+        <input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} />
+      </label>
+      <div className="quick-modal__row">
+        <label>
+          Telefone / WhatsApp
+          <input value={phone} maxLength={30} inputMode="tel" onChange={(event) => setPhone(event.target.value)} />
+        </label>
+        <label>
+          Comissão (%)
+          <input value={commission} maxLength={6} inputMode="decimal" placeholder="0" onChange={(event) => setCommission(event.target.value)} />
         </label>
       </div>
     </QuickModal>
