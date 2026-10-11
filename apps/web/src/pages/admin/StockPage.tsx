@@ -162,7 +162,8 @@ export function StockPage() {
       window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
     };
   }, []);
-  const simple = stockMode === 'simple' && !totemSurface;
+  // Vale também no Catálogo do totem: o mesmo cadastro simplificado da Retaguarda.
+  const simple = stockMode === 'simple';
   const [includeBrandInName, setIncludeBrandInName] = useState(false);
   const [registryPanel, setRegistryPanel] = useState<RegistryPanel | null>(null);
   const [unitConversionOpen, setUnitConversionOpen] = useState(false);
@@ -2292,13 +2293,13 @@ export function StockPage() {
             <h2>{crudFormTitle(mode, 'produto')}</h2>
             {error ? <p className="qty-low">{error}</p> : null}
             <p className="empty">
-              {totemSurface
-                ? 'Catálogo da vitrine: nome, preço, foto, quantidade e atributos.'
-                : simple
-                  ? 'Marca, tipo e modelo montam a descrição. Fornecedor, grupo, subgrupo e datas ficam na aba Especificações.'
+              {simple
+                ? 'Marca, tipo e modelo montam a descrição. Fornecedor, grupo, subgrupo e datas ficam na aba Especificações.'
+                : totemSurface
+                  ? 'Catálogo da vitrine: nome, preço, foto, quantidade e atributos.'
                   : 'Campos agrupados por tema. Tamanho (roupa/calçado) entra como atributo — cadastre em '}
               {!totemSurface && !simple ? <Link to={specsPath('atributos')}>Especificações</Link> : null}
-              {totemSurface && catalogFull ? (
+              {totemSurface && catalogFull && !simple ? (
                 <>
                   {' '}
                   Cadastro completo em <Link to="/erp/produtos">Retaguarda · produtos</Link>.
