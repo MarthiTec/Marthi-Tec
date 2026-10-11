@@ -13,6 +13,7 @@ import { unreservedQuantity } from '../services/commercialReservations.js';
 import { getStoreWhatsAppConfig } from '../services/storeCommunication.js';
 import { maskDocument, receiptToken, validReceiptToken } from '../services/receiptToken.js';
 import { buildReceiptPdf } from '../services/receiptPdf.js';
+import { saleCardInterest, spreadOverLines, stripCardInterestNote } from '../services/receiptCustomerView.js';
 import { getStoreBrandProfile, instagramHandle, instagramUrl, messageSignature, withProtocol } from './storeProfile.js';
 
 /** Texto da garantia conforme o tipo escolhido na venda. */
@@ -34,7 +35,9 @@ salesRouter.post('/api/v1/sales/:id/send-receipt-email', requireAuth, async (req
     const result = await pool.query(`SELECT s.*,st.trade_name AS store_name FROM sales_orders s JOIN stores st ON st.id=s.store_id WHERE s.id=$1 AND s.store_id=$2`, [req.params.id, req.storeId]);
     const sale = result.rows[0];
     if (!sale) throw Object.assign(new Error('Venda não encontrada nesta loja.'), {status:404});
-    const lines = await pool.query(`SELECT name,qty,unit_price,total_price FROM sales_order_lines WHERE sale_id=$1 OR order_id=$1`, [sale.id]);
+    const rawLines = await pool.query(`SELECT name,qty,unit_price,total_price FROM sales_order_lines WHERE sale_id=$1 OR order_id=$1`, [sale.id]);
+    // E-mail do cliente: juros do cartão embutidos nos itens (valor combinado), sem linha de juros.
+    const lines = { rows: spreadOverLines(rawLines.rows.map((r) => ({ name: r.name, qty: Number(r.qty), unitPrice: Number(r.unit_price), totalPrice: Number(r.total_price), total_price: Number(r.total_price) })), saleCardInterest(sale.card_interest, sale.notes)).map((r) => ({ ...r, total_price: r.totalPrice })) };
     const money=(value:unknown)=>Number(value || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
     const terms=sale.warranty_terms || 'Garantia legal conforme condições da venda.';
     const items=lines.rows.map(item=>`<tr><td style="padding:8px;color:#20333d">${escapeHtml(item.name)}</td><td style="padding:8px;color:#20333d">${Number(item.qty)}</td><td style="padding:8px;color:#20333d">${money(item.total_price)}</td></tr>`).join('');
@@ -90,6 +93,8 @@ const externalSaleSchema = z.object({
   installments: z.coerce.number().int().min(1).max(36).default(1),
   discount: z.coerce.number().min(0).default(0),
   surcharge: z.coerce.number().min(0).default(0),
+  /** Parte do acréscimo que é juros do cartão (taxa repassada): informação da loja, não sai no comprovante do cliente. */
+  cardInterest: z.coerce.number().min(0).default(0),
   notes: z.string().default(''),
   warrantyMonths: z.coerce.number().int().min(0).default(3),
   /** Da loja (com prazo), somente do fabricante ou sem garantia. */
@@ -270,8 +275,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         ],
       );
       await client.query(
-        "UPDATE sales_orders SET warranty_type = $2, warranty_months = CASE WHEN $2 = 'store' THEN warranty_months ELSE 0 END WHERE id = $1",
-        [orderId, body.warrantyType],
+        "UPDATE sales_orders SET warranty_type = $2, warranty_months = CASE WHEN $2 = 'store' THEN warranty_months ELSE 0 END, card_interest = LEAST($3::numeric, surcharge) WHERE id = $1",
+        [orderId, body.warrantyType, body.cardInterest],
       );
 
       // 3. Inserir itens da venda e dar BAIXA NO ESTOQUE
@@ -588,6 +593,21 @@ async function buildReceipt(saleId: string, storeId?: string) {
     s.store_zip ? `CEP ${s.store_zip}` : '',
   ].filter(Boolean).join(' · ');
   const profile = await getStoreBrandProfile(pool, s.store_id);
+  // Documento do cliente: juros do cartão embutidos nos itens (valor combinado), sem linha nem anotação de juros.
+  const cardInterest = saleCardInterest(s.card_interest, s.notes);
+  const customerItems = spreadOverLines(
+    linesRes.rows.map((r) => ({
+      name: r.name,
+      qty: Number(r.qty),
+      unitPrice: Number(r.unit_price),
+      totalPrice: Number(r.total_price),
+      imei: r.imei || '',
+      attributes: Array.isArray(r.attributes)
+        ? r.attributes.map((a: { name: string; value: string }) => `${a.name}: ${a.value}`).join(' · ')
+        : '',
+    })),
+    cardInterest,
+  );
   const instagram = profile?.instagram ? instagramUrl(profile.instagram) : '';
   const website = profile?.website ? withProtocol(profile.website) : '';
   return {
@@ -622,16 +642,7 @@ async function buildReceipt(saleId: string, storeId?: string) {
         document: s.customer_document || '',
         phone: s.customer_phone || '',
       },
-      items: linesRes.rows.map((r) => ({
-        name: r.name,
-        qty: Number(r.qty),
-        unitPrice: Number(r.unit_price),
-        totalPrice: Number(r.total_price),
-        imei: r.imei || '',
-        attributes: Array.isArray(r.attributes)
-          ? r.attributes.map((a: { name: string; value: string }) => `${a.name}: ${a.value}`).join(' · ')
-          : '',
-      })),
+      items: customerItems,
       tradeIn: tradeInRes.rows.length > 0 ? {
         device: tradeInRes.rows[0].device_name,
         imei: tradeInRes.rows[0].imei,
@@ -640,9 +651,10 @@ async function buildReceipt(saleId: string, storeId?: string) {
         creditValue: Number(tradeInRes.rows[0].trade_value),
       } : null,
       financial: {
-        subtotal: Number(s.subtotal || s.total || 0),
+        subtotal: Number(s.subtotal || s.total || 0) + (customerItems.length ? cardInterest : 0),
         discount: Number(s.discount || 0),
-        surcharge: Number(s.surcharge || 0),
+        // Só o acréscimo combinado com o cliente; os juros do cartão já estão nos itens.
+        surcharge: Math.max(0, Math.round((Number(s.surcharge || 0) - cardInterest) * 100) / 100),
         tradeInCredit: Number(s.trade_in_value || 0),
         totalPaid: Number(s.final_amount || s.total_amount || s.total || 0),
         paymentMethod: payment?.method || s.payment_name || 'Não informado',
@@ -653,7 +665,7 @@ async function buildReceipt(saleId: string, storeId?: string) {
         months: s.warranty_type && s.warranty_type !== 'store' ? 0 : (s.warranty_months ?? 3),
         terms: s.warranty_terms || 'Garantia legal de 90 dias balcão cobrindo exclusivamente defeitos de fabricação.',
       },
-      notes: s.notes || '',
+      notes: stripCardInterestNote(s.notes),
     },
     // QR Code do comprovante: abre a versão pública assinada (sem login).
     verifyToken: receiptToken(s.id),

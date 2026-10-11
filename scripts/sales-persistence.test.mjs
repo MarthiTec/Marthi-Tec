@@ -218,3 +218,17 @@ test('receipt email reads the persisted sale and its store SMTP, and rejects for
   const rows=(await query('SELECT store_id FROM communication_delivery_logs')).rows;assert.ok(rows.every(row=>row.store_id==='store-a'));
  }finally{nodemailer.createTransport=original;}
 });
+test('card interest stays with the store: customer receipt shows only the agreed total, no surcharge or interest note',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-card','store-a','stock-card',5,20,50)");
+ // Venda nova (juros no campo próprio) e venda antiga (juros só anotado nas observações).
+ for(const cardInterest of [10,0]){
+  const sale=await request('/sales/external',{...payload,lines:[{stockId:'stock-card',name:'Cartao',qty:1,unitPrice:50}],paymentMethod:'Cartão de Crédito',installments:2,surcharge:10,cardInterest,notes:'Cliente pediu película · Juros do cartão 2x (20%): R$ 10,00'});
+  const body=await sale.json();assert.equal(sale.status,201,JSON.stringify(body));
+  const id=body.data.id||body.data.saleId||body.data.orderId;
+  if(cardInterest) assert.equal(Number((await query('SELECT card_interest FROM sales_orders WHERE id=$1',[id])).rows[0].card_interest),10);
+  const r=(await (await request('/sales/'+id+'/receipt')).json()).data;
+  assert.equal(r.sale.items[0].totalPrice,60);assert.equal(r.sale.items[0].unitPrice,60);
+  assert.equal(r.sale.financial.subtotal,60);assert.equal(r.sale.financial.surcharge,0);assert.equal(r.sale.financial.totalPaid,60);
+  assert.equal(r.sale.notes,'Cliente pediu película');assert.ok(!/juros/i.test(JSON.stringify(r)));
+ }
+});

@@ -526,6 +526,8 @@ export function ExternalSalePage() {
         discount: Number(generalDiscount) || 0,
         // Juros do cartão entram como acréscimo: o total da venda é o que o cliente paga.
         surcharge: round2((Number(generalSurcharge) || 0) + cardInterest),
+        // Separado para o comprovante do cliente mostrar só o valor combinado (os juros ficam para a loja).
+        cardInterest,
         notes: [saleNotes.trim(), cardInterest > 0 ? `Juros do cartão ${installments}x (${cardRate.toLocaleString('pt-BR')}%): ${formatMoney(cardInterest)}` : ''].filter(Boolean).join(' · '),
         warrantyType,
         warrantyMonths: warrantyType === 'store' ? Number(warrantyMonths) : 0,
