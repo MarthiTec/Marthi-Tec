@@ -29,6 +29,15 @@ export type CardMachine = {
   name: string;             // ex: 'Maquininha Principal (Stone / PagBank)'
   model?: string;           // ex: 'Smart POS P2'
   serialNumber?: string;
+  /** Adquirente / credenciadora (Stone, Cielo, PagBank…). */
+  acquirer?: string;
+  /** Código do estabelecimento / terminal na adquirente. */
+  terminalId?: string;
+  /** Conta do financeiro onde a adquirente deposita. */
+  settlementAccountId?: string;
+  /** Prazo de recebimento, em dias (D+N). */
+  debitSettlementDays?: number;
+  creditSettlementDays?: number;
   isDefaultTotem: boolean;  // Se esta máquina é a referência para o Totem
   defaultBrandId: string;   // Bandeira usada para o cálculo padrão no Totem (ex: 'master')
   brands: CardBrand[];

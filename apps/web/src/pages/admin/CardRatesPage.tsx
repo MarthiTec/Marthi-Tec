@@ -18,6 +18,7 @@ import {
 } from '../../data/cardRatesStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { apiListBankAccounts } from '../../services/erpApi';
 
 function formatPercent(rate: number) {
   return `${(Number(rate) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
@@ -41,6 +42,13 @@ export function CardRatesPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [simGross, setSimGross] = useState<number>(1000);
   const [simParcels, setSimParcels] = useState<number>(12);
+  // Contas do financeiro para indicar onde a maquininha deposita.
+  const [bankAccounts, setBankAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    apiListBankAccounts(true)
+      .then((rows) => setBankAccounts(rows.map((row) => ({ id: row.id, name: [row.name, row.bank].filter(Boolean).join(' · ') }))))
+      .catch(() => setBankAccounts([]));
+  }, []);
 
   useEffect(() => {
     let active=true;
@@ -133,7 +141,11 @@ export function CardRatesPage() {
     const newMachine: CardMachine = {
       id,
       name: `Maquininha ${machines.length + 1}`,
-      model: 'Smart POS',
+      model: '',
+      acquirer: '',
+      serialNumber: '',
+      terminalId: '',
+      settlementAccountId: '',
       isDefaultTotem: false,
       defaultBrandId: 'master',
       brands: DEFAULT_CARD_BRANDS.map(b=>({...b,debitRate:0,installments:b.installments.map(i=>({...i,rate:0}))})),
@@ -343,12 +355,7 @@ export function CardRatesPage() {
               Maquininha Padrão:{' '}
               <strong style={{ color: 'var(--ink, #fff)' }}>{defaultTotemMachine?.name}</strong> ·
               Bandeira de Cálculo:{' '}
-              <strong style={{ color: 'var(--accent, #2dd4bf)' }}>{defaultTotemBrand?.name}</strong>{' '}
-              (Taxa 12x:{' '}
-              <strong>
-                {formatPercent(defaultTotemBrand?.installments.find((it) => it.installment === 12)?.rate ?? 0)}
-              </strong>
-              )
+              <strong style={{ color: 'var(--accent, #2dd4bf)' }}>{defaultTotemBrand?.name}</strong>
             </p>
           </div>
 
@@ -433,7 +440,9 @@ export function CardRatesPage() {
               ) : null}
             </h3>
             <p className="empty" style={{ margin: '3px 0 0', fontSize: '0.82rem' }}>
-              Identificador: {activeMachine.id} · Modelo: {activeMachine.model || 'Smart POS'}
+              {[activeMachine.acquirer, activeMachine.model, activeMachine.serialNumber ? `Nº de série ${activeMachine.serialNumber}` : '']
+                .filter(Boolean)
+                .join(' · ') || 'Preencha a adquirente, o modelo e o número de série abaixo.'}
             </p>
           </div>
 
@@ -474,12 +483,82 @@ export function CardRatesPage() {
           </label>
 
           <label>
-            <span className="admin-field-label">Modelo / Adquirente</span>
+            <span className="admin-field-label">Adquirente</span>
+            <input
+              type="text"
+              list="card-acquirers"
+              value={activeMachine.acquirer ?? ''}
+              onChange={(e) => updateActiveMachine({ acquirer: e.target.value })}
+              placeholder="Ex: Stone, Cielo, PagBank"
+            />
+            <datalist id="card-acquirers">
+              {['Stone', 'Cielo', 'Rede', 'PagBank', 'Mercado Pago', 'Getnet', 'SumUp', 'InfinitePay', 'Ton', 'Safrapay', 'Sicredi', 'Vero'].map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </label>
+
+          <label>
+            <span className="admin-field-label">Modelo</span>
             <input
               type="text"
               value={activeMachine.model ?? ''}
               onChange={(e) => updateActiveMachine({ model: e.target.value })}
-              placeholder="Ex: PagBank Pro 2 / Stone P2"
+              placeholder="Ex: Smart POS P2, Moderninha Pro 2"
+            />
+          </label>
+
+          <label>
+            <span className="admin-field-label">Nº de série</span>
+            <input
+              type="text"
+              value={activeMachine.serialNumber ?? ''}
+              maxLength={60}
+              onChange={(e) => updateActiveMachine({ serialNumber: e.target.value })}
+              placeholder="Etiqueta atrás da maquininha"
+            />
+          </label>
+
+          <label>
+            <span className="admin-field-label">Código do estabelecimento / terminal</span>
+            <input
+              type="text"
+              value={activeMachine.terminalId ?? ''}
+              maxLength={60}
+              onChange={(e) => updateActiveMachine({ terminalId: e.target.value })}
+              placeholder="Stone Code, EC, ID do terminal"
+            />
+          </label>
+
+          <AdminPicker
+            label="Conta de recebimento"
+            value={activeMachine.settlementAccountId ?? ''}
+            placeholder={bankAccounts.length ? 'Escolha a conta' : 'Cadastre a conta no Financeiro'}
+            options={[{ value: '', label: 'Não informada' }, ...bankAccounts.map((account) => ({ value: account.id, label: account.name }))]}
+            onChange={(val) => updateActiveMachine({ settlementAccountId: val })}
+          />
+
+          <label>
+            <span className="admin-field-label">Recebe o débito em (dias)</span>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              value={activeMachine.debitSettlementDays ?? ''}
+              onChange={(e) => updateActiveMachine({ debitSettlementDays: e.target.value === '' ? undefined : Math.max(0, Math.round(Number(e.target.value))) })}
+              placeholder="Ex: 1 (D+1)"
+            />
+          </label>
+
+          <label>
+            <span className="admin-field-label">Recebe o crédito em (dias)</span>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              value={activeMachine.creditSettlementDays ?? ''}
+              onChange={(e) => updateActiveMachine({ creditSettlementDays: e.target.value === '' ? undefined : Math.max(0, Math.round(Number(e.target.value))) })}
+              placeholder="Ex: 30 (D+30) ou 1 se antecipa"
             />
           </label>
 
@@ -645,21 +724,6 @@ export function CardRatesPage() {
                     <tr key={item.installment}>
                       <td>
                         <strong style={{ fontSize: '0.92rem' }}>{item.installment}x</strong>
-                        {item.installment === 12 && activeMachine.defaultBrandId === activeBrand.id ? (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: '0.72rem',
-                              background: 'rgba(45, 212, 191, 0.2)',
-                              color: 'var(--accent, #2dd4bf)',
-                              padding: '2px 5px',
-                              borderRadius: 4,
-                              fontWeight: 700,
-                            }}
-                          >
-                            Padrão Totem
-                          </span>
-                        ) : null}
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

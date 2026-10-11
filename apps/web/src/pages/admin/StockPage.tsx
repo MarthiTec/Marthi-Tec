@@ -274,6 +274,10 @@ export function StockPage() {
    */
   function applySupplierEntries(target: number | 'simple', entries: SupplierEntry[]) {
     const next = supplierEntriesSummary(entries);
+    // Bateria informada na entrada do fornecedor vale para o aparelho (seminovo): não precisa digitar de novo.
+    const enteredBattery = [...entries].reverse().find((entry) => entry.batteryLevel !== null && entry.batteryLevel !== undefined)?.batteryLevel;
+    const batteryFor = (condition: unknown) =>
+      enteredBattery !== undefined && enteredBattery !== null && (conditionCode(String(condition ?? '')) || 'new') !== 'new' ? { batteryLevel: enteredBattery } : {};
     if (target === 'simple') {
       setForm((current) => {
         const delta = next.qty - supplierEntriesSummary(current.supplierEntries).qty;
@@ -282,6 +286,7 @@ export function StockPage() {
           supplierEntries: entries,
           qty: Math.max(0, (Number(current.qty) || 0) + delta),
           ...(entries.length ? { cost: next.avgCost, avgCost: next.avgCost, lastPurchaseCost: entries[entries.length - 1].unitCost } : {}),
+          ...batteryFor(current.condition),
         };
       });
     } else {
@@ -289,7 +294,13 @@ export function StockPage() {
         current.map((row, i) => {
           if (i !== target) return row;
           const delta = next.qty - supplierEntriesSummary(row.supplierEntries).qty;
-          return { ...row, supplierEntries: entries, qty: Math.max(0, (Number(row.qty) || 0) + delta), ...(entries.length ? { cost: next.avgCost, avgCost: next.avgCost } : {}) };
+          return {
+            ...row,
+            supplierEntries: entries,
+            qty: Math.max(0, (Number(row.qty) || 0) + delta),
+            ...(entries.length ? { cost: next.avgCost, avgCost: next.avgCost } : {}),
+            ...batteryFor(row.condition || form.condition),
+          };
         }),
       );
     }

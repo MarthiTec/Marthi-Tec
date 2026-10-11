@@ -7308,3 +7308,7 @@ select.caixa-mov-input {
 }
 .stock-help-pick__close:hover { border-color: #b91c1c; color: #b91c1c; }
 .stock-help-pick__reopen { margin: 0 0 12px; }
+/* Linha da variação: colunas dividem o espaço igualmente; cor ou valor comprido termina em reticências em vez de empurrar os outros campos. */
+.stock-variation-container tbody tr { grid-auto-columns: minmax(118px, 1fr); }
+.stock-variation-container .admin-picker__trigger { min-width: 0; max-width: 100%; }
+.stock-variation-container .admin-picker__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
