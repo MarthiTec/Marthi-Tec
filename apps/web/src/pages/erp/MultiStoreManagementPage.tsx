@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
+import { AddressFields } from '../../components/PersonFields';
 import {
   calculateLicensingSummary,
   deleteStore,
@@ -170,7 +171,7 @@ export function MultiStoreManagementPage() {
       complement: '',
       neighborhood: '',
       city: '',
-      state: 'RJ',
+      state: '',
       ibgeCityCode: '',
       taxRegime: 'simples_nacional',
       segmentId: 'assistencia_tecnica',
@@ -181,9 +182,13 @@ export function MultiStoreManagementPage() {
     setModalOpen(true);
   }
 
-  function handleOpenEdit(store: Store) {
-    setEditingStore({ ...store });
+  async function handleOpenEdit(store: Store) {
     setFormError(null);
+    if (isNestAuthed()) {
+      await hydrateMultiStoreFromApi().catch(() => null);
+    }
+    const fresh = listStores().find((item) => item.id === store.id) ?? store;
+    setEditingStore({ ...fresh });
     setModalOpen(true);
   }
 
@@ -228,47 +233,44 @@ export function MultiStoreManagementPage() {
     }
 
     try {
-      const saved = saveStore({
-        ...editingStore,
-        name: editingStore.name.trim(),
-        cnpj: editingStore.cnpj.trim(),
-        segmentId: editingStore.segmentId || 'assistencia_tecnica',
-      });
-      applySegmentPreset(saved.segmentId || 'assistencia_tecnica', saved.id);
-
+      const segmentId = editingStore.segmentId || 'assistencia_tecnica';
+      let storeId = editingStore.id;
       if (isNestAuthed()) {
+        // O cadastro da loja vive no banco: grava primeiro na API e só depois atualiza a tela.
         const payload = {
-          tradeName: saved.tradeName,
-          legalName: saved.name,
-          document: saved.cnpj,
-          email: saved.email,
-          phone: saved.phone,
-          stateRegistration: saved.stateRegistration,
-          municipalRegistration: saved.municipalRegistration,
-          zipCode: saved.zipCode,
-          street: saved.street,
-          number: saved.number,
-          complement: saved.complement,
-          district: saved.neighborhood,
-          city: saved.city,
-          state: saved.state,
-          taxRegime: saved.taxRegime,
-          isMatrix: saved.isMatrix,
-          active: saved.active,
-          segment: saved.segmentId || 'assistencia_tecnica',
-          segmentId: saved.segmentId || 'assistencia_tecnica',
+          tradeName: (editingStore.tradeName || editingStore.name).trim(),
+          legalName: editingStore.name.trim(),
+          document: editingStore.cnpj.trim(),
+          email: editingStore.email || '',
+          phone: editingStore.phone || '',
+          stateRegistration: editingStore.stateRegistration || '',
+          municipalRegistration: editingStore.municipalRegistration || '',
+          zipCode: editingStore.zipCode || '',
+          street: editingStore.street || '',
+          number: editingStore.number || '',
+          complement: editingStore.complement || '',
+          district: editingStore.neighborhood || '',
+          city: editingStore.city || '',
+          state: editingStore.state || '',
+          ibgeCityCode: editingStore.ibgeCityCode || '',
+          taxRegime: editingStore.taxRegime || 'simples_nacional',
+          isMatrix: Boolean(editingStore.isMatrix),
+          active: editingStore.active !== false,
+          segment: segmentId,
+          segmentId,
         };
-        if (editingStore.id) {
-          await apiUpdateStore(editingStore.id, payload).catch((err) =>
-            console.warn('Falha ao atualizar filial na API', err),
-          );
-        } else {
-          await apiCreateStore(payload).catch((err) =>
-            console.warn('Falha ao criar filial na API', err),
-          );
-        }
-        await hydrateMultiStoreFromApi().catch(() => null);
+        if (storeId) await apiUpdateStore(storeId, payload);
+        else storeId = (await apiCreateStore(payload))?.id;
+        await hydrateMultiStoreFromApi();
+      } else {
+        storeId = saveStore({
+          ...editingStore,
+          name: editingStore.name.trim(),
+          cnpj: editingStore.cnpj.trim(),
+          segmentId,
+        }).id;
       }
+      if (storeId) applySegmentPreset(segmentId, storeId);
 
       setModalOpen(false);
     } catch (err: unknown) {
@@ -913,6 +915,7 @@ export function MultiStoreManagementPage() {
             {formError && <div className="multi-store-alert-error">{formError}</div>}
 
             <div className="multi-store-modal__body">
+              <h4 className="multi-store-form-section">Identificação</h4>
               <div className="multi-store-form-row">
                 <label className="multi-store-form-field">
                   <span>Código da Loja</span>
@@ -923,8 +926,7 @@ export function MultiStoreManagementPage() {
                     placeholder="Ex: 001"
                   />
                 </label>
-
-                <label className="multi-store-form-field span-2">
+                <label className="multi-store-form-field span-3">
                   <span>Razão Social *</span>
                   <input
                     type="text"
@@ -946,7 +948,6 @@ export function MultiStoreManagementPage() {
                     placeholder="Ex: Marthi Tech Centro"
                   />
                 </label>
-
                 <label className="multi-store-form-field">
                   <span>CNPJ da Loja *</span>
                   <input
@@ -957,7 +958,6 @@ export function MultiStoreManagementPage() {
                     required
                   />
                 </label>
-
                 <label className="multi-store-form-field">
                   <span>Inscrição Estadual (IE)</span>
                   <input
@@ -967,7 +967,6 @@ export function MultiStoreManagementPage() {
                     placeholder="Isento ou numeração"
                   />
                 </label>
-
                 <label className="multi-store-form-field">
                   <span>Inscrição Municipal (IM)</span>
                   <input
@@ -980,51 +979,14 @@ export function MultiStoreManagementPage() {
               </div>
 
               <div className="multi-store-form-row">
-                <label className="multi-store-form-field span-2">
-                  <span>Token de Acesso da Loja / Filial (CNPJ & E-mail)</span>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={editingStore.accessToken || '(Gerado automaticamente ao salvar)'}
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        color: '#4ade80',
-                        fontFamily: 'monospace',
-                        fontWeight: 600,
-                        letterSpacing: '0.5px',
-                      }}
-                    />
-                    {editingStore.accessToken && (
-                      <button
-                        type="button"
-                        className="multi-store-btn-switch"
-                        style={{ whiteSpace: 'nowrap', padding: '8px 14px' }}
-                        onClick={() => {
-                          void navigator.clipboard.writeText(editingStore.accessToken || '');
-                          alert('✓ Token de acesso copiado com sucesso!');
-                        }}
-                      >
-                        Copiar Token
-                      </button>
-                    )}
-                  </div>
-                  <small style={{ color: 'var(--admin-muted, #94a3b8)', marginTop: 4, display: 'block', fontSize: '0.75rem' }}>
-                    Token seguro exclusivo por CNPJ/E-mail que isola os módulos (Totem, Retaguarda, OS, PDV, Fiscal e E-commerce).
-                  </small>
-                </label>
-              </div>
-
-              <div className="multi-store-form-row">
                 <div className="multi-store-form-field">
                   <AdminPicker
-                    label="Ramo de Atividade da Loja *"
+                    label="Ramo de Atividade *"
                     value={editingStore.segmentId || 'assistencia_tecnica'}
                     options={STORE_SEGMENT_OPTIONS}
                     onChange={(val) => setEditingStore({ ...editingStore, segmentId: val as StoreSegmentId })}
                   />
                 </div>
-
                 <div className="multi-store-form-field">
                   <AdminPicker
                     label="Regime Tributário"
@@ -1033,7 +995,6 @@ export function MultiStoreManagementPage() {
                     onChange={(val) => setEditingStore({ ...editingStore, taxRegime: val as StoreTaxRegime })}
                   />
                 </div>
-
                 <label className="multi-store-form-field">
                   <span>E-mail da Loja</span>
                   <input
@@ -1043,7 +1004,6 @@ export function MultiStoreManagementPage() {
                     placeholder="filial@empresa.com.br"
                   />
                 </label>
-
                 <label className="multi-store-form-field">
                   <span>Telefone / WhatsApp</span>
                   <input
@@ -1055,80 +1015,72 @@ export function MultiStoreManagementPage() {
                 </label>
               </div>
 
-              <h4 style={{ margin: '14px 0 6px', fontSize: '0.9rem', color: 'var(--admin-text)' }}>
-                Endereço Operacional & Localização
-              </h4>
-
-              <div className="multi-store-form-row">
-                <label className="multi-store-form-field">
-                  <span>CEP</span>
-                  <input
-                    type="text"
-                    value={editingStore.zipCode || ''}
-                    onChange={(e) => setEditingStore({ ...editingStore, zipCode: e.target.value })}
-                    placeholder="00000-000"
-                  />
-                </label>
-
-                <label className="multi-store-form-field span-2">
-                  <span>Logradouro</span>
-                  <input
-                    type="text"
-                    value={editingStore.street || ''}
-                    onChange={(e) => setEditingStore({ ...editingStore, street: e.target.value })}
-                    placeholder="Rua, Av, Praça..."
-                  />
-                </label>
-
-                <label className="multi-store-form-field" style={{ maxWidth: 100 }}>
-                  <span>Número</span>
-                  <input
-                    type="text"
-                    value={editingStore.number || ''}
-                    onChange={(e) => setEditingStore({ ...editingStore, number: e.target.value })}
-                    placeholder="123"
-                  />
-                </label>
+              <h4 className="multi-store-form-section">Endereço da loja</h4>
+              <div className="multi-store-address">
+                <AddressFields
+                  legend="Busque pelo CEP ou pelo nome da rua"
+                  value={{
+                    zipCode: editingStore.zipCode || '',
+                    street: editingStore.street || '',
+                    number: editingStore.number || '',
+                    complement: editingStore.complement || '',
+                    district: editingStore.neighborhood || '',
+                    city: editingStore.city || '',
+                    state: editingStore.state || '',
+                  }}
+                  onChange={(address) =>
+                    setEditingStore((current) => ({
+                      ...current,
+                      zipCode: address.zipCode,
+                      street: address.street,
+                      number: address.number,
+                      complement: address.complement,
+                      neighborhood: address.district,
+                      city: address.city,
+                      state: address.state,
+                    }))
+                  }
+                  onCityCode={(code) => setEditingStore((current) => ({ ...current, ibgeCityCode: code }))}
+                />
               </div>
-
               <div className="multi-store-form-row">
                 <label className="multi-store-form-field">
-                  <span>Bairro</span>
-                  <input
-                    type="text"
-                    value={editingStore.neighborhood || ''}
-                    onChange={(e) => setEditingStore({ ...editingStore, neighborhood: e.target.value })}
-                  />
-                </label>
-
-                <label className="multi-store-form-field">
-                  <span>Cidade</span>
-                  <input
-                    type="text"
-                    value={editingStore.city || ''}
-                    onChange={(e) => setEditingStore({ ...editingStore, city: e.target.value })}
-                  />
-                </label>
-
-                <label className="multi-store-form-field" style={{ maxWidth: 80 }}>
-                  <span>UF</span>
-                  <input
-                    type="text"
-                    value={editingStore.state || 'SP'}
-                    onChange={(e) => setEditingStore({ ...editingStore, state: e.target.value.toUpperCase() })}
-                    maxLength={2}
-                  />
-                </label>
-
-                <label className="multi-store-form-field">
-                  <span>Cód. IBGE Município</span>
+                  <span>Cód. IBGE do município</span>
                   <input
                     type="text"
                     value={editingStore.ibgeCityCode || ''}
                     onChange={(e) => setEditingStore({ ...editingStore, ibgeCityCode: e.target.value })}
-                    placeholder="Ex: 3550308"
+                    inputMode="numeric"
+                    placeholder="Preenchido pelo CEP"
                   />
                 </label>
+              </div>
+
+              <h4 className="multi-store-form-section">Acesso</h4>
+              <div className="multi-store-form-row">
+                <div className="multi-store-form-field span-4">
+                  <span>Token de Acesso da Loja / Filial</span>
+                  <div className="multi-store-token">
+                    <input
+                      type="text"
+                      readOnly
+                      aria-label="Token de acesso"
+                      value={editingStore.accessToken || '(Gerado automaticamente ao salvar)'}
+                    />
+                    {editingStore.accessToken && (
+                      <button
+                        type="button"
+                        className="multi-store-btn-switch"
+                        onClick={() => handleCopyToken(editingStore.accessToken, editingStore.id)}
+                      >
+                        {copiedTokenId && copiedTokenId === editingStore.id ? '✓ Copiado' : 'Copiar token'}
+                      </button>
+                    )}
+                  </div>
+                  <small className="multi-store-form-hint">
+                    Token exclusivo por CNPJ/E-mail que isola os módulos (Totem, Retaguarda, OS, PDV, Fiscal e E-commerce).
+                  </small>
+                </div>
               </div>
 
               <div className="multi-store-checkbox-group">

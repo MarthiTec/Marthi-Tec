@@ -22,6 +22,7 @@ const storeSchema = z.object({
   district: z.string().default(''),
   city: z.string().default(''),
   state: z.string().default(''),
+  ibgeCityCode: z.string().default(''),
   taxRegime: z.string().default('simples_nacional'),
   isMatrix: z.boolean().default(false),
   active: z.boolean().default(true),
@@ -172,6 +173,7 @@ if (hasRestrictedStores) {
           district: r.district,
           city: r.city,
           state: r.state,
+          ibgeCityCode: r.ibge_city_code || '',
           taxRegime: r.tax_regime,
           isMatrix: Boolean(r.is_matrix),
           active: Boolean(r.active),
@@ -240,8 +242,8 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
           `INSERT INTO stores (
             id, client_account_id, trade_name, legal_name, document_type, document,
             state_registration, municipal_registration, email, phone, zip_code, street,
-            number, complement, district, city, state, tax_regime, is_matrix, active, segment, stock_mode
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CASE WHEN $21 = 'assistencia_tecnica' THEN 'simple' ELSE 'standard' END)
+            number, complement, district, city, state, tax_regime, is_matrix, active, segment, stock_mode, ibge_city_code
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CASE WHEN $21 = 'assistencia_tecnica' THEN 'simple' ELSE 'standard' END, $22)
           ON CONFLICT (client_account_id, document) DO UPDATE
           SET trade_name = EXCLUDED.trade_name, segment = EXCLUDED.segment, active = true, updated_at = now()`,
           [
@@ -266,6 +268,7 @@ storesRouter.post('/api/v1/stores', requireAuth, async (req, res, next) => {
             body.isMatrix,
             body.active,
             initialSegment,
+            body.ibgeCityCode.replace(/\D/g, ''),
           ],
         );
 
@@ -324,7 +327,7 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
     const isSuper = req.user?.role === 'superadmin';
 
     if (pool) {
-      await pool.query(
+      const result = await pool.query(
         `UPDATE stores
          SET trade_name = COALESCE($1, trade_name),
              legal_name = COALESCE($2, legal_name),
@@ -342,6 +345,9 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
              is_matrix = COALESCE($14, is_matrix),
              active = COALESCE($15, active),
              segment = COALESCE($18, segment),
+             complement = COALESCE($20, complement),
+             tax_regime = COALESCE($21, tax_regime),
+             ibge_city_code = COALESCE($22, ibge_city_code),
              updated_at = now()
          WHERE id = $16 AND ($17::boolean = true OR client_account_id = $19)`,
         [
@@ -357,15 +363,22 @@ storesRouter.patch('/api/v1/stores/:id', requireAuth, async (req, res, next) => 
           body.number,
           body.district,
           body.city,
-          body.state,
+          body.state?.trim().toUpperCase(),
           body.isMatrix,
           body.active,
           id,
           isSuper,
           targetSegment,
           clientAccountId,
+          body.complement,
+          body.taxRegime,
+          body.ibgeCityCode === undefined ? undefined : body.ibgeCityCode.replace(/\D/g, ''),
         ],
       );
+      if (!result.rowCount) {
+        res.status(404).json({ success: false, error: { message: 'Loja/Filial não encontrada.' } });
+        return;
+      }
 
       if (targetSegment) {
         await pool.query(
@@ -487,9 +500,9 @@ storesRouter.put('/api/v1/store/plan', requireAuth, async (req, res, next) => {
     if (pool) {
       await pool.query(
         `INSERT INTO store_licenses (id, store_id, client_account_id, plan_id, modules, status)
-         VALUES ($1, $2, $3, $4::plan_id, $5::module_id[], 'active')
+         VALUES ($1, $2, $3, $4, $5::text[], 'active')
          ON CONFLICT (store_id) DO UPDATE
-         SET plan_id = $4::plan_id, modules = $5::module_id[], updated_at = now()`,
+         SET plan_id = $4, modules = $5::text[], updated_at = now()`,
         [`LIC-${storeId}`, storeId, clientAccountId, dbPlan, ['totem', 'os', 'erp', 'fiscal']],
       );
     }
@@ -526,7 +539,29 @@ const adminClientSchema = z.object({
   accessToken: z.string().optional(),
   parentClientId: z.string().optional().nullable(),
   branchName: z.string().optional(),
+  /** Loja (matriz) cujo endereço está sendo editado. */
+  storeId: z.string().optional().nullable(),
+  address: z
+    .object({
+      zipCode: z.string().trim().max(9).default(''),
+      street: z.string().trim().max(160).default(''),
+      number: z.string().trim().max(20).default(''),
+      complement: z.string().trim().max(120).default(''),
+      district: z.string().trim().max(120).default(''),
+      city: z.string().trim().max(120).default(''),
+      state: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .refine((uf) => uf === '' || /^[A-Z]{2}$/.test(uf), 'UF deve ter 2 letras.')
+        .default(''),
+      cityCode: z.string().trim().max(10).default(''),
+    })
+    .optional(),
 });
+
+type AdminAddress = NonNullable<z.infer<typeof adminClientSchema>['address']>;
+const EMPTY_ADMIN_ADDRESS: AdminAddress = { zipCode: '', street: '', number: '', complement: '', district: '', city: '', state: '', cityCode: '' };
 
 storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
@@ -535,6 +570,9 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
       const sql = `
         SELECT c.*,
                s.id as store_id, s.trade_name as store_name, s.is_matrix, s.access_token as store_token,
+               s.zip_code as store_zip_code, s.street as store_street, s.number as store_number,
+               s.complement as store_complement, s.district as store_district, s.city as store_city,
+               s.state as store_state, s.ibge_city_code as store_city_code,
                l.plan_id, l.modules::text[] as modules, l.final_price,
                pc.confirmed_at as manual_confirmed_at, pc.contracting_status as manual_status,
                pc.payment_method as manual_method, pc.transaction_ref as manual_ref,
@@ -587,6 +625,20 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
             phoneVerified: false,
             notes: row.partner_notes || '',
             accessToken: token,
+            // Endereço da loja matriz (primeira linha do cliente, ordenada pela matriz).
+            storeId: row.store_id || null,
+            address: row.store_id
+              ? {
+                  zipCode: row.store_zip_code || '',
+                  street: row.store_street || '',
+                  number: row.store_number || '',
+                  complement: row.store_complement || '',
+                  district: row.store_district || '',
+                  city: row.store_city || '',
+                  state: row.store_state || '',
+                  cityCode: row.store_city_code || '',
+                }
+              : null,
             paymentDetails: (row.manual_method || row.partner_pay_method) ? {
               method: row.manual_method || row.partner_pay_method,
               identifiedAt: row.manual_confirmed_at || row.payment_confirmed_at || row.created_at,
@@ -669,6 +721,17 @@ storesRouter.post('/api/v1/admin/clients', requireSession, requirePlatformAdmin,
     const token = body.accessToken || generateStoreAccessToken(cleanDoc, body.email, clientId);
 
     if (pool) {
+      // O cadastro casa a conta pelo documento: sem ele (ou com o de outro cliente) sobrescreveria outra empresa.
+      if (cleanDoc.replace(/\D/g, '').length < 11) {
+        throw Object.assign(new Error('Informe o CNPJ (ou CPF) do cliente.'), { status: 422 });
+      }
+      const owner = await pool.query(
+        `SELECT id FROM client_accounts WHERE regexp_replace(document, '\\D', '', 'g') = $1 LIMIT 1`,
+        [cleanDoc.replace(/\D/g, '')],
+      );
+      if (owner.rows[0] && owner.rows[0].id !== clientId) {
+        throw Object.assign(new Error('Já existe um cliente cadastrado com este CNPJ/CPF.'), { status: 409 });
+      }
       // 1. client_accounts
       await pool.query(
         `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, access_token)
@@ -684,16 +747,17 @@ storesRouter.post('/api/v1/admin/clients', requireSession, requirePlatformAdmin,
         [clientId, body.tradeName, body.legalName || body.tradeName, cleanDoc, body.email, body.phone, body.status, token],
       );
 
-      // 2. stores
+      // 2. stores — o endereço é o informado no cadastro (fica em branco até ser preenchido).
       const storeId = `STR-${clientId.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}`;
+      const address = body.address ?? EMPTY_ADMIN_ADDRESS;
       await pool.query(
         `INSERT INTO stores (
            id, client_account_id, trade_name, legal_name, document_type, document,
-           email, phone, zip_code, street, number, complement, district, city, state,
+           email, phone, zip_code, street, number, complement, district, city, state, ibge_city_code,
            tax_regime, is_matrix, active, access_token
          ) VALUES (
            $1, $2, $3, $4, 'cnpj', $5, $6, $7,
-           '25800-000', 'Endereço Comercial', '100', '', 'Centro', 'Três Rios', 'RJ',
+           $9, $10, $11, $12, $13, $14, $15, $16,
            'simples_nacional', true, true, $8
          )
          ON CONFLICT (id) DO UPDATE SET
@@ -702,7 +766,11 @@ storesRouter.post('/api/v1/admin/clients', requireSession, requirePlatformAdmin,
            phone = EXCLUDED.phone,
            access_token = EXCLUDED.access_token,
            active = true`,
-        [storeId, clientId, body.tradeName, body.legalName || body.tradeName, cleanDoc, body.email, body.phone, token],
+        [
+          storeId, clientId, body.tradeName, body.legalName || body.tradeName, cleanDoc, body.email, body.phone, token,
+          address.zipCode, address.street, address.number, address.complement, address.district, address.city, address.state,
+          address.cityCode.replace(/\D/g, ''),
+        ],
       );
 
       // 3. store_licenses
@@ -747,6 +815,9 @@ storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdm
 
     if (pool && clientId) {
       const cleanDoc = (body.document || '').replace(/\D/g, '');
+      const current = await pool.query('SELECT status FROM client_accounts WHERE id = $1', [clientId]);
+      const previousStatus: string | undefined = current.rows[0]?.status;
+      // Só a conta do próprio cliente (antes casava também por e-mail/documento e podia alterar outra conta).
       await pool.query(
         `UPDATE client_accounts
          SET trade_name = COALESCE($1, trade_name),
@@ -757,11 +828,23 @@ storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdm
              status = COALESCE($6, status),
              access_token = COALESCE($7, access_token),
              updated_at = now()
-         WHERE id = $8 OR lower(email) = lower($4) OR (length($9) >= 6 AND regexp_replace(document, '\\D', '', 'g') = $9)`,
-        [body.tradeName, body.legalName, body.document, body.email, body.phone, body.status, body.accessToken, clientId, cleanDoc],
+         WHERE id = $8`,
+        [body.tradeName, body.legalName, body.document, body.email, body.phone, body.status, body.accessToken, clientId],
       );
 
-      if (body.tradeName || body.legalName || body.document || body.email || body.phone || body.accessToken || body.status) {
+      // Dados cadastrais e endereço: só na loja informada (ou na matriz). As filiais têm cadastro próprio.
+      const address = body.address;
+      const target = await pool.query(
+        `SELECT id FROM stores
+         WHERE client_account_id = $1 AND ($2::text IS NULL OR id = $2)
+         ORDER BY is_matrix DESC, active DESC, created_at ASC LIMIT 1`,
+        [clientId, body.storeId || null],
+      );
+      const targetStoreId: string | undefined = target.rows[0]?.id;
+      if (address && !targetStoreId) {
+        throw Object.assign(new Error('Este cliente ainda não tem loja cadastrada para receber o endereço.'), { status: 422 });
+      }
+      if (targetStoreId) {
         await pool.query(
           `UPDATE stores
            SET trade_name = COALESCE($1, trade_name),
@@ -770,11 +853,31 @@ storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdm
                email = COALESCE($4, email),
                phone = COALESCE($5, phone),
                access_token = COALESCE($6, access_token),
-               active = CASE WHEN $7 = 'blocked' OR $7 = 'inactive' THEN false ELSE true END,
+               zip_code = COALESCE($7, zip_code),
+               street = COALESCE($8, street),
+               number = COALESCE($9, number),
+               complement = COALESCE($10, complement),
+               district = COALESCE($11, district),
+               city = COALESCE($12, city),
+               state = COALESCE($13, state),
+               ibge_city_code = COALESCE($14, ibge_city_code),
                updated_at = now()
-           WHERE client_account_id = $8 OR id = $8`,
-          [body.tradeName, body.legalName, body.document, body.email, body.phone, body.accessToken, body.status, clientId],
+           WHERE id = $15 AND client_account_id = $16`,
+          [
+            body.tradeName, body.legalName, body.document, body.email, body.phone, body.accessToken,
+            address?.zipCode, address?.street, address?.number, address?.complement, address?.district, address?.city, address?.state,
+            address ? address.cityCode.replace(/\D/g, '') : undefined,
+            targetStoreId, clientId,
+          ],
         );
+      }
+
+      // Bloquear/inativar desliga as lojas; reativar religa. Salvar sem mudar o status não mexe nas lojas
+      // (antes toda edição religava inclusive filiais desativadas).
+      if (body.status === 'blocked' || body.status === 'inactive') {
+        await pool.query('UPDATE stores SET active = false, updated_at = now() WHERE client_account_id = $1 AND active', [clientId]);
+      } else if (body.status === 'active' && previousStatus && previousStatus !== 'active') {
+        await pool.query('UPDATE stores SET active = true, updated_at = now() WHERE client_account_id = $1', [clientId]);
       }
 
       if (body.planId) {
@@ -783,7 +886,7 @@ storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdm
         else if (body.planId === 'silver' || body.planId === 'growth') dbPlan = 'growth';
 
         await pool.query(
-          `UPDATE store_licenses SET plan_id = $1::plan_id, updated_at = now() WHERE client_account_id = $2`,
+          `UPDATE store_licenses SET plan_id = $1, updated_at = now() WHERE client_account_id = $2`,
           [dbPlan, clientId],
         );
       }
@@ -793,7 +896,7 @@ storesRouter.put('/api/v1/admin/clients/:id', requireSession, requirePlatformAdm
           ['totem', 'os', 'erp', 'fiscal', 'ecommerce'].includes(m),
         );
         await pool.query(
-          `UPDATE store_licenses SET modules = $1::module_id[], updated_at = now() WHERE client_account_id = $2`,
+          `UPDATE store_licenses SET modules = $1::text[], updated_at = now() WHERE client_account_id = $2`,
           [validModules, clientId],
         );
       }

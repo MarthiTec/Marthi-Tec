@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CompanyUserSummary } from '../../components/CompanyUserSummary';
 import { CrudNameButton, CrudRowActions } from '../../components/CrudKit';
+import { AddressFields } from '../../components/PersonFields';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import { PARTNER_MODULES, type PartnerModuleId, type PlanId } from '../../data/catalog';
@@ -12,6 +13,7 @@ import {
   clientPresenceLabel,
   createMarthiClientWithSecureActivation,
   deleteMarthiClient,
+  EMPTY_CLIENT_ADDRESS,
   forceClientPasswordReset,
   generateClientAccessToken,
   getClientBranches,
@@ -26,17 +28,18 @@ import {
   planMonthlyAmount,
   regenerateClientAccessToken,
   resendClientActivationEmail,
+  saveMarthiClientEdit,
   sendClientPhoneVerification,
   setMarthiClientPaymentOk,
   setMarthiClientStatus,
   upsertMarthiClient,
   type MarthiClient,
+  type MarthiClientAddress,
   type MarthiClientStatus,
 } from '../../data/marthiClientsStore';
 import { PRESENCE_EVENT } from '../../data/presenceStore';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { lookupCnpjData } from '../../services/cnpj';
-import { nestApiUrl } from '../../services/config';
 
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -73,6 +76,8 @@ type EditForm = {
   parentClientId: string;
   branchName: string;
   accessToken?: string;
+  storeId: string | null;
+  address: MarthiClientAddress;
 };
 
 type NewClientForm = {
@@ -89,6 +94,7 @@ type NewClientForm = {
   modules: PartnerModuleId[];
   parentClientId: string;
   branchName: string;
+  address: MarthiClientAddress;
 };
 
 function toEditForm(client: MarthiClient): EditForm {
@@ -106,6 +112,8 @@ function toEditForm(client: MarthiClient): EditForm {
     parentClientId: client.parentClientId || '',
     branchName: client.branchName || '',
     accessToken: client.accessToken,
+    storeId: client.storeId ?? null,
+    address: { ...EMPTY_CLIENT_ADDRESS, ...(client.address ?? {}) },
   };
 }
 
@@ -121,6 +129,7 @@ export function MarthiClientsPage() {
   const [editing, setEditing] = useState<EditForm | null>(null);
   const [auditClient, setAuditClient] = useState<MarthiClient | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // New Client Creation Modal
   const [isCreating, setIsCreating] = useState(false);
@@ -140,6 +149,7 @@ export function MarthiClientsPage() {
     modules: ['totem', 'erp'],
     parentClientId: '',
     branchName: '',
+    address: { ...EMPTY_CLIENT_ADDRESS },
   });
 
   async function handleModalCnpjLookup(raw: string) {
@@ -156,15 +166,19 @@ export function MarthiClientsPage() {
         legalName: prev.legalName || data.legalName,
         phone: prev.phone || data.phone,
         email: prev.email || data.email,
-        notes: [
-          prev.notes,
-          data.stateRegistration ? `IE: ${data.stateRegistration}` : '',
-          data.street
-            ? `${data.street}, ${data.number || 'S/N'} - ${data.district}, ${data.city}/${data.state} (CEP: ${data.zipCode})`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
+        notes: [prev.notes, data.stateRegistration ? `IE: ${data.stateRegistration}` : ''].filter(Boolean).join('\n'),
+        address: data.street
+          ? {
+              ...prev.address,
+              zipCode: data.zipCode || prev.address.zipCode,
+              street: data.street,
+              number: data.number || prev.address.number,
+              complement: data.complement || prev.address.complement,
+              district: data.district || prev.address.district,
+              city: data.city || prev.address.city,
+              state: data.state || prev.address.state,
+            }
+          : prev.address,
       }));
       setModalCnpjStatus(
         data.stateRegistration
@@ -264,6 +278,7 @@ export function MarthiClientsPage() {
       modules: ['totem', 'erp'],
       parentClientId: '',
       branchName: '',
+      address: { ...EMPTY_CLIENT_ADDRESS },
     });
     setIsCreating(true);
   }
@@ -285,7 +300,9 @@ export function MarthiClientsPage() {
     const parentClientId = newForm.parentClientId.trim() || undefined;
     const branchName = parentClientId ? (newForm.branchName.trim() || `${tradeName} (Filial)`) : undefined;
 
-    const client = await createMarthiClientWithSecureActivation({
+    let client: MarthiClient;
+    try {
+      client = await createMarthiClientWithSecureActivation({
       tradeName,
       legalName: newForm.legalName.trim() || undefined,
       document: newForm.document.trim() || undefined,
@@ -300,7 +317,12 @@ export function MarthiClientsPage() {
       actorName: user?.name || 'Administrador Marthi',
       parentClientId,
       branchName,
+      address: newForm.address,
     });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Não foi possível cadastrar o cliente.');
+      return;
+    }
 
     logAction({
       actorName: user?.name ?? 'Admin Marthi',
@@ -337,7 +359,7 @@ export function MarthiClientsPage() {
     }));
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editing) return;
     const tradeName = editing.tradeName.trim();
     const email = editing.email.trim().toLowerCase();
@@ -350,50 +372,57 @@ export function MarthiClientsPage() {
       setFormError('Mensalidade inválida.');
       return;
     }
+    const address = editing.address;
+    if (address.zipCode && address.zipCode.replace(/\D/g, '').length !== 8) {
+      setFormError('CEP da loja inválido: use 8 números.');
+      return;
+    }
+    if (address.state && !/^[A-Za-z]{2}$/.test(address.state)) {
+      setFormError('UF da loja deve ter 2 letras.');
+      return;
+    }
 
     const parentClientId = editing.parentClientId.trim() || undefined;
     const branchName = parentClientId ? (editing.branchName.trim() || `${tradeName} (Filial)`) : undefined;
 
-    const saved = upsertMarthiClient({
-      clientId: editing.clientId,
-      tradeName,
-      email,
-      phone: editing.phone.trim() || undefined,
-      planId: editing.planId,
-      monthlyAmount: amount,
-      status: editing.status,
-      paymentOk: editing.paymentOk,
-      notes: editing.notes.trim(),
-      modules: editing.modules,
-      parentClientId: parentClientId || null,
-      branchName,
-      accessToken: editing.accessToken,
-    });
+    setSavingEdit(true);
+    try {
+      await saveMarthiClientEdit(editing.clientId, {
+        tradeName,
+        email,
+        phone: editing.phone.trim() || undefined,
+        planId: editing.planId,
+        modules: editing.modules,
+        monthlyAmount: amount,
+        status: editing.status,
+        paymentOk: editing.paymentOk,
+        notes: editing.notes.trim(),
+        accessToken: editing.accessToken,
+        storeId: editing.storeId,
+        // Cliente ainda sem loja (cadastro pendente) não tem onde gravar o endereço.
+        address: editing.storeId ? address : null,
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Não foi possível salvar no banco.');
+      return;
+    } finally {
+      setSavingEdit(false);
+    }
+
+    // Vínculo matriz/filial da lista da tela.
+    const current = getMarthiClient(editing.clientId);
+    if (current && ((current.parentClientId || '') !== (parentClientId || '') || (current.branchName || '') !== (branchName || ''))) {
+      upsertMarthiClient({ ...current, parentClientId: parentClientId || null, branchName });
+    }
 
     logAction({
       actorName: user?.name ?? 'Admin Marthi',
       actorEmail: user?.email ?? '',
       action: 'marthi.cliente.editar',
-      detail: `${saved.tradeName} (${saved.clientId}) · ${planLabel(saved.planId)}${parentClientId ? ' [Filial Unificada]' : ''}`,
+      detail: `${tradeName} (${editing.clientId}) · ${planLabel(editing.planId)}${parentClientId ? ' [Filial Unificada]' : ''}`,
     });
 
-    try {
-      const apiUrl = nestApiUrl();
-      fetch(`${apiUrl}/api/v1/admin/clients/${saved.clientId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(saved),
-      }).catch(() => {});
-      fetch(`${apiUrl}/api/v1/admin/clients`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(saved),
-      }).catch(() => {});
-    } catch {
-      /* ignore */
-    }
-
-    setFlash(`Registro de ${saved.tradeName} atualizado.`);
+    setFlash(`Registro de ${tradeName} atualizado.`);
     setEditing(null);
     setFormError(null);
     refresh();
@@ -540,8 +569,19 @@ export function MarthiClientsPage() {
     });
     if (!ok) return;
 
+    try {
+      if (action.type === 'block') await setMarthiClientStatus(client.clientId, 'blocked');
+      else if (action.type === 'inactive') await setMarthiClientStatus(client.clientId, 'inactive');
+      else if (action.type === 'reactivate') {
+        await setMarthiClientPaymentOk(client.clientId, true);
+        await setMarthiClientStatus(client.clientId, 'active');
+      } else await setMarthiClientPaymentOk(client.clientId, action.paymentOk);
+    } catch (err) {
+      setFlash(err instanceof Error ? err.message : 'Não foi possível gravar a alteração no banco.');
+      return;
+    }
+
     if (action.type === 'block') {
-      setMarthiClientStatus(client.clientId, 'blocked');
       logAction({
         actorName,
         actorEmail,
@@ -554,7 +594,6 @@ export function MarthiClientsPage() {
     }
 
     if (action.type === 'inactive') {
-      setMarthiClientStatus(client.clientId, 'inactive');
       logAction({
         actorName,
         actorEmail,
@@ -567,8 +606,6 @@ export function MarthiClientsPage() {
     }
 
     if (action.type === 'reactivate') {
-      setMarthiClientPaymentOk(client.clientId, true);
-      setMarthiClientStatus(client.clientId, 'active');
       logAction({
         actorName,
         actorEmail,
@@ -580,7 +617,6 @@ export function MarthiClientsPage() {
       return;
     }
 
-    setMarthiClientPaymentOk(client.clientId, action.paymentOk);
     logAction({
       actorName,
       actorEmail,
@@ -620,6 +656,7 @@ export function MarthiClientsPage() {
       modules: [...client.modules],
       parentClientId: client.parentClientId || (client.companyType === 'matrix' ? client.clientId : ''),
       branchName: client.companyType === 'matrix' ? 'Nova Filial' : '',
+      address: { ...EMPTY_CLIENT_ADDRESS },
     });
     setIsCreating(true);
   }
@@ -633,7 +670,12 @@ export function MarthiClientsPage() {
     });
     if (!ok) return;
 
-    deleteMarthiClient(client.clientId);
+    try {
+      await deleteMarthiClient(client.clientId);
+    } catch (err) {
+      setFlash(err instanceof Error ? err.message : 'Não foi possível excluir o cliente no banco.');
+      return;
+    }
     logAction({
       actorName: user?.name ?? 'Admin Marthi',
       actorEmail: user?.email ?? 'admin@marthi.com.br',
@@ -767,6 +809,22 @@ export function MarthiClientsPage() {
               onChange={(value) => setEditing({ ...editing, paymentOk: value === '1' })}
             />
 
+            {/* Endereço da loja matriz (gravado no cadastro da loja) */}
+            <div className="span-2 marthi-address">
+              {editing.storeId ? (
+                <AddressFields
+                  legend="Endereço da loja"
+                  value={editing.address}
+                  onChange={(address) => setEditing((cur) => (cur ? { ...cur, address: { ...cur.address, ...address } } : cur))}
+                  onCityCode={(cityCode) => setEditing((cur) => (cur ? { ...cur, address: { ...cur.address, cityCode } } : cur))}
+                />
+              ) : (
+                <p className="marthi-address__empty">
+                  Este cliente ainda não tem loja ativa no banco (cadastro pendente ou bloqueado). O endereço fica disponível depois da ativação.
+                </p>
+              )}
+            </div>
+
             {/* Estrutura Corporativa / Matriz e Filial */}
             <div className="span-2" style={{ borderTop: '1px solid var(--line)', paddingTop: '16px', marginTop: '8px' }}>
               <h3 style={{ margin: '0 0 10px', fontSize: '0.95rem', color: 'var(--ink)' }}>
@@ -889,8 +947,8 @@ export function MarthiClientsPage() {
             </div>
             <div className="span-2 admin-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className="btn btn--primary" onClick={saveEdit}>
-                  Salvar alterações
+                <button type="button" className="btn btn--primary" onClick={() => void saveEdit()} disabled={savingEdit}>
+                  {savingEdit ? 'Salvando…' : 'Salvar alterações'}
                 </button>
                 <button
                   type="button"
@@ -1255,7 +1313,7 @@ export function MarthiClientsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <label className="marthi-form-field">
-                  <span>CNPJ da Empresa</span>
+                  <span>CNPJ da Empresa *</span>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <input
                       type="text"
@@ -1347,6 +1405,15 @@ export function MarthiClientsPage() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div className="marthi-address">
+                <AddressFields
+                  legend="Endereço da loja (busque pelo CEP ou pela rua)"
+                  value={newForm.address}
+                  onChange={(address) => setNewForm((prev) => ({ ...prev, address: { ...prev.address, ...address } }))}
+                  onCityCode={(cityCode) => setNewForm((prev) => ({ ...prev, address: { ...prev.address, cityCode } }))}
+                />
               </div>
 
               <div
@@ -1701,13 +1768,17 @@ export function MarthiClientsPage() {
                     type="button"
                     className="btn btn--ghost"
                     style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                    onClick={() => {
-                      const newToken = regenerateClientAccessToken(auditClient.clientId);
-                      if (newToken) {
-                        refresh();
-                        const updated = getMarthiClient(auditClient.clientId);
-                        if (updated) setAuditClient(updated);
-                        setFlash(`Novo Token gerado para ${auditClient.tradeName}: ${newToken}`);
+                    onClick={async () => {
+                      try {
+                        const newToken = await regenerateClientAccessToken(auditClient.clientId);
+                        if (newToken) {
+                          refresh();
+                          const updated = getMarthiClient(auditClient.clientId);
+                          if (updated) setAuditClient(updated);
+                          setFlash(`Novo Token gerado para ${auditClient.tradeName}: ${newToken}`);
+                        }
+                      } catch (err) {
+                        setFlash(err instanceof Error ? err.message : 'Não foi possível renovar o token no banco.');
                       }
                     }}
                     title="Gerar ou renovar Token de Acesso da loja"

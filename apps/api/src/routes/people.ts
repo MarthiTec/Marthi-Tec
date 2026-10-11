@@ -8,7 +8,7 @@ export const peopleRouter = Router();
 const VIACEP_URL = 'https://viacep.com.br/ws';
 const digits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
 
-type ViaCepRow = { cep?: string; logradouro?: string; complemento?: string; bairro?: string; localidade?: string; uf?: string; erro?: boolean | string };
+type ViaCepRow = { cep?: string; logradouro?: string; complemento?: string; bairro?: string; localidade?: string; uf?: string; ibge?: string; erro?: boolean | string };
 
 function toAddress(row: ViaCepRow) {
   return {
@@ -18,6 +18,7 @@ function toAddress(row: ViaCepRow) {
     city: row.localidade ?? '',
     state: (row.uf ?? '').toUpperCase(),
     complement: row.complemento ?? '',
+    cityCode: digits(row.ibge),
   };
 }
 

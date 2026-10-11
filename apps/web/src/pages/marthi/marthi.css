@@ -1520,3 +1520,36 @@
   .marthi-payout-card { padding: 16px; }
   .marthi-input-action-row .btn { width: 100%; }
 }
+
+/* Endereço da loja nos modais do /admin (componente com busca por CEP e por rua). */
+.marthi-address .address-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.marthi-modal-form > .marthi-address .address-fields label {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #334155;
+}
+.marthi-modal-form > .marthi-address .address-fields input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  background: #ffffff;
+}
+.marthi-modal-form > .marthi-address .address-fields input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+.marthi-address__empty {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line, #cbd5e1);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--mute, #64748b);
+}

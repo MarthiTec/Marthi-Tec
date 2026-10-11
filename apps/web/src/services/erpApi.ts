@@ -476,7 +476,7 @@ export type ApiPersonDetails = {
   emails: string[];
 };
 
-export type ApiAddress = { zipCode: string; street: string; district: string; city: string; state: string; complement: string };
+export type ApiAddress = { zipCode: string; street: string; district: string; city: string; state: string; complement: string; cityCode?: string };
 
 export function apiAddressByCep(cep: string) {
   return nestGet<ApiAddress>(`/address/cep/${cep.replace(/\D/g, '')}`);
@@ -2065,6 +2065,7 @@ export type ApiStoreRow = {
   district: string;
   city: string;
   state: string;
+  ibgeCityCode?: string;
   taxRegime: string;
   isMatrix: boolean;
   active: boolean;

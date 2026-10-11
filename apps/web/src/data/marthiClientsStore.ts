@@ -29,8 +29,26 @@ export type MarthiClientPaymentDetails = {
   notes?: string;
 };
 
+/** Endereço da loja (matriz) do cliente, como está no banco. */
+export type MarthiClientAddress = {
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  district: string;
+  city: string;
+  state: string;
+  cityCode: string;
+};
+
+export const EMPTY_CLIENT_ADDRESS: MarthiClientAddress = {
+  zipCode: '', street: '', number: '', complement: '', district: '', city: '', state: '', cityCode: '',
+};
+
 export type MarthiClient = {
   isDemo?: boolean;
+  storeId?: string | null;
+  address?: MarthiClientAddress | null;
   clientId: string;
   tradeName: string;
   legalName?: string;
@@ -185,6 +203,8 @@ function normalizeClient(raw: Partial<MarthiClient>): MarthiClient {
     parentClientId: raw.parentClientId?.trim() || null,
     branchName: raw.branchName?.trim() || undefined,
     accessToken: raw.accessToken || '',
+    storeId: raw.storeId ?? null,
+    address: raw.address ? { ...EMPTY_CLIENT_ADDRESS, ...raw.address } : null,
   };
 }
 
@@ -262,23 +282,12 @@ export async function hydrateMarthiClientsFromApi(): Promise<MarthiClient[]> {
   return listMarthiClients();
 }
 
-export function regenerateClientAccessToken(clientId: string): string | null {
-  const state = load();
-  const client = state.clients.find((c) => c.clientId === clientId);
+export async function regenerateClientAccessToken(clientId: string): Promise<string | null> {
+  const client = load().clients.find((c) => c.clientId === clientId);
   if (!client) return null;
   const newToken = generateClientAccessToken(client.document, client.email, client.clientId);
-  client.accessToken = newToken;
-  save(state);
-  try {
-    const apiUrl = nestApiUrl();
-    fetch(`${apiUrl}/api/v1/admin/clients`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(client),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
+  await nestRequest(`/admin/clients/${encodeURIComponent(clientId)}`, { method: 'PUT', body: JSON.stringify({ accessToken: newToken }) });
+  await hydrateMarthiClientsFromApi();
   return newToken;
 }
 
@@ -347,51 +356,56 @@ export function upsertMarthiClient(
   }
 
   save(state);
-
-  // Persist to Postgres API in background
-  try {
-    const apiUrl = nestApiUrl();
-    fetch(`${apiUrl}/api/v1/admin/clients`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(next),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
-
   return next;
 }
 
-export function deleteMarthiClient(clientId: string): boolean {
+/** Edição do cadastro pelo /admin: grava no banco (conta, loja matriz e endereço) e recarrega a lista. */
+export async function saveMarthiClientEdit(
+  clientId: string,
+  input: {
+    tradeName: string;
+    email: string;
+    phone?: string;
+    planId: PlanId;
+    modules: PartnerModuleId[];
+    monthlyAmount: number;
+    status: MarthiClientStatus;
+    paymentOk: boolean;
+    notes: string;
+    accessToken?: string;
+    storeId?: string | null;
+    address?: MarthiClientAddress | null;
+  },
+) {
+  await nestRequest(`/admin/clients/${encodeURIComponent(clientId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...input, address: input.address ?? undefined, storeId: input.storeId ?? undefined }),
+  });
+  await hydrateMarthiClientsFromApi();
+  return getMarthiClient(clientId);
+}
+
+export async function deleteMarthiClient(clientId: string): Promise<boolean> {
+  await nestRequest(`/admin/clients/${encodeURIComponent(clientId)}`, { method: 'DELETE' });
   const state = load();
   const idx = state.clients.findIndex((item) => item.clientId === clientId);
-  if (idx < 0) return false;
-  const removed = state.clients.splice(idx, 1)[0];
-  if (removed?.parentClientId) {
-    try {
-      removeBranchFromMultiStore(removed.clientId);
-    } catch {
-      /* ignore */
+  if (idx >= 0) {
+    const removed = state.clients.splice(idx, 1)[0];
+    if (removed?.parentClientId) {
+      try {
+        removeBranchFromMultiStore(removed.clientId);
+      } catch {
+        /* ignore */
+      }
     }
+    state.clients.forEach((c) => {
+      if (c.parentClientId === clientId) {
+        c.parentClientId = null;
+        c.companyType = 'independent';
+      }
+    });
+    save(state);
   }
-  state.clients.forEach((c) => {
-    if (c.parentClientId === clientId) {
-      c.parentClientId = null;
-      c.companyType = 'independent';
-    }
-  });
-  save(state);
-
-  try {
-    const apiUrl = nestApiUrl();
-    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
-      method: 'DELETE',
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
-
   return true;
 }
 
@@ -436,6 +450,7 @@ export async function createMarthiClientWithSecureActivation(input: {
   actorName?: string;
   parentClientId?: string | null;
   branchName?: string;
+  address?: MarthiClientAddress;
 }): Promise<MarthiClient> {
   const client = upsertMarthiClient({
     tradeName: input.tradeName,
@@ -456,16 +471,33 @@ export async function createMarthiClientWithSecureActivation(input: {
     activationTokenSentAt: input.paymentOk ? now() : undefined,
   });
 
-  // Notifica o backend para pré-registro e envio do link de ativação seguro
+  await nestRequest('/admin/clients', {
+    method: 'POST',
+    body: JSON.stringify({
+      clientId: client.clientId,
+      tradeName: client.tradeName,
+      legalName: client.legalName || '',
+      document: client.document || '',
+      email: client.email,
+      phone: client.phone || '',
+      planId: client.planId,
+      modules: client.modules,
+      status: client.status,
+      paymentOk: client.paymentOk,
+      monthlyAmount: client.monthlyAmount,
+      notes: client.notes,
+      parentClientId: client.parentClientId,
+      branchName: client.branchName,
+      address: input.address,
+    }),
+  });
+
+  // Link de ativação seguro (a senha é criada pelo próprio cliente).
   if (input.paymentOk) {
     try {
-      const apiUrl = nestApiUrl();
-      await fetch(`${apiUrl}/api/v1/admin/clients/resend-activation`, {
+      await nestRequest('/admin/clients/resend-activation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-actor-name': input.actorName || 'Administrador Marthi',
-        },
+        headers: { 'x-actor-name': input.actorName || 'Administrador Marthi' },
         body: JSON.stringify({
           email: client.email,
           clientName: client.tradeName,
@@ -473,18 +505,19 @@ export async function createMarthiClientWithSecureActivation(input: {
         }),
       });
     } catch (err) {
-      console.warn('[marthiClientsStore] Backend activation dispatch fallback:', err);
+      console.warn('[marthiClientsStore] Falha ao enviar o link de ativação:', err);
     }
   }
 
-  return client;
+  await hydrateMarthiClientsFromApi().catch(() => null);
+  return getMarthiClient(client.clientId) ?? client;
 }
 
-export function setMarthiClientStatus(
+export async function setMarthiClientStatus(
   clientId: string,
   status: MarthiClientStatus,
   notes?: string,
-): MarthiClient | null {
+): Promise<MarthiClient | null> {
   const state = load();
   const client = state.clients.find((item) => item.clientId === clientId);
   if (!client) return null;
@@ -498,32 +531,19 @@ export function setMarthiClientStatus(
   } else if (status === 'active') {
     client.contractingStatus = client.passwordConfigured ? 'acesso_ativado' : 'acesso_pendente';
   }
+  await nestRequest(`/admin/clients/${encodeURIComponent(clientId)}`, { method: 'PUT', body: JSON.stringify({ status }) });
+  await nestRequest('/admin/clients/toggle-access', {
+    method: 'POST',
+    body: JSON.stringify({ email: client.email, active: status === 'active' }),
+  });
   save(state);
-  try {
-    const apiUrl = nestApiUrl();
-    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    }).catch(() => {});
-    fetch(`${apiUrl}/api/v1/admin/clients/toggle-access`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: client.email,
-        active: status === 'active',
-      }),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
   return client;
 }
 
-export function setMarthiClientPaymentOk(
+export async function setMarthiClientPaymentOk(
   clientId: string,
   paymentOk: boolean,
-): MarthiClient | null {
+): Promise<MarthiClient | null> {
   const state = load();
   const client = state.clients.find((item) => item.clientId === clientId);
   if (!client) return null;
@@ -536,22 +556,11 @@ export function setMarthiClientPaymentOk(
       ? 'acesso_ativado'
       : 'acesso_pendente'
     : 'aguardando_pagamento';
+  await nestRequest(`/admin/clients/${encodeURIComponent(clientId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ paymentOk, status: client.status }),
+  });
   save(state);
-  try {
-    const apiUrl = nestApiUrl();
-    fetch(`${apiUrl}/api/v1/admin/clients/${clientId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentOk, status: client.status }),
-    }).catch(() => {});
-    fetch(`${apiUrl}/api/v1/admin/clients`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(client),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
   return client;
 }
 

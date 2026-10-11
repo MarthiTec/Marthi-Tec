@@ -8,11 +8,13 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (err instanceof ZodError) {
+    // A primeira mensagem do esquema (ex.: "Documento inválido.") diz o que corrigir; as técnicas do zod não.
+    const first = err.issues.find((issue) => issue.code === 'custom' || /[À-ú]|inválid|obrigat/i.test(issue.message));
     res.status(400).json({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Dados inválidos.',
+        message: first ? `Dados inválidos: ${first.message}` : 'Dados inválidos.',
         details: err.flatten(),
       },
     });

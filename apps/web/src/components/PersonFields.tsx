@@ -129,10 +129,15 @@ export function AddressFields({
   value,
   disabled,
   onChange,
+  onCityCode,
+  legend = 'Endereço',
 }: {
   value: AddressValue;
   disabled?: boolean;
   onChange: (value: AddressValue) => void;
+  /** Código IBGE do município, quando a busca pelo CEP o devolve (cadastro da loja / fiscal). */
+  onCityCode?: (code: string) => void;
+  legend?: string;
 }) {
   const store = getActiveStore();
   const [searchCity, setSearchCity] = useState(value.city || store?.city || '');
@@ -154,6 +159,7 @@ export function AddressFields({
       city: address.city || value.city,
       state: address.state || value.state,
     });
+    if (address.cityCode && onCityCode) onCityCode(address.cityCode);
     setResults([]);
     setStreet('');
     setMessage('');
@@ -203,7 +209,7 @@ export function AddressFields({
 
   return (
     <fieldset className="address-fields span-2" disabled={disabled}>
-      <legend>Endereço</legend>
+      <legend>{legend}</legend>
       {!disabled ? (
         <div className="address-search">
           <label className="address-search__street">

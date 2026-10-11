@@ -633,37 +633,41 @@
   gap: 12px;
 }
 
+/* Linhas do formulário em grade de 4 colunas: rótulos, campos e seletores ficam alinhados. */
 .multi-store-form-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 .multi-store-form-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
-  min-width: 140px;
+  min-width: 0;
 }
 
-.multi-store-form-field.span-2 {
-  flex: 2;
-  min-width: 280px;
-}
+.multi-store-form-field.span-2 { grid-column: span 2; }
+.multi-store-form-field.span-3 { grid-column: span 3; }
+.multi-store-form-field.span-4 { grid-column: 1 / -1; }
 
-.multi-store-form-field span {
+.multi-store-form-field > span {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--admin-muted, #64748b);
 }
 
-.is-theme-dark .multi-store-form-field span {
+.is-theme-dark .multi-store-form-field > span {
   color: #94a3b8;
 }
 
 .multi-store-form-field input,
 .multi-store-form-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--admin-border, #cbd5e1);
   border-radius: 6px;
@@ -888,5 +892,107 @@
   .multi-store-licensing-overview,
   .multi-store-isolation-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Seletores no formulário da loja: mesmo rótulo, altura e borda dos campos de texto. */
+.multi-store-form-field .admin-picker {
+  gap: 4px;
+}
+.multi-store-form-field .admin-picker__caption {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--admin-muted, #64748b);
+}
+.multi-store-form-field .admin-picker__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.multi-store-form-field .admin-picker__trigger {
+  min-height: 40px;
+  border-radius: 6px;
+  border-color: var(--admin-border, #cbd5e1);
+}
+
+.multi-store-form-section {
+  margin: 6px 0 -2px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--admin-muted, #64748b);
+}
+
+.multi-store-form-hint {
+  font-size: 0.75rem;
+  color: var(--admin-muted, #64748b);
+}
+
+.multi-store-token {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.multi-store-token input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  background: var(--admin-surface-subtle, #f8fafc);
+}
+.multi-store-token button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+/* Endereço (componente compartilhado com a busca por CEP) no visual do formulário da loja. */
+.multi-store-address .address-fields {
+  padding: 12px;
+  border-color: var(--admin-border, #e2e8f0);
+  border-radius: 10px;
+}
+.multi-store-address .address-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--admin-muted, #64748b);
+}
+.multi-store-address .address-fields input {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border, #cbd5e1);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 400;
+  background: var(--admin-surface, #ffffff);
+  color: var(--admin-text, #1e293b);
+  outline: none;
+}
+.multi-store-address .address-fields input:focus {
+  border-color: #2563eb;
+}
+.is-theme-dark .multi-store-address .address-fields input,
+.is-theme-dark .multi-store-token input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .multi-store-form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .multi-store-form-field.span-2,
+  .multi-store-form-field.span-3 {
+    grid-column: 1 / -1;
+  }
+  .multi-store-token {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

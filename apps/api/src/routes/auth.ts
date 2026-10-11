@@ -315,7 +315,7 @@ authRouter.post('/api/v1/admin/clients/force-reset', requireSession, requirePlat
   }
 });
 
-authRouter.post('/api/v1/admin/clients/toggle-access', async (req, res, next) => {
+authRouter.post('/api/v1/admin/clients/toggle-access', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
     const body = adminActionSchema.parse(req.body);
     const actor = req.header('x-actor-name') || 'Administrador Marthi';

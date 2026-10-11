@@ -38,7 +38,7 @@ globalThis.fetch = async (url, init) => {
   if (!u.startsWith('https://viacep.com.br/')) return realFetch(url, init);
   viaCepCalls.push(u);
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  if (u === 'https://viacep.com.br/ws/01310100/json/') return json({ cep: '01310-100', logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' });
+  if (u === 'https://viacep.com.br/ws/01310100/json/') return json({ cep: '01310-100', logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP', ibge: '3550308' });
   if (u === 'https://viacep.com.br/ws/99999999/json/') return json({ erro: 'true' });
   if (u.startsWith('https://viacep.com.br/ws/SP/S%C3%A3o%20Paulo/Paulista/')) return json([
     { cep: '01310-100', logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' },
@@ -55,7 +55,7 @@ after(async () => { globalThis.fetch = realFetch; server.close(); await once(ser
 test('address is found by CEP and by street name, and unknown CEP returns 404', async () => {
   const byCep = await request('/address/cep/01310-100');
   assert.equal(byCep.status, 200, JSON.stringify(byCep.json));
-  assert.deepEqual(byCep.json.data, { zipCode: '01310-100', street: 'Avenida Paulista', district: 'Bela Vista', city: 'São Paulo', state: 'SP', complement: '' });
+  assert.deepEqual(byCep.json.data, { zipCode: '01310-100', street: 'Avenida Paulista', district: 'Bela Vista', city: 'São Paulo', state: 'SP', complement: '', cityCode: '3550308' });
   assert.equal((await request('/address/cep/99999999')).status, 404);
   const byStreet = await request('/address/search?uf=SP&city=' + encodeURIComponent('São Paulo') + '&street=Paulista');
   assert.equal(byStreet.status, 200, JSON.stringify(byStreet.json));
