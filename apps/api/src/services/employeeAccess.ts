@@ -29,6 +29,7 @@ const RULES: Rule[] = [
   { group: /^(sales|pos|orders|goals|pickup-requests)$/, areas: ['pdv'] },
   { group: /^fiscal$/, areas: ['erp_fiscal', 'fiscal'] },
   { group: /^ecommerce$/, areas: ['ecommerce'] },
+  { group: /^ads$/, areas: ['ads'], guardReads: true },
 ];
 
 const FULL_ROLES = new Set(['admin', 'superadmin', 'owner', 'manager']);
@@ -50,6 +51,7 @@ export const AREA_LABEL: Record<string, string> = {
   erp_fiscal: 'Fiscal',
   ecommerce: 'E-commerce',
   totem: 'Totem',
+  ads: 'Anúncios Ads',
 };
 
 function hasArea(areas: string[], wanted: string) {

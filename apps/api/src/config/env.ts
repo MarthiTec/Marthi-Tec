@@ -42,6 +42,18 @@ const envSchema = z.object({
   SMTP_SECURE: z.preprocess((value) => value === true || value === 'true', z.boolean()).default(false),
   SMTP_FROM: z.string().default('Marthi Tecnologia <marthi.tecnologia@gmail.com>'),
   INTERNAL_NOTIFICATION_EMAIL: z.string().email().default('marthi.tecnologia@gmail.com'),
+  // Marthi ADS (Meta). Sem app/segredo/chave a conexão fica bloqueada com a explicação na tela.
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  /** Configuração do Facebook Login for Business (opcional; sem ela o login usa `scope`). */
+  META_LOGIN_CONFIG_ID: z.string().optional(),
+  /** Chave de 32 bytes em base64 para criptografar os tokens (AES-256-GCM). */
+  META_TOKEN_KEY: z.string().optional(),
+  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v26.0'),
+  /** URL pública da API (retorno do OAuth e exclusão de dados). Padrão: FRONTEND_URL. */
+  PUBLIC_API_URL: z.string().optional(),
+  /** test | production — o painel avisa quando é ambiente de teste. */
+  ADS_ENVIRONMENT: z.enum(['test', 'production']).default(process.env.NODE_ENV === 'production' || process.env.DISCLOUD_APP_ID ? 'production' : 'test'),
   FRONTEND_URL: z.string().default(
     process.env.FRONTEND_URL ||
     (process.env.DISCLOUD_APP_ID || process.env.NODE_ENV === 'production'

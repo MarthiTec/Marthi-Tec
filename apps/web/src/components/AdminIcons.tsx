@@ -46,7 +46,8 @@ export type AdminIconName =
   | 'barcode'
   | 'warehouse'
   | 'chart'
-  | 'wallet';
+  | 'wallet'
+  | 'megaphone';
 
 type AdminIconProps = {
   name: AdminIconName;
@@ -392,6 +393,13 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
           <path d="M4 7a2 2 0 0 1 2-2h11v4" />
           <rect x="4" y="9" width="16" height="11" rx="2" />
           <path d="M16 14.5h.01" />
+        </svg>
+      );
+    case 'megaphone':
+      return (
+        <svg {...common}>
+          <path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z" />
+          <path d="M16.5 8.5a5 5 0 0 1 0 7M7 15l1.5 5h2.5l-1-5" />
         </svg>
       );
     case 'dollar':

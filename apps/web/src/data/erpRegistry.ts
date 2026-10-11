@@ -46,6 +46,7 @@ export type AccessArea =
   | 'erp_invoices'
   | 'erp_fiscal'
   | 'ecommerce'
+  | 'ads'
   | 'erp_plan';
 
 export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
@@ -68,6 +69,7 @@ export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
   erp_invoices: 'Notas entrada/saída',
   erp_fiscal: 'Fiscal (NCM/CFOP)',
   ecommerce: 'E-commerce',
+  ads: 'Anúncios Ads (montar anúncios; autorizar gasto e conectar contas é só do administrador)',
   erp_plan: 'Plano da loja (admin)',
 };
 
@@ -521,7 +523,7 @@ export async function upsertEmployee(
         'totem', 'pdv', 'os', 'erp_customers', 'erp_stock', 'erp_attrs',
         'erp_prices', 'erp_payments', 'erp_finance', 'erp_sellers',
         'erp_suppliers', 'erp_employees', 'erp_audit', 'erp_invoices',
-        'erp_fiscal', 'ecommerce', 'erp_plan', 'painel', 'erp', 'fiscal',
+        'erp_fiscal', 'ecommerce', 'ads', 'erp_plan', 'painel', 'erp', 'fiscal',
       ]);
       const areas = (
         input.role === 'admin'
@@ -730,6 +732,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
     return 'erp_fiscal';
   }
   if (pathname.startsWith('/ecommerce')) return 'ecommerce';
+  if (pathname.startsWith('/painel/ads')) return 'ads';
   if (pathname.startsWith('/painel/plano')) return 'erp_plan';
   return null;
 }

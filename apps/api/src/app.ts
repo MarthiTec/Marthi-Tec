@@ -15,6 +15,7 @@ import { productCatalogRouter } from './routes/productCatalog.js';
 import { supportRouter } from './routes/support.js';
 import { stockEntriesRouter } from './routes/stockEntries.js';
 import { orderRemindersRouter } from './routes/orderReminders.js';
+import { adsRouter } from './routes/ads.js';
 import { deviceReferenceRouter } from './routes/deviceReference.js';
 import { stockRouter } from './routes/stock.js';
 import { registryRouter } from './routes/registry.js';
@@ -68,6 +69,8 @@ const webDist = resolveWebDist();
 const serveWeb = Boolean(webDist);
 
 app.use(cors());
+// Fotos de anúncio (até 30 MB pela regra da Meta) chegam em base64: limite maior só nesta rota.
+app.use('/api/v1/ads/media/image', express.json({ limit: '42mb' }));
 app.use(express.json({ limit: '5mb' }));
 
 // Rotas da API da Marthi Plataforma
@@ -81,6 +84,7 @@ app.use(productCatalogRouter);
 app.use(supportRouter);
 app.use(stockEntriesRouter);
 app.use(orderRemindersRouter);
+app.use(adsRouter);
 app.use(deviceReferenceRouter);
 app.use(stockRouter);
 app.use(stockInvoicesRouter);

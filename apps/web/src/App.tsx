@@ -100,6 +100,13 @@ import { ExternalSalePage } from './pages/admin/ExternalSalePage';
 import { StockReportPage } from './pages/admin/StockReportPage';
 import { StockEntryPage } from './pages/admin/StockEntryPage';
 import { ImeiReportPage } from './pages/admin/ImeiReportPage';
+import { AdsOverviewPage } from './pages/ads/AdsOverviewPage';
+import { AdsCreatePage } from './pages/ads/AdsCreatePage';
+import { AdsCampaignsPage } from './pages/ads/AdsCampaignsPage';
+import { AdsMediaPage } from './pages/ads/AdsMediaPage';
+import { AdsAccountsPage } from './pages/ads/AdsAccountsPage';
+import { AdsCreditsPage, AdsPostsPage } from './pages/ads/AdsInfoPages';
+import { DataDeletionStatusPage, OfferPublicPage } from './pages/ads/OfferPublicPage';
 import { GoalsManagementPage } from './pages/admin/GoalsManagementPage';
 import { SalesGoalsReportPage } from './pages/admin/SalesGoalsReportPage';
 
@@ -134,6 +141,8 @@ export function App() {
         <Routes>
         <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/comprovante/:id" element={<ReceiptPublicPage />} />
+        <Route path="/oferta/:storeId/:productId" element={<OfferPublicPage />} />
+        <Route path="/exclusao-dados" element={<DataDeletionStatusPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
@@ -258,6 +267,13 @@ export function App() {
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="venda-externa" element={<ExternalSalePage />} />
+          <Route path="ads" element={<AdsOverviewPage />} />
+          <Route path="ads/criar" element={<AdsCreatePage />} />
+          <Route path="ads/campanhas" element={<AdsCampaignsPage />} />
+          <Route path="ads/publicacoes" element={<AdsPostsPage />} />
+          <Route path="ads/midias" element={<AdsMediaPage />} />
+          <Route path="ads/creditos" element={<AdsCreditsPage />} />
+          <Route path="ads/contas" element={<AdsAccountsPage />} />
           <Route path="metas" element={<GoalsManagementPage />} />
           <Route path="relatorio-vendas" element={<SalesGoalsReportPage />} />
           <Route path="totem" element={<TotemInsightsPage />} />

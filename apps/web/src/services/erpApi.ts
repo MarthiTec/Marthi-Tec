@@ -459,6 +459,7 @@ export type AccessArea =
   | 'erp_invoices'
   | 'erp_fiscal'
   | 'ecommerce'
+  | 'ads'
   | 'erp_plan';
 
 /** Endereço, tipo de pessoa e contatos extras (cliente, fornecedor e vendedor). */

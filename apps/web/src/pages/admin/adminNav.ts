@@ -88,6 +88,21 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    id: 'ads',
+    label: 'Anúncios Ads',
+    icon: 'megaphone',
+    module: null,
+    children: [
+      { to: '/painel/ads', label: 'Visão geral', end: true },
+      { to: '/painel/ads/criar', label: 'Criar anúncio' },
+      { to: '/painel/ads/campanhas', label: 'Campanhas' },
+      { to: '/painel/ads/publicacoes', label: 'Publicações e calendário' },
+      { to: '/painel/ads/midias', label: 'Fotos e vídeos' },
+      { to: '/painel/ads/creditos', label: 'Créditos e pagamentos' },
+      { to: '/painel/ads/contas', label: 'Contas conectadas' },
+    ],
+  },
+  {
     id: 'cardapio',
     label: 'Cardápio Digital',
     icon: 'store',
