@@ -27,8 +27,11 @@ import { DailyPendingModal } from '../../components/DailyPendingModal';
 
 type WarrantyType = 'store' | 'manufacturer' | 'none';
 /** Texto padrão de cada tipo de garantia (o vendedor pode editar na venda). */
+/** Garantia da loja: o texto acompanha o prazo em meses (6 meses = 180 dias). */
+const storeWarrantyTerms = (months: number) =>
+  `Garantia legal de ${Math.max(1, Math.round(months || 0)) * 30} dias balcão para defeitos de fabricação. Não cobre choques físicos, quedas ou umidade.`;
 const WARRANTY_TERMS: Record<WarrantyType, string> = {
-  store: 'Garantia legal de 90 dias balcão para defeitos de fabricação. Não cobre choques físicos, quedas ou umidade.',
+  store: storeWarrantyTerms(3),
   manufacturer: 'Garantia somente do fabricante, conforme o manual e a assistência técnica autorizada da marca. A loja não oferece garantia adicional.',
   none: 'Produto vendido sem garantia.',
 };
@@ -979,14 +982,31 @@ export function ExternalSalePage() {
                   onChange={(value) => {
                     const next = value as WarrantyType;
                     // Troca o texto padrão junto, a menos que o vendedor já tenha escrito o dele.
-                    if (Object.values(WARRANTY_TERMS).includes(warrantyTerms) || !warrantyTerms.trim()) setWarrantyTerms(WARRANTY_TERMS[next]);
+                    if (Object.values(WARRANTY_TERMS).includes(warrantyTerms) || warrantyTerms === storeWarrantyTerms(warrantyMonths) || !warrantyTerms.trim()) {
+                      setWarrantyTerms(next === 'store' ? storeWarrantyTerms(warrantyMonths) : WARRANTY_TERMS[next]);
+                    }
                     setWarrantyType(next);
                   }}
                 />
                 {warrantyType === 'store' ? (
                   <div>
                     <label className="admin-label">Prazo (meses)</label>
-                    <input type="number" min="1" max="24" className="admin-input" value={warrantyMonths} onChange={(e) => setWarrantyMonths(Number(e.target.value))} />
+                    <input
+                      type="number"
+                      min="1"
+                      max="24"
+                      className="admin-input"
+                      value={warrantyMonths}
+                      onChange={(e) => {
+                        const months = Number(e.target.value);
+                        // Os termos acompanham o prazo: texto padrão é refeito; texto próprio só troca o "N dias".
+                        const oldDays = Math.max(1, Math.round(warrantyMonths || 0)) * 30;
+                        const newDays = Math.max(1, Math.round(months || 0)) * 30;
+                        if (warrantyTerms === storeWarrantyTerms(warrantyMonths) || !warrantyTerms.trim()) setWarrantyTerms(storeWarrantyTerms(months));
+                        else if (months > 0) setWarrantyTerms(warrantyTerms.replace(new RegExp(`\\b${oldDays}\\s+dias\\b`, 'i'), `${newDays} dias`));
+                        setWarrantyMonths(months);
+                      }}
+                    />
                   </div>
                 ) : null}
               </div>
