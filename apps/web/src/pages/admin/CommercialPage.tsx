@@ -530,7 +530,6 @@ export function CommercialPage({
               ))}
             </div>
             <div className="commercial-toolbar">
-              </button>
               <button className="btn btn--primary" type="submit">
                 Salvar regras no banco
               </button>

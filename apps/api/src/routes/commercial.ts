@@ -310,7 +310,7 @@ commercialRouter.get(`${prefix}/state`, async (req, res, next) => {
         storeId,
       ]),
       pool.query(
-        "SELECT id,name FROM suppliers WHERE store_id=$1 AND active=true ORDER BY name",
+        "SELECT id,COALESCE(NULLIF(trade_name,''),name) AS name FROM suppliers WHERE store_id=$1 AND active=true ORDER BY 2",
         [storeId],
       ),
       offers(pool, storeId),
