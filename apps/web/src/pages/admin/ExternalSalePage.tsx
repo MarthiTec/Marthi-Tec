@@ -729,16 +729,16 @@ export function ExternalSalePage() {
                     const imeis = prod && (variation || !prod.variations?.length) ? availableImeis(prod, variation) : [];
                     if (!imeis.length) {
                       return (
-                        <div>
-                          <label className="admin-label">IMEI</label>
+                        <div className="external-sale-wide-field">
+                          <label className="admin-label">IMEI do aparelho</label>
                           <input type="text" className="admin-input" disabled value={prod?.variations?.length && !variation ? 'Escolha cor e capacidade' : 'Sem IMEI cadastrado'} readOnly />
                         </div>
                       );
                     }
                     return (
-                      <div>
+                      <div className="external-sale-wide-field">
                         <AdminPicker
-                          label={`IMEI do aparelho (${imeis.length} em estoque)`}
+                          label={`IMEI do aparelho · ${imeis.length} em estoque`}
                           value={line.imei || ''}
                           searchable
                           placeholder="Escolha o IMEI"

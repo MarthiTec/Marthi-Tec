@@ -170,3 +170,6 @@
 .xsale-promo__text { flex: 1 1 220px; min-width: 0; }
 .xsale-promo__remove { border: 0; background: transparent; color: var(--accent, #0e7490); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 4px; }
 .xsale-promo__remove:hover { text-decoration: underline; }
+/* Rótulos numa linha só: rótulo que quebra empurra o campo para baixo e desalinha a fileira. */
+.xsale .admin-picker__caption,
+.xsale .admin-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
