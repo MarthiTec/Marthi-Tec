@@ -115,3 +115,17 @@
 @media (max-width: 720px) {
   .offer-page__main { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Tema escuro: avisos, etiquetas e passos com fundo translúcido e texto legível (inclusive o negrito). */
+:is(.admin--dark, .is-theme-dark) .ads-env { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+:is(.admin--dark, .is-theme-dark) .ads-chip.is-ok, :is(.admin--dark, .is-theme-dark) .ads-ok { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+:is(.admin--dark, .is-theme-dark) .ads-chip.is-warn, :is(.admin--dark, .is-theme-dark) .ads-issues li.is-warning { background: rgba(245, 158, 11, 0.14); color: #fcd34d; }
+:is(.admin--dark, .is-theme-dark) .ads-chip.is-bad, :is(.admin--dark, .is-theme-dark) .ads-issues li.is-error, :is(.admin--dark, .is-theme-dark) .ads-error, :is(.admin--dark, .is-theme-dark) .ads-feedback { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+:is(.admin--dark, .is-theme-dark) .ads-chip.is-info { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+:is(.admin--dark, .is-theme-dark) .ads-chip.is-muted { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+:is(.admin--dark, .is-theme-dark) .ads-issues li strong, :is(.admin--dark, .is-theme-dark) .ads-ok strong, :is(.admin--dark, .is-theme-dark) .ads-error strong, :is(.admin--dark, .is-theme-dark) .ads-feedback strong { color: inherit; }
+:is(.admin--dark, .is-theme-dark) .ads-issues li.is-warning strong { color: #fde68a; }
+:is(.admin--dark, .is-theme-dark) .ads-issues li.is-error strong { color: #fecaca; }
+:is(.admin--dark, .is-theme-dark) .ads-blocked__phase { background: rgba(99, 102, 241, 0.2); color: #c7d2fe; }
+:is(.admin--dark, .is-theme-dark) .ads-steps li.is-done { color: #86efac; border-color: rgba(34, 197, 94, 0.35); background: rgba(34, 197, 94, 0.1); }
+:is(.admin--dark, .is-theme-dark) .ads-head__kicker { color: #60a5fa; }
