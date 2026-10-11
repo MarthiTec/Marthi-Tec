@@ -56,31 +56,30 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/erp/cardapio/imprimir': { kicker: 'Restaurante', title: 'Display de Mesa' },
 };
 
-type NavItem = { to: string; label: string; icon: AdminIconName; end?: boolean };
+/** `also`: outras rotas que deixam o item marcado (ex.: os relatórios dentro de Relatórios). */
+type NavItem = { to: string; label: string; icon: AdminIconName; end?: boolean; also?: string[] };
 
 const NAV_FOOD: NavItem[] = [
   { to: '/erp/cardapio', label: 'Cardápio Digital', icon: 'store' },
-  { to: '/mesa', label: 'Mesas / Salão', icon: 'ops' },
+  { to: '/mesa', label: 'Mesas / Salão', icon: 'layers' },
   { to: '/cozinha', label: 'Cozinha', icon: 'totem' },
 ];
 
 const NAV_PRODUCTS: NavItem[] = [
   { to: '/erp/produtos', label: 'Produtos & Estoque', icon: 'box', end: true },
-  { to: '/erp/entrada-estoque', label: 'Entrada de estoque', icon: 'box' },
-  { to: '/erp/balanco', label: 'Balanço', icon: 'box' },
-  { to: '/erp/movimentos', label: 'Movimentos', icon: 'ops' },
-  { to: '/erp/relatorio-estoque', label: 'Relatório de estoque', icon: 'print' },
-  { to: '/erp/relatorio-imei', label: 'Estoque por IMEI', icon: 'print' },
+  { to: '/erp/entrada-estoque', label: 'Entrada de estoque', icon: 'inbox' },
+  { to: '/erp/balanco', label: 'Balanço', icon: 'clipboard' },
+  { to: '/erp/movimentos', label: 'Movimentos', icon: 'swap' },
   { to: '/erp/especificacoes', label: 'Especificações', icon: 'tag' },
-  { to: '/erp/api-aparelhos', label: 'API de aparelhos', icon: 'ops' },
+  { to: '/erp/api-aparelhos', label: 'API de aparelhos', icon: 'barcode' },
   { to: '/erp/notas', label: 'Notas de estoque', icon: 'fiscal' },
-  { to: '/erp/kits', label: 'Kits', icon: 'box' },
-  { to: '/erp/lotes', label: 'Lotes / Rastro', icon: 'box' },
-  { to: '/erp/almoxarifado', label: 'Almoxarifado', icon: 'box' },
-  { to: '/erp/tabelas', label: 'Tabelas de preço', icon: 'ops' },
-  { to: '/erp/campanhas', label: 'Campanhas', icon: 'ops' },
-  { to: '/erp/orcamentos', label: 'Orçamentos', icon: 'ops' },
-  { to: '/erp/comercial', label: 'Encomendas & Ofertas', icon: 'ops' },
+  { to: '/erp/kits', label: 'Kits', icon: 'layers' },
+  { to: '/erp/lotes', label: 'Lotes / Rastro', icon: 'barcode' },
+  { to: '/erp/almoxarifado', label: 'Almoxarifado', icon: 'warehouse' },
+  { to: '/erp/tabelas', label: 'Tabelas de preço', icon: 'list' },
+  { to: '/erp/campanhas', label: 'Campanhas', icon: 'percent' },
+  { to: '/erp/orcamentos', label: 'Orçamentos', icon: 'clipboard' },
+  { to: '/erp/comercial', label: 'Encomendas & Ofertas', icon: 'truck' },
 ];
 
 const NAV_PEOPLE: NavItem[] = [
@@ -88,14 +87,14 @@ const NAV_PEOPLE: NavItem[] = [
 ];
 
 const NAV_FINANCE: NavItem[] = [
-  { to: '/erp/financeiro', label: 'Financeiro', icon: 'ops' },
-  { to: '/erp/taxas-cartao', label: 'Taxas & Maquininhas', icon: 'ops' },
+  { to: '/erp/financeiro', label: 'Financeiro', icon: 'wallet' },
+  { to: '/erp/taxas-cartao', label: 'Taxas & Maquininhas', icon: 'card' },
   { to: '/erp/boletos', label: 'Boletos', icon: 'fiscal' },
 ];
 
 const NAV_BACK: NavItem[] = [
-  { to: '/erp/relatorios', label: 'Relatórios', icon: 'ops' },
-  { to: '/erp/auditoria', label: 'Auditoria', icon: 'ops' },
+  { to: '/erp/relatorios', label: 'Relatórios', icon: 'chart', also: ['/erp/relatorio-estoque', '/erp/relatorio-imei'] },
+  { to: '/erp/auditoria', label: 'Auditoria', icon: 'shield' },
 ];
 
 function isMobileNav() {
@@ -149,7 +148,7 @@ export function ErpLayout() {
         key={item.to}
         to={item.to}
         end={item.end}
-        className={({ isActive }) => (isActive ? 'is-active' : undefined)}
+        className={({ isActive }) => (isActive || item.also?.some((path) => location.pathname.startsWith(path)) ? 'is-active' : undefined)}
       >
         <AdminIcon name={item.icon} />
         {item.label}

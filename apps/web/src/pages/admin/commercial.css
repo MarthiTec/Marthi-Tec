@@ -91,3 +91,7 @@
     width: 100%;
   }
 }
+
+/* Abas no padrão do sistema + "Atualizar" ao lado. */
+.commercial-tabs-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.commercial-tabs-row .stock-form-tabs { flex: 1 1 auto; margin: 0; }

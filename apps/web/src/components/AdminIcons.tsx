@@ -35,7 +35,18 @@ export type AdminIconName =
   | 'user'
   | 'factory'
   | 'badge'
-  | 'shield';
+  | 'shield'
+  | 'inbox'
+  | 'swap'
+  | 'clipboard'
+  | 'percent'
+  | 'card'
+  | 'layers'
+  | 'list'
+  | 'barcode'
+  | 'warehouse'
+  | 'chart'
+  | 'wallet';
 
 type AdminIconProps = {
   name: AdminIconName;
@@ -301,6 +312,86 @@ export function AdminIcon({ name, className = 'admin-ico' }: AdminIconProps) {
         <svg {...common}>
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
           <path d="M3 3v5h5" />
+        </svg>
+      );
+    case 'inbox':
+      return (
+        <svg {...common}>
+          <path d="M12 3v9M8.5 8.5 12 12l3.5-3.5" />
+          <path d="M4 13h4l1.5 3h5L16 13h4v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6z" />
+        </svg>
+      );
+    case 'swap':
+      return (
+        <svg {...common}>
+          <path d="M4 8h13M14 5l3 3-3 3" />
+          <path d="M20 16H7M10 13l-3 3 3 3" />
+        </svg>
+      );
+    case 'clipboard':
+      return (
+        <svg {...common}>
+          <rect x="5" y="4" width="14" height="17" rx="2" />
+          <path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h3" />
+        </svg>
+      );
+    case 'percent':
+      return (
+        <svg {...common}>
+          <path d="M19 5 5 19" />
+          <circle cx="7" cy="7" r="2.2" />
+          <circle cx="17" cy="17" r="2.2" />
+        </svg>
+      );
+    case 'card':
+      return (
+        <svg {...common}>
+          <rect x="3" y="5.5" width="18" height="13" rx="2" />
+          <path d="M3 10h18M7 15h3" />
+        </svg>
+      );
+    case 'layers':
+      return (
+        <svg {...common}>
+          <path d="M12 4 3 8.5l9 4.5 9-4.5L12 4z" />
+          <path d="m3 12.5 9 4.5 9-4.5M3 16.5l9 4.5 9-4.5" />
+        </svg>
+      );
+    case 'list':
+      return (
+        <svg {...common}>
+          <path d="M9 6h11M9 12h11M9 18h11" />
+          <circle cx="4.5" cy="6" r="1" fill="currentColor" stroke="none" />
+          <circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none" />
+          <circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case 'barcode':
+      return (
+        <svg {...common}>
+          <path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12" />
+        </svg>
+      );
+    case 'warehouse':
+      return (
+        <svg {...common}>
+          <path d="M3 9.5 12 4l9 5.5V20H3V9.5z" />
+          <path d="M7 20v-7h10v7M7 16h10" />
+        </svg>
+      );
+    case 'chart':
+      return (
+        <svg {...common}>
+          <path d="M4 4v16h16" />
+          <path d="m7 15 4-4 3 3 5-6" />
+        </svg>
+      );
+    case 'wallet':
+      return (
+        <svg {...common}>
+          <path d="M4 7a2 2 0 0 1 2-2h11v4" />
+          <rect x="4" y="9" width="16" height="11" rx="2" />
+          <path d="M16 14.5h.01" />
         </svg>
       );
     case 'dollar':

@@ -337,29 +337,34 @@ export function CommercialPage({
           Acompanhe pedidos, consulte ofertas e registre recebimentos.
         </p>
         {!settingsOnly ? (
-          <div className="commercial-toolbar">
-            {[
-
-              ["offers", "Ofertas de fornecedores"],
-              ["orders", "Encomendas"],
-              ["agenda", "Recebimentos"],
-              ["catalog", "Catálogo"],
-              ["rules", "Configurações"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={`btn ${tab === value ? "btn--primary" : "btn--ghost"}`}
-                onClick={() => {
-                  setTab(value);
-                  setDetail(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="commercial-tabs-row">
+            <nav className="stock-form-tabs" role="tablist" aria-label="Partes das encomendas">
+              {[
+                ["orders", "Encomendas"],
+                ["offers", "Ofertas de fornecedores"],
+                ["agenda", "Recebimentos"],
+                ["catalog", "Catálogo"],
+                ["rules", "Configurações"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === value}
+                  className={`stock-form-tab ${tab === value ? "is-active" : ""}`}
+                  onClick={() => {
+                    setTab(value);
+                    setDetail(null);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
             <button
-              className="btn btn--ghost"
+              type="button"
+              className="btn btn--ghost btn--sm"
+              title="Buscar de novo no banco"
               onClick={() => setRevision((v) => v + 1)}
             >
               Atualizar
@@ -390,8 +395,8 @@ export function CommercialPage({
         >
           <h3>Regras comerciais da loja</h3>
           <p className="empty">
-            Nenhuma política é ativada automaticamente. O modelo Cellponto
-            apenas preenche este formulário para revisão e salvamento.
+            Nenhuma política é ativada automaticamente: preencha as regras
+            desta loja e salve — elas ficam gravadas no banco.
           </p>
           <fieldset
             disabled={!state.canConfigure || busy}
@@ -525,34 +530,6 @@ export function CommercialPage({
               ))}
             </div>
             <div className="commercial-toolbar">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                disabled={
-                  ![
-                    "assistencia_tecnica",
-                    "comercio_eletronicos",
-                    "personalizado",
-                  ].includes(profile.segmentId)
-                }
-                onClick={() =>
-                  setProfile({
-                    ...profile,
-                    enabled: true,
-                    appleRules: true,
-                    tradeIn: true,
-                    supplierComparison: true,
-                    catalog: true,
-                    readyMarkup: 10,
-                    orderMarkup: 5,
-                    upgradeMarkup: 0,
-                    usedWarrantyMonths: 6,
-                    receiptDays: [2, 3, 4, 5, 6],
-                    categories: ["iphone", "watch", "ipad", "mac"],
-                  })
-                }
-              >
-                Preencher modelo Cellponto
               </button>
               <button className="btn btn--primary" type="submit">
                 Salvar regras no banco
@@ -671,6 +648,13 @@ export function CommercialPage({
                         </td>
                       </tr>
                     ))}
+                  {!state.offers.some((o) => offerLabel(o).toLowerCase().includes(search.toLowerCase())) ? (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        {search ? "Nenhuma oferta com essa busca." : "Nenhuma oferta cadastrada. Use “Nova oferta” ou importe a lista do fornecedor."}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -1023,6 +1007,11 @@ export function CommercialPage({
                       </td>
                     </tr>
                   ))}
+                  {!state.orders.length ? (
+                    <tr>
+                      <td colSpan={5} className="empty">Nenhuma encomenda ainda. Use “Nova encomenda”.</td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -1463,6 +1452,11 @@ export function CommercialPage({
                       <td>{statuses[o.status]}</td>
                     </tr>
                   ))}
+                {!state.orders.some((o) => ["purchased", "in_transit", "received"].includes(o.status)) ? (
+                  <tr>
+                    <td colSpan={4} className="empty">Nada a receber: nenhuma encomenda comprada ou em trânsito.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>

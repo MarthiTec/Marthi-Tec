@@ -776,3 +776,14 @@
 .erp-app__main {
   overflow: clip;
 }
+
+/* Relatórios: lista dos relatórios completos (estoque, IMEI, movimentos, balanço). */
+.erp-reports__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.erp-reports__item {
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--card, #fff); color: var(--ink); text-decoration: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.erp-reports__item:hover { border-color: #0e7490; box-shadow: 0 4px 14px rgba(14, 116, 144, 0.12); }
+.erp-reports__item .admin-ico { flex: none; width: 26px; height: 26px; color: #0e7490; }
+.erp-reports__item span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.erp-reports__item small { color: var(--mute); font-size: 0.8rem; line-height: 1.35; }

@@ -667,7 +667,8 @@ export function applyPriceTable(basePrice: number, table: PriceTable | undefined
 export function findStockByCode(code: string) {
   const needle = code.trim().toLowerCase().replace(/\s+/g, '');
   if (!needle) return null;
-  const stock = load().stock;
+  // Produto inativo (excluído com histórico) não volta para a venda.
+  const stock = load().stock.filter((item) => item.active !== false);
   const exact = stock.find((item) => {
     const sku = item.sku.toLowerCase().replace(/\s+/g, '');
     const barcode = item.barcode.toLowerCase().replace(/\s+/g, '');

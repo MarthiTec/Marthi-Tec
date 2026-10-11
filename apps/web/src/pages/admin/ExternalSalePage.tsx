@@ -63,7 +63,9 @@ import { hydrateCardMachinesFromApi } from '../../data/cardRatesStore';
 import { hydrateTotemSettingsFromApi } from '../../data/totemSettings';
 import { evaluateCampaignForLine, hydratePromoCampaigns, PROMO_EVENT, type EvaluatedLinePromo } from '../../data/promoCampaignStore';
 import type { StockVariationRow, SupplierEntry } from '../../data/adminStore';
-import { stockSearchText } from '../../data/stockSearch';
+import { StockSearchPicker, type StockPick } from '../../components/StockSearchPicker';
+import { QuickStockRegisterModal, type QuickStockResult } from '../../components/QuickStockRegisterModal';
+import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode } from '../../data/productCondition';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -186,27 +188,8 @@ export function ExternalSalePage() {
           .then((rows) => storeRef.current === storeId && setSellers(rows.map((row) => ({ id: row.id, name: row.name }))))
           .catch(() => undefined);
 
-        const mappedStock: StockOption[] = (Array.isArray(stkRes) ? stkRes : []).map((it: any) => ({
-          id: it.id,
-          name: it.name,
-          price: Number(it.price) || 0,
-          cost: Number(it.cost) || 0,
-          qty: Number(it.qty) || 0,
-          imei: it.imei || '',
-          category: it.category || 'Geral',
-          brand: it.brand || '',
-          supplierId: it.supplierId || undefined,
-          groupId: it.groupId || undefined,
-          subgroupId: it.subgroupId || undefined,
-          pickupPrices: it.pickupPrices,
-          attrs: it.attrs, color: it.color, capacity: it.capacity,
-          variations: Array.isArray(it.variations) ? it.variations : [],
-          sku: it.sku || '',
-          barcode: it.barcode || '',
-          catalogTypeName: it.catalogTypeName || '',
-          catalogModelName: it.catalogModelName || '',
-          supplierEntries: Array.isArray(it.supplierEntries) ? it.supplierEntries : [],
-        }));
+        // Só produtos ativos: o excluído (inativado) não aparece na venda.
+        const mappedStock: StockOption[] = (Array.isArray(stkRes) ? stkRes : []).filter((it: any) => it.active !== false).map(toStockOption);
 
         setStockItems(mappedStock);
 
@@ -220,6 +203,31 @@ export function ExternalSalePage() {
     }
     void loadData();
   }, [storeId, user?.id]);
+
+  /** Produto da API no formato da venda externa. */
+  function toStockOption(it: any): StockOption {
+    return {
+      id: it.id,
+      name: it.name,
+      price: Number(it.price) || 0,
+      cost: Number(it.cost) || 0,
+      qty: Number(it.qty) || 0,
+      imei: it.imei || '',
+      category: it.category || 'Geral',
+      brand: it.brand || '',
+      supplierId: it.supplierId || undefined,
+      groupId: it.groupId || undefined,
+      subgroupId: it.subgroupId || undefined,
+      pickupPrices: it.pickupPrices,
+      attrs: it.attrs, color: it.color, capacity: it.capacity,
+      variations: Array.isArray(it.variations) ? it.variations : [],
+      sku: it.sku || '',
+      barcode: it.barcode || '',
+      catalogTypeName: it.catalogTypeName || '',
+      catalogModelName: it.catalogModelName || '',
+      supplierEntries: Array.isArray(it.supplierEntries) ? it.supplierEntries : [],
+    };
+  }
 
   /**
    * Retirada da linha: com variações, vale o preço da variação escolhida (cor, capacidade…),
@@ -272,10 +280,10 @@ export function ExternalSalePage() {
    * Dados do produto do estoque já na linha: cor/capacidade quando só há uma opção (ou só uma
    * variação com estoque), com o preço dessa variação.
    */
-  function autoFillFromProduct(prod: StockOption) {
+  function autoFillFromProduct(prod: StockOption, forced?: StockVariationRow) {
     const variations = prod.variations ?? [];
     const inStock = variations.filter((v) => Number(v.qty) > 0);
-    const chosen = inStock.length === 1 ? inStock[0] : variations.length === 1 ? variations[0] : undefined;
+    const chosen = forced ?? (inStock.length === 1 ? inStock[0] : variations.length === 1 ? variations[0] : undefined);
     const attributes: Array<{ id: string; name: string; value: string }> = [];
     for (const attr of attributeDefs.filter((item) => item.active && item.useOnExternalSale !== false)) {
       let values: string[] = [];
@@ -292,8 +300,56 @@ export function ExternalSalePage() {
       const unique = [...new Set(values.filter(Boolean))];
       if (unique.length === 1) attributes.push({ id: attr.id, name: attr.name, value: unique[0] });
     }
+    // Com a variação definida (ex.: achada pelo IMEI), a condição dela também vai para a venda.
+    const code = chosen ? conditionCode(chosen.condition) : '';
+    if (forced && code) attributes.push({ id: CONDITION_ATTR_ID, name: 'Condição', value: CONDITION_LABEL[code] });
     return { attributes, price: chosen && Number(chosen.price) > 0 ? Number(chosen.price) : undefined };
   }
+
+  /** Produto escolhido na busca: pelo IMEI já vem a variação e o IMEI do aparelho. */
+  function handleLinePick(index: number, pick: StockPick<StockOption>, items: StockOption[] = stockItems) {
+    const prod = items.find((p) => p.id === pick.product.id) ?? pick.product;
+    const auto = autoFillFromProduct(prod, pick.variation);
+    setLines((prev) =>
+      prev.map((l, idx) =>
+        idx !== index
+          ? l
+          : {
+              ...l,
+              stockId: prod.id,
+              attributes: auto.attributes,
+              pickupMethodId: undefined,
+              deliveryAddress: undefined,
+              name: prod.name,
+              unitPrice: auto.price ?? prod.price,
+              unitCost: prod.cost,
+              imei: pick.imei || prod.imei || '',
+            },
+      ),
+    );
+  }
+
+  // Produto não encontrado: cadastro na hora (com entrada no estoque) para não travar a venda.
+  const [quickRegister, setQuickRegister] = useState<{ index: number; text: string } | null>(null);
+  function handleQuickRegistered(result: QuickStockResult) {
+    if (!quickRegister) return;
+    const option = toStockOption(result.product);
+    const items = [...stockItems.filter((item) => item.id !== option.id), option];
+    setStockItems(items);
+    const variation = result.variationId ? option.variations?.find((v) => v.id === result.variationId) : undefined;
+    handleLinePick(quickRegister.index, { product: option, variation, imei: result.imei }, items);
+    setQuickRegister(null);
+  }
+
+  /** Linha de detalhe na busca: variações, preço e estoque. */
+  const describeOption = (p: StockOption) =>
+    [
+      ...Object.values(p.attrs ?? {}).filter((value) => typeof value === 'string' && value),
+      p.variations?.length ? `${p.variations.length} variaç${p.variations.length === 1 ? 'ão' : 'ões'}` : '',
+      `${formatMoney(p.price)} · disp.: ${p.qty}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
   function handleLineProductChange(index: number, stockId: string) {
     const prod = stockItems.find((p) => p.id === stockId);
@@ -466,7 +522,7 @@ export function ExternalSalePage() {
         if (storeRef.current === storeId) setError('Venda ' + result.id + ' salva. O comprovante não carregou; consulte a venda antes de tentar novamente.');
       }
       const refreshed = await apiListStock().catch(() => null);
-      if (refreshed && storeRef.current === storeId) setStockItems(refreshed.map((it: any) => ({ ...it, qty: Number(it.qty), price: Number(it.price), cost: Number(it.cost) })));
+      if (refreshed && storeRef.current === storeId) setStockItems(refreshed.filter((it: any) => it.active !== false).map(toStockOption));
     } catch (err: any) {
       setError(err.message || 'Falha ao processar venda externa.');
     } finally {
@@ -529,6 +585,7 @@ export function ExternalSalePage() {
       {error ? <div className="xsale-alert" role="alert">{error}</div> : null}
       {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
 
+      {quickRegister ? <QuickStockRegisterModal initialText={quickRegister.text} products={stockItems} onClose={() => setQuickRegister(null)} onDone={handleQuickRegistered} /> : null}
       <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPaymentMethod(ticket.payment==='Parcelado'?'Cartão de Crédito':'PIX');setInstallments(ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1);requestId.current=crypto.randomUUID();}}/>
       <form onSubmit={handleSubmit} className="xsale-layout">
         <div className="xsale-main">
@@ -615,19 +672,14 @@ export function ExternalSalePage() {
                     ) : null}
                   </div>
                   <div className="external-sale-wide-field">
-                    <AdminPicker
+                    <StockSearchPicker
                       label="Produto"
-                      searchable
-                      value={line.stockId || ''}
-                      options={[
-                        { value: '', label: 'Selecione um produto do estoque…' },
-                        ...stockItems.filter((p) => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId).map((p) => ({
-                          value: p.id,
-                          label: [p.name, ...Object.values(p.attrs ?? {}).filter((value) => typeof value === 'string' && value), `${formatMoney(p.price)} (disp.: ${p.qty})`].join(' · '),
-                          keywords: stockSearchText(p),
-                        })),
-                      ]}
-                      onChange={(val) => handleLineProductChange(idx, val)}
+                      items={stockItems.filter((p) => brandFilter === 'all' || normalizeBrand(p.brand) === normalizeBrand(brandFilter) || p.id === line.stockId)}
+                      selected={stockItems.find((p) => p.id === line.stockId) ?? null}
+                      describe={describeOption}
+                      onSelect={(pick) => handleLinePick(idx, pick)}
+                      onClear={() => handleLineProductChange(idx, '')}
+                      onNotFound={(text) => setQuickRegister({ index: idx, text })}
                     />
                   </div>
                   <PickupFields product={pickupProductFor(line)} methodId={line.pickupMethodId} address={line.deliveryAddress} onChange={(pickupMethodId, deliveryAddress, price) => setLines((current) => current.map((entry, i) => (i === idx ? { ...entry, pickupMethodId, deliveryAddress, unitPrice: saleLineUnitPrice(stockItems.find((p) => p.id === entry.stockId), entry.attributes ?? [], pickupMethodId) ?? price ?? entry.unitPrice } : entry)))} />

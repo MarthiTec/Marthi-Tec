@@ -273,3 +273,18 @@ button.user-chip {
 .admin.is-collapsed .user-chip-stack .presence-ctl.user-chip__status {
   position: static;
 }
+
+/* Status do usuário alinhado igual em todos os módulos (Painel, Retaguarda, PDV, OS…): o cartão não
+   tem margem própria dentro do conjunto e o ícone fica centralizado na altura do cartão. */
+.user-chip-stack.has-status > .user-chip {
+  margin: 0 !important;
+  width: 100%;
+}
+.user-chip-stack .presence-ctl.user-chip__status {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+.admin.is-collapsed .user-chip-stack .presence-ctl.user-chip__status {
+  transform: none;
+}

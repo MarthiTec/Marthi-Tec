@@ -94,3 +94,8 @@
 }
 .imei-list__remove:hover { border-color: #b91c1c; color: #b91c1c; }
 .imei-list__add { justify-self: start; }
+
+/* Cadastrar e vender (produto não encontrado na venda) */
+.quick-stock-register { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.quick-stock-register__supplier { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+@media (max-width: 560px) { .quick-stock-register { grid-template-columns: minmax(0, 1fr); } }

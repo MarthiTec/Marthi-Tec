@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { getAdminState } from '../../data/adminStore';
 import { listEmployees } from '../../data/erpRegistry';
 import {
@@ -15,6 +16,14 @@ import {
   stockBalanceStatus,
   stockMargin,
 } from '../../data/stockLedger';
+
+/** Relatórios completos da loja (abrem em tela própria, com filtros e impressão). */
+const REPORTS: Array<{ to: string; icon: AdminIconName; title: string; text: string }> = [
+  { to: '/erp/relatorio-estoque', icon: 'box', title: 'Relatório de estoque', text: 'Aparelhos e variações com fotos, fornecedor, custo, venda e data de entrada. Filtros, colunas e impressão.' },
+  { to: '/erp/relatorio-imei', icon: 'barcode', title: 'Estoque por IMEI', text: 'Cada IMEI com modelo, custo, venda, entrada, saída e situação. Histórico do aparelho e baixas.' },
+  { to: '/erp/movimentos', icon: 'swap', title: 'Movimentação de estoque', text: 'Entradas, vendas, ajustes e baixas com saldo anterior e novo.' },
+  { to: '/erp/balanco', icon: 'clipboard', title: 'Balanço e alertas', text: 'Saldo, mínimo/máximo, custo médio, markup e margem.' },
+];
 
 export function ErpReportsPage() {
   const dre = buildDre();
@@ -99,6 +108,18 @@ export function ErpReportsPage() {
           </button>
         </div>
       </div>
+
+      <nav className="erp-reports__list" aria-label="Relatórios">
+        {REPORTS.map((report) => (
+          <Link key={report.to} to={report.to} className="erp-reports__item">
+            <AdminIcon name={report.icon} />
+            <span>
+              <strong>{report.title}</strong>
+              <small>{report.text}</small>
+            </span>
+          </Link>
+        ))}
+      </nav>
 
       <div className="admin-grid">
         <article className="admin-card">

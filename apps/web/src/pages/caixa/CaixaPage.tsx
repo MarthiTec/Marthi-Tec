@@ -716,7 +716,7 @@ export function CaixaPage() {
   const addSplitRef = useRef<() => void>(() => undefined);
   const toggleClientPanelRef = useRef<() => void>(() => undefined);
   const openPanelRef = useRef<(op: Exclude<CaixaPanel, null>) => void>(() => undefined);
-  const quickStock = useMemo(() => stock.filter((item) => item.qty > 0).slice(0, 10), [stock]);
+  const quickStock = useMemo(() => stock.filter((item) => item.active !== false && item.qty > 0).slice(0, 10), [stock]);
   const codeParsed = useMemo(() => parseCodeInput(code), [code]);
   const searchMatches = useMemo(() => {
     if (codeParsed.waitingForCode) return [] as StockItem[];

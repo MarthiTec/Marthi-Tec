@@ -1,0 +1,33 @@
+.stock-search-picker { position: relative; display: grid; gap: 6px; min-width: 0; }
+.stock-search-picker__label { font-size: 0.82rem; font-weight: 700; color: var(--ink); }
+.stock-search-picker > input {
+  min-height: 42px; width: 100%; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--line, #d8dde3); border-radius: 12px;
+  background: var(--card, #fff); color: var(--ink); font: inherit; font-size: 0.92rem;
+}
+.stock-search-picker > input:focus { outline: none; border-color: #0e7490; box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.15); }
+.stock-search-picker__results {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 6px; list-style: none;
+  max-height: 320px; overflow-y: auto; background: var(--card, #fff); border: 1px solid var(--line, #d8dde3); border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+.stock-search-picker__results li > button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.stock-search-picker__results li > button:hover { background: rgba(14, 116, 144, 0.08); }
+.stock-search-picker__results span { display: flex; flex-direction: column; min-width: 0; }
+.stock-search-picker__results small, .stock-search-picker__selected small { color: var(--mute); font-size: 0.78rem; }
+.stock-search-picker__results em { font-style: normal; font-weight: 700; color: #0e7490; white-space: nowrap; font-size: 0.82rem; }
+.stock-search-picker__empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; color: var(--mute); font-size: 0.86rem; }
+.stock-search-picker__selected {
+  display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 4px 6px 4px 14px; border: 1px solid #0e7490; border-radius: 12px;
+  background: rgba(14, 116, 144, 0.05);
+}
+.stock-search-picker__selected > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stock-search-picker__selected strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-search-picker__change { border: 0; background: none; color: #0e7490; font: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; padding: 4px 6px; }
+.stock-search-picker__clear {
+  flex: none; width: 30px; height: 30px; border-radius: 999px; border: 1px solid var(--line, #d8dde3); background: transparent; color: var(--mute);
+  font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.stock-search-picker__clear:hover { border-color: #b91c1c; color: #b91c1c; }
