@@ -36,6 +36,8 @@ export async function postEntryPayable(
   if (payment === 'none' || amount <= 0) return null;
   const date = (input.entryDate || new Date().toISOString()).slice(0, 10);
   const due = (input.dueDate || date).slice(0, 10);
+  // Compra paga com data de entrada anterior: a saída do caixa fica nesse dia (meio-dia de Brasília).
+  const paidMoment = date < new Date().toISOString().slice(0, 10) ? `${date}T12:00:00-03:00` : null;
   const id = `PAY-${randomUUID()}`;
   const imeiText = input.imeis.length ? ` · IMEI ${input.imeis.join(', ')}` : '';
   const description = `Compra: ${input.productName} · ${input.qty} un${imeiText}`.slice(0, 480);
@@ -47,9 +49,9 @@ export async function postEntryPayable(
   if (payment === 'paid') {
     await db.query(`UPDATE payables SET status = 'paid', paid_amount = amount, paid_at = $2::date, updated_at = now() WHERE id = $1`, [id, date]);
     await db.query(
-      `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name)
-       VALUES ($1, $2, 'out', $3, $4, 'manual', $5, $6, 'Compra de mercadorias', $7)`,
-      [`ENT-${randomUUID()}`, input.storeId, `Baixa total: ${description}`, amount, id, input.accountId || null, input.operator],
+      `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name, created_at)
+       VALUES ($1, $2, 'out', $3, $4, 'manual', $5, $6, 'Compra de mercadorias', $7, COALESCE($8::timestamptz, now()))`,
+      [`ENT-${randomUUID()}`, input.storeId, `Baixa total: ${description}`, amount, id, input.accountId || null, input.operator, paidMoment],
     );
     if (input.accountId) await db.query('UPDATE bank_accounts SET current_balance = current_balance - $1 WHERE id = $2 AND store_id = $3', [amount, input.accountId, input.storeId]);
   }

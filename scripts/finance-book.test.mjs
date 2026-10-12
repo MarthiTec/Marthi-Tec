@@ -110,3 +110,17 @@ test('DRE counts each settled bill once (cash book), by category and by month in
   assert.equal(dre.result, dre.revenue - dre.expenses);
   assert.equal((await call('/finance/dre?month=2026-9')).status, 400);
 });
+
+test('a purchase paid on a past entry date leaves the cash on that day; older ones are moved by migration 0089', async () => {
+  await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,active) VALUES('s-entry','store-a','Aparelho',0,0,2000,true)");
+  const posted = await call('/stock/s-entry/entries', 'POST', { entry: { entryDate: '2026-09-28', qty: 1, unitCost: 1280, imeis: ['900000000000777'], payment: 'paid' } });
+  assert.equal(posted.status, 201, JSON.stringify(posted.error));
+  const entry = (await query('SELECT f.created_at FROM finance_entries f WHERE f.ref_id=$1', [posted.data.payableId])).rows[0];
+  assert.equal(localDay(entry.created_at), '2026-09-28');
+  // Como ficou em produção antes da correção: saída do caixa no dia do lançamento.
+  await query("UPDATE finance_entries SET created_at = now() WHERE ref_id=$1", [posted.data.payableId]);
+  await query("UPDATE payables SET created_at = now() WHERE id=$1", [posted.data.payableId]);
+  for (let i = 0; i < 2; i += 1) await db.exec(fs.readFileSync('apps/api/src/db/migrations/0089_entry_purchase_cash_date.sql', 'utf8'));
+  const fixed = (await query('SELECT created_at FROM finance_entries WHERE ref_id=$1', [posted.data.payableId])).rows[0];
+  assert.equal(localDay(fixed.created_at), '2026-09-28');
+});
