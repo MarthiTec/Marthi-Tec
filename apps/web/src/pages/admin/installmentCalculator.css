@@ -1,0 +1,38 @@
+/* Calculadora de parcelamento (PDV). */
+.installment-calc__head h1 { margin: 0 0 4px; }
+.installment-calc__head p { margin: 0 0 16px; color: var(--mute, #64748b); }
+.installment-calc__alert {
+  margin: 0 0 16px; padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, #d97706 12%, transparent); color: inherit;
+}
+.installment-calc__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.installment-calc__card { display: grid; gap: 16px; }
+.installment-calc__card h2 { margin: 0; font-size: 1rem; }
+.installment-calc__inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.installment-calc__result { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.installment-calc__result div { padding: 12px 14px; border: 1px solid var(--line, #d8dde3); border-radius: 12px; }
+.installment-calc__result dt { color: var(--mute, #64748b); font-size: 0.8rem; font-weight: 700; }
+.installment-calc__result dd { margin: 4px 0 0; font-size: 1.15rem; font-weight: 800; }
+.installment-calc__highlight { border-color: var(--accent, #0f766e) !important; background: color-mix(in srgb, var(--accent, #0f766e) 8%, transparent); }
+.installment-calc__table { display: grid; border: 1px solid var(--line, #d8dde3); border-radius: 12px; overflow: hidden; }
+.installment-calc__row {
+  display: grid; grid-template-columns: 76px 64px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 8px 12px; border: 0; border-top: 1px solid var(--line, #d8dde3); background: transparent; color: inherit;
+  font: inherit; font-size: 0.88rem; text-align: left; cursor: pointer;
+}
+.installment-calc__row--head {
+  border-top: 0; cursor: default; color: var(--mute, #64748b); font-size: 0.72rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.04em; background: color-mix(in srgb, var(--mute, #64748b) 10%, transparent);
+}
+.installment-calc__row:not(.installment-calc__row--head):hover { background: color-mix(in srgb, var(--accent, #0f766e) 6%, transparent); }
+.installment-calc__row.is-selected { background: color-mix(in srgb, var(--accent, #0f766e) 14%, transparent); font-weight: 800; }
+.installment-calc__row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.installment-calc__row > span:nth-child(n + 3) { text-align: right; }
+.installment-calc__note { margin: 0; color: var(--mute, #64748b); font-size: 0.8rem; }
+@media (max-width: 860px) {
+  .installment-calc__layout, .installment-calc__inputs { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .installment-calc__result { grid-template-columns: minmax(0, 1fr); }
+  .installment-calc__row { grid-template-columns: 66px 52px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; font-size: 0.8rem; }
+}
