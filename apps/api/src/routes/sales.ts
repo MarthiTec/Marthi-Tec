@@ -95,6 +95,8 @@ const externalSaleSchema = z.object({
   surcharge: z.coerce.number().min(0).default(0),
   /** Parte do acréscimo que é juros do cartão (taxa repassada): informação da loja, não sai no comprovante do cliente. */
   cardInterest: z.coerce.number().min(0).default(0),
+  /** Venda que já aconteceu (lançamento de histórico): só gestão, não futura e até 120 dias atrás. */
+  saleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data da venda inválida.').optional(),
   notes: z.string().default(''),
   warrantyMonths: z.coerce.number().int().min(0).default(3),
   /** Da loja (com prazo), somente do fabricante ou sem garantia. */
@@ -114,6 +116,15 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     for(const line of body.lines) line.pickupKind=undefined;
     const orderId = `VND-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const today = new Date().toISOString().slice(0, 10);
+    // Data da venda informada: meio-dia no horário de Brasília desse dia.
+    let saleAt: string | null = null;
+    if (body.saleDate) {
+      if (!['admin', 'superadmin', 'manager'].includes(String(req.user?.role ?? ''))) throw Object.assign(new Error('Só a gestão da loja lança venda com data anterior.'), { status: 403 });
+      const oldest = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+      if (body.saleDate > today) throw Object.assign(new Error('A data da venda não pode ser no futuro.'), { status: 422 });
+      if (body.saleDate < oldest) throw Object.assign(new Error('Lance vendas de até 120 dias atrás.'), { status: 422 });
+      if (body.saleDate < today) saleAt = new Date(`${body.saleDate}T12:00:00-03:00`).toISOString();
+    }
     const nowIso = new Date().toISOString();
 
     if (!pool) {
@@ -238,7 +249,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       const marginPercent = grossAmount > 0 ? Math.round((grossProfit / grossAmount) * 10000) / 100 : 0;
 
       const isCash = body.paymentMethod.toLowerCase().includes('dinheiro');
-      const externalCashStatus = isCash ? 'pending_pickup' : 'not_applicable';
+      const externalCashStatus = isCash && !saleAt ? 'pending_pickup' : 'not_applicable';
 
       // 2. Inserir registro principal da venda em sales_orders
       await client.query(
@@ -346,7 +357,27 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
       // 4. Se houver UPGRADE / TRADE-IN: dar ENTRADA no estoque do aparelho usado
       let createdTradeInStockId: string | null = null;
-      if (body.tradeIn && body.tradeIn.tradeValue > 0) {
+      const tradeInImei = body.tradeIn?.imei?.trim() ?? '';
+      const alreadyInStock = tradeInImei
+        ? (
+            await client.query(
+              `SELECT x.stock_item_id FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
+                WHERE x.store_id = $1 AND e.imei = $2 LIMIT 1`,
+              [storeId, tradeInImei],
+            )
+          ).rows[0]
+        : null;
+      if (body.tradeIn && body.tradeIn.tradeValue > 0 && alreadyInStock) {
+        await client.query(
+          `INSERT INTO sale_trade_ins (id, sale_id, store_id, device_name, imei, capacity, color, condition_state, notes, trade_value, stock_item_id, status, received_by_seller_id, customer_id, stock_preexisting)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'received', $12, $13, true)`,
+          [
+            `TI-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, orderId, storeId, body.tradeIn.deviceName, tradeInImei, body.tradeIn.capacity, body.tradeIn.color,
+            body.tradeIn.conditionState, [body.tradeIn.notes, 'Aparelho já estava cadastrado no estoque (entrada anterior com este IMEI).'].filter(Boolean).join(' · '),
+            body.tradeIn.tradeValue, alreadyInStock.stock_item_id, body.sellerId || null, body.customerId || null,
+          ],
+        );
+      } else if (body.tradeIn && body.tradeIn.tradeValue > 0) {
         if (body.tradeIn.brand) {
           const brand = await client.query('SELECT 1 FROM store_brands WHERE store_id = $1 AND slug = $2 AND active = true', [storeId, body.tradeIn.brand]);
           if (!brand.rows[0]) throw Object.assign(new Error('Selecione uma marca ativa cadastrada nesta loja.'), { status: 400 });
@@ -524,6 +555,23 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
       }
       if (body.requestId) await client.query('UPDATE sales_orders SET request_key = $1 WHERE id = $2 AND store_id = $3', [body.requestId, orderId, storeId]);
+      if (saleAt) {
+        const shiftDays = Math.round((new Date(`${today}T12:00:00Z`).getTime() - new Date(`${body.saleDate}T12:00:00Z`).getTime()) / 86400000);
+        await client.query('UPDATE sales_orders SET created_at = $2, updated_at = $2 WHERE id = $1', [orderId, saleAt]);
+        await client.query('UPDATE sale_payments SET created_at = $2 WHERE sale_id = $1', [orderId, saleAt]);
+        await client.query('UPDATE stock_movements SET created_at = $3 WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
+        await client.query('UPDATE finance_entries SET created_at = $3 WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
+        await client.query('UPDATE stock_sold_units SET sold_at = $3 WHERE store_id = $1 AND sale_id = $2', [storeId, orderId, saleAt]);
+        await client.query(
+          `UPDATE receivables SET created_at = $3, due_date = due_date - $4::int, received_at = CASE WHEN received_at IS NULL THEN NULL ELSE $3::timestamptz END
+            WHERE store_id = $1 AND sale_id = $2`,
+          [storeId, orderId, saleAt, shiftDays],
+        );
+        const tradeIns = (await client.query('UPDATE sale_trade_ins SET created_at = $2 WHERE sale_id = $1 RETURNING id', [orderId, saleAt])).rows.map((row) => row.id);
+        if (tradeIns.length) {
+          await client.query('UPDATE stock_supplier_entries SET entry_date = $3::date, created_at = $4 WHERE store_id = $1 AND ref_id = ANY($2::text[])', [storeId, tradeIns, body.saleDate, saleAt]);
+        }
+      }
       await client.query('COMMIT');
 
       res.status(201).json({
@@ -547,7 +595,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
           tradeInStockId: createdTradeInStockId,
           warrantyMonths: body.warrantyMonths,
           linesCount: body.lines.length,
-          createdAt: nowIso,
+          createdAt: saleAt ?? nowIso,
         },
       });
     } catch (err: any) {
@@ -1119,7 +1167,10 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         [saleId],
       );
       for (const trade of tradeRes.rows) {
-        if (trade.stock_item_id && trade.stock_merged) {
+        if (trade.stock_preexisting) {
+          // O aparelho já estava no estoque antes da venda: cancela só o crédito da troca.
+          await client.query(`UPDATE sale_trade_ins SET status = 'cancelled', updated_at = now() WHERE id = $1`, [trade.id]);
+        } else if (trade.stock_item_id && trade.stock_merged) {
           // Aparelho que entrou num produto já existente: sai só a unidade da troca.
           const item = await client.query('SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [trade.stock_item_id, storeId]);
           if (!item.rows.length || Number(item.rows[0].qty) < 1 || trade.status === 'resold') throw Object.assign(new Error('Aparelho da troca já movimentado; cancelamento exige conferência do estoque.'), {status: 409});

@@ -248,3 +248,24 @@ test('seller is required when the store has sellers, and a completed sale can mo
  assert.equal((await request('/sales/'+id+'/seller',{sellerId:'seller-b'})).status,422);
  assert.equal((await request('/sales/'+id+'/seller',{sellerId:'seller-a2'},'store-b')).status,403);
 });
+test('a past sale keeps its real date in order, payment, stock, receivables, cash and trade-in; a trade-in already in stock is not added again',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-past','store-a','stock-past',5,20,50)");
+ const day=new Date(Date.now()-10*86400000).toISOString().slice(0,10);
+ const line=[{stockId:'stock-past',name:'Passada',qty:1,unitPrice:50}];
+ assert.equal((await request('/sales/external',{...payload,lines:line,saleDate:new Date(Date.now()+3*86400000).toISOString().slice(0,10)})).status,422);
+ assert.equal((await request('/sales/external',{...payload,lines:line,saleDate:'2020-01-01'})).status,422);
+ const res=await request('/sales/external',{...payload,paymentMethod:'Dinheiro',lines:line,saleDate:day,tradeIn:{deviceName:'iPhone usado',imei:'111222333444555',tradeValue:10}});
+ const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));const id=json.data.id;
+ const at=(sql)=>query(sql,[id]).then(r=>r.rows.map(x=>new Date(Object.values(x)[0]).toISOString().slice(0,10)));
+ for(const sql of ['SELECT created_at FROM sales_orders WHERE id=$1','SELECT created_at FROM sale_payments WHERE sale_id=$1','SELECT created_at FROM stock_movements WHERE ref_id=$1','SELECT created_at FROM finance_entries WHERE ref_id=$1','SELECT due_date FROM receivables WHERE sale_id=$1','SELECT created_at FROM sale_trade_ins WHERE sale_id=$1']) assert.deepEqual([...new Set(await at(sql))],[day],sql);
+ assert.equal((await query('SELECT external_cash_status FROM sales_orders WHERE id=$1',[id])).rows[0].external_cash_status,'not_applicable');
+ const entry=(await query("SELECT entry_date FROM stock_supplier_entries WHERE imeis @> '[\"111222333444555\"]'::jsonb")).rows;
+ assert.equal(entry.length,1);assert.equal(new Date(entry[0].entry_date).toISOString().slice(0,10),day);
+ // O mesmo aparelho de novo como troca: registra o crédito e liga ao estoque existente, sem nova entrada.
+ const again=await (await request('/sales/external',{...payload,lines:line,tradeIn:{deviceName:'iPhone usado',imei:'111222333444555',tradeValue:10}})).json();
+ assert.equal((await query("SELECT count(*)::int AS n FROM stock_supplier_entries WHERE imeis @> '[\"111222333444555\"]'::jsonb")).rows[0].n,1);
+ const trade=(await query('SELECT trade_value,stock_item_id FROM sale_trade_ins WHERE sale_id=$1',[again.data.id])).rows[0];assert.equal(Number(trade.trade_value),10);assert.ok(trade.stock_item_id);
+ const qty=(await query('SELECT qty,active FROM stock_items WHERE id=$1',[trade.stock_item_id])).rows[0];
+ assert.equal((await request('/sales/'+again.data.id+'/cancel',{reason:'Teste'})).status,200);
+ assert.deepEqual((await query('SELECT qty,active FROM stock_items WHERE id=$1',[trade.stock_item_id])).rows[0],qty);
+});
