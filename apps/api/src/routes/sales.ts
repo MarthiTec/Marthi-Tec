@@ -203,6 +203,15 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
           // Custo unitário real registrado no cadastro de estoque (imutável por usuário comum)
           lineCost = Number(stockRow.cost) || 0;
+          // Aparelho com IMEI: o custo é o da entrada desse aparelho (compras do mesmo modelo têm custos diferentes).
+          if (line.imei) {
+            const entry = await client.query(
+              `SELECT x.unit_cost FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
+                WHERE x.store_id = $1 AND x.stock_item_id = $2 AND e.imei = $3 ORDER BY x.entry_date DESC, x.created_at DESC LIMIT 1`,
+              [storeId, line.stockId, line.imei],
+            );
+            if (entry.rows.length) lineCost = Number(entry.rows[0].unit_cost) || 0;
+          }
         } else if (line.unitCost !== undefined && req.user?.role === 'admin') {
           lineCost = Number(line.unitCost) || 0;
         }

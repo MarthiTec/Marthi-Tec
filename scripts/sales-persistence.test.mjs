@@ -269,3 +269,10 @@ test('a past sale keeps its real date in order, payment, stock, receivables, cas
  assert.equal((await request('/sales/'+again.data.id+'/cancel',{reason:'Teste'})).status,200);
  assert.deepEqual((await query('SELECT qty,active FROM stock_items WHERE id=$1',[trade.stock_item_id])).rows[0],qty);
 });
+test('a device sold by IMEI carries the cost of its own entry, not the product average',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-imei','store-a','stock-imei',2,6975,7500)");
+ await query(`INSERT INTO stock_supplier_entries(id,store_id,stock_item_id,qty,unit_cost,imeis) VALUES('SE-1','store-a','stock-imei',1,6900,'["900000000000001"]'::jsonb),('SE-2','store-a','stock-imei',1,7050,'["900000000000002"]'::jsonb)`);
+ const res=await request('/sales/external',{...payload,lines:[{stockId:'stock-imei',name:'x',qty:1,unitPrice:7500,imei:'900000000000002'}]});const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+ assert.equal(Number((await query('SELECT unit_cost FROM sales_order_lines WHERE sale_id=$1',[json.data.id])).rows[0].unit_cost),7050);
+ assert.equal(Number((await query('SELECT gross_profit FROM sales_orders WHERE id=$1',[json.data.id])).rows[0].gross_profit),450);
+});
