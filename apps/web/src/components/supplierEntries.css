@@ -38,6 +38,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
+  /* Campo ao lado de um mais alto (fornecedor + cadastro, IMEIs + botão) não estica nem desce. */
+  align-items: start;
 }
 
 .supplier-entry__imeis {
@@ -156,3 +158,5 @@
   .supplier-entries-modal .supplier-entry__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .supplier-entries-modal .supplier-entry__grid > .supplier-entry__imeis:not(label) { grid-column: span 3; }
 }
+/* Mesma altura dos seletores (Origem, Fornecedor, Financeiro). */
+.supplier-entry__grid .admin-field input:not([type='checkbox']) { box-sizing: border-box; height: 40px; min-height: 40px; }

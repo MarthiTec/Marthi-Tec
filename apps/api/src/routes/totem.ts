@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { formatStockRow } from './stock.js';
+import { totemVisibleStock } from '../services/totemAvailability.js';
 
 export const totemRouter = Router();
 
@@ -231,7 +232,10 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
             variations: rest.variations.map(({ cost: _vc, avgCost: _va, pricingPolicy: _vp, lastEntry: _vl, ...variation }: any) => variation),
           };
         };
-        res.json({ success: true, data: result.rows.map((row) => publicRow(formatStockRow(row))) });
+        // Sem estoque e sem "Sob encomenda" não vai para o totem (nem a variação, nem o produto).
+        const methods = (await pool.query('SELECT id, kind FROM pickup_methods WHERE store_id = $1 AND active = true', [storeId])).rows;
+        const visible = result.rows.map((row) => totemVisibleStock(methods, formatStockRow(row))).filter((row): row is NonNullable<typeof row> => row !== null);
+        res.json({ success: true, data: visible.map(publicRow) });
         return;
       } catch (dbErr) {
         throw dbErr;

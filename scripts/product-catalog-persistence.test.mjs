@@ -61,3 +61,23 @@ test('legacy display variation IDs cannot collide while editing another product'
  const update=await fetch(base+'/stock/'+secondRow.id,{method:'PATCH',headers:{authorization:'Bearer '+token,'x-store-id':'store-a','content-type':'application/json'},body:JSON.stringify({variations:[baseVariation]})});
  const updateResult=await update.json();assert.equal(update.status,200,JSON.stringify(updateResult));
 });
+test('totem shows only what can be sold: stock on hand, or "Sob encomenda"; zero stock "Em mãos" stays out',async()=>{
+ const ids=Object.fromEntries((await query("SELECT kind,id FROM pickup_methods WHERE store_id='store-a'")).rows.map(r=>[r.kind,r.id]));
+ const create=async(body)=>{const res=await request('/stock',{showOnTotem:true,...body});const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));return json.data.id;};
+ const handZero=await create({name:'Em mãos zerado',qty:0,price:100,pickupPrices:{[ids.immediate]:100}});
+ const handStock=await create({name:'Em mãos com estoque',qty:2,price:100,pickupPrices:{[ids.immediate]:100}});
+ const orderZero=await create({name:'Encomenda zerado',qty:0,price:100,pickupPrices:{[ids.order]:100}});
+ const legacyZero=await create({name:'Sem retirada zerado',qty:0,price:100});
+ const hidden=await create({name:'Fora do totem',qty:3,price:100,showOnTotem:false,pickupPrices:{[ids.immediate]:100}});
+ const mixed=await create({name:'Grade mista',price:100,variations:[
+  {id:'v-hand-zero',attrs:{color:'Azul'},qty:0,price:100,pickupPrices:{[ids.immediate]:100}},
+  {id:'v-hand-stock',attrs:{color:'Preto'},qty:1,price:100,pickupPrices:{[ids.immediate]:100}},
+  {id:'v-order',attrs:{color:'Rosa'},qty:0,price:90,pickupPrices:{[ids.order]:90}},
+ ]});
+ const allZero=await create({name:'Grade zerada',price:100,variations:[{id:'v-z',attrs:{color:'Azul'},qty:0,price:100,pickupPrices:{[ids.immediate]:100}}]});
+ const catalog=(await (await fetch(base+'/totem/catalog?storeId=store-a')).json()).data;
+ const shown=new Set(catalog.map(p=>p.id));
+ for(const id of [handStock,orderZero,mixed]) assert.ok(shown.has(id),id);
+ for(const id of [handZero,legacyZero,hidden,allZero]) assert.ok(!shown.has(id),id);
+ assert.deepEqual(catalog.find(p=>p.id===mixed).variations.map(v=>v.attrs.color).sort(),['Preto','Rosa']);
+});
