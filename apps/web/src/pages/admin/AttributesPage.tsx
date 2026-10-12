@@ -77,6 +77,10 @@ export function AttributesPage() {
   });
   const [form, setForm] = useState(() => emptyForm(totemSurface));
   const [valueDraft, setValueDraft] = useState('');
+  // Renomear valor: valores salvos no banco (ao abrir o atributo) e o que virou cada um (antigo → novo).
+  const [savedValues, setSavedValues] = useState<string[]>([]);
+  const [renames, setRenames] = useState<Record<string, string>>({});
+  const [renaming, setRenaming] = useState<{ value: string; text: string } | null>(null);
   const [deltaDraft, setDeltaDraft] = useState('0');
   const [mode, setMode] = useState<Mode>('new');
   const [formVisible, setFormVisible] = useState(false);
@@ -150,6 +154,9 @@ export function AttributesPage() {
   );
 
   function resetForm() {
+    setSavedValues([]);
+    setRenames({});
+    setRenaming(null);
     setForm(emptyForm(totemSurface));
     setValueDraft('');
     setDeltaDraft('0');
@@ -236,7 +243,11 @@ export function AttributesPage() {
     setSaving(true);
     try {
       if (mode === 'edit' && selectedId) {
-        const updated = await updateAttribute(selectedId, payload);
+        // Só os valores que já existiam no banco são renomeados nos produtos.
+        const renamed = Object.entries(renames)
+          .filter(([from, to]) => savedValues.includes(from) && from !== to)
+          .map(([from, to]) => ({ from, to }));
+        const updated = await updateAttribute(selectedId, { ...payload, renames: renamed });
         setItems(Array.isArray(updated) ? updated : []);
       } else {
         const created = await createAttribute(payload);
@@ -253,6 +264,9 @@ export function AttributesPage() {
 
   function loadItem(item: ProductAttribute, nextMode: Mode) {
     if (!item) return;
+    setSavedValues(Array.isArray(item.values) ? [...item.values] : []);
+    setRenames({});
+    setRenaming(null);
     setSelectedId(item.id);
     setMode(nextMode);
     setFormVisible(true);
@@ -295,6 +309,29 @@ export function AttributesPage() {
     });
     setValueDraft('');
     setDeltaDraft('0');
+  }
+
+  /** Renomeia o valor no formulário; se o novo nome já existe, os dois viram um só ao salvar. */
+  function applyRename() {
+    if (!renaming) return;
+    const { value } = renaming;
+    const text = renaming.text.trim();
+    if (!text) return setError('Informe o novo nome do valor.');
+    setRenaming(null);
+    if (text === value) return;
+    const values = Array.isArray(form.values) ? form.values : [];
+    const deltas = { ...(form.priceDeltas || {}) };
+    const merge = values.includes(text);
+    if (!merge) deltas[text] = deltas[value] ?? 0;
+    delete deltas[value];
+    setForm({ ...form, values: merge ? values.filter((item) => item !== value) : values.map((item) => (item === value ? text : item)), priceDeltas: deltas });
+    setRenames((current) => {
+      const origin = Object.keys(current).find((key) => current[key] === value) ?? value;
+      const next = { ...current, [origin]: text };
+      if (origin === text) delete next[origin];
+      return next;
+    });
+    setError('');
   }
 
   async function remove(item: ProductAttribute) {
@@ -575,7 +612,31 @@ export function AttributesPage() {
                 <tbody>
                   {form.values.map((value) => (
                     <tr key={value}>
-                      <td>{value}</td>
+                      <td>
+                        {renaming?.value === value ? (
+                          <span className="attr-values__rename">
+                            <input
+                              autoFocus
+                              value={renaming.text}
+                              maxLength={100}
+                              aria-label={`Novo nome de ${value}`}
+                              onChange={(e) => setRenaming({ value, text: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  applyRename();
+                                }
+                                if (e.key === 'Escape') setRenaming(null);
+                              }}
+                            />
+                            <button type="button" className="btn btn--ghost btn--sm" onClick={applyRename}>
+                              OK
+                            </button>
+                          </span>
+                        ) : (
+                          value
+                        )}
+                      </td>
                       <td>
                         <input
                           type="number"
@@ -593,7 +654,16 @@ export function AttributesPage() {
                           }
                         />
                       </td>
-                      <td>
+                      <td className="attr-values__actions">
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          disabled={readOnly || saving}
+                          title="Renomear: os produtos com este valor passam a usar o novo nome"
+                          onClick={() => setRenaming({ value, text: value })}
+                        >
+                          Renomear
+                        </button>
                         <button
                           type="button"
                           className="btn btn--ghost"

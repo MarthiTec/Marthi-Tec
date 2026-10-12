@@ -77,7 +77,7 @@ export function apiCreateAttribute(body: Omit<ProductAttribute, 'id'>) {
   return nestPost<ProductAttribute>('/attributes', body);
 }
 
-export function apiUpdateAttribute(id: string, body: Partial<Omit<ProductAttribute, 'id'>>) {
+export function apiUpdateAttribute(id: string, body: Partial<Omit<ProductAttribute, 'id'>> & { renames?: Array<{ from: string; to: string }> }) {
   return nestPatch<ProductAttribute>(`/attributes/${id}`, body);
 }
 

@@ -5,6 +5,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { renameAttributeValue } from '../services/attributeRename.js';
 
 export const attributesRouter = Router();
 const schema = z.object({
@@ -15,6 +16,8 @@ const schema = z.object({
  useOnStock: z.boolean().default(true), useOnPdv: z.boolean().default(true),
  useOnExternalSale: z.boolean().default(true), sort: z.coerce.number().int().default(0), active: z.boolean().default(true),
 });
+/** Valores renomeados na edição (nome antigo → novo): os produtos acompanham. */
+const renamesSchema = z.array(z.object({ from: z.string().trim().min(1).max(100), to: z.string().trim().min(1).max(100) })).max(100).default([]);
 export function formatAttrResponse(row: any, values: any[]) {
  return { id: row.id, name: row.name, values: values.map(v => v.value),
  priceDeltas: Object.fromEntries(values.filter(v => Number(v.price_delta) !== 0).map(v => [v.value,Number(v.price_delta)])),
@@ -100,11 +103,12 @@ async function update(req: any,res: any,next: any) {
  if(!canEdit(req,res)) return;
  let db: PoolClient | undefined;
  try {
-  const patch=schema.partial().parse(req.body); db=await pool.connect(); await db.query('BEGIN');
+  const patch=schema.partial().parse(req.body); const renames=renamesSchema.parse(req.body?.renames ?? []); db=await pool.connect(); await db.query('BEGIN');
   const current=await db.query('SELECT * FROM product_attributes WHERE id=$1 AND store_id=$2 FOR UPDATE',[req.params.id,req.storeId]);
   if(!current.rows[0]) { await db.query('ROLLBACK'); missing(res); return; }
   const [old]=await read(db,req.storeId,req.params.id); const body={...old,...patch};
   await db.query(`UPDATE product_attributes SET name=$3,use_on_totem=$4,filter_on_totem=$5,use_on_stock=$6,use_on_pdv=$7,use_on_external_sale=$8,sort=$9,active=$10 WHERE id=$1 AND store_id=$2`,[req.params.id,req.storeId,body.name,body.useOnTotem,body.filterOnTotem,body.useOnStock,body.useOnPdv,body.useOnExternalSale,body.sort,body.active]);
+  for(const {from,to} of renames) await renameAttributeValue(db,req.storeId!,req.params.id,from,to);
   if(patch.values!==undefined || patch.priceDeltas!==undefined) await writeValues(db,req.params.id,body.values,body.priceDeltas);
   const [record]=await read(db,req.storeId,req.params.id); await db.query('COMMIT'); res.json({success:true,data:record});
  } catch(e) { if(db) await db.query('ROLLBACK'); next(e); } finally { db?.release(); }

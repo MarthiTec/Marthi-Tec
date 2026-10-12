@@ -89,7 +89,8 @@ export async function createAttribute(payload: Omit<ProductAttribute,'id'>) {
  const created=await apiCreateAttribute(payload);
  return persist([...current,created],expected);
 }
-export async function updateAttribute(id: string,payload: Partial<Omit<ProductAttribute,'id'>>) {
+/** renames: valores renomeados (antigo → novo); o servidor leva o novo nome para os produtos. */
+export async function updateAttribute(id: string,payload: Partial<Omit<ProductAttribute, 'id'>> & { renames?: Array<{ from: string; to: string }> }) {
  authenticated(); const expected=context(); const current=load();
  const { apiUpdateAttribute }=await import('../services/erpApi');
  const updated=await apiUpdateAttribute(id,payload);

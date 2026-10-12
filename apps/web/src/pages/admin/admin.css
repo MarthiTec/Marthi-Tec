@@ -3606,6 +3606,11 @@
   width: 140px;
 }
 
+/* Renomear valor do atributo na própria linha. */
+.attr-values__rename { display: flex; align-items: center; gap: 6px; }
+.attr-values__rename input { min-height: 40px; width: min(220px, 100%); }
+.attr-values__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+
 .pdv__form {
   width: 100%;
   max-width: 100%;
