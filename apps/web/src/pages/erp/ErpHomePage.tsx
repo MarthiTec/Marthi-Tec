@@ -74,7 +74,7 @@ const CARDS = [
 ] as const;
 
 export function ErpHomePage() {
-  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot(7));
+  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot());
   const [ready, setReady] = useState(() => getErpBootstrapState().ready || !isNestAuthed());
   const stock = getAdminState().stock;
   const snap = stockBalanceSnapshot(stock);
@@ -94,7 +94,7 @@ export function ErpHomePage() {
         const next = await hydrateDashboardFromApi(7);
         if (alive) setDash(next);
       } catch {
-        if (alive) setDash(getDashboardSnapshot(7));
+        if (alive) setDash(getDashboardSnapshot());
       }
     })();
     return () => {

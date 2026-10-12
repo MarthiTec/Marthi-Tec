@@ -98,6 +98,12 @@ const manualEntrySchema = z.object({
 
 /* ── In-Memory Fallbacks ────────────────────────────────── */
 
+/** Data da baixa: dia informado (AAAA-MM-DD) ao meio-dia de Brasília, data/hora informada ou agora. */
+const settlementMoment = (value?: string) => {
+  if (!value) return new Date().toISOString();
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00-03:00`).toISOString() : value;
+};
+
 const memoryPayables = new Map<string, any>();
 const memoryReceivables = new Map<string, any>();
 const memoryAccounts = new Map<string, any>();
@@ -111,7 +117,7 @@ financeRouter.get('/api/v1/finance/accounts', requireAuth, async (req, res, next
 
     if (pool) {
       const result = await pool.query(
-        `SELECT id, name, bank, agency, number, type, initial_balance, current_balance, active, created_at
+        `SELECT id, name, bank, agency, number, type, initial_balance, current_balance, active, created_at, updated_at
          FROM bank_accounts
          WHERE store_id = $1 AND active = true
          ORDER BY name ASC`,
@@ -130,6 +136,7 @@ financeRouter.get('/api/v1/finance/accounts', requireAuth, async (req, res, next
           currentBalance: Number(r.current_balance) || 0,
           active: Boolean(r.active),
           createdAt: r.created_at,
+          updatedAt: r.updated_at,
         })),
       });
       return;
@@ -215,6 +222,17 @@ financeRouter.patch('/api/v1/finance/accounts/:id', requireAuth, async (req, res
     const updated = { ...curr, ...body };
     memoryAccounts.set(id, updated);
     res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Excluir conta bancária: desativa (o histórico de pagamentos e recebimentos continua ligado a ela). */
+financeRouter.delete('/api/v1/finance/accounts/:id', requireAuth, async (req, res, next) => {
+  try {
+    const row = (await pool.query('UPDATE bank_accounts SET active = false, updated_at = now() WHERE id = $1 AND store_id = $2 RETURNING *', [req.params.id, req.storeId])).rows[0];
+    if (!row) throw Object.assign(new Error('Conta bancária não encontrada nesta loja.'), { status: 404 });
+    res.json({ success: true, data: rowToClient(row) });
   } catch (error) {
     next(error);
   }
@@ -384,7 +402,7 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
     const storeId = req.storeId!;
     const id = req.params.id;
     const body = settleBillSchema.parse(req.body || {});
-    const paidAt = body.paymentDate || new Date().toISOString();
+    const paidAt = settlementMoment(body.paymentDate);
 
     if (pool) {
       const client = await pool.connect();
@@ -446,9 +464,9 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
         ].filter(Boolean).join(' · ');
 
         await client.query(
-          `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name)
-           VALUES ($1, $2, 'out', $3, $4, 'manual', $5, $6, $7, $8)`,
-          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador'],
+          `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name, created_at)
+           VALUES ($1, $2, 'out', $3, $4, 'manual', $5, $6, $7, $8, $9::timestamptz)`,
+          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador', paidAt],
         );
 
         // Debita da conta bancária se vinculada
@@ -730,7 +748,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
     const storeId = req.storeId!;
     const id = req.params.id;
     const body = settleBillSchema.parse(req.body || {});
-    const receivedAt = body.paymentDate || new Date().toISOString();
+    const receivedAt = settlementMoment(body.paymentDate);
 
     if (pool) {
       const client = await pool.connect();
@@ -791,9 +809,9 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
         ].filter(Boolean).join(' · ');
 
         await client.query(
-          `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name)
-           VALUES ($1, $2, 'in', $3, $4, 'manual', $5, $6, $7, $8)`,
-          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador'],
+          `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, account_id, category, operator_name, created_at)
+           VALUES ($1, $2, 'in', $3, $4, 'manual', $5, $6, $7, $8, $9::timestamptz)`,
+          [entryId, storeId, noteParts, netAmount, id, accountId, curr.category, req.user?.name || 'Operador', receivedAt],
         );
 
         // Credita na conta bancária se vinculada

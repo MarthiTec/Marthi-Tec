@@ -27,7 +27,7 @@ export function AdminHomePage() {
   const isAdmin = userIsStoreAdmin(user?.email);
   const { tickets } = usePosTickets();
   const openTickets = tickets.filter((item) => item.status === 'open');
-  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot(7));
+  const [dash, setDash] = useState<DashboardSnapshot>(() => getDashboardSnapshot());
   const [ready, setReady] = useState(() => getErpBootstrapState().ready || !isNestAuthed());
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function AdminHomePage() {
         const next = await hydrateDashboardFromApi(7);
         if (alive) setDash(next);
       } catch {
-        if (alive) setDash(getDashboardSnapshot(7));
+        if (alive) setDash(getDashboardSnapshot());
       }
     })();
     return () => {

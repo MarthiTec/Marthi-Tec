@@ -838,24 +838,24 @@ export type ApiAdvancePayment = {
 
 export function apiListBankAccounts(activeOnly?: boolean) {
   const qs = activeOnly ? '?active=true' : '';
-  return nestGet<ApiBankAccount[]>(`/bank-accounts${qs}`);
+  return nestGet<ApiBankAccount[]>(`/finance/accounts${qs}`);
 }
 
 export function apiCreateBankAccount(
   body: Omit<ApiBankAccount, 'id' | 'createdAt' | 'updatedAt' | 'balance'>,
 ) {
-  return nestPost<ApiBankAccount>('/bank-accounts', body);
+  return nestPost<ApiBankAccount>('/finance/accounts', body);
 }
 
 export function apiUpdateBankAccount(
   id: string,
   body: Partial<Omit<ApiBankAccount, 'id' | 'createdAt' | 'updatedAt' | 'balance'>>,
 ) {
-  return nestPatch<ApiBankAccount>(`/bank-accounts/${id}`, body);
+  return nestPatch<ApiBankAccount>(`/finance/accounts/${id}`, body);
 }
 
 export function apiDeleteBankAccount(id: string) {
-  return nestDelete<ApiBankAccount>(`/bank-accounts/${id}`);
+  return nestDelete<ApiBankAccount>(`/finance/accounts/${id}`);
 }
 
 export function apiListPayables(query?: { status?: ApiPayable['status']; from?: string; to?: string }) {
@@ -864,13 +864,13 @@ export function apiListPayables(query?: { status?: ApiPayable['status']; from?: 
   if (query?.from) params.set('from', query.from);
   if (query?.to) params.set('to', query.to);
   const qs = params.toString();
-  return nestGet<ApiPayable[]>(`/payables${qs ? `?${qs}` : ''}`);
+  return nestGet<ApiPayable[]>(`/finance/payables${qs ? `?${qs}` : ''}`);
 }
 
 export function apiCreatePayable(
   body: Omit<ApiPayable, 'id' | 'paidAmount' | 'status' | 'createdAt' | 'updatedAt' | 'paidAt'>,
 ) {
-  return nestPost<ApiPayable>('/payables', body);
+  return nestPost<ApiPayable>('/finance/payables', body);
 }
 
 export function apiUpdatePayable(
@@ -881,7 +881,7 @@ export function apiUpdatePayable(
     }
   >,
 ) {
-  return nestPatch<ApiPayable>(`/payables/${id}`, body);
+  return nestPatch<ApiPayable>(`/finance/payables/${id}`, body);
 }
 
 export type ApiSettleBillPayload = {
@@ -898,11 +898,16 @@ export type ApiSettleBillPayload = {
   notes?: string;
 };
 
+/** Baixa de conta: a API recebe a data como paymentDate. */
+function settlePayload({ at, ...body }: ApiSettleBillPayload | { amount: number; accountId?: string; at?: string }) {
+  return { ...body, paymentDate: at };
+}
+
 export function apiPayPayable(
   id: string,
   body: ApiSettleBillPayload | { amount: number; accountId?: string; at?: string },
 ) {
-  return nestPost<ApiPayable>(`/payables/${id}/pay`, body);
+  return nestPost<ApiPayable>(`/finance/payables/${id}/pay`, settlePayload(body));
 }
 
 export function apiListReceivables(query?: {
@@ -915,7 +920,7 @@ export function apiListReceivables(query?: {
   if (query?.from) params.set('from', query.from);
   if (query?.to) params.set('to', query.to);
   const qs = params.toString();
-  return nestGet<ApiReceivable[]>(`/receivables${qs ? `?${qs}` : ''}`);
+  return nestGet<ApiReceivable[]>(`/finance/receivables${qs ? `?${qs}` : ''}`);
 }
 
 export function apiCreateReceivable(
@@ -924,7 +929,7 @@ export function apiCreateReceivable(
     'id' | 'receivedAmount' | 'status' | 'createdAt' | 'updatedAt' | 'receivedAt'
   >,
 ) {
-  return nestPost<ApiReceivable>('/receivables', body);
+  return nestPost<ApiReceivable>('/finance/receivables', body);
 }
 
 export function apiUpdateReceivable(
@@ -935,18 +940,18 @@ export function apiUpdateReceivable(
     }
   >,
 ) {
-  return nestPatch<ApiReceivable>(`/receivables/${id}`, body);
+  return nestPatch<ApiReceivable>(`/finance/receivables/${id}`, body);
 }
 
 export function apiReceiveReceivable(
   id: string,
   body: ApiSettleBillPayload | { amount: number; accountId?: string; at?: string },
 ) {
-  return nestPost<ApiReceivable>(`/receivables/${id}/receive`, body);
+  return nestPost<ApiReceivable>(`/finance/receivables/${id}/receive`, settlePayload(body));
 }
 
 export function apiListTreasury() {
-  return nestGet<ApiTreasuryMove[]>('/treasury');
+  return nestGet<ApiTreasuryMove[]>('/finance/treasury');
 }
 
 export function apiCreateTreasury(body: {
@@ -957,11 +962,11 @@ export function apiCreateTreasury(body: {
   description?: string;
   at?: string;
 }) {
-  return nestPost<ApiTreasuryMove>('/treasury', body);
+  return nestPost<ApiTreasuryMove>('/finance/treasury', body);
 }
 
 export function apiListAdvances() {
-  return nestGet<ApiAdvancePayment[]>('/advances');
+  return nestGet<ApiAdvancePayment[]>('/finance/advances');
 }
 
 export function apiCreateAdvance(body: {
@@ -971,15 +976,15 @@ export function apiCreateAdvance(body: {
   accountId: string;
   notes?: string;
 }) {
-  return nestPost<ApiAdvancePayment>('/advances', body);
+  return nestPost<ApiAdvancePayment>('/finance/advances', body);
 }
 
 export function apiApplyAdvance(id: string, body: { amount: number }) {
-  return nestPost<ApiAdvancePayment>(`/advances/${id}/apply`, body);
+  return nestPost<ApiAdvancePayment>(`/finance/advances/${id}/apply`, body);
 }
 
 export function apiRefundAdvance(id: string) {
-  return nestPost<ApiAdvancePayment>(`/advances/${id}/refund`);
+  return nestPost<ApiAdvancePayment>(`/finance/advances/${id}/refund`);
 }
 
 /* ── Fase 3 P1: Warehouses / lots / kits / moves ───────── */

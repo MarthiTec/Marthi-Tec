@@ -439,6 +439,12 @@ export function accountBalance(accountId: string, state = load()) {
   for (const bill of state.receivables) {
     if (bill.accountId === accountId) balance += bill.receivedAmount;
   }
+  // Adiantamento: de cliente entra, a fornecedor sai; estornado, fica só a parte usada.
+  for (const advance of state.advances) {
+    if (advance.accountId !== accountId) continue;
+    const kept = advance.status === 'refunded' ? advance.usedAmount : advance.amount;
+    balance += advance.kind === 'customer' ? kept : -kept;
+  }
   return balance;
 }
 
