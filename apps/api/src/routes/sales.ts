@@ -584,19 +584,19 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       if (body.requestId) await client.query('UPDATE sales_orders SET request_key = $1 WHERE id = $2 AND store_id = $3', [body.requestId, orderId, storeId]);
       if (saleAt) {
         const shiftDays = Math.round((new Date(`${today}T12:00:00Z`).getTime() - new Date(`${body.saleDate}T12:00:00Z`).getTime()) / 86400000);
-        await client.query('UPDATE sales_orders SET created_at = $2, updated_at = $2 WHERE id = $1', [orderId, saleAt]);
-        await client.query('UPDATE sale_payments SET created_at = $2 WHERE sale_id = $1', [orderId, saleAt]);
-        await client.query('UPDATE stock_movements SET created_at = $3 WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
-        await client.query('UPDATE finance_entries SET created_at = $3 WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
-        await client.query('UPDATE stock_sold_units SET sold_at = $3 WHERE store_id = $1 AND sale_id = $2', [storeId, orderId, saleAt]);
+        await client.query('UPDATE sales_orders SET created_at = $2::timestamptz, updated_at = $2::timestamptz WHERE id = $1', [orderId, saleAt]);
+        await client.query('UPDATE sale_payments SET created_at = $2::timestamptz WHERE sale_id = $1', [orderId, saleAt]);
+        await client.query('UPDATE stock_movements SET created_at = $3::timestamptz WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
+        await client.query('UPDATE finance_entries SET created_at = $3::timestamptz WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
+        await client.query('UPDATE stock_sold_units SET sold_at = $3::timestamptz WHERE store_id = $1 AND sale_id = $2', [storeId, orderId, saleAt]);
         await client.query(
-          `UPDATE receivables SET created_at = $3, due_date = due_date - $4::int, received_at = CASE WHEN received_at IS NULL THEN NULL ELSE $3::timestamptz END
+          `UPDATE receivables SET created_at = $3::timestamptz, due_date = due_date::date - $4::int, received_at = CASE WHEN received_at IS NULL THEN NULL ELSE $3::timestamptz END
             WHERE store_id = $1 AND sale_id = $2`,
           [storeId, orderId, saleAt, shiftDays],
         );
-        const tradeIns = (await client.query('UPDATE sale_trade_ins SET created_at = $2 WHERE sale_id = $1 RETURNING id', [orderId, saleAt])).rows.map((row) => row.id);
+        const tradeIns = (await client.query('UPDATE sale_trade_ins SET created_at = $2::timestamptz WHERE sale_id = $1 RETURNING id', [orderId, saleAt])).rows.map((row) => row.id);
         if (tradeIns.length) {
-          await client.query('UPDATE stock_supplier_entries SET entry_date = $3::date, created_at = $4 WHERE store_id = $1 AND ref_id = ANY($2::text[])', [storeId, tradeIns, body.saleDate, saleAt]);
+          await client.query('UPDATE stock_supplier_entries SET entry_date = $3::date, created_at = $4::timestamptz WHERE store_id = $1 AND ref_id = ANY($2::text[])', [storeId, tradeIns, body.saleDate, saleAt]);
         }
       }
       await client.query('COMMIT');

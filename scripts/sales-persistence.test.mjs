@@ -285,3 +285,15 @@ test('a device sold without IMEI carries the cost of the oldest entry it came fr
  assert.deepEqual([Number(order.cost_total),Number(order.gross_profit)],[6900,900]);
  assert.equal((await query("SELECT count(*)::int AS n FROM stock_sold_units WHERE imei='900000000000009'")).rows[0].n,0);
 });
+test('a past sale also works with the production column types (text due date, timestamps without time zone)',async()=>{
+ // Banco de produção: receivables.due_date é texto e algumas datas são timestamp sem fuso.
+ for(const sql of ["ALTER TABLE receivables ALTER COLUMN due_date TYPE varchar USING due_date::text","ALTER TABLE receivables ALTER COLUMN created_at TYPE timestamp","ALTER TABLE receivables ALTER COLUMN received_at TYPE timestamp","ALTER TABLE sales_orders ALTER COLUMN created_at TYPE timestamp","ALTER TABLE finance_entries ALTER COLUMN created_at TYPE timestamp"]) await query(sql);
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-drift','store-a','stock-drift',5,20,50)");
+ const day=new Date(Date.now()-5*86400000).toISOString().slice(0,10);
+ for(const installments of [1,3]){
+  const res=await request('/sales/external',{...payload,installments,saleDate:day,lines:[{stockId:'stock-drift',name:'x',qty:1,unitPrice:50}]});const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+  const dues=(await query('SELECT due_date FROM receivables WHERE sale_id=$1 ORDER BY due_date',[json.data.id])).rows.map(r=>String(r.due_date).slice(0,10));
+  const expected=installments===1?[day]:[1,2,3].map(i=>new Date(Date.parse(day+'T12:00:00Z')+i*30*86400000).toISOString().slice(0,10));
+  assert.deepEqual(dues,expected);
+ }
+});
