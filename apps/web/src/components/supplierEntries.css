@@ -99,3 +99,60 @@
 .quick-stock-register { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .quick-stock-register__supplier { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 @media (max-width: 560px) { .quick-stock-register { grid-template-columns: minmax(0, 1fr); } }
+
+/* Grade de entradas por produto: uma linha por compra; o formulário abre só na entrada em edição. */
+.supplier-entries__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.supplier-entries__search {
+  flex: 1 1 220px; min-width: 0; min-height: 36px; padding: 0 12px; border: 1px solid var(--line, #d8dde3); border-radius: 12px;
+  background: var(--surface, #f8fafc); color: var(--ink); font: inherit; font-size: 0.88rem; box-sizing: border-box;
+}
+.supplier-entries__table { display: grid; border: 1px solid var(--line, #d8dde3); border-radius: 12px; overflow: hidden; }
+.supplier-entries__row {
+  display: grid; grid-template-columns: 52px 92px minmax(120px, 1.4fr) 92px 104px minmax(130px, 1.2fr) 66px 128px;
+  align-items: center; gap: 8px; padding: 8px 12px; font-size: 0.86rem; cursor: pointer;
+}
+.supplier-entries__row > span { min-width: 0; }
+.supplier-entries__row--head {
+  cursor: default; background: color-mix(in srgb, var(--mute, #64748b) 10%, transparent); color: var(--mute, #64748b);
+  font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.supplier-entries__item + .supplier-entries__item,
+.supplier-entries__row--head + .supplier-entries__item { border-top: 1px solid var(--line, #d8dde3); }
+.supplier-entries__item:not(.is-open) .supplier-entries__row:hover { background: color-mix(in srgb, var(--accent, #0f766e) 6%, transparent); }
+.supplier-entries__item.is-open { background: color-mix(in srgb, var(--accent, #0f766e) 5%, transparent); }
+.supplier-entries__item.is-open .supplier-entries__row { font-weight: 700; }
+.supplier-entries__item .supplier-entry { margin: 0 10px 10px; background: var(--card, #fff); }
+.supplier-entries__table > .empty { margin: 0; padding: 10px 12px; }
+.supplier-entries__supplier, .supplier-entries__imei { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.supplier-entries__imei { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+.supplier-entries__row small { color: var(--mute, #64748b); font-weight: 600; }
+.supplier-entries__new {
+  margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent, #0f766e) 15%, transparent);
+  color: var(--accent, #0f766e); font-size: 0.68rem; font-style: normal; font-weight: 800;
+}
+.supplier-entries__actions { display: flex; justify-content: flex-end; gap: 4px; }
+.supplier-entries__actions button,
+.supplier-entry__close {
+  border: 0; background: transparent; color: var(--accent, #0f766e); font: inherit; font-size: 0.78rem; font-weight: 700;
+  text-transform: none; letter-spacing: 0; cursor: pointer; padding: 4px 6px;
+}
+.supplier-entry__close { display: block; margin: 10px 0 0 auto; }
+.supplier-entries__actions button.is-danger { color: #b91c1c; }
+.is-theme-dark .supplier-entries__actions button.is-danger,
+.is-theme-dark .supplier-entry__remove { color: #fca5a5; }
+.is-theme-dark .supplier-entries__item .supplier-entry { background: var(--card, #0f1b24); }
+
+/* Tela estreita: cada entrada vira um cartão com rótulos. */
+@media (max-width: 900px) {
+  .supplier-entries__row--head { display: none; }
+  .supplier-entries__row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+  .supplier-entries__row > span[data-label]::before {
+    content: attr(data-label); display: block; color: var(--mute, #64748b); font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+  }
+  .supplier-entries__actions { grid-column: 1 / -1; }
+}
+.quick-modal__card.supplier-entries-modal { width: min(1060px, 100%); }
+@media (min-width: 900px) {
+  .supplier-entries-modal .supplier-entry__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .supplier-entries-modal .supplier-entry__grid > .supplier-entry__imeis:not(label) { grid-column: span 3; }
+}

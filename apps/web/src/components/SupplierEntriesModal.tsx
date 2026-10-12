@@ -95,13 +95,21 @@ export function SupplierEntriesModal({
   // Aparelhos que já saíram (venda, bonificação…) só aparecem quando o usuário pede.
   const [showOut, setShowOut] = useState(false);
   const anyOut = rows.some((row) => (row.soldQty ?? 0) > 0);
+  // Grade por produto: cada entrada numa linha; só a que está sendo lançada ou editada abre o formulário.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const update = (key: string, patch: Partial<Draft>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
-  const add = () =>
-    setRows((current) => [
-      ...current,
-      toDraft({ supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: current[current.length - 1]?.unitCost ?? 0, imeis: [], payment: 'pending' }, current.length, suppliers),
-    ]);
+  const add = () => {
+    const draft = toDraft(
+      { supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: rows[rows.length - 1]?.unitCost ?? 0, imeis: [], payment: 'pending' },
+      rows.length,
+      suppliers,
+    );
+    setRows((current) => [...current, draft]);
+    setEditing(draft.key);
+    setSearch('');
+  };
 
   const parsed = rows.map((row) => {
     const typed = filledImeis(row.imeiList);
@@ -110,13 +118,19 @@ export function SupplierEntriesModal({
   const summary = supplierEntriesSummary(parsed);
 
   function apply() {
+    // Com erro, abre a entrada que precisa de ajuste.
+    const fail = (key: string, message: string) => {
+      setEditing(key);
+      setSearch('');
+      setError(message);
+    };
     for (const [index, row] of parsed.entries()) {
-      if (!(Number(row.qty) > 0) || !Number.isInteger(Number(row.qty))) return setError(`Entrada ${index + 1}: informe a quantidade em unidades.`);
-      if (row.imeis.length > Number(row.qty)) return setError(`Entrada ${index + 1}: há ${row.imeis.length} IMEIs para ${row.qty} unidade(s).`);
+      if (!(Number(row.qty) > 0) || !Number.isInteger(Number(row.qty))) return fail(row.key, `Entrada ${index + 1}: informe a quantidade em unidades.`);
+      if (row.imeis.length > Number(row.qty)) return fail(row.key, `Entrada ${index + 1}: há ${row.imeis.length} IMEIs para ${row.qty} unidade(s).`);
     }
     const all = parsed.flatMap((row) => row.imeis);
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
-    if (dup) return setError(`O IMEI ${dup} está repetido.`);
+    if (dup) return fail(parsed.filter((row) => row.imeis.includes(dup)).pop()!.key, `O IMEI ${dup} está repetido.`);
     onApply(
       parsed.map(({ key: _key, imeiList: _list, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
@@ -126,8 +140,145 @@ export function SupplierEntriesModal({
     );
   }
 
+  const supplierName = (row: Draft) =>
+    row.origin === 'trade_in' ? `Troca · ${row.customerName || 'cliente'}` : allSuppliers.find((item) => item.id === row.supplierId)?.name || row.supplierName || 'O do produto';
+  const term = search.trim().toLowerCase();
+  const matches = (row: (typeof parsed)[number]) =>
+    !term ||
+    row.imeis.some((imei) => imei.includes(term)) ||
+    [supplierName(row), row.notes ?? '', row.entryDate].some((text) => text.toLowerCase().includes(term));
+  // Mais recentes primeiro; a entrada nova (ainda não aplicada) fica no topo.
+  const ordered = parsed
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => matches(row) || row.key === editing)
+    .sort((a, b) => Number(!b.row.id) - Number(!a.row.id) || String(b.row.entryDate).localeCompare(String(a.row.entryDate)) || b.index - a.index);
+
+  const editor = (row: Draft, index: number) => (
+    <fieldset className="supplier-entry">
+      <legend>
+        Entrada {index + 1}
+        {row.soldQty ? (
+          <span className="supplier-entry__sold-count">
+            {Number(row.qty) - row.soldQty} em estoque · {row.soldQty} {row.soldQty === 1 ? 'saiu' : 'saíram'}
+          </span>
+        ) : null}
+      </legend>
+      <div className="supplier-entry__grid">
+        {row.origin === 'trade_in' ? (
+          <label className="admin-field">
+            Origem
+            <input value={`Troca · ${row.customerName || 'cliente'}`} disabled />
+          </label>
+        ) : (
+          <>
+            <AdminPicker
+              label="Origem"
+              value={row.supplierOrigin}
+              options={SUPPLIER_ORIGIN_OPTIONS}
+              onChange={(value) => {
+                const supplierOrigin: SupplierOrigin = value === 'upgrade' ? 'upgrade' : 'company';
+                update(row.key, { supplierOrigin, supplierId: originOf(allSuppliers, row.supplierId) === supplierOrigin ? row.supplierId : '' });
+              }}
+            />
+            <div className="supplier-entry__supplier">
+              <AdminPicker
+                label="Fornecedor"
+                value={row.supplierId}
+                placeholder="O do produto"
+                options={[
+                  { value: '', label: 'O do produto (ou nenhum)' },
+                  ...allSuppliers.filter((item) => (item.origin === 'upgrade' ? 'upgrade' : 'company') === row.supplierOrigin).map((item) => ({ value: item.id, label: item.name })),
+                ]}
+                onChange={(supplierId) => update(row.key, { supplierId })}
+              />
+              <InlineSupplierCreate
+                origin={row.supplierOrigin}
+                onCreated={(supplier) => {
+                  setCreated((current) => [...current, supplier]);
+                  update(row.key, { supplierId: supplier.id });
+                  onSupplierCreated?.(supplier);
+                }}
+              />
+            </div>
+          </>
+        )}
+        <label className="admin-field">
+          Data
+          <input type="date" value={row.entryDate} max={today()} onChange={(e) => update(row.key, { entryDate: e.target.value })} />
+        </label>
+        <label className="admin-field">
+          Quantidade
+          <input type="number" min={1} step={1} value={row.qty} onChange={(e) => update(row.key, { qty: Number(e.target.value) })} />
+        </label>
+        <label className="admin-field">
+          Custo unitário
+          <CurrencyInput value={row.unitCost} ariaLabel="Custo unitário da entrada" onChange={(unitCost) => update(row.key, { unitCost })} />
+        </label>
+        <div className="admin-field supplier-entry__imeis">
+          <ImeiListField
+            label={`IMEIs em estoque (${parsed[index].typed.length})`}
+            value={row.imeiList}
+            onChange={(imeiList) => {
+              // Cada IMEI é um aparelho: com mais IMEIs que unidades, a quantidade acompanha.
+              const units = row.outImeis.length + filledImeis(imeiList).length;
+              update(row.key, { imeiList, qty: Math.max(Number(row.qty) || 0, units) });
+            }}
+          />
+        </div>
+        {showOut && row.soldQty ? (
+          <div className="supplier-entry__units">
+            {(row.soldImeis ?? []).map((item) => (
+              <span key={item.imei} className="supplier-entry__unit is-sold" title={item.saleId ? `Venda ${item.saleId}` : undefined}>
+                {item.imei} · {OUT_LABEL[item.kind ?? 'sale'] ?? 'Saiu'} {dateTimeBr(item.soldAt)}
+              </span>
+            ))}
+            {(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0) > 0 ? (
+              <span className="supplier-entry__unit is-sold">{(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0)} un sem IMEI vendida(s)</span>
+            ) : null}
+          </div>
+        ) : null}
+        {!row.id && row.origin !== 'trade_in' ? (
+          <>
+            <AdminPicker
+              label="Financeiro"
+              value={row.payment ?? 'pending'}
+              options={PAYMENT_OPTIONS}
+              onChange={(value) => update(row.key, { payment: value === 'paid' || value === 'none' ? value : 'pending' })}
+            />
+            {(row.payment ?? 'pending') === 'pending' ? (
+              <label className="admin-field">
+                Vencimento
+                <input type="date" value={row.dueDate || row.entryDate} onChange={(e) => update(row.key, { dueDate: e.target.value })} />
+              </label>
+            ) : null}
+          </>
+        ) : null}
+        <label className="admin-field">
+          Bateria (%)
+          <input
+            type="number"
+            min={0}
+            max={100}
+            inputMode="numeric"
+            value={row.batteryLevel ?? ''}
+            placeholder="Usado: ex. 87"
+            onChange={(e) => update(row.key, { batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
+          />
+        </label>
+        <label className="admin-field supplier-entry__imeis">
+          Observação
+          <textarea rows={2} maxLength={500} value={row.notes ?? ''} placeholder="Ex.: troca de bateria, está no reparo com o João…" onChange={(e) => update(row.key, { notes: e.target.value })} />
+        </label>
+      </div>
+      <button type="button" className="supplier-entry__close" onClick={() => setEditing(null)}>
+        Concluir entrada
+      </button>
+    </fieldset>
+  );
+
   return (
     <QuickModal
+      className="supplier-entries-modal"
       title={title}
       subtitle="Cada compra com o fornecedor, a data, a quantidade, o custo e os IMEIs. O preço de venda continua o da variação."
       submitLabel="Aplicar"
@@ -136,144 +287,93 @@ export function SupplierEntriesModal({
       onSubmit={apply}
     >
       <div className="supplier-entries">
-        {anyOut ? (
-          <label className="supplier-entries__show-out">
-            <input type="checkbox" checked={showOut} onChange={(e) => setShowOut(e.target.checked)} />
-            Exibir aparelhos que já saíram (vendidos, bonificação, uso interno)
-          </label>
-        ) : null}
-        {rows.length === 0 ? <p className="empty">Nenhuma entrada ainda. Use “+ Entrada de fornecedor”.</p> : null}
-        {rows.map((row, index) => (
-          <fieldset key={row.key} className="supplier-entry">
-            <legend>
-              Entrada {index + 1}
-              {row.soldQty ? (
-                <span className="supplier-entry__sold-count">
-                  {Number(row.qty) - row.soldQty} em estoque · {row.soldQty} {row.soldQty === 1 ? 'saiu' : 'saíram'}
-                </span>
-              ) : null}
-              {row.soldQty ? null : (
-                <button type="button" className="supplier-entry__remove" onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>
-                  Remover
-                </button>
-              )}
-            </legend>
-            <div className="supplier-entry__grid">
-              {row.origin === 'trade_in' ? (
-                <label className="admin-field">
-                  Origem
-                  <input value={`Troca · ${row.customerName || 'cliente'}`} disabled />
-                </label>
-              ) : (
-                <>
-                  <AdminPicker
-                    label="Origem"
-                    value={row.supplierOrigin}
-                    options={SUPPLIER_ORIGIN_OPTIONS}
-                    onChange={(value) => {
-                      const supplierOrigin: SupplierOrigin = value === 'upgrade' ? 'upgrade' : 'company';
-                      update(row.key, { supplierOrigin, supplierId: originOf(allSuppliers, row.supplierId) === supplierOrigin ? row.supplierId : '' });
-                    }}
-                  />
-                  <div className="supplier-entry__supplier">
-                    <AdminPicker
-                      label="Fornecedor"
-                      value={row.supplierId}
-                      placeholder="O do produto"
-                      options={[
-                        { value: '', label: 'O do produto (ou nenhum)' },
-                        ...allSuppliers.filter((item) => (item.origin === 'upgrade' ? 'upgrade' : 'company') === row.supplierOrigin).map((item) => ({ value: item.id, label: item.name })),
-                      ]}
-                      onChange={(supplierId) => update(row.key, { supplierId })}
-                    />
-                    <InlineSupplierCreate
-                      origin={row.supplierOrigin}
-                      onCreated={(supplier) => {
-                        setCreated((current) => [...current, supplier]);
-                        update(row.key, { supplierId: supplier.id });
-                        onSupplierCreated?.(supplier);
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-              <label className="admin-field">
-                Data
-                <input type="date" value={row.entryDate} max={today()} onChange={(e) => update(row.key, { entryDate: e.target.value })} />
-              </label>
-              <label className="admin-field">
-                Quantidade
-                <input type="number" min={1} step={1} value={row.qty} onChange={(e) => update(row.key, { qty: Number(e.target.value) })} />
-              </label>
-              <label className="admin-field">
-                Custo unitário
-                <CurrencyInput value={row.unitCost} ariaLabel="Custo unitário da entrada" onChange={(unitCost) => update(row.key, { unitCost })} />
-              </label>
-              <div className="admin-field supplier-entry__imeis">
-                <ImeiListField
-                  label={`IMEIs em estoque (${parsed[index].typed.length})`}
-                  value={row.imeiList}
-                  onChange={(imeiList) => {
-                    // Cada IMEI é um aparelho: com mais IMEIs que unidades, a quantidade acompanha.
-                    const units = row.outImeis.length + filledImeis(imeiList).length;
-                    update(row.key, { imeiList, qty: Math.max(Number(row.qty) || 0, units) });
-                  }}
-                />
-              </div>
-              {showOut && row.soldQty ? (
-                <div className="supplier-entry__units">
-                  {(row.soldImeis ?? []).map((item) => (
-                    <span key={item.imei} className="supplier-entry__unit is-sold" title={item.saleId ? `Venda ${item.saleId}` : undefined}>
-                      {item.imei} · {OUT_LABEL[item.kind ?? 'sale'] ?? 'Saiu'} {dateTimeBr(item.soldAt)}
-                    </span>
-                  ))}
-                  {(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0) > 0 ? (
-                    <span className="supplier-entry__unit is-sold">{(row.soldQty ?? 0) - (row.soldImeis?.length ?? 0)} un sem IMEI vendida(s)</span>
-                  ) : null}
-                </div>
-              ) : null}
-              {!row.id && row.origin !== 'trade_in' ? (
-                <>
-                  <AdminPicker
-                    label="Financeiro"
-                    value={row.payment ?? 'pending'}
-                    options={PAYMENT_OPTIONS}
-                    onChange={(value) => update(row.key, { payment: value === 'paid' || value === 'none' ? value : 'pending' })}
-                  />
-                  {(row.payment ?? 'pending') === 'pending' ? (
-                    <label className="admin-field">
-                      Vencimento
-                      <input type="date" value={row.dueDate || row.entryDate} onChange={(e) => update(row.key, { dueDate: e.target.value })} />
-                    </label>
-                  ) : null}
-                </>
-              ) : null}
-              <label className="admin-field">
-                Bateria (%)
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  inputMode="numeric"
-                  value={row.batteryLevel ?? ''}
-                  placeholder="Usado: ex. 87"
-                  onChange={(e) => update(row.key, { batteryLevel: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(Number(e.target.value)))) })}
-                />
-              </label>
-              <label className="admin-field supplier-entry__imeis">
-                Observação
-                <textarea rows={2} maxLength={500} value={row.notes ?? ''} placeholder="Ex.: troca de bateria, está no reparo com o João…" onChange={(e) => update(row.key, { notes: e.target.value })} />
-              </label>
-            </div>
-          </fieldset>
-        ))}
-        <button type="button" className="quick-add-btn" onClick={add}>
-          ＋ Entrada de fornecedor
-        </button>
+        <div className="supplier-entries__toolbar">
+          <button type="button" className="quick-add-btn" onClick={add}>
+            ＋ Entrada de fornecedor
+          </button>
+          {rows.length > 3 ? (
+            <input
+              className="supplier-entries__search"
+              type="search"
+              value={search}
+              placeholder="Buscar IMEI, fornecedor, data ou observação"
+              aria-label="Buscar entrada"
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          ) : null}
+          {anyOut ? (
+            <label className="supplier-entries__show-out">
+              <input type="checkbox" checked={showOut} onChange={(e) => setShowOut(e.target.checked)} />
+              Exibir aparelhos que já saíram
+            </label>
+          ) : null}
+        </div>
         {summary.count ? (
           <p className="supplier-entries__summary">
             <strong>{summary.qty} un</strong> de {summary.suppliers} {summary.suppliers === 1 ? 'fornecedor' : 'fornecedores'} · custo médio <strong>{money(summary.avgCost)}</strong>
           </p>
+        ) : null}
+        {rows.length === 0 ? <p className="empty">Nenhuma entrada ainda. Use “+ Entrada de fornecedor”.</p> : null}
+        {rows.length ? (
+          <div className="supplier-entries__table" role="table" aria-label="Entradas do produto">
+            <div className="supplier-entries__row supplier-entries__row--head" role="row">
+              <span role="columnheader">Nº</span>
+              <span role="columnheader">Data</span>
+              <span role="columnheader">Origem / fornecedor</span>
+              <span role="columnheader">Qtd</span>
+              <span role="columnheader">Custo un.</span>
+              <span role="columnheader">IMEIs</span>
+              <span role="columnheader">Bateria</span>
+              <span role="columnheader" aria-label="Ações" />
+            </div>
+            {ordered.length === 0 ? <p className="empty">Nenhuma entrada com “{search}”.</p> : null}
+            {ordered.map(({ row, index }) => {
+              const inStock = Number(row.qty) - (row.soldQty ?? 0);
+              const open = editing === row.key;
+              return (
+                <div key={row.key} className={`supplier-entries__item${open ? ' is-open' : ''}`}>
+                  <div className="supplier-entries__row" role="row" onClick={() => setEditing(open ? null : row.key)}>
+                    <span role="cell" data-label="Nº">
+                      {index + 1}
+                      {!row.id ? <em className="supplier-entries__new">nova</em> : null}
+                    </span>
+                    <span role="cell" data-label="Data">{row.entryDate ? new Date(`${String(row.entryDate).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '—'}</span>
+                    <span role="cell" data-label="Origem" className="supplier-entries__supplier" title={supplierName(row)}>
+                      {supplierName(row)}
+                    </span>
+                    <span role="cell" data-label="Qtd">
+                      {row.qty}
+                      {row.soldQty ? <small> · {inStock} em estoque</small> : null}
+                    </span>
+                    <span role="cell" data-label="Custo un.">{money(Number(row.unitCost) || 0)}</span>
+                    <span role="cell" data-label="IMEIs" className="supplier-entries__imei" title={row.imeis.join(', ')}>
+                      {row.typed[0] ?? (row.imeis.length ? '—' : 'sem IMEI')}
+                      {row.typed.length > 1 ? <small> +{row.typed.length - 1}</small> : null}
+                    </span>
+                    <span role="cell" data-label="Bateria">{row.batteryLevel != null ? `${row.batteryLevel}%` : '—'}</span>
+                    <span role="cell" className="supplier-entries__actions" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" onClick={() => setEditing(open ? null : row.key)}>
+                        {open ? 'Fechar' : 'Editar'}
+                      </button>
+                      {row.soldQty ? null : (
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => {
+                            setRows((current) => current.filter((item) => item.key !== row.key));
+                            if (open) setEditing(null);
+                          }}
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  {open ? editor(rows.find((item) => item.key === row.key)!, index) : null}
+                </div>
+              );
+            })}
+          </div>
         ) : null}
       </div>
     </QuickModal>

@@ -15,6 +15,7 @@ export function QuickModal({
   onClose,
   onSubmit,
   children,
+  className,
 }: {
   title: string;
   subtitle?: string;
@@ -24,6 +25,8 @@ export function QuickModal({
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
   children: ReactNode;
+  /** Classe extra no cartão (ex.: janela mais larga para uma grade). */
+  className?: string;
 }) {
   const titleId = useId();
   const form = useRef<HTMLFormElement>(null);
@@ -56,7 +59,7 @@ export function QuickModal({
   // Portal no body: a janela nunca fica dentro do formulário da página (form dentro de form).
   return createPortal(
     <div className="quick-modal" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
-      <form ref={form} className="quick-modal__card" role="dialog" aria-modal="true" aria-labelledby={titleId} onSubmit={submit}>
+      <form ref={form} className={`quick-modal__card${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} onSubmit={submit}>
         <header className="quick-modal__head">
           <div>
             <h2 id={titleId}>{title}</h2>
