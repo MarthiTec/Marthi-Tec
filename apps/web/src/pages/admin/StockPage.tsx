@@ -5,6 +5,7 @@ import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../c
 import {ProductPickupPrices,PickupPriceList,offeredPickupIds} from '../../components/PickupFields';
 import { QuickModal } from '../../components/QuickModal';
 import { SupplierEntriesModal, supplierEntriesLabel, supplierEntriesSummary } from '../../components/SupplierEntriesModal';
+import { stockInventoryValue } from '../../data/stockLedger';
 import { conditionCode } from '../../data/productCondition';
 import { AdjustableValue } from '../../components/AdjustableValue';
 import type { SupplierEntry } from '../../data/adminStore';
@@ -218,6 +219,7 @@ export function StockPage() {
   const [totemFilter, setTotemFilter] = useState<CrudStatusFilter | 'totem' | 'hidden'>('all');
   // Produto excluído com histórico fica inativo: por padrão a lista mostra só os ativos.
   const [statusFilter, setStatusFilter] = useState<CrudStatusFilter>('active');
+  const [stockFilter, setStockFilter] = useState<'all' | 'positive' | 'empty'>('all');
   // Controle por IMEI: o que já foi vendido (ou baixado) some da busca; aparece só marcando a opção.
   const [showSoldImeis, setShowSoldImeis] = useState(false);
   const [listSort, setListSort] = useState<'name' | 'name-desc' | 'recent' | 'oldest' | 'price-desc' | 'price-asc' | 'qty-desc' | 'qty-asc'>('name');
@@ -561,6 +563,8 @@ export function StockPage() {
       if (statusFilter === 'inactive' && item.active !== false) return false;
       if (totemFilter === 'totem' && !item.showOnTotem) return false;
       if (totemFilter === 'hidden' && item.showOnTotem) return false;
+      if (stockFilter === 'positive' && !((Number(item.qty) || 0) > 0)) return false;
+      if (stockFilter === 'empty' && (Number(item.qty) || 0) > 0) return false;
       if (attrFilterId !== 'all') {
         const value = item.attrs?.[attrFilterId] ?? '';
         if (!value) return false;
@@ -591,7 +595,7 @@ export function StockPage() {
       'qty-asc': (a, b) => (Number(a.qty) || 0) - (Number(b.qty) || 0) || byName(a, b),
     };
     return [...filtered].sort(sorters[listSort]);
-  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query, supplierNames, brands, showSoldImeis]);
+  }, [items, kindFilter, brandFilter, conditionFilter, totemFilter, statusFilter, stockFilter, listSort, attrFilterId, attrFilterValue, codeQuery, query, supplierNames, brands, showSoldImeis]);
 
   /** Totais da lista filtrada: unidades em estoque, custo total e valor de venda total. */
   const listTotals = useMemo(() => {
@@ -600,18 +604,17 @@ export function StockPage() {
     let sale = 0;
     for (const item of visible) {
       const variations = item.variations ?? [];
+      // Custo: cada aparelho pelo custo da sua entrada (não o médio, que inclui os já vendidos).
+      cost += stockInventoryValue(item);
       if (variations.length) {
         for (const v of variations) {
           const qty = Math.max(0, Number(v.qty) || 0);
           units += qty;
-          // Sem custo gravado, vale o custo médio das entradas por fornecedor.
-          cost += qty * (Number(v.avgCost || v.cost) || supplierEntriesSummary(v.supplierEntries).avgCost);
           sale += qty * (Number(v.price) || 0);
         }
       } else {
         const qty = Math.max(0, Number(item.qty) || 0);
         units += qty;
-        cost += qty * (Number(item.avgCost || item.cost) || supplierEntriesSummary(item.supplierEntries).avgCost);
         sale += qty * (Number(item.price) || 0);
       }
     }
@@ -2040,6 +2043,20 @@ export function StockPage() {
                         { value: 'all', label: 'Todos' },
                       ]}
                       onChange={(value) => setStatusFilter(value as CrudStatusFilter)}
+                    />
+                  </label>
+                  <label className="admin-field crud-filter-field">
+                    Estoque
+                    <AdminPicker
+                      compact
+                      label="Estoque"
+                      value={stockFilter}
+                      options={[
+                        { value: 'all', label: 'Todos' },
+                        { value: 'positive', label: 'Com estoque' },
+                        { value: 'empty', label: 'Sem estoque' },
+                      ]}
+                      onChange={(value) => setStockFilter(value as typeof stockFilter)}
                     />
                   </label>
                   <label className="admin-field crud-filter-field">

@@ -4,6 +4,7 @@ import {
   saveStock,
   type StockItem,
 } from './adminStore';
+import { inStockCost } from './stockCost';
 
 const STORAGE_KEY = 'marthi.stock.movements.v1';
 export const STOCK_MOVEMENTS_EVENT = 'marthi-stock-movements';
@@ -117,8 +118,12 @@ export const STOCK_BALANCE_LABEL: Record<StockBalanceStatus, string> = {
   empty: 'Zerado',
 };
 
-export function stockInventoryValue(item: Pick<StockItem, 'qty' | 'avgCost' | 'cost'>) {
-  return roundMoney(item.qty * stockCostBase(item));
+/** Custo do estoque do produto: por variação (cor/capacidade) ou do produto simples. */
+export function stockInventoryValue(item: Pick<StockItem, 'qty' | 'avgCost' | 'cost' | 'variations' | 'supplierEntries'>) {
+  if (item.variations?.length) {
+    return roundMoney(item.variations.reduce((sum, v) => sum + inStockCost(v.qty, v.avgCost || v.cost, v.supplierEntries), 0));
+  }
+  return inStockCost(item.qty, stockCostBase(item), item.supplierEntries);
 }
 
 export function stockRetailValue(item: Pick<StockItem, 'qty' | 'price'>) {
