@@ -15,7 +15,9 @@ import {
   applyAdvance,
   BANK_TYPE_LABEL,
   BILL_STATUS_LABEL,
-  buildDre,
+  emptyDre,
+  loadDre,
+  type DreReport,
   cancelBill,
   createAdvance,
   createTreasuryMove,
@@ -147,7 +149,16 @@ export function FinancePage() {
   const treasury = useMemo(() => listTreasury(), [tick]);
   const advances = useMemo(() => listAdvances(), [tick]);
   const suppliers = useMemo(() => listSuppliers(true), []);
-  const dre = useMemo(() => buildDre(), [tick]);
+  const [dre, setDre] = useState<DreReport>(() => emptyDre());
+  useEffect(() => {
+    let alive = true;
+    loadDre()
+      .then((report) => alive && setDre(report))
+      .catch(() => alive && setDre(emptyDre()));
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
   const boletos = useMemo(() => boletoSnapshot(), [tick]);
   const conciliation = useMemo(() => conciliationSnapshot(), [tick]);
 
@@ -412,7 +423,7 @@ function ResumoPanel({
   treasuryTotal: number;
   payables: number;
   receivables: number;
-  dre: ReturnType<typeof buildDre>;
+  dre: DreReport;
   boletosOpen: number;
   boletosAmount: number;
   conciliationPending: number;
@@ -1600,7 +1611,7 @@ function DrePanel({
   result,
 }: {
   month: string;
-  lines: ReturnType<typeof buildDre>['lines'];
+  lines: DreReport['lines'];
   result: number;
 }) {
   function handleShareWhatsApp() {

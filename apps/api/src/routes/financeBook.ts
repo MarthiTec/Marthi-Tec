@@ -207,3 +207,48 @@ financeBookRouter.post('/api/v1/finance/advances/:id/refund', requireAuth, async
     db.release();
   }
 });
+
+/* ── DRE do mês (regime de caixa) ─────────────────────── */
+
+/**
+ * Receitas e despesas do mês pelos lançamentos do caixa, por categoria. Cada recebimento e cada
+ * pagamento já gera o seu lançamento, então contas baixadas não são somadas de novo.
+ */
+financeBookRouter.get('/api/v1/finance/dre', requireAuth, async (req, res, next) => {
+  try {
+    const { month } = z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (AAAA-MM).').optional() }).parse(req.query);
+    const period = month ?? (await pool.query("SELECT to_char(now() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') AS month")).rows[0].month;
+    const rows = (
+      await pool.query(
+        `SELECT type, COALESCE(NULLIF(category, ''), 'Sem categoria') AS category, sum(amount) AS total
+           FROM finance_entries
+          WHERE store_id = $1 AND to_char(created_at::timestamptz AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') = $2
+          GROUP BY 1, 2 ORDER BY 3 DESC`,
+        [req.storeId, period],
+      )
+    ).rows;
+    const lines = (type: string, prefix: string, kind: 'revenue' | 'expense') =>
+      rows.filter((row) => row.type === type).map((row) => ({ label: `${prefix} · ${row.category}`, amount: money(row.total), kind }));
+    const revenue = rows.filter((row) => row.type === 'in').reduce((sum, row) => sum + money(row.total), 0);
+    const expenses = rows.filter((row) => row.type === 'out').reduce((sum, row) => sum + money(row.total), 0);
+    const result = Math.round((revenue - expenses) * 100) / 100;
+    res.json({
+      success: true,
+      data: {
+        month: period,
+        revenue,
+        expenses,
+        result,
+        lines: [
+          ...lines('in', 'Receita', 'revenue'),
+          { label: 'Receita bruta', amount: revenue, kind: 'total' },
+          ...lines('out', 'Despesa', 'expense'),
+          { label: 'Despesas totais', amount: expenses, kind: 'total' },
+          { label: 'Resultado do período', amount: result, kind: 'total' },
+        ],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});

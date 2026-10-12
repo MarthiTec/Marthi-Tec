@@ -97,3 +97,16 @@ test('dashboard summary is computed from the database and matches it', async () 
   assert.equal(res.data.treasury, (await balance(caixa)) + (await balance(banco)));
   assert.equal((await fetch(base + '/dashboard/summary', { headers: { 'x-store-id': 'store-a' } })).status, 401);
 });
+
+test('DRE counts each settled bill once (cash book), by category and by month in Brasília', async () => {
+  const bill = (await call('/finance/receivables', 'POST', { description: 'Venda a prazo', category: 'Vendas', amount: 1000, dueDate: '2026-09-15' })).data;
+  assert.equal((await call(`/finance/receivables/${bill.id}/receive`, 'POST', { paymentDate: '2026-09-15' })).status, 200);
+  const dre = (await call('/finance/dre?month=2026-09')).data;
+  const sum = async (type) => Number((await query(`SELECT COALESCE(sum(amount),0) v FROM finance_entries WHERE store_id='store-a' AND type=$1 AND to_char(created_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM')='2026-09'`, [type])).rows[0].v);
+  assert.equal(dre.revenue, await sum('in'));
+  assert.equal(dre.revenue, 1000);
+  assert.equal(dre.expenses, await sum('out'));
+  assert.deepEqual(dre.lines.find((line) => line.label === 'Receita · Vendas'), { label: 'Receita · Vendas', amount: 1000, kind: 'revenue' });
+  assert.equal(dre.result, dre.revenue - dre.expenses);
+  assert.equal((await call('/finance/dre?month=2026-9')).status, 400);
+});

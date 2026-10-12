@@ -950,6 +950,11 @@ export function apiReceiveReceivable(
   return nestPost<ApiReceivable>(`/finance/receivables/${id}/receive`, settlePayload(body));
 }
 
+/** DRE do mês (AAAA-MM) pelos lançamentos do caixa, calculada no banco. */
+export function apiGetDre(month?: string) {
+  return nestGet<import('../data/financeBook').DreReport>(`/finance/dre${month ? `?month=${month}` : ''}`);
+}
+
 export function apiListTreasury() {
   return nestGet<ApiTreasuryMove[]>('/finance/treasury');
 }

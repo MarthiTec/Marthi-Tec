@@ -1,5 +1,5 @@
 import {storeScopedKey} from './storeCache';
-import { addFinance, getAdminState, type FinanceEntry } from './adminStore';
+import { addFinance } from './adminStore';
 import { getSupplier } from './erpRegistry';
 import {
   apiApplyAdvance,
@@ -1159,54 +1159,14 @@ export type DreReport = {
   result: number;
 };
 
-function monthKey(iso: string) {
-  return iso.slice(0, 7);
+/** DRE vazia enquanto a API não responde (nunca números do navegador). */
+export function emptyDre(month = today().slice(0, 7)): DreReport {
+  return { month, lines: [], revenue: 0, expenses: 0, result: 0 };
 }
 
-function sumFinance(entries: FinanceEntry[], type: 'in' | 'out', month: string) {
-  return entries
-    .filter((item) => item.type === type && monthKey(item.createdAt) === month)
-    .reduce((sum, item) => sum + item.amount, 0);
-}
-
-export function buildDre(month = today().slice(0, 7)): DreReport {
-  const admin = getAdminState();
-  const book = load();
-  const cashIn = sumFinance(admin.finance, 'in', month);
-  const cashOut = sumFinance(admin.finance, 'out', month);
-  const received = book.receivables
-    .filter((item) => item.receivedAt && monthKey(item.receivedAt) === month)
-    .reduce((sum, item) => sum + item.receivedAmount, 0);
-  const paid = book.payables
-    .filter((item) => item.paidAt && monthKey(item.paidAt) === month)
-    .reduce((sum, item) => sum + item.paidAmount, 0);
-
-  const byExpenseCategory = new Map<string, number>();
-  for (const bill of book.payables) {
-    if (!bill.paidAt || monthKey(bill.paidAt) !== month || bill.paidAmount <= 0) continue;
-    byExpenseCategory.set(
-      bill.category,
-      (byExpenseCategory.get(bill.category) ?? 0) + bill.paidAmount,
-    );
-  }
-
-  const revenue = cashIn + received;
-  const expenses = cashOut + paid;
-  const lines: DreLine[] = [
-    { label: 'Receitas do caixa (PDV/OS/manual)', amount: cashIn, kind: 'revenue' },
-    { label: 'Contas a receber baixadas', amount: received, kind: 'revenue' },
-    { label: 'Receita bruta', amount: revenue, kind: 'total' },
-    { label: 'Saídas do caixa', amount: cashOut, kind: 'expense' },
-    ...[...byExpenseCategory.entries()].map(([label, amount]) => ({
-      label: `Despesa · ${label}`,
-      amount,
-      kind: 'expense' as const,
-    })),
-    { label: 'Despesas totais', amount: expenses, kind: 'total' },
-    { label: 'Resultado do período', amount: revenue - expenses, kind: 'total' },
-  ];
-
-  return { month, lines, revenue, expenses, result: revenue - expenses };
+export async function loadDre(month?: string): Promise<DreReport> {
+  const { apiGetDre } = await import('../services/erpApi');
+  return apiGetDre(month);
 }
 
 export function money(value: number) {

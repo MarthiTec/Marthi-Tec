@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { getAdminState } from '../../data/adminStore';
 import { listEmployees } from '../../data/erpRegistry';
 import {
-  buildDre,
+  emptyDre,
+  loadDre,
+  type DreReport,
   money,
   payablesOpenTotal,
   receivablesOpenTotal,
@@ -26,7 +29,16 @@ const REPORTS: Array<{ to: string; icon: AdminIconName; title: string; text: str
 ];
 
 export function ErpReportsPage() {
-  const dre = buildDre();
+  const [dre, setDre] = useState<DreReport>(() => emptyDre());
+  useEffect(() => {
+    let alive = true;
+    loadDre()
+      .then((report) => alive && setDre(report))
+      .catch(() => alive && setDre(emptyDre()));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const users = listEmployees(true).filter((item) => item.isSystemUser);
   const stock = getAdminState().stock;
   const snap = stockBalanceSnapshot(stock);
