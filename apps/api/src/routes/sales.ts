@@ -364,6 +364,24 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         }
       }
 
+      // Custo real da venda: o das entradas das unidades que saíram (pelo IMEI ou a entrada mais antiga).
+      const realCost = await client.query(
+        `UPDATE sales_order_lines l SET unit_cost = x.cost, total_cost = round(x.cost * l.qty, 2)
+           FROM (SELECT u.sale_line_id, avg(e.unit_cost) AS cost
+                   FROM stock_sold_units u JOIN stock_supplier_entries e ON e.id = u.entry_id
+                  WHERE u.store_id = $1 AND u.sale_id = $2 AND u.reverted_at IS NULL
+                  GROUP BY u.sale_line_id) x
+          WHERE l.id = x.sale_line_id AND l.sale_id = $2
+          RETURNING l.id`,
+        [storeId, orderId],
+      );
+      if (realCost.rows.length) {
+        const cost = Number((await client.query('SELECT COALESCE(sum(total_cost), 0) AS cost FROM sales_order_lines WHERE sale_id = $1', [orderId])).rows[0].cost) || 0;
+        const profit = Math.round((grossAmount - cost) * 100) / 100;
+        const margin = grossAmount > 0 ? Math.round((profit / grossAmount) * 10000) / 100 : 0;
+        await client.query('UPDATE sales_orders SET cost_total = $2, gross_profit = $3, margin_percent = $4 WHERE id = $1', [orderId, cost, profit, margin]);
+      }
+
       // 4. Se houver UPGRADE / TRADE-IN: dar ENTRADA no estoque do aparelho usado
       let createdTradeInStockId: string | null = null;
       const tradeInImei = body.tradeIn?.imei?.trim() ?? '';

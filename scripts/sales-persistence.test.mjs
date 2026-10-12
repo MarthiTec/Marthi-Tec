@@ -276,3 +276,12 @@ test('a device sold by IMEI carries the cost of its own entry, not the product a
  assert.equal(Number((await query('SELECT unit_cost FROM sales_order_lines WHERE sale_id=$1',[json.data.id])).rows[0].unit_cost),7050);
  assert.equal(Number((await query('SELECT gross_profit FROM sales_orders WHERE id=$1',[json.data.id])).rows[0].gross_profit),450);
 });
+test('a device sold without IMEI carries the cost of the oldest entry it came from',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-fifo','store-a','stock-fifo',2,6975,7800)");
+ await query(`INSERT INTO stock_supplier_entries(id,store_id,stock_item_id,qty,unit_cost,imeis,entry_date) VALUES('SE-F1','store-a','stock-fifo',1,6900,'[]'::jsonb,'2026-09-28'),('SE-F2','store-a','stock-fifo',1,7050,'["900000000000009"]'::jsonb,'2026-10-02')`);
+ const res=await request('/sales/external',{...payload,lines:[{stockId:'stock-fifo',name:'x',qty:1,unitPrice:7800}]});const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+ assert.equal(Number((await query('SELECT unit_cost FROM sales_order_lines WHERE sale_id=$1',[json.data.id])).rows[0].unit_cost),6900);
+ const order=(await query('SELECT cost_total,gross_profit FROM sales_orders WHERE id=$1',[json.data.id])).rows[0];
+ assert.deepEqual([Number(order.cost_total),Number(order.gross_profit)],[6900,900]);
+ assert.equal((await query("SELECT count(*)::int AS n FROM stock_sold_units WHERE imei='900000000000009'")).rows[0].n,0);
+});
