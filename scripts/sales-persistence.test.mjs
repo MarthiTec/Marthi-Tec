@@ -299,3 +299,17 @@ test('a past sale also works with the production column types (text due date, ti
   assert.deepEqual(dues,expected);
  }
 });
+test('card interest passed to the customer is not store profit, also for older sales that kept it in the notes',async()=>{
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-card-profit','store-a','stock-card-profit',3,3200,3700)");
+ const res=await request('/sales/external',{...payload,paymentMethod:'Cartão de Crédito',installments:18,surcharge:740,cardInterest:740,lines:[{stockId:'stock-card-profit',name:'x',qty:1,unitPrice:3700}]});
+ const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+ const sale=(await query('SELECT final_amount,gross_profit,margin_percent FROM sales_orders WHERE id=$1',[json.data.id])).rows[0];
+ assert.deepEqual([Number(sale.final_amount),Number(sale.gross_profit),Number(sale.margin_percent)],[4440,500,13.51]);
+ // Venda antiga: juros só na observação e lucro com os juros dentro.
+ await query(`INSERT INTO sales_orders(id,store_id,customer_name,subtotal,discount,surcharge,final_amount,cost_total,gross_profit,margin_percent,status,sale_type,notes)
+  VALUES('VND-OLD','store-a','Jeferson',3700,0,740,4440,3200,1240,27.93,'completed','external','Juros do cartão 18x (20%): R$ 740,00')`);
+ await db.exec(fs.readFileSync('apps/api/src/db/migrations/0087_sale_profit_without_card_interest.sql','utf8'));
+ await db.exec(fs.readFileSync('apps/api/src/db/migrations/0087_sale_profit_without_card_interest.sql','utf8'));
+ const old=(await query("SELECT card_interest,gross_profit,margin_percent FROM sales_orders WHERE id='VND-OLD'")).rows[0];
+ assert.deepEqual([Number(old.card_interest),Number(old.gross_profit),Number(old.margin_percent)],[740,500,13.51]);
+});

@@ -239,8 +239,10 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       if (grossAmount < 0 || tradeInCredit > grossAmount) throw Object.assign(new Error('Desconto ou crédito de troca superior ao valor da venda.'), {status: 400});
       const netAmountToPay = Math.round((grossAmount - tradeInCredit) * 100) / 100;
 
-      const grossProfit = Math.round((grossAmount - totalCost) * 100) / 100;
-      const marginPercent = grossAmount > 0 ? Math.round((grossProfit / grossAmount) * 10000) / 100 : 0;
+      // Juros do cartão repassados ao cliente são da operadora: não entram no lucro nem na margem.
+      const storeRevenue = grossAmount - Math.min(body.cardInterest, body.surcharge);
+      const grossProfit = Math.round((storeRevenue - totalCost) * 100) / 100;
+      const marginPercent = storeRevenue > 0 ? Math.round((grossProfit / storeRevenue) * 10000) / 100 : 0;
 
       const isCash = body.paymentMethod.toLowerCase().includes('dinheiro');
       const externalCashStatus = isCash && !saleAt ? 'pending_pickup' : 'not_applicable';
@@ -350,7 +352,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       }
 
       // Custo e lucro pelos aparelhos que realmente saíram (IMEI ou entrada mais antiga).
-      await applyRealSaleCost(client, storeId, orderId, grossAmount);
+      await applyRealSaleCost(client, storeId, orderId, storeRevenue);
 
       // 4. Se houver UPGRADE / TRADE-IN: dar ENTRADA no estoque do aparelho usado
       let createdTradeInStockId: string | null = null;

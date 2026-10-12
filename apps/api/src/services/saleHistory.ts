@@ -45,8 +45,9 @@ export async function findEntryByImei(db: Db, storeId: string, imei: string): Pr
 /**
  * Custo real da venda: o das entradas das unidades que saíram (pelo IMEI ou pela entrada mais
  * antiga). Atualiza itens, movimentos de saída e custo, lucro e margem da venda.
+ * storeRevenue: valor da venda sem os juros do cartão (esses são da operadora).
  */
-export async function applyRealSaleCost(db: Db, storeId: string, saleId: string, grossAmount: number) {
+export async function applyRealSaleCost(db: Db, storeId: string, saleId: string, storeRevenue: number) {
   const lines = await db.query(
     `UPDATE sales_order_lines l SET unit_cost = x.cost, total_cost = round(x.cost * l.qty, 2)
        FROM (SELECT u.sale_line_id, avg(e.unit_cost) AS cost
@@ -65,8 +66,8 @@ export async function applyRealSaleCost(db: Db, storeId: string, saleId: string,
     [storeId, saleId],
   );
   const cost = Number((await db.query('SELECT COALESCE(sum(total_cost), 0) AS cost FROM sales_order_lines WHERE sale_id = $1', [saleId])).rows[0].cost) || 0;
-  const profit = Math.round((grossAmount - cost) * 100) / 100;
-  const margin = grossAmount > 0 ? Math.round((profit / grossAmount) * 10000) / 100 : 0;
+  const profit = Math.round((storeRevenue - cost) * 100) / 100;
+  const margin = storeRevenue > 0 ? Math.round((profit / storeRevenue) * 10000) / 100 : 0;
   await db.query('UPDATE sales_orders SET cost_total = $2, gross_profit = $3, margin_percent = $4 WHERE id = $1', [saleId, cost, profit, margin]);
 }
 
