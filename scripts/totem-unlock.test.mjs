@@ -21,6 +21,7 @@ pool.query = query;
 pool.connect = async () => ({ query, release() {} });
 
 await query(`INSERT INTO client_accounts(id,trade_name,legal_name,document,email,phone,contact_name) VALUES('a','a','a','a','a','','Test')`);
+await query(`INSERT INTO stores(id,client_account_id,trade_name,legal_name,document) VALUES('store-new','a','Loja nova','Loja nova','2')`);
 await query(`INSERT INTO stores(id,client_account_id,trade_name,legal_name,document,totem_exit_password) VALUES('store-a','a','Loja A','Loja A','1','senha-da-loja')`);
 
 const server = app.listen(0, '127.0.0.1');
@@ -56,4 +57,12 @@ test('repeated wrong passwords are throttled per store', async () => {
   assert.equal(last.status, 429);
   // Even the right password waits until the window expires.
   assert.equal((await unlock('senha-da-loja')).status, 429);
+});
+
+test('a store without its own exit password has no default one: the totem asks the store to define it', async () => {
+  for (const password of ['1234', 'cellponto', '']) {
+    const res = await fetch(base + '/totem/unlock', { method: 'POST', headers: { 'content-type': 'application/json', 'x-store-id': 'store-new' }, body: JSON.stringify({ password }) });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error.code, 'EXIT_PASSWORD_NOT_SET');
+  }
 });

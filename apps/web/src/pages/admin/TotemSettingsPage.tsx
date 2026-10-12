@@ -1022,7 +1022,7 @@ export function TotemSettingsPage() {
               {(['namePrompt','intentPrompt','brandPrompt','productsPrompt','closingPrompt'] as const).map((key,index)=><details key={key} className="totem-settings-step" open={key==='namePrompt'?true:undefined}><summary><span>{index+1}</span><strong>{['Boas-vindas','Preferência de compra','Marca','Produtos sugeridos','Finalizar com vendedor'][index]}</strong></summary><label>Mensagem do assistente<textarea rows={3} value={assistant[key]} maxLength={300} onChange={e=>setAssistant(current=>({...current,[key]:e.target.value}))}/></label></details>)}
             </div>
             <aside className="totem-settings-chat" aria-label="Exemplo da conversa">
-              <div className="totem-settings-chat__heading">{assistant.avatar?<img src={assistant.avatar} alt=""/>:<span aria-hidden="true">{assistant.name.slice(0,1)||'M'}</span>}<div><strong>{assistant.name||'Assistente'}</strong><small>Prévia da conversa</small></div></div>
+              <div className="totem-settings-chat__heading">{assistant.avatar?<img src={assistant.avatar} alt=""/>:<span aria-hidden="true">{assistant.name.slice(0,1)||'A'}</span>}<div><strong>{assistant.name||'Assistente'}</strong><small>Prévia da conversa</small></div></div>
               <label>Nome de exemplo<input value={exampleName} maxLength={100} onChange={e=>setExampleName(e.target.value)} placeholder="Ana Paula"/></label>
               <p className="totem-settings-chat__bubble">{assistantText(assistant.namePrompt,exampleName,assistant.name)}</p>
               <p className="totem-settings-chat__reply">{exampleName||'Seu cliente'}</p>

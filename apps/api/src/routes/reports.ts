@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 
 export const reportsRouter = Router();
 
-/* ── 1. Relatório de Vendas e Metas (Gilvan & Mariana) ──────── */
+/* ── 1. Relatório de Vendas e Metas ──────── */
 
 reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, next) => {
   try {

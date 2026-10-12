@@ -1005,10 +1005,10 @@ financeRouter.post('/api/v1/finance', requireAuth, async (req, res, next) => {
   }
 });
 
-/* ── 5. Recolhimento de Valores em Espécie (Gilvan Teodo) ──── */
+/* ── 5. Recolhimento de Valores em Espécie ──── */
 
 const pickupSchema = z.object({
-  responsibleName: z.string().min(1, 'Nome do responsável é obrigatório.').default('Gilvan Teodo'),
+  responsibleName: z.string().trim().min(1, 'Nome do responsável é obrigatório.'),
   amount: z.coerce.number().min(0.01, 'Valor de recolhimento deve ser positivo.'),
   origin: z.string().default('vendas_externas'),
   paymentMethod: z.string().default('dinheiro'),
@@ -1085,7 +1085,7 @@ financeRouter.post('/api/v1/finance/pickups', requireAuth, async (req, res, next
           `Recolhimento de dinheiro em espécie - Responsável: ${body.responsibleName}`,
           body.amount,
           pickupId,
-          req.user?.name || 'Gilvan Teodo',
+          req.user?.name || 'Operador',
         ],
       );
 

@@ -22,9 +22,10 @@ export const totemRouter = Router();
 
 const defaultTotemSettings = {
   attractContent:'full',
-  assistant:{enabled:false,name:'Mariana',avatar:null,whatsapp:'',sellerId:'',askIntent:true,askBrand:true,namePrompt:'Oi, meu nome é {vendedor}. Como você prefere ser chamado?',intentPrompt:'Oi, {nome}! O que está buscando hoje?',brandPrompt:'Qual marca te agrada mais, {nome}?',productsPrompt:'{nome}, estes são os produtos disponíveis. Qual faz mais sentido para você?',closingPrompt:'Ótima escolha, {nome}! Você pode finalizar comigo pelo WhatsApp ou na loja.'},
+  assistant:{enabled:false,name:'',avatar:null,whatsapp:'',sellerId:'',askIntent:true,askBrand:true,namePrompt:'Oi, meu nome é {vendedor}. Como você prefere ser chamado?',intentPrompt:'Oi, {nome}! O que está buscando hoje?',brandPrompt:'Qual marca te agrada mais, {nome}?',productsPrompt:'{nome}, estes são os produtos disponíveis. Qual faz mais sentido para você?',closingPrompt:'Ótima escolha, {nome}! Você pode finalizar comigo pelo WhatsApp ou na loja.'},
   mode: 'kiosk',
-  exitPassword: '1234',
+  /** Sem senha padrão: cada loja define a sua em Configurações do Totem. */
+  exitPassword: '',
   shareStockWithErp: true,
   vertical: 'phones',
   columns: 2,
@@ -59,7 +60,7 @@ const defaultTotemSettings = {
 
 const totemSettingsSchema = z.object({
   attractContent:z.enum(['full','text','background']).default('full'),
-  assistant:z.object({enabled:z.boolean(),name:z.string().trim().min(1).max(80),avatar:z.string().nullable(),whatsapp:z.string().max(30),sellerId:z.string().max(100),askIntent:z.boolean(),askBrand:z.boolean(),namePrompt:z.string().max(300),intentPrompt:z.string().max(300),brandPrompt:z.string().max(300),productsPrompt:z.string().max(300),closingPrompt:z.string().max(300)}).optional(),
+  assistant:z.object({enabled:z.boolean(),name:z.string().trim().max(80),avatar:z.string().nullable(),whatsapp:z.string().max(30),sellerId:z.string().max(100),askIntent:z.boolean(),askBrand:z.boolean(),namePrompt:z.string().max(300),intentPrompt:z.string().max(300),brandPrompt:z.string().max(300),productsPrompt:z.string().max(300),closingPrompt:z.string().max(300)}).refine((assistant)=>!assistant.enabled||assistant.name.length>0,{message:'Informe o nome do assistente.',path:['name']}).optional(),
   mode: z.enum(['kiosk', 'catalog']).default('kiosk'),
   exitPassword: z.string().optional(),
   shareStockWithErp: z.boolean().default(true),
@@ -547,6 +548,10 @@ async function handleUnlock(req: Request, res: Response, next: NextFunction) {
       return;
     }
     const settings = await getStoreTotemSettings(storeId);
+    if (!settings.exitPassword) {
+      res.status(409).json({ success: false, error: { code: 'EXIT_PASSWORD_NOT_SET', message: 'A loja ainda não definiu a senha de saída. Defina em Configurações do Totem.' } });
+      return;
+    }
     if (password.trim() !== String(settings.exitPassword)) {
       unlockFailures.set(storeId, { count: (current?.count ?? 0) + 1, since: current?.since ?? now });
       res.status(403).json({ success: false, error: { code: 'INVALID_PASSWORD', message: 'Senha incorreta. Só a loja pode fechar o totem.' } });

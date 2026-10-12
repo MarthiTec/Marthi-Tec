@@ -365,7 +365,8 @@ export const ATTRACT_COLOR_PRESETS: { hex: string; label: string }[] = [
   { hex: '#18181b', label: 'Grafite' },
 ];
 
-const DEFAULT_EXIT = import.meta.env.VITE_TOTEM_EXIT_PASSWORD?.trim() || 'cellponto';
+/** Sem senha padrão no código: a senha de saída vem do cadastro da loja. */
+const DEFAULT_EXIT = '';
 
 let memorySettings: TotemSettings | null = null;
 
