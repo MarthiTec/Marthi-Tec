@@ -173,3 +173,10 @@
 /* Rótulos numa linha só: rótulo que quebra empurra o campo para baixo e desalinha a fileira. */
 .xsale .admin-picker__caption,
 .xsale .admin-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Correção de venda concluída. */
+.xsale-edit { border: 1px solid var(--accent, #0f766e); }
+.xsale-edit__hint { margin: 0 0 12px; color: var(--mute, #64748b); font-size: 0.88rem; }
+.xsale-edit__reason { grid-column: span 2; }
+.xsale-edit__history { margin: 12px 0; padding-left: 18px; color: var(--mute, #64748b); font-size: 0.82rem; }
+@media (max-width: 720px) { .xsale-edit__reason { grid-column: auto; } }

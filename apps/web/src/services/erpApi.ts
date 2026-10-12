@@ -2183,6 +2183,10 @@ export type ExternalSalePayload = {
   warrantyTerms?: string;
   lines: ExternalSaleLine[];
   tradeIn?: TradeInPayload | null;
+  /** Venda que já aconteceu (AAAA-MM-DD). */
+  saleDate?: string;
+  cardInterest?: number;
+  warrantyType?: 'store' | 'manufacturer' | 'none';
 };
 
 export type GoalRow = {
@@ -2220,6 +2224,38 @@ export type GoalRow = {
 
 export function apiCreateExternalSale(body: ExternalSalePayload, storeId?: string) {
   return nestRequest<any>('/sales/external', { method: 'POST', body: JSON.stringify(body), headers: storeId ? { 'x-store-id': storeId } : undefined });
+}
+
+/** Venda concluída no formato do formulário, para corrigir (gestão da loja). */
+export type ExternalSaleEditData = {
+  id: string;
+  saleDate: string;
+  customerId: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerDocument: string;
+  sellerId: string | null;
+  paymentMethod: string;
+  installments: number;
+  discount: number;
+  surcharge: number;
+  cardInterest: number;
+  notes: string;
+  warrantyType: 'store' | 'manufacturer' | 'none';
+  warrantyMonths: number;
+  warrantyTerms: string;
+  lines: Array<{ stockId: string; name: string; qty: number; unitPrice: number; imei: string; attributes: Array<{ id: string; name: string; value: string }> }>;
+  tradeIn: TradeInPayload | null;
+  revisions: Array<{ id: string; reason: string; operator: string; at: string }>;
+};
+
+export function apiGetSaleForEdit(saleId: string, storeId?: string) {
+  return nestRequest<ExternalSaleEditData>(`/sales/${encodeURIComponent(saleId)}/edit`, { headers: storeId ? { 'x-store-id': storeId } : undefined });
+}
+
+/** Corrige a venda inteira: o servidor refaz estoque, financeiro e metas e guarda o histórico. */
+export function apiUpdateExternalSale(saleId: string, body: ExternalSalePayload & { reason: string }, storeId?: string) {
+  return nestRequest<any>(`/sales/${encodeURIComponent(saleId)}`, { method: 'PUT', body: JSON.stringify(body), headers: storeId ? { 'x-store-id': storeId } : undefined });
 }
 
 export type ApiExternalSaleSummary = {

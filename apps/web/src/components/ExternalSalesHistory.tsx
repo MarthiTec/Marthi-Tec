@@ -29,7 +29,8 @@ function periodStart(days: number) {
  * Vendas externas já feitas: buscar por cliente, telefone, documento ou número da venda,
  * reimprimir / reenviar o comprovante e cancelar (o servidor confere a permissão).
  */
-export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
+/** onEdit: abre a venda no formulário para corrigir (só para a gestão da loja). */
+export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void; onEdit?: (saleId: string) => void }) {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('7');
   const [status, setStatus] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [search, setSearch] = useState('');
@@ -196,6 +197,11 @@ export function ExternalSalesHistory({ onClose }: { onClose: () => void }) {
                     <button type="button" className="btn btn--ghost btn--sm" disabled={opening === row.id} onClick={() => void openReceipt(row.id)}>
                       {opening === row.id ? 'Abrindo…' : '🖨 Comprovante'}
                     </button>
+                    {row.status !== 'cancelled' && onEdit ? (
+                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => onEdit(row.id)}>
+                        Corrigir venda
+                      </button>
+                    ) : null}
                     {row.status !== 'cancelled' ? (
                       <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setChangingSeller(row); setNewSellerId(''); setSellerError(''); }}>
                         Trocar vendedor

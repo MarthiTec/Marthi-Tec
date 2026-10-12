@@ -14,6 +14,8 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
   apiCreateExternalSale,
+  apiGetSaleForEdit,
+  apiUpdateExternalSale,
   apiGetSaleReceipt,
   apiListCustomers,
   apiListSellers,
@@ -69,7 +71,7 @@ import type { StockVariationRow, SupplierEntry } from '../../data/adminStore';
 import { StockSearchPicker, type StockPick } from '../../components/StockSearchPicker';
 import { QuickStockRegisterModal, type QuickStockResult } from '../../components/QuickStockRegisterModal';
 import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode } from '../../data/productCondition';
-import { availableImeis, lineVariation } from '../../data/saleVariation';
+import { availableImeis, lineVariation, restoreSaleUnits } from '../../data/saleVariation';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -78,6 +80,7 @@ const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'c
 export function ExternalSalePage() {
   const { user } = useAuth();
   const isPrivileged = user?.role === 'admin' || user?.role === 'superadmin';
+  const canCorrectSales = isPrivileged || user?.role === 'manager';
 
   const [storeId, setStoreId] = useState(getActiveStoreId);
   const storeRef = useRef(storeId);
@@ -162,6 +165,9 @@ export function ExternalSalePage() {
   const [warrantyMonths, setWarrantyMonths] = useState(3);
   const [warrantyTerms, setWarrantyTerms] = useState(WARRANTY_TERMS.store);
   const [saleNotes, setSaleNotes] = useState('');
+
+  // Correção de venda concluída: número, data, motivo e as correções anteriores.
+  const [editing, setEditing] = useState<{ id: string; saleDate: string; reason: string; revisions: Array<{ id: string; reason: string; operator: string; at: string }> } | null>(null);
 
   // Modais de Sucesso, Recolhimento e Pendências
   const requestId = useRef(crypto.randomUUID());
@@ -487,6 +493,10 @@ export function ExternalSalePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting || loading || storeRef.current !== getActiveStoreId()) { setError('Aguarde o carregamento da loja ativa.'); return; }
+    if (editing && editing.reason.trim().length < 3) {
+      setError('Informe o motivo da correção da venda.');
+      return;
+    }
     if (!selectedSellerId) {
       setError(sellers.length ? 'Escolha o vendedor responsável pela venda.' : 'Cadastre o vendedor responsável em "Novo vendedor" antes de concluir a venda.');
       return;
@@ -553,7 +563,10 @@ export function ExternalSalePage() {
         tradeIn: hasTradeIn && tradeIn.tradeValue > 0 ? tradeIn : null,
       };
 
-      const result = await apiCreateExternalSale({...payload, requestId: requestId.current}, storeId);
+      const result = editing
+        ? await apiUpdateExternalSale(editing.id, { ...payload, saleDate: editing.saleDate, reason: editing.reason.trim() }, storeId)
+        : await apiCreateExternalSale({...payload, requestId: requestId.current}, storeId);
+      setEditing(null);
       if (!result?.id) throw new Error('A API não confirmou a gravação da venda.');
       if (storeRef.current === storeId) setSavedSaleId(result.id);
       // Never reconstruct the receipt from browser caches or fixed company data.
@@ -570,6 +583,45 @@ export function ExternalSalePage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Abre a venda concluída no formulário: os aparelhos dela voltam ao estoque da tela até salvar. */
+  async function startEdit(saleId: string) {
+    setHistoryOpen(false);
+    setError('');
+    try {
+      const sale = await apiGetSaleForEdit(saleId, storeId);
+      handleResetForm();
+      setStockItems((current) => restoreSaleUnits(current, sale.id, sale.lines));
+      setSelectedCustomerId(sale.customerId ?? '');
+      setCustomerName(sale.customerName || 'Consumidor Final');
+      setCustomerPhone(sale.customerPhone);
+      setCustomerDocument(sale.customerDocument);
+      setSelectedSellerId(sale.sellerId ?? '');
+      setLines(sale.lines.map((line) => ({ ...line, unitCost: stockItems.find((item) => item.id === line.stockId)?.cost ?? 0, discount: 0, surcharge: 0 })));
+      setGeneralDiscount(sale.discount);
+      setGeneralSurcharge(sale.surcharge);
+      setHasTradeIn(Boolean(sale.tradeIn));
+      if (sale.tradeIn) setTradeIn(sale.tradeIn);
+      setPaymentMethod(sale.paymentMethod);
+      setInstallments(sale.installments);
+      setWarrantyType(sale.warrantyType);
+      setWarrantyMonths(sale.warrantyMonths);
+      setWarrantyTerms(sale.warrantyTerms);
+      setSaleNotes(sale.notes);
+      setEditing({ id: sale.id, saleDate: sale.saleDate, reason: '', revisions: sale.revisions });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível abrir a venda para correção.');
+    }
+  }
+
+  /** Sai da correção sem gravar: o estoque da tela volta a ser o do banco. */
+  async function cancelEdit() {
+    setEditing(null);
+    handleResetForm();
+    const refreshed = await apiListStock().catch(() => null);
+    if (refreshed && storeRef.current === storeId) setStockItems(refreshed.filter((it: any) => it.active !== false).map(toStockOption));
   }
 
   function handleResetForm() {
@@ -625,6 +677,36 @@ export function ExternalSalePage() {
       </header>
 
       {error ? <div className="xsale-alert" role="alert">{error}</div> : null}
+      {editing ? (
+        <section className="xsale-card xsale-edit" aria-label="Correção de venda">
+          <h2 className="xsale-card__title">Corrigindo a venda {editing.id}</h2>
+          <p className="xsale-edit__hint">
+            Altere o que estiver errado (cliente, vendedor, aparelho, IMEI, preço, troca, pagamento, data ou garantia) e salve. Estoque, financeiro e metas são refeitos com os dados corrigidos; o histórico guarda como a venda estava.
+          </p>
+          <div className="xsale-grid">
+            <div className="xsale-field">
+              <label className="admin-label" htmlFor="xsale-edit-date">Data da venda</label>
+              <input id="xsale-edit-date" type="date" className="admin-input" value={editing.saleDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setEditing({ ...editing, saleDate: e.target.value })} />
+            </div>
+            <div className="xsale-field xsale-edit__reason">
+              <label className="admin-label" htmlFor="xsale-edit-reason">Motivo da correção</label>
+              <input id="xsale-edit-reason" className="admin-input" maxLength={500} placeholder="Ex.: IMEI lançado errado na planilha" value={editing.reason} onChange={(e) => setEditing({ ...editing, reason: e.target.value })} />
+            </div>
+          </div>
+          {editing.revisions.length ? (
+            <ul className="xsale-edit__history">
+              {editing.revisions.map((rev) => (
+                <li key={rev.id}>
+                  {new Date(rev.at).toLocaleString('pt-BR')} · {rev.operator}: {rev.reason}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button type="button" className="btn btn--ghost" onClick={() => void cancelEdit()}>
+            Cancelar correção
+          </button>
+        </section>
+      ) : null}
       {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
 
       {quickRegister ? <QuickStockRegisterModal initialText={quickRegister.text} products={stockItems} onClose={() => setQuickRegister(null)} onDone={handleQuickRegistered} /> : null}
@@ -1055,7 +1137,7 @@ export function ExternalSalePage() {
               </div>
             ) : null}
             <button type="submit" className="btn btn--primary xsale-submit" disabled={submitting || loading || !storeId || Boolean(savedSaleId)}>
-              {submitting ? 'Gravando venda…' : '✓ Concluir venda'}
+              {submitting ? 'Gravando venda…' : editing ? '✓ Salvar correção' : '✓ Concluir venda'}
             </button>
           </section>
         </aside>
@@ -1067,7 +1149,7 @@ export function ExternalSalePage() {
           <button type="button" className="btn btn--primary" onClick={handleResetForm}>Iniciar nova venda</button>
         </div>
       ) : null}
-      {historyOpen ? <ExternalSalesHistory onClose={() => setHistoryOpen(false)} /> : null}
+      {historyOpen ? <ExternalSalesHistory onClose={() => setHistoryOpen(false)} onEdit={canCorrectSales ? (saleId) => void startEdit(saleId) : undefined} /> : null}
       {createdReceipt ? <WarrantyReceiptModal receipt={createdReceipt} onClose={handleResetForm} onNewSale={handleResetForm} /> : null}
       {showPickupModal ? (
         <CashPickupModal onClose={() => setShowPickupModal(false)} onSuccess={() => alert('Recolhimento registrado com sucesso no financeiro!')} />
