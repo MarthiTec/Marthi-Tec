@@ -283,6 +283,8 @@ test('a device sold without IMEI carries the cost of the oldest entry it came fr
  assert.equal(Number((await query('SELECT unit_cost FROM sales_order_lines WHERE sale_id=$1',[json.data.id])).rows[0].unit_cost),6900);
  const order=(await query('SELECT cost_total,gross_profit FROM sales_orders WHERE id=$1',[json.data.id])).rows[0];
  assert.deepEqual([Number(order.cost_total),Number(order.gross_profit)],[6900,900]);
+ const movement=(await query("SELECT cost,unit_cost FROM stock_movements WHERE ref_id=$1 AND type='sale'",[json.data.id])).rows[0];
+ assert.deepEqual([Number(movement.cost),Number(movement.unit_cost)],[6900,6900]);
  assert.equal((await query("SELECT count(*)::int AS n FROM stock_sold_units WHERE imei='900000000000009'")).rows[0].n,0);
 });
 test('a past sale also works with the production column types (text due date, timestamps without time zone)',async()=>{

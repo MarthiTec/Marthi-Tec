@@ -4,6 +4,7 @@ import {changeVariationQuantity} from '../services/variationInventory.js';
 import { receiveTradeInIntoExistingProduct } from '../services/tradeInStock.js';
 import { recordTradeInEntry } from '../services/supplierEntries.js';
 import { markUnitsSold, unmarkSaleUnits } from '../services/soldUnits.js';
+import { applyRealSaleCost, findEntryByImei, isStoreManagement, moveSaleToDate, resolveSaleMoment } from '../services/saleHistory.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -116,15 +117,8 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
     for(const line of body.lines) line.pickupKind=undefined;
     const orderId = `VND-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const today = new Date().toISOString().slice(0, 10);
-    // Data da venda informada: meio-dia no horário de Brasília desse dia.
-    let saleAt: string | null = null;
-    if (body.saleDate) {
-      if (!['admin', 'superadmin', 'manager'].includes(String(req.user?.role ?? ''))) throw Object.assign(new Error('Só a gestão da loja lança venda com data anterior.'), { status: 403 });
-      const oldest = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
-      if (body.saleDate > today) throw Object.assign(new Error('A data da venda não pode ser no futuro.'), { status: 422 });
-      if (body.saleDate < oldest) throw Object.assign(new Error('Lance vendas de até 120 dias atrás.'), { status: 422 });
-      if (body.saleDate < today) saleAt = new Date(`${body.saleDate}T12:00:00-03:00`).toISOString();
-    }
+    // Venda que já aconteceu (lançamento de histórico): momento gravado na venda e no que ela gera.
+    const saleAt = resolveSaleMoment(body.saleDate, req.user?.role, today);
     const nowIso = new Date().toISOString();
 
     if (!pool) {
@@ -203,15 +197,6 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
           // Custo unitário real registrado no cadastro de estoque (imutável por usuário comum)
           lineCost = Number(stockRow.cost) || 0;
-          // Aparelho com IMEI: o custo é o da entrada desse aparelho (compras do mesmo modelo têm custos diferentes).
-          if (line.imei) {
-            const entry = await client.query(
-              `SELECT x.unit_cost FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
-                WHERE x.store_id = $1 AND x.stock_item_id = $2 AND e.imei = $3 ORDER BY x.entry_date DESC, x.created_at DESC LIMIT 1`,
-              [storeId, line.stockId, line.imei],
-            );
-            if (entry.rows.length) lineCost = Number(entry.rows[0].unit_cost) || 0;
-          }
         } else if (line.unitCost !== undefined && req.user?.role === 'admin') {
           lineCost = Number(line.unitCost) || 0;
         }
@@ -364,36 +349,14 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
         }
       }
 
-      // Custo real da venda: o das entradas das unidades que saíram (pelo IMEI ou a entrada mais antiga).
-      const realCost = await client.query(
-        `UPDATE sales_order_lines l SET unit_cost = x.cost, total_cost = round(x.cost * l.qty, 2)
-           FROM (SELECT u.sale_line_id, avg(e.unit_cost) AS cost
-                   FROM stock_sold_units u JOIN stock_supplier_entries e ON e.id = u.entry_id
-                  WHERE u.store_id = $1 AND u.sale_id = $2 AND u.reverted_at IS NULL
-                  GROUP BY u.sale_line_id) x
-          WHERE l.id = x.sale_line_id AND l.sale_id = $2
-          RETURNING l.id`,
-        [storeId, orderId],
-      );
-      if (realCost.rows.length) {
-        const cost = Number((await client.query('SELECT COALESCE(sum(total_cost), 0) AS cost FROM sales_order_lines WHERE sale_id = $1', [orderId])).rows[0].cost) || 0;
-        const profit = Math.round((grossAmount - cost) * 100) / 100;
-        const margin = grossAmount > 0 ? Math.round((profit / grossAmount) * 10000) / 100 : 0;
-        await client.query('UPDATE sales_orders SET cost_total = $2, gross_profit = $3, margin_percent = $4 WHERE id = $1', [orderId, cost, profit, margin]);
-      }
+      // Custo e lucro pelos aparelhos que realmente saíram (IMEI ou entrada mais antiga).
+      await applyRealSaleCost(client, storeId, orderId, grossAmount);
 
       // 4. Se houver UPGRADE / TRADE-IN: dar ENTRADA no estoque do aparelho usado
       let createdTradeInStockId: string | null = null;
+      // Aparelho da troca já cadastrado (mesmo IMEI): registra só o crédito, sem duplicar o estoque.
       const tradeInImei = body.tradeIn?.imei?.trim() ?? '';
-      const alreadyInStock = tradeInImei
-        ? (
-            await client.query(
-              `SELECT x.stock_item_id FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
-                WHERE x.store_id = $1 AND e.imei = $2 LIMIT 1`,
-              [storeId, tradeInImei],
-            )
-          ).rows[0]
-        : null;
+      const alreadyInStock = await findEntryByImei(client, storeId, tradeInImei);
       if (body.tradeIn && body.tradeIn.tradeValue > 0 && alreadyInStock) {
         await client.query(
           `INSERT INTO sale_trade_ins (id, sale_id, store_id, device_name, imei, capacity, color, condition_state, notes, trade_value, stock_item_id, status, received_by_seller_id, customer_id, stock_preexisting)
@@ -582,23 +545,7 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
 
       }
       if (body.requestId) await client.query('UPDATE sales_orders SET request_key = $1 WHERE id = $2 AND store_id = $3', [body.requestId, orderId, storeId]);
-      if (saleAt) {
-        const shiftDays = Math.round((new Date(`${today}T12:00:00Z`).getTime() - new Date(`${body.saleDate}T12:00:00Z`).getTime()) / 86400000);
-        await client.query('UPDATE sales_orders SET created_at = $2::timestamptz, updated_at = $2::timestamptz WHERE id = $1', [orderId, saleAt]);
-        await client.query('UPDATE sale_payments SET created_at = $2::timestamptz WHERE sale_id = $1', [orderId, saleAt]);
-        await client.query('UPDATE stock_movements SET created_at = $3::timestamptz WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
-        await client.query('UPDATE finance_entries SET created_at = $3::timestamptz WHERE store_id = $1 AND ref_id = $2', [storeId, orderId, saleAt]);
-        await client.query('UPDATE stock_sold_units SET sold_at = $3::timestamptz WHERE store_id = $1 AND sale_id = $2', [storeId, orderId, saleAt]);
-        await client.query(
-          `UPDATE receivables SET created_at = $3::timestamptz, due_date = due_date::date - $4::int, received_at = CASE WHEN received_at IS NULL THEN NULL ELSE $3::timestamptz END
-            WHERE store_id = $1 AND sale_id = $2`,
-          [storeId, orderId, saleAt, shiftDays],
-        );
-        const tradeIns = (await client.query('UPDATE sale_trade_ins SET created_at = $2::timestamptz WHERE sale_id = $1 RETURNING id', [orderId, saleAt])).rows.map((row) => row.id);
-        if (tradeIns.length) {
-          await client.query('UPDATE stock_supplier_entries SET entry_date = $3::date, created_at = $4::timestamptz WHERE store_id = $1 AND ref_id = ANY($2::text[])', [storeId, tradeIns, body.saleDate, saleAt]);
-        }
-      }
+      if (saleAt && body.saleDate) await moveSaleToDate(client, { storeId, saleId: orderId, saleDate: body.saleDate, saleAt, today });
       await client.query('COMMIT');
 
       res.status(201).json({
@@ -1004,7 +951,7 @@ salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) =>
   }
 });
 
-/* ── 4. Pendências do Dia (Mariana & Gilvan) ─────────────────── */
+/* ── 4. Pendências do Dia ─────────────────── */
 
 salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, res, next) => {
   try {
@@ -1085,7 +1032,7 @@ salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, r
 /** Troca o vendedor de uma venda concluída: metas e comissões leem o vendedor da venda, então passam juntas. */
 salesRouter.post('/api/v1/sales/:id/seller', requireAuth, async (req, res, next) => {
   try {
-    if (!['admin', 'superadmin', 'manager'].includes(req.user!.role || '')) throw Object.assign(new Error('Sem permissão para trocar o vendedor da venda.'), { status: 403 });
+    if (!isStoreManagement(req.user?.role)) throw Object.assign(new Error('Sem permissão para trocar o vendedor da venda.'), { status: 403 });
     if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
     const storeId = req.storeId!;
     const { sellerId } = z.object({ sellerId: z.string().trim().min(1, 'Escolha o vendedor.') }).parse(req.body);
@@ -1120,7 +1067,7 @@ salesRouter.post('/api/v1/sales/:id/seller', requireAuth, async (req, res, next)
 
 salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next) => {
   try {
-    if (!['admin', 'superadmin', 'manager'].includes(req.user!.role || '')) throw Object.assign(new Error('Sem permissão para cancelar vendas.'), {status: 403});
+    if (!isStoreManagement(req.user?.role)) throw Object.assign(new Error('Sem permissão para cancelar vendas.'), {status: 403});
     const storeId = req.storeId!;
     const saleId = req.params.id;
     const body = z.object({ reason: z.string().default('Cancelamento solicitado pelo cliente') }).parse(req.body);
