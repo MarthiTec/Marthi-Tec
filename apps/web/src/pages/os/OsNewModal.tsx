@@ -60,6 +60,48 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
   const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
+  function resetForm() {
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerDocument('');
+    setCustomerEmail('');
+
+    setItemName('');
+    setItemBrand('');
+    setItemModel('');
+    setItemColor('');
+    setItemRef('');
+    setDevicePassword('');
+    setAccessories('');
+    setConditionOnEntry('');
+
+    setDefect('');
+    setDiagnosis('');
+    setNotes('');
+    setTechNotes('');
+
+    setTechnician(TECHNICIANS_LIST[0]?.name ?? '');
+    setSellerId('');
+    setPriority('normal');
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    setEstimatedReadyAt(d.toISOString().split('T')[0]);
+    setLabor(0);
+    setParts(0);
+
+    setError('');
+    setBusy(false);
+  }
+
+  // Limpa os campos sempre que o modal for reaberto
+  useEffect(() => {
+    if (open) {
+      resetForm();
+      setCreatedOrder(null);
+      setShareOpen(false);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,19 +115,28 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open]);
 
+  function handleCloseModal() {
+    resetForm();
+    onClose();
+  }
+
   if (shareOpen && createdOrder) {
     return (
       <OsCreatedShareModal
         open={shareOpen}
         order={createdOrder}
-        authorName={technician}
+        authorName={createdOrder.technician || technician}
         onClose={() => {
           setShareOpen(false);
+          setCreatedOrder(null);
+          resetForm();
           onCreated(createdOrder);
           onClose();
         }}
         onContinueToOrder={(order) => {
           setShareOpen(false);
+          setCreatedOrder(null);
+          resetForm();
           onCreated(order);
           onClose();
         }}
@@ -149,6 +200,8 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
         parts: Number(parts) || 0,
       });
 
+      // Limpa todos os campos do formulário imediatamente após gerar a OS
+      resetForm();
       setCreatedOrder(created);
       setShareOpen(true);
     } catch (err) {
@@ -173,7 +226,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
           <button
             type="button"
             className="os-modal__close-btn"
-            onClick={onClose}
+            onClick={handleCloseModal}
             aria-label="Fechar"
           >
             ✕
@@ -493,7 +546,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
             <button
               type="button"
               className="btn btn--ghost"
-              onClick={onClose}
+              onClick={handleCloseModal}
               disabled={busy}
             >
               Cancelar

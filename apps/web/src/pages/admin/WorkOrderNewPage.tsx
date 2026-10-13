@@ -63,6 +63,7 @@ export function WorkOrderNewPage() {
     setError('');
     try {
       const created = await createWorkOrder(form);
+      setForm({ ...EMPTY, technician: profile.displayName });
       setCreatedOrder(created);
       setShareOpen(true);
     } catch (err) {
