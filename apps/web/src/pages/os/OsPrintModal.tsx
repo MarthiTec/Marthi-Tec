@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
@@ -16,7 +16,9 @@ import {
 } from '../../data/osPrintSettings';
 import {
   downloadOsPdf,
+  downloadElementPdf,
   generateOsPdfBlob,
+  generatePdfBlobFromElement,
   sendEmailWithPdf,
   shareOrSendWhatsAppWithFile,
 } from '../../utils/commercialPdf';
@@ -68,6 +70,8 @@ export function OsPrintModal({ order, open, onClose }: Props) {
     return order?.itemRef || (order as any)?.imei || (order as any)?.serialNumber || (order as any)?.serial || '';
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const sheetContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync settings when order changes or opens
   useEffect(() => {
@@ -150,21 +154,46 @@ export function OsPrintModal({ order, open, onClose }: Props) {
       .join('\n');
   };
 
-  const handleSendWhatsApp = async () => {
-    if (!order) return;
-    const pdfBlob = generateOsPdfBlob(order, settings.company);
-    const text = generateWhatsAppMessage();
-    await shareOrSendWhatsAppWithFile({
-      phone: order.customerPhone || '',
-      text,
-      pdfBlob,
-      fileName: `Ordem_Servico_${order.id}.pdf`,
-      onNotify: (msg) => alert(msg),
-    });
+  const getSheetElement = (): HTMLElement | null => {
+    if (sheetContainerRef.current) {
+      const child = sheetContainerRef.current.firstElementChild as HTMLElement;
+      if (child) return child;
+      return sheetContainerRef.current;
+    }
+    return document.querySelector('.os-commercial-sheet, .os-print-sheet') as HTMLElement;
   };
 
-  const handleSendEmail = () => {
-    if (!order) return;
+  const getPreviewPdfBlob = async (): Promise<Blob> => {
+    const el = getSheetElement();
+    if (el) {
+      return await generatePdfBlobFromElement(el);
+    }
+    return generateOsPdfBlob(order!, settings.company);
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!order || isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const pdfBlob = await getPreviewPdfBlob();
+      const text = generateWhatsAppMessage();
+      await shareOrSendWhatsAppWithFile({
+        phone: order.customerPhone || '',
+        text,
+        pdfBlob,
+        fileName: `Ordem_Servico_${order.id}.pdf`,
+        onNotify: (msg) => alert(msg),
+      });
+    } catch (err) {
+      console.error('Falha ao compartilhar via WhatsApp:', err);
+      alert('Não foi possível gerar o PDF para o WhatsApp.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!order || isGeneratingPdf) return;
     const companyTitle =
       settings.company.tradeName || settings.company.name || 'MARTHI ASSISTÊNCIA TÉCNICA';
     let targetEmail = order.customerEmail?.trim();
@@ -179,23 +208,45 @@ export function OsPrintModal({ order, open, onClose }: Props) {
       }
       targetEmail = input.trim();
     }
-    const pdfBlob = generateOsPdfBlob(order, settings.company);
-    const subject = `Ordem de Serviço #${order.id} - ${companyTitle}`;
-    const body = `Prezado(a) ${order.customerName || 'Cliente'},\n\nSegue em anexo a Ordem de Serviço #${order.id} referente ao equipamento ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}.\n\nValor Total: ${money(workOrderTotal(order))}\n\nO documento oficial em formato PDF segue em anexo.\n\nAtenciosamente,\n${companyTitle}\n${settings.company.phone ? `WhatsApp: ${settings.company.phone}` : ''}`;
+    setIsGeneratingPdf(true);
+    try {
+      const pdfBlob = await getPreviewPdfBlob();
+      const subject = `Ordem de Serviço #${order.id} - ${companyTitle}`;
+      const body = `Prezado(a) ${order.customerName || 'Cliente'},\n\nSegue em anexo a Ordem de Serviço #${order.id} referente ao equipamento ${[order.itemName, order.itemBrand, order.itemModel].filter(Boolean).join(' ')}.\n\nValor Total: ${money(workOrderTotal(order))}\n\nO documento oficial em formato PDF segue em anexo.\n\nAtenciosamente,\n${companyTitle}\n${settings.company.phone ? `WhatsApp: ${settings.company.phone}` : ''}`;
 
-    sendEmailWithPdf({
-      email: targetEmail,
-      subject,
-      body,
-      pdfBlob,
-      fileName: `Ordem_Servico_${order.id}.pdf`,
-      onNotify: (msg) => alert(msg),
-    });
+      sendEmailWithPdf({
+        email: targetEmail,
+        subject,
+        body,
+        pdfBlob,
+        fileName: `Ordem_Servico_${order.id}.pdf`,
+        onNotify: (msg) => alert(msg),
+      });
+    } catch (err) {
+      console.error('Falha ao enviar e-mail com PDF:', err);
+      alert('Não foi possível gerar o PDF para envio de e-mail.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
-  const handleDownloadPdf = () => {
-    if (!order) return;
-    downloadOsPdf(order, settings.company);
+  const handleDownloadPdf = async () => {
+    if (!order || isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const el = getSheetElement();
+      const fileName = `Ordem_Servico_${order.id}.pdf`;
+      if (el) {
+        await downloadElementPdf(el, fileName);
+      } else {
+        downloadOsPdf(order, settings.company);
+      }
+    } catch (err) {
+      console.error('Falha ao gerar PDF visual fiel, executando fallback:', err);
+      downloadOsPdf(order, settings.company);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return createPortal(
@@ -208,155 +259,168 @@ export function OsPrintModal({ order, open, onClose }: Props) {
       >
         {/* BARRA SUPERIOR DE AÇÕES E CONTROLES PRÉ-IMPRESSÃO (OCULTA NA IMPRESSÃO) */}
         <header className="os-print-modal__bar no-print">
-          <div className="os-print-modal__bar-left">
-            <span className="os-print-modal__icon">🖨️</span>
-            <div>
-              <strong>Impressão da Ordem de Serviço #{order.id}</strong>
-              <div className="os-print-controls-strip">
-                {/* Seletor de Modelo */}
-                <div className="os-print-toggle-group">
-                  <span className="os-print-toggle-label">Modelo:</span>
-                  <button
-                    type="button"
-                    className={`os-print-toggle-btn ${activeModel === 'commercial' ? 'is-active' : ''}`}
-                    onClick={() => handleSelectModel('commercial')}
-                    title="Novo modelo comercial com logotipo, QR Code, dados fiscais e grade 9 pontos"
-                  >
-                    ⭐ Personalizado (Comercial / NF)
-                  </button>
-                  <button
-                    type="button"
-                    className={`os-print-toggle-btn ${activeModel === 'default' ? 'is-active' : ''}`}
-                    onClick={() => handleSelectModel('default')}
-                    title="Modelo padrão existente da bancada"
-                  >
-                    📄 Modelo Atual
-                  </button>
-                </div>
-
-                {/* Seletor de Tipo de Senha */}
-                <div className="os-print-toggle-group">
-                  <span className="os-print-toggle-label">IMEI/Série:</span>
-                  <input
-                    type="text"
-                    className="os-print-pwd-quick-input"
-                    style={{ width: 135 }}
-                    placeholder="IMEI / Nº de Série"
-                    value={customImei}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomImei(val);
-                      if (order?.id) {
-                        updateWorkOrder(order.id, { itemRef: val });
-                      }
-                    }}
-                    title="IMEI ou Número de Série do equipamento"
-                  />
-                </div>
-
-                <div className="os-print-toggle-group">
-                  <span className="os-print-toggle-label">Senha:</span>
-                  <button
-                    type="button"
-                    className={`os-print-toggle-btn ${passwordType === 'typed' ? 'is-active' : ''}`}
-                    onClick={() => setPasswordType('typed')}
-                    title="Exibe senha numérica ou texto digitado"
-                  >
-                    🔢 Digitada
-                  </button>
-                  <button
-                    type="button"
-                    className={`os-print-toggle-btn ${passwordType === 'pattern' ? 'is-active' : ''}`}
-                    onClick={() => setPasswordType('pattern')}
-                    title="Exibe padrão de 9 pontos (3x3) para desenho no papel"
-                  >
-                    ⭕ Desenho (9 Pontos)
-                  </button>
-                  <button
-                    type="button"
-                    className={`os-print-toggle-btn ${passwordType === 'none' ? 'is-active' : ''}`}
-                    onClick={() => setPasswordType('none')}
-                    title="Sem senha"
-                  >
-                    🚫 Sem Senha
-                  </button>
-
-                  {passwordType === 'typed' ? (
-                    <input
-                      type="text"
-                      className="os-print-pwd-quick-input"
-                      placeholder="Senha/PIN"
-                      value={customPassword}
-                      onChange={(e) => setCustomPassword(e.target.value)}
-                      title="Altere ou confirme a senha para este impresso"
-                    />
-                  ) : null}
-                </div>
+          {/* Linha 1: Título e Botões de Ação */}
+          <div className="os-print-modal__bar-top">
+            <div className="os-print-modal__bar-left">
+              <span className="os-print-modal__icon">🖨️</span>
+              <div>
+                <strong>Impressão da Ordem de Serviço #{order.id}</strong>
+                <p>Pré-visualização de impressão (2 vias bancada & cliente)</p>
               </div>
+            </div>
+
+            <div className="os-print-modal__bar-actions">
+              <button
+                type="button"
+                className="btn btn--primary os-print-modal__btn-print"
+                onClick={() => window.print()}
+                title="Imprimir vias na impressora (Ctrl+P)"
+              >
+                <AdminIcon name="print" />
+                <span>Imprimir Agora (Ctrl+P)</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                title="Baixar PDF fiel à pré-visualização no computador"
+              >
+                <span>{isGeneratingPdf ? '⏳ Gerando...' : '📥 Baixar PDF'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                style={{ background: '#25d366', color: '#fff', borderColor: '#22c55e', fontWeight: 600 }}
+                onClick={handleSendWhatsApp}
+                disabled={isGeneratingPdf}
+                title="Enviar OS e PDF pelo WhatsApp"
+              >
+                <span>💬 WhatsApp (PDF)</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                style={{ background: '#6366f1', color: '#fff', borderColor: '#4f46e5', fontWeight: 600 }}
+                onClick={handleSendEmail}
+                disabled={isGeneratingPdf}
+                title={
+                  order.customerEmail
+                    ? `Enviar OS por e-mail para ${order.customerEmail}`
+                    : 'Enviar OS por e-mail'
+                }
+              >
+                <span>📧 {order.customerEmail ? 'E-mail' : 'Enviar E-mail'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary os-print-modal__btn-config"
+                onClick={() => setDrawerOpen(true)}
+                title="Configurar Logo, Dados da Empresa e QR Code"
+              >
+                <span>⚙️ Configurações</span>
+              </button>
+              <button
+                type="button"
+                className="os-print-modal__btn-close"
+                onClick={onClose}
+                title="Fechar pré-visualização (Esc)"
+              >
+                ✕ Fechar
+              </button>
             </div>
           </div>
 
-          <div className="os-print-modal__bar-actions">
-            <button
-              type="button"
-              className="btn btn--secondary"
-              style={{ background: '#25d366', color: '#fff', borderColor: '#22c55e', fontWeight: 600 }}
-              onClick={handleSendWhatsApp}
-              title="Enviar OS e PDF pelo WhatsApp"
-            >
-              <span>💬 WhatsApp (PDF)</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              style={{ background: '#6366f1', color: '#fff', borderColor: '#4f46e5', fontWeight: 600 }}
-              onClick={handleSendEmail}
-              title={
-                order.customerEmail
-                  ? `Enviar OS por e-mail para ${order.customerEmail}`
-                  : 'Enviar OS por e-mail'
-              }
-            >
-              <span>📧 {order.customerEmail ? 'E-mail' : 'Enviar E-mail'}</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={handleDownloadPdf}
-              title="Baixar PDF da Ordem de Serviço no computador"
-            >
-              <span>📥 Baixar PDF</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn--secondary os-print-modal__btn-config"
-              onClick={() => setDrawerOpen(true)}
-              title="Configurar Logo, Dados da Empresa e QR Code"
-            >
-              <span>⚙️ Configurações</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary os-print-modal__btn-print"
-              onClick={() => window.print()}
-            >
-              <AdminIcon name="print" />
-              <span>Imprimir Agora (Ctrl+P)</span>
-            </button>
-            <button
-              type="button"
-              className="os-print-modal__btn-close"
-              onClick={onClose}
-              title="Fechar (Esc)"
-            >
-              ✕ Fechar
-            </button>
+          {/* Linha 2: Barra de Configurações do Documento (Modelo, IMEI/Série, Senha) */}
+          <div className="os-print-modal__bar-bottom">
+            <div className="os-print-controls-strip">
+              {/* Seletor de Modelo */}
+              <div className="os-print-toggle-group">
+                <span className="os-print-toggle-label">Modelo:</span>
+                <button
+                  type="button"
+                  className={`os-print-toggle-btn ${activeModel === 'commercial' ? 'is-active' : ''}`}
+                  onClick={() => handleSelectModel('commercial')}
+                  title="Novo modelo comercial com logotipo, QR Code, dados fiscais e grade 9 pontos"
+                >
+                  ⭐ Personalizado (Comercial / NF)
+                </button>
+                <button
+                  type="button"
+                  className={`os-print-toggle-btn ${activeModel === 'default' ? 'is-active' : ''}`}
+                  onClick={() => handleSelectModel('default')}
+                  title="Modelo padrão existente da bancada"
+                >
+                  📄 Modelo Atual
+                </button>
+              </div>
+
+              {/* Seletor de Tipo de Senha */}
+              <div className="os-print-toggle-group">
+                <span className="os-print-toggle-label">IMEI/Série:</span>
+                <input
+                  type="text"
+                  className="os-print-pwd-quick-input"
+                  style={{ width: 135 }}
+                  placeholder="IMEI / Nº de Série"
+                  value={customImei}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomImei(val);
+                    if (order?.id) {
+                      updateWorkOrder(order.id, { itemRef: val });
+                    }
+                  }}
+                  title="IMEI ou Número de Série do equipamento"
+                />
+              </div>
+
+              <div className="os-print-toggle-group">
+                <span className="os-print-toggle-label">Senha:</span>
+                <button
+                  type="button"
+                  className={`os-print-toggle-btn ${passwordType === 'typed' ? 'is-active' : ''}`}
+                  onClick={() => setPasswordType('typed')}
+                  title="Exibe senha numérica ou texto digitado"
+                >
+                  🔢 Digitada
+                </button>
+                <button
+                  type="button"
+                  className={`os-print-toggle-btn ${passwordType === 'pattern' ? 'is-active' : ''}`}
+                  onClick={() => setPasswordType('pattern')}
+                  title="Exibe padrão de 9 pontos (3x3) para desenho no papel"
+                >
+                  ⭕ Desenho (9 Pontos)
+                </button>
+                <button
+                  type="button"
+                  className={`os-print-toggle-btn ${passwordType === 'none' ? 'is-active' : ''}`}
+                  onClick={() => setPasswordType('none')}
+                  title="Sem senha"
+                >
+                  🚫 Sem Senha
+                </button>
+
+                {passwordType === 'typed' ? (
+                  <input
+                    type="text"
+                    className="os-print-pwd-quick-input"
+                    placeholder="Senha/PIN"
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value)}
+                    title="Altere ou confirme a senha para este impresso"
+                  />
+                ) : null}
+              </div>
+            </div>
           </div>
         </header>
 
         {/* FOLHA DE IMPRESSÃO (Renderizada na tela e na impressora/PDF) */}
         <div className="os-print-sheet-scroll-wrap">
-          {activeModel === 'commercial' ? (
+          <div ref={sheetContainerRef} className="os-print-sheet-canvas-target" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            {activeModel === 'commercial' ? (
             /* =================================================================
                MODELO PERSONALIZADO (NOTA FISCAL / COMERCIAL COM QR CODE E 9 PONTOS)
                ================================================================= */
@@ -637,6 +701,7 @@ export function OsPrintModal({ order, open, onClose }: Props) {
               </section>
             </article>
           )}
+          </div>
         </div>
       </div>
 

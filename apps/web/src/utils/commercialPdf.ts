@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import type { PosQuote } from '../data/posQuotesStore';
 import type { CompanyPrintData } from '../data/osPrintSettings';
 import type { WorkOrder } from '../data/osStore';
@@ -98,7 +99,7 @@ export function sendEmailWithPdf({
   );
 }
 
-function downloadBlob(blob: Blob, fileName: string) {
+export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -107,6 +108,71 @@ function downloadBlob(blob: Blob, fileName: string) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+/**
+ * Converte um elemento do DOM (como a folha de pré-visualização de 2 vias da OS)
+ * diretamente em um arquivo PDF idêntico ao layout visual renderizado na tela.
+ */
+export async function generatePdfBlobFromElement(element: HTMLElement): Promise<Blob> {
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight,
+  });
+
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 6;
+  const marginY = 6;
+  const usableWidth = pageWidth - marginX * 2;
+  const usableHeight = pageHeight - marginY * 2;
+
+  const targetWidth = usableWidth;
+  const targetHeight = (canvas.height * targetWidth) / canvas.width;
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+  if (targetHeight <= usableHeight) {
+    // Cabe perfeitamente em uma única página A4 (caso comum do modelo de 2 vias)
+    pdf.addImage(imgData, 'JPEG', marginX, marginY, targetWidth, targetHeight);
+  } else {
+    // Paginação multi-páginas para tabelas extensas
+    let heightLeft = targetHeight;
+    let position = marginY;
+    let isFirst = true;
+
+    while (heightLeft > 0) {
+      if (!isFirst) {
+        pdf.addPage();
+      }
+      pdf.addImage(imgData, 'JPEG', marginX, position, targetWidth, targetHeight);
+      position -= usableHeight;
+      heightLeft -= usableHeight;
+      isFirst = false;
+    }
+  }
+
+  return pdf.output('blob');
+}
+
+/**
+ * Gera e realiza o download do PDF baseado exatamente no elemento visual renderizado no DOM.
+ */
+export async function downloadElementPdf(element: HTMLElement, fileName: string): Promise<void> {
+  const blob = await generatePdfBlobFromElement(element);
+  downloadBlob(blob, fileName);
 }
 
 /* ==========================================================================

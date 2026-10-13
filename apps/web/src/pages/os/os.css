@@ -5655,12 +5655,15 @@
 
   .os-print-modal__bar-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    width: 100%;
   }
 
-  .os-print-modal__btn-print,
-  .os-print-modal__btn-close {
-    flex: 1 1 0;
+  .os-print-modal__bar-actions > button,
+  .os-print-modal__bar-actions > .btn {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 130px;
     justify-content: center;
   }
 
@@ -5809,8 +5812,8 @@
 }
 
 .os-print-modal-dialog {
-  width: min(880px, 96vw);
-  height: min(92vh, 920px);
+  width: min(1080px, 96vw);
+  height: min(94vh, 940px);
   background: #2a313d;
   border-radius: 12px;
   display: flex;
@@ -5821,19 +5824,28 @@
 
 .os-print-modal__bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px;
   background: #181d24;
   color: #fff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
+}
+
+.os-print-modal__bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .os-print-modal__bar-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 200px;
 }
 
 .os-print-modal__icon {
@@ -5844,6 +5856,7 @@
   display: block;
   font-size: 0.95rem;
   color: #fff;
+  font-weight: 700;
 }
 
 .os-print-modal__bar-left p {
@@ -5855,7 +5868,17 @@
 .os-print-modal__bar-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.os-print-modal__bar-bottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .os-print-modal__btn-print {
