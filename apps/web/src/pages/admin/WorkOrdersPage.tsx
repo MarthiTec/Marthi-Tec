@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
@@ -7,6 +9,7 @@ import {
   getActiveOperation,
   listOperations,
   listWorkOrders,
+  OS_STATE_EVENT,
   STATUS_LABEL,
   TECHNICIANS_LIST,
   updateWorkOrder,
@@ -55,6 +58,7 @@ function priorityMeta(p: WorkOrderPriority) {
 }
 
 export function WorkOrdersPage() {
+  const { user } = useAuth();
   const osBase = useOsBase();
   const [params, setParams] = useSearchParams();
 
@@ -62,7 +66,7 @@ export function WorkOrdersPage() {
   const quoteFilter = params.get('quote') as QuoteStatus | null;
   const opFilter = params.get('op');
   const roleParam = params.get('role');
-  const isMaster = roleParam !== 'tech';
+  const isMaster = roleParam !== 'tech' || user?.role === 'admin' || userIsStoreAdmin(user?.email);
 
   const [orders, setOrders] = useState(() => listWorkOrders());
   const [query, setQuery] = useState('');
@@ -114,6 +118,13 @@ export function WorkOrdersPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<WorkOrderStatus | null>(null);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(''), 6000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   const activeOp = getActiveOperation();
   const currentOp = opFilter && opFilter !== 'all'
@@ -785,6 +796,30 @@ export function WorkOrdersPage() {
       ) : null}
 
       {error ? <p className="qty-low">{error}</p> : null}
+      {successMessage ? (
+        <div
+          className="os-sprint-alert os-sprint-alert--info"
+          style={{
+            margin: '8px 0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <strong>Ciclo Atualizado</strong>
+            <p>{successMessage}</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={() => setSuccessMessage('')}
+            style={{ minHeight: 'auto', padding: '4px 8px' }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       {/* Cards de Métricas (inibe se optimizeSpace estiver ativo ou se estiver no Dashboard/Backlog) */}
       {!optimizeSpace && viewMode !== 'dashboard' && viewMode !== 'backlog' ? (
@@ -1146,8 +1181,14 @@ export function WorkOrdersPage() {
         orders={orders}
         isMaster={isMaster}
         onClose={() => setSprintModalOpen(false)}
-        onCompleted={() => {
+        onCompleted={(newOp) => {
           setOrders(listWorkOrders());
+          const next = new URLSearchParams(params);
+          next.set('op', newOp.id);
+          setParams(next);
+          window.dispatchEvent(new Event(OS_STATE_EVENT));
+          window.dispatchEvent(new CustomEvent('os:period-changed', { detail: { opId: newOp.id } }));
+          setSuccessMessage(`Ciclo "${newOp.title}" iniciado com sucesso! As tarefas em aberto foram transferidas.`);
         }}
       />
     </section>

@@ -418,23 +418,24 @@ export function getActiveOperation(): WorkOrderOperation {
   return ops.find((op) => op.status === 'active') || ops[0];
 }
 
-export function finishActiveOperation(
+export async function finishActiveOperation(
   currentOpId: string,
   nextTitle: string,
   masterOperatorName = 'Operador Master',
-): { oldOp: WorkOrderOperation; newOp: WorkOrderOperation } {
+): Promise<{ oldOp: WorkOrderOperation; newOp: WorkOrderOperation }> {
   const ops = listOperations();
   const stamp = new Date().toISOString();
   const nextId = `op-${Date.now().toString(36)}`;
   const nextCode = `OP-${stamp.slice(0, 7)}`;
 
+  // Marca a operação atual (e quaisquer anteriores ativas) como concluídas
   const updated = ops.map((op) => {
-    if (op.id === currentOpId) {
+    if (op.id === currentOpId || op.status === 'active') {
       return {
         ...op,
         status: 'completed' as const,
-        completedAt: stamp,
-        masterOperatorName,
+        completedAt: op.completedAt || stamp,
+        masterOperatorName: op.masterOperatorName || masterOperatorName,
       };
     }
     return op;
@@ -457,12 +458,29 @@ export function finishActiveOperation(
   // Mover OSs pendentes da operação anterior para a nova sprint
   const currentOrders = listWorkOrders();
   const migrated = currentOrders.map((order) => {
-    if (order.operationId === currentOpId && !['delivered', 'cancelled'].includes(order.status)) {
+    if (
+      (!order.operationId || order.operationId === currentOpId) &&
+      !['delivered', 'cancelled'].includes(order.status)
+    ) {
       return { ...order, operationId: newOp.id, updatedAt: stamp };
     }
     return order;
   });
   save(migrated);
+
+  // Sincroniza em background no backend se autenticado
+  if (isNestAuthed()) {
+    try {
+      const ordersToSync = migrated.filter(
+        (o) => o.operationId === newOp.id && !['delivered', 'cancelled'].includes(o.status),
+      );
+      for (const ord of ordersToSync) {
+        updateWorkOrder(ord.id, { operationId: newOp.id }).catch(() => undefined);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const oldOp = updated.find((op) => op.id === currentOpId) ?? ops[0];
   return { oldOp, newOp };
@@ -799,6 +817,7 @@ export async function updateWorkOrder(
     }
     const body: Record<string, unknown> = {};
     const keys = [
+      'operationId',
       'status',
       'labor',
       'notes',

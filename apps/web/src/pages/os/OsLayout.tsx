@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AreaGuard } from '../../components/AreaGuard';
 import { AdminIcon } from '../../components/AdminIcons';
@@ -16,7 +16,7 @@ import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { AdminPicker } from '../../components/AdminPicker';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import { OsEcosystemMenu } from './OsEcosystemMenu';
-import { getActiveOperation, listOperations } from '../../data/osStore';
+import { getActiveOperation, listOperations, OS_STATE_EVENT } from '../../data/osStore';
 import '../admin/admin.css';
 import './os.css';
 
@@ -66,8 +66,22 @@ export function OsLayout() {
   const [panel, setPanel] = useState<OsPanel>(null);
   const openPanelRef = useRef<(next: Exclude<OsPanel, null>) => void>(() => undefined);
 
-  const operations = listOperations();
-  const activeOp = getActiveOperation();
+  const [opsRevision, setOpsRevision] = useState(0);
+
+  useEffect(() => {
+    function handleOpsUpdate() {
+      setOpsRevision((r) => r + 1);
+    }
+    window.addEventListener(OS_STATE_EVENT, handleOpsUpdate);
+    window.addEventListener('os:period-changed', handleOpsUpdate);
+    return () => {
+      window.removeEventListener(OS_STATE_EVENT, handleOpsUpdate);
+      window.removeEventListener('os:period-changed', handleOpsUpdate);
+    };
+  }, []);
+
+  const operations = useMemo(() => listOperations(), [opsRevision]);
+  const activeOp = useMemo(() => getActiveOperation(), [opsRevision, operations]);
   const currentOpId = params.get('op') || activeOp.id;
 
   const title = resolveTitle(location.pathname, location.search);

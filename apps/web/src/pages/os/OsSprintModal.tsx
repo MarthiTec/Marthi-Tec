@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { userIsStoreAdmin } from '../../data/erpRegistry';
 import {
   finishActiveOperation,
   type WorkOrder,
@@ -24,6 +25,7 @@ export function OsSprintModal({
   onCompleted,
 }: Props) {
   const { user } = useAuth();
+  const canFinish = isMaster || user?.role === 'admin' || userIsStoreAdmin(user?.email);
   const [nextTitle, setNextTitle] = useState(() => {
     const nextDate = new Date();
     nextDate.setMonth(nextDate.getMonth() + 1);
@@ -37,7 +39,9 @@ export function OsSprintModal({
 
   if (!open) return null;
 
-  const currentOpOrders = orders.filter((o) => o.operationId === operation.id);
+  const currentOpOrders = orders.filter(
+    (o) => !o.operationId || o.operationId === operation.id,
+  );
   const delivered = currentOpOrders.filter((o) => o.status === 'delivered');
   const pending = currentOpOrders.filter((o) => !['delivered', 'cancelled'].includes(o.status));
   const completionPercent = currentOpOrders.length > 0
@@ -45,14 +49,14 @@ export function OsSprintModal({
     : 100;
 
   async function handleFinish() {
-    if (!isMaster) {
-      setError('Apenas o Operador Master possui permissão para encerrar uma Operação.');
+    if (!canFinish) {
+      setError('Apenas o Operador Master ou Administrador possui permissão para encerrar uma Operação.');
       return;
     }
     setBusy(true);
     setError('');
     try {
-      const { newOp } = finishActiveOperation(
+      const { newOp } = await finishActiveOperation(
         operation.id,
         nextTitle.trim(),
         user?.name || 'Operador Master',
@@ -82,11 +86,11 @@ export function OsSprintModal({
         {error ? <div className="os-modal__error">{error}</div> : null}
 
         <div className="os-sprint-body">
-          {!isMaster ? (
+          {!canFinish ? (
             <div className="os-sprint-alert os-sprint-alert--warn">
               <strong>Permissão de Operador Master Necessária</strong>
               <p>
-                Apenas o operador com perfil Master tem autorização para concluir o ciclo de tarefas e iniciar o próximo período.
+                Apenas o operador com perfil Master ou Administrador tem autorização para concluir o ciclo de tarefas e iniciar o próximo período.
               </p>
             </div>
           ) : (
@@ -126,7 +130,7 @@ export function OsSprintModal({
             </div>
           </div>
 
-          {isMaster ? (
+          {canFinish ? (
             <div className="os-sprint-next-form">
               <label>
                 <span>Nome do Próximo Ciclo de Tarefas:</span>
@@ -151,7 +155,7 @@ export function OsSprintModal({
           <button
             type="button"
             className="btn btn--primary os-btn-sprint-finish"
-            disabled={busy || !isMaster}
+            disabled={busy || !canFinish}
             onClick={handleFinish}
           >
             {busy ? 'Concluindo Ciclo…' : 'Concluir Tarefas & Iniciar Próximo Ciclo'}

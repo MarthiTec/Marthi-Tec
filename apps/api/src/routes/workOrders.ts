@@ -324,6 +324,7 @@ workOrdersRouter.patch('/api/v1/work-orders/:id', async (req: Request, res: Resp
     let pIdx = 3;
 
     if (b.status !== undefined) { fields.push(`status = $${pIdx++}`); values.push(b.status); }
+    if (b.operationId !== undefined) { fields.push(`operation_id = $${pIdx++}`); values.push(b.operationId); }
     if (b.customerName !== undefined) { fields.push(`customer_name = $${pIdx++}`); values.push(b.customerName); }
     if (b.customerPhone !== undefined) { fields.push(`customer_phone = $${pIdx++}`); values.push(b.customerPhone); }
     if (b.customerDocument !== undefined) { fields.push(`customer_document = $${pIdx++}`); values.push(b.customerDocument); }
