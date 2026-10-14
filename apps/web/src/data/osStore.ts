@@ -3,6 +3,7 @@ import {
   apiAddPhoto,
   apiClearSignature,
   apiCreateWorkOrder,
+  apiDeleteWorkOrder,
   apiPatchChecklist,
   apiQuoteApprove,
   apiQuoteDraft,
@@ -856,6 +857,24 @@ export async function updateWorkOrder(
     return upsertLocal(normalizeWorkOrder(updated));
   } catch (error) {
     throw new Error(osApiError(error, 'Falha ao atualizar OS.'));
+  }
+}
+
+export async function deleteWorkOrder(id: string): Promise<boolean> {
+  try {
+    if (isNestAuthed()) {
+      try {
+        await apiDeleteWorkOrder(id);
+      } catch (err) {
+        console.error('Falha ao excluir OS na API:', err);
+      }
+    }
+    const all = listWorkOrders();
+    const filtered = all.filter((o) => o.id !== id);
+    save(filtered);
+    return true;
+  } catch (error) {
+    throw new Error(osApiError(error, 'Falha ao excluir OS.'));
   }
 }
 

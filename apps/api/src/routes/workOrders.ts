@@ -531,6 +531,34 @@ workOrdersRouter.post('/api/v1/work-orders/:id/cancel', async (req: Request, res
   }
 });
 
+// 8.1 Excluir OS permanentemente (DELETE /:id)
+workOrdersRouter.delete('/api/v1/work-orders/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
+    const storeId = req.storeId!;
+    const osId = req.params.id;
+
+    const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
+    if (!osRes.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+
+    const row = osRes.rows[0];
+    const currentLines = safeJson(row.lines, []);
+
+    // Reverte todas as peças consumidas de volta ao estoque
+    for (const line of currentLines) {
+      if (line.stockId && line.kind === 'part') {
+        await pool.query('UPDATE stock_items SET qty = qty + $1, updated_at = now() WHERE id = $2 AND store_id = $3', [line.qty || 1, line.stockId, storeId]);
+      }
+    }
+
+    await pool.query('DELETE FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
+
+    res.json({ success: true, data: { id: osId, deleted: true } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // 9. Comprar equipamento / recondicionado (POST /purchase)
 workOrdersRouter.post('/api/v1/work-orders/:id/purchase', async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -11,6 +11,7 @@ import {
   addWorkOrderAttachment,
   addWorkOrderComment,
   addWorkOrderWorklog,
+  deleteWorkOrder,
   findWorkOrdersByCustomer,
   findWorkOrdersByItemRef,
   getActiveOperation,
@@ -26,6 +27,7 @@ import {
   type WorkOrderPriority,
   type WorkOrderStatus,
 } from '../../data/osStore';
+import { cancelWorkOrderWithReversal } from '../../data/workshopLedger';
 import { useStoreCustomization } from '../../data/storeSegment';
 import {
   getWorkshopCheckoutMode,
@@ -47,6 +49,7 @@ type Props = {
   order: WorkOrder | null;
   onClose: () => void;
   onOrderUpdated: (updated: WorkOrder) => void;
+  onOrderDeleted?: (id: string) => void;
 };
 
 type ActivityTab = 'all' | 'comments' | 'history' | 'audit';
@@ -141,7 +144,12 @@ function formatTimeAgo(isoString?: string): string {
   }
 }
 
-export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
+export function OsDetailModal({
+  order,
+  onClose,
+  onOrderUpdated,
+  onOrderDeleted,
+}: Props) {
   const customization = useStoreCustomization();
   const { user } = useAuth();
   const [fullscreen, setFullscreen] = useState(false);
@@ -587,6 +595,49 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
     return `mailto:${email}?subject=${subject}&body=${body}`;
   }
 
+  async function handleCancelOrder() {
+    if (!order) return;
+    const ok = window.confirm(
+      `Deseja realmente CANCELAR a Ordem de Serviço #${order.id}?\n\nQuaisquer peças consumidas nesta OS serão estornadas automaticamente para o estoque.`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await cancelWorkOrderWithReversal(order.id);
+      if (!res.ok) {
+        alert(res.error);
+        return;
+      }
+      onOrderUpdated(res.data);
+      setToast('Ordem de serviço cancelada com sucesso!');
+      setTimeout(() => setToast(''), 3000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Falha ao cancelar OS.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteOrder() {
+    if (!order) return;
+    const ok = window.confirm(
+      `⚠️ ATENÇÃO: Deseja EXCLUIR DEFINITIVAMENTE a Ordem de Serviço #${order.id}?\n\nEsta ação removerá a OS do sistema por completo e não poderá ser desfeita.`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteWorkOrder(order.id);
+      if (onOrderDeleted) {
+        onOrderDeleted(order.id);
+      }
+      onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Falha ao excluir OS.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="os-modal-backdrop os-jira-modal-backdrop" onClick={onClose}>
       <div
@@ -638,6 +689,26 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                 <span>📜</span>
               </button>
             ) : null}
+            {order.status !== 'cancelled' && order.status !== 'delivered' ? (
+              <button
+                type="button"
+                className="os-jira-btn-icon"
+                title="Cancelar OS (estorna peças para o estoque)"
+                onClick={handleCancelOrder}
+                style={{ color: '#f59e0b' }}
+              >
+                <span style={{ fontSize: '1rem' }}>🚫</span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="os-jira-btn-icon"
+              title="Excluir OS definitivamente"
+              onClick={handleDeleteOrder}
+              style={{ color: '#ef4444' }}
+            >
+              <AdminIcon name="trash" />
+            </button>
             <button
               type="button"
               className="os-jira-btn-icon"
@@ -1870,6 +1941,28 @@ export function OsDetailModal({ order, onClose, onOrderUpdated }: Props) {
                         🚀 Iniciar Tarefa na Operação
                       </button>
                     ) : null}
+
+                    {order.status !== 'cancelled' && order.status !== 'delivered' ? (
+                      <button
+                        type="button"
+                        className="btn btn--sm os-jira-side-link"
+                        style={{ color: '#f59e0b', borderColor: '#f59e0b55' }}
+                        onClick={handleCancelOrder}
+                        title="Cancelar OS e estornar peças de volta para o estoque"
+                      >
+                        🚫 Cancelar Ordem de Serviço
+                      </button>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      className="btn btn--sm os-jira-side-link os-jira-side-link--danger"
+                      style={{ color: '#ef4444', borderColor: '#ef444455' }}
+                      onClick={handleDeleteOrder}
+                      title="Excluir permanentemente esta OS do sistema"
+                    >
+                      🗑️ Excluir Definitivamente
+                    </button>
                   </div>
                 </div>
               ) : null}

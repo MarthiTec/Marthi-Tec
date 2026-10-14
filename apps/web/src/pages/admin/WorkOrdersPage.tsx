@@ -6,6 +6,7 @@ import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   BOARD_COLUMNS,
+  deleteWorkOrder,
   getActiveOperation,
   listOperations,
   listWorkOrders,
@@ -19,6 +20,7 @@ import {
   type WorkOrderPriority,
   type WorkOrderStatus,
 } from '../../data/osStore';
+import { cancelWorkOrderWithReversal } from '../../data/workshopLedger';
 import { osHref, useOsBase } from '../os/osPaths';
 import { OsDetailModal } from '../os/OsDetailModal';
 import { OsNewModal } from '../os/OsNewModal';
@@ -321,6 +323,20 @@ export function WorkOrdersPage() {
       setOrders(listWorkOrders());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao mudar prioridade.');
+    }
+  }
+
+  async function handleDeleteOrder(id: string) {
+    if (window.confirm(`⚠️ Deseja realmente EXCLUIR DEFINITIVAMENTE a OS #${id}?\n\nEsta ação apagará a OS do sistema por completo.`)) {
+      try {
+        await deleteWorkOrder(id);
+        setOrders(listWorkOrders());
+        if (selectedDetailOrder?.id === id) {
+          setSelectedDetailOrder(null);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Falha ao excluir OS.');
+      }
     }
   }
 
@@ -1024,6 +1040,39 @@ export function WorkOrdersPage() {
                               <span>📜 Garantia</span>
                             </button>
                           ) : null}
+                          {item.status !== 'cancelled' && item.status !== 'delivered' ? (
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              style={{ color: '#f59e0b' }}
+                              onClick={async () => {
+                                if (window.confirm(`Deseja cancelar a OS #${item.id}? Peças consumidas serão estornadas para o estoque.`)) {
+                                  try {
+                                    const res = await cancelWorkOrderWithReversal(item.id);
+                                    if (res.ok) {
+                                      setOrders(listWorkOrders());
+                                    } else {
+                                      setError(res.error);
+                                    }
+                                  } catch (err) {
+                                    setError(err instanceof Error ? err.message : 'Falha ao cancelar OS.');
+                                  }
+                                }
+                              }}
+                              title="Cancelar OS"
+                            >
+                              Cancelar
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            style={{ color: '#ef4444' }}
+                            onClick={() => handleDeleteOrder(item.id)}
+                            title="Excluir OS definitivamente"
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1051,6 +1100,7 @@ export function WorkOrdersPage() {
                 dragging={draggingId === order.id}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
+                onDelete={handleDeleteOrder}
               />
             ))}
           </div>
@@ -1129,6 +1179,7 @@ export function WorkOrdersPage() {
                   onUpdatePriority={updatePriority}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}
+                  onDelete={handleDeleteOrder}
                 />
               );
             })}
@@ -1143,6 +1194,10 @@ export function WorkOrdersPage() {
           onClose={() => setSelectedDetailOrder(null)}
           onOrderUpdated={(updated) => {
             setSelectedDetailOrder(updated);
+            setOrders(listWorkOrders());
+          }}
+          onOrderDeleted={() => {
+            setSelectedDetailOrder(null);
             setOrders(listWorkOrders());
           }}
         />
@@ -1211,6 +1266,7 @@ function JiraBoardColumn({
   onUpdatePriority,
   onDragStart,
   onDragEnd,
+  onDelete,
 }: {
   status: WorkOrderStatus;
   orders: WorkOrder[];
@@ -1227,6 +1283,7 @@ function JiraBoardColumn({
   onUpdatePriority: (id: string, priority: WorkOrderPriority) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
+  onDelete: (id: string) => void;
 }) {
   function handleDragOver(event: DragEvent) {
     if (!DROP_STATUSES.includes(status)) return;
@@ -1269,6 +1326,7 @@ function JiraBoardColumn({
           dragging={draggingId === order.id}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
+          onDelete={onDelete}
         />
       ))}
     </section>
@@ -1286,6 +1344,7 @@ function JiraWorkOrderCard({
   dragging,
   onDragStart,
   onDragEnd,
+  onDelete,
 }: {
   order: WorkOrder;
   compact: boolean;
@@ -1296,6 +1355,7 @@ function JiraWorkOrderCard({
   dragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
+  onDelete?: (id: string) => void;
 }) {
   const draggedRef = useRef(false);
   const [priorityMenuOpen, setPriorityMenuOpen] = useState(false);
@@ -1401,6 +1461,30 @@ function JiraWorkOrderCard({
           <div className="os-jira-card__foot-left">
             <span className="os-jira-card__type-mark">📗</span>
             <span className="os-jira-card__code">{order.id}</span>
+            {onDelete ? (
+              <button
+                type="button"
+                className="os-jira-card__del-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(order.id);
+                }}
+                title="Excluir OS definitivamente"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  opacity: 0.45,
+                  padding: '0 3px',
+                  fontSize: '0.8rem',
+                  lineHeight: 1,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
+              >
+                🗑️
+              </button>
+            ) : null}
           </div>
 
           <div className="os-jira-card__foot-right">

@@ -115,56 +115,136 @@ export function downloadBlob(blob: Blob, fileName: string) {
  * diretamente em um arquivo PDF idêntico ao layout visual renderizado na tela.
  */
 export async function generatePdfBlobFromElement(element: HTMLElement): Promise<Blob> {
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: false,
-    logging: false,
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: 0,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
-  });
-
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const marginX = 6;
-  const marginY = 6;
-  const usableWidth = pageWidth - marginX * 2;
-  const usableHeight = pageHeight - marginY * 2;
-
-  const targetWidth = usableWidth;
-  const targetHeight = (canvas.height * targetWidth) / canvas.width;
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-  if (targetHeight <= usableHeight) {
-    // Cabe perfeitamente em uma única página A4 (caso comum do modelo de 2 vias)
-    pdf.addImage(imgData, 'JPEG', marginX, marginY, targetWidth, targetHeight);
-  } else {
-    // Paginação multi-páginas para tabelas extensas
-    let heightLeft = targetHeight;
-    let position = marginY;
-    let isFirst = true;
-
-    while (heightLeft > 0) {
-      if (!isFirst) {
-        pdf.addPage();
-      }
-      pdf.addImage(imgData, 'JPEG', marginX, position, targetWidth, targetHeight);
-      position -= usableHeight;
-      heightLeft -= usableHeight;
-      isFirst = false;
-    }
+  // Salva e redefine o scroll do container para capturar a partir do topo
+  const scrollContainer = (element.closest('.os-print-sheet-scroll-wrap') ||
+    element.parentElement) as HTMLElement | null;
+  const originalScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0;
   }
 
-  return pdf.output('blob');
+  // Mede as dimensões completas reais da folha inteira com ambas as vias
+  const fullWidth = Math.max(element.scrollWidth, element.offsetWidth, 800);
+  const fullHeight = Math.max(element.scrollHeight, element.offsetHeight);
+
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      backgroundColor: '#ffffff',
+      width: fullWidth,
+      height: fullHeight,
+      windowWidth: fullWidth,
+      windowHeight: fullHeight + 400,
+      scrollX: 0,
+      scrollY: 0,
+      onclone: (clonedDoc, clonedElement) => {
+        // Desbloqueia e remove restrições de overflow, altura e posição de todos os ancestrais
+        let parent: HTMLElement | null = clonedElement.parentElement;
+        while (parent && parent !== clonedDoc.body) {
+          parent.style.overflow = 'visible';
+          parent.style.maxHeight = 'none';
+          parent.style.height = 'auto';
+          parent.style.minHeight = '0';
+          parent.style.flex = 'none';
+          parent.style.position = 'static';
+          parent.style.transform = 'none';
+          parent = parent.parentElement;
+        }
+
+        if (clonedDoc.body) {
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.height = 'auto';
+          clonedDoc.body.style.maxHeight = 'none';
+          clonedDoc.body.style.position = 'static';
+        }
+
+        if (clonedDoc.documentElement) {
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.documentElement.style.height = 'auto';
+          clonedDoc.documentElement.style.maxHeight = 'none';
+        }
+
+        clonedElement.style.overflow = 'visible';
+        clonedElement.style.maxHeight = 'none';
+        clonedElement.style.height = 'auto';
+        clonedElement.style.width = `${fullWidth}px`;
+      },
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const marginX = 6;
+    const marginY = 6;
+    const usableWidth = pageWidth - marginX * 2; // 198mm
+    const usableHeight = pageHeight - marginY * 2; // 285mm
+
+    const targetWidth = usableWidth;
+    const targetHeight = (canvas.height * targetWidth) / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    // Se couber em 1 página (ou exceder ligeiramente até 35%), ajusta a escala proporcional
+    // para que ambas as vias (loja e cliente) fiquem 100% visíveis juntas na mesma folha A4!
+    if (targetHeight <= usableHeight * 1.35) {
+      const fitScale = targetHeight <= usableHeight ? 1 : usableHeight / targetHeight;
+      const finalWidth = targetWidth * fitScale;
+      const finalHeight = targetHeight * fitScale;
+      const finalX = (pageWidth - finalWidth) / 2;
+      const finalY = (pageHeight - finalHeight) / 2;
+
+      pdf.addImage(imgData, 'JPEG', finalX, finalY, finalWidth, finalHeight);
+    } else {
+      // Documento extraordinariamente longo (multi-páginas real com fatiamento limpo)
+      const pxPageHeight = Math.floor((usableHeight * canvas.width) / usableWidth);
+      let renderedPx = 0;
+      let isFirst = true;
+
+      while (renderedPx < canvas.height) {
+        if (!isFirst) {
+          pdf.addPage();
+        }
+        const sliceHeight = Math.min(pxPageHeight, canvas.height - renderedPx);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const ctx = pageCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0,
+            renderedPx,
+            canvas.width,
+            sliceHeight,
+            0,
+            0,
+            canvas.width,
+            sliceHeight,
+          );
+          const sliceData = pageCanvas.toDataURL('image/jpeg', 0.95);
+          const sliceMmHeight = (sliceHeight * usableWidth) / canvas.width;
+          pdf.addImage(sliceData, 'JPEG', marginX, marginY, usableWidth, sliceMmHeight);
+        }
+        renderedPx += sliceHeight;
+        isFirst = false;
+      }
+    }
+
+    return pdf.output('blob');
+  } finally {
+    if (scrollContainer) {
+      scrollContainer.scrollTop = originalScrollTop;
+    }
+  }
 }
 
 /**

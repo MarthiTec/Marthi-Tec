@@ -267,6 +267,10 @@ export function apiCancelWorkOrder(id: string) {
   return nestPost<WorkOrder>(`/work-orders/${id}/cancel`);
 }
 
+export function apiDeleteWorkOrder(id: string) {
+  return nestDelete<{ id: string; deleted: boolean }>(`/work-orders/${id}`);
+}
+
 export function apiAddPhoto(
   id: string,
   body: { kind: WorkOrderPhotoKind; dataUrl: string; caption?: string },

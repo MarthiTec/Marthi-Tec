@@ -156,11 +156,15 @@ export function OsPrintModal({ order, open, onClose }: Props) {
 
   const getSheetElement = (): HTMLElement | null => {
     if (sheetContainerRef.current) {
-      const child = sheetContainerRef.current.firstElementChild as HTMLElement;
+      const sheet = sheetContainerRef.current.querySelector(
+        '.os-commercial-sheet, .os-print-sheet',
+      ) as HTMLElement | null;
+      if (sheet) return sheet;
+      const child = sheetContainerRef.current.firstElementChild as HTMLElement | null;
       if (child) return child;
       return sheetContainerRef.current;
     }
-    return document.querySelector('.os-commercial-sheet, .os-print-sheet') as HTMLElement;
+    return document.querySelector('.os-commercial-sheet, .os-print-sheet') as HTMLElement | null;
   };
 
   const getPreviewPdfBlob = async (): Promise<Blob> => {
