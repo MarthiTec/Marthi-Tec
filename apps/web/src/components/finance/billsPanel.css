@@ -1,0 +1,96 @@
+/* Contas a pagar / a receber. */
+.bills { display: grid; gap: 14px; }
+.bills__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.bills__head h2 { margin: 0; }
+
+.bills__totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bills__totals button {
+  display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line, #d8dde3); border-radius: 12px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.bills__totals button span { color: var(--mute, #64748b); font-size: 0.78rem; font-weight: 700; }
+.bills__totals button strong { font-size: 1.15rem; }
+.bills__totals button small { color: var(--mute, #64748b); font-size: 0.75rem; }
+.bills__totals button.is-active { border-color: var(--accent, #0f766e); background: color-mix(in srgb, var(--accent, #0f766e) 8%, transparent); }
+.bills__totals button.is-danger strong { color: #b91c1c; }
+
+.bills__filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.bills__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bills__chips button {
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--line, #d8dde3); border-radius: 999px;
+  background: transparent; color: inherit; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+}
+.bills__chips button.is-active { border-color: var(--accent, #0f766e); background: var(--accent, #0f766e); color: #fff; }
+.bills__search {
+  flex: 1 1 220px; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid var(--line, #d8dde3);
+  border-radius: 12px; background: var(--surface, #f8fafc); color: var(--ink); font: inherit; font-size: 0.88rem;
+}
+.bills__range { display: flex; gap: 6px; }
+.bills__range input {
+  min-height: 40px; padding: 0 10px; border: 1px solid var(--line, #d8dde3); border-radius: 12px;
+  background: var(--surface, #f8fafc); color: var(--ink); font: inherit;
+}
+
+.bills__table { display: grid; border: 1px solid var(--line, #d8dde3); border-radius: 12px; overflow: hidden; }
+.bills__row {
+  display: grid; grid-template-columns: 96px minmax(180px, 2fr) minmax(110px, 1fr) 112px 112px 100px minmax(260px, auto);
+  align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line, #d8dde3); font-size: 0.88rem;
+}
+.bills__row > span { min-width: 0; }
+.bills__row--head {
+  border-top: 0; color: var(--mute, #64748b); font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.04em; background: color-mix(in srgb, var(--mute, #64748b) 10%, transparent);
+}
+.bills__row.is-overdue { background: color-mix(in srgb, #dc2626 6%, transparent); }
+.bills__desc { display: grid; gap: 2px; }
+.bills__desc small { color: var(--mute, #64748b); font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bills__link {
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bills__link:hover { color: var(--accent, #0f766e); text-decoration: underline; }
+.bills__money { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bills__status { padding: 2px 9px; border-radius: 999px; font-size: 0.74rem; font-style: normal; font-weight: 800; white-space: nowrap; }
+.bills__status.is-open { background: color-mix(in srgb, #d97706 16%, transparent); color: #b45309; }
+.bills__status.is-partial { background: color-mix(in srgb, #2563eb 14%, transparent); color: #1d4ed8; }
+.bills__status.is-paid { background: color-mix(in srgb, #16a34a 16%, transparent); color: #15803d; }
+.bills__status.is-overdue { background: color-mix(in srgb, #dc2626 16%, transparent); color: #b91c1c; }
+.bills__status.is-cancelled { background: color-mix(in srgb, var(--mute, #64748b) 16%, transparent); color: var(--mute, #64748b); }
+.bills__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.bills__danger { color: #b91c1c; }
+.bills__empty { margin: 0; padding: 14px 12px; color: var(--mute, #64748b); }
+
+.is-theme-dark .bills__status.is-open { color: #fbbf24; }
+.is-theme-dark .bills__status.is-partial { color: #93c5fd; }
+.is-theme-dark .bills__status.is-paid { color: #86efac; }
+.is-theme-dark .bills__status.is-overdue,
+.is-theme-dark .bills__totals button.is-danger strong,
+.is-theme-dark .bills__danger { color: #fca5a5; }
+
+/* Formulário e ficha da conta. */
+.bills-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: start; }
+.bills-form__wide { grid-column: 1 / -1; }
+.bills-form__hint { color: var(--mute, #64748b); font-size: 0.76rem; font-weight: 600; }
+.bills-view { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 0; }
+.bills-view dt { color: var(--mute, #64748b); font-size: 0.76rem; font-weight: 700; }
+.bills-view dd { margin: 2px 0 0; font-weight: 700; }
+.bills-view__wide { grid-column: 1 / -1; }
+.bills-view__title { margin: 16px 0 6px; font-size: 0.9rem; }
+.bills-view__moves { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bills-view__moves li { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 10px; font-size: 0.84rem; }
+.bills-view__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+/* Tela estreita: cada conta vira um cartão. */
+@media (max-width: 1100px) {
+  .bills__row--head { display: none; }
+  .bills__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bills__row > span[data-label]::before {
+    content: attr(data-label); display: block; color: var(--mute, #64748b); font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+  }
+  .bills__desc { grid-column: 1 / -1; }
+  .bills__money { text-align: left; }
+  .bills__actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .bills__totals, .bills-form, .bills-view { grid-template-columns: minmax(0, 1fr); }
+}

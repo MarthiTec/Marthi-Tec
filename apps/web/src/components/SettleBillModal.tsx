@@ -13,25 +13,37 @@ export type SettleBillModalProps = {
   onClose: () => void;
 };
 
-export function SettleBillModal({
-  open,
-  kind,
-  item,
-  accounts,
-  onConfirm,
-  onClose,
-}: SettleBillModalProps) {
-  if (!open || !item) return null;
+/** Valor digitado em reais: aceita "1.250,00", "1250,00" e "1250.00". */
+const parseMoney = (text: string) => {
+  const raw = text.trim();
+  const value = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
+  return Math.max(0, value || 0);
+};
+const moneyText = (value: number) => value.toFixed(2).replace('.', ',');
+/** Data de hoje no relógio do usuário (toISOString vira o dia às 21h em Brasília). */
+const localToday = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+const dateBr = (value: string) => (value ? value.slice(0, 10).split('-').reverse().join('/') : '—');
+
+export function SettleBillModal(props: SettleBillModalProps) {
+  if (!props.open || !props.item) return null;
+  return <SettleBillForm key={props.item.id} {...props} item={props.item} />;
+}
+
+/** Formulário da baixa: montado com a conta escolhida, os campos começam do saldo dela. */
+function SettleBillForm({ kind, item, accounts, onConfirm, onClose }: SettleBillModalProps & { item: Payable | Receivable }) {
 
   const isPayable = kind === 'payable';
   const openRemainder = Math.max(0, item.amount - (isPayable ? (item as Payable).paidAmount : (item as Receivable).receivedAmount));
 
   // Estados dos inputs de baixa
-  const [amountStr, setAmountStr] = useState(openRemainder.toFixed(2));
+  const [amountStr, setAmountStr] = useState(moneyText(openRemainder));
   const [interestStr, setInterestStr] = useState('0,00');
   const [fineStr, setFineStr] = useState('0,00');
   const [discountStr, setDiscountStr] = useState('0,00');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(localToday);
   const [accountId, setAccountId] = useState(item.accountId || accounts[0]?.id || '');
   const [documentNumber, setDocumentNumber] = useState(item.documentNumber || '');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState(item.invoiceId || '');
@@ -49,10 +61,10 @@ export function SettleBillModal({
     }
   }, [isPayable]);
 
-  const parsedAmount = Math.max(0, Number(amountStr.replace(',', '.')) || 0);
-  const parsedInterest = Math.max(0, Number(interestStr.replace(',', '.')) || 0);
-  const parsedFine = Math.max(0, Number(fineStr.replace(',', '.')) || 0);
-  const parsedDiscount = Math.max(0, Number(discountStr.replace(',', '.')) || 0);
+  const parsedAmount = parseMoney(amountStr);
+  const parsedInterest = parseMoney(interestStr);
+  const parsedFine = parseMoney(fineStr);
+  const parsedDiscount = parseMoney(discountStr);
 
   const netTotal = Math.max(0, parsedAmount + parsedInterest + parsedFine - parsedDiscount);
   const isPartial = parsedAmount < openRemainder - 0.01;
@@ -151,7 +163,7 @@ export function SettleBillModal({
             </div>
             <div>
               <span className="settle-summary-sub">Vencimento Original</span>
-              <span>{item.dueDate}</span>
+              <span>{dateBr(item.dueDate)}</span>
             </div>
           </div>
         </section>

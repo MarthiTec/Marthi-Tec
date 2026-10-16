@@ -792,6 +792,8 @@ export type ApiPayable = {
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
+  /** Entrada de estoque que gerou a conta (compra). */
+  stockEntryId?: string;
 };
 
 export type ApiReceivable = {
@@ -815,6 +817,8 @@ export type ApiReceivable = {
   createdAt: string;
   updatedAt: string;
   receivedAt?: string;
+  /** Venda que gerou a conta. */
+  saleId?: string;
 };
 
 export type ApiTreasuryMove = {
@@ -957,6 +961,31 @@ export function apiReceiveReceivable(
 /** DRE do mês (AAAA-MM) pelos lançamentos do caixa, calculada no banco. */
 export function apiGetDre(month?: string) {
   return nestGet<import('../data/financeBook').DreReport>(`/finance/dre${month ? `?month=${month}` : ''}`);
+}
+
+/** Exclui a conta (o servidor só aceita conta sem baixa e fora de venda/entrada de estoque). */
+export function apiDeletePayable(id: string) {
+  return nestDelete<{ ok: boolean }>(`/finance/payables/${encodeURIComponent(id)}`);
+}
+
+export function apiDeleteReceivable(id: string) {
+  return nestDelete<{ ok: boolean }>(`/finance/receivables/${encodeURIComponent(id)}`);
+}
+
+/** Estorna a baixa: a conta volta para em aberto e o lançamento sai do caixa. */
+export function apiRevertPayable(id: string) {
+  return nestPost<ApiPayable>(`/finance/payables/${encodeURIComponent(id)}/revert`, {});
+}
+
+export function apiRevertReceivable(id: string) {
+  return nestPost<ApiReceivable>(`/finance/receivables/${encodeURIComponent(id)}/revert`, {});
+}
+
+export type ApiBillMovement = { id: string; type: 'in' | 'out'; label: string; amount: number; accountId: string; category: string; operator: string; at: string };
+
+/** Baixas da conta no caixa (pagamentos/recebimentos ligados a ela). */
+export function apiListBillMovements(refId: string) {
+  return nestGet<ApiBillMovement[]>(`/finance/movements?refId=${encodeURIComponent(refId)}`);
 }
 
 export function apiListTreasury() {

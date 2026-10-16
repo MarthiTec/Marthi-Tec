@@ -124,3 +124,59 @@ test('a purchase paid on a past entry date leaves the cash on that day; older on
   const fixed = (await query('SELECT created_at FROM finance_entries WHERE ref_id=$1', [posted.data.payableId])).rows[0];
   assert.equal(localDay(fixed.created_at), '2026-09-28');
 });
+
+test('bills follow ERP rules: a settled bill needs a reversal before delete or amount change; history shows the settlement', async () => {
+  const bill = (await call('/finance/payables', 'POST', { description: 'Aluguel', category: 'Aluguel', amount: 4345, dueDate: '2026-10-10' })).data;
+  assert.equal((await call(`/finance/payables/${bill.id}/pay`, 'POST', { paymentDate: '2026-10-10' })).status, 200);
+  const history = (await call(`/finance/movements?refId=${bill.id}`)).data;
+  assert.deepEqual(history.map((m) => [m.type, m.amount]), [['out', 4345]]);
+  const blocked = await call(`/finance/payables/${bill.id}`, 'DELETE');
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.error.message, /estorne/);
+  assert.equal((await call(`/finance/payables/${bill.id}`, 'PATCH', { amount: 4000 })).status, 409);
+  assert.equal((await call(`/finance/payables/${bill.id}`, 'PATCH', { description: 'Aluguel loja 119A', amount: 4345 })).status, 200, 'other fields can be edited');
+  assert.equal((await call(`/finance/payables/${bill.id}/revert`, 'POST', {})).status, 200);
+  assert.equal((await call(`/finance/movements?refId=${bill.id}`)).data.length, 0);
+  assert.equal((await call(`/finance/payables/${bill.id}`, 'PATCH', { amount: 4000 })).status, 200);
+  assert.equal((await call(`/finance/payables/${bill.id}`, 'DELETE')).status, 200);
+  assert.equal((await query('SELECT count(*)::int n FROM payables WHERE id=$1', [bill.id])).rows[0].n, 0);
+});
+
+test('editing a bill from the form: empty fields clear the link, omitted fields stay', async () => {
+  const bill = (await call('/finance/payables', 'POST', { description: 'Internet', category: 'Internet', amount: 179.8, dueDate: '2026-10-25', notes: 'contrato 12 meses', documentNumber: 'BOL-1' })).data;
+  // O formulário manda fornecedor avulso e conta bancária em branco como ''.
+  const edited = await call(`/finance/payables/${bill.id}`, 'PATCH', { description: 'Internet loja', supplierId: '', supplierName: 'Giga', amount: 189.9, dueDate: '2026-10-25', accountId: '', notes: '' });
+  assert.equal(edited.status, 200, JSON.stringify(edited.error));
+  const row = (await query('SELECT description, supplier_id, amount, account_id, notes, document_number FROM payables WHERE id=$1', [bill.id])).rows[0];
+  assert.equal(row.description, 'Internet loja');
+  assert.equal(row.supplier_id, null);
+  assert.equal(Number(row.amount), 189.9);
+  assert.equal(row.account_id, null);
+  assert.equal(row.notes, '', 'notes erased in the form are erased');
+  assert.equal(row.document_number, 'BOL-1', 'fields not sent are kept');
+  const receivable = (await call('/finance/receivables', 'POST', { description: 'Conserto', category: 'Serviços OS', amount: 350, dueDate: '2026-10-20' })).data;
+  assert.equal((await call(`/finance/receivables/${receivable.id}`, 'PATCH', { customerId: '', customerName: 'Cliente', accountId: '', amount: 380 })).status, 200);
+});
+
+test('bills created by a stock entry or a sale are corrected at their origin', async () => {
+  await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,active) VALUES('s-origin','store-a','Aparelho origem',0,0,2000,true)");
+  const entry = await call('/stock/s-origin/entries', 'POST', { entry: { entryDate: '2026-10-05', qty: 1, unitCost: 1500, imeis: ['900000000000888'], payment: 'pending' } });
+  assert.equal(entry.status, 201, JSON.stringify(entry.error));
+  const fromEntry = await call(`/finance/payables/${entry.data.payableId}`, 'DELETE');
+  assert.equal(fromEntry.status, 409);
+  assert.match(fromEntry.error.message, /entrada de estoque/);
+  const listed = (await call('/finance/payables')).data.find((p) => p.id === entry.data.payableId);
+  assert.ok(listed.stockEntryId);
+
+  await query("INSERT INTO sales_orders(id,store_id,customer_name,subtotal,final_amount,status,sale_type) VALUES('VND-ORIGIN','store-a','Cliente',100,100,'completed','external')");
+  await query("INSERT INTO receivables(id,store_id,description,amount,due_date,status,sale_id) VALUES('REC-ORIGIN','store-a','Parcela',100,'2026-11-10','open','VND-ORIGIN')");
+  const fromSale = await call('/finance/receivables/REC-ORIGIN', 'DELETE');
+  assert.equal(fromSale.status, 409);
+  assert.match(fromSale.error.message, /VND-ORIGIN/);
+  assert.equal((await call('/finance/receivables')).data.find((r) => r.id === 'REC-ORIGIN').saleId, 'VND-ORIGIN');
+  // Recebida na própria venda (caixa ligado à venda): estorno pela venda.
+  await query("UPDATE receivables SET status='paid', received_amount=100 WHERE id='REC-ORIGIN'");
+  const revert = await call('/finance/receivables/REC-ORIGIN/revert', 'POST', {});
+  assert.equal(revert.status, 409);
+  assert.match(revert.error.message, /própria venda/);
+});

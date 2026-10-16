@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
-import { SettleBillModal } from '../../components/SettleBillModal';
+import { BillsPanel } from '../../components/finance/BillsPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   addFinance,
@@ -14,15 +14,11 @@ import {
   ADVANCE_KIND_LABEL,
   applyAdvance,
   BANK_TYPE_LABEL,
-  BILL_STATUS_LABEL,
   emptyDre,
   loadDre,
   type DreReport,
-  cancelBill,
   createAdvance,
   createTreasuryMove,
-  EXPENSE_CATEGORIES,
-  isOverdue,
   listAdvances,
   listBankAccounts,
   listPayables,
@@ -33,19 +29,11 @@ import {
   payablesOpenTotal,
   receivablesOpenTotal,
   refundAdvance,
-  REVENUE_CATEGORIES,
-  settlePayableDetailed,
-  settleReceivableDetailed,
   totalTreasury,
   TREASURY_KIND_LABEL,
   upsertBankAccount,
-  upsertPayable,
-  upsertReceivable,
   type AdvanceKind,
   type BankAccountType,
-  type Payable,
-  type Receivable,
-  type SettleBillOptions,
   type TreasuryKind,
 } from '../../data/financeBook';
 import { listSuppliers } from '../../data/erpRegistry';
@@ -302,7 +290,8 @@ export function FinancePage() {
           ) : null}
 
           {tab === 'pagar' ? (
-            <PagarPanel
+            <BillsPanel
+              kind="payable"
               accounts={accounts}
               suppliers={suppliers}
               items={payables}
@@ -315,7 +304,8 @@ export function FinancePage() {
           ) : null}
 
           {tab === 'receber' ? (
-            <ReceberPanel
+            <BillsPanel
+              kind="receivable"
               accounts={accounts}
               items={receivables}
               onError={setError}
@@ -749,495 +739,6 @@ function ExtratoPanel({
           </tbody>
         </table></div>
       </article>
-    </>
-  );
-}
-
-function PagarPanel({
-  accounts,
-  suppliers,
-  items,
-  onError,
-  onSaved,
-}: {
-  accounts: ReturnType<typeof listBankAccounts>;
-  suppliers: ReturnType<typeof listSuppliers>;
-  items: ReturnType<typeof listPayables>;
-  onError: (value: string) => void;
-  onSaved: (note: string) => void;
-}) {
-  const [description, setDescription] = useState('');
-  const [supplierId, setSupplierId] = useState('');
-  const [supplierName, setSupplierName] = useState('');
-  const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
-  const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const [documentNumber, setDocumentNumber] = useState('');
-  const [settleItem, setSettleItem] = useState<Payable | null>(null);
-
-  async function submit() {
-    const result = await upsertPayable({
-      description,
-      supplierId: supplierId || undefined,
-      supplierName,
-      category,
-      amount: parseMoney(amount),
-      dueDate,
-      accountId,
-      documentNumber: documentNumber.trim() || undefined,
-    });
-    if (!result.ok) {
-      onError(result.error);
-      return;
-    }
-    setDescription('');
-    setSupplierName('');
-    setAmount('');
-    setDocumentNumber('');
-    onSaved(`Conta a pagar ${result.data.id}`);
-  }
-
-  async function handleConfirmSettle(options: SettleBillOptions) {
-    if (!settleItem) return;
-    const result = await settlePayableDetailed(settleItem.id, options);
-    if (!result.ok) {
-      onError(result.error);
-      throw new Error(result.error);
-    }
-    onSaved(`Baixa efetuada: ${settleItem.id} (${settleItem.description})`);
-    setSettleItem(null);
-  }
-
-  function handleShareWhatsApp() {
-    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
-    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.paidAmount), 0);
-    const lines = [
-      `📑 *Relatório de Contas a Pagar*`,
-      `🔴 *Total em Aberto:* ${money(totalOpen)} (${openItems.length} títulos)`,
-      '',
-      ...openItems.slice(0, 10).map((i) => `• ${i.description} (${i.supplierName || 'Avulso'}) - *${money(i.amount - i.paidAmount)}* (Venc: ${i.dueDate})${i.documentNumber ? ` [Doc: ${i.documentNumber}]` : ''}`),
-      openItems.length > 10 ? `... e mais ${openItems.length - 10} contas.` : '',
-    ].filter(Boolean);
-    shareFinancialReportWhatsApp('Contas a Pagar', lines);
-  }
-
-  function handleShareEmail() {
-    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
-    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.paidAmount), 0);
-    const lines = [
-      `Relatório de Contas a Pagar`,
-      `Total em Aberto: ${money(totalOpen)} (${openItems.length} títulos)`,
-      '',
-      ...openItems.map((i) => `- ${i.description} | ${i.supplierName || 'Avulso'} | ${money(i.amount - i.paidAmount)} | Venc: ${i.dueDate}${i.documentNumber ? ` | Doc: ${i.documentNumber}` : ''}`),
-    ];
-    shareFinancialReportEmail('Contas a Pagar', lines);
-  }
-
-  return (
-    <>
-      <article className="admin-card">
-        <h2>Nova conta a pagar</h2>
-        <div className="admin-form">
-          <label className="span-2">
-            Descrição
-            <input value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-          <AdminPicker
-            label="Fornecedor cadastrado"
-            value={supplierId}
-            placeholder="Avulso"
-            options={suppliers.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={(value) => {
-              setSupplierId(value);
-              const found = suppliers.find((item) => item.id === value);
-              if (found) setSupplierName(found.name);
-            }}
-          />
-          <label>
-            Fornecedor (nome)
-            <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} />
-          </label>
-          <AdminPicker
-            label="Categoria"
-            value={category}
-            options={EXPENSE_CATEGORIES.map((item) => ({ value: item, label: item }))}
-            onChange={setCategory}
-          />
-          <label>
-            Valor (R$)
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </label>
-          <label>
-            Vencimento
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </label>
-          <label>
-            Nº Documento / Boleto / Nota
-            <input
-              value={documentNumber}
-              onChange={(e) => setDocumentNumber(e.target.value)}
-              placeholder="Ex: BOL-1290, NF-842"
-            />
-          </label>
-          <AdminPicker
-            label="Conta para baixa"
-            value={accountId}
-            options={accounts.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={setAccountId}
-          />
-        </div>
-        <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
-            Cadastrar
-          </button>
-        </div>
-      </article>
-
-      <article className="admin-card">
-        <div className="dash-card__head" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Contas a pagar</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
-              onClick={handleShareWhatsApp}
-              title="Compartilhar resumo das contas a pagar por WhatsApp"
-            >
-              📱 Enviar por WhatsApp
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
-              onClick={handleShareEmail}
-              title="Enviar relatório por e-mail"
-            >
-              ✉️ Enviar por E-mail
-            </button>
-          </div>
-        </div>
-
-        <div className="admin-table-container"><table className="admin-table">
-          <thead>
-            <tr>
-              <th>Descrição &amp; Detalhes</th>
-              <th>Fornecedor</th>
-              <th>Venc.</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const open = item.amount - item.paidAmount;
-              return (
-                <tr key={item.id} className={isOverdue(item.dueDate, item.status) ? 'is-overdue' : ''}>
-                  <td>
-                    <strong>{item.description}</strong>
-                    <div className="empty" style={{ fontSize: '0.8rem', marginTop: 2 }}>
-                      {item.category}
-                      {item.documentNumber ? ` · Doc: ${item.documentNumber}` : ''}
-                      {item.invoiceNumber ? ` · 📑 ${item.invoiceNumber}` : ''}
-                      {item.interestAmount ? ` · +Juros: ${money(item.interestAmount)}` : ''}
-                      {item.discountAmount ? ` · -Desc: ${money(item.discountAmount)}` : ''}
-                    </div>
-                  </td>
-                  <td>{item.supplierName || '—'}</td>
-                  <td>{item.dueDate}</td>
-                  <td>
-                    <strong>{money(item.amount)}</strong>
-                    {item.paidAmount > 0 ? (
-                      <div className="empty" style={{ fontSize: '0.78rem' }}>
-                        restam {money(open)} · pago {money(item.paidAmount)}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{BILL_STATUS_LABEL[item.status]}</td>
-                  <td>
-                    <div className="crud-actions">
-                      {item.status === 'open' || item.status === 'partial' ? (
-                        <button
-                          type="button"
-                          className="btn btn--primary"
-                          style={{ padding: '5px 12px', fontSize: '0.82rem' }}
-                          onClick={() => setSettleItem(item)}
-                          title="Dar baixa completa ou parcial com juros/multa/desconto"
-                        >
-                          Pagar
-                        </button>
-                      ) : null}
-                      {item.status === 'open' ? (
-                        <button
-                          type="button"
-                          className="btn btn--ghost crud-actions__danger"
-                          onClick={() => {
-                            void (async () => {
-                              const result = await cancelBill('payable', item.id);
-                              if (!result.ok) onError(result.error);
-                              else onSaved(`Cancelada ${item.id}`);
-                            })();
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table></div>
-      </article>
-
-      <SettleBillModal
-        open={Boolean(settleItem)}
-        kind="payable"
-        item={settleItem}
-        accounts={accounts}
-        onConfirm={handleConfirmSettle}
-        onClose={() => setSettleItem(null)}
-      />
-    </>
-  );
-}
-
-function ReceberPanel({
-  accounts,
-  items,
-  onError,
-  onSaved,
-}: {
-  accounts: ReturnType<typeof listBankAccounts>;
-  items: ReturnType<typeof listReceivables>;
-  onError: (value: string) => void;
-  onSaved: (note: string) => void;
-}) {
-  const [description, setDescription] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [category, setCategory] = useState<string>(REVENUE_CATEGORIES[2]);
-  const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const [documentNumber, setDocumentNumber] = useState('');
-  const [settleItem, setSettleItem] = useState<Receivable | null>(null);
-
-  async function submit() {
-    const result = await upsertReceivable({
-      description,
-      customerName,
-      category,
-      amount: parseMoney(amount),
-      dueDate,
-      accountId,
-      documentNumber: documentNumber.trim() || undefined,
-    });
-    if (!result.ok) {
-      onError(result.error);
-      return;
-    }
-    setDescription('');
-    setCustomerName('');
-    setAmount('');
-    setDocumentNumber('');
-    onSaved(`Conta a receber ${result.data.id}`);
-  }
-
-  async function handleConfirmSettle(options: SettleBillOptions) {
-    if (!settleItem) return;
-    const result = await settleReceivableDetailed(settleItem.id, options);
-    if (!result.ok) {
-      onError(result.error);
-      throw new Error(result.error);
-    }
-    onSaved(`Recebimento efetuado: ${settleItem.id} (${settleItem.description})`);
-    setSettleItem(null);
-  }
-
-  function handleShareWhatsApp() {
-    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
-    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.receivedAmount), 0);
-    const lines = [
-      `📈 *Relatório de Contas a Receber*`,
-      `🟢 *Total em Aberto:* ${money(totalOpen)} (${openItems.length} títulos)`,
-      '',
-      ...openItems.slice(0, 10).map((i) => `• ${i.description} (${i.customerName}) - *${money(i.amount - i.receivedAmount)}* (Venc: ${i.dueDate})${i.documentNumber ? ` [Doc: ${i.documentNumber}]` : ''}`),
-      openItems.length > 10 ? `... e mais ${openItems.length - 10} recebimentos pendentes.` : '',
-    ].filter(Boolean);
-    shareFinancialReportWhatsApp('Contas a Receber', lines);
-  }
-
-  function handleShareEmail() {
-    const openItems = items.filter((i) => i.status === 'open' || i.status === 'partial');
-    const totalOpen = openItems.reduce((acc, i) => acc + (i.amount - i.receivedAmount), 0);
-    const lines = [
-      `Relatório de Contas a Receber`,
-      `Total em Aberto: ${money(totalOpen)} (${openItems.length} títulos)`,
-      '',
-      ...openItems.map((i) => `- ${i.description} | ${i.customerName} | ${money(i.amount - i.receivedAmount)} | Venc: ${i.dueDate}${i.documentNumber ? ` | Doc: ${i.documentNumber}` : ''}`),
-    ];
-    shareFinancialReportEmail('Contas a Receber', lines);
-  }
-
-  return (
-    <>
-      <article className="admin-card">
-        <h2>Nova conta a receber</h2>
-        <div className="admin-form">
-          <label className="span-2">
-            Descrição
-            <input value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-          <label>
-            Cliente
-            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-          </label>
-          <AdminPicker
-            label="Categoria"
-            value={category}
-            options={REVENUE_CATEGORIES.map((item) => ({ value: item, label: item }))}
-            onChange={setCategory}
-          />
-          <label>
-            Valor (R$)
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </label>
-          <label>
-            Vencimento
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-          </label>
-          <label>
-            Nº Documento / Boleto / Nota
-            <input
-              value={documentNumber}
-              onChange={(e) => setDocumentNumber(e.target.value)}
-              placeholder="Ex: BOL-1290, NF-842"
-            />
-          </label>
-          <AdminPicker
-            label="Conta para baixa"
-            value={accountId}
-            options={accounts.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={setAccountId}
-          />
-        </div>
-        <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
-            Cadastrar
-          </button>
-        </div>
-      </article>
-
-      <article className="admin-card">
-        <div className="dash-card__head" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Contas a receber</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
-              onClick={handleShareWhatsApp}
-              title="Compartilhar resumo das contas a receber por WhatsApp"
-            >
-              📱 Enviar por WhatsApp
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
-              onClick={handleShareEmail}
-              title="Enviar relatório por e-mail"
-            >
-              ✉️ Enviar por E-mail
-            </button>
-          </div>
-        </div>
-
-        <div className="admin-table-container"><table className="admin-table">
-          <thead>
-            <tr>
-              <th>Descrição &amp; Detalhes</th>
-              <th>Cliente</th>
-              <th>Venc.</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const open = item.amount - item.receivedAmount;
-              return (
-                <tr key={item.id} className={isOverdue(item.dueDate, item.status) ? 'is-overdue' : ''}>
-                  <td>
-                    <strong>{item.description}</strong>
-                    <div className="empty" style={{ fontSize: '0.8rem', marginTop: 2 }}>
-                      {item.category}
-                      {item.documentNumber ? ` · Doc: ${item.documentNumber}` : ''}
-                      {item.invoiceNumber ? ` · 📑 ${item.invoiceNumber}` : ''}
-                      {item.interestAmount ? ` · +Juros: ${money(item.interestAmount)}` : ''}
-                      {item.discountAmount ? ` · -Desc: ${money(item.discountAmount)}` : ''}
-                    </div>
-                  </td>
-                  <td>{item.customerName}</td>
-                  <td>{item.dueDate}</td>
-                  <td>
-                    <strong>{money(item.amount)}</strong>
-                    {item.receivedAmount > 0 ? (
-                      <div className="empty" style={{ fontSize: '0.78rem' }}>
-                        restam {money(open)} · recebido {money(item.receivedAmount)}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{BILL_STATUS_LABEL[item.status]}</td>
-                  <td>
-                    <div className="crud-actions">
-                      {item.status === 'open' || item.status === 'partial' ? (
-                        <button
-                          type="button"
-                          className="btn btn--primary"
-                          style={{ padding: '5px 12px', fontSize: '0.82rem' }}
-                          onClick={() => setSettleItem(item)}
-                          title="Dar baixa de recebimento com cálculo líquido e documento"
-                        >
-                          Receber
-                        </button>
-                      ) : null}
-                      {item.status === 'open' ? (
-                        <button
-                          type="button"
-                          className="btn btn--ghost crud-actions__danger"
-                          onClick={() => {
-                            void (async () => {
-                              const result = await cancelBill('receivable', item.id);
-                              if (!result.ok) onError(result.error);
-                              else onSaved(`Cancelada ${item.id}`);
-                            })();
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table></div>
-      </article>
-
-      <SettleBillModal
-        open={Boolean(settleItem)}
-        kind="receivable"
-        item={settleItem}
-        accounts={accounts}
-        onConfirm={handleConfirmSettle}
-        onClose={() => setSettleItem(null)}
-      />
     </>
   );
 }
