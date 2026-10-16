@@ -581,6 +581,7 @@ export type ApiEmployee = {
   isSystemUser: boolean;
   userEmail: string;
   accessAreas: AccessArea[];
+  homeArea?: '' | 'painel' | 'pdv' | 'totem' | 'os' | 'erp' | 'fiscal' | 'ecommerce';
   permissions?: ApiEmployeePermissions;
   active: boolean;
   sellerId?: string;

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
+import { AdminIcon } from '../../components/AdminIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
@@ -678,35 +679,33 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
                     : `Notinha ${fiscal.number}`}
                 </p>
               ) : null}
-              <div className="caixa-panel__actions crud-actions">
-                <CrudIconButton
-                  action="edit"
-                  onClick={() => startEdit(selected)}
-                  disabled={!canEdit}
-                />
+              <div className="caixa-panel__actions caixa-sale-actions">
+                <button type="button" className="btn btn--ghost" onClick={() => startEdit(selected)} disabled={!canEdit}>
+                  <AdminIcon name="edit" /> Editar
+                </button>
                 <button
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => onOpenExchange?.(selected.id)}
                   disabled={!canExchange}
                 >
-                  Criar troca
+                  <AdminIcon name="swap" /> Criar troca
                 </button>
                 <button type="button" className="btn btn--ghost" onClick={reprint} disabled={!fiscal}>
-                  Reimprimir
+                  <AdminIcon name="print" /> Reimprimir
                 </button>
                 {canEmitNfce ? (
                   <button type="button" className="btn btn--ghost" onClick={emitNfce}>
-                    Emitir NFC-e
+                    <AdminIcon name="receipt" /> Emitir NFC-e
                   </button>
                 ) : null}
                 <button
                   type="button"
-                  className="btn btn--ghost"
+                  className="btn btn--ghost caixa-sale-actions__danger"
                   onClick={() => void cancelSale()}
                   disabled={selected.status === 'cancelled'}
                 >
-                  Cancelar venda
+                  <AdminIcon name="trash" /> Cancelar venda
                 </button>
                 <button type="button" className="btn btn--primary" onClick={onClose}>
                   Fechar

@@ -9821,3 +9821,22 @@
   font-size: 0.9rem;
   font-weight: 650;
 }
+
+/* Módulo que o usuário não pode abrir: cinza e sem clique. */
+.os-ecosystem-card.is-locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.os-ecosystem-card.is-locked:hover {
+  transform: none;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+.os-ecosystem-card__badge--locked {
+  background: rgba(100, 116, 139, 0.16);
+  color: #475569;
+}
+.is-theme-dark .os-ecosystem-card.is-locked:hover {
+  background: transparent;
+}

@@ -2857,3 +2857,59 @@
   font-size: 0.9rem;
   font-weight: 650;
 }
+
+/* + ao lado do cliente: cadastro rápido (igual ao da venda externa), sem mexer no layout. */
+.pdv__consumer {
+  position: relative;
+}
+.pdv__consumer .pdv__consumer-btn {
+  padding-right: 52px;
+}
+.pdv__consumer-add {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 36px;
+  height: calc(var(--pdv-consumer-h, 40px) - 12px);
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--teal-deep, #0a5550);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.pdv__consumer-add:hover {
+  background: rgba(15, 118, 110, 0.12);
+}
+.pdv--caixa .pdv__consumer {
+  --pdv-consumer-h: 48px;
+}
+.is-theme-dark .pdv__consumer-add {
+  background: transparent;
+  color: #5eead4;
+  border-color: rgba(94, 234, 212, 0.35);
+}
+
+/* Ações da venda consultada: todas com ícone e nome. */
+.caixa-sale-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.caixa-sale-actions .btn .admin-ico {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.caixa-sale-actions__danger:not(:disabled) {
+  color: #b91c1c;
+}
+.is-theme-dark .caixa-sale-actions__danger:not(:disabled) {
+  color: #fca5a5;
+}

@@ -75,6 +75,28 @@ export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
 
 export const ALL_ACCESS_AREAS = Object.keys(ACCESS_AREA_LABEL) as AccessArea[];
 
+/** Sistema que abre quando a pessoa entra. Vazio = automático (pela ordem das áreas liberadas). */
+export type HomeArea = '' | 'painel' | 'pdv' | 'totem' | 'os' | 'erp' | 'fiscal' | 'ecommerce';
+export const HOME_AREA_OPTIONS: { area: Exclude<HomeArea, ''>; label: string; path: string }[] = [
+  { area: 'painel', label: 'Painel administrativo', path: '/painel' },
+  { area: 'pdv', label: 'PDV / Caixa', path: '/caixa' },
+  { area: 'os', label: 'Ordens de serviço', path: '/os' },
+  { area: 'erp', label: 'Retaguarda (ERP)', path: '/erp' },
+  { area: 'totem', label: 'Totem', path: '/totem' },
+  { area: 'fiscal', label: 'Emissor fiscal', path: '/fiscal' },
+  { area: 'ecommerce', label: 'E-commerce', path: '/ecommerce' },
+];
+
+/** O sistema padrão está entre as áreas liberadas? (Administrador abre todos.) */
+export function homeAreaAllowed(role: EmployeeRole, areas: AccessArea[], homeArea: HomeArea) {
+  if (!homeArea || role === 'admin') return true;
+  return (
+    areas.includes(homeArea as AccessArea) ||
+    (homeArea === 'erp' && areas.some((area) => area.startsWith('erp_'))) ||
+    (homeArea === 'fiscal' && areas.some((area) => area === 'erp_fiscal' || area === 'erp_invoices'))
+  );
+}
+
 export type EmployeeRole = 'admin' | 'manager' | 'operator' | 'seller';
 
 export const EMPLOYEE_ROLE_LABEL: Record<EmployeeRole, string> = {
@@ -132,6 +154,8 @@ export type Employee = {
   /** E-mail do usuário de login (normalizado). */
   userEmail: string;
   accessAreas: AccessArea[];
+  /** Sistema que abre ao entrar (vazio = automático). */
+  homeArea?: HomeArea;
   permissions?: EmployeePermissions;
   active: boolean;
   sellerId?: string;
@@ -294,6 +318,7 @@ function mapEmployee(row: ApiEmployee): Employee {
     isSystemUser: row.isSystemUser,
     userEmail: row.userEmail ?? '',
     accessAreas: areas,
+    homeArea: (row.homeArea ?? '') as HomeArea,
     permissions: row.permissions,
     active: row.active,
     sellerId: row.sellerId,
@@ -540,6 +565,7 @@ export async function upsertEmployee(
         isSystemUser: input.isSystemUser,
         userEmail,
         accessAreas: areas,
+        homeArea: input.homeArea,
         permissions: input.permissions,
         active: input.active ?? true,
         sellerId: input.sellerId,
@@ -794,6 +820,9 @@ export function moduleAreas(module: PartnerModuleId): AccessArea[] {
 export function resolveAppHome(userEmail: string | null | undefined): string {
   if (isMarthiStaffEmail(userEmail)) return '/admin';
   const employee = findEmployeeByUserEmail(userEmail);
+  // Sistema padrão escolhido no cadastro do usuário (se ainda estiver liberado para ele).
+  const home = employee?.homeArea ? HOME_AREA_OPTIONS.find((option) => option.area === employee.homeArea) : undefined;
+  if (employee && home && homeAreaAllowed(employee.role, employee.accessAreas, employee.homeArea ?? '')) return home.path;
   if (employee && employee.role !== 'admin' && !employee.accessAreas.includes('painel')) {
     const areas = employee.accessAreas;
     if (areas.includes('pdv')) return '/caixa';

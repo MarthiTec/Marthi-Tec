@@ -14,6 +14,7 @@ import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { UserChip } from '../../components/UserChip';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { QuickCreateCustomer } from '../../components/QuickCreate';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { OperatorProfilePanel } from '../../components/OperatorProfilePanel';
 import { useAuth } from '../../contexts/AuthContext';
@@ -271,6 +272,7 @@ export function CaixaPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [walkIn, setWalkIn] = useState(true);
   const [customerPickOpen, setCustomerPickOpen] = useState(false);
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [customerQuery, setCustomerQuery] = useState('');
   const [deletePrompt, setDeletePrompt] = useState<{ key: string } | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
@@ -2656,6 +2658,29 @@ export function CaixaPage() {
                     >
                       {walkIn ? 'Consumidor Final' : customerName}
                     </button>
+                    <button
+                      type="button"
+                      className="pdv__consumer-add"
+                      title="Cadastrar cliente"
+                      aria-label="Cadastrar cliente"
+                      onClick={() => {
+                        setCustomerPickOpen(false);
+                        setQuickCustomerOpen(true);
+                      }}
+                    >
+                      +
+                    </button>
+                    {quickCustomerOpen ? (
+                      <QuickCreateCustomer
+                        initial={customerQuery.trim() ? { name: customerQuery.trim() } : undefined}
+                        onClose={() => setQuickCustomerOpen(false)}
+                        onCreated={(customer) => {
+                          setCustomers(getAdminState().customers);
+                          pickCustomer(customer);
+                          setCustomerQuery('');
+                        }}
+                      />
+                    ) : null}
                     <span className="empty">
                       {walkIn
                         ? 'Venda avulsa · clique para buscar cliente'

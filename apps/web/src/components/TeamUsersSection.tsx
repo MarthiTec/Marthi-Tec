@@ -22,6 +22,9 @@ import { logAction } from '../data/auditLog';
 import { ERP_BOOTSTRAP_EVENT } from '../data/erpBootstrap';
 import {
   ACCESS_AREA_LABEL,
+  HOME_AREA_OPTIONS,
+  homeAreaAllowed,
+  type HomeArea,
   ALL_ACCESS_AREAS,
   EMPLOYEE_ROLE_LABEL,
   hydrateErpRegistryFromApi,
@@ -106,6 +109,7 @@ const EMPTY = {
   isSystemUser: true,
   userEmail: '',
   accessAreas: [] as AccessArea[],
+  homeArea: '' as HomeArea,
   active: true,
   sellerId: '',
   accessPassword: '',
@@ -230,6 +234,7 @@ export function TeamUsersSection({ variant, id }: Props) {
       isSystemUser: item.isSystemUser,
       userEmail: item.userEmail,
       accessAreas: item.accessAreas.filter((area) => areaOptions.includes(area)),
+      homeArea: item.homeArea ?? '',
       active: item.active,
       sellerId: item.sellerId ?? '',
       accessPassword: '',
@@ -242,6 +247,8 @@ export function TeamUsersSection({ variant, id }: Props) {
       const has = current.accessAreas.includes(area);
       return {
         ...current,
+        // Tirou o módulo que era o sistema padrão: volta para automático.
+        homeArea: has && current.homeArea === area ? '' : current.homeArea,
         accessAreas: has
           ? current.accessAreas.filter((item) => item !== area)
           : [...current.accessAreas, area],
@@ -262,6 +269,7 @@ export function TeamUsersSection({ variant, id }: Props) {
       isSystemUser: form.isSystemUser,
       userEmail: form.isSystemUser ? form.userEmail || form.email : '',
       accessAreas,
+      homeArea: homeAreaAllowed(form.role, accessAreas, form.homeArea) ? form.homeArea : '',
       active: form.active,
       sellerId: form.sellerId || undefined,
       accessPassword: form.accessPassword.trim() || undefined,
@@ -683,6 +691,21 @@ export function TeamUsersSection({ variant, id }: Props) {
             <p className="empty" style={{ marginTop: 12 }}>
               Administrador tem acesso a todas as áreas do plano.
             </p>
+          ) : null}
+
+          {form.isSystemUser ? (
+            <div className="admin-form" style={{ marginTop: 12 }}>
+              <AdminPicker
+                label="Sistema padrão ao entrar"
+                value={form.homeArea}
+                disabled={readOnly}
+                options={[
+                  { value: '', label: 'Automático (pelos módulos liberados)' },
+                  ...HOME_AREA_OPTIONS.filter((option) => (option.area === 'painel' || planAreas.includes(option.area as AccessArea)) && homeAreaAllowed(form.role, form.accessAreas, option.area)).map((option) => ({ value: option.area, label: option.label })),
+                ]}
+                onChange={(value) => setForm({ ...form, homeArea: value as HomeArea })}
+              />
+            </div>
           ) : null}
 
           {form.isSystemUser ? (

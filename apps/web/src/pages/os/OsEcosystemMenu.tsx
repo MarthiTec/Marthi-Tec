@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
+import { useCanOpen } from '../../components/AreaGuard';
 import { useStoreCustomization } from '../../data/storeSegment';
 
 type EcosystemApp = {
@@ -94,6 +95,8 @@ export function OsEcosystemMenu() {
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  // Mesma regra das rotas: o que o usuário não pode abrir aparece bloqueado (cinza).
+  const canOpen = useCanOpen();
 
   const availableApps = ECOSYSTEM_APPS.filter((app) => {
     if (app.id === 'cozinha') return customization.showTablesAndKitchen;
@@ -151,12 +154,17 @@ export function OsEcosystemMenu() {
           <div className="os-ecosystem-popover__grid">
             {availableApps.map((app) => {
               const isCurrent = location.pathname.startsWith(app.path);
+              const locked = !isCurrent && !canOpen(app.path);
               return (
                 <button
                   key={app.id}
                   type="button"
-                  className={`os-ecosystem-card ${isCurrent ? 'is-current' : ''}`}
+                  className={`os-ecosystem-card ${isCurrent ? 'is-current' : ''} ${locked ? 'is-locked' : ''}`}
+                  disabled={locked}
+                  aria-disabled={locked}
+                  title={locked ? 'Bloqueado para o seu usuário. Peça ao administrador em Usuários & Permissões.' : undefined}
                   onClick={() => {
+                    if (locked) return;
                     setOpen(false);
                     navigate(app.path);
                   }}
@@ -174,6 +182,8 @@ export function OsEcosystemMenu() {
                         <span className="os-ecosystem-card__badge os-ecosystem-card__badge--active">
                           Módulo Atual
                         </span>
+                      ) : locked ? (
+                        <span className="os-ecosystem-card__badge os-ecosystem-card__badge--locked">Bloqueado</span>
                       ) : app.badge ? (
                         <span className="os-ecosystem-card__badge">
                           {app.badge}

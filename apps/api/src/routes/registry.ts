@@ -15,6 +15,8 @@ registryRouter.use((req,res,next)=>{
 
 /* ── Schemas ───────────────────────────────────────────── */
 
+const HOME_AREAS = ['painel', 'pdv', 'totem', 'os', 'erp', 'fiscal', 'ecommerce'] as const;
+
 const employeeSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Nome do colaborador é obrigatório.'),
@@ -26,10 +28,25 @@ const employeeSchema = z.object({
   userEmail: z.string().default(''),
   accessPassword: z.string().optional(),
   accessAreas: z.array(z.string()).default([]),
+  /** Sistema que abre ao entrar; vazio = automático pelas áreas liberadas. */
+  homeArea: z.enum(['', ...HOME_AREAS]).default(''),
   permissions: z.record(z.any()).default({}),
   active: z.boolean().default(true),
   sellerId: z.string().optional(),
 });
+
+/** O sistema padrão precisa estar entre as áreas liberadas do usuário (administrador abre tudo). */
+function homeAreaAllowed(role: string | undefined, areas: string[], homeArea: string | undefined) {
+  if (!homeArea || role === 'admin') return true;
+  return (
+    areas.includes(homeArea) ||
+    (homeArea === 'erp' && areas.some((area) => area.startsWith('erp_'))) ||
+    (homeArea === 'fiscal' && areas.some((area) => area === 'erp_fiscal' || area === 'erp_invoices'))
+  );
+}
+function assertHomeArea(role: string | undefined, areas: string[], homeArea: string | undefined) {
+  if (!homeAreaAllowed(role, areas, homeArea)) throw Object.assign(new Error('O sistema padrão precisa estar entre os módulos liberados para o usuário.'), { status: 400 });
+}
 
 const customerSchema = z.object({
   id: z.string().optional(),
@@ -103,7 +120,7 @@ registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
     if (pool) {
       const sql = `
         SELECT e.id, e.name, e.phone, e.email, e.document, e.role, e.is_system_user, e.user_email,
-               e.access_areas, e.permissions, e.active, e.seller_id, e.created_at, e.updated_at,
+               e.access_areas, e.home_area, e.permissions, e.active, e.seller_id, e.created_at, e.updated_at,
                -- Funcionário com login: vale a situação do login (login desativado = inativo).
                (SELECT u.active FROM users u WHERE lower(u.email) = lower(COALESCE(NULLIF(e.user_email, ''), e.email)) LIMIT 1) AS login_active
         FROM employees e
@@ -128,6 +145,7 @@ registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
           isSystemUser: Boolean(r.is_system_user),
           userEmail: r.user_email || '',
           accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
+          homeArea: r.home_area || '',
           permissions: r.permissions || {},
           active: Boolean(r.active),
           sellerId: r.seller_id || undefined,
@@ -155,6 +173,7 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
     const storeId = req.storeId!;
     const clientAccountId = req.clientAccountId!;
     const body = employeeSchema.parse(req.body);
+    assertHomeArea(body.role, body.accessAreas, body.homeArea);
 
     const userLimit = req.userLimit || 10;
     const planName = (req.planId || 'Bronze').toUpperCase();
@@ -230,8 +249,8 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
         await client.query(
           `INSERT INTO employees (
             id, store_id, name, phone, email, document, role, is_system_user, user_email,
-            access_areas, permissions, active, seller_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            access_areas, permissions, active, seller_id, home_area
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
           [
             empId,
             storeId,
@@ -246,6 +265,7 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
             JSON.stringify(body.permissions),
             body.active,
             body.sellerId || null,
+            body.homeArea,
           ],
         );
 
@@ -265,6 +285,7 @@ registryRouter.post('/api/v1/employees', requireAuth, async (req, res, next) => 
             isSystemUser: Boolean(r.is_system_user),
             userEmail: r.user_email || '',
             accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
+            homeArea: r.home_area || '',
             permissions: r.permissions || {},
             active: Boolean(r.active),
             sellerId: r.seller_id || undefined,
@@ -320,6 +341,10 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
         }
 
         const curr = currentRes.rows[0];
+        // Áreas mudaram sem escolher o sistema padrão: se ele saiu das áreas, volta para automático.
+        const nextAreas = body.accessAreas ?? (Array.isArray(curr.access_areas) ? curr.access_areas : []);
+        if (body.homeArea !== undefined) assertHomeArea(body.role ?? curr.role, nextAreas, body.homeArea);
+        else if (!homeAreaAllowed(body.role ?? curr.role, nextAreas, curr.home_area)) body.homeArea = '';
 
         // Se está ativando um colaborador inativo, valida o limite do plano
         if (body.active === true && curr.active === false) {
@@ -406,6 +431,7 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
                permissions = COALESCE($9, permissions),
                active = COALESCE($10, active),
                seller_id = COALESCE($11, seller_id),
+               home_area = COALESCE($14, home_area),
                updated_at = now()
            WHERE id = $12 AND store_id = $13`,
           [
@@ -422,6 +448,7 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
             body.sellerId,
             id,
             storeId,
+            body.homeArea,
           ],
         );
 
@@ -441,6 +468,7 @@ registryRouter.patch('/api/v1/employees/:id', requireAuth, async (req, res, next
             isSystemUser: Boolean(r.is_system_user),
             userEmail: r.user_email || '',
             accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
+            homeArea: r.home_area || '',
             permissions: r.permissions || {},
             active: Boolean(r.active),
             sellerId: r.seller_id || undefined,
