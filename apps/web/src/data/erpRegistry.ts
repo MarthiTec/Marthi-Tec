@@ -140,6 +140,8 @@ export type EmployeePermissions = {
   canDelete?: boolean;
   posAdHocConfigure?: boolean;
   posAdHocLaunch?: boolean;
+  /** Ver as vendas e o caixa da venda externa (separado do PDV). Padrão: desligado. */
+  viewExternalSales?: boolean;
 };
 
 export type Employee = {

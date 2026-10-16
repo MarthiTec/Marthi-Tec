@@ -610,7 +610,7 @@ posRouter.get('/api/v1/orders', requireAuth, async (req, res, next) => {
         status:row.status==='completed'?'sold':row.status,payment:row.payment_name,sellerId:row.seller_id || '',
         sellerName:row.seller_name,createdAt:row.created_at,cashSessionId:row.session_id,
         cancelledAt:row.cancelled_at,cancelReason:row.cancel_reason,
-        lines:lines.rows.filter(line=>line.sale_id===row.id).map(line=>({id:line.id,stockId:line.stock_item_id || '',
+        lines:lines.rows.filter(line=>line.sale_id===row.id).map(line=>({id:line.id,stockId:line.stock_id || line.stock_item_id || '',
           name:line.name,qty:Number(line.qty),unitPrice:Number(line.unit_price),imei:line.imei,isAdHoc:line.is_ad_hoc,itemType:line.item_type})),
       }))});
       return;

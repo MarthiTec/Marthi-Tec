@@ -4,6 +4,7 @@ import { ATTR_CAP, ATTR_COR } from './attributeStore';
 import {
   apiClosePosSale,
   apiCancelSale,
+  apiRestoreSale,
   apiCreateCustomer,
   apiCreateFinanceManual,
   apiCreatePayment,
@@ -847,6 +848,25 @@ export async function cancelPosSale(orderId: string, reason: string): Promise<{ 
   save(next);
   window.dispatchEvent(new Event(STOCK_EVENT));
   return { ok: true, order: saved ?? ({ ...(order as SalesOrder), status: 'cancelled' } as SalesOrder) };
+}
+
+/** Estorno do cancelamento (até 24h) no banco: estoque, recebível, financeiro e caixa voltam. */
+export async function restorePosSale(orderId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isNestAuthed()) {
+    const result = restorePosSaleOrder(orderId);
+    return result.ok ? { ok: true } : result;
+  }
+  try {
+    await apiRestoreSale(orderId);
+  } catch (error) {
+    return { ok: false, error: apiErrorMessage(error, 'Não foi possível restaurar a venda.') };
+  }
+  const state = load();
+  const saved = state.orders.find((item) => item.id === orderId);
+  if (saved) saved.status = 'sold';
+  save(state);
+  window.dispatchEvent(new Event(STOCK_EVENT));
+  return { ok: true };
 }
 
 export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrder } | { ok: false; error: string } {

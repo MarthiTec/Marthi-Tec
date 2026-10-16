@@ -116,3 +116,23 @@ test('closing keeps the breakdown and the difference; a closed register can be r
   assert.deepEqual([reopened.data.status, reopened.data.reopenCount], ['open', 1]);
   assert.equal((await call('/cash/sessions')).data.length, 1);
 });
+
+test('a cancelled PDV sale can be restored within 24h: stock, receivable, revenue and cash come back', async () => {
+  const sale = await call('/pos/sales', 'POST', { idempotencyKey: 'cash-restore-1', paymentName: 'Dinheiro', cashAmount: 50, lines: [{ stockId: 'cash-stock', name: 'Capinha', qty: 1, unitPrice: 50 }] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.error));
+  const stockBefore = await stockQty('cash-stock');
+  const cashBefore = await expected(sessionId);
+  assert.equal((await call(`/sales/${sale.data.id}/cancel`, 'POST', { reason: 'Engano' })).status, 200);
+  assert.deepEqual([await stockQty('cash-stock'), await expected(sessionId)], [stockBefore + 1, cashBefore - 50]);
+  const restored = await call(`/sales/${sale.data.id}/restore`, 'POST', {});
+  assert.equal(restored.status, 200, JSON.stringify(restored.error));
+  assert.deepEqual([await stockQty('cash-stock'), await expected(sessionId)], [stockBefore, cashBefore]);
+  const row = (await query('SELECT status, cancelled_at FROM sales_orders WHERE id=$1', [sale.data.id])).rows[0];
+  assert.deepEqual([row.status, row.cancelled_at], ['completed', null]);
+  assert.equal((await query("SELECT status FROM receivables WHERE sale_id=$1", [sale.data.id])).rows[0].status, 'paid');
+  const net = (await query("SELECT COALESCE(SUM(CASE WHEN type='in' THEN amount ELSE -amount END),0) AS n FROM finance_entries WHERE ref_id=$1", [sale.data.id])).rows[0].n;
+  assert.equal(Number(net), 50, 'revenue is back in the finance book');
+  assert.equal((await call(`/sales/${sale.data.id}/restore`, 'POST', {})).status, 409, 'only a cancelled sale');
+  await query("UPDATE sales_orders SET status='cancelled', cancelled_at = now() - interval '25 hours' WHERE id=$1", [sale.data.id]);
+  assert.equal((await call(`/sales/${sale.data.id}/restore`, 'POST', {})).status, 409, 'after 24h it is final');
+});

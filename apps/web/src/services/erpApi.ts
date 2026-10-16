@@ -571,6 +571,7 @@ export type ApiEmployeePermissions = {
   canDelete?: boolean;
   posAdHocConfigure?: boolean;
   posAdHocLaunch?: boolean;
+  viewExternalSales?: boolean;
 };
 
 export type ApiEmployee = {
@@ -2441,4 +2442,54 @@ export function apiSaveSupplierOffer(id: string | undefined, body: ApiSupplierOf
 
 export function apiDeleteSupplierOffer(id: string) {
   return nestDelete<{ ok: boolean }>(`/supplier-offers/${encodeURIComponent(id)}`);
+}
+
+/* ── Consulta de vendas (PDV e painel) no banco ──────────────── */
+
+export type ApiSaleSearchItem = {
+  id: string;
+  type: 'pos' | 'external';
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  customerDocument: string;
+  sellerId: string;
+  sellerName: string;
+  status: 'sold' | 'cancelled';
+  /** Id do caixa do PDV, ou "external" (caixa da venda externa). */
+  sessionId: string;
+  amount: number;
+  payment: string;
+  items: string;
+  imeis: string[];
+  cancelledAt?: string | null;
+  cancelReason: string;
+};
+
+export type ApiSaleSearchParams = {
+  q?: string;
+  imei?: string;
+  customer?: string;
+  sellerId?: string;
+  from?: string;
+  to?: string;
+  session?: string;
+  type?: 'all' | 'pos' | 'external';
+  status?: 'all' | 'sold' | 'cancelled';
+  limit?: number;
+};
+
+export function apiSearchSales(params: ApiSaleSearchParams) {
+  const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]));
+  return nestGet<{ canSeeExternal: boolean; items: ApiSaleSearchItem[] }>(`/sales/search${qs.size ? `?${qs}` : ''}`);
+}
+
+/** Corrige cliente, documento e data/hora da venda do PDV (com motivo e histórico). */
+export function apiEditPosSale(id: string, body: { customerName: string; customerDocument: string; saleAt?: string; reason: string }) {
+  return nestPatch<{ id: string; customerName: string; customerDocument: string; createdAt: string }>(`/pos/sales/${encodeURIComponent(id)}`, body);
+}
+
+/** Estorno do cancelamento (até 24h) da venda do PDV. */
+export function apiRestoreSale(id: string) {
+  return nestPost<{ id: string; status: 'sold' }>(`/sales/${encodeURIComponent(id)}/restore`, {});
 }

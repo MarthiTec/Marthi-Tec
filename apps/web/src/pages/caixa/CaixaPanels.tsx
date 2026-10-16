@@ -2,6 +2,8 @@ import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
 import { AdminIcon } from '../../components/AdminIcons';
+import { SalesLookup, type SaleHit } from '../../components/SalesLookup';
+import { apiEditPosSale, apiSearchSales } from '../../services/erpApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import {
@@ -27,13 +29,12 @@ import {
 import {
   adjustStockQty,
   cancelPosSale,
+  restorePosSale,
   findStockByCode,
   findStockMatches,
   getAdminState,
   getOrderById,
-  restorePosSaleOrder,
   searchOrders,
-  updatePosSaleOrder,
   type Customer,
   type PaymentMethod,
   type SalesOrder,
@@ -41,11 +42,7 @@ import {
 } from '../../data/adminStore';
 import {
   hoursLeftLabel,
-  listCanceledSalesWithinWindow,
-  markCanceledSaleRestored,
   registerCanceledSale,
-  type CanceledSaleEntry,
-  CANCELED_SALES_EVENT,
 } from '../../data/canceledSalesStore';
 import {
   addCashAporte,
@@ -293,169 +290,74 @@ export function CaixaPanelHost(props: PanelProps) {
 function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
   const { user } = useAuth();
   const { confirm, dialog } = useConfirmDialog();
-  const [query, setQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sessionFilter, setSessionFilter] = useState('');
-  const [selected, setSelected] = useState<SalesOrder | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [editing, setEditing] = useState<SaleHit | null>(null);
   const [editName, setEditName] = useState('');
   const [editDocument, setEditDocument] = useState('');
-  const [editPayment, setEditPayment] = useState('');
-  const [editItems, setEditItems] = useState('');
-  const [editAmount, setEditAmount] = useState('');
   const [editAt, setEditAt] = useState('');
-  const [tick, setTick] = useState(0);
+  const [editReason, setEditReason] = useState('');
+  const [busy, setBusy] = useState(false);
   const fiscalOn = hasModule('fiscal');
-  const sessions = useMemo(() => listCashSessions(), [tick]);
-  const hits = useMemo(() => {
-    const base = searchOrders({
-      query,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-      limit: 120,
-    });
-    if (!sessionFilter) return base.slice(0, 60);
-    return base
-      .filter((order) => {
-        if (order.cashSessionId === sessionFilter) return true;
-        return findCashSessionForOrder(order.id)?.id === sessionFilter;
-      })
-      .slice(0, 60);
-  }, [query, dateFrom, dateTo, sessionFilter, tick]);
-  const fiscal = selected
-    ? getLatestFiscalDocumentForRef('sale', selected.id)
-    : null;
-  const selectedSession =
-    selected?.cashSessionId
-      ? sessions.find((item) => item.id === selected.cashSessionId) ?? null
-      : selected
-        ? findCashSessionForOrder(selected.id)
-        : null;
-  const canEmitNfce =
-    Boolean(selected) &&
-    selected?.status === 'sold' &&
-    fiscalOn &&
-    (!fiscal || fiscal.kind === 'receipt' || fiscal.status === 'cancelled' || fiscal.status === 'error');
-  const canEdit = Boolean(selected && selected.status === 'sold');
-  const canExchange = Boolean(selected && selected.status === 'sold' && onOpenExchange);
 
-  function refresh() {
-    setTick((value) => value + 1);
-    if (selected) {
-      const next = getOrderById(selected.id);
-      setSelected(next);
-      if (next && editing) startEdit(next);
-    }
+  function startEdit(sale: SaleHit) {
+    setEditing(sale);
+    setEditName(sale.customerName);
+    setEditDocument(sale.customerDocument);
+    setEditAt(formatDateTimeLocal(sale.createdAt));
+    setEditReason('');
   }
 
-  function startEdit(order: SalesOrder) {
-    setEditing(true);
-    setEditName(order.customerName);
-    setEditDocument(order.customerDocument ?? '');
-    setEditPayment(order.payment);
-    setEditItems(order.productName);
-    setEditAmount(String(order.amount));
-    setEditAt(formatDateTimeLocal(order.createdAt));
-  }
-
-  function cancelEdit() {
-    setEditing(false);
-  }
-
-  function saveEdit(event: FormEvent) {
+  async function saveEdit(event: FormEvent) {
     event.preventDefault();
-    if (!selected) return;
-    const result = updatePosSaleOrder({
-      orderId: selected.id,
-      customerName: editName,
-      customerDocument: editDocument,
-      payment: editPayment,
-      productName: editItems,
-      amount: Number(editAmount.replace(',', '.')) || 0,
-      createdAt: editAt,
-    });
-    if (!result.ok) {
-      onError(result.error);
-      return;
+    if (!editing || busy) return;
+    setBusy(true);
+    try {
+      await apiEditPosSale(editing.id, {
+        customerName: editName.trim(),
+        customerDocument: editDocument.trim(),
+        saleAt: editAt ? new Date(editAt).toISOString() : undefined,
+        reason: editReason.trim(),
+      });
+      logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: 'pdv.venda.editar', detail: `${editing.id} · ${editReason.trim()}` });
+      onDone(`Venda ${editing.id} atualizada.`);
+      setEditing(null);
+      setRefreshKey((value) => value + 1);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Não foi possível alterar a venda.');
+    } finally {
+      setBusy(false);
     }
-    logAction({
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-      action: 'pdv.venda.editar',
-      detail: `${result.order.id} · ${money(result.order.amount)}`,
-    });
-    setSelected(result.order);
-    setEditing(false);
-    setTick((value) => value + 1);
-    onDone(`Venda ${result.order.id} atualizada.`);
   }
 
-  function reprint() {
-    if (!selected) return;
-    const result = reprintFiscalDocument(selected.id);
-    if (!result.ok) {
-      onError(result.error);
-      return;
-    }
+  function reprint(sale: SaleHit) {
+    const result = reprintFiscalDocument(sale.id);
+    if (!result.ok) return onError(result.error);
     onDone(`Reimpressão · ${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number}`);
     window.alert(result.text);
   }
 
-  function emitNfce() {
-    if (!selected) return;
-    const result = emitNfeFromSale({
-      orderId: selected.id,
-      customerName: selected.customerName,
-      amount: selected.amount,
-      asNfce: true,
-      customerDocument: selected.customerDocument,
-    });
-    if (!result.ok) {
-      onError(result.error);
-      return;
-    }
-    refresh();
-    onDone(
-      `${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} · ${FISCAL_STATUS_LABEL[result.document.status]}`,
-    );
+  function emitNfce(sale: SaleHit) {
+    const result = emitNfeFromSale({ orderId: sale.id, customerName: sale.customerName, amount: sale.amount, asNfce: true, customerDocument: sale.customerDocument });
+    if (!result.ok) return onError(result.error);
+    setRefreshKey((value) => value + 1);
+    onDone(`${FISCAL_KIND_LABEL[result.document.kind]} ${result.document.number} · ${FISCAL_STATUS_LABEL[result.document.status]}`);
   }
 
-  async function cancelSale() {
-    if (!selected) return;
+  async function cancelSale(sale: SaleHit) {
     const ok = await confirm({
       title: 'Cancelar venda?',
-      message: `Tem certeza que deseja cancelar a venda ${selected.id}? Ela ficará disponível para estorno por 24 horas.`,
+      message: `Cancelar a venda ${sale.id} (${money(sale.amount)})? O estoque volta, o valor é estornado e, se foi em dinheiro, sai da gaveta.`,
       confirmLabel: 'Cancelar venda',
       danger: true,
     });
     if (!ok) return;
-    const fiscalCancel = cancelFiscalDocumentForSale(selected.id);
-    const result = await cancelPosSale(selected.id, 'Cancelada no PDV');
-    if (!result.ok) {
-      onError(result.error);
-      return;
-    }
-    registerCanceledSale({
-      order: result.order,
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-    });
-    logAction({
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-      action: 'pdv.venda.cancelar',
-      detail: `${result.order.id} · ${money(result.order.amount)} · estorno 24h`,
-    });
-    refresh();
-    onDone(
-      `Venda ${result.order.id} cancelada (estorno 24h)${fiscalCancel.ok ? ` · ${FISCAL_KIND_LABEL[fiscalCancel.document.kind]} cancelada` : ''}`,
-    );
-  }
-
-  function sessionLabel(order: SalesOrder) {
-    if (order.cashSessionId) return order.cashSessionId;
-    return findCashSessionForOrder(order.id)?.id ?? '—';
+    const fiscalCancel = cancelFiscalDocumentForSale(sale.id);
+    const result = await cancelPosSale(sale.id, 'Cancelada no PDV');
+    if (!result.ok) return onError(result.error);
+    registerCanceledSale({ order: result.order, actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '' });
+    logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: 'pdv.venda.cancelar', detail: `${sale.id} · ${money(sale.amount)}` });
+    setRefreshKey((value) => value + 1);
+    onDone(`Venda ${sale.id} cancelada${fiscalCancel.ok ? ` · ${FISCAL_KIND_LABEL[fiscalCancel.document.kind]} cancelada` : ''}`);
   }
 
   return (
@@ -463,264 +365,80 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
       {dialog}
       <div className="caixa-panel__head">
         <h2>Consultar vendas</h2>
-        <p className="empty">
-          Filtre por data/hora e caixa. Edite, emita NFC-e ou abra uma troca a partir da venda.
-        </p>
+        <p className="empty">Busque por pedido, IMEI, cliente, vendedor, data ou caixa. Edite, emita NFC-e, troque ou cancele a partir da venda.</p>
       </div>
 
-      <div className="caixa-panel__filters">
-        <label className="caixa-panel__full">
-          Buscar
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelected(null);
-              setEditing(false);
-            }}
-            placeholder="PED-… / Maria / iPhone / Pix"
-            autoFocus
-          />
-        </label>
-        <label>
-          De
-          <input
-            type="datetime-local"
-            value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              setSelected(null);
-              setEditing(false);
-            }}
-          />
-        </label>
-        <label>
-          Até
-          <input
-            type="datetime-local"
-            value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              setSelected(null);
-              setEditing(false);
-            }}
-          />
-        </label>
-        <AdminPicker
-          label="Caixa"
-          value={sessionFilter}
-          options={[
-            { value: '', label: 'Todos os caixas' },
-            ...sessions.map((session) => ({
-              value: session.id,
-              label: `${session.id} · ${session.status === 'open' ? 'Aberto' : 'Fechado'} · ${formatDisplay(session.openedAt)}`,
-            })),
-          ]}
-          onChange={(val) => {
-            setSessionFilter(val);
-            setSelected(null);
-            setEditing(false);
-          }}
-        />
-      </div>
-
-      <div className="caixa-sales-list" role="list">
-        {hits.length === 0 ? (
-          <p className="empty caixa-sales-list__empty">
-            {query || dateFrom || dateTo || sessionFilter
-              ? 'Nenhuma venda encontrada com esses filtros.'
-              : 'Nenhuma venda ainda.'}
-          </p>
-        ) : (
-          hits.map((order) => {
-            const doc = getLatestFiscalDocumentForRef('sale', order.id);
-            const status =
-              order.status === 'cancelled'
-                ? 'Cancelada'
-                : doc
-                  ? FISCAL_STATUS_LABEL[doc.status]
-                  : 'Sem DF-e';
+      {editing ? (
+        <form className="caixa-panel__edit" onSubmit={saveEdit}>
+          <div className="caixa-panel__grid">
+            <label className="caixa-panel__full">
+              Cliente
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            </label>
+            <label>
+              Documento
+              <input value={editDocument} onChange={(e) => setEditDocument(e.target.value)} placeholder="CPF/CNPJ" />
+            </label>
+            <label>
+              Data/hora da venda
+              <input type="datetime-local" value={editAt} onChange={(e) => setEditAt(e.target.value)} required />
+            </label>
+            <label className="caixa-panel__full">
+              Motivo da alteração
+              <input value={editReason} onChange={(e) => setEditReason(e.target.value)} minLength={3} required placeholder="Ex.: nome do cliente estava errado" />
+            </label>
+            <p className="empty caixa-panel__full">Valor e itens mudam pela troca ou pelo cancelamento, que acertam estoque, caixa e financeiro.</p>
+          </div>
+          <div className="caixa-panel__actions">
+            <button type="button" className="btn btn--ghost" onClick={() => setEditing(null)}>
+              Descartar
+            </button>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? 'Salvando…' : 'Salvar edição'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <SalesLookup
+          autoFocus
+          refreshKey={refreshKey}
+          renderActions={(sale) => {
+            const fiscal = getLatestFiscalDocumentForRef('sale', sale.id);
+            const open = sale.status === 'sold';
+            const pos = sale.type === 'pos';
+            const canEmitNfce = open && pos && fiscalOn && (!fiscal || fiscal.kind === 'receipt' || fiscal.status === 'cancelled' || fiscal.status === 'error');
             return (
-              <button
-                key={order.id}
-                type="button"
-                role="listitem"
-                className={`caixa-sales-card ${selected?.id === order.id ? 'is-selected' : ''}`}
-                onClick={() => {
-                  setSelected(order);
-                  setEditing(false);
-                }}
-              >
-                <div className="caixa-sales-card__top">
-                  <strong>{order.id}</strong>
-                  <span className="price-red">{money(order.amount)}</span>
-                </div>
-                <div className="caixa-sales-card__meta">
-                  <span>{order.customerName}</span>
-                  <span>{sessionLabel(order)}</span>
-                </div>
-                <div className="caixa-sales-card__foot">
-                  <em>{order.productName}</em>
-                  <span>
-                    {status} · {formatDisplay(order.createdAt)}
-                  </span>
-                </div>
-              </button>
-            );
-          })
-        )}
-      </div>
-
-      {selected ? (
-        <div className="caixa-panel__detail">
-          {editing ? (
-            <form className="caixa-panel__edit" onSubmit={saveEdit}>
-              <div className="caixa-panel__grid">
-                <label className="caixa-panel__full">
-                  Cliente
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
-                </label>
-                <label>
-                  Documento
-                  <input
-                    value={editDocument}
-                    onChange={(e) => setEditDocument(e.target.value)}
-                    placeholder="CPF/CNPJ"
-                  />
-                </label>
-                <label>
-                  Valor
-                  <input
-                    value={editAmount}
-                    onChange={(e) => setEditAmount(e.target.value)}
-                    inputMode="decimal"
-                    required
-                  />
-                </label>
-                <label className="caixa-panel__full">
-                  Pagamento
-                  <input
-                    value={editPayment}
-                    onChange={(e) => setEditPayment(e.target.value)}
-                    required
-                  />
-                </label>
-                <label className="caixa-panel__full">
-                  Itens
-                  <input value={editItems} onChange={(e) => setEditItems(e.target.value)} required />
-                </label>
-                <label className="caixa-panel__full">
-                  Data/hora da venda
-                  <input
-                    type="datetime-local"
-                    value={editAt}
-                    onChange={(e) => setEditAt(e.target.value)}
-                    required
-                  />
-                </label>
-              </div>
-              <div className="caixa-panel__actions">
-                <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
-                  Descartar
-                </button>
-                <button type="submit" className="btn btn--primary">
-                  Salvar edição
-                </button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <div className="caixa-panel__summary">
-                <div>
-                  <span>Pedido</span>
-                  <strong>{selected.id}</strong>
-                </div>
-                <div>
-                  <span>Cliente</span>
-                  <strong>{selected.customerName}</strong>
-                </div>
-                <div>
-                  <span>Documento</span>
-                  <strong>{selected.customerDocument || '—'}</strong>
-                </div>
-                <div>
-                  <span>Pagamento</span>
-                  <strong>{selected.payment}</strong>
-                </div>
-                <div>
-                  <span>Caixa</span>
-                  <strong>
-                    {selectedSession
-                      ? `${selectedSession.id} · ${selectedSession.status === 'open' ? 'Aberto' : 'Fechado'}`
-                      : sessionLabel(selected)}
-                  </strong>
-                </div>
-                <div>
-                  <span>SEFAZ / DF-e</span>
-                  <strong className={fiscal?.status === 'authorized' ? 'pdv__ok' : undefined}>
-                    {fiscal
-                      ? `${FISCAL_KIND_LABEL[fiscal.kind]} · ${FISCAL_STATUS_LABEL[fiscal.status]}`
-                      : 'Sem documento fiscal'}
-                  </strong>
-                </div>
-                <div>
-                  <span>Quando</span>
-                  <strong>{formatDisplay(selected.createdAt)}</strong>
-                </div>
-                <div>
-                  <span>Total</span>
-                  <strong className="price-red">{money(selected.amount)}</strong>
-                </div>
-              </div>
-              {fiscal ? (
-                <p className="empty caixa-panel__fiscal-note">
-                  {fiscal.kind !== 'receipt'
-                    ? `Nº ${fiscal.number}/${fiscal.series} · chave ${fiscal.accessKey.slice(0, 20)}…`
-                    : `Notinha ${fiscal.number}`}
-                </p>
-              ) : null}
               <div className="caixa-panel__actions caixa-sale-actions">
-                <button type="button" className="btn btn--ghost" onClick={() => startEdit(selected)} disabled={!canEdit}>
+                <button type="button" className="btn btn--ghost" onClick={() => startEdit(sale)} disabled={!open || !pos} title={pos ? undefined : 'Venda externa: corrija pela tela de Venda Externa'}>
                   <AdminIcon name="edit" /> Editar
                 </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => onOpenExchange?.(selected.id)}
-                  disabled={!canExchange}
-                >
+                <button type="button" className="btn btn--ghost" onClick={() => onOpenExchange?.(sale.id)} disabled={!open || !pos || !onOpenExchange}>
                   <AdminIcon name="swap" /> Criar troca
                 </button>
-                <button type="button" className="btn btn--ghost" onClick={reprint} disabled={!fiscal}>
+                <button type="button" className="btn btn--ghost" onClick={() => reprint(sale)} disabled={!fiscal}>
                   <AdminIcon name="print" /> Reimprimir
                 </button>
                 {canEmitNfce ? (
-                  <button type="button" className="btn btn--ghost" onClick={emitNfce}>
+                  <button type="button" className="btn btn--ghost" onClick={() => emitNfce(sale)}>
                     <AdminIcon name="receipt" /> Emitir NFC-e
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className="btn btn--ghost caixa-sale-actions__danger"
-                  onClick={() => void cancelSale()}
-                  disabled={selected.status === 'cancelled'}
-                >
+                <button type="button" className="btn btn--ghost caixa-sale-actions__danger" onClick={() => void cancelSale(sale)} disabled={!open || !pos}>
                   <AdminIcon name="trash" /> Cancelar venda
                 </button>
-                <button type="button" className="btn btn--primary" onClick={onClose}>
-                  Fechar
-                </button>
               </div>
-            </>
-          )}
-        </div>
-      ) : (
+            );
+          }}
+        />
+      )}
+
+      {!editing ? (
         <div className="pdv__modal-actions">
           <button type="button" className="btn btn--primary" onClick={onClose}>
             Fechar
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -728,43 +446,39 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
 function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
   const { user } = useAuth();
   const { confirm, dialog } = useConfirmDialog();
-  const [entries, setEntries] = useState<CanceledSaleEntry[]>(() => listCanceledSalesWithinWindow());
+  const [entries, setEntries] = useState<SaleHit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
 
+  // Vendas do PDV canceladas nas últimas 24 horas, direto do banco.
   useEffect(() => {
-    function refresh() {
-      setEntries(listCanceledSalesWithinWindow());
-    }
-    refresh();
-    window.addEventListener(CANCELED_SALES_EVENT, refresh);
-    window.addEventListener('storage', refresh);
+    let alive = true;
+    setLoading(true);
+    void apiSearchSales({ type: 'pos', status: 'cancelled', from: new Date(Date.now() - 24 * 3600000).toISOString(), limit: 100 })
+      .then((data) => alive && setEntries(data.items.filter((item) => item.cancelledAt && Date.now() - Date.parse(item.cancelledAt) <= 24 * 3600000)))
+      .catch((err) => alive && onError(err instanceof Error ? err.message : 'Não foi possível consultar os cancelamentos.'))
+      .finally(() => alive && setLoading(false));
     return () => {
-      window.removeEventListener(CANCELED_SALES_EVENT, refresh);
-      window.removeEventListener('storage', refresh);
+      alive = false;
     };
-  }, []);
+  }, [tick, onError]);
 
-  async function restore(entry: CanceledSaleEntry) {
+  async function restore(entry: SaleHit) {
     const ok = await confirm({
       title: 'Estornar cancelamento?',
-      message: `Tem certeza que deseja restaurar a venda ${entry.orderId}? O cancelamento será revertido.`,
+      message: `Restaurar a venda ${entry.id}? O estoque sai de novo, o valor volta ao financeiro e, se foi em dinheiro, à gaveta.`,
       confirmLabel: 'Restaurar venda',
       danger: false,
     });
     if (!ok) return;
-    const result = restorePosSaleOrder(entry.orderId, entry.snapshot);
+    const result = await restorePosSale(entry.id);
     if (!result.ok) {
       onError(result.error);
       return;
     }
-    markCanceledSaleRestored(entry.id);
-    logAction({
-      actorName: user?.name ?? 'Operador',
-      actorEmail: user?.email ?? '',
-      action: 'pdv.venda.restaurar',
-      detail: `${result.order.id} · ${money(result.order.amount)} · estorno do cancelamento`,
-    });
-    setEntries(listCanceledSalesWithinWindow());
-    onDone(`Venda ${result.order.id} restaurada (estorno do cancelamento).`);
+    logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: 'pdv.venda.restaurar', detail: `${entry.id} · ${money(entry.amount)} · estorno do cancelamento` });
+    setTick((value) => value + 1);
+    onDone(`Venda ${entry.id} restaurada (estorno do cancelamento).`);
   }
 
   return (
@@ -772,10 +486,7 @@ function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
       {dialog}
       <div className="caixa-panel__head">
         <h2>Vendas canceladas (24h)</h2>
-        <p className="empty">
-          Cancelamentos recentes ficam aqui por 24 horas para possível estorno. Depois são removidos
-          automaticamente.
-        </p>
+        <p className="empty">Cancelamentos das últimas 24 horas podem ser estornados aqui. Depois disso o cancelamento é definitivo.</p>
       </div>
       <div className="caixa-panel__table">
         <div className="admin-table-container"><table className="admin-table">
@@ -793,24 +504,20 @@ function CanceledSalesPanel({ onClose, onDone, onError }: PanelProps) {
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={6}>
-                  <p className="empty">Nenhuma venda cancelada na janela de 24h.</p>
+                  <p className="empty">{loading ? 'Buscando…' : 'Nenhuma venda cancelada nas últimas 24 horas.'}</p>
                 </td>
               </tr>
             ) : (
               entries.map((entry) => (
                 <tr key={entry.id}>
-                  <td>{entry.orderId}</td>
-                  <td>{entry.snapshot.customerName}</td>
-                  <td className="price-red">{money(entry.snapshot.amount)}</td>
-                  <td>{formatDisplay(entry.canceledAt)}</td>
-                  <td>{hoursLeftLabel(entry.expiresAt)}</td>
+                  <td>{entry.id}</td>
+                  <td>{entry.customerName}</td>
+                  <td className="price-red">{money(entry.amount)}</td>
+                  <td>{entry.cancelledAt ? formatDisplay(entry.cancelledAt) : '—'}</td>
+                  <td>{entry.cancelledAt ? hoursLeftLabel(new Date(Date.parse(entry.cancelledAt) + 24 * 3600000).toISOString()) : '—'}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      onClick={() => void restore(entry)}
-                    >
-                      Restaurar
+                    <button type="button" className="btn btn--primary" onClick={() => void restore(entry)}>
+                      <AdminIcon name="restore" /> Restaurar
                     </button>
                   </td>
                 </tr>
