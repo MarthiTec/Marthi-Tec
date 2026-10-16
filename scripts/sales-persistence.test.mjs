@@ -298,6 +298,13 @@ test('a past sale also works with the production column types (text due date, ti
   const expected=installments===1?[day]:[1,2,3].map(i=>new Date(Date.parse(day+'T12:00:00Z')+i*30*86400000).toISOString().slice(0,10));
   assert.deepEqual(dues,expected);
  }
+ // Kardex de produção: previous_qty numérico e new_qty inteiro; a troca entra num produto que já existe.
+ await query('ALTER TABLE stock_movements ALTER COLUMN previous_qty TYPE numeric');
+ await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,kind,condition) VALUES('stock-drift-trade','store-a','IPHONE DRIFT TROCA',1,900,1300,'device','used')");
+ const res=await request('/sales/external',{...payload,saleDate:day,lines:[{stockId:'stock-drift',name:'x',qty:1,unitPrice:50}],tradeIn:{deviceName:'IPHONE DRIFT TROCA',imei:'900000000000077',capacity:'128GB',color:'Branco',conditionState:'used',tradeValue:20}});
+ const json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+ const move=(await query("SELECT previous_qty,new_qty FROM stock_movements WHERE stock_id='stock-drift-trade' AND ref_type='trade_in'")).rows[0];
+ assert.deepEqual([Number(move.previous_qty),Number(move.new_qty)],[1,2]);
 });
 test('card interest passed to the customer is not store profit, also for older sales that kept it in the notes',async()=>{
  await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price) VALUES('stock-card-profit','store-a','stock-card-profit',3,3200,3700)");

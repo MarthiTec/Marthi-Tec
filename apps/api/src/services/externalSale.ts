@@ -394,7 +394,7 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
     await client.query(
       `INSERT INTO stock_movements (
         id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes
-      ) VALUES ($1, $2, $3, 'in', 1, $8, $8 + 1, $4, 'trade_in', $5, $6, $7)`,
+      ) VALUES ($1, $2, $3, 'in', 1, $8::int, $8::int + 1, $4, 'trade_in', $5, $6, $7)`,
       [
         tradeMovId,
         storeId,
