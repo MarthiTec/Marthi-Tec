@@ -107,6 +107,8 @@ export type StockItem = {
   batteryLevel?: number | null;
   /** Mostra condição e bateria no totem (padrão: sim). */
   showConditionOnTotem?: boolean;
+  /** Juros no cartão: 0 = com juros (padrão); N = sem juros até N parcelas. */
+  interestFreeInstallments?: number;
   /** Tipo e modelo do catálogo (Marca + Tipo + Modelo = descrição). */
   catalogTypeId?: string;
   catalogModelId?: string;
@@ -379,6 +381,7 @@ function normalizeStock(item: StockItem): StockItem {
     supplierEntries: Array.isArray(item.supplierEntries) ? item.supplierEntries : undefined,
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
+    interestFreeInstallments: Math.max(0, Number(item.interestFreeInstallments) || 0),
     catalogTypeId: item.catalogTypeId ?? '',
     catalogModelId: item.catalogModelId ?? '',
     catalogTypeName: item.catalogTypeName ?? '',
@@ -629,6 +632,7 @@ function toNestStockBody(item: StockItem) {
     supplierEntries: item.supplierEntries,
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
+    interestFreeInstallments: Math.max(0, Number(item.interestFreeInstallments) || 0),
     catalogTypeId: item.catalogTypeId ?? undefined,
     catalogModelId: item.catalogModelId ?? undefined,
     groupId: item.groupId ?? undefined,

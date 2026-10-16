@@ -44,6 +44,8 @@ const stockItemSchema = z.object({
   batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
   /** Mostra condição e bateria no totem (padrão: sim). */
   showConditionOnTotem: z.boolean().optional(),
+  /** Juros no cartão: 0 = com juros (padrão); N = sem juros até N parcelas. */
+  interestFreeInstallments: z.coerce.number().int().min(0).max(24).optional(),
   /** Tipo (IPHONE, IPAD…) e Modelo (15 PRO MAX…) do catálogo: com a marca, montam a descrição. */
   catalogTypeId: z.string().nullable().optional(),
   catalogModelId: z.string().nullable().optional(),
@@ -177,6 +179,7 @@ async function saveProductDetails(db: PoolClient, storeId: string, id: string, b
     fields.push(['battery_level', batteryFor(condition, body.batteryLevel)]);
   }
   if (body.showConditionOnTotem !== undefined) fields.push(['show_condition_on_totem', body.showConditionOnTotem]);
+  if (body.interestFreeInstallments !== undefined) fields.push(['interest_free_installments', body.interestFreeInstallments]);
   // Tipo e modelo: do catálogo da plataforma ou da própria loja; o modelo tem que ser do tipo escolhido.
   if (body.catalogTypeId && !(await db.query('SELECT 1 FROM catalog_types WHERE id = $1 AND (store_id IS NULL OR store_id = $2)', [body.catalogTypeId, storeId])).rows.length) {
     throw Object.assign(new Error('Tipo de produto não encontrado.'), { status: 400 });
@@ -250,6 +253,7 @@ export function formatStockRow(row: any) {
     purchaseFactor: Number(row.purchase_factor ?? row.purchaseFactor) || 1,
     batteryLevel: batteryFor(row.condition, row.battery_level ?? row.batteryLevel),
     showConditionOnTotem: (row.show_condition_on_totem ?? row.showConditionOnTotem) !== false,
+    interestFreeInstallments: Number(row.interest_free_installments ?? row.interestFreeInstallments) || 0,
     catalogTypeId: row.catalog_type_id ?? row.catalogTypeId ?? '',
     catalogModelId: row.catalog_model_id ?? row.catalogModelId ?? '',
     catalogTypeName: row.catalog_type_name ?? '',
@@ -334,7 +338,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, catalog_type_id, catalog_model_id, created_by_name,
                  (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
                  (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
@@ -385,7 +389,7 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, catalog_type_id, catalog_model_id, created_by_name,
                  (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
                  (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
@@ -845,7 +849,7 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
         const itemsRes = await pool.query(
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, catalog_type_id, catalog_model_id, created_by_name,
+                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, catalog_type_id, catalog_model_id, created_by_name,
                  (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
                  (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
            FROM stock_items

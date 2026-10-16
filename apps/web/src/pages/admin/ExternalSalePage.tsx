@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
+import { interestBase } from '../../data/cardInterest';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
@@ -45,6 +46,8 @@ type StockOption = {
   /** Grade de variações (preço e retirada por cor/capacidade). */
   variations?: StockVariationRow[];
   attrs?: Record<string,unknown>; color?: string; capacity?: string;
+  /** Juros no cartão: 0 = com juros; N = sem juros até N parcelas. */
+  interestFreeInstallments?: number;
   brand: string;
   id: string;
   name: string;
@@ -237,6 +240,7 @@ export function ExternalSalePage() {
       catalogTypeName: it.catalogTypeName || '',
       catalogModelName: it.catalogModelName || '',
       supplierEntries: Array.isArray(it.supplierEntries) ? it.supplierEntries : [],
+      interestFreeInstallments: Number(it.interestFreeInstallments) || 0,
     };
   }
 
@@ -486,7 +490,10 @@ export function ExternalSalePage() {
   const cardRateFor = (count: number) => (count <= 1 ? 0 : Math.max(0, Number(totemCardFee(count)) || 0));
   const isCredit = paymentMethod === 'Cartão de Crédito';
   const cardRate = isCredit ? cardRateFor(installments) : 0;
-  const cardInterest = round2((netAmountToPay * cardRate) / 100);
+  // Só os produtos com juros neste parcelamento entram na base (produto "sem juros até N" fica de fora).
+  const interestLines = lines.map((line) => ({ lineTotal: (Number(line.qty) || 1) * (Number(line.unitPrice) || 0), interestFreeInstallments: stockItems.find((item) => item.id === line.stockId)?.interestFreeInstallments }));
+  const chargedBase = isCredit ? interestBase(interestLines, netAmountToPay, installments) : 0;
+  const cardInterest = round2((chargedBase * cardRate) / 100);
   const totalCharged = round2(netAmountToPay + cardInterest);
   const installmentValue = installments > 0 ? round2(totalCharged / installments) : totalCharged;
 
@@ -1126,7 +1133,7 @@ export function ExternalSalePage() {
             </span>
             {cardInterest > 0 ? (
               <span className="xsale-muted">
-                Inclui juros do cartão de {formatMoney(cardInterest)} ({cardRate.toLocaleString('pt-BR')}%) sobre {formatMoney(netAmountToPay)}
+                Inclui juros do cartão de {formatMoney(cardInterest)} ({cardRate.toLocaleString('pt-BR')}%) sobre {formatMoney(chargedBase)}{chargedBase < netAmountToPay ? " (produtos sem juros neste parcelamento ficam de fora)" : ""}
               </span>
             ) : null}
             {isPrivileged ? (

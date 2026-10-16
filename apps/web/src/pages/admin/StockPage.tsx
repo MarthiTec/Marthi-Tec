@@ -995,6 +995,7 @@ export function StockPage() {
       supplierEntries: item.supplierEntries,
       batteryLevel: item.batteryLevel ?? null,
       showConditionOnTotem: item.showConditionOnTotem !== false,
+      interestFreeInstallments: item.interestFreeInstallments ?? 0,
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       catalogTypeId: item.catalogTypeId ?? '',
@@ -1689,6 +1690,19 @@ export function StockPage() {
                   ) : null}
                 </label>
   );
+  // Juros no cartão: por padrão a taxa da maquininha vai para o cliente; alguns aparelhos saem sem juros até N vezes.
+  const interestFieldNode = (
+    <AdminPicker
+      label="Juros no cartão"
+      value={String(form.interestFreeInstallments ?? 0)}
+      disabled={readOnly}
+      options={[
+        { value: '0', label: 'Com juros (taxa da maquininha)' },
+        ...Array.from({ length: 17 }, (_, index) => index + 2).map((count) => ({ value: String(count), label: `Sem juros até ${count}x` })),
+      ]}
+      onChange={(value) => setForm({ ...form, interestFreeInstallments: Number(value) || 0 })}
+    />
+  );
   const codesCardNode = (
           <article className="admin-card stock-form-card">
             <h3>Códigos</h3>
@@ -1883,6 +1897,7 @@ export function StockPage() {
           {skuFieldNode}
           {conditionFieldsNode}
           {unitFieldNode}
+          {interestFieldNode}
           <label>
             Data de cadastro
             <input value={form.createdAt ? new Date(form.createdAt).toLocaleString('pt-BR') : 'Registrada ao salvar'} disabled />
@@ -2412,6 +2427,7 @@ export function StockPage() {
                 {subgroupFieldNode}
                 {conditionFieldsNode}
                 {unitFieldNode}
+                {interestFieldNode}
                 {totemFieldNode}
               </div>
               </div>
@@ -3026,6 +3042,7 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     skuWithSupplier: true,
     batteryLevel: 100,
     showConditionOnTotem: true,
+    interestFreeInstallments: 0,
     groupId: '',
     subgroupId: '',
     // Padrão: entrou hoje; o usuário pode escolher outra data.

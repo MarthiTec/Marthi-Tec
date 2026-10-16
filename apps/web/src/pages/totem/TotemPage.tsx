@@ -39,6 +39,7 @@ import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemAttractScene } from './TotemAttractScene';
 import {PICKUP_CHOICES,TotemGuidedFlow} from './TotemGuidedFlow';
+import {interestFreeLabel} from '../../data/cardInterest';
 import {assistantText} from '../../data/totemAssistant';
 import {loadTotemOffers,dayOfferFor,type DayOffer} from '../../data/dayOffers';
 import QRCode from 'qrcode';
@@ -1531,7 +1532,7 @@ export function TotemPage() {
                           {copy.showInstallments ? <span>À Vista</span> : <span>Preço</span>}
                           {offer&&<del>De {formatBRL(normalPrice)}</del>}
                           <strong>{formatBRL(displayedPrice)}</strong>
-                          {copy.showInstallments ? <small>{formatInstallment(displayedPrice, 18, quote.stock?.cardRate ? quote.stock.cardRate : undefined)}</small> : null}
+                          {copy.showInstallments ? <small>{interestFreeLabel(displayedPrice, quote.stock?.interestFreeInstallments) || formatInstallment(displayedPrice, 18, quote.stock?.cardRate ? quote.stock.cardRate : undefined)}</small> : null}
                           {quote.stock ? (
                             <em className="totem-card__stock">
                               {quote.qty > 0 ? `${quote.qty} un. em estoque` : 'Sob consulta'}

@@ -217,7 +217,7 @@ async function handleGetCatalog(req: Request, res: Response, next: NextFunction)
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at,
-                 battery_level, show_condition_on_totem
+                 battery_level, show_condition_on_totem, interest_free_installments
           FROM stock_items
           WHERE store_id = $1
             AND active = true
