@@ -53,6 +53,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
       { to: '/painel/pagamentos', label: 'Formas de pagamento' },
+      { to: '/painel/cotacao', label: 'Cotação rápida', accent: '#0f766e' },
       { to: '/painel/calculadora', label: 'Calculadora' },
       { to: '/painel/taxas-cartao', label: 'Taxas & Maquininhas' },
       { to: '/painel/metas', label: 'Metas & Comissões', accent: '#6366f1' },

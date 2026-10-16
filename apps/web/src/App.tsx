@@ -98,6 +98,7 @@ import { MultiStoreManagementPage } from './pages/erp/MultiStoreManagementPage';
 import { PainelUsersPage } from './pages/admin/PainelUsersPage';
 import { ExternalSalePage } from './pages/admin/ExternalSalePage';
 import { InstallmentCalculatorPage } from './pages/admin/InstallmentCalculatorPage';
+import { QuickQuotePage } from './pages/admin/QuickQuotePage';
 import { StockReportPage } from './pages/admin/StockReportPage';
 import { StockEntryPage } from './pages/admin/StockEntryPage';
 import { ImeiReportPage } from './pages/admin/ImeiReportPage';
@@ -269,6 +270,7 @@ export function App() {
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="venda-externa" element={<ExternalSalePage />} />
           <Route path="calculadora" element={<InstallmentCalculatorPage />} />
+          <Route path="cotacao" element={<QuickQuotePage />} />
           <Route path="ads" element={<AdsOverviewPage />} />
           <Route path="ads/criar" element={<AdsCreatePage />} />
           <Route path="ads/campanhas" element={<AdsCampaignsPage />} />

@@ -1,0 +1,19 @@
+/* Cotação rápida (PDV): usa o layout da calculadora de parcelamento. */
+.quick-quote__margin { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.quick-quote__switch {
+  display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line, #d8dde3); border-radius: 12px;
+  background: var(--card-2, #f8fafc);
+}
+.quick-quote__switch button {
+  min-width: 40px; min-height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--mute, #64748b); font: inherit; font-weight: 800; cursor: pointer;
+}
+.quick-quote__switch button.is-active { background: var(--accent, #0f766e); color: #fff; }
+.quick-quote__check { display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+.quick-quote__check input { width: 18px; height: 18px; }
+.quick-quote__profit dd small { display: block; margin-top: 2px; color: var(--mute, #64748b); font-size: 0.75rem; font-weight: 600; }
+.quick-quote__formalize { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line, #d8dde3); }
+.quick-quote__done {
+  margin: 0; padding: 10px 14px; border-radius: 12px; font-weight: 700;
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+}
