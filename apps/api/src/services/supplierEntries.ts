@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { assertSoldUnitsKept, soldByEntry } from './soldUnits.js';
 import { cancelEntryPayables, postEntryPayable, syncEntryPayable } from './entryFinance.js';
+import { allImeisOf, cleanImeiPairs, takenImei } from './imeiPairs.js';
 
 /**
  * Entradas do mesmo produto por fornecedor (ex.: iPhone 17 Pro Max comprado de vários fornecedores).
@@ -17,6 +18,8 @@ export const supplierEntrySchema = z
     qty: z.coerce.number().int('A quantidade da entrada é em unidades inteiras.').positive('A quantidade da entrada deve ser maior que zero.'),
     unitCost: z.coerce.number().finite().min(0, 'Custo da entrada inválido.'),
     imeis: z.array(z.string().trim().min(1)).default([]),
+    /** Aparelho com dois IMEIs: { IMEI principal: segundo IMEI } (o segundo não conta como unidade). */
+    secondaryImeis: z.record(z.string()).default({}),
     notes: z.string().max(500).default(''),
     /** Bateria (%) do aparelho desta entrada (usados). */
     batteryLevel: z.coerce.number().int().min(0).max(100).nullable().optional(),
@@ -48,21 +51,16 @@ export async function saveSupplierEntries(
   const existing = new Map<string, any>(
     (await db.query('SELECT * FROM stock_supplier_entries WHERE store_id = $1 AND stock_item_id = $2', [storeId, stockId])).rows.map((row) => [row.id, row]),
   );
-  const all = groups.flatMap((group) => group.entries.map((entry) => ({ ...entry, variationId: group.variationId })));
+  const all = groups.flatMap((group) =>
+    group.entries.map((entry) => ({ ...entry, secondaryImeis: cleanImeiPairs(entry.imeis, entry.secondaryImeis), variationId: group.variationId })),
+  );
 
-  // IMEI não se repete: nem dentro do produto, nem em outro produto da loja.
-  const imeis = all.flatMap((entry) => entry.imeis);
+  // IMEI não se repete (principal ou 2º IMEI): nem dentro do produto, nem em outro produto da loja.
+  const imeis = allImeisOf(all);
   const dup = imeis.find((imei, index) => imeis.indexOf(imei) !== index);
   if (dup) throw httpError(`O IMEI ${dup} aparece mais de uma vez nas entradas.`);
-  if (imeis.length) {
-    const taken = await db.query(
-      `SELECT e.imei, s.name FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
-         JOIN stock_items s ON s.id = x.stock_item_id
-        WHERE x.store_id = $1 AND x.stock_item_id <> $2 AND e.imei = ANY($3::text[]) LIMIT 1`,
-      [storeId, stockId, imeis],
-    );
-    if (taken.rows[0]) throw httpError(`O IMEI ${taken.rows[0].imei} já está no produto "${taken.rows[0].name}".`, 409);
-  }
+  const taken = await takenImei(db, storeId, imeis, stockId);
+  if (taken) throw httpError(`O IMEI ${taken.imei} já está no produto "${taken.name}".`, 409);
 
   const suppliers = [...new Set(all.map((entry) => entry.supplierId || options.defaultSupplierId).filter(Boolean))] as string[];
   const names = new Map<string, string>();
@@ -88,9 +86,9 @@ export async function saveSupplierEntries(
       kept.add(current.id);
       await db.query(
         `UPDATE stock_supplier_entries
-            SET variation_id = $3, supplier_id = $4, entry_date = COALESCE($5::date, entry_date), qty = $6, unit_cost = $7, imeis = $8::jsonb, notes = $9, battery_level = $10, updated_at = now()
+            SET variation_id = $3, supplier_id = $4, entry_date = COALESCE($5::date, entry_date), qty = $6, unit_cost = $7, imeis = $8::jsonb, notes = $9, battery_level = $10, imei_pairs = $11::jsonb, updated_at = now()
           WHERE id = $1 AND store_id = $2`,
-        [current.id, storeId, entry.variationId, current.origin === 'trade_in' ? current.supplier_id : supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
+        [current.id, storeId, entry.variationId, current.origin === 'trade_in' ? current.supplier_id : supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null, JSON.stringify(entry.secondaryImeis)],
       );
       if (current.origin !== 'trade_in') await syncEntryPayable(db, storeId, current.id, entry.qty, entry.unitCost);
       continue;
@@ -98,9 +96,9 @@ export async function saveSupplierEntries(
     const id = `SEN-${randomUUID()}`;
     kept.add(id);
     await db.query(
-      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes, battery_level)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10, $11)`,
-      [id, storeId, stockId, entry.variationId, supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
+      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes, battery_level, imei_pairs)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10, $11, $12::jsonb)`,
+      [id, storeId, stockId, entry.variationId, supplierId, entryDate, entry.qty, entry.unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null, JSON.stringify(entry.secondaryImeis)],
     );
     newQty += entry.qty;
     const supplierName = supplierId ? names.get(supplierId) ?? '' : '';
@@ -190,6 +188,7 @@ const toEntry = (row: any, sold?: { qty: number; imeis: Array<{ imei: string; sa
   qty: Number(row.qty) || 0,
   unitCost: Number(row.unit_cost) || 0,
   imeis: Array.isArray(row.imeis) ? row.imeis.map(String) : [],
+  secondaryImeis: row.imei_pairs && typeof row.imei_pairs === 'object' ? row.imei_pairs : {},
   notes: row.notes ?? '',
   batteryLevel: row.battery_level === null || row.battery_level === undefined ? null : Number(row.battery_level),
   /** 'supplier' = compra de fornecedor; 'trade_in' = aparelho recebido na troca (o cliente é a origem). */

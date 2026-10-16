@@ -2,6 +2,7 @@ import {pickupSelection,validatePickupLines,recordPickup} from '../services/pick
 import {applyDayOffersToLines} from '../services/dayOffers.js';
 import {changeVariationQuantity} from '../services/variationInventory.js';
 import { markUnitsSold } from '../services/soldUnits.js';
+import { primaryImei } from '../services/imeiPairs.js';
 import { pickedAttributeSchema,validateSaleAttributes } from '../services/saleAttributes.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -448,6 +449,8 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
 
         // 4. Insere as linhas e BAIXA O ESTOQUE
         for (const line of body.lines) {
+          // Dual chip: a venda guarda o IMEI principal do aparelho, mesmo que tenham lido o 2º.
+          line.imei = await primaryImei(client, storeId, line.imei);
           const lineId = `LIN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           await client.query(
             `INSERT INTO sales_order_lines (id, order_id, stock_id, name, qty, unit_price, total_price, imei, is_ad_hoc, item_type, attributes)

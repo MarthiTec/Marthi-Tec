@@ -35,7 +35,8 @@ const dateTimeBr = (iso: string) => (iso ? new Date(iso).toLocaleDateString('pt-
 const OUT_LABEL: Record<string, string> = { sale: 'Vendido', bonus: 'Bonificação', internal: 'Uso interno', loss: 'Perda' };
 
 /** Os IMEIs que já saíram ficam fora da caixa de texto (não somem da entrada: voltam no Aplicar). */
-type Draft = SupplierEntry & { key: string; imeiList: string[]; outImeis: string[]; supplierOrigin: SupplierOrigin };
+/** secondList: 2º IMEI (dual chip) de cada IMEI da caixa, na mesma posição. */
+type Draft = SupplierEntry & { key: string; imeiList: string[]; secondList: string[]; outImeis: string[]; supplierOrigin: SupplierOrigin };
 
 const PAYMENT_OPTIONS = [
   { value: 'pending', label: 'A pagar (contas a pagar)' },
@@ -60,6 +61,7 @@ const toDraft = (entry: SupplierEntry, index: number, suppliers: SupplierOption[
     ...entry,
     key: entry.id || `new_${index}_${Date.now()}`,
     imeiList: (entry.imeis ?? []).filter((imei) => !outImeis.includes(imei)),
+    secondList: (entry.imeis ?? []).filter((imei) => !outImeis.includes(imei)).map((imei) => entry.secondaryImeis?.[imei] ?? ''),
     outImeis,
     supplierOrigin: originOf(suppliers, entry.supplierId),
   };
@@ -113,7 +115,14 @@ export function SupplierEntriesModal({
 
   const parsed = rows.map((row) => {
     const typed = filledImeis(row.imeiList);
-    return { ...row, typed, imeis: [...row.outImeis, ...typed.filter((imei) => !row.outImeis.includes(imei))] };
+    // 2º IMEI: o dos aparelhos que já saíram fica como estava; o dos que estão na caixa vem do campo ao lado.
+    const secondaryImeis: Record<string, string> = {};
+    for (const imei of row.outImeis) if (row.secondaryImeis?.[imei]) secondaryImeis[imei] = row.secondaryImeis[imei];
+    row.imeiList.forEach((imei, index) => {
+      const second = (row.secondList[index] ?? '').trim();
+      if (imei.trim() && second) secondaryImeis[imei.trim()] = second;
+    });
+    return { ...row, typed, secondaryImeis, imeis: [...row.outImeis, ...typed.filter((imei) => !row.outImeis.includes(imei))] };
   });
   const summary = supplierEntriesSummary(parsed);
 
@@ -128,11 +137,11 @@ export function SupplierEntriesModal({
       if (!(Number(row.qty) > 0) || !Number.isInteger(Number(row.qty))) return fail(row.key, `Entrada ${index + 1}: informe a quantidade em unidades.`);
       if (row.imeis.length > Number(row.qty)) return fail(row.key, `Entrada ${index + 1}: há ${row.imeis.length} IMEIs para ${row.qty} unidade(s).`);
     }
-    const all = parsed.flatMap((row) => row.imeis);
+    const all = parsed.flatMap((row) => [...row.imeis, ...Object.values(row.secondaryImeis)]);
     const dup = all.find((imei, index) => all.indexOf(imei) !== index);
-    if (dup) return fail(parsed.filter((row) => row.imeis.includes(dup)).pop()!.key, `O IMEI ${dup} está repetido.`);
+    if (dup) return fail(parsed.filter((row) => row.imeis.includes(dup) || Object.values(row.secondaryImeis).includes(dup)).pop()!.key, `O IMEI ${dup} está repetido.`);
     onApply(
-      parsed.map(({ key: _key, imeiList: _list, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
+      parsed.map(({ key: _key, imeiList: _list, secondList: _second, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
@@ -218,10 +227,11 @@ export function SupplierEntriesModal({
           <ImeiListField
             label={`IMEIs em estoque (${parsed[index].typed.length})`}
             value={row.imeiList}
-            onChange={(imeiList) => {
-              // Cada IMEI é um aparelho: com mais IMEIs que unidades, a quantidade acompanha.
+            secondary={row.secondList}
+            onChange={(imeiList, secondList) => {
+              // Cada IMEI é um aparelho: com mais IMEIs que unidades, a quantidade acompanha (o 2º IMEI não conta).
               const units = row.outImeis.length + filledImeis(imeiList).length;
-              update(row.key, { imeiList, qty: Math.max(Number(row.qty) || 0, units) });
+              update(row.key, { imeiList, secondList, qty: Math.max(Number(row.qty) || 0, units) });
             }}
           />
         </div>

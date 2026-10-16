@@ -67,7 +67,13 @@ salesSearchRouter.get('/api/v1/sales/search', requireAuth, async (req, res, next
     // IMEI digitado aos poucos: a partir de 3 dígitos já filtra.
     const imeiDigits = q.imei.replace(/\D/g, '');
     if (imeiDigits.length >= 3) {
-      add("EXISTS (SELECT 1 FROM sales_order_lines li WHERE (li.sale_id = s.id OR li.order_id = s.id) AND li.imei LIKE ?)", `%${imeiDigits}%`);
+      // Também pelo 2º IMEI do aparelho dual chip (guardado na entrada).
+    add(
+      `EXISTS (SELECT 1 FROM sales_order_lines li WHERE (li.sale_id = s.id OR li.order_id = s.id) AND (li.imei LIKE ? OR EXISTS (
+         SELECT 1 FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_each_text(COALESCE(x.imei_pairs, '{}'::jsonb)) AS p(key, value)
+          WHERE x.store_id = s.store_id AND ((p.key = li.imei AND p.value LIKE ?) OR (p.value = li.imei AND p.key LIKE ?)))))`,
+      `%${imeiDigits}%`,
+    );
     }
     if (q.q) {
       args.push(like(q.q));

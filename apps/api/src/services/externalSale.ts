@@ -6,6 +6,7 @@ import { changeVariationQuantity } from './variationInventory.js';
 import { receiveTradeInIntoExistingProduct } from './tradeInStock.js';
 import { recordTradeInEntry } from './supplierEntries.js';
 import { markUnitsSold } from './soldUnits.js';
+import { primaryImei } from './imeiPairs.js';
 import { applyRealSaleCost, findEntryByImei, moveSaleToDate } from './saleHistory.js';
 import { pickedAttributeSchema, validateSaleAttributes } from './saleAttributes.js';
 import { unreservedQuantity } from './commercialReservations.js';
@@ -159,7 +160,8 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
 
       const stockRow = stockCheck.rows[0];
       line.name = stockRow.name;
-      line.imei = String(line.imei ?? '').trim() || stockRow.imei || "";
+      // Dual chip: a venda guarda o IMEI principal do aparelho, mesmo que tenham digitado o 2º.
+      line.imei = await primaryImei(client, storeId, String(line.imei ?? '').trim() || stockRow.imei || "");
       const currentQty = Number(stockRow.qty);
       if (currentQty < line.qty && line.pickupKind!=='order') {
         throw new Error(`Estoque insuficiente para o produto "${stockRow.name}". Disponível: ${currentQty}, Solicitado: ${line.qty}`);

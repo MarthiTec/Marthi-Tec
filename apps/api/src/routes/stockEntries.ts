@@ -7,6 +7,7 @@ import { canManageArea } from '../services/employeeAccess.js';
 import { attributeValueKey } from '../services/attributeValues.js';
 import { conditionCode } from '../services/productCondition.js';
 import { attachSupplierEntries, supplierEntrySchema } from '../services/supplierEntries.js';
+import { allImeisOf, cleanImeiPairs, takenImei } from '../services/imeiPairs.js';
 import { stockDetails } from '../services/stockDetails.js';
 import { postEntryPayable } from '../services/entryFinance.js';
 import { imeiHistory, imeiReport, revertWriteOff, writeOffImei } from '../services/soldUnits.js';
@@ -49,18 +50,13 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
     const product = (await db.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [req.params.id, storeId])).rows[0];
     if (!product) throw Object.assign(new Error('Produto não encontrado nesta loja.'), { status: 404 });
 
-    // IMEI não se repete na loja.
-    const dup = entry.imeis.find((imei, index) => entry.imeis.indexOf(imei) !== index);
+    // IMEI não se repete na loja (principal ou 2º IMEI do aparelho dual chip).
+    entry.secondaryImeis = cleanImeiPairs(entry.imeis, entry.secondaryImeis);
+    const entryImeis = allImeisOf([entry]);
+    const dup = entryImeis.find((imei, index) => entryImeis.indexOf(imei) !== index);
     if (dup) throw Object.assign(new Error(`O IMEI ${dup} está repetido na entrada.`), { status: 400 });
-    if (entry.imeis.length) {
-      const taken = await db.query(
-        `SELECT e.imei, s.name FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
-           JOIN stock_items s ON s.id = x.stock_item_id
-          WHERE x.store_id = $1 AND e.imei = ANY($2::text[]) LIMIT 1`,
-        [storeId, entry.imeis],
-      );
-      if (taken.rows[0]) throw Object.assign(new Error(`O IMEI ${taken.rows[0].imei} já está no produto "${taken.rows[0].name}".`), { status: 409 });
-    }
+    const taken = await takenImei(db, storeId, entryImeis);
+    if (taken) throw Object.assign(new Error(`O IMEI ${taken.imei} já está no produto "${taken.name}".`), { status: 409 });
     const supplierId = entry.supplierId || product.supplier_id || null;
     let supplierName = '';
     if (supplierId) {
@@ -125,9 +121,9 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
 
     const entryId = `SEN-${randomUUID()}`;
     await db.query(
-      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes, battery_level)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10, $11)`,
-      [entryId, storeId, product.id, variationId, supplierId, entry.entryDate || null, qty, unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null],
+      `INSERT INTO stock_supplier_entries (id, store_id, stock_item_id, variation_id, supplier_id, entry_date, qty, unit_cost, imeis, notes, battery_level, imei_pairs)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6::date, CURRENT_DATE), $7, $8, $9::jsonb, $10, $11, $12::jsonb)`,
+      [entryId, storeId, product.id, variationId, supplierId, entry.entryDate || null, qty, unitCost, JSON.stringify(entry.imeis), entry.notes, entry.batteryLevel ?? null, JSON.stringify(entry.secondaryImeis)],
     );
     await db.query(
       `INSERT INTO stock_movements (id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes)

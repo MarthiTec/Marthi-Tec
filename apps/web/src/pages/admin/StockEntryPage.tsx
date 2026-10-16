@@ -36,6 +36,8 @@ type Form = {
   qty: number;
   unitCost: number;
   imeiList: string[];
+  /** 2º IMEI (dual chip) de cada IMEI, na mesma posição. */
+  secondList: string[];
   batteryLevel: number | null;
   notes: string;
   /** Financeiro da compra: a pagar (com vencimento), já paga (sai do caixa/conta) ou sem lançamento. */
@@ -55,6 +57,7 @@ const emptyForm = (): Form => ({
   qty: 1,
   unitCost: 0,
   imeiList: [],
+  secondList: [],
   batteryLevel: 100,
   notes: '',
   payment: 'pending',
@@ -141,6 +144,7 @@ export function StockEntryPage() {
   }, [attributes, variations]);
 
   const imeis = filledImeis(form.imeiList);
+  const secondaryImeis = Object.fromEntries(form.imeiList.map((imei, index) => [imei.trim(), (form.secondList[index] ?? '').trim()]).filter(([imei, second]) => imei && second));
   const creatingVariation = form.variationKey === NEW_VARIATION;
   const chosenVariation = !creatingVariation && form.variationKey ? variations.find((v) => (v.id ?? '') === form.variationKey) : undefined;
   const effectiveCondition = chosenVariation ? conditionCode(chosenVariation.condition) || 'new' : form.condition;
@@ -196,6 +200,7 @@ export function StockEntryPage() {
           qty,
           unitCost: Number(form.unitCost) || 0,
           imeis,
+          secondaryImeis,
           notes: form.notes.trim(),
           batteryLevel: effectiveCondition === 'new' ? 100 : form.batteryLevel,
           payment: form.payment,
@@ -212,6 +217,7 @@ export function StockEntryPage() {
         newAttrs: {},
         qty: 1,
         imeiList: [],
+  secondList: [],
         notes: '',
       }));
     } catch (err) {
@@ -392,7 +398,8 @@ export function StockEntryPage() {
               <ImeiListField
                 label={`IMEIs (${imeis.length}/${Number(form.qty) || 0})`}
                 value={form.imeiList}
-                onChange={(imeiList) => update({ imeiList, qty: Math.max(Number(form.qty) || 0, filledImeis(imeiList).length) })}
+                secondary={form.secondList}
+                onChange={(imeiList, secondList) => update({ imeiList, secondList, qty: Math.max(Number(form.qty) || 0, filledImeis(imeiList).length) })}
               />
             </div>
             <label className="stock-entry__wide">

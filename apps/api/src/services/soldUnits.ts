@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { primaryImei } from './imeiPairs.js';
 
 type Db = Pick<PoolClient, 'query'>;
 const httpError = (message: string, status = 400) => Object.assign(new Error(message), { status });
@@ -19,7 +20,8 @@ export async function markUnitsSold(
 ) {
   const qty = Math.max(0, Math.floor(Number(input.qty) || 0));
   if (!qty) return;
-  const imei = (input.imei ?? '').trim();
+  // Leu o 2º IMEI de um aparelho dual chip: vale o IMEI principal da unidade.
+  const imei = await primaryImei(db, input.storeId, (input.imei ?? '').trim());
   let remaining = qty;
 
   if (imei) {

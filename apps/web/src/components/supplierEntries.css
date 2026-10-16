@@ -160,3 +160,9 @@
 }
 /* Mesma altura dos seletores (Origem, Fornecedor, Financeiro). */
 .supplier-entry__grid .admin-field input:not([type='checkbox']) { box-sizing: border-box; height: 40px; min-height: 40px; }
+/* 2º IMEI (dual chip) ao lado do IMEI do aparelho. */
+.imei-list__row input.imei-list__second { flex: 0.85; border-style: dashed; }
+@media (max-width: 560px) {
+  .imei-list__row { flex-wrap: wrap; }
+  .imei-list__row input.imei-list__second { flex-basis: calc(100% - 40px); }
+}

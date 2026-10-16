@@ -61,6 +61,8 @@ export type SupplierEntry = {
   qty: number;
   unitCost: number;
   imeis: string[];
+  /** Aparelho dual chip: { IMEI principal: 2º IMEI } (o 2º não conta como unidade). */
+  secondaryImeis?: Record<string, string>;
   notes?: string;
   /** Bateria (%) do aparelho desta entrada. */
   batteryLevel?: number | null;

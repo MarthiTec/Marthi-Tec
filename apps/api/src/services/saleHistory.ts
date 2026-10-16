@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { primaryImei } from './imeiPairs.js';
 
 /**
  * Venda com a data em que aconteceu e com o custo dos aparelhos que realmente saíram do estoque.
@@ -34,6 +35,7 @@ export function resolveSaleMoment(saleDate: string | undefined, role: unknown, t
 /** Entrada da loja com esse IMEI (o aparelho já foi cadastrado no estoque), a mais recente. */
 export async function findEntryByImei(db: Db, storeId: string, imei: string): Promise<{ id: string; stock_item_id: string } | null> {
   if (!imei.trim()) return null;
+  imei = await primaryImei(db, storeId, imei);
   const result = await db.query(
     `SELECT x.id, x.stock_item_id FROM stock_supplier_entries x CROSS JOIN LATERAL jsonb_array_elements_text(x.imeis) AS e(imei)
       WHERE x.store_id = $1 AND e.imei = $2 ORDER BY x.entry_date DESC, x.created_at DESC LIMIT 1`,
