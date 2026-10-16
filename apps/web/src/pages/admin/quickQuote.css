@@ -17,3 +17,51 @@
   margin: 0; padding: 10px 14px; border-radius: 12px; font-weight: 700;
   background: color-mix(in srgb, #16a34a 12%, transparent);
 }
+
+/* Rápida | Por fornecedor */
+.quick-quote__tabs { display: inline-flex; gap: 4px; margin: 0 0 16px; padding: 4px; border: 1px solid var(--line, #d8dde3); border-radius: 12px; background: var(--card-2, #f8fafc); }
+.quick-quote__tabs button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent; color: var(--mute, #64748b); font: inherit; font-weight: 800; cursor: pointer; }
+.quick-quote__tabs button.is-active { background: var(--accent, #0f766e); color: #fff; }
+
+/* Cotação avançada por fornecedor */
+.supplier-quote { display: grid; gap: 16px; }
+.supplier-quote__search { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(5, minmax(120px, 1fr)); gap: 12px; align-items: end; }
+.supplier-quote__advice { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--accent, #0f766e); border-radius: 12px; background: color-mix(in srgb, var(--accent, #0f766e) 8%, transparent); }
+.supplier-quote__advice.is-stock { border-color: #d97706; background: color-mix(in srgb, #d97706 10%, transparent); }
+.supplier-quote__advice p, .supplier-quote__advice ul { margin: 0; }
+.supplier-quote__advice ul { padding-left: 18px; font-size: 0.86rem; }
+.supplier-quote__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.supplier-quote__head h2 { margin: 0; font-size: 1rem; }
+.supplier-quote__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.supplier-quote__card { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line, #d8dde3); border-radius: 14px; background: var(--card, #fff); }
+.supplier-quote__card.is-best { border: 2px solid var(--accent, #0f766e); }
+.supplier-quote__card header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.supplier-quote__card h3 { margin: 0; font-size: 1rem; }
+.supplier-quote__card header small { color: var(--mute, #64748b); font-size: 0.76rem; font-weight: 600; }
+.supplier-quote__rank { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--mute, #64748b) 14%, transparent); font-weight: 800; }
+.supplier-quote__card.is-best .supplier-quote__rank { background: var(--accent, #0f766e); color: #fff; }
+.supplier-quote__price { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.supplier-quote__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 0; font-size: 0.84rem; }
+.supplier-quote__facts dt { color: var(--mute, #64748b); font-size: 0.72rem; font-weight: 700; }
+.supplier-quote__facts dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.supplier-quote__procon { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.supplier-quote__procon ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 0.8rem; }
+.supplier-quote__procon li { padding-left: 18px; position: relative; }
+.supplier-quote__procon .is-pro li::before { content: '✓'; position: absolute; left: 0; color: #15803d; font-weight: 800; }
+.supplier-quote__procon .is-con li::before { content: '✗'; position: absolute; left: 0; color: #b91c1c; font-weight: 800; }
+.supplier-quote__notes { margin: 0; color: var(--mute, #64748b); font-size: 0.8rem; }
+.supplier-quote__card footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.supplier-quote__empty { margin: 0; color: var(--mute, #64748b); }
+.supplier-quote__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.supplier-quote__form > label { display: grid; gap: 6px; min-width: 0; }
+.supplier-quote__wide { grid-column: 1 / -1; }
+.is-theme-dark .supplier-quote__procon .is-pro li::before { color: #86efac; }
+.is-theme-dark .supplier-quote__procon .is-con li::before { color: #fca5a5; }
+@media (max-width: 900px) {
+  .supplier-quote__search { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .supplier-quote__model { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .supplier-quote__search, .supplier-quote__form, .supplier-quote__procon { grid-template-columns: minmax(0, 1fr); }
+  .supplier-quote__list { grid-template-columns: minmax(0, 1fr); }
+}

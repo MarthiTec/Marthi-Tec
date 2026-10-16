@@ -15,6 +15,7 @@ import { hydrateTotemSettingsFromApi } from '../../data/totemSettings';
 import { totemCardFee } from '../../data/variantQuote';
 import './installmentCalculator.css';
 import './quickQuote.css';
+import { SupplierQuotePanel } from './SupplierQuotePanel';
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const percent = (value: number) => `${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`;
@@ -60,6 +61,7 @@ export function QuickQuotePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState('');
+  const [mode, setMode] = useState<'quick' | 'suppliers'>('quick');
 
   useEffect(() => {
     const changed = () => setStoreId(getActiveStoreId());
@@ -166,14 +168,40 @@ export function QuickQuotePage() {
       <header className="installment-calc__head">
         <h1>Cotação rápida</h1>
         <p>Preço do fornecedor de agora + sua margem. Com aparelho na troca, o desconto sai na hora; no cartão, a taxa da maquininha vai para o cliente.</p>
+        <div className="quick-quote__tabs" role="tablist" aria-label="Tipo de cotação">
+          <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'is-active' : ''} onClick={() => setMode('quick')}>
+            Rápida
+          </button>
+          <button type="button" role="tab" aria-selected={mode === 'suppliers'} className={mode === 'suppliers' ? 'is-active' : ''} onClick={() => setMode('suppliers')}>
+            Por fornecedor
+          </button>
+        </div>
       </header>
 
-      {ratesReady && !hasRates ? (
+      {mode === 'suppliers' ? (
+        <SupplierQuotePanel
+          marginMode={marginMode}
+          margin={margin}
+          onMarginModeChange={setMarginMode}
+          onMarginChange={setMargin}
+          onUse={(name, offerCost) => {
+            setStockId('');
+            setDevice(name);
+            setCost(offerCost);
+            setCreated('');
+            setMode('quick');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      ) : null}
+
+      {mode === 'quick' && ratesReady && !hasRates ? (
         <p className="installment-calc__alert" role="status">
           Nenhuma taxa de cartão cadastrada: o parcelamento sai sem juros. Cadastre em <Link to="/painel/taxas-cartao">Taxas & Maquininhas</Link>.
         </p>
       ) : null}
 
+      {mode === 'quick' ? (
       <div className="installment-calc__layout">
         <section className="admin-card installment-calc__card" aria-label="Dados da cotação">
           <AdminPicker
@@ -307,6 +335,7 @@ export function QuickQuotePage() {
           </p>
         </section>
       </div>
+      ) : null}
     </div>
   );
 }

@@ -41,6 +41,7 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { proxyUnmatchedApi } from './middlewares/nestProxy.js';
 import { financeBookRouter } from './routes/financeBook.js';
 import { dashboardRouter } from './routes/dashboard.js';
+import { supplierOffersRouter } from './routes/supplierOffers.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
@@ -98,6 +99,7 @@ app.use(storesRouter);
 app.use(financeRouter);
 app.use(financeBookRouter);
 app.use(dashboardRouter);
+app.use(supplierOffersRouter);
 app.use(posRouter);
 app.use(salesRouter);
 app.use(commercialRouter);

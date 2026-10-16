@@ -2403,3 +2403,22 @@ export function apiGetStoreBrandProfile() {
 export function apiSaveStoreBrandProfile(body: Partial<Omit<ApiStoreBrandProfile, 'name' | 'legalName' | 'logoFromTotem'>>) {
   return nestRequest<ApiStoreBrandProfile>('/store/brand-profile', { method: 'PUT', body: JSON.stringify(body) });
 }
+
+/* ── Cotação avançada: ofertas dos fornecedores ───────────────── */
+
+export type ApiSupplierOfferInput = Omit<import('../data/supplierOfferCompare').SupplierOffer, 'id' | 'quotedAt'> & { quotedAt?: string };
+
+/** Ofertas cotadas nos últimos `days` dias (0 = só hoje). */
+export function apiListSupplierOffers(days = 7) {
+  return nestGet<import('../data/supplierOfferCompare').SupplierOffer[]>(`/supplier-offers?days=${days}`);
+}
+
+export function apiSaveSupplierOffer(id: string | undefined, body: ApiSupplierOfferInput) {
+  return id
+    ? nestPut<import('../data/supplierOfferCompare').SupplierOffer>(`/supplier-offers/${encodeURIComponent(id)}`, body)
+    : nestPost<import('../data/supplierOfferCompare').SupplierOffer>('/supplier-offers', body);
+}
+
+export function apiDeleteSupplierOffer(id: string) {
+  return nestDelete<{ ok: boolean }>(`/supplier-offers/${encodeURIComponent(id)}`);
+}
