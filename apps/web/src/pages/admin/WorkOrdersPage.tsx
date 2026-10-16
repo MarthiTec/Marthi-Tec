@@ -30,6 +30,7 @@ import { OsSprintModal } from '../os/OsSprintModal';
 import { OsTechnicianRoadmap } from '../os/OsTechnicianRoadmap';
 import { OsBacklogView } from '../os/OsBacklogView';
 import { OsDashboardView } from '../os/OsDashboardView';
+import { TradeEvaluationStrip } from '../../components/TradeEvaluationStrip';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1342,6 +1343,7 @@ export function WorkOrdersPage() {
         </article>
       ) : (
         <div className="os-board-wrapper">
+          <TradeEvaluationStrip />
           {backlogCount > 0 && !statusFilter ? (
             <div className="os-board-backlog-callout" onClick={() => changeView('backlog')}>
               <div className="os-board-backlog-callout__text">

@@ -64,6 +64,7 @@ type StockOption = {
 import { QuickAddButton } from '../../components/QuickModal';
 import { QuickCreateCustomer, QuickCreateSeller } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
+import { TradeEvaluationPanel, tradeEvaluationSummary } from '../../components/TradeEvaluationPanel';
 
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
 import { totemCardFee } from '../../data/variantQuote';
@@ -950,6 +951,27 @@ export function ExternalSalePage() {
                   <div>
                     <label className="admin-label">IMEI do aparelho entregue</label>
                     <input type="text" className="admin-input" placeholder="3589…" value={tradeIn.imei} onChange={(e) => setTradeIn({ ...tradeIn, imei: e.target.value })} />
+                  </div>
+                  <div className="external-sale-wide-field">
+                    <TradeEvaluationPanel
+                      imei={tradeIn.imei || ''}
+                      deviceName={tradeIn.deviceName}
+                      customerId={selectedCustomerId || null}
+                      customerName={customerName}
+                      capacity={tradeIn.capacity}
+                      color={tradeIn.color}
+                      notes={tradeIn.notes}
+                      onApproved={(evaluation) =>
+                        // Preço aprovado vira o crédito; bateria e o que a oficina viu vão para o usado.
+                        setTradeIn((current) => ({
+                          ...current,
+                          tradeValue: evaluation.approvedPrice ?? evaluation.suggestedPrice ?? current.tradeValue,
+                          batteryLevel: evaluation.batteryLevel ?? current.batteryLevel,
+                          conditionState: evaluation.cracked ? 'damaged' : current.conditionState,
+                          notes: current.notes?.includes('Avaliação da oficina:') ? current.notes : [current.notes, `Avaliação da oficina: ${tradeEvaluationSummary(evaluation)}`].filter(Boolean).join(' · ').slice(0, 500),
+                        }))
+                      }
+                    />
                   </div>
                   <div>
                     <AdminPicker

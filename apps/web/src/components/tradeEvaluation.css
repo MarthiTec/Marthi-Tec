@@ -1,0 +1,40 @@
+/* Avaliação do aparelho de troca (venda externa e esteira da OS). */
+.trade-eval { display: grid; gap: 8px; }
+.trade-eval__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.trade-eval__card { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-left: 4px solid #d97706; border-radius: 10px; background: var(--surface, #fff); }
+.trade-eval__card p { margin: 0; font-size: .86rem; }
+.trade-eval__card.is-evaluated { border-left-color: var(--accent, #0f766e); }
+.trade-eval__card.is-approved { border-left-color: #16a34a; }
+.trade-eval__card.is-rejected { border-left-color: #dc2626; }
+.trade-eval__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.trade-eval__head .btn { margin-left: auto; }
+.trade-eval__badge { padding: 2px 8px; border-radius: 999px; background: rgba(var(--accent-rgb, 15, 118, 110), .1); color: var(--accent, #0f766e); font-size: .72rem; font-weight: 700; }
+.trade-eval__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.trade-eval__actions:empty { display: none; }
+.trade-eval__error { margin: 0; color: #dc2626; font-size: .82rem; }
+
+/* Esteira da OS: faixa de avaliações pendentes acima do quadro. */
+.trade-eval-strip { display: grid; gap: 8px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid #f59e0b55; border-radius: 12px; background: #fffbeb; }
+.trade-eval-strip__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .9rem; font-weight: 750; color: #92400e; }
+.trade-eval-strip__list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.trade-eval-strip__item { flex: 0 0 auto; display: grid; gap: 2px; min-width: 230px; max-width: 320px; padding: 8px 10px; border: 1px solid #f59e0b66; border-radius: 10px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.trade-eval-strip__item:hover { border-color: #d97706; box-shadow: 0 2px 8px #d9770622; }
+.trade-eval-strip__item strong { font-size: .84rem; }
+.trade-eval-strip__item span { color: var(--mute, #64748b); font-size: .78rem; }
+.trade-eval-strip__item.is-evaluated { border-color: var(--line, #e2e8f0); background: #f8fafc; }
+.trade-eval-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.trade-eval-form .is-wide { grid-column: 1 / -1; }
+.trade-eval-form fieldset { display: flex; gap: 12px; margin: 0; padding: 0; border: 0; }
+.trade-eval-form legend { margin-bottom: 4px; font-size: .8rem; font-weight: 650; }
+.trade-eval-form label.trade-eval__choice { display: inline-flex; align-items: center; gap: 4px; font-size: .86rem; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .trade-eval-strip { background: #3a2a0a; border-color: #f59e0b44; }
+  :root:not([data-theme="light"]) .trade-eval-strip__title { color: #fcd34d; }
+  :root:not([data-theme="light"]) .trade-eval-strip__item { background: #1e293b; }
+  :root:not([data-theme="light"]) .trade-eval-strip__item.is-evaluated { background: #0f172a; }
+}
+:root[data-theme="dark"] .trade-eval-strip { background: #3a2a0a; border-color: #f59e0b44; }
+:root[data-theme="dark"] .trade-eval-strip__title { color: #fcd34d; }
+:root[data-theme="dark"] .trade-eval-strip__item { background: #1e293b; }
+:root[data-theme="dark"] .trade-eval-strip__item.is-evaluated { background: #0f172a; }

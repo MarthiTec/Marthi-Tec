@@ -44,6 +44,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { supplierOffersRouter } from './routes/supplierOffers.js';
 import { cashRouter } from './routes/cash.js';
 import { salesSearchRouter } from './routes/salesSearch.js';
+import { tradeEvaluationsRouter } from './routes/tradeEvaluations.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
@@ -104,6 +105,7 @@ app.use(dashboardRouter);
 app.use(supplierOffersRouter);
 app.use(cashRouter);
 app.use(salesSearchRouter);
+app.use(tradeEvaluationsRouter);
 app.use(posRouter);
 app.use(salesRouter);
 app.use(commercialRouter);
