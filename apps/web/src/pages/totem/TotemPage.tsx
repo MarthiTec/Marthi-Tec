@@ -1,6 +1,6 @@
 import {PickupFields} from '../../components/PickupFields';
 import {usePickupMethods} from '../../data/pickup';
-import {productPickupMethods,selectProductVariation,productAvailableForTotem} from '../../data/productPickup';
+import {productPickupMethods,selectProductVariation,productAvailableForTotem,pickupFitsView,type PickupView} from '../../data/productPickup';
 import type {DeliveryAddress} from '../../data/pickup';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -38,7 +38,7 @@ import { formatInstallment, totemCardFee, quoteFromPicked, quoteTotemVariant } f
 import { submitTotemLead } from '../../services/totem';
 import { ProductCarousel } from './ProductCarousel';
 import { TotemAttractScene } from './TotemAttractScene';
-import {TotemGuidedFlow} from './TotemGuidedFlow';
+import {PICKUP_CHOICES,TotemGuidedFlow} from './TotemGuidedFlow';
 import {assistantText} from '../../data/totemAssistant';
 import {loadTotemOffers,dayOfferFor,type DayOffer} from '../../data/dayOffers';
 import QRCode from 'qrcode';
@@ -56,8 +56,8 @@ import { TotemPicker } from './TotemPicker';
 import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode, conditionText, productConditionChoices, type ProductConditionCode } from '../../data/productCondition';
 import {
   INSTALLMENTS,
-  PAYMENT_OPTIONS,
-  formatBRL,
+  PAYMENT_OPTIONS,
+  formatBRL,
   type TotemProduct,
 } from './totemData';
 import { listTotemCatalog, listTotemStock, loadTotemCatalog } from './totemCatalog';
@@ -231,6 +231,8 @@ export function TotemPage() {
   const [guidedSettings,setGuidedSettings]=useState(()=>getTotemSettings().assistant);
   const [attractContent,setAttractContent]=useState(()=>getTotemSettings().attractContent);
   const [shoppingIntent,setShoppingIntent]=useState('all');
+  // Em mãos, sob encomenda ou ambos: escolhido no passo a passo ou nos botões do catálogo.
+  const [pickupView,setPickupView]=useState<PickupView>('all');
   const [dayOffers,setDayOffers]=useState<DayOffer[]>([]);
   const [offerNow,setOfferNow]=useState(Date.now);
   useEffect(()=>{let active=true;const refresh=()=>{void loadTotemOffers().then(rows=>{if(active)setDayOffers(rows);}).catch(()=>{});setOfferNow(Date.now());};refresh();const timer=window.setInterval(refresh,60000);return()=>{active=false;window.clearInterval(timer);};},[]);
@@ -341,7 +343,7 @@ export function TotemPage() {
     setExitError(null);
     setConfigs({});
     setTicketId(null);
-    setShoppingIntent('all');setWhatsappUrl(undefined);setTrackingToken(undefined);
+    setShoppingIntent('all');setPickupView('all');setWhatsappUrl(undefined);setTrackingToken(undefined);
     setSentToCashierDone(false);
     setCustomerNotified(false);
     setGroup('all');
@@ -392,9 +394,15 @@ export function TotemPage() {
     return index;
   }, [totemBrands]);
   const availableCatalog = useMemo(
-    () => catalog.filter((item) => productAvailableForTotem(pickupMethods, listTotemStock().find((stock) => stock.id === item.stockId))),
-    [catalog, pickupMethods],
+    () => catalog.filter((item) => productAvailableForTotem(pickupMethods, listTotemStock().find((stock) => stock.id === item.stockId), pickupView)),
+    [catalog, pickupMethods, pickupView],
   );
+  /** Só pergunta/mostra "em mãos ou sob encomenda" quando a loja tem produtos dos dois jeitos. */
+  const offersBothPickups = useMemo(() => {
+    const stocks = catalog.map((item) => listTotemStock().find((stock) => stock.id === item.stockId));
+    return stocks.some((stock) => productAvailableForTotem(pickupMethods, stock, 'immediate')) && stocks.some((stock) => productAvailableForTotem(pickupMethods, stock, 'order'));
+  }, [catalog, pickupMethods]);
+  const viewMethods = (methods: typeof pickupMethods) => methods.filter((method) => pickupFitsView(pickupView, method));
   const navItems = useMemo<TotemNavItem[]>(() => {
     const groups = new Map<string, TotemNavItem>();
     for (const product of availableCatalog) {
@@ -762,7 +770,7 @@ export function TotemPage() {
     const stock=listTotemStock().find(item=>item.id===product.stockId);
     const selected=selectProductVariation(stock,base);
     if(selected) Object.assign(base,selected.attrs);
-    const available=productPickupMethods(pickupMethods,stock??null,selected);
+    const available=viewMethods(productPickupMethods(pickupMethods,stock??null,selected));
     if(!available.some(method=>method.id===base['pickup-method'])) base['pickup-method']=available[0]?.id||'';
     return base;
   }
@@ -850,7 +858,7 @@ export function TotemPage() {
     const cardFeePercent = stockFee !== undefined ? stockFee : totemCardFee(18);
     return {
       stockId:quote.stock?.id,pickupPrices:quote.stock?.pickupPrices,baseCashPrice:quote.cashPrice,
-      pickupAllowedIds:productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]).map(method=>method.id),
+      pickupAllowedIds:viewMethods(productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0])).map(method=>method.id),
       pickupMethodId:config['pickup-method'],
       product,
       picked,
@@ -1146,7 +1154,7 @@ export function TotemPage() {
         />
       )}
 
-      {step==='guided'&&<TotemGuidedFlow settings={guidedSettings} brands={visual.navGroup==='brand'?navItems.filter(item=>item.key!=='outros').map(item=>({id:item.key,label:item.label,logo:item.logo})):[]} hasOffers={dayOffers.some(offer=>Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow)&&catalog.some(product=>offer.criteria.stockIds.includes(product.stockId||'')&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} onCancel={resetTotem} onComplete={(customer,intent,chosenBrand)=>{setName(customer);setShoppingIntent(intent);setGroup(chosenBrand==='all'?'all':chosenBrand);setStep('catalog');bumpIdle();}}/>}
+      {step==='guided'&&<TotemGuidedFlow settings={guidedSettings} brands={visual.navGroup==='brand'?navItems.filter(item=>item.key!=='outros').map(item=>({id:item.key,label:item.label,logo:item.logo})):[]} hasOffers={dayOffers.some(offer=>Date.parse(offer.endDate)>offerNow&&(!offer.startDate||Date.parse(offer.startDate)<=offerNow)&&catalog.some(product=>offer.criteria.stockIds.includes(product.stockId||'')&&productAvailableForTotem(pickupMethods,listTotemStock().find(stock=>stock.id===product.stockId))))} offersBothPickups={offersBothPickups} onCancel={resetTotem} onComplete={(customer,intent,chosenBrand,view)=>{setName(customer);setShoppingIntent(intent);setPickupView(view);setGroup(chosenBrand==='all'?'all':chosenBrand);setStep('catalog');bumpIdle();}}/>}
       {step === 'welcome' && collectNameUpFront && (
         <section className={`totem__welcome totem__welcome--kb-${keyboardPlacement}`}>
           {keyboardPlacement === 'top' ? (
@@ -1301,6 +1309,7 @@ export function TotemPage() {
                         ))
                       : null}
                     <button type="button" className={`totem-chip totem-chip--offer ${shoppingIntent==='offers'?'is-active':''}`} onClick={()=>{bumpIdle();setShoppingIntent(current=>current==='offers'?'all':'offers');}}>🔥 Ofertas do dia</button>
+                    {offersBothPickups ? PICKUP_CHOICES.map(choice=><button key={choice.id} type="button" className={`totem-chip totem-chip--pickup ${pickupView===choice.id?'is-active':''}`} aria-pressed={pickupView===choice.id} onClick={()=>{bumpIdle();setPickupView(choice.id);}}>{choice.label}</button>) : null}
                   </div>
                 </div>
               ) : null}
@@ -1415,7 +1424,7 @@ export function TotemPage() {
                   .filter((attr) => resolveTotemAttrOptions(product, attr).length > 0)
                   .slice(0, 5);
                 const quote = quoteTotemVariant(product.name, product.cashPrice, config, listTotemStock().filter(s => s.id === product.stockId));
-                const availablePickup = productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]);
+                const availablePickup = viewMethods(productPickupMethods(pickupMethods,quote.stock,quote.stock?.variations?.[0]));
                 const pickupPrice = quote.stock?.pickupPrices?.[config['pickup-method']];
                 const normalPrice = typeof pickupPrice === 'number' ? pickupPrice : quote.cashPrice;
                 const offer=dayOfferFor(dayOffers,product.stockId||'',config,normalPrice,offerNow);

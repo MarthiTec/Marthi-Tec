@@ -1892,6 +1892,10 @@ html.totem-html-scroll {
 .totem-chip.totem-chip--offer{border:1.5px solid var(--accent,#0f766e);color:var(--accent,#0f766e);background:rgba(var(--accent-rgb,15,118,110),.08)}
 .totem-chip.totem-chip--offer:hover{background:rgba(var(--accent-rgb,15,118,110),.16)}
 .totem-chip.totem-chip--offer.is-active{background:var(--accent,#0f766e);border-color:var(--accent,#0f766e);color:#fff}
+/* Em mãos / sob encomenda / ambos: botões com contorno para não parecer texto solto. */
+.totem-chip.totem-chip--pickup{border:1.5px solid rgba(0,0,0,.14)}
+.totem-chip.totem-chip--pickup.is-active{border-color:transparent}
+.totem--dark .totem-chip.totem-chip--pickup{border-color:rgba(255,255,255,.2)}
 .totem-whatsapp-handoff{padding:20px;margin:20px auto;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;max-width:450px}
 .totem-whatsapp-handoff img{width:min(260px,100%);height:auto;background:white;border-radius:12px}
 .totem-whatsapp-handoff a{display:block;text-decoration:none;padding:14px;white-space:normal}

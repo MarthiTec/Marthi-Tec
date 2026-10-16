@@ -27,10 +27,14 @@ export function selectProductVariation(stock:StockItem|undefined,config:Record<s
     .sort((a,b)=>b.score-a.score)[0]?.v ?? valid[0];
 }
 
-export function productAvailableForTotem(methods:PickupMethod[],stock:StockItem|undefined) {
+/** O que o cliente quer ver no totem: preços em mãos (pronta entrega), sob encomenda ou ambos. */
+export type PickupView='all'|'immediate'|'order';
+export const pickupFitsView=(view:PickupView,method:PickupMethod)=>view==='all'||(view==='order'?method.kind==='order':method.kind!=='order');
+
+export function productAvailableForTotem(methods:PickupMethod[],stock:StockItem|undefined,view:PickupView='all') {
   if(!stock) return false;
   const variations=stock.variations?.length?stock.variations:[undefined];
-  return variations.some(variation=>productPickupMethods(methods,stock,variation).some(method=>method.kind==='order'||Number(variation?.qty??stock.qty)>0));
+  return variations.some(variation=>productPickupMethods(methods,stock,variation).filter(method=>pickupFitsView(view,method)).some(method=>method.kind==='order'||Number(variation?.qty??stock.qty)>0));
 }
 
 type SaleStock = { price: number; pickupPrices?: Record<string, number | null>; variations?: StockVariationRow[] };

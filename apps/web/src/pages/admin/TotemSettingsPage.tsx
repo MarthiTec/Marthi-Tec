@@ -1014,19 +1014,20 @@ export function TotemSettingsPage() {
           <div className="totem-settings-options">
             <TotemSettingToggle label="Preferência de compra" hint="Perguntar sobre preço baixo, ofertas ou novidades." checked={assistant.askIntent} onChange={askIntent=>setAssistant(current=>({...current,askIntent}))}/>
             <TotemSettingToggle label="Marca preferida" hint="Mostrar apenas marcas com produtos disponíveis." checked={assistant.askBrand} onChange={askBrand=>setAssistant(current=>({...current,askBrand}))}/>
+            <TotemSettingToggle label="Em mãos ou sob encomenda" hint="Perguntar se quer ver os preços em mãos, sob encomenda ou ambos (só quando a loja tem os dois)." checked={assistant.askPickup} onChange={askPickup=>setAssistant(current=>({...current,askPickup}))}/>
           </div>
           <div className="totem-settings-conversation">
             <div className="totem-settings-messages">
               <h3>Personalize as mensagens</h3>
               <p>O marcador <code>{'{nome}'}</code> usa o nome que o cliente informar, inclusive nomes como Ana Paula. <code>{'{vendedor}'}</code> usa o nome do assistente.</p>
-              {(['namePrompt','intentPrompt','brandPrompt','productsPrompt','closingPrompt'] as const).map((key,index)=><details key={key} className="totem-settings-step" open={key==='namePrompt'?true:undefined}><summary><span>{index+1}</span><strong>{['Boas-vindas','Preferência de compra','Marca','Produtos sugeridos','Finalizar com vendedor'][index]}</strong></summary><label>Mensagem do assistente<textarea rows={3} value={assistant[key]} maxLength={300} onChange={e=>setAssistant(current=>({...current,[key]:e.target.value}))}/></label></details>)}
+              {(['namePrompt','intentPrompt','pickupPrompt','brandPrompt','productsPrompt','closingPrompt'] as const).map((key,index)=><details key={key} className="totem-settings-step" open={key==='namePrompt'?true:undefined}><summary><span>{index+1}</span><strong>{['Boas-vindas','Preferência de compra','Em mãos ou sob encomenda','Marca','Produtos sugeridos','Finalizar com vendedor'][index]}</strong></summary><label>Mensagem do assistente<textarea rows={3} value={assistant[key]} maxLength={300} onChange={e=>setAssistant(current=>({...current,[key]:e.target.value}))}/></label></details>)}
             </div>
             <aside className="totem-settings-chat" aria-label="Exemplo da conversa">
               <div className="totem-settings-chat__heading">{assistant.avatar?<img src={assistant.avatar} alt=""/>:<span aria-hidden="true">{assistant.name.slice(0,1)||'A'}</span>}<div><strong>{assistant.name||'Assistente'}</strong><small>Prévia da conversa</small></div></div>
               <label>Nome de exemplo<input value={exampleName} maxLength={100} onChange={e=>setExampleName(e.target.value)} placeholder="Ana Paula"/></label>
               <p className="totem-settings-chat__bubble">{assistantText(assistant.namePrompt,exampleName,assistant.name)}</p>
               <p className="totem-settings-chat__reply">{exampleName||'Seu cliente'}</p>
-              {(assistant.askIntent?[assistant.intentPrompt]:[]).concat(assistant.askBrand?[assistant.brandPrompt]:[],[assistant.productsPrompt,assistant.closingPrompt]).map((text,index)=><p key={index} className="totem-settings-chat__bubble">{assistantText(text,exampleName,assistant.name)}</p>)}
+              {(assistant.askIntent?[assistant.intentPrompt]:[]).concat(assistant.askPickup?[assistant.pickupPrompt]:[],assistant.askBrand?[assistant.brandPrompt]:[],[assistant.productsPrompt,assistant.closingPrompt]).map((text,index)=><p key={index} className="totem-settings-chat__bubble">{assistantText(text,exampleName,assistant.name)}</p>)}
               <small>Exemplo de como o cliente verá as mensagens. O nome real será informado no totem.</small>
             </aside>
           </div>

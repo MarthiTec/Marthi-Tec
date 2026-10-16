@@ -1,28 +1,45 @@
 import { useState } from 'react';
 import { assistantText, type TotemAssistantSettings } from '../../data/totemAssistant';
+import type { PickupView } from '../../data/productPickup';
 import { TotemKeyboard } from './TotemKeyboard';
+
+export const PICKUP_CHOICES: { id: PickupView; label: string }[] = [
+  { id: 'immediate', label: 'Em mãos' },
+  { id: 'order', label: 'Sob encomenda' },
+  { id: 'all', label: 'Ver ambos' },
+];
 
 export function TotemGuidedFlow({
   settings,
   brands,
   hasOffers,
+  offersBothPickups,
   onComplete,
   onCancel,
 }: {
   settings: TotemAssistantSettings;
   brands: { id: string; label: string; logo?: string }[];
   hasOffers: boolean;
-  onComplete: (name: string, intent: string, brand: string) => void;
+  /** A loja tem produtos em mãos e sob encomenda: só então vale perguntar. */
+  offersBothPickups: boolean;
+  onComplete: (name: string, intent: string, brand: string, view: PickupView) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState('');
   const [intent, setIntent] = useState('all');
-  const [stage, setStage] = useState<'name' | 'intent' | 'brand'>('name');
+  const [view, setView] = useState<PickupView>('all');
+  const [stage, setStage] = useState<'name' | 'intent' | 'pickup' | 'brand'>('name');
 
+  function afterPickup(value: PickupView) {
+    setView(value);
+    if (settings.askBrand && brands.length) setStage('brand');
+    else onComplete(name.trim(), intent, 'all', value);
+  }
   function afterIntent(value: string) {
     setIntent(value);
-    if (settings.askBrand && brands.length) setStage('brand');
-    else onComplete(name.trim(), value, 'all');
+    if (settings.askPickup && offersBothPickups) setStage('pickup');
+    else if (settings.askBrand && brands.length) setStage('brand');
+    else onComplete(name.trim(), value, 'all', 'all');
   }
   function afterName() {
     if (!name.trim()) return;
@@ -30,7 +47,7 @@ export function TotemGuidedFlow({
     else afterIntent('all');
   }
 
-  const prompt = stage === 'name' ? settings.namePrompt : stage === 'intent' ? settings.intentPrompt : settings.brandPrompt;
+  const prompt = stage === 'name' ? settings.namePrompt : stage === 'intent' ? settings.intentPrompt : stage === 'pickup' ? settings.pickupPrompt : settings.brandPrompt;
 
   return (
     <section className="totem-guided">
@@ -88,15 +105,23 @@ export function TotemGuidedFlow({
           ))}
           {!hasOffers && <p>Não há ofertas ativas neste momento.</p>}
         </div>
+      ) : stage === 'pickup' ? (
+        <div className="totem-guided__choices">
+          {PICKUP_CHOICES.map((item) => (
+            <button key={item.id} type="button" className="totem-btn totem-btn--primary" onClick={() => afterPickup(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
       ) : (
         <div className="totem-guided__choices">
           {brands.map((brand) => (
-            <button key={brand.id} className={`totem-btn totem-btn--primary${brand.logo ? ' totem-guided__brand' : ''}`} onClick={() => onComplete(name.trim(), intent, brand.id)}>
+            <button key={brand.id} className={`totem-btn totem-btn--primary${brand.logo ? ' totem-guided__brand' : ''}`} onClick={() => onComplete(name.trim(), intent, brand.id, view)}>
               {brand.logo ? <span className="totem-guided__brand-logo" aria-hidden="true"><img src={brand.logo} alt="" /></span> : null}
               {brand.label}
             </button>
           ))}
-          <button className="totem-btn totem-btn--ghost" onClick={() => onComplete(name.trim(), intent, 'all')}>
+          <button className="totem-btn totem-btn--ghost" onClick={() => onComplete(name.trim(), intent, 'all', view)}>
             Ver todas as marcas
           </button>
         </div>

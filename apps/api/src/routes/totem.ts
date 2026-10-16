@@ -22,7 +22,7 @@ export const totemRouter = Router();
 
 const defaultTotemSettings = {
   attractContent:'full',
-  assistant:{enabled:false,name:'',avatar:null,whatsapp:'',sellerId:'',askIntent:true,askBrand:true,namePrompt:'Oi, meu nome é {vendedor}. Como você prefere ser chamado?',intentPrompt:'Oi, {nome}! O que está buscando hoje?',brandPrompt:'Qual marca te agrada mais, {nome}?',productsPrompt:'{nome}, estes são os produtos disponíveis. Qual faz mais sentido para você?',closingPrompt:'Ótima escolha, {nome}! Você pode finalizar comigo pelo WhatsApp ou na loja.'},
+  assistant:{enabled:false,name:'',avatar:null,whatsapp:'',sellerId:'',askIntent:true,askBrand:true,askPickup:true,namePrompt:'Oi, meu nome é {vendedor}. Como você prefere ser chamado?',intentPrompt:'Oi, {nome}! O que está buscando hoje?',pickupPrompt:'Quer ver os preços dos produtos em mãos, sob encomenda ou ambos, {nome}?',brandPrompt:'Qual marca te agrada mais, {nome}?',productsPrompt:'{nome}, estes são os produtos disponíveis. Qual faz mais sentido para você?',closingPrompt:'Ótima escolha, {nome}! Você pode finalizar comigo pelo WhatsApp ou na loja.'},
   mode: 'kiosk',
   /** Sem senha padrão: cada loja define a sua em Configurações do Totem. */
   exitPassword: '',
@@ -60,7 +60,7 @@ const defaultTotemSettings = {
 
 const totemSettingsSchema = z.object({
   attractContent:z.enum(['full','text','background']).default('full'),
-  assistant:z.object({enabled:z.boolean(),name:z.string().trim().max(80),avatar:z.string().nullable(),whatsapp:z.string().max(30),sellerId:z.string().max(100),askIntent:z.boolean(),askBrand:z.boolean(),namePrompt:z.string().max(300),intentPrompt:z.string().max(300),brandPrompt:z.string().max(300),productsPrompt:z.string().max(300),closingPrompt:z.string().max(300)}).refine((assistant)=>!assistant.enabled||assistant.name.length>0,{message:'Informe o nome do assistente.',path:['name']}).optional(),
+  assistant:z.object({enabled:z.boolean(),name:z.string().trim().max(80),avatar:z.string().nullable(),whatsapp:z.string().max(30),sellerId:z.string().max(100),askIntent:z.boolean(),askBrand:z.boolean(),askPickup:z.boolean().default(true),namePrompt:z.string().max(300),intentPrompt:z.string().max(300),pickupPrompt:z.string().max(300).default('Quer ver os preços dos produtos em mãos, sob encomenda ou ambos, {nome}?'),brandPrompt:z.string().max(300),productsPrompt:z.string().max(300),closingPrompt:z.string().max(300)}).refine((assistant)=>!assistant.enabled||assistant.name.length>0,{message:'Informe o nome do assistente.',path:['name']}).optional(),
   mode: z.enum(['kiosk', 'catalog']).default('kiosk'),
   exitPassword: z.string().optional(),
   shareStockWithErp: z.boolean().default(true),
