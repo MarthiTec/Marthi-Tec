@@ -1,5 +1,5 @@
 /* Contas a pagar / a receber. */
-.bills { display: grid; gap: 14px; }
+.bills { display: grid; gap: 14px; container-type: inline-size; }
 .bills__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .bills__head h2 { margin: 0; }
 
@@ -33,8 +33,8 @@
 
 .bills__table { display: grid; border: 1px solid var(--line, #d8dde3); border-radius: 12px; overflow: hidden; }
 .bills__row {
-  display: grid; grid-template-columns: 96px minmax(180px, 2fr) minmax(110px, 1fr) 112px 112px 100px minmax(260px, auto);
-  align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line, #d8dde3); font-size: 0.88rem;
+  display: grid; grid-template-columns: 84px minmax(120px, 2fr) minmax(80px, 1fr) 96px 96px 84px auto;
+  align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line, #d8dde3); font-size: 0.88rem;
 }
 .bills__row > span { min-width: 0; }
 .bills__row--head {
@@ -57,15 +57,13 @@
 .bills__status.is-overdue { background: color-mix(in srgb, #dc2626 16%, transparent); color: #b91c1c; }
 .bills__status.is-cancelled { background: color-mix(in srgb, var(--mute, #64748b) 16%, transparent); color: var(--mute, #64748b); }
 .bills__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
-.bills__danger { color: #b91c1c; }
 .bills__empty { margin: 0; padding: 14px 12px; color: var(--mute, #64748b); }
 
 .is-theme-dark .bills__status.is-open { color: #fbbf24; }
 .is-theme-dark .bills__status.is-partial { color: #93c5fd; }
 .is-theme-dark .bills__status.is-paid { color: #86efac; }
 .is-theme-dark .bills__status.is-overdue,
-.is-theme-dark .bills__totals button.is-danger strong,
-.is-theme-dark .bills__danger { color: #fca5a5; }
+.is-theme-dark .bills__totals button.is-danger strong { color: #fca5a5; }
 
 /* Formulário e ficha da conta. */
 .bills-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: start; }
@@ -80,8 +78,8 @@
 .bills-view__moves li { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 10px; font-size: 0.84rem; }
 .bills-view__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
-/* Tela estreita: cada conta vira um cartão. */
-@media (max-width: 1100px) {
+/* Painel estreito (tela pequena ou menu lateral aberto): cada conta vira um cartão. */
+@container (max-width: 860px) {
   .bills__row--head { display: none; }
   .bills__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bills__row > span[data-label]::before {

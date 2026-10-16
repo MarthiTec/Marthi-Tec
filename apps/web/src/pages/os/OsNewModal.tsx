@@ -1,5 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { QuickCreateCustomer } from '../../components/QuickCreate';
+import { QuickAddButton } from '../../components/QuickModal';
 import { getAdminState } from '../../data/adminStore';
 import { listSellers } from '../../data/erpRegistry';
 import {
@@ -29,6 +31,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerDocument, setCustomerDocument] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
 
   const [itemName, setItemName] = useState('');
   const [itemBrand, setItemBrand] = useState('');
@@ -254,6 +257,21 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
                   }))}
                   onChange={pickCustomer}
                 />
+                <div className="quick-field__actions">
+                  <QuickAddButton label="Novo cliente" onClick={() => setQuickCustomerOpen(true)} />
+                </div>
+                {quickCustomerOpen ? (
+                  <QuickCreateCustomer
+                    initial={{ name: customerName, phone: customerPhone, document: customerDocument, email: customerEmail }}
+                    onClose={() => setQuickCustomerOpen(false)}
+                    onCreated={(customer) => {
+                      setCustomerName(customer.name);
+                      setCustomerPhone(customer.phone);
+                      setCustomerDocument(customer.document);
+                      setCustomerEmail(customer.email);
+                    }}
+                  />
+                ) : null}
               </div>
               <label>
                 <span>Nome completo *</span>

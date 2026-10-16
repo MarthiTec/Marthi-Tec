@@ -33,7 +33,6 @@ import {
   restorePosSaleOrder,
   searchOrders,
   updatePosSaleOrder,
-  upsertCustomer,
   type Customer,
   type PaymentMethod,
   type SalesOrder,
@@ -82,7 +81,7 @@ import {
 } from '../../data/cashSettings';
 import { listEmployees, listSellers, userIsStoreAdmin, userCanConfigureAdHoc } from '../../data/erpRegistry';
 import { getPosTerminalId } from '../../data/posDraftStore';
-import { lookupCep, maskCep } from '../../services/cep';
+import { CustomerQuickFields, emptyCustomerDraft, saveCustomerDraft, type CustomerDraft } from '../../components/CustomerQuickFields';
 import {
   cancelFiscalDocumentForSale,
   emitNfeFromSale,
@@ -2897,119 +2896,24 @@ function PricePanel({ onClose }: PanelProps) {
   );
 }
 
-function onlyDigitsLocal(value: string) {
-  return value.replace(/\D/g, '');
-}
-
-function formatCpfLocal(value: string) {
-  const digits = onlyDigitsLocal(value).slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) {
-    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  }
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-}
-
-function isValidCpfLocal(value: string) {
-  const cpf = onlyDigitsLocal(value);
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-  let sum = 0;
-  for (let i = 0; i < 9; i += 1) sum += Number(cpf[i]) * (10 - i);
-  let dig = (sum * 10) % 11;
-  if (dig === 10) dig = 0;
-  if (dig !== Number(cpf[9])) return false;
-  sum = 0;
-  for (let i = 0; i < 10; i += 1) sum += Number(cpf[i]) * (11 - i);
-  dig = (sum * 10) % 11;
-  if (dig === 10) dig = 0;
-  return dig === Number(cpf[10]);
-}
-
-function formatPhoneLocal(value: string) {
-  const digits = onlyDigitsLocal(value).slice(0, 11);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  }
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
 function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated, prefillCustomer }: PanelProps) {
-  const [name, setName] = useState(() => prefillCustomer?.name || '');
-  const [document, setDocument] = useState('');
-  const [phone, setPhone] = useState(() => prefillCustomer?.phone ? formatPhoneLocal(prefillCustomer.phone) : '');
-  const [email, setEmail] = useState('');
-  const [zipCode, setZipCode] = useState('');
-  const [street, setStreet] = useState('');
-  const [number, setNumber] = useState('');
-  const [complement, setComplement] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [cepStatus, setCepStatus] = useState('');
-  const [cepLoading, setCepLoading] = useState(false);
-
-  async function consultCep(raw: string) {
-    const digits = onlyDigitsLocal(raw);
-    if (digits.length !== 8) return;
-    setCepLoading(true);
-    setCepStatus('Consultando CEP…');
-    try {
-      const address = await lookupCep(digits);
-      setZipCode(address.zipCode);
-      if (address.street) setStreet(address.street);
-      if (address.complement) setComplement(address.complement);
-      if (address.neighborhood) setNeighborhood(address.neighborhood);
-      if (address.city) setCity(address.city);
-      if (address.state) setState(address.state);
-      setCepStatus('Endereço preenchido pelo CEP.');
-    } catch (error) {
-      setCepStatus(error instanceof Error ? error.message : 'Falha ao consultar CEP.');
-    } finally {
-      setCepLoading(false);
-    }
-  }
+  const [draft, setDraft] = useState<CustomerDraft>(() => emptyCustomerDraft({ name: prefillCustomer?.name, phone: prefillCustomer?.phone }));
+  const [saving, setSaving] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const trimmedName = name.trim();
-    const cpfDigits = onlyDigitsLocal(document);
-    if (!trimmedName) {
-      onError('Informe o nome do cliente.');
-      return;
-    }
-    if (cpfDigits.length !== 11 || !isValidCpfLocal(cpfDigits)) {
-      onError('Informe um CPF válido.');
-      return;
-    }
-
+    if (saving) return;
+    setSaving(true);
     try {
-      const next = await upsertCustomer({
-        name: trimmedName,
-        document: formatCpfLocal(cpfDigits),
-        phone: phone.trim(),
-        email: email.trim(),
-        zipCode: zipCode.trim(),
-        street: street.trim(),
-        number: number.trim(),
-        complement: complement.trim(),
-        neighborhood: neighborhood.trim(),
-        city: city.trim(),
-        state: state.trim().toUpperCase(),
-        active: true,
-      });
-
-      const saved =
-        next.customers.find((item) => onlyDigitsLocal(item.document) === cpfDigits) ??
-        next.customers[0];
-
-      if (saved) onCustomerCreated?.(saved);
-      onDone(`Cliente ${saved?.name ?? trimmedName} cadastrado.`);
+      // No caixa o CPF/CNPJ é obrigatório (vai para o cupom).
+      const saved = await saveCustomerDraft(draft, true);
+      onCustomerCreated?.(saved);
+      onDone(`Cliente ${saved.name} cadastrado.`);
       onClose();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Falha ao cadastrar cliente.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -3017,117 +2921,17 @@ function CustomerQuickPanel({ onClose, onDone, onError, onCustomerCreated, prefi
     <form className="caixa-panel caixa-panel--fit" onSubmit={submit}>
       <div className="caixa-panel__head">
         <h2>Cadastro rápido de cliente</h2>
-        <p className="empty">Obrigatório: nome e CPF. Endereço, telefone e e-mail são opcionais.</p>
+        <p className="empty">Obrigatório: nome e CPF/CNPJ. Digite o CEP para preencher o endereço.</p>
       </div>
       <div className="caixa-panel__body">
-        <div className="caixa-panel__grid">
-          <label className="caixa-panel__full">
-            Nome *
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome completo"
-              required
-              autoFocus
-            />
-          </label>
-          <label>
-            CPF *
-            <input
-              value={document}
-              onChange={(e) => setDocument(formatCpfLocal(e.target.value))}
-              placeholder="000.000.000-00"
-              inputMode="numeric"
-              required
-            />
-          </label>
-          <label>
-            Telefone
-            <input
-              value={phone}
-              onChange={(e) => setPhone(formatPhoneLocal(e.target.value))}
-              placeholder="(00) 00000-0000"
-              inputMode="tel"
-            />
-          </label>
-          <label className="caixa-panel__full">
-            E-mail
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="opcional"
-            />
-          </label>
-          <label>
-            CEP
-            <input
-              value={zipCode}
-              onChange={(e) => {
-                const masked = maskCep(e.target.value);
-                setZipCode(masked);
-                setCepStatus('');
-                if (onlyDigitsLocal(masked).length === 8) void consultCep(masked);
-              }}
-              onBlur={() => void consultCep(zipCode)}
-              placeholder="00000-000"
-              inputMode="numeric"
-              disabled={cepLoading}
-            />
-          </label>
-          <label>
-            Número
-            <input
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              placeholder="nº"
-            />
-          </label>
-          <label className="caixa-panel__full">
-            Endereço
-            <input
-              value={street}
-              onChange={(e) => setStreet(e.target.value)}
-              placeholder="Rua / avenida"
-            />
-          </label>
-          <label>
-            Complemento
-            <input
-              value={complement}
-              onChange={(e) => setComplement(e.target.value)}
-              placeholder="opcional"
-            />
-          </label>
-          <label>
-            Bairro
-            <input
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-            />
-          </label>
-          <label>
-            Cidade
-            <input value={city} onChange={(e) => setCity(e.target.value)} />
-          </label>
-          <label>
-            UF
-            <input
-              value={state}
-              onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="UF"
-              maxLength={2}
-            />
-          </label>
-        </div>
-        {cepStatus ? <p className="empty">{cepStatus}</p> : null}
+        <CustomerQuickFields value={draft} onChange={setDraft} requireDocument />
       </div>
       <div className="pdv__modal-actions">
         <button type="button" className="btn btn--ghost" onClick={onClose}>
           Cancelar
         </button>
-        <button type="submit" className="btn btn--primary" disabled={cepLoading}>
-          Salvar cliente
+        <button type="submit" className="btn btn--primary" disabled={saving}>
+          {saving ? 'Salvando…' : 'Salvar cliente'}
         </button>
       </div>
     </form>

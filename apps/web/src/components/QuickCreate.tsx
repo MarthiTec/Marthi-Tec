@@ -3,7 +3,8 @@ import { QuickModal } from './QuickModal';
 import { createBrand, type Brand } from '../data/brandStore';
 import { createAttribute, type ProductAttribute } from '../data/attributeStore';
 import { getErpRegistry, upsertSupplier } from '../data/erpRegistry';
-import { apiCreateCustomer, apiCreateSeller, type ApiSeller } from '../services/erpApi';
+import { apiCreateSeller, type ApiSeller } from '../services/erpApi';
+import { CustomerQuickFields, emptyCustomerDraft, saveCustomerDraft, type CustomerDraft } from './CustomerQuickFields';
 import type { Customer } from '../data/adminStore';
 
 const message = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
@@ -150,36 +151,26 @@ export function QuickCreateAttribute({ onClose, onCreated }: { onClose: () => vo
   );
 }
 
-/** Cliente direto da venda: nome é o único obrigatório. */
-export function QuickCreateCustomer({ onClose, onCreated }: { onClose: () => void; onCreated: (customer: Customer) => void }) {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [document, setDocument] = useState('');
-  const [email, setEmail] = useState('');
-  const [city, setCity] = useState('');
+/** Cliente direto da venda, OS ou financeiro: a mesma ficha em todas as telas (nome é o único obrigatório). */
+export function QuickCreateCustomer({
+  initial,
+  onClose,
+  onCreated,
+}: {
+  /** O que já foi digitado na tela (nome, telefone, CPF) entra preenchido. */
+  initial?: { name?: string; phone?: string; document?: string; email?: string };
+  onClose: () => void;
+  onCreated: (customer: Customer) => void;
+}) {
+  const [draft, setDraft] = useState<CustomerDraft>(() => emptyCustomerDraft(initial));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   async function save() {
-    if (!name.trim()) return setError('Informe o nome do cliente.');
     setBusy(true);
     setError('');
     try {
-      const customer = await apiCreateCustomer({
-        name: name.trim(),
-        phone: phone.trim(),
-        document: document.trim(),
-        email: email.trim(),
-        city: city.trim(),
-        zipCode: '',
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        state: '',
-        active: true,
-      });
-      onCreated(customer);
+      onCreated(await saveCustomerDraft(draft));
       onClose();
     } catch (err) {
       setError(message(err, 'Não foi possível salvar o cliente.'));
@@ -189,31 +180,8 @@ export function QuickCreateCustomer({ onClose, onCreated }: { onClose: () => voi
   }
 
   return (
-    <QuickModal title="Novo cliente" subtitle="Cadastro rápido. O endereço pode ser completado depois em Pessoas › Clientes." busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar cliente">
-      <label>
-        Nome / Razão social *
-        <input value={name} maxLength={160} onChange={(event) => setName(event.target.value)} />
-      </label>
-      <div className="quick-modal__row">
-        <label>
-          Telefone / WhatsApp
-          <input value={phone} maxLength={30} inputMode="tel" onChange={(event) => setPhone(event.target.value)} />
-        </label>
-        <label>
-          CPF / CNPJ
-          <input value={document} maxLength={20} inputMode="numeric" onChange={(event) => setDocument(event.target.value)} />
-        </label>
-      </div>
-      <div className="quick-modal__row">
-        <label>
-          E-mail
-          <input value={email} maxLength={160} type="email" onChange={(event) => setEmail(event.target.value)} />
-        </label>
-        <label>
-          Cidade
-          <input value={city} maxLength={80} onChange={(event) => setCity(event.target.value)} />
-        </label>
-      </div>
+    <QuickModal title="Novo cliente" subtitle="Cadastro rápido com os dados da ficha de venda. Digite o CEP para preencher o endereço." className="customer-quick-modal" busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar cliente">
+      <CustomerQuickFields value={draft} onChange={setDraft} />
     </QuickModal>
   );
 }

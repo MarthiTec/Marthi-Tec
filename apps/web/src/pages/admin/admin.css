@@ -1722,6 +1722,14 @@
   opacity: 0.95;
 }
 
+/* Baixa e estorno já são coloridos: no tema escuro mantêm a cor. */
+.is-theme-dark .crud-ico-btn--settle .crud-ico-img,
+.is-theme-dark .crud-ico-btn--revert .crud-ico-img,
+.admin.admin--dark .crud-ico-btn--settle .crud-ico-img,
+.admin.admin--dark .crud-ico-btn--revert .crud-ico-img {
+  filter: none;
+}
+
 .crud-ico-btn:hover .crud-ico-img {
   opacity: 1;
 }

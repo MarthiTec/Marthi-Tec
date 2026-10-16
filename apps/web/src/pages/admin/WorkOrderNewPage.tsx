@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { QuickCreateCustomer } from '../../components/QuickCreate';
+import { QuickAddButton } from '../../components/QuickModal';
 import { getAdminState } from '../../data/adminStore';
 import { listSellers } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
@@ -44,6 +46,7 @@ export function WorkOrderNewPage() {
   const [error, setError] = useState('');
   const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
 
   function pickCustomer(id: string) {
     const customer = customers.find((item) => item.id === id);
@@ -91,6 +94,24 @@ export function WorkOrderNewPage() {
             }))}
             onChange={(value) => pickCustomer(value)}
           />
+          <div className="quick-field__actions">
+            <QuickAddButton label="Novo cliente" onClick={() => setQuickCustomerOpen(true)} />
+          </div>
+          {quickCustomerOpen ? (
+            <QuickCreateCustomer
+              initial={{ name: form.customerName, phone: form.customerPhone, document: form.customerDocument, email: form.customerEmail }}
+              onClose={() => setQuickCustomerOpen(false)}
+              onCreated={(customer) =>
+                setForm((current) => ({
+                  ...current,
+                  customerName: customer.name,
+                  customerPhone: customer.phone,
+                  customerDocument: customer.document,
+                  customerEmail: customer.email,
+                }))
+              }
+            />
+          ) : null}
           <label>
             Telefone
             <input

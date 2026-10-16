@@ -29,7 +29,10 @@ export type Customer = {
   id: string;
   name: string;
   phone: string;
+  /** Pessoa física (CPF) ou jurídica (CNPJ). */
+  documentType?: 'cpf' | 'cnpj';
   document: string;
+  rg?: string;
   email: string;
   city: string;
   zipCode: string;
@@ -410,7 +413,9 @@ function normalizeCustomer(item: Partial<Customer> & Pick<Customer, 'id' | 'name
     id: item.id,
     name: item.name ?? '',
     phone: item.phone ?? '',
+    documentType: item.documentType === 'cnpj' ? 'cnpj' : 'cpf',
     document: item.document ?? '',
+    rg: item.rg ?? '',
     email: item.email ?? '',
     city: item.city ?? '',
     zipCode: item.zipCode ?? '',
@@ -864,13 +869,29 @@ export function restorePosSaleOrder(
   return { ok: true, order };
 }
 
+/** Cadastra o cliente no banco e já o coloca na lista usada por PDV, OS e venda externa. */
+export async function createCustomer(input: Omit<Customer, 'id' | 'createdAt'>): Promise<Customer> {
+  if (!isNestAuthed()) throw new Error('Entre no sistema para gravar no banco de dados.');
+  try {
+    const saved = normalizeCustomer(await apiCreateCustomer(input));
+    const state = load();
+    state.customers = [saved, ...state.customers.filter((item) => item.id !== saved.id)];
+    save(state);
+    return saved;
+  } catch (error) {
+    throw new Error(apiErrorMessage(error, 'Falha ao salvar cliente.'));
+  }
+}
+
 export async function upsertCustomer(
   input: Omit<Customer, 'id' | 'createdAt'> & { id?: string },
 ): Promise<AdminState> {
   const payload = {
     name: input.name.trim(),
     phone: (input.phone ?? '').trim(),
+    ...(input.documentType ? { documentType: input.documentType } : {}),
     document: (input.document ?? '').trim(),
+    ...(input.rg !== undefined ? { rg: input.rg.trim() } : {}),
     email: (input.email ?? '').trim(),
     city: (input.city ?? '').trim(),
     zipCode: (input.zipCode ?? '').trim(),

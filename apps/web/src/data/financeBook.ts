@@ -89,6 +89,8 @@ export type Payable = {
 export type Receivable = {
   id: string;
   description: string;
+  /** Cliente cadastrado (vazio = avulso, só o nome). */
+  customerId?: string;
   customerName: string;
   category: string;
   amount: number;
@@ -299,6 +301,7 @@ function mapReceivable(row: ApiReceivable): Receivable {
   return {
     id: row.id,
     description: row.description,
+    customerId: row.customerId,
     customerName: row.customerName ?? '',
     category: row.category ?? '',
     amount: row.amount,
@@ -666,6 +669,7 @@ export async function upsertPayable(input: {
 export async function upsertReceivable(input: {
   id?: string;
   description: string;
+  customerId?: string;
   customerName: string;
   category: string;
   amount: number;
@@ -688,6 +692,7 @@ export async function upsertReceivable(input: {
     try {
       const body = {
         description: input.description.trim(),
+        customerId: input.customerId ?? '',
         customerName: input.customerName.trim(),
         category: input.category.trim() || 'Recebimentos',
         amount: input.amount,

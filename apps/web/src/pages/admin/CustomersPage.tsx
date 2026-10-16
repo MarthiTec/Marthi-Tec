@@ -38,6 +38,7 @@ type Form = {
   tradeName: string;
   documentType: DocumentType;
   document: string;
+  rg: string;
   phone: string;
   phones: string[];
   email: string;
@@ -53,6 +54,7 @@ const EMPTY: Form = {
   tradeName: '',
   documentType: 'cpf',
   document: '',
+  rg: '',
   phone: '',
   phones: [],
   email: '',
@@ -69,6 +71,7 @@ function formFrom(customer: ApiCustomerRecord): Form {
     tradeName: customer.tradeName ?? '',
     documentType: customer.documentType === 'cnpj' ? 'cnpj' : 'cpf',
     document: customer.document ? formatCpfCnpj(customer.document) : '',
+    rg: customer.rg ?? '',
     phone: customer.phone ?? '',
     phones: customer.phones ?? [],
     email: customer.email ?? '',
@@ -201,6 +204,7 @@ export function CustomersPage() {
         tradeName: form.documentType === 'cnpj' ? form.tradeName.trim() : '',
         documentType: form.documentType,
         document: form.document.trim(),
+        rg: form.documentType === 'cpf' ? form.rg.trim() : '',
         phone: form.phone.trim(),
         phones: form.phones.map((item) => item.trim()).filter(Boolean),
         email: form.email.trim(),
@@ -348,6 +352,12 @@ export function CustomersPage() {
                   placeholder={isCompany ? 'Razão social da empresa' : 'Nome do cliente'}
                 />
               </label>
+              {!isCompany ? (
+                <label>
+                  RG
+                  <input value={form.rg} maxLength={30} disabled={readOnly} onChange={(e) => setForm({ ...form, rg: e.target.value })} />
+                </label>
+              ) : null}
               {isCompany ? (
                 <label>
                   Nome fantasia

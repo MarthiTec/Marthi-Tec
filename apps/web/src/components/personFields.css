@@ -196,3 +196,32 @@
   min-width: 0;
   box-sizing: border-box;
 }
+
+/* Cadastro rápido de cliente (venda externa, PDV, OS, financeiro): mesma ficha em todas as telas. */
+.customer-quick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.customer-quick > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.customer-quick .span-2,
+.customer-quick__wide {
+  grid-column: 1 / -1;
+}
+.customer-quick__hint {
+  margin-top: -6px;
+  color: var(--mute, #64748b);
+  font-size: 0.78rem;
+}
+.quick-modal__card.customer-quick-modal {
+  width: min(760px, 100%);
+}
+@media (max-width: 560px) {
+  .customer-quick { grid-template-columns: minmax(0, 1fr); }
+  .customer-quick .person-type { grid-template-columns: minmax(0, 1fr); }
+}

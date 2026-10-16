@@ -496,6 +496,7 @@ export type ApiCustomerRecord = ApiPersonDetails & {
   name: string;
   tradeName: string;
   document: string;
+  rg?: string;
   phone: string;
   email: string;
   notes: string;
@@ -799,6 +800,7 @@ export type ApiPayable = {
 export type ApiReceivable = {
   id: string;
   description: string;
+  customerId?: string;
   customerName: string;
   category: string;
   amount: number;

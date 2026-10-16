@@ -755,6 +755,7 @@ export function ExternalSalePage() {
                 </div>
                 {quickCustomerOpen ? (
                   <QuickCreateCustomer
+                    initial={selectedCustomerId ? undefined : { name: customerName, phone: customerPhone, document: customerDocument }}
                     onClose={() => setQuickCustomerOpen(false)}
                     onCreated={(customer) => {
                       setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]);

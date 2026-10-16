@@ -39,6 +39,7 @@ const customerSchema = z.object({
   tradeName: z.string().default(''),
   documentType: z.enum(['cnpj', 'cpf']).default('cpf'),
   document: z.string().default(''),
+  rg: z.string().trim().max(30).default(''),
   phone: z.string().default(''),
   email: z.string().default(''),
   zipCode: z.string().default(''),
@@ -524,6 +525,7 @@ registryRouter.get('/api/v1/customers', requireAuth, async (req, res, next) => {
           tradeName: r.trade_name || '',
           documentType: r.document_type,
           document: r.document || '',
+          rg: r.rg || '',
           phone: r.phone || '',
           phoneDigits: r.phone_digits || '',
           email: r.email || '',
@@ -568,8 +570,8 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
       const inserted = await pool.query(
         `INSERT INTO customers (
           id, store_id, name, trade_name, document_type, document, phone, phone_digits,
-          email, zip_code, street, number, complement, district, city, state, customer_group, credit_limit, notes, active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          email, zip_code, street, number, complement, district, city, state, customer_group, credit_limit, notes, active, rg
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         ON CONFLICT (store_id, phone_digits) DO NOTHING RETURNING *`,
         [
           id,
@@ -592,6 +594,7 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
           body.creditLimit,
           body.notes.trim(),
           body.active,
+          body.rg,
         ],
       );
 
@@ -635,6 +638,7 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
              notes = COALESCE($14, notes),
              complement = COALESCE($17, complement), document_type = COALESCE($18, document_type),
              active = COALESCE($19, active), phone_digits = CASE WHEN $20 THEN $21 ELSE phone_digits END,
+             rg = COALESCE($22, rg),
              updated_at = now()
          WHERE id = $15 AND store_id = $16`,
         [
@@ -655,6 +659,7 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
           id,
           storeId,
           body.complement,body.documentType,body.active,body.phone!==undefined,body.phone===undefined ? null : onlyDigits(body.phone)||null,
+          body.rg,
         ],
       );
       await savePersonDetails(pool, 'customers', id, storeId, personDetailsSchema.parse(req.body));

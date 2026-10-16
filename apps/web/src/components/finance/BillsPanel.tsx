@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../AdminPicker';
+import { CrudIconButton } from '../CrudKit';
 import { CurrencyInput } from '../CurrencyInput';
-import { QuickModal } from '../QuickModal';
+import { QuickAddButton, QuickModal } from '../QuickModal';
+import { QuickCreateCustomer, QuickCreateSupplier } from '../QuickCreate';
+import { getAdminState } from '../../data/adminStore';
+import { getErpRegistry } from '../../data/erpRegistry';
 import { SettleBillModal } from '../SettleBillModal';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import {
@@ -319,21 +323,15 @@ export function BillsPanel({
               <span role="cell" data-label="Situação">
                 <em className={`bills__status is-${row.overdue ? 'overdue' : row.status}`}>{row.overdue ? 'Vencida' : row.status === 'paid' ? words.settled : BILL_STATUS_LABEL[row.status]}</em>
               </span>
-              <span role="cell" className="bills__actions">
+              <span role="cell" className="bills__actions crud-actions">
                 {open ? (
-                  <button type="button" className="btn btn--primary btn--sm" disabled={busyId === row.id} onClick={() => setSettling(row.bill)}>
-                    {words.settle}
-                  </button>
+                  <CrudIconButton action="settle" title={`${words.settle} (dar baixa)`} disabled={busyId === row.id} onClick={() => setSettling(row.bill)} />
                 ) : null}
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setViewing(row.bill)}>Ver</button>
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setForm({ mode: 'edit', bill: row.bill })}>Editar</button>
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setForm({ mode: 'duplicate', bill: row.bill })}>Duplicar</button>
-                {row.settled > 0 ? (
-                  <button type="button" className="btn btn--ghost btn--sm" disabled={busyId === row.id} onClick={() => void handleRevert(row)}>Estornar</button>
-                ) : null}
-                <button type="button" className="btn btn--ghost btn--sm bills__danger" disabled={Boolean(lock) || busyId === row.id} title={lock || 'Excluir conta'} onClick={() => void handleDelete(row)}>
-                  Excluir
-                </button>
+                <CrudIconButton action="view" onClick={() => setViewing(row.bill)} />
+                <CrudIconButton action="edit" onClick={() => setForm({ mode: 'edit', bill: row.bill })} />
+                <CrudIconButton action="duplicate" onClick={() => setForm({ mode: 'duplicate', bill: row.bill })} />
+                {row.settled > 0 ? <CrudIconButton action="revert" disabled={busyId === row.id} onClick={() => void handleRevert(row)} /> : null}
+                <CrudIconButton action="delete" disabled={Boolean(lock) || busyId === row.id} title={lock || 'Excluir conta'} onClick={() => void handleDelete(row)} />
               </span>
             </div>
           );
@@ -403,7 +401,12 @@ function BillForm({
   const payable = kind === 'payable';
   const source = form.bill;
   const [description, setDescription] = useState(source?.description ?? '');
-  const [supplierId, setSupplierId] = useState(payable ? (source as Payable | undefined)?.supplierId ?? '' : '');
+  // Fornecedor ou cliente cadastrado; vazio = avulso (só o nome).
+  const [partyId, setPartyId] = useState(payable ? (source as Payable | undefined)?.supplierId ?? '' : (source as Receivable | undefined)?.customerId ?? '');
+  const [parties, setParties] = useState(() =>
+    payable ? suppliers : getAdminState().customers.filter((item) => item.active).map((item) => ({ id: item.id, name: item.name })),
+  );
+  const [quickParty, setQuickParty] = useState(false);
   const [party, setParty] = useState(source ? (payable ? (source as Payable).supplierName : (source as Receivable).customerName) : '');
   const [category, setCategory] = useState(source?.category || (payable ? EXPENSE_CATEGORIES[0] : REVENUE_CATEGORIES[2]));
   const [amount, setAmount] = useState(source?.amount ?? 0);
@@ -418,7 +421,7 @@ function BillForm({
     setSaving(true);
     const id = form.mode === 'edit' ? source?.id : undefined;
     const common = { id, description, category, amount, dueDate, accountId, notes, documentNumber: documentNumber.trim() || undefined };
-    const result = payable ? await upsertPayable({ ...common, supplierId: supplierId || undefined, supplierName: party }) : await upsertReceivable({ ...common, customerName: party });
+    const result = payable ? await upsertPayable({ ...common, supplierId: partyId || undefined, supplierName: party }) : await upsertReceivable({ ...common, customerId: partyId, customerName: party });
     setSaving(false);
     if (!result.ok) return setError(result.error);
     onSaved(form.mode === 'edit' ? `Conta atualizada: ${result.data.description}` : `Conta lançada: ${result.data.description}`);
@@ -432,15 +435,41 @@ function BillForm({
           Descrição
           <input value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        {payable ? (
+        <div className="quick-field">
           <AdminPicker
-            label="Fornecedor cadastrado"
-            value={supplierId}
-            options={[{ value: '', label: 'Avulso (digitar o nome)' }, ...suppliers.map((item) => ({ value: item.id, label: item.name }))]}
+            label={payable ? 'Fornecedor cadastrado' : 'Cliente cadastrado'}
+            value={partyId}
+            options={[{ value: '', label: 'Avulso (digitar o nome)' }, ...parties.map((item) => ({ value: item.id, label: item.name }))]}
             onChange={(value) => {
-              setSupplierId(value);
-              const found = suppliers.find((item) => item.id === value);
+              setPartyId(value);
+              const found = parties.find((item) => item.id === value);
               if (found) setParty(found.name);
+            }}
+          />
+          <div className="quick-field__actions">
+            <QuickAddButton label={payable ? 'Novo fornecedor' : 'Novo cliente'} onClick={() => setQuickParty(true)} />
+          </div>
+        </div>
+        {quickParty && payable ? (
+          <QuickCreateSupplier
+            onClose={() => setQuickParty(false)}
+            onCreated={(id) => {
+              const created = getErpRegistry().suppliers.find((item) => item.id === id);
+              if (!created) return;
+              setParties((current) => [{ id, name: created.name }, ...current.filter((item) => item.id !== id)]);
+              setPartyId(id);
+              setParty(created.name);
+            }}
+          />
+        ) : null}
+        {quickParty && !payable ? (
+          <QuickCreateCustomer
+            initial={{ name: party }}
+            onClose={() => setQuickParty(false)}
+            onCreated={(customer) => {
+              setParties((current) => [{ id: customer.id, name: customer.name }, ...current.filter((item) => item.id !== customer.id)]);
+              setPartyId(customer.id);
+              setParty(customer.name);
             }}
           />
         ) : null}

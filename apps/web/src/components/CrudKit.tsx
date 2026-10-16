@@ -67,13 +67,15 @@ export function CrudListBar({
   );
 }
 
-type CrudActionKind = 'view' | 'edit' | 'duplicate' | 'delete';
+type CrudActionKind = 'view' | 'edit' | 'duplicate' | 'delete' | 'settle' | 'revert';
 
 const CRUD_ACTION_ICON: Record<CrudActionKind, { src: string; label: string }> = {
   view: { src: '/pdv/view.png', label: 'Visualizar' },
   edit: { src: '/pdv/edit.png', label: 'Editar' },
   duplicate: { src: '/pdv/duplicate.png', label: 'Duplicar' },
   delete: { src: '/pdv/trash.png', label: 'Excluir' },
+  settle: { src: '/pdv/settle.png', label: 'Dar baixa' },
+  revert: { src: '/pdv/revert.png', label: 'Estornar baixa' },
 };
 
 type CrudIconButtonProps = {
@@ -83,7 +85,7 @@ type CrudIconButtonProps = {
   title?: string;
 };
 
-/** Botão de ação padronizado (olho / lápis / duplicar / lixeira). */
+/** Botão de ação padronizado (olho / lápis / duplicar / lixeira / baixa / estorno). */
 export function CrudIconButton({ action, onClick, disabled, title }: CrudIconButtonProps) {
   const meta = CRUD_ACTION_ICON[action];
   return (
