@@ -82,6 +82,8 @@ export type Payable = {
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
+  /** Compra lançada pela entrada de estoque: valor e exclusão pela entrada. */
+  stockEntryId?: string;
 };
 
 export type Receivable = {
@@ -105,6 +107,8 @@ export type Receivable = {
   createdAt: string;
   updatedAt: string;
   receivedAt?: string;
+  /** Venda que gerou a conta: valor e exclusão pela venda. */
+  saleId?: string;
 };
 
 export type TreasuryKind = 'transfer' | 'deposit' | 'withdraw' | 'adjustment';
@@ -287,6 +291,7 @@ function mapPayable(row: ApiPayable): Payable {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     paidAt: row.paidAt,
+    stockEntryId: row.stockEntryId,
   };
 }
 
@@ -312,6 +317,7 @@ function mapReceivable(row: ApiReceivable): Receivable {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     receivedAt: row.receivedAt,
+    saleId: row.saleId,
   };
 }
 
@@ -927,50 +933,42 @@ export async function settleReceivable(
   return settleReceivableDetailed(id, { amount });
 }
 
-export async function cancelBill(
-  kind: 'payable' | 'receivable',
-  id: string,
-): Promise<BookResult> {
-  if (!isNestAuthed()) return {ok:false,error:'Entre no sistema para gravar no banco de dados.'};
-  if (isNestAuthed()) {
-    try {
-      if (kind === 'payable') {
-        const row = await apiUpdatePayable(id, { status: 'cancelled' });
-        const mapped = mapPayable(row);
-        const state = load();
-        putPayable(state, mapped);
-        save(state);
-      } else {
-        const row = await apiUpdateReceivable(id, { status: 'cancelled' });
-        const mapped = mapReceivable(row);
-        const state = load();
-        putReceivable(state, mapped);
-        save(state);
-      }
-      return { ok: true, data: undefined };
-    } catch (error) {
-      return { ok: false, error: nestError(error, 'Falha ao cancelar conta.') };
-    }
-  }
+export type BillKind = 'payable' | 'receivable';
 
-  const state = load();
-  if (kind === 'payable') {
-    const current = state.payables.find((item) => item.id === id);
-    if (!current) return { ok: false, error: 'Conta não encontrada.' };
-    if (current.paidAmount > 0) return { ok: false, error: 'Já há pagamento parcial.' };
-    state.payables = state.payables.map((item) =>
-      item.id === id ? { ...item, status: 'cancelled', updatedAt: now() } : item,
-    );
-  } else {
-    const current = state.receivables.find((item) => item.id === id);
-    if (!current) return { ok: false, error: 'Conta não encontrada.' };
-    if (current.receivedAmount > 0) return { ok: false, error: 'Já há recebimento parcial.' };
-    state.receivables = state.receivables.map((item) =>
-      item.id === id ? { ...item, status: 'cancelled', updatedAt: now() } : item,
-    );
+/** Exclui a conta. O servidor recusa conta com baixa ou gerada por venda/entrada de estoque. */
+export async function deleteBill(kind: BillKind, id: string): Promise<BookResult> {
+  const { apiDeletePayable, apiDeleteReceivable } = await import('../services/erpApi');
+  try {
+    if (kind === 'payable') await apiDeletePayable(id);
+    else await apiDeleteReceivable(id);
+    const state = load();
+    if (kind === 'payable') state.payables = state.payables.filter((item) => item.id !== id);
+    else state.receivables = state.receivables.filter((item) => item.id !== id);
+    save(state);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return { ok: false, error: nestError(error, 'Não foi possível excluir a conta.') };
   }
-  save(state);
-  return { ok: true, data: undefined };
+}
+
+/** Estorna a baixa: a conta volta para em aberto e o lançamento sai do caixa (e da conta bancária). */
+export async function revertBill(kind: BillKind, id: string): Promise<BookResult> {
+  const { apiRevertPayable, apiRevertReceivable } = await import('../services/erpApi');
+  try {
+    const state = load();
+    if (kind === 'payable') putPayable(state, mapPayable(await apiRevertPayable(id)));
+    else putReceivable(state, mapReceivable(await apiRevertReceivable(id)));
+    save(state);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return { ok: false, error: nestError(error, 'Não foi possível estornar a baixa.') };
+  }
+}
+
+/** Baixas da conta registradas no caixa. */
+export async function loadBillMovements(id: string) {
+  const { apiListBillMovements } = await import('../services/erpApi');
+  return apiListBillMovements(id);
 }
 
 export async function createTreasuryMove(input: {

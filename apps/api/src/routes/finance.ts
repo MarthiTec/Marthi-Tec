@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { assertBillAmountEditable, assertBillDeletable, assertBillRevertible } from '../services/billRules.js';
 
 export const financeRouter = Router();
 
@@ -248,7 +249,8 @@ financeRouter.get('/api/v1/finance/payables', requireAuth, async (req, res, next
       const result = await pool.query(
         `SELECT id, description, supplier_id, supplier_name, category, amount, paid_amount,
                 due_date, status, account_id, paid_at, notes, document_number, interest_amount,
-                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at
+                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at,
+                (SELECT e.id FROM stock_supplier_entries e WHERE e.store_id = payables.store_id AND e.payable_id = payables.id LIMIT 1) AS stock_entry_id
          FROM payables
          WHERE store_id = $1
          ORDER BY due_date ASC`,
@@ -276,6 +278,7 @@ financeRouter.get('/api/v1/finance/payables', requireAuth, async (req, res, next
           invoiceId: r.invoice_id || undefined,
           invoiceNumber: r.invoice_number || '',
           invoiceType: r.invoice_type || undefined,
+          stockEntryId: r.stock_entry_id || undefined,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         })),
@@ -347,15 +350,18 @@ financeRouter.patch('/api/v1/finance/payables/:id', requireAuth, async (req, res
     const storeId = req.storeId!;
     const id = req.params.id;
     const body = payableSchema.partial().parse(req.body);
+    await assertBillAmountEditable(pool, 'payable', storeId, id, body.amount);
 
     if (pool) {
       await pool.query(
         `UPDATE payables
-         SET description = COALESCE($1, description), supplier_id = COALESCE($2, supplier_id),
+         SET description = COALESCE($1, description), supplier_id = CASE WHEN $2::text IS NULL THEN supplier_id ELSE NULLIF($2::text, '') END,
              supplier_name = COALESCE($3, supplier_name), category = COALESCE($4, category),
              amount = COALESCE($5, amount), due_date = COALESCE($6, due_date),
-             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes),
-             document_number = COALESCE($9, document_number), invoice_id = COALESCE($10, invoice_id),
+             account_id = CASE WHEN $7::text IS NULL THEN account_id ELSE NULLIF($7::text, '') END,
+             notes = COALESCE($8, notes),
+             document_number = COALESCE($9, document_number),
+             invoice_id = CASE WHEN $10::text IS NULL THEN invoice_id ELSE NULLIF($10::text, '') END,
              invoice_number = COALESCE($11, invoice_number), invoice_type = COALESCE($12, invoice_type),
              updated_at = now()
          WHERE id = $13 AND store_id = $14`,
@@ -572,6 +578,7 @@ financeRouter.delete('/api/v1/finance/payables/:id', requireAuth, async (req, re
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
+    await assertBillDeletable(pool, 'payable', storeId, id);
     if (pool) {
       await pool.query(`DELETE FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
       res.json({ success: true, data: { ok: true } });
@@ -594,7 +601,7 @@ financeRouter.get('/api/v1/finance/receivables', requireAuth, async (req, res, n
       const result = await pool.query(
         `SELECT id, description, customer_id, customer_name, category, amount, received_amount,
                 due_date, status, account_id, received_at, notes, document_number, interest_amount,
-                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at
+                fine_amount, discount_amount, invoice_id, invoice_number, invoice_type, created_at, updated_at, sale_id
          FROM receivables
          WHERE store_id = $1
          ORDER BY due_date ASC`,
@@ -622,6 +629,7 @@ financeRouter.get('/api/v1/finance/receivables', requireAuth, async (req, res, n
           invoiceId: r.invoice_id || undefined,
           invoiceNumber: r.invoice_number || '',
           invoiceType: r.invoice_type || undefined,
+          saleId: r.sale_id || undefined,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         })),
@@ -693,15 +701,18 @@ financeRouter.patch('/api/v1/finance/receivables/:id', requireAuth, async (req, 
     const storeId = req.storeId!;
     const id = req.params.id;
     const body = receivableSchema.partial().parse(req.body);
+    await assertBillAmountEditable(pool, 'receivable', storeId, id, body.amount);
 
     if (pool) {
       await pool.query(
         `UPDATE receivables
-         SET description = COALESCE($1, description), customer_id = COALESCE($2, customer_id),
+         SET description = COALESCE($1, description), customer_id = CASE WHEN $2::text IS NULL THEN customer_id ELSE NULLIF($2::text, '') END,
              customer_name = COALESCE($3, customer_name), category = COALESCE($4, category),
              amount = COALESCE($5, amount), due_date = COALESCE($6, due_date),
-             account_id = COALESCE($7, account_id), notes = COALESCE($8, notes),
-             document_number = COALESCE($9, document_number), invoice_id = COALESCE($10, invoice_id),
+             account_id = CASE WHEN $7::text IS NULL THEN account_id ELSE NULLIF($7::text, '') END,
+             notes = COALESCE($8, notes),
+             document_number = COALESCE($9, document_number),
+             invoice_id = CASE WHEN $10::text IS NULL THEN invoice_id ELSE NULLIF($10::text, '') END,
              invoice_number = COALESCE($11, invoice_number), invoice_type = COALESCE($12, invoice_type),
              updated_at = now()
          WHERE id = $13 AND store_id = $14`,
@@ -857,6 +868,7 @@ financeRouter.post(['/api/v1/finance/receivables/:id/revert', '/api/v1/finance/r
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
+    await assertBillRevertible(pool, 'receivable', storeId, id);
 
     if (pool) {
       const client = await pool.connect();
@@ -913,6 +925,7 @@ financeRouter.delete('/api/v1/finance/receivables/:id', requireAuth, async (req,
   try {
     const storeId = req.storeId!;
     const id = req.params.id;
+    await assertBillDeletable(pool, 'receivable', storeId, id);
     if (pool) {
       await pool.query(`DELETE FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);
       res.json({ success: true, data: { ok: true } });

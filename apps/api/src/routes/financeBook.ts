@@ -252,3 +252,34 @@ financeBookRouter.get('/api/v1/finance/dre', requireAuth, async (req, res, next)
     next(error);
   }
 });
+
+/* ── Movimentos de uma conta (baixas no caixa) ─────────── */
+
+/** Lançamentos do caixa ligados a uma conta a pagar/receber: as baixas que ela já teve. */
+financeBookRouter.get('/api/v1/finance/movements', requireAuth, async (req, res, next) => {
+  try {
+    const { refId } = z.object({ refId: z.string().trim().min(1).max(120) }).parse(req.query);
+    const rows = (
+      await pool.query(
+        `SELECT id, type, label, amount, account_id, category, operator_name, created_at
+           FROM finance_entries WHERE store_id = $1 AND ref_id = $2 ORDER BY created_at`,
+        [req.storeId, refId],
+      )
+    ).rows;
+    res.json({
+      success: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        label: row.label,
+        amount: money(row.amount),
+        accountId: row.account_id ?? '',
+        category: row.category,
+        operator: row.operator_name,
+        at: row.created_at,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});

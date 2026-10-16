@@ -16,6 +16,7 @@ export function QuickModal({
   onSubmit,
   children,
   className,
+  readOnly = false,
 }: {
   title: string;
   subtitle?: string;
@@ -27,6 +28,8 @@ export function QuickModal({
   children: ReactNode;
   /** Classe extra no cartão (ex.: janela mais larga para uma grade). */
   className?: string;
+  /** Só leitura (ficha): um único botão, que fecha. */
+  readOnly?: boolean;
 }) {
   const titleId = useId();
   const form = useRef<HTMLFormElement>(null);
@@ -76,9 +79,11 @@ export function QuickModal({
           </p>
         ) : null}
         <footer className="quick-modal__foot">
-          <button type="button" className="btn btn--ghost" disabled={busy} onClick={onClose}>
-            Cancelar
-          </button>
+          {readOnly ? null : (
+            <button type="button" className="btn btn--ghost" disabled={busy} onClick={onClose}>
+              Cancelar
+            </button>
+          )}
           <button type="submit" className="btn btn--primary" disabled={busy}>
             {busy ? 'Salvando…' : submitLabel}
           </button>
