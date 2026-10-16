@@ -2,7 +2,10 @@ import {storeScopedKey} from './storeCache';
 /** Sessão de caixa do PDV (localStorage) + vales e trocas. Dual-path Nest. */
 
 import {
+  apiCancelStoreCredit,
   apiCashAporte,
+  apiDeleteCashMovement,
+  apiUpdateCashMovement,
   apiCashDrawer,
   apiCashSangria,
   apiCloseCashSession,
@@ -282,6 +285,7 @@ function mapSession(row: ApiCashSession): CashSession {
     expectedCash: row.expectedCash,
     countedCash: row.countedCash,
     difference: row.difference,
+    closeBreakdown: (row as ApiCashSession & { closeBreakdown?: CashCloseBreakdown }).closeBreakdown,
     operatorName: row.operatorName,
     status: row.status,
     reopenCount: row.reopenCount ?? 0,
@@ -476,7 +480,7 @@ export async function openCashSession(input: {
         openingFloat: Math.max(0, Number(input.openingFloat) || 0),
         operatorName: input.operatorName.trim() || 'Operador',
         note: input.note?.trim() || undefined,
-        openedAt: input.openedAt?.trim() || undefined,
+        openedAt: input.openedAt?.trim() ? nowIso(input.openedAt) : undefined,
       });
       const mapped = mapSession(row);
       const state = load();
@@ -486,7 +490,7 @@ export async function openCashSession(input: {
       window.dispatchEvent(new CustomEvent('marthi-cash-drawer', { detail: { at: stamp } }));
       return { ok: true, session: mapped };
     } catch (error) {
-      console.warn('[cashRegisterStore] Falha ao abrir caixa na API Nest, operando em modo local:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível abrir o caixa.') };
     }
   }
 
@@ -564,7 +568,7 @@ export async function addCashAporte(input: {
         beneficiaryId: beneficiaryType === 'employee' ? input.beneficiaryId : undefined,
         beneficiaryName,
         operatorName: input.operatorName || undefined,
-        at: input.at?.trim() || undefined,
+        at: input.at?.trim() ? nowIso(input.at) : undefined,
       });
       const mapped = mapSession(row);
       const state = load();
@@ -572,7 +576,7 @@ export async function addCashAporte(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      console.warn('[cashRegisterStore] Falha no aporte via Nest, operando em modo local:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível lançar o aporte.') };
     }
   }
 
@@ -626,7 +630,7 @@ export async function addCashSangria(input: {
         beneficiaryId: beneficiaryType === 'employee' ? input.beneficiaryId : undefined,
         beneficiaryName,
         operatorName: input.operatorName || undefined,
-        at: input.at?.trim() || undefined,
+        at: input.at?.trim() ? nowIso(input.at) : undefined,
       });
       const mapped = mapSession(row);
       const state = load();
@@ -634,7 +638,7 @@ export async function addCashSangria(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      console.warn('[cashRegisterStore] Falha na sangria via Nest, operando em modo local:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível lançar a sangria.') };
     }
   }
 
@@ -660,7 +664,20 @@ export async function addCashSangria(input: {
   });
 }
 
-export function deleteCashMovement(movementId: string) {
+export async function deleteCashMovement(movementId: string): Promise<{ ok: true; session: CashSession } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (!open) return { ok: false, error: 'Abra o caixa antes de continuar.' };
+    try {
+      const mapped = mapSession(await apiDeleteCashMovement(open.id, movementId));
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true, session: mapped };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Não foi possível excluir o movimento.') };
+    }
+  }
   return mutateOpen((session) => {
     const index = session.movements.findIndex((item) => item.id === movementId);
     if (index < 0) return { ok: false, error: 'Movimento não encontrado.' };
@@ -675,7 +692,7 @@ export function deleteCashMovement(movementId: string) {
   });
 }
 
-export function updateCashMovement(input: {
+export async function updateCashMovement(input: {
   movementId: string;
   amount: number;
   note?: string;
@@ -687,6 +704,29 @@ export function updateCashMovement(input: {
 }) {
   const amount = Math.abs(Number(input.amount) || 0);
   if (amount <= 0) return { ok: false as const, error: 'Informe um valor válido.' };
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    if (!open) return { ok: false as const, error: 'Abra o caixa antes de continuar.' };
+    try {
+      const mapped = mapSession(
+        await apiUpdateCashMovement(open.id, input.movementId, {
+          amount,
+          note: input.note,
+          reason: input.reason,
+          beneficiaryType: input.beneficiaryType,
+          beneficiaryId: input.beneficiaryId,
+          beneficiaryName: input.beneficiaryName,
+          at: input.at?.trim() ? new Date(input.at).toISOString() : undefined,
+        }),
+      );
+      const state = load();
+      putSession(state, mapped);
+      save(state);
+      return { ok: true as const, session: mapped };
+    } catch (error) {
+      return { ok: false as const, error: nestError(error, 'Não foi possível atualizar o movimento.') };
+    }
+  }
   return mutateOpen((session) => {
     const movement = session.movements.find((item) => item.id === input.movementId);
     if (!movement) return { ok: false, error: 'Movimento não encontrado.' };
@@ -747,6 +787,12 @@ export function registerCashSale(
 ) {
   const value = roundMoney(Math.max(0, Number(amount) || 0));
   if (value <= 0) return { ok: false as const, error: 'Valor inválido.' };
+  // A venda já entrou no caixa pelo servidor (com a parte em dinheiro): só atualiza a tela.
+  if (isNestAuthed()) {
+    const open = getOpenCashSession();
+    void refreshOpenCashSessionFromApi();
+    return open ? { ok: true as const, session: open } : { ok: false as const, error: 'Sem caixa aberto.' };
+  }
   // Só o que foi pago em dinheiro entra na gaveta; cartão e Pix são conferidos
   // por canal no fechamento.
   const cashValue =
@@ -906,8 +952,18 @@ export async function redeemStoreCredit(input: {
   return { ok: true, credit };
 }
 
-export function cancelStoreCredit(id: string) {
-  // Nest ainda não expõe cancelamento de vale — permanece local.
+export async function cancelStoreCredit(id: string): Promise<{ ok: true; credit: StoreCredit } | { ok: false; error: string }> {
+  if (isNestAuthed()) {
+    try {
+      const credit = mapCredit(await apiCancelStoreCredit(id));
+      const state = load();
+      putCredit(state, credit);
+      save(state);
+      return { ok: true, credit };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Não foi possível cancelar o vale.') };
+    }
+  }
   const state = load();
   const credit = state.credits.find((item) => item.id === id);
   if (!credit) return { ok: false as const, error: 'Vale não encontrado.' };
@@ -1114,6 +1170,8 @@ export async function closeCashSession(input: {
         countedCash: counted,
         operatorName: input.operatorName.trim() || 'Operador',
         note: input.note?.trim() || undefined,
+        closedAt: input.closedAt?.trim() ? nowIso(input.closedAt) : undefined,
+        breakdown: input.breakdown,
       });
       const mapped = mapSession(row);
       if (input.breakdown) {
@@ -1124,7 +1182,7 @@ export async function closeCashSession(input: {
       save(state);
       return { ok: true as const, session: mapped };
     } catch (error) {
-      console.warn('[cashRegisterStore] Falha ao fechar caixa na API Nest, operando em modo local:', error);
+      return { ok: false as const, error: nestError(error, 'Não foi possível fechar o caixa.') };
     }
   }
 
@@ -1180,7 +1238,7 @@ export async function reopenCashSession(input: {
       save(state);
       return { ok: true, session: mapped };
     } catch (error) {
-      console.warn('[cashRegisterStore] Falha ao reabrir caixa na API Nest, operando em modo local:', error);
+      return { ok: false, error: nestError(error, 'Não foi possível reabrir o caixa.') };
     }
   }
 

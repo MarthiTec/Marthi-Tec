@@ -3,6 +3,7 @@ import {storeScopedKey} from './storeCache';
 import { ATTR_CAP, ATTR_COR } from './attributeStore';
 import {
   apiClosePosSale,
+  apiCancelSale,
   apiCreateCustomer,
   apiCreateFinanceManual,
   apiCreatePayment,
@@ -826,6 +827,28 @@ export function updatePosSaleOrder(input: {
   return { ok: true, order };
 }
 
+/**
+ * Cancela a venda do PDV no banco: o estoque volta, o recebível é cancelado, o estorno entra no
+ * financeiro e o dinheiro sai da gaveta do caixa aberto. Sem login (modo de demonstração), só local.
+ */
+export async function cancelPosSale(orderId: string, reason: string): Promise<{ ok: true; order: SalesOrder } | { ok: false; error: string }> {
+  if (!isNestAuthed()) return cancelPosSaleOrder(orderId);
+  const state = load();
+  const order = state.orders.find((item) => item.id === orderId);
+  if (order && order.status === 'cancelled') return { ok: false, error: 'Venda já cancelada.' };
+  try {
+    await apiCancelSale(orderId, reason);
+  } catch (error) {
+    return { ok: false, error: apiErrorMessage(error, 'Não foi possível cancelar a venda.') };
+  }
+  const next = load();
+  const saved = next.orders.find((item) => item.id === orderId);
+  if (saved) saved.status = 'cancelled';
+  save(next);
+  window.dispatchEvent(new Event(STOCK_EVENT));
+  return { ok: true, order: saved ?? ({ ...(order as SalesOrder), status: 'cancelled' } as SalesOrder) };
+}
+
 export function cancelPosSaleOrder(orderId: string): { ok: true; order: SalesOrder } | { ok: false; error: string } {
   const state = load();
   const order = state.orders.find((item) => item.id === orderId);
@@ -1185,6 +1208,7 @@ export async function closePosSale(input: {
   surcharge: number;
   sellerId?: string;
   sellerName?: string;
+  cashAmount?: number;
   lines: PosLineInput[];
 }): Promise<AdminState> {
   if (isNestAuthed()) {
@@ -1204,6 +1228,7 @@ export async function closePosSale(input: {
         surcharge: input.surcharge,
         sellerId: input.sellerId,
         sellerName: input.sellerName,
+        cashAmount: input.cashAmount,
         lines: input.lines,
       });
       const state = load();

@@ -68,6 +68,8 @@ const closeSaleSchema = z.object({
   surcharge: z.coerce.number().min(0).default(0),
   sellerId: z.string().optional().nullable(),
   sellerName: z.string().default(''),
+  /** Parte paga em dinheiro (vai para a gaveta). Sem ela, vale o nome da forma de pagamento. */
+  cashAmount: z.coerce.number().min(0).optional(),
   lines: z.array(saleLineSchema).min(1, 'Informe ao menos um item.'),
 });
 
@@ -535,18 +537,19 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           [entId, storeId, `Venda PDV #${orderId} - ${body.paymentName}`, total, orderId, req.user?.name || 'Operador'],
         );
 
-        // 6. Se o pagamento foi em dinheiro e há caixa aberto, atualiza expected_cash e gera evento no caixa
-        if (openSessionId && body.paymentName.toLowerCase().includes('dinheiro')) {
+        // 6. Com caixa aberto, toda venda entra no caixa; só a parte em dinheiro soma na gaveta.
+        const cashPart = Math.min(total, body.cashAmount ?? (body.paymentName.toLowerCase().includes('dinheiro') ? total : 0));
+        if (openSessionId) {
           await client.query(
-            `UPDATE cash_sessions SET expected_cash = expected_cash + $1 WHERE id = $2`,
-            [total, openSessionId],
+            `UPDATE cash_sessions SET expected_cash = expected_cash + $1::numeric WHERE id = $2`,
+            [cashPart, openSessionId],
           );
 
           const cMovId = `MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           await client.query(
             `INSERT INTO cash_session_events (id, session_id, store_id, type, amount, cash_amount, note, order_id, operator_name)
-             VALUES ($1, $2, $3, 'sale', $4, $4, $5, $6, $7)`,
-            [cMovId, openSessionId, storeId, total, `Venda PDV #${orderId}`, orderId, req.user?.name || 'Operador'],
+             VALUES ($1, $2, $3, 'sale', $4, $8, $5, $6, $7)`,
+            [cMovId, openSessionId, storeId, total, `Venda PDV #${orderId}`, orderId, req.user?.name || 'Operador', cashPart],
           );
         }
 

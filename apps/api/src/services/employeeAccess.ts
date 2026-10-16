@@ -26,7 +26,7 @@ const RULES: Rule[] = [
   { group: /^(price-tables|promotions)$/, areas: ['erp_prices'], registry: true },
   { group: /^payments$/, areas: ['erp_payments'], registry: true },
   { group: /^stock-invoices$/, areas: ['erp_invoices'] },
-  { group: /^(sales|pos|orders|goals|pickup-requests)$/, areas: ['pdv'] },
+  { group: /^(sales|pos|orders|goals|pickup-requests|cash)$/, areas: ['pdv'] },
   { group: /^fiscal$/, areas: ['erp_fiscal', 'fiscal'] },
   { group: /^ecommerce$/, areas: ['ecommerce'] },
   { group: /^ads$/, areas: ['ads'], guardReads: true },
@@ -115,4 +115,22 @@ export async function checkEmployeeAccess(
 /** Gestão da loja ou funcionário com a tela liberada em Permissões (conferido no login da requisição). */
 export function canManageArea(req: { user?: { role?: string }; areaGranted?: boolean }) {
   return FULL_ROLES.has(String(req.user?.role ?? '').toLowerCase()) || req.areaGranted === true;
+}
+
+/** Permissão específica do funcionário (ex.: posCancelSale). Dono, administrador e gerente sempre podem. */
+export async function employeeHasPermission(db: Queryable, input: { storeId: string; email: string; role: string }, key: string) {
+  if (FULL_ROLES.has((input.role || '').toLowerCase())) return true;
+  const employee = (
+    await db.query(
+      `SELECT role, permissions, active FROM employees
+        WHERE store_id = $1 AND is_system_user = true AND lower(coalesce(nullif(user_email, ''), email)) = lower($2)
+        ORDER BY active DESC, updated_at DESC LIMIT 1`,
+      [input.storeId, input.email],
+    )
+  ).rows[0];
+  // Login sem cadastro de funcionário nesta loja (ex.: dono): sem restrição, como no resto da API.
+  if (!employee) return true;
+  if (!employee.active) return false;
+  if (['admin', 'manager'].includes(String(employee.role || '').toLowerCase())) return true;
+  return Boolean(employee.permissions && employee.permissions[key] === true);
 }

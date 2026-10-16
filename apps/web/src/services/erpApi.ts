@@ -192,6 +192,8 @@ export function apiClosePosSale(body: {
   surcharge: number;
   sellerId?: string;
   sellerName?: string;
+  /** Parte paga em dinheiro: é o que entra na gaveta do caixa. */
+  cashAmount?: number;
   lines: Array<{
     pickupMethodId?:string;deliveryAddress?:DeliveryAddress;
     attributes?: Array<{id:string;name:string;value:string}>;
@@ -1403,9 +1405,26 @@ export function apiCashDrawer(id: string, body?: { note?: string; operatorName?:
 
 export function apiCloseCashSession(
   id: string,
-  body: { countedCash: number; operatorName: string; note?: string },
+  body: { countedCash: number; operatorName: string; note?: string; closedAt?: string; breakdown?: Record<string, unknown> },
 ) {
   return nestPost<ApiCashSession>(`/cash/sessions/${id}/close`, body);
+}
+
+/** Corrige uma sangria ou um aporte do caixa aberto. */
+export function apiUpdateCashMovement(
+  sessionId: string,
+  movementId: string,
+  body: { amount: number; note?: string; reason?: string; beneficiaryType?: 'store' | 'employee'; beneficiaryId?: string; beneficiaryName?: string; at?: string },
+) {
+  return nestPatch<ApiCashSession>(`/cash/sessions/${encodeURIComponent(sessionId)}/movements/${encodeURIComponent(movementId)}`, body);
+}
+
+export function apiDeleteCashMovement(sessionId: string, movementId: string) {
+  return nestDelete<ApiCashSession>(`/cash/sessions/${encodeURIComponent(sessionId)}/movements/${encodeURIComponent(movementId)}`);
+}
+
+export function apiCancelStoreCredit(id: string) {
+  return nestPost<ApiStoreCredit>(`/cash/credits/${encodeURIComponent(id)}/cancel`, {});
 }
 
 export function apiReopenCashSession(id: string, body: { operatorName: string; note?: string }) {

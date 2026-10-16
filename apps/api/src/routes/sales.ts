@@ -1,6 +1,7 @@
 import {changeVariationQuantity} from '../services/variationInventory.js';
 import { unmarkSaleUnits } from '../services/soldUnits.js';
 import { isStoreManagement, resolveSaleMoment } from '../services/saleHistory.js';
+import { employeeHasPermission } from '../services/employeeAccess.js';
 import { externalSaleSchema, recordExternalSale } from '../services/externalSale.js';
 import { reverseTradeIn, saleForEdit, saleSnapshot, undoExternalSale } from '../services/externalSaleEdit.js';
 import { Router } from 'express';
@@ -642,9 +643,14 @@ salesRouter.put('/api/v1/sales/:id', requireAuth, async (req, res, next) => {
 
 salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next) => {
   try {
-    if (!isStoreManagement(req.user?.role)) throw Object.assign(new Error('Sem permissão para cancelar vendas.'), {status: 403});
     const storeId = req.storeId!;
     const saleId = req.params.id;
+    // Gerência sempre; no PDV, o operador com "cancelar venda" liberado em Permissões.
+    const canCancel =
+      isStoreManagement(req.user?.role) ||
+      ((await pool.query("SELECT 1 FROM sales_orders WHERE id = $1 AND store_id = $2 AND COALESCE(sale_type, 'pos') <> 'external'", [saleId, storeId])).rows.length > 0 &&
+        (await employeeHasPermission(pool, { storeId, email: req.user?.email ?? '', role: req.user?.role ?? '' }, 'posCancelSale')));
+    if (!canCancel) throw Object.assign(new Error('Sem permissão para cancelar vendas.'), {status: 403});
     const body = z.object({ reason: z.string().default('Cancelamento solicitado pelo cliente') }).parse(req.body);
 
     if (!pool) {
@@ -743,6 +749,25 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
         ],
       );
 
+      }
+      // 6. Venda do PDV paga em dinheiro: o dinheiro devolvido sai da gaveta do caixa aberto.
+      const cashSale = (
+        await client.query(
+          "SELECT SUM(cash_amount) AS cash, SUM(amount) AS total FROM cash_session_events WHERE store_id = $1 AND order_id = $2 AND COALESCE(type, event_type) = 'sale'",
+          [storeId, saleId],
+        )
+      ).rows[0];
+      const cashBack = Math.round((Number(cashSale?.cash) || 0) * 100) / 100;
+      if (Number(cashSale?.total) > 0) {
+        const open = (await client.query("SELECT id FROM cash_sessions WHERE store_id = $1 AND status = 'open' ORDER BY opened_at DESC LIMIT 1 FOR UPDATE", [storeId])).rows[0];
+        if (open) {
+          await client.query(
+            `INSERT INTO cash_session_events (id, session_id, store_id, type, amount, cash_amount, note, order_id, operator_name)
+             VALUES ($1, $2, $3, 'sale', $4::numeric, $5::numeric, $6, $7, $8)`,
+            [`MOV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, open.id, storeId, -Number(cashSale.total), -cashBack, `Cancelamento da venda #${saleId}`, saleId, req.user?.name || 'Operador'],
+          );
+          if (cashBack) await client.query('UPDATE cash_sessions SET expected_cash = expected_cash - $2::numeric WHERE id = $1', [open.id, cashBack]);
+        }
       }
       await client.query('COMMIT');
       res.json({ success: true, data: { ok: true, saleId, status: 'cancelled' } });

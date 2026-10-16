@@ -1362,6 +1362,7 @@ export function CaixaPage() {
         surcharge: surchargeMoney,
         sellerId: seller?.id,
         sellerName: seller?.name,
+        cashAmount: saleCash,
         lines: pricedLines.map((line) => ({
           stockId: line.stockId,
           name: line.name,

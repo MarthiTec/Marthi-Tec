@@ -26,7 +26,7 @@ import {
 } from '../../data/posQuotesStore';
 import {
   adjustStockQty,
-  cancelPosSaleOrder,
+  cancelPosSale,
   findStockByCode,
   findStockMatches,
   getAdminState,
@@ -431,7 +431,7 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
     });
     if (!ok) return;
     const fiscalCancel = cancelFiscalDocumentForSale(selected.id);
-    const result = cancelPosSaleOrder(selected.id);
+    const result = await cancelPosSale(selected.id, 'Cancelada no PDV');
     if (!result.ok) {
       onError(result.error);
       return;
@@ -1082,13 +1082,13 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
     setEditEmployeeId('');
   }
 
-  function saveEdit(id: string) {
+  async function saveEdit(id: string) {
     if (editBeneficiaryType === 'employee' && !editEmployeeId) {
       onError('Selecione o funcionário.');
       return;
     }
     const employee = employees.find((item) => item.id === editEmployeeId);
-    const result = updateCashMovement({
+    const result = await updateCashMovement({
       movementId: id,
       amount: Number(editAmount.replace(',', '.')) || 0,
       reason: editReason,
@@ -1116,7 +1116,7 @@ function MovementsPanel({ cashSession, onClose, onDone, onError, onRefresh }: Pa
       danger: true,
     });
     if (!ok) return;
-    const result = deleteCashMovement(id);
+    const result = await deleteCashMovement(id);
     if (!result.ok) {
       onError(result.error);
       return;
@@ -1651,7 +1651,7 @@ function ValePanel({ operatorName, onClose, onDone, onError, onRefresh }: PanelP
       danger: true,
     });
     if (!ok) return;
-    const result = cancelStoreCredit(creditId);
+    const result = await cancelStoreCredit(creditId);
     if (!result.ok) {
       onError(result.error);
       return;
