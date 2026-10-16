@@ -383,24 +383,54 @@ export function createDefaultOperation(): WorkOrderOperation {
 export const DEFAULT_OPERATIONS: WorkOrderOperation[] = [];
 
 export function listOperations(): WorkOrderOperation[] {
+  const defaultOp = createDefaultOperation();
   try {
     const raw = localStorage.getItem(storeScopedKey(OPERATIONS_STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const clean = parsed.filter(
-          (op: WorkOrderOperation) =>
-            op.id !== 'op-2026-08' &&
-            op.id !== 'op-2026-07' &&
-            op.masterOperatorName !== 'Marthi Master',
-        );
-        if (clean.length > 0) return clean;
+        const seenIds = new Set<string>();
+        const seenTitles = new Set<string>();
+        const clean: WorkOrderOperation[] = [];
+
+        for (const op of parsed as WorkOrderOperation[]) {
+          if (!op || !op.id || !op.title) continue;
+          if (
+            op.id === 'op-2026-08' ||
+            op.id === 'op-2026-07' ||
+            op.masterOperatorName === 'Marthi Master'
+          ) {
+            continue;
+          }
+          // Ignora IDs aleatórios gerados antigamente (ex: op-mv7dp5so) ou meses futuros
+          if (!/^op-\d{4}-\d{2}$/.test(op.id)) continue;
+          if (op.id > defaultOp.id) continue;
+
+          const normTitle = op.title.trim().toLowerCase();
+          if (seenIds.has(op.id) || seenTitles.has(normTitle)) continue;
+          seenIds.add(op.id);
+          seenTitles.add(normTitle);
+
+          clean.push(
+            op.id === defaultOp.id
+              ? { ...op, title: defaultOp.title, status: 'active' }
+              : op,
+          );
+        }
+
+        if (!seenIds.has(defaultOp.id)) {
+          clean.unshift(defaultOp);
+        }
+
+        if (clean.length !== parsed.length) {
+          saveOperations(clean);
+        }
+        return clean;
       }
     }
   } catch {
     /* ignore */
   }
-  const defaultOp = createDefaultOperation();
   saveOperations([defaultOp]);
   return [defaultOp];
 }
@@ -421,70 +451,74 @@ export function getActiveOperation(): WorkOrderOperation {
 
 export async function finishActiveOperation(
   currentOpId: string,
-  nextTitle: string,
+  _nextTitle?: string,
   masterOperatorName = 'Operador Master',
-): Promise<{ oldOp: WorkOrderOperation; newOp: WorkOrderOperation }> {
+): Promise<{ oldOp: WorkOrderOperation; newOp: WorkOrderOperation; concludedCount: number }> {
+  const defaultOp = createDefaultOperation();
   const ops = listOperations();
   const stamp = new Date().toISOString();
-  const nextId = `op-${Date.now().toString(36)}`;
-  const nextCode = `OP-${stamp.slice(0, 7)}`;
 
-  // Marca a operação atual (e quaisquer anteriores ativas) como concluídas
-  const updated = ops.map((op) => {
-    if (op.id === currentOpId || op.status === 'active') {
-      return {
-        ...op,
-        status: 'completed' as const,
-        completedAt: op.completedAt || stamp,
-        masterOperatorName: op.masterOperatorName || masterOperatorName,
-      };
-    }
-    return op;
-  });
-
-  const newOp: WorkOrderOperation = {
-    id: nextId,
-    code: nextCode,
-    title: nextTitle || `Operação ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+  const targetOp = ops.find((op) => op.id === currentOpId) || defaultOp;
+  const updatedOp: WorkOrderOperation = {
+    ...targetOp,
+    id: defaultOp.id,
+    code: defaultOp.code,
+    title: defaultOp.title,
     status: 'active',
-    startDate: stamp.split('T')[0],
-    endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-    masterOperatorName,
-    targetOrdersCount: 25,
+    completedAt: stamp,
+    masterOperatorName: masterOperatorName || targetOp.masterOperatorName,
   };
 
-  const allOps = [newOp, ...updated];
-  saveOperations(allOps);
+  // Mantém apenas 1 registro único por mês (sem gerar duplicatas no combobox)
+  const deduplicated = [
+    updatedOp,
+    ...ops.filter((op) => op.id !== updatedOp.id && op.id !== currentOpId),
+  ];
+  saveOperations(deduplicated);
 
-  // Mover OSs pendentes da operação anterior para a nova sprint
+  // Conclui (entrega) as OSs que já estão com status "ready" (Pronta) e normaliza operationId
   const currentOrders = listWorkOrders();
+  let concludedCount = 0;
+  const readyOrderIds: string[] = [];
+
   const migrated = currentOrders.map((order) => {
-    if (
-      (!order.operationId || order.operationId === currentOpId) &&
-      !['delivered', 'cancelled'].includes(order.status)
-    ) {
-      return { ...order, operationId: newOp.id, updatedAt: stamp };
+    const normalizedOpId =
+      order.operationId && /^op-\d{4}-\d{2}$/.test(order.operationId)
+        ? order.operationId
+        : updatedOp.id;
+
+    if (order.status === 'ready') {
+      concludedCount++;
+      readyOrderIds.push(order.id);
+      return {
+        ...order,
+        operationId: updatedOp.id,
+        status: 'delivered' as const,
+        deliveredAt: order.deliveredAt || stamp,
+        updatedAt: stamp,
+      };
+    }
+
+    if (order.operationId !== normalizedOpId) {
+      return { ...order, operationId: normalizedOpId, updatedAt: stamp };
     }
     return order;
   });
   save(migrated);
 
   // Sincroniza em background no backend se autenticado
-  if (isNestAuthed()) {
+  if (isNestAuthed() && readyOrderIds.length > 0) {
     try {
-      const ordersToSync = migrated.filter(
-        (o) => o.operationId === newOp.id && !['delivered', 'cancelled'].includes(o.status),
-      );
-      for (const ord of ordersToSync) {
-        updateWorkOrder(ord.id, { operationId: newOp.id }).catch(() => undefined);
+      const { apiDeliverWorkOrder } = await import('../services/erpApi');
+      for (const id of readyOrderIds) {
+        apiDeliverWorkOrder(id).catch(() => undefined);
       }
     } catch {
       /* ignore */
     }
   }
 
-  const oldOp = updated.find((op) => op.id === currentOpId) ?? ops[0];
-  return { oldOp, newOp };
+  return { oldOp: targetOp, newOp: updatedOp, concludedCount };
 }
 
 export const DISPOSITION_LABEL: Record<AssetDisposition, string> = {
@@ -636,7 +670,10 @@ function normalizeWorkOrder(raw: Partial<WorkOrder> & Pick<WorkOrder, 'id'>): Wo
     purchaseAt: raw.purchaseAt,
     purchaseStockId: raw.purchaseStockId,
     purchaseFinanceId: raw.purchaseFinanceId,
-    operationId: raw.operationId ?? 'op-2026-09',
+    operationId:
+      raw.operationId && /^op-\d{4}-\d{2}$/.test(raw.operationId) && raw.operationId !== 'op-2026-09'
+        ? raw.operationId
+        : createDefaultOperation().id,
     comments: Array.isArray(raw.comments) ? raw.comments : [],
     attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
     history: Array.isArray(raw.history) ? raw.history : [],

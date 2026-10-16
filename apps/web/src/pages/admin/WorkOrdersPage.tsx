@@ -45,6 +45,58 @@ const REFRESH_EVENTS = [
 ] as const;
 
 type ViewMode = 'dashboard' | 'board' | 'backlog' | 'roadmap' | 'list';
+type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'this_month' | 'last_month' | 'custom';
+
+function toLocalIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getOrderLocalIsoDate(isoString?: string): string {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return isoString.slice(0, 10);
+  return toLocalIsoDate(d);
+}
+
+function computePresetRange(preset: DatePreset): { from: string; to: string } {
+  const now = new Date();
+  const todayStr = toLocalIsoDate(now);
+  switch (preset) {
+    case 'today':
+      return { from: todayStr, to: todayStr };
+    case 'yesterday': {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yStr = toLocalIsoDate(y);
+      return { from: yStr, to: yStr };
+    }
+    case '7d': {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 6);
+      return { from: toLocalIsoDate(d), to: todayStr };
+    }
+    case '30d': {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 29);
+      return { from: toLocalIsoDate(d), to: todayStr };
+    }
+    case 'this_month': {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { from: toLocalIsoDate(first), to: toLocalIsoDate(last) };
+    }
+    case 'last_month': {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { from: toLocalIsoDate(first), to: toLocalIsoDate(last) };
+    }
+    default:
+      return { from: '', to: '' };
+  }
+}
 
 function priorityMeta(p: WorkOrderPriority) {
   switch (p) {
@@ -67,6 +119,7 @@ export function WorkOrdersPage() {
   const statusFilter = params.get('status') as WorkOrderStatus | null;
   const quoteFilter = params.get('quote') as QuoteStatus | null;
   const opFilter = params.get('op');
+  const periodParam = params.get('period') as DatePreset | null;
   const roleParam = params.get('role');
   const isMaster = roleParam !== 'tech' || user?.role === 'admin' || userIsStoreAdmin(user?.email);
 
@@ -77,6 +130,56 @@ export function WorkOrdersPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<WorkOrderPriority | 'all'>('all');
+  const [datePreset, setDatePreset] = useState<DatePreset>(() =>
+    periodParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(periodParam)
+      ? periodParam
+      : 'all',
+  );
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    if (periodParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(periodParam)) {
+      return computePresetRange(periodParam).from;
+    }
+    return '';
+  });
+  const [dateTo, setDateTo] = useState<string>(() => {
+    if (periodParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(periodParam)) {
+      return computePresetRange(periodParam).to;
+    }
+    return '';
+  });
+
+  // Sincroniza quando o combobox superior (OsLayout) muda ?period=
+  useEffect(() => {
+    if (periodParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(periodParam)) {
+      setDatePreset(periodParam);
+      const range = computePresetRange(periodParam);
+      setDateFrom(range.from);
+      setDateTo(range.to);
+    } else if (!periodParam && datePreset !== 'custom') {
+      setDatePreset('all');
+      setDateFrom('');
+      setDateTo('');
+    }
+  }, [periodParam]);
+
+  function applyDatePreset(nextPreset: DatePreset) {
+    setDatePreset(nextPreset);
+    const nextParams = new URLSearchParams(params);
+    if (nextPreset === 'all') {
+      setDateFrom('');
+      setDateTo('');
+      nextParams.delete('period');
+    } else if (nextPreset === 'custom') {
+      nextParams.delete('period');
+    } else {
+      const range = computePresetRange(nextPreset);
+      setDateFrom(range.from);
+      setDateTo(range.to);
+      nextParams.set('period', nextPreset);
+    }
+    setParams(nextParams, { replace: true });
+  }
+
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const v = params.get('view');
     if (v === 'dashboard' || v === 'board' || v === 'backlog' || v === 'roadmap' || v === 'list') {
@@ -129,9 +232,11 @@ export function WorkOrdersPage() {
   }, [successMessage]);
 
   const activeOp = getActiveOperation();
-  const currentOp = opFilter && opFilter !== 'all'
-    ? listOperations().find((o) => o.id === opFilter) || activeOp
-    : activeOp;
+  const validOps = listOperations();
+  const currentOp =
+    opFilter && opFilter !== 'all'
+      ? validOps.find((o) => o.id === opFilter) || activeOp
+      : activeOp;
 
   // Fechar dropdown de busca ao clicar fora
   useEffect(() => {
@@ -246,6 +351,7 @@ export function WorkOrdersPage() {
   }
 
   // Contagem de filtros ativos
+  const hasDateFilter = Boolean(datePreset !== 'all' || dateFrom || dateTo);
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (query.trim()) count++;
@@ -253,20 +359,33 @@ export function WorkOrdersPage() {
     if (selectedPriority !== 'all') count++;
     if (statusFilter) count++;
     if (quoteFilter) count++;
+    if (hasDateFilter) count++;
     return count;
-  }, [query, selectedTech, selectedPriority, statusFilter, quoteFilter]);
+  }, [query, selectedTech, selectedPriority, statusFilter, quoteFilter, hasDateFilter]);
 
-  // Lista filtrada
+  // Lista filtrada (inclui filtro de data de cadastro da OS)
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return orders.filter((item) => {
-      // Filtro de Operação/Sprint (se não for "all")
-      if (opFilter && opFilter !== 'all') {
+      // Filtro de Operação/Sprint apenas se for um ciclo válido explícito e não houver filtro de data amplo
+      if (
+        opFilter &&
+        opFilter !== 'all' &&
+        !hasDateFilter &&
+        validOps.some((o) => o.id === opFilter)
+      ) {
         if (item.operationId && item.operationId !== opFilter) return false;
       }
       if (statusFilter && item.status !== statusFilter) return false;
       if (quoteFilter && item.quoteStatus !== quoteFilter) return false;
       if (!statusFilter && !quoteFilter && item.status === 'cancelled') return false;
+
+      // Filtro por data (createdAt em YYYY-MM-DD local)
+      if (dateFrom || dateTo) {
+        const orderDate = getOrderLocalIsoDate(item.createdAt);
+        if (dateFrom && orderDate < dateFrom) return false;
+        if (dateTo && orderDate > dateTo) return false;
+      }
 
       // Filtro por técnico
       if (selectedTech && item.technician?.toLowerCase() !== selectedTech.toLowerCase()) {
@@ -283,7 +402,19 @@ export function WorkOrdersPage() {
         .toLowerCase()
         .includes(needle);
     });
-  }, [orders, query, statusFilter, quoteFilter, opFilter, selectedTech, selectedPriority]);
+  }, [
+    orders,
+    query,
+    statusFilter,
+    quoteFilter,
+    opFilter,
+    hasDateFilter,
+    validOps,
+    dateFrom,
+    dateTo,
+    selectedTech,
+    selectedPriority,
+  ]);
 
   // Métricas
   const backlogCount = orders.filter((item) => item.status === 'backlog').length;
@@ -292,7 +423,9 @@ export function WorkOrdersPage() {
   const readyCount = orders.filter((item) => item.status === 'ready').length;
   const quoteWaiting = orders.filter((item) => item.quoteStatus === 'sent').length;
 
-  const currentOpOrders = orders.filter((o) => !o.operationId || o.operationId === currentOp.id);
+  const currentOpOrders = orders.filter(
+    (o) => (!o.operationId || o.operationId === currentOp.id) && o.status !== 'cancelled',
+  );
   const currentOpDelivered = currentOpOrders.filter((o) => o.status === 'delivered').length;
   const sprintProgress = currentOpOrders.length > 0
     ? Math.round((currentOpDelivered / currentOpOrders.length) * 100)
@@ -340,14 +473,27 @@ export function WorkOrdersPage() {
     }
   }
 
+  function clearDateFilter() {
+    setDatePreset('all');
+    setDateFrom('');
+    setDateTo('');
+    const next = new URLSearchParams(params);
+    next.delete('period');
+    setParams(next, { replace: true });
+  }
+
   function clearAllFilters() {
     setQuery('');
     setSelectedTech(null);
     setSelectedPriority('all');
+    setDatePreset('all');
+    setDateFrom('');
+    setDateTo('');
     const next = new URLSearchParams(params);
     next.delete('status');
     next.delete('quote');
-    setParams(next);
+    next.delete('period');
+    setParams(next, { replace: true });
   }
 
   function onDragStart(orderId: string) {
@@ -558,6 +704,73 @@ export function WorkOrdersPage() {
           ) : null}
         </div>
 
+        {/* Filtro de Data Rápido na Barra Principal */}
+        <div className="os-jira-date-bar">
+          <div className="os-jira-priority-picker-wrap">
+            <AdminPicker
+              compact
+              aria-label="Filtrar OS por período de data"
+              value={datePreset}
+              options={[
+                { value: 'all', label: '📅 Todas as datas' },
+                { value: 'today', label: '📅 Hoje' },
+                { value: 'yesterday', label: '📅 Ontem' },
+                { value: '7d', label: '📅 Últimos 7 dias' },
+                { value: '30d', label: '📅 Últimos 30 dias' },
+                { value: 'this_month', label: '📅 Este mês' },
+                { value: 'last_month', label: '📅 Mês passado' },
+                { value: 'custom', label: '📅 Escolher data...' },
+              ]}
+              onChange={(val) => applyDatePreset(val as DatePreset)}
+              className="os-jira-priority-combobox"
+            />
+          </div>
+
+          <div className="os-jira-date-inputs" title="Filtrar OS por data inicial e final">
+            <input
+              type="date"
+              className="os-jira-date-input"
+              aria-label="Data inicial"
+              value={dateFrom}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDatePreset('custom');
+                setDateFrom(v);
+                if (v && !dateTo) setDateTo(v);
+                const next = new URLSearchParams(params);
+                next.delete('period');
+                setParams(next, { replace: true });
+              }}
+            />
+            <span className="os-jira-date-sep">até</span>
+            <input
+              type="date"
+              className="os-jira-date-input"
+              aria-label="Data final"
+              value={dateTo}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDatePreset('custom');
+                setDateTo(v);
+                if (v && !dateFrom) setDateFrom(v);
+                const next = new URLSearchParams(params);
+                next.delete('period');
+                setParams(next, { replace: true });
+              }}
+            />
+            {hasDateFilter ? (
+              <button
+                type="button"
+                className="os-jira-date-clear"
+                onClick={clearDateFilter}
+                title="Limpar filtro de data"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         {/* Combobox Padrão de Prioridades com Ícones (AdminPicker) */}
         <div className="os-jira-priority-picker-wrap">
           <AdminPicker
@@ -640,18 +853,16 @@ export function WorkOrdersPage() {
           })}
         </div>
 
-        {/* Botão Filtrar [ N ] */}
+        {/* Botão Filtrar por Data */}
         <button
           type="button"
-          className={`os-jira-pill-btn ${activeFiltersCount > 0 ? 'is-active' : ''}`}
+          className={`os-jira-pill-btn ${filterDrawerOpen || hasDateFilter ? 'is-active' : ''}`}
           onClick={() => setFilterDrawerOpen((v) => !v)}
-          title="Abrir painel de filtros dentro da operação"
+          title="Abrir filtro de data para listar suas OS"
         >
           <AdminIcon name="filter" />
-          <span>Filtrar</span>
-          {activeFiltersCount > 0 ? (
-            <span className="os-jira-badge-count">{activeFiltersCount}</span>
-          ) : null}
+          <span>Data</span>
+          {hasDateFilter ? <span className="os-jira-badge-count">1</span> : null}
         </button>
 
         {/* Botão Limpar Filtros */}
@@ -661,7 +872,7 @@ export function WorkOrdersPage() {
             className="os-jira-link-btn"
             onClick={clearAllFilters}
           >
-            Remover filtros
+            Remover filtros ({activeFiltersCount})
           </button>
         ) : null}
 
@@ -745,11 +956,11 @@ export function WorkOrdersPage() {
         </button>
       </div>
 
-      {/* Painel Retrátil de Filtro da Operação */}
+      {/* Painel Retrátil Simplificado: Apenas Filtro de Data */}
       {filterDrawerOpen ? (
         <aside className="os-filter-drawer">
           <div className="os-filter-drawer__head">
-            <strong>Filtros da Operação Atual</strong>
+            <strong>📅 Filtrar OS por Data</strong>
             <button
               type="button"
               className="os-filter-drawer__close"
@@ -759,52 +970,68 @@ export function WorkOrdersPage() {
             </button>
           </div>
 
+          <div className="os-filter-drawer__presets">
+            {(
+              [
+                { key: 'all', label: 'Todas as datas' },
+                { key: 'today', label: 'Hoje' },
+                { key: 'yesterday', label: 'Ontem' },
+                { key: '7d', label: 'Últimos 7 dias' },
+                { key: '30d', label: 'Últimos 30 dias' },
+                { key: 'this_month', label: 'Este mês' },
+                { key: 'last_month', label: 'Mês passado' },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className={`os-p-filter-pill ${datePreset === p.key ? 'is-active' : ''}`}
+                onClick={() => applyDatePreset(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           <div className="os-filter-drawer__body">
             <label>
-              <span>Buscar texto (cliente / modelo / defeito):</span>
+              <span>Data inicial (De):</span>
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ex.: iPhone, Cliente, Placa..."
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDatePreset('custom');
+                  setDateFrom(v);
+                  if (v && !dateTo) setDateTo(v);
+                }}
               />
             </label>
 
-            <AdminPicker
-              label="Técnico Responsável"
-              value={selectedTech ?? ''}
-              options={[
-                { value: '', label: 'Todos os técnicos' },
-                ...TECHNICIANS_LIST.map((t) => ({
-                  value: t.name,
-                  label: `${t.name} (${t.specialty})`,
-                })),
-              ]}
-              onChange={(val) => setSelectedTech(val ? val : null)}
-            />
-
-            <AdminPicker
-              label="Nível de Prioridade"
-              value={selectedPriority}
-              options={[
-                { value: 'all', label: 'Todas as prioridades' },
-                { value: 'urgent', label: '⇈ Urgente' },
-                { value: 'high', label: '↑ Alta' },
-                { value: 'normal', label: '= Normal' },
-                { value: 'low', label: '↓ Baixa' },
-              ]}
-              onChange={(val) => setSelectedPriority(val as any)}
-            />
+            <label>
+              <span>Data final (Até):</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDatePreset('custom');
+                  setDateTo(v);
+                  if (v && !dateFrom) setDateFrom(v);
+                }}
+              />
+            </label>
 
             <div className="os-filter-drawer__actions">
-              <button type="button" className="btn btn--ghost" onClick={clearAllFilters}>
-                Limpar Todos
+              <button type="button" className="btn btn--ghost" onClick={clearDateFilter}>
+                Limpar Data
               </button>
               <button
                 type="button"
                 className="btn btn--primary"
                 onClick={() => setFilterDrawerOpen(false)}
               >
-                Aplicar ({filtered.length} encontrados)
+                Listar OS ({filtered.length} encontradas)
               </button>
             </div>
           </div>
@@ -869,7 +1096,7 @@ export function WorkOrdersPage() {
       {/* Conteúdo Principal conforme ViewMode */}
       {viewMode === 'dashboard' ? (
         <OsDashboardView
-          orders={orders}
+          orders={filtered}
           onOpenOrder={(order) => setSelectedDetailOrder(order)}
           onGoToBoard={(targetStatus) => {
             if (targetStatus) {
@@ -885,7 +1112,7 @@ export function WorkOrdersPage() {
         />
       ) : viewMode === 'backlog' ? (
         <OsBacklogView
-          orders={orders}
+          orders={filtered}
           onOpenOrder={(order) => setSelectedDetailOrder(order)}
           onMoveOrder={move}
           onUpdatePriority={updatePriority}
@@ -904,6 +1131,7 @@ export function WorkOrdersPage() {
               <thead>
                 <tr>
                   <th>Código</th>
+                  <th>Data</th>
                   <th>Cliente</th>
                   <th>Equipamento</th>
                   <th>Defeito</th>
@@ -941,6 +1169,13 @@ export function WorkOrdersPage() {
                         >
                           {item.id}
                         </button>
+                      </td>
+                      <td>
+                        <span style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                          {item.createdAt
+                            ? new Date(item.createdAt).toLocaleDateString('pt-BR')
+                            : '—'}
+                        </span>
                       </td>
                       <td>
                         <strong>{item.customerName}</strong>
@@ -1236,14 +1471,18 @@ export function WorkOrdersPage() {
         orders={orders}
         isMaster={isMaster}
         onClose={() => setSprintModalOpen(false)}
-        onCompleted={(newOp) => {
+        onCompleted={(newOp, concludedCount) => {
           setOrders(listWorkOrders());
           const next = new URLSearchParams(params);
-          next.set('op', newOp.id);
-          setParams(next);
+          next.delete('op');
+          setParams(next, { replace: true });
           window.dispatchEvent(new Event(OS_STATE_EVENT));
           window.dispatchEvent(new CustomEvent('os:period-changed', { detail: { opId: newOp.id } }));
-          setSuccessMessage(`Ciclo "${newOp.title}" iniciado com sucesso! As tarefas em aberto foram transferidas.`);
+          setSuccessMessage(
+            concludedCount && concludedCount > 0
+              ? `${concludedCount} ${concludedCount === 1 ? 'OS pronta foi concluída' : 'OSs prontas foram concluídas'} em "${newOp.title}"!`
+              : `Ciclo "${newOp.title}" atualizado sem gerar registros duplicados!`,
+          );
         }}
       />
     </section>

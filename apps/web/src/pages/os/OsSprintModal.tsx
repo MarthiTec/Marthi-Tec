@@ -13,7 +13,7 @@ type Props = {
   orders: WorkOrder[];
   isMaster: boolean;
   onClose: () => void;
-  onCompleted: (newOp: WorkOrderOperation) => void;
+  onCompleted: (newOp: WorkOrderOperation, concludedCount?: number) => void;
 };
 
 export function OsSprintModal({
@@ -26,13 +26,6 @@ export function OsSprintModal({
 }: Props) {
   const { user } = useAuth();
   const canFinish = isMaster || user?.role === 'admin' || userIsStoreAdmin(user?.email);
-  const [nextTitle, setNextTitle] = useState(() => {
-    const nextDate = new Date();
-    nextDate.setMonth(nextDate.getMonth() + 1);
-    const monthName = nextDate.toLocaleDateString('pt-BR', { month: 'long' });
-    const capitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-    return `Operação ${capitalized} ${nextDate.getFullYear()}`;
-  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -40,31 +33,36 @@ export function OsSprintModal({
   if (!open) return null;
 
   const currentOpOrders = orders.filter(
-    (o) => !o.operationId || o.operationId === operation.id,
+    (o) => (!o.operationId || o.operationId === operation.id) && o.status !== 'cancelled',
   );
   const delivered = currentOpOrders.filter((o) => o.status === 'delivered');
-  const pending = currentOpOrders.filter((o) => !['delivered', 'cancelled'].includes(o.status));
-  const completionPercent = currentOpOrders.length > 0
-    ? Math.round((delivered.length / currentOpOrders.length) * 100)
-    : 100;
+  const ready = currentOpOrders.filter((o) => o.status === 'ready');
+  const inProgress = currentOpOrders.filter(
+    (o) => !['delivered', 'ready', 'cancelled'].includes(o.status),
+  );
+  const totalFinishedAfter = delivered.length + ready.length;
+  const completionPercent =
+    currentOpOrders.length > 0
+      ? Math.round((totalFinishedAfter / currentOpOrders.length) * 100)
+      : 100;
 
   async function handleFinish() {
     if (!canFinish) {
-      setError('Apenas o Operador Master ou Administrador possui permissão para encerrar uma Operação.');
+      setError('Apenas o Operador Master ou Administrador possui permissão para concluir as tarefas.');
       return;
     }
     setBusy(true);
     setError('');
     try {
-      const { newOp } = await finishActiveOperation(
+      const { newOp, concludedCount } = await finishActiveOperation(
         operation.id,
-        nextTitle.trim(),
+        operation.title,
         user?.name || 'Operador Master',
       );
-      onCompleted(newOp);
+      onCompleted(newOp, concludedCount);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao encerrar operação.');
+      setError(err instanceof Error ? err.message : 'Falha ao concluir tarefas.');
     } finally {
       setBusy(false);
     }
@@ -75,7 +73,7 @@ export function OsSprintModal({
       <div className="os-modal os-modal--sprint">
         <header className="os-modal__head">
           <div className="os-modal__title-group">
-            <span className="os-modal__kicker">Ciclo Mensal · Gestão de Tarefas da Oficina</span>
+            <span className="os-modal__kicker">Gestão de Tarefas da Oficina</span>
             <h2>Concluir Tarefas: {operation.title}</h2>
           </div>
           <button type="button" className="os-modal__close-btn" onClick={onClose} aria-label="Fechar">
@@ -90,34 +88,34 @@ export function OsSprintModal({
             <div className="os-sprint-alert os-sprint-alert--warn">
               <strong>Permissão de Operador Master Necessária</strong>
               <p>
-                Apenas o operador com perfil Master ou Administrador tem autorização para concluir o ciclo de tarefas e iniciar o próximo período.
+                Apenas o operador com perfil Master ou Administrador tem autorização para dar baixa em lote nas tarefas prontas deste período.
               </p>
             </div>
           ) : (
             <div className="os-sprint-alert os-sprint-alert--info">
-              <strong>Fechamento do Ciclo de Tarefas</strong>
+              <strong>Baixa de Tarefas Prontas no Período Atual</strong>
               <p>
-                Ao concluir, as tarefas finalizadas serão arquivadas no histórico deste período e as tarefas em andamento serão transferidas automaticamente para o próximo ciclo.
+                Ao confirmar, as OSs com status <strong>Pronta ({ready.length})</strong> serão marcadas como <strong>Entregues/Concluídas</strong> dentro de <strong>{operation.title}</strong>, mantendo as OSs em andamento no quadro sem gerar ciclos duplicados.
               </p>
             </div>
           )}
 
           <div className="os-sprint-stats">
             <div className="os-sprint-stat-item">
-              <span className="os-sprint-stat-item__label">Total de Tarefas</span>
+              <span className="os-sprint-stat-item__label">Total no Período</span>
               <strong className="os-sprint-stat-item__val">{currentOpOrders.length}</strong>
             </div>
             <div className="os-sprint-stat-item is-success">
-              <span className="os-sprint-stat-item__label">Tarefas Concluídas</span>
+              <span className="os-sprint-stat-item__label">Prontas p/ Concluir</span>
+              <strong className="os-sprint-stat-item__val">{ready.length}</strong>
+            </div>
+            <div className="os-sprint-stat-item">
+              <span className="os-sprint-stat-item__label">Já Entregues</span>
               <strong className="os-sprint-stat-item__val">{delivered.length}</strong>
             </div>
             <div className="os-sprint-stat-item is-warn">
-              <span className="os-sprint-stat-item__label">A Transferir</span>
-              <strong className="os-sprint-stat-item__val">{pending.length}</strong>
-            </div>
-            <div className="os-sprint-stat-item">
-              <span className="os-sprint-stat-item__label">Taxa de Conclusão</span>
-              <strong className="os-sprint-stat-item__val">{completionPercent}%</strong>
+              <span className="os-sprint-stat-item__label">Em Bancada</span>
+              <strong className="os-sprint-stat-item__val">{inProgress.length}</strong>
             </div>
           </div>
 
@@ -129,23 +127,6 @@ export function OsSprintModal({
               />
             </div>
           </div>
-
-          {canFinish ? (
-            <div className="os-sprint-next-form">
-              <label>
-                <span>Nome do Próximo Ciclo de Tarefas:</span>
-                <input
-                  value={nextTitle}
-                  onChange={(e) => setNextTitle(e.target.value)}
-                  placeholder="Ex.: Operação Outubro 2026"
-                  required
-                />
-              </label>
-              <small>
-                {pending.length} tarefas em aberto serão automaticamente transferidas para este novo ciclo.
-              </small>
-            </div>
-          ) : null}
         </div>
 
         <footer className="os-modal__foot">
@@ -158,10 +139,15 @@ export function OsSprintModal({
             disabled={busy || !canFinish}
             onClick={handleFinish}
           >
-            {busy ? 'Concluindo Ciclo…' : 'Concluir Tarefas & Iniciar Próximo Ciclo'}
+            {busy
+              ? 'Concluindo Tarefas…'
+              : ready.length > 0
+              ? `Concluir ${ready.length} ${ready.length === 1 ? 'Tarefa Pronta' : 'Tarefas Prontas'}`
+              : 'Atualizar Ciclo Atual'}
           </button>
         </footer>
       </div>
     </div>
   );
 }
+

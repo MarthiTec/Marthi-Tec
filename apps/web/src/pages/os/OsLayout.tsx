@@ -82,7 +82,29 @@ export function OsLayout() {
 
   const operations = useMemo(() => listOperations(), [opsRevision]);
   const activeOp = useMemo(() => getActiveOperation(), [opsRevision, operations]);
-  const currentOpId = params.get('op') || activeOp.id;
+  const rawOpParam = params.get('op');
+  const datePresetParam = params.get('period');
+
+  // Limpa automaticamente IDs antigos/inválidos na URL (ex.: ?op=op-mv7dp5so)
+  useEffect(() => {
+    if (
+      rawOpParam &&
+      rawOpParam !== 'all' &&
+      !operations.some((op) => op.id === rawOpParam)
+    ) {
+      const next = new URLSearchParams(params);
+      next.delete('op');
+      setParams(next, { replace: true });
+    }
+  }, [rawOpParam, operations, params, setParams]);
+
+  const currentPeriodValue = useMemo(() => {
+    if (datePresetParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(datePresetParam)) {
+      return datePresetParam;
+    }
+    if (rawOpParam === 'all') return 'all';
+    return activeOp.id;
+  }, [datePresetParam, rawOpParam, activeOp.id]);
 
   const title = resolveTitle(location.pathname, location.search);
   const isBoard = location.pathname === '/os';
@@ -106,12 +128,17 @@ export function OsLayout() {
     navigate(path);
   }
 
-  function handlePeriodChange(newOpId: string) {
+  function handlePeriodChange(val: string) {
     const next = new URLSearchParams(params);
-    if (newOpId === 'all') {
+    if (['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(val)) {
+      next.set('period', val);
+      next.set('op', 'all');
+    } else if (val === 'all') {
+      next.delete('period');
       next.set('op', 'all');
     } else {
-      next.set('op', newOpId);
+      next.delete('period');
+      next.delete('op');
     }
     setParams(next);
   }
@@ -249,14 +276,17 @@ export function OsLayout() {
           <span className="os-app__period-icon" aria-hidden="true">📅</span>
           <AdminPicker
             compact
-            aria-label="Filtrar por período / operação da oficina"
-            value={currentOpId}
+            aria-label="Filtrar por período ou data da oficina"
+            value={currentPeriodValue}
             options={[
-              ...operations.map((op) => ({
-                value: op.id,
-                label: `${op.title} ${op.status === 'active' ? '(Tarefas Ativas)' : '(Concluída)'}`,
-              })),
-              { value: 'all', label: 'Todas as Operações (Histórico Total)' },
+              { value: activeOp.id, label: `${activeOp.title} (Ciclo Atual)` },
+              { value: 'today', label: 'OS de Hoje' },
+              { value: 'yesterday', label: 'OS de Ontem' },
+              { value: '7d', label: 'Últimos 7 dias' },
+              { value: '30d', label: 'Últimos 30 dias' },
+              { value: 'this_month', label: 'Este mês' },
+              { value: 'last_month', label: 'Mês passado' },
+              { value: 'all', label: 'Todas as OS (Histórico Total)' },
             ]}
             onChange={(val) => handlePeriodChange(val)}
             className="os-app__period-picker"

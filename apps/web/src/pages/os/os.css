@@ -2846,15 +2846,108 @@
 }
 
 /* ==========================================================================
+   Filtro de Data Rápido na Barra Principal e Drawer
+   ========================================================================== */
+.os-jira-date-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.os-jira-date-inputs {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--card, #f8fafc);
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.os-jira-date-input {
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.os-jira-date-sep {
+  font-size: 0.74rem;
+  color: var(--mute, #64748b);
+  font-weight: 600;
+}
+
+.os-jira-date-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.os-jira-date-clear:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.is-theme-dark .os-jira-date-inputs,
+.admin--dark .os-jira-date-inputs {
+  background: #11151a;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.is-theme-dark .os-jira-date-input,
+.admin--dark .os-jira-date-input {
+  color: #f1f5f9;
+  color-scheme: dark;
+}
+
+.is-theme-dark .os-jira-date-sep,
+.admin--dark .os-jira-date-sep {
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .os-jira-date-bar {
+    width: 100%;
+  }
+  .os-jira-date-inputs {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .os-jira-date-input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ==========================================================================
    Painel de Filtros Retrátil (Filter Drawer)
    ========================================================================== */
 .os-filter-drawer {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--line, #cbd5e1);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 14px;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -2879,6 +2972,13 @@
 
 .os-filter-drawer__close:hover {
   color: #0f172a;
+}
+
+.os-filter-drawer__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .os-filter-drawer__body {
@@ -2922,36 +3022,44 @@
 }
 
 /* Dark mode filter drawer */
-.is-theme-dark .os-filter-drawer {
+.is-theme-dark .os-filter-drawer,
+.admin--dark .os-filter-drawer {
   background: #182029;
   border-color: rgba(255, 255, 255, 0.1);
   color: #fff;
   box-shadow: none;
 }
 
-.is-theme-dark .os-filter-drawer__head strong {
+.is-theme-dark .os-filter-drawer__head strong,
+.admin--dark .os-filter-drawer__head strong {
   color: #fff;
 }
 
-.is-theme-dark .os-filter-drawer__close {
+.is-theme-dark .os-filter-drawer__close,
+.admin--dark .os-filter-drawer__close {
   color: #94a3b8;
 }
 
-.is-theme-dark .os-filter-drawer__close:hover {
+.is-theme-dark .os-filter-drawer__close:hover,
+.admin--dark .os-filter-drawer__close:hover {
   color: #fff;
 }
 
-.is-theme-dark .os-filter-drawer__body label {
+.is-theme-dark .os-filter-drawer__body label,
+.admin--dark .os-filter-drawer__body label {
   color: #94a3b8;
 }
 
-.is-theme-dark .os-filter-drawer__body input {
+.is-theme-dark .os-filter-drawer__body input,
+.admin--dark .os-filter-drawer__body input {
   background: #11151a;
   border-color: rgba(255, 255, 255, 0.14);
   color: #fff;
+  color-scheme: dark;
 }
 
-.is-theme-dark .os-filter-drawer__body input:focus {
+.is-theme-dark .os-filter-drawer__body input:focus,
+.admin--dark .os-filter-drawer__body input:focus {
   border-color: #38bdf8;
   background: #11151a;
 }
