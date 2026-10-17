@@ -8,10 +8,12 @@ import { APPLE_REFERENCE_URL, matchReference, parseAppleModels, type DeviceRefer
 export const deviceReferenceRouter = Router();
 let refresh: Promise<DeviceReference[]> | null = null;
 
-async function loadReferences(): Promise<DeviceReference[]> {
+export async function loadReferences(): Promise<DeviceReference[]> {
   const saved = await pool.query('SELECT data, refreshed_at FROM device_reference_sources WHERE source_url = $1', [APPLE_REFERENCE_URL]);
   const row = saved.rows[0];
-  if (row && Date.now() - new Date(row.refreshed_at).getTime() < 86400000) return row.data;
+  // Cache salvo antes das fotos dos modelos (sem "image") é refeito para trazer as fotos.
+  const hasImages = Array.isArray(row?.data) && row.data.some((model: DeviceReference) => model.image);
+  if (row && hasImages && Date.now() - new Date(row.refreshed_at).getTime() < 86400000) return row.data;
   if (!refresh) {
     refresh = (async () => {
       const response = await fetch(APPLE_REFERENCE_URL, { signal: AbortSignal.timeout(10000), redirect: 'error' });

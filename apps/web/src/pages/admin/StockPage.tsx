@@ -15,6 +15,7 @@ import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiS
 import { nestRequest } from '../../services/nestClient';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickAddButton } from '../../components/QuickModal';
+import { PhotoSuggestions } from '../../components/PhotoSuggestions';
 import { QuickCreateAttribute, QuickCreateBrand, QuickCreateSupplier } from '../../components/QuickCreate';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -1449,6 +1450,13 @@ export function StockPage() {
                     catch {setError('Informe uma URL HTTPS válida para a foto.');}
                   }}>Adicionar URL</button>
                 </div>}
+                {!readOnly && form.showOnTotem && !form.images.length ? (
+                  <PhotoSuggestions
+                    name={form.name}
+                    brand={brands.find((b) => b.slug === form.brand)?.name ?? ''}
+                    onPick={(url) => setForm((current) => ({ ...current, images: current.images.includes(url) ? current.images : [...current.images, url] }))}
+                  />
+                ) : null}
                 <button type="button" className="btn btn--ghost btn--sm stock-photo-picker__preview" onClick={()=>setTotemPhotoPreview(true)}>Prévia no totem</button>
                 <p className="empty stock-photo-picker__help">
                   A primeira foto é a capa no Totem e ERP. Prefira fundo branco ou transparente.

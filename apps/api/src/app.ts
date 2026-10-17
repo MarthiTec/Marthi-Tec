@@ -46,6 +46,7 @@ import { cashRouter } from './routes/cash.js';
 import { salesSearchRouter } from './routes/salesSearch.js';
 import { tradeEvaluationsRouter } from './routes/tradeEvaluations.js';
 import { saleCostAuditRouter } from './routes/saleCostAudit.js';
+import { productImagesRouter } from './routes/productImages.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
@@ -108,6 +109,7 @@ app.use(cashRouter);
 app.use(salesSearchRouter);
 app.use(tradeEvaluationsRouter);
 app.use(saleCostAuditRouter);
+app.use(productImagesRouter);
 app.use(posRouter);
 app.use(salesRouter);
 app.use(commercialRouter);

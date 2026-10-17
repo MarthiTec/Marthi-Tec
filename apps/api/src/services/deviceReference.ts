@@ -4,6 +4,8 @@ export type DeviceReference = {
   colors: string[];
   capacities: string[];
   sourceUrl: string;
+  /** Foto oficial do modelo (cores lado a lado) na página da Apple. */
+  image?: string;
 };
 
 export const APPLE_REFERENCE_URL = 'https://support.apple.com/pt-br/108044';
@@ -40,8 +42,13 @@ export function parseAppleModels(html: string): DeviceReference[] {
     const link = [...section[2].matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)]
       .find(a => /especifica/i.test(text(a[2])));
     const url = link ? new URL(link[1], APPLE_REFERENCE_URL) : new URL(APPLE_REFERENCE_URL);
+    // Foto oficial do modelo: só de domínio da Apple e por HTTPS.
+    const img = [...section[2].matchAll(/<img\b[^>]*>/gi)].map((tag) => tag[0]).find((tag) => /\bgb-image\b/.test(tag));
+    const src = img?.match(/\bsrc="([^"]+)"/i)?.[1];
+    const image = src ? new URL(src, APPLE_REFERENCE_URL) : null;
     models.push({ brand: 'Apple', model, colors, capacities: [...new Set(capacities)],
-      sourceUrl: url.hostname === 'support.apple.com' ? url.href : APPLE_REFERENCE_URL });
+      sourceUrl: url.hostname === 'support.apple.com' ? url.href : APPLE_REFERENCE_URL,
+      ...(image && image.protocol === 'https:' && /(^|\.)apple\.com$/.test(image.hostname) ? { image: image.href } : {}) });
   }
   return models;
 }

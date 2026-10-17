@@ -10,6 +10,23 @@ type ProductCarouselProps = {
 
 const AUTO_MS = 10_000;
 
+/**
+ * Produto sem foto (ou foto que não carregou): um cartão com o nome do produto no lugar do "Sem foto".
+ * É desenhado na tela, não grava nada; a foto de verdade continua sendo a do cadastro.
+ */
+export function ProductNameCard({ name, size = 'card' }: { name: string; size?: 'card' | 'hero' }) {
+  const clean = name.replace(/\s+/g, ' ').trim() || 'Produto';
+  return (
+    <span className={`totem-name-card totem-name-card--${size}`} role="img" aria-label={clean}>
+      <svg className="totem-name-card__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="6.5" y="2.5" width="11" height="19" rx="2.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M10.5 5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+      <strong className="totem-name-card__name">{clean}</strong>
+    </span>
+  );
+}
+
 export function ProductCarousel({
   images,
   alt,
@@ -39,7 +56,7 @@ export function ProductCarousel({
   }, [slides.length, autoPlayMs]);
 
   if (slides.length === 0) {
-    return <div className={`totem-carousel totem-carousel--${size} totem-carousel--empty ${className}`} role="img" aria-label={`${alt} — sem foto`}><span className="totem-carousel__placeholder">Sem foto</span></div>;
+    return <div className={`totem-carousel totem-carousel--${size} totem-carousel--empty ${className}`}><ProductNameCard name={alt} size={size} /></div>;
   }
 
   function go(delta: number) {
@@ -91,7 +108,7 @@ export function ProductCarousel({
         {slides.map((src, slideIndex) => (
           <div className="totem-carousel__slide" key={`${src}-${slideIndex}`}>
             {failedImages.has(src) ? (
-              <span className="totem-carousel__placeholder" role="img" aria-label={`${alt} — foto indisponível`}>Foto indisponível</span>
+              <ProductNameCard name={alt} size={size} />
             ) : (
               <img src={src} alt={`${alt} — foto ${slideIndex + 1}`} draggable={false} loading="lazy" decoding="async" onError={() => setFailedImages(current => new Set([...current, src]))} />
             )}
