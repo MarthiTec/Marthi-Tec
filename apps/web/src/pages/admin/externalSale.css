@@ -186,3 +186,17 @@
 .xsale-pay-row__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .84rem; }
 .xsale-pay-row__head .btn { display: inline-flex; align-items: center; gap: 4px; }
 .xsale-pay-add { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Formas de pagamento no padrão do PDV (CSS base em caixa/caixaPayments.css). */
+.xsale-split .pdv-split__amount input { min-height: 44px; font-weight: 700; }
+.xsale-split .pdv-split__main .admin-picker,
+.xsale-split .pdv-split__main > * { min-width: 0; }
+.xsale-split .pdv-split__drop { height: 44px; }
+.xsale-split .pdv-split__status strong { color: inherit; }
+
+/* Desconto/acréscimo com R$ ou % (como no PDV). */
+.xsale-adj { display: grid; gap: 4px; min-width: 0; }
+.xsale-adj__input { display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: stretch; }
+.xsale-adj__input .admin-input { min-width: 0; border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.xsale-adj__toggle { min-height: 44px; border: 1px solid var(--line, #d8dde3); border-left: 0; border-radius: 0 12px 12px 0; background: rgba(var(--accent-rgb, 15, 118, 110), .1); color: var(--accent, #0f766e); font: inherit; font-size: .8rem; font-weight: 800; cursor: pointer; }
+.xsale-adj__toggle:hover { background: rgba(var(--accent-rgb, 15, 118, 110), .18); }

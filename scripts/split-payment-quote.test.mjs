@@ -16,7 +16,7 @@ test('a single payment is the whole amount, as before (card 4x with the machine 
 });
 
 test('PIX + cash + card: the last one takes what is left and only the card pays interest', () => {
-  const { quotes, remainder, cardInterest, totalCharged } = quotePayments(
+  const { quotes, allocated, remainder, cardInterest, totalCharged } = quotePayments(
     [
       { method: 'PIX', installments: 1, amount: 1000 },
       { method: 'Dinheiro', installments: 1, amount: 500 },
@@ -28,7 +28,7 @@ test('PIX + cash + card: the last one takes what is left and only the card pays 
   );
   assert.deepEqual(quotes.map((q) => [q.method, q.base, q.interest, q.total]), [['PIX', 1000, 0, 1000], ['Dinheiro', 500, 0, 500], ['Cartão de Crédito', 1000, 68, 1068]]);
   assert.equal(quotes[2].perInstallment, 356);
-  assert.deepEqual([remainder, cardInterest, totalCharged], [1000, 68, 2568]);
+  assert.deepEqual([allocated, remainder, cardInterest, totalCharged], [2500, 0, 68, 2568]);
 });
 
 test('PIX installments are ignored, and values above the total show a negative remainder', () => {
@@ -43,4 +43,17 @@ test('a product "without interest up to 10x" keeps its share out of the card int
   const { quotes } = quotePayments([{ method: 'PIX', installments: 1, amount: 500 }, { method: 'Cartão de Crédito', installments: 10, amount: 0 }], 2500, lines, rateFor);
   // Cartão: R$ 2.000, dos quais 20% (a capinha) pagam juros de 12%.
   assert.deepEqual([quotes[1].base, quotes[1].interest], [2000, 48]);
+});
+
+test('once the seller types in the last payment it keeps the typed value and the screen shows what is missing', () => {
+  const rows = [{ method: 'PIX', installments: 1, amount: 1000 }, { method: 'Dinheiro', installments: 1, amount: 900, touched: true }];
+  const { quotes, allocated, remainder } = quotePayments(rows, 2500, phone, rateFor);
+  assert.deepEqual([quotes[1].base, allocated, remainder], [900, 1900, 600]);
+});
+
+test('discount or surcharge in R$ or % of the products value', async () => {
+  const { moneyAdjust } = await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].text).toString('base64'));
+  assert.equal(moneyAdjust(2500, 10, 'percent'), 250);
+  assert.equal(moneyAdjust(2500, 150, 'money'), 150);
+  assert.equal(moneyAdjust(2500, 0, 'percent'), 0);
 });

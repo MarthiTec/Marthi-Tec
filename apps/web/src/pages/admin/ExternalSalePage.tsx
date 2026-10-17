@@ -10,7 +10,8 @@ import { Link } from 'react-router-dom';
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
-import { CREDIT_METHOD, quotePayments, type PaymentRow } from '../../data/splitPayment';
+import { CREDIT_METHOD, moneyAdjust, quotePayments, type MoneyMode, type PaymentRow } from '../../data/splitPayment';
+import '../caixa/caixaPayments.css';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
@@ -140,6 +141,9 @@ export function ExternalSalePage() {
   // Desconto / Acréscimo Geral
   const [generalDiscount, setGeneralDiscount] = useState(0);
   const [generalSurcharge, setGeneralSurcharge] = useState(0);
+  // Desconto e acréscimo em R$ ou % (como no PDV).
+  const [discountMode, setDiscountMode] = useState<MoneyMode>('money');
+  const [surchargeMode, setSurchargeMode] = useState<MoneyMode>('money');
 
   // Upgrade / Trade-in
   const [hasTradeIn, setHasTradeIn] = useState(false);
@@ -477,7 +481,23 @@ export function ExternalSalePage() {
     }, 0);
   }, [lines, stockItems]);
 
-  const grossTotal = Math.max(0, subtotal - Number(generalDiscount || 0) + Number(generalSurcharge || 0));
+  const discountValue = moneyAdjust(subtotal, Number(generalDiscount) || 0, discountMode);
+  const surchargeValue = moneyAdjust(subtotal, Number(generalSurcharge) || 0, surchargeMode);
+  /** Troca R$ ↔ % mantendo o mesmo valor em reais. */
+  function toggleAdjMode(kind: 'discount' | 'surcharge') {
+    const mode = kind === 'discount' ? discountMode : surchargeMode;
+    const value = kind === 'discount' ? discountValue : surchargeValue;
+    const next: MoneyMode = mode === 'money' ? 'percent' : 'money';
+    const converted = next === 'percent' ? (subtotal > 0 ? Math.round((value / subtotal) * 10000) / 100 : 0) : value;
+    if (kind === 'discount') {
+      setDiscountMode(next);
+      setGeneralDiscount(converted);
+    } else {
+      setSurchargeMode(next);
+      setGeneralSurcharge(converted);
+    }
+  }
+  const grossTotal = Math.max(0, subtotal - discountValue + surchargeValue);
   const tradeInCredit = hasTradeIn ? Number(tradeIn.tradeValue || 0) : 0;
   const netAmountToPay = Math.max(0, Math.round((grossTotal - tradeInCredit) * 100) / 100);
 
@@ -496,7 +516,7 @@ export function ExternalSalePage() {
   const cardRateFor = (count: number) => (count <= 1 ? 0 : Math.max(0, Number(totemCardFee(count)) || 0));
   // Só os produtos com juros neste parcelamento entram na base (produto "sem juros até N" fica de fora).
   const interestLines = lines.map((line) => ({ lineTotal: (Number(line.qty) || 1) * (Number(line.unitPrice) || 0), interestFreeInstallments: stockItems.find((item) => item.id === line.stockId)?.interestFreeInstallments }));
-  const { quotes: paymentQuotes, remainder: paymentRemainder, cardInterest, totalCharged } = quotePayments(payments, netAmountToPay, interestLines, cardRateFor);
+  const { quotes: paymentQuotes, allocated: paymentAllocated, remainder: paymentRemainder, cardInterest, totalCharged } = quotePayments(payments, netAmountToPay, interestLines, cardRateFor);
   const hasCashPayment = payments.some((row) => row.method === 'Dinheiro');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -534,10 +554,10 @@ export function ExternalSalePage() {
       }
     }
 
-    if (paymentQuotes.length > 1) {
-      if (paymentRemainder < 0) return setError('Os valores dos pagamentos passam do total a pagar. Ajuste os valores.');
-      if (paymentQuotes.some((quote) => quote.base <= 0)) return setError('Informe o valor de cada meio de pagamento (ou remova o que sobrou).');
+    if (Math.abs(paymentRemainder) > 0.009) {
+      return setError(paymentRemainder > 0 ? `Falta lançar ${formatMoney(paymentRemainder)} nas formas de pagamento.` : `As formas de pagamento passam do total em ${formatMoney(-paymentRemainder)}.`);
     }
+    if (paymentQuotes.length > 1 && paymentQuotes.some((quote) => quote.base <= 0)) return setError('Informe o valor de cada forma de pagamento (ou remova a que sobrou).');
 
     setSubmitting(true);
     setError('');
@@ -553,9 +573,9 @@ export function ExternalSalePage() {
         paymentMethod: paymentQuotes[0].method,
         installments: paymentQuotes[0].installments,
         payments: paymentQuotes.map((quote) => ({ method: quote.method, amount: quote.total, installments: quote.installments, cardInterest: quote.interest })),
-        discount: Number(generalDiscount) || 0,
+        discount: discountValue,
         // Juros do cartão entram como acréscimo: o total da venda é o que o cliente paga.
-        surcharge: round2((Number(generalSurcharge) || 0) + cardInterest),
+        surcharge: round2(surchargeValue + cardInterest),
         // Separado para o comprovante do cliente mostrar só o valor combinado (os juros ficam para a loja).
         cardInterest,
         notes: [saleNotes.trim(), ...paymentQuotes.filter((quote) => quote.interest > 0).map((quote) => `Juros do cartão ${quote.installments}x (${quote.rate.toLocaleString('pt-BR')}%): ${formatMoney(quote.interest)}`)].filter(Boolean).join(' · '),
@@ -614,6 +634,8 @@ export function ExternalSalePage() {
       setCustomerDocument(sale.customerDocument);
       setSelectedSellerId(sale.sellerId ?? '');
       setLines(sale.lines.map((line) => ({ ...line, unitCost: stockItems.find((item) => item.id === line.stockId)?.cost ?? 0, discount: 0, surcharge: 0 })));
+      setDiscountMode('money');
+      setSurchargeMode('money');
       setGeneralDiscount(sale.discount);
       setGeneralSurcharge(sale.surcharge);
       setHasTradeIn(Boolean(sale.tradeIn));
@@ -649,6 +671,8 @@ export function ExternalSalePage() {
     setCustomerDocument('');
     setGeneralDiscount(0);
     setGeneralSurcharge(0);
+    setDiscountMode('money');
+    setSurchargeMode('money');
     setHasTradeIn(false);
     setTradeIn({
       deviceName: '',
@@ -1056,93 +1080,146 @@ export function ExternalSalePage() {
           <section className="xsale-card">
             <h2 className="xsale-card__title"><span className="xsale-step">4</span> Pagamento</h2>
             <div className="xsale-stack">
-              {paymentQuotes.map((quote, index) => {
-                const multiple = paymentQuotes.length > 1;
-                const isLast = index === paymentQuotes.length - 1;
-                return (
-                  <div key={index} className={multiple ? 'xsale-pay-row' : 'xsale-stack'}>
-                    {multiple ? (
-                      <div className="xsale-pay-row__head">
-                        <strong>{index + 1}º pagamento</strong>
-                        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments((rows) => rows.filter((_, i) => i !== index))} aria-label={`Remover o ${index + 1}º pagamento`}>
-                          <AdminIcon name="trash" /> Remover
-                        </button>
-                      </div>
-                    ) : null}
-                    <AdminPicker
-                      label="Meio de pagamento"
-                      value={quote.method}
-                      options={[
-                        { value: 'Cartão de Crédito', label: 'Cartão de crédito' },
-                        { value: 'Cartão de Débito', label: 'Cartão de débito' },
-                        { value: 'PIX', label: 'PIX (chave da loja)' },
-                        { value: 'Dinheiro', label: 'Dinheiro (sem caixa)' },
-                        { value: 'Transferência Bancária', label: 'Transferência / TED' },
-                      ]}
-                      onChange={(val) => setPaymentRow(index, { method: val, installments: val === CREDIT_METHOD ? payments[index].installments : 1 })}
-                    />
-                    {multiple ? (
-                      isLast ? (
-                        <p className={paymentRemainder < 0 ? 'xsale-warn' : 'xsale-muted'}>
-                          {paymentRemainder < 0 ? (
-                            <>Os valores acima passam do total em <strong>{formatMoney(-paymentRemainder)}</strong>.</>
-                          ) : (
-                            <>Restante: <strong>{formatMoney(quote.base)}</strong></>
-                          )}
-                        </p>
-                      ) : (
-                        <div>
-                          <label className="admin-label">Valor (R$)</label>
-                          <CurrencyInput className="admin-input" value={payments[index].amount} onChange={(value) => setPaymentRow(index, { amount: value })} ariaLabel={`Valor do ${index + 1}º pagamento`} />
+              {/* Formas de pagamento no padrão do PDV (o parcelamento continua o da venda externa, com o valor das parcelas). */}
+              <section className="pdv-split xsale-split" aria-label="Formas de pagamento">
+                <div className="pdv-split__head">
+                  <h3>Formas de pagamento</h3>
+                  <button
+                    type="button"
+                    className="pdv-split__add"
+                    disabled={payments.length >= 6}
+                    title="Dividir o pagamento em outra forma (ex.: PIX + cartão)"
+                    onClick={() =>
+                      // A forma que estava ficando com o restante passa a ter esse valor fixo; a nova fica com o que faltar.
+                      setPayments((rows) => [
+                        ...rows.map((row, i) => (i === rows.length - 1 ? { ...row, amount: paymentQuotes[i]?.base ?? 0, touched: true } : row)),
+                        { method: 'PIX', installments: 1, amount: 0 },
+                      ])
+                    }
+                  >
+                    + Forma
+                  </button>
+                </div>
+                <ul className="pdv-split__rows">
+                  {paymentQuotes.map((quote, index) => {
+                    const multiple = paymentQuotes.length > 1;
+                    const missing = paymentRemainder > 0.005 ? paymentRemainder : 0;
+                    return (
+                      <li key={index} className={`pdv-split__row${quote.method === 'Dinheiro' ? ' is-cash' : ''}`}>
+                        <div className={`pdv-split__main${multiple ? ' is-multi' : ''}`}>
+                          <AdminPicker
+                            label={index === 0 ? 'Pagamento' : `Forma ${index + 1}`}
+                            value={quote.method}
+                            options={[
+                              { value: 'Cartão de Crédito', label: 'Crédito' },
+                              { value: 'Cartão de Débito', label: 'Débito' },
+                              { value: 'PIX', label: 'PIX' },
+                              { value: 'Dinheiro', label: 'Dinheiro (sem caixa)' },
+                              { value: 'Transferência Bancária', label: 'Transferência / TED' },
+                            ]}
+                            onChange={(val) => setPaymentRow(index, { method: val, installments: val === CREDIT_METHOD ? payments[index].installments : 1 })}
+                          />
+                          <label className="pdv-split__amount">
+                            Valor
+                            <CurrencyInput
+                              className="admin-input"
+                              value={quote.base}
+                              placeholder="0,00"
+                              ariaLabel={`Valor em ${quote.method}`}
+                              onChange={(value) => setPaymentRow(index, { amount: value, touched: true })}
+                            />
+                          </label>
+                          {multiple ? (
+                            <button
+                              type="button"
+                              className="pdv-split__drop xsale-split__drop"
+                              aria-label={`Remover ${quote.method}`}
+                              title="Remover forma"
+                              onClick={() => setPayments((rows) => rows.filter((_, i) => i !== index))}
+                            >
+                              ×
+                            </button>
+                          ) : null}
                         </div>
-                      )
-                    ) : null}
-                    {quote.method === CREDIT_METHOD ? (
-                      <AdminPicker
-                        label="Parcelamento"
-                        value={String(quote.installments)}
-                        options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, i) => {
-                          const count = i + 1;
-                          const option = quotePayments([{ method: CREDIT_METHOD, installments: count, amount: 0 }], quote.base, interestLines, cardRateFor).quotes[0];
-                          return {
-                            value: String(count),
-                            label:
-                              count === 1
-                                ? `1x à vista (${formatMoney(quote.base)})`
-                                : `${count}x de ${formatMoney(option.perInstallment)} · total ${formatMoney(option.total)}${option.rate > 0 ? ` (${option.rate.toLocaleString('pt-BR')}%)` : ' sem juros'}`,
-                          };
-                        })}
-                        onChange={(val) => setPaymentRow(index, { installments: Number(val) })}
-                      />
-                    ) : null}
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm xsale-pay-add"
-                disabled={payments.length >= 6}
-                onClick={() =>
-                  // O que era o último pagamento fica com o valor que sobrava; o novo fica com o restante.
-                  setPayments((rows) => [...rows.map((row, i) => (i === rows.length - 1 ? { ...row, amount: paymentQuotes[i]?.base ?? 0 } : row)), { method: 'PIX', installments: 1, amount: 0 }])
-                }
-              >
-                <AdminIcon name="plus" /> Outro meio de pagamento
-              </button>
+                        {missing > 0 ? (
+                          <button type="button" className="pdv-split__rest" onClick={() => setPaymentRow(index, { amount: round2(quote.base + missing), touched: true })}>
+                            Jogar o restante aqui ({formatMoney(missing)})
+                          </button>
+                        ) : null}
+                        {quote.method === CREDIT_METHOD ? (
+                          <AdminPicker
+                            label="Parcelamento"
+                            value={String(quote.installments)}
+                            options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, i) => {
+                              const count = i + 1;
+                              const option = quotePayments([{ method: CREDIT_METHOD, installments: count, amount: 0 }], quote.base, interestLines, cardRateFor).quotes[0];
+                              return {
+                                value: String(count),
+                                label:
+                                  count === 1
+                                    ? `1x à vista (${formatMoney(quote.base)})`
+                                    : `${count}x de ${formatMoney(option.perInstallment)} · total ${formatMoney(option.total)}${option.rate > 0 ? ` (${option.rate.toLocaleString('pt-BR')}%)` : ' sem juros'}`,
+                              };
+                            })}
+                            onChange={(val) => setPaymentRow(index, { installments: Number(val) })}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="pdv-split__status">
+                  <span>
+                    Lançado <strong>{formatMoney(paymentAllocated)}</strong>
+                  </span>
+                  {paymentRemainder > 0.005 ? (
+                    <span className="is-warn">
+                      Falta <strong>{formatMoney(paymentRemainder)}</strong>
+                    </span>
+                  ) : paymentRemainder < -0.005 ? (
+                    <span className="is-warn">
+                      Excede <strong>{formatMoney(-paymentRemainder)}</strong>
+                    </span>
+                  ) : (
+                    <span className="is-ok">Pagamento fechado</span>
+                  )}
+                </div>
+              </section>
               {hasCashPayment ? (
                 <p className="xsale-warn">
                   <strong>Recebimento sem caixa:</strong> a parte em dinheiro fica registrada e fica na loja até o recolhimento.
                 </p>
               ) : null}
+              {/* Desconto e acréscimo em R$ ou %, como no PDV (o % é sobre o valor dos produtos). */}
               <div className="xsale-grid xsale-grid--2">
-                <div>
-                  <label className="admin-label">Desconto (R$)</label>
-                  <CurrencyInput className="admin-input" value={generalDiscount} onChange={setGeneralDiscount} ariaLabel="Desconto" />
-                </div>
-                <div>
-                  <label className="admin-label">Acréscimo (R$)</label>
-                  <CurrencyInput className="admin-input" value={generalSurcharge} onChange={setGeneralSurcharge} ariaLabel="Acréscimo" />
-                </div>
+                <label className="xsale-adj">
+                  <span className="admin-label">Desc.</span>
+                  <span className="xsale-adj__input">
+                    {discountMode === 'percent' ? (
+                      <input className="admin-input" type="number" min={0} max={100} step="0.01" inputMode="decimal" value={generalDiscount || ''} placeholder="0" aria-label="Desconto em %" onChange={(e) => setGeneralDiscount(Math.max(0, Number(e.target.value) || 0))} />
+                    ) : (
+                      <CurrencyInput className="admin-input" value={generalDiscount} onChange={setGeneralDiscount} ariaLabel="Desconto em R$" />
+                    )}
+                    <button type="button" className="xsale-adj__toggle" title="Alternar R$ / %" onClick={() => toggleAdjMode('discount')}>
+                      {discountMode === 'percent' ? '%' : 'R$'}
+                    </button>
+                  </span>
+                  {discountMode === 'percent' && discountValue > 0 ? <small className="xsale-muted">= {formatMoney(discountValue)}</small> : null}
+                </label>
+                <label className="xsale-adj">
+                  <span className="admin-label">Acr.</span>
+                  <span className="xsale-adj__input">
+                    {surchargeMode === 'percent' ? (
+                      <input className="admin-input" type="number" min={0} step="0.01" inputMode="decimal" value={generalSurcharge || ''} placeholder="0" aria-label="Acréscimo em %" onChange={(e) => setGeneralSurcharge(Math.max(0, Number(e.target.value) || 0))} />
+                    ) : (
+                      <CurrencyInput className="admin-input" value={generalSurcharge} onChange={setGeneralSurcharge} ariaLabel="Acréscimo em R$" />
+                    )}
+                    <button type="button" className="xsale-adj__toggle" title="Alternar R$ / %" onClick={() => toggleAdjMode('surcharge')}>
+                      {surchargeMode === 'percent' ? '%' : 'R$'}
+                    </button>
+                  </span>
+                  {surchargeMode === 'percent' && surchargeValue > 0 ? <small className="xsale-muted">= {formatMoney(surchargeValue)}</small> : null}
+                </label>
               </div>
               <div className={warrantyType === 'store' ? 'xsale-grid xsale-grid--2' : 'xsale-stack'}>
                 <AdminPicker
