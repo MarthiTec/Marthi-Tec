@@ -1,0 +1,72 @@
+/* Catálogo para clientes (painel): editor + prévia. No celular, abas; no computador, prévia fixa ao lado. */
+.salescat { display: grid; gap: 12px; min-width: 0; }
+.salescat__head { display: grid; gap: 10px; }
+.salescat__head h1 { margin: 0; font-size: 1.35rem; }
+.salescat__muted { margin: 0; color: var(--mute, #64748b); font-size: .84rem; }
+.salescat__pick { min-width: 0; }
+.salescat__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.salescat__actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.salescat__danger { color: #dc2626 !important; }
+.salescat__error { margin: 0; color: #dc2626; font-weight: 600; }
+.salescat__notice { margin: 0; color: var(--accent, #0f766e); font-weight: 600; overflow-wrap: anywhere; }
+
+.salescat__tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.salescat__tab { flex: 0 0 auto; min-height: 40px; padding: 0 16px; border: 1px solid var(--line, #e2e8f0); border-radius: 999px; background: var(--card, #fff); color: inherit; font: inherit; font-size: .88rem; font-weight: 700; cursor: pointer; }
+.salescat__tab.is-on { border-color: var(--accent, #0f766e); background: var(--accent, #0f766e); color: #fff; }
+
+.salescat__layout { display: grid; gap: 14px; min-width: 0; }
+.salescat__layout.is-preview .salescat__editor { display: none; }
+.salescat__layout:not(.is-preview) .salescat__preview { display: none; }
+.salescat__preview { min-width: 0; overflow: hidden; border-radius: 16px; border: 1px solid var(--line, #e2e8f0); }
+
+.salescat__panel { display: grid; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 16px; background: var(--card, #fff); }
+.salescat__filters { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.salescat__filters input[type='search'] { min-height: 44px; font-size: 16px; }
+.salescat__checks { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .88rem; }
+.salescat__checks label, .salescat__switch { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
+.salescat__checks input, .salescat__switch input { width: 18px; height: 18px; }
+.salescat__bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .84rem; }
+.salescat__bulk span { margin-right: auto; }
+.salescat__list { display: grid; gap: 6px; max-height: 62vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.salescat__row { display: grid; grid-template-columns: 22px 48px minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; cursor: pointer; }
+.salescat__row.is-on { border-color: var(--accent, #0f766e); background: color-mix(in srgb, var(--accent, #0f766e) 8%, transparent); }
+.salescat__row input { width: 20px; height: 20px; }
+.salescat__thumb { display: grid; place-items: center; width: 48px; height: 48px; overflow: hidden; border-radius: 10px; background: #f1f2f4; color: #64748b; font-weight: 800; }
+.salescat__thumb img { width: 100%; height: 100%; object-fit: contain; }
+.salescat__info { display: grid; gap: 2px; min-width: 0; }
+.salescat__info strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.salescat__info small { color: var(--mute, #64748b); font-size: .76rem; }
+
+.salescat__look .admin-field { display: grid; gap: 4px; }
+.salescat__styles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.salescat__style { display: grid; gap: 6px; justify-items: center; padding: 8px; border: 2px solid var(--line, #e2e8f0); border-radius: 12px; background: transparent; color: inherit; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.salescat__style.is-on { border-color: var(--accent, #0f766e); }
+.salescat__style span { width: 54px; height: 76px; border-radius: 6px; background: #eef0f3; box-shadow: inset 0 0 0 1px #e2e8f0; }
+.salescat__style--diagonal span { background: linear-gradient(115deg, transparent 58%, var(--cat-accent) 58% 68%, #2b2f36 68%) top / 100% 45% no-repeat, linear-gradient(115deg, var(--cat-accent) 0 30%, transparent 30%) bottom / 100% 32% no-repeat, #eef0f3; }
+.salescat__style--band span { background: linear-gradient(90deg, #eef0f3 27%, #2b2f36 27% 73%, #eef0f3 73%); }
+.salescat__covers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.salescat__cover { display: grid; place-items: center; width: 64px; height: 64px; padding: 4px; overflow: hidden; border: 2px solid var(--line, #e2e8f0); border-radius: 12px; background: #fff; color: #334155; font: inherit; font-size: .7rem; font-weight: 700; cursor: pointer; }
+.salescat__cover.is-on { border-color: var(--accent, #0f766e); }
+.salescat__cover img { width: 100%; height: 100%; object-fit: contain; }
+.salescat__accents { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.salescat__accent { width: 34px; height: 34px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px var(--line, #e2e8f0); cursor: pointer; }
+.salescat__accent.is-on { box-shadow: 0 0 0 3px var(--accent, #0f766e); }
+.salescat__accents input[type='color'] { width: 40px; height: 36px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+
+@media (min-width: 720px) {
+  .salescat__head { grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); align-items: end; }
+  .salescat__filters { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); align-items: end; }
+}
+
+/* Computador: editor e prévia lado a lado; a aba "Prévia" some (a prévia fica sempre à vista). */
+@media (min-width: 1180px) {
+  .salescat__tab--preview { display: none; }
+  .salescat__layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .salescat__layout .salescat__editor { display: block !important; }
+  .salescat__layout .salescat__preview { display: block !important; position: sticky; top: 12px; max-height: calc(100dvh - 24px); overflow-y: auto; }
+  .salescat__filters { grid-template-columns: 1fr 1fr; }
+}
+
+/* O .admin-page é flex em coluna: sem isto a barra de abas (overflow-x) encolhia até sumir. */
+.salescat > * { flex-shrink: 0; min-width: 0; }
+.salescat__tabs { min-height: 44px; align-items: center; }

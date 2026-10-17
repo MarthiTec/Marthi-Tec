@@ -1,6 +1,8 @@
 import {DeviceCatalogSettingsPage} from './pages/admin/DeviceCatalogSettingsPage';
 import {PickupTrackingPage} from './pages/PickupTrackingPage';
 import { ReceiptPublicPage } from './pages/ReceiptPublicPage';
+import { CatalogPublicPage } from './pages/CatalogPublicPage';
+import { SalesCatalogPage } from './pages/admin/SalesCatalogPage';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
@@ -143,6 +145,7 @@ export function App() {
         <Routes>
         <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/comprovante/:id" element={<ReceiptPublicPage />} />
+        <Route path="/catalogo/:token" element={<CatalogPublicPage />} />
         <Route path="/oferta/:storeId/:productId" element={<OfferPublicPage />} />
         <Route path="/exclusao-dados" element={<DataDeletionStatusPage />} />
         <Route path="/" element={<HomePage />} />
@@ -269,6 +272,7 @@ export function App() {
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="venda-externa" element={<ExternalSalePage />} />
+          <Route path="catalogo" element={<SalesCatalogPage />} />
           <Route path="calculadora" element={<InstallmentCalculatorPage />} />
           <Route path="cotacao" element={<QuickQuotePage />} />
           <Route path="ads" element={<AdsOverviewPage />} />

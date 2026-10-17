@@ -80,6 +80,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
+      { to: '/painel/catalogo', label: 'Catálogo para clientes', accent: '#e4572e' },
       { to: '/erp/entrada-estoque', label: 'Entrada de estoque' },
       { to: '/painel/especificacoes', label: 'Especificações' },
       { to: '/painel/pessoas', label: 'Pessoas' },

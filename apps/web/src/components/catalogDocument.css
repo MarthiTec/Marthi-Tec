@@ -1,0 +1,129 @@
+/* Catálogo para o cliente (link, prévia do painel e impressão). Pensado primeiro para o celular. */
+.catalog {
+  --cat-accent: #e4572e;
+  --cat-ink: #16181d;
+  --cat-mute: #6b7280;
+  --cat-line: #e6e7eb;
+  --cat-bg: #f3f4f6;
+  --cat-card: #ffffff;
+  --cat-dark: #2b2f36;
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+  background: var(--cat-bg);
+  color: var(--cat-ink);
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Capa ─────────────────────────────────────────── */
+.catalog-cover {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+  border-radius: 18px;
+  background: radial-gradient(120% 80% at 20% 15%, #ffffff 0%, #eef0f3 55%, #e3e6ea 100%);
+  box-shadow: 0 18px 40px rgba(22, 24, 29, 0.14);
+  isolation: isolate;
+  container-type: inline-size;
+}
+.catalog-cover__text { position: absolute; top: 9%; left: 8%; right: 8%; z-index: 2; }
+.catalog-cover__text h1 { margin: 0; font-size: clamp(1.5rem, 9cqw, 4.2rem); font-weight: 900; line-height: .95; letter-spacing: .02em; text-transform: uppercase; color: var(--cat-dark); overflow-wrap: anywhere; }
+.catalog-cover__text p { margin: 10px 0 0; max-width: 62%; font-size: clamp(.9rem, 4cqw, 1.5rem); font-weight: 700; color: var(--cat-accent); }
+.catalog-cover__photo { position: absolute; z-index: 1; left: 50%; bottom: 17%; width: 72%; max-height: 50%; object-fit: contain; transform: translateX(-50%); filter: drop-shadow(0 22px 26px rgba(22, 24, 29, 0.28)); }
+.catalog-cover__brand { position: absolute; z-index: 2; right: 8%; bottom: 5%; display: grid; justify-items: end; gap: 4px; text-align: right; }
+.catalog-cover__brand img { max-width: 150px; max-height: 64px; object-fit: contain; }
+.catalog-cover__brand strong { font-size: clamp(1.1rem, 5vw, 1.6rem); font-weight: 900; color: var(--cat-dark); }
+.catalog-cover__brand small { color: var(--cat-mute); font-size: .78rem; }
+
+/* Diagonal: faixas inclinadas na cor da loja e em grafite (como a capa de referência). */
+.catalog-cover__stripe { position: absolute; z-index: 0; width: 30%; height: 40%; transform: skewX(-24deg); transform-origin: top; }
+.catalog-cover__stripe--a { top: -6%; right: -6%; background: var(--cat-dark); }
+.catalog-cover__stripe--b { top: -6%; right: 18%; width: 10%; background: var(--cat-accent); }
+.catalog-cover__stripe--c { bottom: -10%; left: -14%; height: 34%; background: var(--cat-accent); transform-origin: bottom; }
+.catalog-cover__stripe--d { bottom: -10%; left: 16%; width: 10%; height: 34%; background: var(--cat-dark); opacity: .9; transform-origin: bottom; }
+
+/* Faixa: coluna escura central com o título e o produto em destaque. */
+.catalog-cover--band { background: radial-gradient(circle, rgba(22, 24, 29, 0.09) 1px, transparent 1.4px) 0 0 / 14px 14px, linear-gradient(180deg, #f7f7f8, #e9ebee); }
+.catalog-cover__band { position: absolute; z-index: 0; top: 0; bottom: 0; left: 27%; width: 46%; background: linear-gradient(180deg, var(--cat-dark), #3d424b); }
+.catalog-cover--band .catalog-cover__text { top: 7%; left: 27%; right: 27%; text-align: center; }
+.catalog-cover--band .catalog-cover__text h1 { color: #fff; font-size: clamp(1.2rem, 7cqw, 3.2rem); }
+.catalog-cover--band .catalog-cover__text p { max-width: none; color: #fff; font-style: italic; font-weight: 500; opacity: .92; }
+.catalog-cover--band .catalog-cover__photo { width: 80%; bottom: 20%; }
+.catalog-cover--band .catalog-cover__brand { left: 0; right: 0; justify-items: center; text-align: center; }
+.catalog-cover--band .catalog-cover__brand strong { color: #fff; }
+.catalog-cover--band .catalog-cover__brand small { color: rgba(255, 255, 255, 0.75); }
+
+/* ── Cabeçalho, busca e filtros ───────────────────── */
+.catalog-head { position: sticky; top: 0; z-index: 5; display: grid; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px); box-shadow: 0 6px 18px rgba(22, 24, 29, 0.08); }
+.catalog-head__brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.catalog-head__brand img { width: 40px; height: 40px; object-fit: contain; border-radius: 10px; background: #fff; }
+.catalog-head__brand strong { display: block; font-size: 1rem; font-weight: 800; }
+.catalog-head__brand small { color: var(--cat-mute); font-size: .78rem; }
+.catalog-head__tools { display: grid; gap: 8px; }
+.catalog-head__tools input { width: 100%; box-sizing: border-box; min-height: 42px; padding: 0 14px; border: 1px solid var(--cat-line); border-radius: 999px; background: #fff; color: var(--cat-ink); font: inherit; font-size: 16px; }
+.catalog-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.catalog-chips::-webkit-scrollbar { display: none; }
+.catalog-chips button { flex: 0 0 auto; min-height: 34px; padding: 0 14px; border: 1px solid var(--cat-line); border-radius: 999px; background: #fff; color: var(--cat-ink); font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.catalog-chips button.is-on { border-color: var(--cat-accent); background: var(--cat-accent); color: #fff; }
+
+/* ── Produtos ─────────────────────────────────────── */
+.catalog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.catalog-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border-radius: 16px; background: var(--cat-card); box-shadow: 0 4px 14px rgba(22, 24, 29, 0.07); }
+.catalog-card.is-sold-out { opacity: .55; }
+.catalog-card__media { position: relative; aspect-ratio: 1; background: radial-gradient(80% 80% at 50% 40%, #ffffff 0%, #f1f2f4 100%); }
+.catalog-card__media img { width: 100%; height: 100%; object-fit: contain; padding: 10px; box-sizing: border-box; }
+.catalog-card__noimg { display: grid; place-items: center; width: 100%; height: 100%; padding: 12px; box-sizing: border-box; color: var(--cat-dark); font-size: .95rem; font-weight: 900; text-align: center; text-transform: uppercase; background: linear-gradient(135deg, color-mix(in srgb, var(--cat-accent) 14%, #fff), #f1f2f4); }
+.catalog-card__badges { position: absolute; top: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+.catalog-badge { padding: 3px 8px; border-radius: 999px; background: rgba(22, 24, 29, 0.78); color: #fff; font-size: .66rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.catalog-badge--new { background: var(--cat-accent); }
+.catalog-badge--out { background: #6b7280; }
+.catalog-card__body { display: flex; flex: 1; flex-direction: column; gap: 6px; padding: 10px 10px 12px; }
+.catalog-card__brand { color: var(--cat-mute); font-size: .66rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.catalog-card__body h2 { margin: 0; font-size: .92rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.catalog-variants { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.catalog-variants li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; }
+.catalog-variants li.is-out { opacity: .5; text-decoration: line-through; }
+.catalog-variants li strong { font-size: .8rem; font-weight: 800; }
+.catalog-variants__tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.catalog-tag { padding: 2px 7px; border: 1px solid var(--cat-line); border-radius: 999px; background: #fafafa; font-size: .7rem; font-weight: 600; white-space: nowrap; }
+.catalog-tag--cap { border-color: color-mix(in srgb, var(--cat-accent) 35%, #fff); background: color-mix(in srgb, var(--cat-accent) 9%, #fff); }
+.catalog-tag--cond { background: #f1f5f9; }
+.catalog-tag--battery { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.catalog-card__foot { display: grid; gap: 8px; margin-top: auto; padding-top: 4px; }
+.catalog-price { display: grid; line-height: 1.1; }
+.catalog-price small { color: var(--cat-mute); font-size: .7rem; font-weight: 600; }
+.catalog-price strong { color: var(--cat-accent); font-size: 1.2rem; font-weight: 900; letter-spacing: -.01em; }
+.catalog-price--ask { color: var(--cat-mute); font-size: .8rem; font-weight: 700; }
+.catalog-cta { display: grid; place-items: center; min-height: 38px; border-radius: 12px; background: #16a34a; color: #fff; font-size: .82rem; font-weight: 800; text-decoration: none; }
+.catalog-cta:hover { background: #15803d; }
+.catalog-empty { margin: 24px 0; color: var(--cat-mute); text-align: center; }
+
+.catalog-foot { display: grid; gap: 4px; padding: 14px 4px 24px; color: var(--cat-mute); font-size: .8rem; text-align: center; }
+.catalog-foot p { margin: 0; }
+.catalog-foot strong { color: var(--cat-ink); }
+.catalog-foot__note { padding: 10px 12px; border-radius: 12px; background: #fff; color: var(--cat-ink); font-weight: 600; }
+
+@media (min-width: 620px) {
+  .catalog { gap: 18px; padding: 18px; }
+  .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+  .catalog-card__body { padding: 14px; }
+  .catalog-card__body h2 { font-size: 1rem; }
+  .catalog-head { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+  .catalog-head__tools { grid-template-columns: minmax(180px, 280px) auto; justify-content: end; align-items: center; }
+}
+
+/* ── Impressão / PDF (A4) ─────────────────────────── */
+@media print {
+  @page { size: A4; margin: 10mm; }
+  .catalog { padding: 0; background: #fff; gap: 8mm; }
+  .catalog-cover { max-width: none; width: 100%; height: 277mm; aspect-ratio: auto; border-radius: 0; box-shadow: none; page-break-after: always; break-after: page; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .catalog-head { position: static; box-shadow: none; backdrop-filter: none; padding: 0 0 4mm; border-bottom: 1px solid var(--cat-line); border-radius: 0; }
+  .catalog-head__tools, .catalog-cta { display: none !important; }
+  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5mm; }
+  .catalog-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; border: 1px solid var(--cat-line); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .catalog-badge, .catalog-tag, .catalog-card__media { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
