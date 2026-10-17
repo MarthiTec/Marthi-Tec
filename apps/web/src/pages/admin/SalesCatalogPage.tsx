@@ -3,6 +3,7 @@ import { AdminPicker } from '../../components/AdminPicker';
 import { AdminIcon } from '../../components/AdminIcons';
 import { CatalogDocument, type CatalogItem, type CatalogStore } from '../../components/CatalogDocument';
 import { conditionCode } from '../../data/productCondition';
+import { usePickupMethods } from '../../data/pickup';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { apiListStock } from '../../services/erpApi';
 import { apiListProductGroups, type ProductGroup } from '../../services/productCatalogApi';
@@ -29,7 +30,8 @@ type StockRow = {
   groupId?: string;
   condition?: string;
   active?: boolean;
-  variations?: Array<{ price?: number; qty?: number; condition?: string }>;
+  pickupPrices?: Record<string, number | null>;
+  variations?: Array<{ price?: number; qty?: number; condition?: string; pickupPrices?: Record<string, number | null> }>;
 };
 
 const ACCENTS = ['#e4572e', '#0f766e', '#1d4ed8', '#7c3aed', '#db2777', '#16181d'];
@@ -42,6 +44,7 @@ const blank = (): SalesCatalogInput => ({
   accent: ACCENTS[0],
   showPrices: true,
   hideSoldOut: true,
+  includeOrderProducts: true,
   note: '',
   productIds: [],
 });
@@ -76,7 +79,16 @@ export function SalesCatalogPage() {
   const [groupId, setGroupId] = useState('');
   const [brand, setBrand] = useState('');
   const [condition, setCondition] = useState<'all' | 'new' | 'used'>('all');
-  const [onlyStock, setOnlyStock] = useState(true);
+  /** Disponível = tem estoque ou aceita encomenda (produto sob encomenda aparece mesmo sem unidade na loja). */
+  const [availability, setAvailability] = useState<'available' | 'stock' | 'order' | 'all'>('available');
+  const { methods: pickupMethods } = usePickupMethods();
+  const orderMethodId = pickupMethods.find((method) => method.kind === 'order' && method.active)?.id ?? '';
+  /** Mesma regra do servidor: preço da variação por cima do do produto; null = encomenda desligada. */
+  const orderable = (row: StockRow) => {
+    if (!orderMethodId) return false;
+    const lines = row.variations?.length ? row.variations : [{}];
+    return lines.some((v: { pickupPrices?: Record<string, number | null> }) => ({ ...(row.pickupPrices ?? {}), ...(v.pickupPrices ?? {}) })[orderMethodId] !== null);
+  };
   const [onlyPhoto, setOnlyPhoto] = useState(false);
   const [onlyMarked, setOnlyMarked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -109,7 +121,7 @@ export function SalesCatalogPage() {
   useEffect(() => {
     let alive = true;
     const timer = window.setTimeout(() => {
-      apiPreviewSalesCatalog(form.productIds, form.hideSoldOut)
+      apiPreviewSalesCatalog(form.productIds, form.hideSoldOut, form.includeOrderProducts)
         .then((data) => alive && setPreview(data))
         .catch(() => undefined);
     }, 400);
@@ -117,7 +129,7 @@ export function SalesCatalogPage() {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [form.productIds, form.hideSoldOut]);
+  }, [form.productIds, form.hideSoldOut, form.includeOrderProducts]);
 
   function open(catalog: SalesCatalog) {
     setCurrentId(catalog.id);
@@ -139,11 +151,14 @@ export function SalesCatalogPage() {
       if (brand && row.brand !== brand) return false;
       if (condition === 'used' && !isUsed(row)) return false;
       if (condition === 'new' && isUsed(row) && !(row.variations ?? []).some((v) => (conditionCode(v.condition) || 'new') === 'new')) return false;
-      if (onlyStock && stockQty(row) <= 0) return false;
+      const inStock = stockQty(row) > 0;
+      if (availability === 'available' && !inStock && !orderable(row)) return false;
+      if (availability === 'stock' && !inStock) return false;
+      if (availability === 'order' && (inStock || !orderable(row))) return false;
       if (onlyPhoto && !row.images?.length) return false;
       return true;
     });
-  }, [stock, query, groupId, brand, condition, onlyStock, onlyPhoto, onlyMarked, marked]);
+  }, [stock, query, groupId, brand, condition, availability, orderMethodId, onlyPhoto, onlyMarked, marked]);
 
   const toggle = (id: string) => update({ productIds: marked.has(id) ? form.productIds.filter((x) => x !== id) : [...form.productIds, id] });
   const markAll = () => update({ productIds: [...form.productIds, ...filtered.map((row) => row.id).filter((id) => !marked.has(id))] });
@@ -305,6 +320,17 @@ export function SalesCatalogPage() {
                 <AdminPicker label="Grupo" value={groupId} options={[{ value: '', label: 'Todos os grupos' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} onChange={setGroupId} />
                 <AdminPicker label="Marca" value={brand} options={[{ value: '', label: 'Todas as marcas' }, ...brands.map((b) => ({ value: b, label: b }))]} onChange={setBrand} />
                 <AdminPicker
+                  label="Disponibilidade"
+                  value={availability}
+                  options={[
+                    { value: 'available', label: 'Em estoque ou sob encomenda' },
+                    { value: 'stock', label: 'Só em estoque' },
+                    { value: 'order', label: 'Só sob encomenda' },
+                    { value: 'all', label: 'Todos (até os esgotados)' },
+                  ]}
+                  onChange={(value) => setAvailability(value as typeof availability)}
+                />
+                <AdminPicker
                   label="Condição"
                   value={condition}
                   options={[
@@ -316,9 +342,6 @@ export function SalesCatalogPage() {
                 />
               </div>
               <div className="salescat__checks">
-                <label>
-                  <input type="checkbox" checked={onlyStock} onChange={(e) => setOnlyStock(e.target.checked)} /> Só com estoque
-                </label>
                 <label>
                   <input type="checkbox" checked={onlyPhoto} onChange={(e) => setOnlyPhoto(e.target.checked)} /> Só com foto
                 </label>
@@ -346,7 +369,8 @@ export function SalesCatalogPage() {
                       <span className="salescat__info">
                         <strong>{row.name}</strong>
                         <small>
-                          {priceRange(row)} · {stockQty(row)} em estoque{isUsed(row) ? ' · usado' : ''}
+                          {priceRange(row)} · {stockQty(row) > 0 ? `${stockQty(row)} em estoque${orderable(row) ? ' · aceita encomenda' : ''}` : orderable(row) ? 'sob encomenda' : 'esgotado'}
+                          {isUsed(row) ? ' · usado' : ''}
                           {!row.images?.length ? ' · sem foto' : ''}
                         </small>
                       </span>
@@ -419,6 +443,9 @@ export function SalesCatalogPage() {
               </label>
               <label className="salescat__switch">
                 <input type="checkbox" checked={form.hideSoldOut} onChange={(e) => update({ hideSoldOut: e.target.checked })} /> Esconder o que esgotar
+              </label>
+              <label className="salescat__switch">
+                <input type="checkbox" checked={form.includeOrderProducts} onChange={(e) => update({ includeOrderProducts: e.target.checked })} /> Incluir sempre os produtos sob encomenda (mesmo sem marcar, inclusive os novos)
               </label>
               <label className="admin-field">
                 Observação no rodapé

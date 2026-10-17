@@ -131,7 +131,7 @@ catalogOrdersRouter.post('/api/v1/public/sales-catalogs/:token/orders', async (r
 
     // Itens com o preço e a disponibilidade de agora (o produto pode ter sido vendido nesse meio-tempo).
     const allowed: string[] = Array.isArray(catalog.product_ids) ? catalog.product_ids : [];
-    const current = await catalogItems(pool, storeId, allowed, false);
+    const current = await catalogItems(pool, storeId, allowed, false, catalog.include_order_products !== false);
     const orderMethod = await orderMethodOf(pool, storeId);
     const lines = body.items.map((wanted) => {
       const item = current.find((entry) => entry.id === wanted.productId);

@@ -32,6 +32,8 @@ const catalogSchema = z.object({
   accent: z.string().regex(/^#[0-9a-f]{6}$/i, 'Cor inválida.').default('#e4572e'),
   showPrices: z.boolean().default(true),
   hideSoldOut: z.boolean().default(true),
+  /** Produtos sob encomenda entram sempre (mesmo sem marcar). */
+  includeOrderProducts: z.boolean().default(true),
   note: z.string().trim().max(300).default(''),
   productIds: z.array(z.string().min(1).max(80)).max(500).default([]),
 });
@@ -46,6 +48,7 @@ const view = (row: any) => ({
   accent: row.accent,
   showPrices: row.show_prices,
   hideSoldOut: row.hide_sold_out,
+  includeOrderProducts: row.include_order_products !== false,
   note: row.note,
   productIds: Array.isArray(row.product_ids) ? row.product_ids : [],
   token: row.token,
@@ -54,8 +57,15 @@ const view = (row: any) => ({
   updatedAt: row.updated_at,
 });
 
-/** Itens atuais do estoque para os produtos escolhidos (sem custo e sem IMEI). */
-export async function catalogItems(db: Db, storeId: string, productIds: string[], hideSoldOut: boolean) {
+/**
+ * Itens atuais do estoque para os produtos escolhidos (sem custo e sem IMEI). Com includeOrder, os
+ * produtos sob encomenda da loja (sem unidade, mas com encomenda) entram no fim mesmo sem estar marcados.
+ */
+export async function catalogItems(db: Db, storeId: string, chosenIds: string[], hideSoldOut: boolean, includeOrder = false) {
+  const extraIds = includeOrder
+    ? (await db.query('SELECT id FROM stock_items WHERE store_id = $1 AND active = true AND NOT (id = ANY($2::text[])) ORDER BY name', [storeId, chosenIds])).rows.map((row) => String(row.id))
+    : [];
+  const productIds = [...chosenIds, ...extraIds];
   if (!productIds.length) return [];
   const products = (
     await db.query(
@@ -80,7 +90,10 @@ export async function catalogItems(db: Db, storeId: string, productIds: string[]
     list.push({ variationId: entry.variation_id ?? null, battery: entry.battery_level === null ? null : Number(entry.battery_level), free: Number(entry.free) || 0 });
     units.set(entry.stock_item_id, list);
   }
-  return buildCatalogItems(products, productIds, attributes, units, { hideSoldOut, orderMethod: await orderMethodOf(db, storeId) });
+  const orderMethod = await orderMethodOf(db, storeId);
+  const chosen = buildCatalogItems(products, chosenIds, attributes, units, { hideSoldOut, orderMethod });
+  const extra = extraIds.length ? buildCatalogItems(products, extraIds, attributes, units, { hideSoldOut: true, orderMethod }).filter((item) => item.orderOnly) : [];
+  return [...chosen, ...extra];
 }
 
 /** Modalidade "sob encomenda" ativa da loja (prazo e preço por produto). */
@@ -117,7 +130,7 @@ salesCatalogsRouter.get('/api/v1/sales-catalogs', async (req, res, next) => {
 salesCatalogsRouter.post('/api/v1/sales-catalogs/preview', async (req, res, next) => {
   try {
     const body = catalogSchema.partial({ title: true }).parse(req.body ?? {});
-    const items = await catalogItems(pool, req.storeId!, body.productIds ?? [], body.hideSoldOut ?? true);
+    const items = await catalogItems(pool, req.storeId!, body.productIds ?? [], body.hideSoldOut ?? true, body.includeOrderProducts ?? true);
     res.json({ success: true, data: { store: await storeInfo(pool, req.storeId!), items } });
   } catch (error) {
     next(error);
@@ -129,8 +142,8 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
     const body = catalogSchema.parse(req.body ?? {});
     const row = (
       await pool.query(
-        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14) RETURNING *`,
+        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15) RETURNING *`,
         [
           `CAT-${randomUUID()}`,
           req.storeId,
@@ -146,6 +159,7 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
           JSON.stringify(body.productIds),
           newToken(),
           req.user?.name ?? '',
+          body.includeOrderProducts,
         ],
       )
     ).rows[0];
@@ -161,7 +175,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
     const row = (
       await pool.query(
         `UPDATE sales_catalogs SET title = $3, subtitle = $4, show_cover = $5, cover_style = $6, cover_image = $7, accent = $8, show_prices = $9,
-                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, updated_at = now()
+                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
         [
           req.params.id,
@@ -176,6 +190,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
           body.hideSoldOut,
           body.note,
           JSON.stringify(body.productIds),
+          body.includeOrderProducts,
         ],
       )
     ).rows[0];
@@ -214,7 +229,7 @@ salesCatalogsRouter.get('/api/v1/public/sales-catalogs/:token', async (req, res,
     const row = (await pool.query('SELECT * FROM sales_catalogs WHERE token = $1', [String(req.params.token).slice(0, 64)])).rows[0];
     if (!row) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const catalog = view(row);
-    const items = await catalogItems(pool, row.store_id, catalog.productIds, catalog.hideSoldOut);
+    const items = await catalogItems(pool, row.store_id, catalog.productIds, catalog.hideSoldOut, catalog.includeOrderProducts);
     const { token: _token, createdBy: _by, productIds: _ids, ...publicCatalog } = catalog;
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, data: { catalog: publicCatalog, sellers: await activeSellers(pool, row.store_id), store: await storeInfo(pool, row.store_id), items: catalog.showPrices ? items : items.map((item) => ({ ...item, price: 0, variants: item.variants.map((variant) => ({ ...variant, price: 0 })) })) } });

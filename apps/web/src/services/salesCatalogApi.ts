@@ -5,6 +5,8 @@ import type { CatalogItem, CatalogLook, CatalogStore } from '../components/Catal
 export type SalesCatalog = CatalogLook & {
   id: string;
   hideSoldOut: boolean;
+  /** Produtos sob encomenda entram sempre (mesmo sem marcar). */
+  includeOrderProducts: boolean;
   productIds: string[];
   token: string;
   createdBy: string;
@@ -19,7 +21,8 @@ export const apiCreateSalesCatalog = (body: SalesCatalogInput) => nestPost<Sales
 export const apiUpdateSalesCatalog = (id: string, body: SalesCatalogInput) => nestPatch<SalesCatalog>(`/sales-catalogs/${encodeURIComponent(id)}`, body);
 export const apiDeleteSalesCatalog = (id: string) => nestDelete<{ ok: true }>(`/sales-catalogs/${encodeURIComponent(id)}`);
 export const apiNewSalesCatalogLink = (id: string) => nestPost<SalesCatalog>(`/sales-catalogs/${encodeURIComponent(id)}/new-link`, {});
-export const apiPreviewSalesCatalog = (productIds: string[], hideSoldOut: boolean) => nestPost<CatalogPage>('/sales-catalogs/preview', { productIds, hideSoldOut });
+export const apiPreviewSalesCatalog = (productIds: string[], hideSoldOut: boolean, includeOrderProducts: boolean) =>
+  nestPost<CatalogPage>('/sales-catalogs/preview', { productIds, hideSoldOut, includeOrderProducts });
 export type CatalogSeller = { id: string; name: string };
 export const apiPublicSalesCatalog = (token: string) =>
   nestGet<CatalogPage & { catalog: CatalogLook & { hideSoldOut: boolean }; sellers: CatalogSeller[] }>(`/public/sales-catalogs/${encodeURIComponent(token)}`);

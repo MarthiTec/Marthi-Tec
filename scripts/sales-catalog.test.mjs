@@ -89,8 +89,10 @@ test('the live preview shows unsaved choices; prices can be hidden; the link can
 test('only products of the store; sellers cannot delete; management can', async () => {
   await query("INSERT INTO stores(id,client_account_id,trade_name,legal_name,document) VALUES('store-z','a','Outra','Outra','9')");
   await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,active,kind) VALUES('foreign','store-z','DE OUTRA LOJA',3,1,999,true,'product')");
-  const preview = await call('/sales-catalogs/preview', 'POST', { productIds: ['foreign', iphone.id] });
+  const preview = await call('/sales-catalogs/preview', 'POST', { productIds: ['foreign', iphone.id], includeOrderProducts: false });
   assert.deepEqual(preview.data.items.map((i) => i.name), ['IPHONE 15']);
+  const withOrder = await call('/sales-catalogs/preview', 'POST', { productIds: ['foreign', iphone.id] });
+  assert.equal(withOrder.data.items.some((i) => i.name === 'DE OUTRA LOJA'), false, 'never another store product');
   assert.equal((await call(`/sales-catalogs/${catalog.id}`, 'DELETE', undefined, seller)).status, 403);
   assert.equal((await call(`/sales-catalogs/${catalog.id}`, 'DELETE')).status, 200);
   assert.equal((await call('/sales-catalogs')).data.length, 0);

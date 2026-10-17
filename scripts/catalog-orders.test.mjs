@@ -110,3 +110,20 @@ test('the external sale that finishes the order takes it out of the queue; cance
   const another = await pub('/orders', { customer: { ...customer, phone: '(32) 97777-0000', document: '' }, items: [{ productId: iphone.id, attributes: azul }] });
   assert.equal((await call(`/catalog-orders/${another.data.id}/cancel`, 'POST', { reason: 'Desistiu' })).data.status, 'cancelled');
 });
+
+test('products sold by order always show in the catalog and can be ordered, even when not marked (option on by default)', async () => {
+  const byOrder = (await call('/stock', 'POST', { name: 'IPHONE 18 PRO ENCOMENDA', kind: 'device', qty: 0, price: 9800, cost: 9000 })).data;
+  const onlyMarked = (await call('/sales-catalogs', 'POST', { title: 'Só o iPhone 17', productIds: [iphone.id] })).data;
+  assert.equal(onlyMarked.includeOrderProducts, true);
+  const page = (await (await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}`)).json()).data;
+  const names = page.items.map((i) => i.name);
+  assert.ok(names.includes('IPHONE 18 PRO ENCOMENDA'), 'order-only product shows without being marked');
+  assert.equal(names.includes('FONE ESGOTADO'), false, 'no stock and no order: still hidden');
+  assert.equal(names[0], 'IPHONE 17 PRO MAX', 'the marked products come first');
+  const ordered = await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}/orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customer: { ...customer, phone: '(32) 96666-0000' }, items: [{ productId: byOrder.id, attributes: [] }] }) });
+  assert.equal(ordered.status, 201, JSON.stringify(await ordered.clone().json()));
+  const off = await call(`/sales-catalogs/${onlyMarked.id}`, 'PATCH', { title: 'Só o iPhone 17', productIds: [iphone.id], includeOrderProducts: false });
+  assert.equal(off.data.includeOrderProducts, false);
+  const offPage = (await (await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}`)).json()).data;
+  assert.deepEqual(offPage.items.map((i) => i.name), ['IPHONE 17 PRO MAX']);
+});
