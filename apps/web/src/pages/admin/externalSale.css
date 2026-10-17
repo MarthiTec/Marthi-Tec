@@ -180,3 +180,9 @@
 .xsale-edit__reason { grid-column: span 2; }
 .xsale-edit__history { margin: 12px 0; padding-left: 18px; color: var(--mute, #64748b); font-size: 0.82rem; }
 @media (max-width: 720px) { .xsale-edit__reason { grid-column: auto; } }
+
+/* Mais de um meio de pagamento: cada um num bloco, a última linha mostra o restante. */
+.xsale-pay-row { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: rgba(var(--accent-rgb, 15, 118, 110), .03); }
+.xsale-pay-row__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .84rem; }
+.xsale-pay-row__head .btn { display: inline-flex; align-items: center; gap: 4px; }
+.xsale-pay-add { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }

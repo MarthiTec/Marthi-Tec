@@ -63,6 +63,21 @@ export const externalSaleSchema = z.object({
   surcharge: z.coerce.number().min(0).default(0),
   /** Parte do acréscimo que é juros do cartão (taxa repassada): informação da loja, não sai no comprovante do cliente. */
   cardInterest: z.coerce.number().min(0).default(0),
+  /**
+   * Mais de um meio de pagamento (ex.: PIX + cartão 4x). Cada valor já inclui os juros do cartão dele e a soma
+   * fecha o total a pagar. Sem a lista, vale paymentMethod/installments com o total.
+   */
+  payments: z
+    .array(
+      z.object({
+        method: z.string().trim().min(1, 'Escolha o meio de pagamento.'),
+        amount: z.coerce.number().min(0),
+        installments: z.coerce.number().int().min(1).max(36).default(1),
+        cardInterest: z.coerce.number().min(0).default(0),
+      }),
+    )
+    .max(6, 'No máximo 6 meios de pagamento por venda.')
+    .optional(),
   /** Venda que já aconteceu (lançamento de histórico): só gestão, não futura e até 120 dias atrás. */
   saleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data da venda inválida.').optional(),
   notes: z.string().default(''),
@@ -211,12 +226,31 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
   if (grossAmount < 0 || tradeInCredit > grossAmount) throw Object.assign(new Error('Desconto ou crédito de troca superior ao valor da venda.'), {status: 400});
   const netAmountToPay = Math.round((grossAmount - tradeInCredit) * 100) / 100;
 
+  // Meios de pagamento: a soma precisa fechar o total a pagar (crédito da troca já descontado).
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  const split = (body.payments ?? []).filter((payment, _index, all) => payment.amount > 0 || all.length === 1);
+  const payments = split.length
+    ? split.map((payment) => ({ ...payment, amount: round2(payment.amount), cardInterest: round2(payment.cardInterest) }))
+    : [{ method: body.paymentMethod, amount: netAmountToPay, installments: body.installments, cardInterest: body.cardInterest }];
+  if (split.length) {
+    const paid = round2(payments.reduce((sum, payment) => sum + payment.amount, 0));
+    if (Math.abs(paid - netAmountToPay) > 0.01) {
+      const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      throw Object.assign(new Error(`A soma dos pagamentos (${brl(paid)}) não fecha com o total a pagar (${brl(netAmountToPay)}).`), { status: 400 });
+    }
+    body.cardInterest = round2(payments.reduce((sum, payment) => sum + payment.cardInterest, 0));
+    body.paymentMethod = payments.length === 1 ? payments[0].method : payments.map((p) => (p.installments > 1 ? `${p.method} ${p.installments}x` : p.method)).join(' + ');
+    body.installments = Math.max(...payments.map((p) => p.installments));
+  }
+  const isCashMethod = (method: string) => method.toLowerCase().includes('dinheiro');
+  const cashAmount = round2(payments.filter((p) => isCashMethod(p.method)).reduce((sum, p) => sum + p.amount, 0));
+
   // Juros do cartão repassados ao cliente são da operadora: não entram no lucro nem na margem.
   const storeRevenue = grossAmount - Math.min(body.cardInterest, body.surcharge);
   const grossProfit = Math.round((storeRevenue - totalCost) * 100) / 100;
   const marginPercent = storeRevenue > 0 ? Math.round((grossProfit / storeRevenue) * 10000) / 100 : 0;
 
-  const isCash = body.paymentMethod.toLowerCase().includes('dinheiro');
+  const isCash = payments.some((p) => isCashMethod(p.method));
   const externalCashStatus = isCash && options.keepCashStatus ? options.keepCashStatus : isCash && !saleAt ? 'pending_pickup' : 'not_applicable';
 
   // 2. Inserir registro principal da venda em sales_orders
@@ -268,8 +302,8 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
     ],
   );
   await client.query(
-    "UPDATE sales_orders SET warranty_type = $2, warranty_months = CASE WHEN $2 = 'store' THEN warranty_months ELSE 0 END, card_interest = LEAST($3::numeric, surcharge) WHERE id = $1",
-    [orderId, body.warrantyType, body.cardInterest],
+    "UPDATE sales_orders SET warranty_type = $2, warranty_months = CASE WHEN $2 = 'store' THEN warranty_months ELSE 0 END, card_interest = LEAST($3::numeric, surcharge), cash_amount = $4::numeric WHERE id = $1",
+    [orderId, body.warrantyType, body.cardInterest, isCash ? cashAmount : null],
   );
 
   // 3. Inserir itens da venda e dar BAIXA NO ESTOQUE
@@ -449,51 +483,50 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
     });
   }
 
-  // 5. Registrar Formas de Pagamento em sale_payments
-  const payId = `PAY-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  await client.query(
-    `INSERT INTO sale_payments (id, sale_id, method_name, method, amount, installments)
-     VALUES ($1, $2, $3, $3, $4, $5)`,
-    [payId, orderId, body.paymentMethod, netAmountToPay, body.installments],
-  );
+  // 5–7. Cada meio de pagamento: sale_payments, contas a receber (parcelas a cada 30 dias quando parcelado)
+  // e, à vista, o lançamento no livro caixa.
+  const multiple = payments.length > 1;
+  for (const [index, payment] of payments.entries()) {
+    const label = multiple ? `${payment.method}${payment.installments > 1 ? ` ${payment.installments}x` : ''}` : body.paymentMethod;
+    const payId = `PAY-${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 6)}`;
+    await client.query(
+      `INSERT INTO sale_payments (id, sale_id, method_name, method, amount, installments, card_interest, created_at)
+       VALUES ($1, $2, $3, $3, $4::numeric, $5::int, $6::numeric, now() + ($7::int * interval '1 millisecond'))`,
+      [payId, orderId, payment.method, payment.amount, payment.installments, payment.cardInterest, index],
+    );
 
-  // 6. Integração Financeira: Contas a Receber (Receivables)
-  if (body.installments > 1) {
-    // Venda parcelada (ex: 10x no cartão): gera parcelas com vencimentos a cada 30 dias
-    const installmentAmount = Math.round((netAmountToPay / body.installments) * 100) / 100;
-    let runningTotal = 0;
-
-    for (let i = 1; i <= body.installments; i++) {
-      const recId = `REC-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 5)}`;
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (i * 30));
-      const dueIso = dueDate.toISOString().slice(0, 10);
-
-      const isLast = i === body.installments;
-      const currAmount = isLast ? Math.round((netAmountToPay - runningTotal) * 100) / 100 : installmentAmount;
-      runningTotal += currAmount;
-
-      await client.query(
-        `INSERT INTO receivables (
-          id, store_id, description, customer_id, customer_name, category, amount,
-          received_amount, due_date, status, sale_id, notes
-        ) VALUES ($1, $2, $3, $4, $5, 'Vendas Externas', $6, 0, $7, 'open', $8, $9)`,
-        [
-          recId,
-          storeId,
-          `Venda #${orderId} (${i}/${body.installments}) - ${body.paymentMethod}`,
-          body.customerId || null,
-          body.customerName,
-          currAmount,
-          dueIso,
-          orderId,
-          `Parcela ${i} de ${body.installments} da Venda Externa #${orderId}`,
-        ],
-      );
+    if (payment.installments > 1) {
+      const installmentAmount = round2(payment.amount / payment.installments);
+      let runningTotal = 0;
+      for (let i = 1; i <= payment.installments; i++) {
+        const recId = `REC-${Date.now().toString(36)}-${index}-${i}-${Math.random().toString(36).slice(2, 5)}`;
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + i * 30);
+        const currAmount = i === payment.installments ? round2(payment.amount - runningTotal) : installmentAmount;
+        runningTotal += currAmount;
+        await client.query(
+          `INSERT INTO receivables (
+            id, store_id, description, customer_id, customer_name, category, amount,
+            received_amount, due_date, status, sale_id, notes
+          ) VALUES ($1, $2, $3, $4, $5, 'Vendas Externas', $6, 0, $7, 'open', $8, $9)`,
+          [
+            recId,
+            storeId,
+            `Venda #${orderId} (${i}/${payment.installments}) - ${multiple ? payment.method : body.paymentMethod}`,
+            body.customerId || null,
+            body.customerName,
+            currAmount,
+            dueDate.toISOString().slice(0, 10),
+            orderId,
+            `Parcela ${i} de ${payment.installments} da Venda Externa #${orderId}`,
+          ],
+        );
+      }
+      continue;
     }
-  } else {
-    // Venda à vista (Dinheiro, PIX, Débito, Cartão 1x)
-    const recId = `REC-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // À vista (Dinheiro, PIX, Débito, Cartão 1x): recebido na hora e no livro caixa.
+    const recId = `REC-${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 6)}`;
     await client.query(
       `INSERT INTO receivables (
         id, store_id, description, customer_id, customer_name, category, amount,
@@ -502,32 +535,21 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
       [
         recId,
         storeId,
-        `Venda Externa #${orderId} - ${body.paymentMethod}`,
+        `Venda Externa #${orderId} - ${label}`,
         body.customerId || null,
         body.customerName,
-        netAmountToPay,
+        payment.amount,
         today,
         orderId,
-        isCash ? 'Recebimento externo em dinheiro (aguardando recolhimento)' : 'Recebimento confirmado',
+        isCashMethod(payment.method) ? 'Recebimento externo em dinheiro (aguardando recolhimento)' : 'Recebimento confirmado',
       ],
     );
-  }
-
-  if (body.installments === 1) {
-  // 7. Lançamento no Livro Caixa (finance_entries)
-  const entId = `ENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  await client.query(
-    `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, category, operator_name)
-     VALUES ($1, $2, 'in', $3, $4, 'manual', $5, 'Vendas Externas', $6)`,
-    [
-      entId,
-      storeId,
-      `Venda Externa #${orderId} - ${body.customerName} (${body.paymentMethod})`,
-      netAmountToPay,
-      orderId,
-      body.sellerName || operator,
-    ],
-  );
+    const entId = `ENT-${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 6)}`;
+    await client.query(
+      `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, category, operator_name)
+       VALUES ($1, $2, 'in', $3, $4, 'manual', $5, 'Vendas Externas', $6)`,
+      [entId, storeId, `Venda Externa #${orderId} - ${body.customerName} (${label})`, payment.amount, orderId, body.sellerName || operator],
+    );
   }
   if (saleAt && body.saleDate) await moveSaleToDate(client, { storeId, saleId: orderId, saleDate: body.saleDate, saleAt, today });
 
@@ -543,6 +565,8 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
     totalPaid: netAmountToPay,
     paymentMethod: body.paymentMethod,
     installments: body.installments,
+    payments,
+    cashAmount: isCash ? cashAmount : 0,
     costTotal: totalCost,
     grossProfit,
     marginPercent,

@@ -195,8 +195,9 @@ async function buildReceipt(saleId: string, storeId?: string) {
         surcharge: Math.max(0, Math.round((Number(s.surcharge || 0) - cardInterest) * 100) / 100),
         tradeInCredit: Number(s.trade_in_value || 0),
         totalPaid: Number(s.final_amount || s.total_amount || s.total || 0),
-        paymentMethod: payment?.method || s.payment_name || 'Não informado',
-        installments: Number(payment?.installments || 1),
+        // Mais de um meio: cada um com o valor (e as parcelas) no comprovante.
+        paymentMethod: paymentRes.rows.length > 1 ? paymentRes.rows.map((row) => { const n = Number(row.installments) || 1; const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); return `${row.method} ${brl(Number(row.amount))}${n > 1 ? ` (${n}x de ${brl(Number(row.amount) / n)})` : ''}`; }).join(' + ') : payment?.method || s.payment_name || 'Não informado',
+        installments: paymentRes.rows.length > 1 ? 1 : Number(payment?.installments || 1),
       },
       warranty: {
         type: (s.warranty_type || 'store') as 'store' | 'manufacturer' | 'none',
@@ -429,8 +430,8 @@ salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) =>
       `SELECT s.id, s.created_at, s.customer_name, s.customer_phone, s.customer_document, s.seller_name,
               COALESCE(NULLIF(s.final_amount, 0), s.total_amount, s.total, 0) AS amount, s.status, s.cancel_reason,
               (SELECT string_agg(l.qty::text || 'x ' || l.name, ', ' ORDER BY l.name) FROM sales_order_lines l WHERE l.sale_id = s.id) AS items,
-              (SELECT p.method_name || CASE WHEN p.installments > 1 THEN ' · ' || p.installments || 'x' ELSE '' END
-                 FROM sale_payments p WHERE p.sale_id = s.id ORDER BY p.created_at LIMIT 1) AS payment
+              (SELECT string_agg(p.method_name || CASE WHEN p.installments > 1 THEN ' · ' || p.installments || 'x' ELSE '' END, ' + ' ORDER BY p.created_at, p.id)
+                 FROM sale_payments p WHERE p.sale_id = s.id) AS payment
          FROM sales_orders s
         WHERE s.store_id = $1 AND s.sale_type = 'external'
           AND s.created_at >= $2 AND s.created_at < $3
@@ -486,7 +487,7 @@ salesRouter.get('/api/v1/sales/external/daily-tasks', requireAuth, async (req, r
 
     // 1. Dinheiro físico em espécie aguardando recolhimento
     const cashRes = await pool.query(
-      `SELECT COUNT(*)::int as count, COALESCE(SUM(total_amount), 0)::numeric as total
+      `SELECT COUNT(*)::int as count, COALESCE(SUM(COALESCE(cash_amount, total_amount)), 0)::numeric as total
        FROM sales_orders
        WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
       [storeId],

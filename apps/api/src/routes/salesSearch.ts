@@ -86,8 +86,8 @@ salesSearchRouter.get('/api/v1/sales/search', requireAuth, async (req, res, next
       `SELECT s.id, COALESCE(s.sale_type, 'pos') AS sale_type, s.created_at, s.customer_name, s.customer_phone, s.customer_document,
               s.seller_id, s.seller_name, s.status, s.session_id, s.cancelled_at, s.cancel_reason,
               COALESCE(NULLIF(s.final_amount, 0), s.total_amount, s.total, 0) AS amount,
-              COALESCE((SELECT p.method_name || CASE WHEN p.installments > 1 THEN ' · ' || p.installments || 'x' ELSE '' END
-                          FROM sale_payments p WHERE p.sale_id = s.id ORDER BY p.created_at LIMIT 1), s.payment_name, '') AS payment,
+              COALESCE((SELECT string_agg(p.method_name || CASE WHEN p.installments > 1 THEN ' · ' || p.installments || 'x' ELSE '' END, ' + ' ORDER BY p.created_at, p.id)
+                          FROM sale_payments p WHERE p.sale_id = s.id), s.payment_name, '') AS payment,
               (SELECT string_agg(li.qty::text || 'x ' || li.name, ', ' ORDER BY li.name) FROM sales_order_lines li WHERE li.sale_id = s.id OR li.order_id = s.id) AS items,
               (SELECT COALESCE(jsonb_agg(DISTINCT li.imei) FILTER (WHERE li.imei <> ''), '[]'::jsonb) FROM sales_order_lines li WHERE li.sale_id = s.id OR li.order_id = s.id) AS imeis
          FROM sales_orders s

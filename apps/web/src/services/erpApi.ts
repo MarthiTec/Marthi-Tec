@@ -2230,6 +2230,8 @@ export type ExternalSalePayload = {
   customerDocument?: string;
   sellerId?: string | null;
   sellerName?: string;
+  /** Mais de um meio de pagamento: cada valor já com os juros do cartão dele; a soma fecha o total. */
+  payments?: Array<{ method: string; amount: number; installments: number; cardInterest: number }>;
   paymentMethod: string;
   installments?: number;
   discount?: number;
@@ -2293,6 +2295,8 @@ export type ExternalSaleEditData = {
   sellerId: string | null;
   paymentMethod: string;
   installments: number;
+  /** Cada meio com o valor combinado (sem juros). */
+  payments?: Array<{ method: string; amount: number; installments: number }>;
   discount: number;
   surcharge: number;
   cardInterest: number;

@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
-import { interestBase } from '../../data/cardInterest';
+import { CREDIT_METHOD, quotePayments, type PaymentRow } from '../../data/splitPayment';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { AdminIcon } from '../../components/AdminIcons';
 import {
@@ -162,9 +162,9 @@ export function ExternalSalePage() {
     if (brand) setTradeIn(current => current.brand ? current : { ...current, brand: brand.slug });
   }, [tradeDevice, brands]);
 
-  // Forma de Pagamento e Parcelas
-  const [paymentMethod, setPaymentMethod] = useState('Cartão de Crédito');
-  const [installments, setInstallments] = useState(1);
+  // Formas de pagamento: uma ou mais (ex.: PIX + cartão 4x); a última fica com o que falta.
+  const [payments, setPayments] = useState<PaymentRow[]>([{ method: CREDIT_METHOD, installments: 1, amount: 0 }]);
+  const setPaymentRow = (index: number, patch: Partial<PaymentRow>) => setPayments((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const [warrantyType, setWarrantyType] = useState<WarrantyType>('store');
   const [warrantyMonths, setWarrantyMonths] = useState(3);
   const [warrantyTerms, setWarrantyTerms] = useState(WARRANTY_TERMS.store);
@@ -489,14 +489,10 @@ export function ExternalSalePage() {
   }, [storeId]);
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const cardRateFor = (count: number) => (count <= 1 ? 0 : Math.max(0, Number(totemCardFee(count)) || 0));
-  const isCredit = paymentMethod === 'Cartão de Crédito';
-  const cardRate = isCredit ? cardRateFor(installments) : 0;
   // Só os produtos com juros neste parcelamento entram na base (produto "sem juros até N" fica de fora).
   const interestLines = lines.map((line) => ({ lineTotal: (Number(line.qty) || 1) * (Number(line.unitPrice) || 0), interestFreeInstallments: stockItems.find((item) => item.id === line.stockId)?.interestFreeInstallments }));
-  const chargedBase = isCredit ? interestBase(interestLines, netAmountToPay, installments) : 0;
-  const cardInterest = round2((chargedBase * cardRate) / 100);
-  const totalCharged = round2(netAmountToPay + cardInterest);
-  const installmentValue = installments > 0 ? round2(totalCharged / installments) : totalCharged;
+  const { quotes: paymentQuotes, remainder: paymentRemainder, cardInterest, totalCharged } = quotePayments(payments, netAmountToPay, interestLines, cardRateFor);
+  const hasCashPayment = payments.some((row) => row.method === 'Dinheiro');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -533,6 +529,11 @@ export function ExternalSalePage() {
       }
     }
 
+    if (paymentQuotes.length > 1) {
+      if (paymentRemainder < 0) return setError('Os valores dos pagamentos passam do total a pagar. Ajuste os valores.');
+      if (paymentQuotes.some((quote) => quote.base <= 0)) return setError('Informe o valor de cada meio de pagamento (ou remova o que sobrou).');
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -544,14 +545,15 @@ export function ExternalSalePage() {
         customerDocument: customerDocument.trim(),
         sellerId: selectedSellerId || null,
         sellerName: (sellers.find((seller) => seller.id === selectedSellerId)?.name ?? sellerName).trim(),
-        paymentMethod,
-        installments: Number(installments) || 1,
+        paymentMethod: paymentQuotes[0].method,
+        installments: paymentQuotes[0].installments,
+        payments: paymentQuotes.map((quote) => ({ method: quote.method, amount: quote.total, installments: quote.installments, cardInterest: quote.interest })),
         discount: Number(generalDiscount) || 0,
         // Juros do cartão entram como acréscimo: o total da venda é o que o cliente paga.
         surcharge: round2((Number(generalSurcharge) || 0) + cardInterest),
         // Separado para o comprovante do cliente mostrar só o valor combinado (os juros ficam para a loja).
         cardInterest,
-        notes: [saleNotes.trim(), cardInterest > 0 ? `Juros do cartão ${installments}x (${cardRate.toLocaleString('pt-BR')}%): ${formatMoney(cardInterest)}` : ''].filter(Boolean).join(' · '),
+        notes: [saleNotes.trim(), ...paymentQuotes.filter((quote) => quote.interest > 0).map((quote) => `Juros do cartão ${quote.installments}x (${quote.rate.toLocaleString('pt-BR')}%): ${formatMoney(quote.interest)}`)].filter(Boolean).join(' · '),
         warrantyType,
         warrantyMonths: warrantyType === 'store' ? Number(warrantyMonths) : 0,
         warrantyTerms: warrantyTerms.trim(),
@@ -611,8 +613,7 @@ export function ExternalSalePage() {
       setGeneralSurcharge(sale.surcharge);
       setHasTradeIn(Boolean(sale.tradeIn));
       if (sale.tradeIn) setTradeIn(sale.tradeIn);
-      setPaymentMethod(sale.paymentMethod);
-      setInstallments(sale.installments);
+      setPayments(sale.payments?.length ? sale.payments : [{ method: sale.paymentMethod, installments: sale.installments, amount: 0 }]);
       setWarrantyType(sale.warrantyType);
       setWarrantyMonths(sale.warrantyMonths);
       setWarrantyTerms(sale.warrantyTerms);
@@ -653,8 +654,7 @@ export function ExternalSalePage() {
       notes: '',
       tradeValue: 0,
     });
-    setPaymentMethod('Cartão de Crédito');
-    setInstallments(1);
+    setPayments([{ method: CREDIT_METHOD, installments: 1, amount: 0 }]);
     setCreatedReceipt(null);
   }
 
@@ -718,7 +718,7 @@ export function ExternalSalePage() {
       {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
 
       {quickRegister ? <QuickStockRegisterModal initialText={quickRegister.text} products={stockItems} onClose={() => setQuickRegister(null)} onDone={handleQuickRegistered} /> : null}
-      <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPaymentMethod(ticket.payment==='Parcelado'?'Cartão de Crédito':'PIX');setInstallments(ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1);requestId.current=crypto.randomUUID();}}/>
+      <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPayments([{method:ticket.payment==='Parcelado'?CREDIT_METHOD:'PIX',installments:ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1,amount:0}]);requestId.current=crypto.randomUUID();}}/>
       <form onSubmit={handleSubmit} className="xsale-layout">
         <div className="xsale-main">
           {/* 1. Cliente */}
@@ -1051,39 +1051,82 @@ export function ExternalSalePage() {
           <section className="xsale-card">
             <h2 className="xsale-card__title"><span className="xsale-step">4</span> Pagamento</h2>
             <div className="xsale-stack">
-              <AdminPicker
-                label="Meio de pagamento"
-                value={paymentMethod}
-                options={[
-                  { value: 'Cartão de Crédito', label: 'Cartão de crédito' },
-                  { value: 'Cartão de Débito', label: 'Cartão de débito' },
-                  { value: 'PIX', label: 'PIX (chave da loja)' },
-                  { value: 'Dinheiro', label: 'Dinheiro (sem caixa)' },
-                  { value: 'Transferência Bancária', label: 'Transferência / TED' },
-                ]}
-                onChange={(val) => setPaymentMethod(val)}
-              />
-              {paymentMethod === 'Cartão de Crédito' ? (
-                <AdminPicker
-                  label="Parcelamento"
-                  value={String(installments)}
-                  options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, index) => {
-                    const count = index + 1;
-                    const rate = cardRateFor(count);
-                    const total = round2(netAmountToPay * (1 + rate / 100));
-                    return {
-                      value: String(count),
-                      label: count === 1
-                        ? `1x à vista (${formatMoney(netAmountToPay)})`
-                        : `${count}x de ${formatMoney(round2(total / count))} · total ${formatMoney(total)}${rate > 0 ? ` (${rate.toLocaleString('pt-BR')}%)` : ' sem juros'}`,
-                    };
-                  })}
-                  onChange={(val) => setInstallments(Number(val))}
-                />
-              ) : null}
-              {paymentMethod === 'Dinheiro' ? (
+              {paymentQuotes.map((quote, index) => {
+                const multiple = paymentQuotes.length > 1;
+                const isLast = index === paymentQuotes.length - 1;
+                return (
+                  <div key={index} className={multiple ? 'xsale-pay-row' : 'xsale-stack'}>
+                    {multiple ? (
+                      <div className="xsale-pay-row__head">
+                        <strong>{index + 1}º pagamento</strong>
+                        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments((rows) => rows.filter((_, i) => i !== index))} aria-label={`Remover o ${index + 1}º pagamento`}>
+                          <AdminIcon name="trash" /> Remover
+                        </button>
+                      </div>
+                    ) : null}
+                    <AdminPicker
+                      label="Meio de pagamento"
+                      value={quote.method}
+                      options={[
+                        { value: 'Cartão de Crédito', label: 'Cartão de crédito' },
+                        { value: 'Cartão de Débito', label: 'Cartão de débito' },
+                        { value: 'PIX', label: 'PIX (chave da loja)' },
+                        { value: 'Dinheiro', label: 'Dinheiro (sem caixa)' },
+                        { value: 'Transferência Bancária', label: 'Transferência / TED' },
+                      ]}
+                      onChange={(val) => setPaymentRow(index, { method: val, installments: val === CREDIT_METHOD ? payments[index].installments : 1 })}
+                    />
+                    {multiple ? (
+                      isLast ? (
+                        <p className={paymentRemainder < 0 ? 'xsale-warn' : 'xsale-muted'}>
+                          {paymentRemainder < 0 ? (
+                            <>Os valores acima passam do total em <strong>{formatMoney(-paymentRemainder)}</strong>.</>
+                          ) : (
+                            <>Restante: <strong>{formatMoney(quote.base)}</strong></>
+                          )}
+                        </p>
+                      ) : (
+                        <div>
+                          <label className="admin-label">Valor (R$)</label>
+                          <CurrencyInput className="admin-input" value={payments[index].amount} onChange={(value) => setPaymentRow(index, { amount: value })} ariaLabel={`Valor do ${index + 1}º pagamento`} />
+                        </div>
+                      )
+                    ) : null}
+                    {quote.method === CREDIT_METHOD ? (
+                      <AdminPicker
+                        label="Parcelamento"
+                        value={String(quote.installments)}
+                        options={Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, i) => {
+                          const count = i + 1;
+                          const option = quotePayments([{ method: CREDIT_METHOD, installments: count, amount: 0 }], quote.base, interestLines, cardRateFor).quotes[0];
+                          return {
+                            value: String(count),
+                            label:
+                              count === 1
+                                ? `1x à vista (${formatMoney(quote.base)})`
+                                : `${count}x de ${formatMoney(option.perInstallment)} · total ${formatMoney(option.total)}${option.rate > 0 ? ` (${option.rate.toLocaleString('pt-BR')}%)` : ' sem juros'}`,
+                          };
+                        })}
+                        onChange={(val) => setPaymentRow(index, { installments: Number(val) })}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm xsale-pay-add"
+                disabled={payments.length >= 6}
+                onClick={() =>
+                  // O que era o último pagamento fica com o valor que sobrava; o novo fica com o restante.
+                  setPayments((rows) => [...rows.map((row, i) => (i === rows.length - 1 ? { ...row, amount: paymentQuotes[i]?.base ?? 0 } : row)), { method: 'PIX', installments: 1, amount: 0 }])
+                }
+              >
+                <AdminIcon name="plus" /> Outro meio de pagamento
+              </button>
+              {hasCashPayment ? (
                 <p className="xsale-warn">
-                  <strong>Recebimento sem caixa:</strong> a venda fica registrada e o dinheiro fica na loja até o recolhimento.
+                  <strong>Recebimento sem caixa:</strong> a parte em dinheiro fica registrada e fica na loja até o recolhimento.
                 </p>
               ) : null}
               <div className="xsale-grid xsale-grid--2">
@@ -1150,12 +1193,20 @@ export function ExternalSalePage() {
           <section className="xsale-card xsale-total">
             <small>Total da venda</small>
             <strong className="xsale-total__value">{formatMoney(totalCharged)}</strong>
-            <span className="xsale-muted">
-              {paymentMethod} {installments > 1 && isCredit ? `· ${installments}x de ${formatMoney(installmentValue)}` : '· à vista'}
-            </span>
+            {paymentQuotes.map((quote, index) => (
+              <span key={index} className="xsale-muted">
+                {paymentQuotes.length > 1 ? `${quote.method}: ${formatMoney(quote.total)}` : quote.method}
+                {quote.installments > 1 ? ` · ${quote.installments}x de ${formatMoney(quote.perInstallment)}` : paymentQuotes.length > 1 ? '' : ' · à vista'}
+              </span>
+            ))}
             {cardInterest > 0 ? (
               <span className="xsale-muted">
-                Inclui juros do cartão de {formatMoney(cardInterest)} ({cardRate.toLocaleString('pt-BR')}%) sobre {formatMoney(chargedBase)}{chargedBase < netAmountToPay ? " (produtos sem juros neste parcelamento ficam de fora)" : ""}
+                Inclui juros do cartão de {formatMoney(cardInterest)}
+                {paymentQuotes
+                  .filter((quote) => quote.interest > 0)
+                  .map((quote) => ` (${quote.rate.toLocaleString('pt-BR')}% em ${quote.installments}x)`)
+                  .join('')}
+                {interestLines.some((line) => Number(line.interestFreeInstallments) > 0) ? ' · produtos sem juros neste parcelamento ficam de fora' : ''}
               </span>
             ) : null}
             {isPrivileged ? (

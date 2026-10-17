@@ -63,7 +63,8 @@ export async function undoExternalSale(db: Db, storeId: string, sale: any, newTr
   const saleId = sale.id;
   const installments = Number((await db.query('SELECT max(installments) AS n FROM sale_payments WHERE sale_id = $1', [saleId])).rows[0]?.n) || 1;
   if (installments > 1) {
-    const received = await db.query('SELECT 1 FROM receivables WHERE sale_id = $1 AND store_id = $2 AND received_amount > 0 LIMIT 1', [saleId, storeId]);
+    // Só as parcelas contam: o que foi pago à vista na venda (ex.: PIX + cartão) já nasce recebido.
+    const received = await db.query("SELECT 1 FROM receivables WHERE sale_id = $1 AND store_id = $2 AND received_amount > 0 AND notes LIKE 'Parcela %' LIMIT 1", [saleId, storeId]);
     if (received.rows.length) throw httpError('Esta venda tem parcela já recebida: estorne o recebimento no Financeiro antes de alterar a venda.', 409);
   }
   const delivered = await db.query("SELECT 1 FROM pickup_requests WHERE store_id = $1 AND reference_id = $2 AND status = 'completed' LIMIT 1", [storeId, saleId]);
@@ -112,7 +113,8 @@ export async function saleForEdit(db: Db, storeId: string, saleId: string) {
   if (!sale) throw httpError('Venda não encontrada nesta loja.', 404);
   if (sale.sale_type !== 'external') throw httpError('Só vendas externas podem ser alteradas por aqui.', 409);
   if (sale.status === 'cancelled') throw httpError('Venda cancelada não pode ser alterada.', 409);
-  const payment = (await db.query('SELECT method_name, installments FROM sale_payments WHERE sale_id = $1 ORDER BY id LIMIT 1', [saleId])).rows[0];
+  const paymentRows = (await db.query('SELECT method_name, method, amount, installments, card_interest FROM sale_payments WHERE sale_id = $1 ORDER BY created_at, id', [saleId])).rows;
+  const payment = paymentRows[0];
   const lines = (await db.query('SELECT * FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1 ORDER BY id', [saleId])).rows;
   const trade = (await db.query("SELECT * FROM sale_trade_ins WHERE sale_id = $1 AND store_id = $2 AND status <> 'cancelled' ORDER BY created_at LIMIT 1", [saleId, storeId])).rows[0];
   const battery = trade ? (await db.query("SELECT battery_level FROM stock_supplier_entries WHERE store_id = $1 AND ref_id = $2 LIMIT 1", [storeId, trade.id])).rows[0]?.battery_level ?? null : null;
@@ -128,6 +130,12 @@ export async function saleForEdit(db: Db, storeId: string, saleId: string) {
     sellerId: sale.seller_id,
     paymentMethod: payment?.method_name || sale.payment_name || '',
     installments: Number(payment?.installments) || 1,
+    // Cada meio com o valor combinado (sem os juros do cartão; a tela recalcula pela taxa das parcelas).
+    payments: paymentRows.map((row) => ({
+      method: row.method_name || row.method || '',
+      amount: Math.max(0, Math.round(((Number(row.amount) || 0) - (paymentRows.length === 1 ? cardInterest : Number(row.card_interest) || 0)) * 100) / 100),
+      installments: Number(row.installments) || 1,
+    })),
     discount: Number(sale.discount) || 0,
     // Acréscimo combinado sem os juros do cartão (a tela recalcula os juros pela taxa das parcelas).
     surcharge: Math.max(0, Math.round(((Number(sale.surcharge) || 0) - cardInterest) * 100) / 100),

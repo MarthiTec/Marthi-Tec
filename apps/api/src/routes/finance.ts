@@ -1057,7 +1057,7 @@ financeRouter.get('/api/v1/finance/pickups', requireAuth, async (req, res, next)
 
     // 1. Saldo físico de vendas em dinheiro ainda não recolhidas
     const pendingRes = await pool.query(
-      `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+      `SELECT COALESCE(SUM(COALESCE(cash_amount, total_amount)), 0)::numeric as pending_total
        FROM sales_orders
        WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
       [storeId],
@@ -1141,7 +1141,7 @@ financeRouter.post('/api/v1/finance/pickups', requireAuth, async (req, res, next
       // 3. Atualiza status de vendas em dinheiro pendentes até o montante recolhido
       let remainingToClear = body.amount;
       const pendingSales = await client.query(
-        `SELECT id, total_amount FROM sales_orders
+        `SELECT id, COALESCE(cash_amount, total_amount) AS total_amount FROM sales_orders
          WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'
          ORDER BY created_at ASC`,
         [storeId],
@@ -1160,7 +1160,7 @@ financeRouter.post('/api/v1/finance/pickups', requireAuth, async (req, res, next
       await client.query('COMMIT');
 
       const updatedPending = await pool.query(
-        `SELECT COALESCE(SUM(total_amount), 0)::numeric as pending_total
+        `SELECT COALESCE(SUM(COALESCE(cash_amount, total_amount)), 0)::numeric as pending_total
          FROM sales_orders
          WHERE store_id = $1 AND external_cash_status = 'pending_pickup' AND status = 'completed'`,
         [storeId],
