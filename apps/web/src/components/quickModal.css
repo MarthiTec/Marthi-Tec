@@ -173,3 +173,6 @@
 .sales-history__actions {display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;justify-content:flex-end;}
 .sales-history__foot {padding:12px 20px;border-top:1px solid var(--line,rgba(16,20,24,.1));font-size:.88rem;}
 @media (max-width:600px) {.sales-history__row {flex-direction:column;}.sales-history__side {justify-items:start;text-align:left;}.sales-history__actions {justify-content:flex-start;}}
+
+/* Nova OS: o "+ Novo cliente" logo abaixo da busca precisa de respiro (antes ficava colado no campo). */
+.os-form-col-full > .quick-field__actions { margin-top: 10px; }

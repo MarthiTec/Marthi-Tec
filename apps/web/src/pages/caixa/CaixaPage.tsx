@@ -2651,26 +2651,29 @@ export function CaixaPage() {
               {clientPanelOpen ? (
                 <>
                   <div className={`pdv__consumer ${customerPickOpen ? 'is-picking' : ''}`}>
-                    <button
-                      type="button"
-                      className="pdv__consumer-btn is-active"
-                      onClick={() => setCustomerPickOpen((open) => !open)}
-                      title="Buscar cliente cadastrado"
-                    >
-                      {walkIn ? 'Consumidor Final' : customerName}
-                    </button>
-                    <button
-                      type="button"
-                      className="pdv__consumer-add"
-                      title="Cadastrar cliente"
-                      aria-label="Cadastrar cliente"
-                      onClick={() => {
-                        setCustomerPickOpen(false);
-                        setQuickCustomerOpen(true);
-                      }}
-                    >
-                      +
-                    </button>
+                    {/* Botão do cliente e o "+" na mesma linha: o "+" fica centrado dentro do botão. */}
+                    <div className="pdv__consumer-row">
+                      <button
+                        type="button"
+                        className="pdv__consumer-btn is-active"
+                        onClick={() => setCustomerPickOpen((open) => !open)}
+                        title="Buscar cliente cadastrado"
+                      >
+                        {walkIn ? 'Consumidor Final' : customerName}
+                      </button>
+                      <button
+                        type="button"
+                        className="pdv__consumer-add"
+                        title="Cadastrar cliente"
+                        aria-label="Cadastrar cliente"
+                        onClick={() => {
+                          setCustomerPickOpen(false);
+                          setQuickCustomerOpen(true);
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
                     {quickCustomerOpen ? (
                       <QuickCreateCustomer
                         initial={customerQuery.trim() ? { name: customerQuery.trim() } : undefined}
