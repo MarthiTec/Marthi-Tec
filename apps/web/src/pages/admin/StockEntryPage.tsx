@@ -15,6 +15,8 @@ import { apiListBankAccounts, apiListStock, apiListSuppliers } from '../../servi
 import { apiCreateStockEntry } from '../../services/productCatalogApi';
 import '../../components/supplierEntries.css';
 import './stockEntry.css';
+import { QuickAddButton } from '../../components/QuickModal';
+import { QuickCreateAttributeValue } from '../../components/QuickCreate';
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const today = () => {
@@ -60,7 +62,8 @@ const emptyForm = (): Form => ({
   secondList: [],
   batteryLevel: 100,
   notes: '',
-  payment: 'pending',
+  // Normalmente a loja paga o fornecedor para ele mandar o produto.
+  payment: 'paid',
   dueDate: '',
   accountId: '',
 });
@@ -106,6 +109,8 @@ export function StockEntryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  /** Atributo recebendo um valor novo (cor/capacidade que ainda não existe). */
+  const [newValueFor, setNewValueFor] = useState<ProductAttribute | null>(null);
   const { brands } = useBrands();
   const brandName = (slug?: string) => (slug ? findBrand(brands, slug)?.name ?? slug : '');
 
@@ -303,14 +308,16 @@ export function StockEntryPage() {
             {creatingVariation ? (
               <>
                 {gridAttributes.map((attr) => (
-                  <AdminPicker
-                    key={attr.id}
-                    label={attr.name}
-                    value={form.newAttrs[attr.id] ?? ''}
-                    placeholder="—"
-                    options={[{ value: '', label: '—' }, ...attr.values.map((value) => ({ value, label: value }))]}
-                    onChange={(value) => update({ newAttrs: { ...form.newAttrs, [attr.id]: value } })}
-                  />
+                  <div key={attr.id} className="stock-entry__attr">
+                    <AdminPicker
+                      label={attr.name}
+                      value={form.newAttrs[attr.id] ?? ''}
+                      placeholder="—"
+                      options={[{ value: '', label: '—' }, ...attr.values.map((value) => ({ value, label: value }))]}
+                      onChange={(value) => update({ newAttrs: { ...form.newAttrs, [attr.id]: value } })}
+                    />
+                    <QuickAddButton label={`Nova ${attr.name.toLowerCase()}`} onClick={() => setNewValueFor(attr)} />
+                  </div>
                 ))}
                 <AdminPicker
                   label="Condição"
@@ -373,8 +380,8 @@ export function StockEntryPage() {
               label="Financeiro"
               value={form.payment}
               options={[
-                { value: 'pending', label: 'A pagar (contas a pagar)' },
                 { value: 'paid', label: 'Já pago (sai do caixa)' },
+                { value: 'pending', label: 'A pagar (contas a pagar)' },
                 { value: 'none', label: 'Não lançar no financeiro' },
               ]}
               onChange={(value) => update({ payment: value === 'paid' || value === 'none' ? value : 'pending' })}
@@ -419,6 +426,17 @@ export function StockEntryPage() {
             </button>
           </div>
         </article>
+      ) : null}
+      {newValueFor ? (
+        <QuickCreateAttributeValue
+          attribute={newValueFor}
+          onClose={() => setNewValueFor(null)}
+          onCreated={(value) => {
+            // A lista vem do banco já com o valor novo; a variação nova fica com ele.
+            setAttributes(getAttributes().filter((attr) => attr.active && attr.useOnStock));
+            setForm((current) => ({ ...current, newAttrs: { ...current.newAttrs, [newValueFor.id]: value } }));
+          }}
+        />
       ) : null}
     </section>
   );

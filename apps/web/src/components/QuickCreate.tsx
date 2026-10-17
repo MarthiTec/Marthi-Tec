@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { QuickModal } from './QuickModal';
 import { createBrand, type Brand } from '../data/brandStore';
-import { createAttribute, type ProductAttribute } from '../data/attributeStore';
+import { createAttribute, updateAttribute, type ProductAttribute } from '../data/attributeStore';
 import { getErpRegistry, upsertSupplier } from '../data/erpRegistry';
 import { apiCreateSeller, type ApiSeller } from '../services/erpApi';
 import { CustomerQuickFields, emptyCustomerDraft, saveCustomerDraft, type CustomerDraft } from './CustomerQuickFields';
@@ -227,6 +227,49 @@ export function QuickCreateSeller({ onClose, onCreated }: { onClose: () => void;
           <input value={commission} maxLength={6} inputMode="decimal" placeholder="0" onChange={(event) => setCommission(event.target.value)} />
         </label>
       </div>
+    </QuickModal>
+  );
+}
+
+/**
+ * Novo valor num atributo que já existe (ex.: uma cor nova "Laranja Cósmico" em Cor). Fica salvo no
+ * atributo da loja e já aparece para os outros produtos, o totem e as vendas.
+ */
+export function QuickCreateAttributeValue({ attribute, onClose, onCreated }: { attribute: ProductAttribute; onClose: () => void; onCreated: (value: string) => void }) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    const typed = value.trim().replace(/\s+/g, ' ');
+    if (!typed) return setError(`Informe a ${attribute.name.toLowerCase()}.`);
+    const key = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '');
+    // Já existe (mesmo escrito diferente, "256 GB" x "256GB"): usa o cadastrado.
+    const existing = attribute.values.find((item) => key(item) === key(typed));
+    if (existing) {
+      onCreated(existing);
+      onClose();
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await updateAttribute(attribute.id, { values: [...attribute.values, typed] });
+      onCreated(typed);
+      onClose();
+    } catch (err) {
+      setError(message(err, 'Não foi possível salvar o novo valor.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <QuickModal title={`Nova ${attribute.name.toLowerCase()}`} subtitle={`Fica salva em ${attribute.name} para todos os produtos.`} busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar">
+      <label>
+        {attribute.name} *
+        <input value={value} maxLength={100} autoFocus placeholder={/cor/i.test(attribute.name) ? 'Ex.: Laranja Cósmico' : /capac/i.test(attribute.name) ? 'Ex.: 2TB' : ''} onChange={(event) => setValue(event.target.value)} />
+      </label>
     </QuickModal>
   );
 }

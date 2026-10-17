@@ -24,3 +24,7 @@
   .stock-entry__product { flex-wrap: wrap; }
   .stock-entry__product > button { width: 100%; }
 }
+
+/* Atributo da nova variação com o botão de valor novo logo abaixo (cor/capacidade que ainda não existe). */
+.stock-entry__attr { display: grid; gap: 6px; align-content: start; }
+.stock-entry__attr .quick-add-btn { justify-self: start; }

@@ -39,8 +39,9 @@ const OUT_LABEL: Record<string, string> = { sale: 'Vendido', bonus: 'Bonificaç�
 type Draft = SupplierEntry & { key: string; imeiList: string[]; secondList: string[]; outImeis: string[]; supplierOrigin: SupplierOrigin };
 
 const PAYMENT_OPTIONS = [
-  { value: 'pending', label: 'A pagar (contas a pagar)' },
+  // Já pago primeiro: normalmente a loja paga o fornecedor para ele mandar o produto.
   { value: 'paid', label: 'Já pago (sai do caixa)' },
+  { value: 'pending', label: 'A pagar (contas a pagar)' },
   { value: 'none', label: 'Não lançar no financeiro' },
 ];
 
@@ -104,7 +105,7 @@ export function SupplierEntriesModal({
   const update = (key: string, patch: Partial<Draft>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const add = () => {
     const draft = toDraft(
-      { supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: rows[rows.length - 1]?.unitCost ?? 0, imeis: [], payment: 'pending' },
+      { supplierId: defaultSupplierId ?? '', entryDate: today(), qty: 1, unitCost: rows[rows.length - 1]?.unitCost ?? 0, imeis: [], payment: 'paid' },
       rows.length,
       suppliers,
     );
@@ -143,6 +144,8 @@ export function SupplierEntriesModal({
     onApply(
       parsed.map(({ key: _key, imeiList: _list, secondList: _second, typed: _typed, outImeis: _out, supplierName: _name, supplierOrigin: _origin, soldQty: _soldQty, soldImeis: _soldImeis, ...row }) => ({
         ...row,
+        // Entrada nova sem escolha: já paga (o padrão da tela).
+        payment: row.id ? row.payment : row.payment ?? 'paid',
         qty: Number(row.qty),
         unitCost: Number(row.unitCost) || 0,
       })),
@@ -251,11 +254,11 @@ export function SupplierEntriesModal({
           <>
             <AdminPicker
               label="Financeiro"
-              value={row.payment ?? 'pending'}
+              value={row.payment ?? 'paid'}
               options={PAYMENT_OPTIONS}
               onChange={(value) => update(row.key, { payment: value === 'paid' || value === 'none' ? value : 'pending' })}
             />
-            {(row.payment ?? 'pending') === 'pending' ? (
+            {(row.payment ?? 'paid') === 'pending' ? (
               <label className="admin-field">
                 Vencimento
                 <input type="date" value={row.dueDate || row.entryDate} onChange={(e) => update(row.key, { dueDate: e.target.value })} />
