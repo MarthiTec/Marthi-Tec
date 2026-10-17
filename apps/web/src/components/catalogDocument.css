@@ -33,7 +33,10 @@
 .catalog-cover__text { position: absolute; top: 9%; left: 8%; right: 8%; z-index: 2; }
 .catalog-cover__text h1 { margin: 0; font-size: clamp(1.5rem, 9cqw, 4.2rem); font-weight: 900; line-height: .95; letter-spacing: .02em; text-transform: uppercase; color: var(--cat-dark); overflow-wrap: anywhere; }
 .catalog-cover__text p { margin: 10px 0 0; max-width: 62%; font-size: clamp(.9rem, 4cqw, 1.5rem); font-weight: 700; color: var(--cat-accent); }
-.catalog-cover__photo { position: absolute; z-index: 1; left: 50%; bottom: 17%; width: 72%; max-height: 50%; object-fit: contain; transform: translateX(-50%); filter: drop-shadow(0 22px 26px rgba(22, 24, 29, 0.28)); }
+/* Foto da capa: fundo branco da foto some no fundo da capa (multiply), com uma sombra de chão discreta. */
+.catalog-cover__stage { position: absolute; z-index: 1; left: 50%; bottom: 15%; width: 74%; height: 50%; transform: translateX(-50%); }
+.catalog-cover__stage::after { content: ''; position: absolute; left: 18%; right: 18%; bottom: -3%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgba(22, 24, 29, 0.28), transparent); z-index: -1; }
+.catalog-cover__photo { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
 .catalog-cover__brand { position: absolute; z-index: 2; right: 8%; bottom: 5%; display: grid; justify-items: end; gap: 4px; text-align: right; }
 .catalog-cover__brand img { max-width: 150px; max-height: 64px; object-fit: contain; }
 .catalog-cover__brand strong { font-size: clamp(1.1rem, 5vw, 1.6rem); font-weight: 900; color: var(--cat-dark); }
@@ -52,7 +55,9 @@
 .catalog-cover--band .catalog-cover__text { top: 7%; left: 27%; right: 27%; text-align: center; }
 .catalog-cover--band .catalog-cover__text h1 { color: #fff; font-size: clamp(1.2rem, 7cqw, 3.2rem); }
 .catalog-cover--band .catalog-cover__text p { max-width: none; color: #fff; font-style: italic; font-weight: 500; opacity: .92; }
-.catalog-cover--band .catalog-cover__photo { width: 80%; bottom: 20%; }
+/* Faixa escura: a foto fica num foco de luz (o branco da foto some no foco, sem quadrado branco). */
+.catalog-cover--band .catalog-cover__stage { width: 84%; bottom: 18%; isolation: isolate; border-radius: 50%; background: radial-gradient(closest-side, #ffffff 0%, #ffffff 58%, rgba(255, 255, 255, 0.85) 70%, rgba(255, 255, 255, 0) 100%); }
+.catalog-cover--band .catalog-cover__stage::after { display: none; }
 .catalog-cover--band .catalog-cover__brand { left: 0; right: 0; justify-items: center; text-align: center; }
 .catalog-cover--band .catalog-cover__brand strong { color: #fff; }
 .catalog-cover--band .catalog-cover__brand small { color: rgba(255, 255, 255, 0.75); }
@@ -74,8 +79,9 @@
 .catalog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
 .catalog-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border-radius: 16px; background: var(--cat-card); box-shadow: 0 4px 14px rgba(22, 24, 29, 0.07); }
 .catalog-card.is-sold-out { opacity: .55; }
-.catalog-card__media { position: relative; aspect-ratio: 1; background: radial-gradient(80% 80% at 50% 40%, #ffffff 0%, #f1f2f4 100%); }
-.catalog-card__media img { width: 100%; height: 100%; object-fit: contain; padding: 10px; box-sizing: border-box; }
+/* Quadro da foto sempre do mesmo tamanho (como no totem): foto alta ou larga cabe dentro sem esticar o cartão. */
+.catalog-card__media { position: relative; aspect-ratio: 1; overflow: hidden; background: radial-gradient(80% 80% at 50% 40%, #ffffff 0%, #f1f2f4 100%); isolation: isolate; }
+.catalog-card__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 12px; box-sizing: border-box; mix-blend-mode: multiply; }
 .catalog-card__noimg { display: grid; place-items: center; width: 100%; height: 100%; padding: 12px; box-sizing: border-box; color: var(--cat-dark); font-size: .95rem; font-weight: 900; text-align: center; text-transform: uppercase; background: linear-gradient(135deg, color-mix(in srgb, var(--cat-accent) 14%, #fff), #f1f2f4); }
 .catalog-card__badges { position: absolute; top: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .catalog-badge { padding: 3px 8px; border-radius: 999px; background: rgba(22, 24, 29, 0.78); color: #fff; font-size: .66rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
@@ -126,4 +132,35 @@
   .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5mm; }
   .catalog-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; border: 1px solid var(--cat-line); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .catalog-badge, .catalog-tag, .catalog-card__media { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* PDF: altura fixa do quadro da foto (o aspect-ratio nem sempre vale na impressão). */
+  .catalog-card__media { height: 46mm; aspect-ratio: auto; }
+}
+
+/* ── Pedido pelo catálogo, encomenda e Upgrade ────── */
+.catalog-head__brand > div { flex: 1; min-width: 0; }
+.catalog-head__actions { display: flex; gap: 6px; }
+.catalog-head__actions button { min-height: 36px; padding: 0 12px; border: 1px solid var(--cat-line); border-radius: 999px; background: #fff; color: var(--cat-ink); font: inherit; font-size: .78rem; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.catalog-badge--order { background: #2563eb; }
+.catalog-tag--order { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.catalog-card__lead { color: #1d4ed8; font-size: .74rem; font-weight: 700; }
+.catalog-variants__pick { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; width: 100%; padding: 5px 6px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.catalog-variants li.is-choice .catalog-variants__pick { border-color: var(--cat-accent); background: color-mix(in srgb, var(--cat-accent) 7%, #fff); }
+.catalog-buy { display: grid; place-items: center; width: 100%; min-height: 42px; border: 0; border-radius: 12px; background: var(--cat-accent); color: #fff; font: inherit; font-size: .88rem; font-weight: 800; cursor: pointer; }
+.catalog-buy:active { transform: scale(.98); }
+.catalog-cta--soft { min-height: 34px; padding: 4px 8px; background: transparent; color: #15803d; border: 1px solid #bbf7d0; font-size: .76rem; text-align: center; line-height: 1.2; }
+.catalog-cta--soft:hover { background: #f0fdf4; }
+
+.catalog-upgrade { display: grid; gap: 10px; padding: 20px 16px; border-radius: 18px; background: linear-gradient(135deg, var(--cat-dark), #3d424b); color: #fff; }
+.catalog-upgrade__kicker { justify-self: start; padding: 3px 10px; border-radius: 999px; background: var(--cat-accent); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.catalog-upgrade h2 { margin: 0; font-size: 1.35rem; font-weight: 900; line-height: 1.15; }
+.catalog-upgrade p { margin: 0; opacity: .9; }
+.catalog-upgrade ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.catalog-upgrade li { position: relative; padding-left: 24px; font-size: .9rem; }
+.catalog-upgrade li::before { content: '✓'; position: absolute; left: 0; top: 0; color: var(--cat-accent); font-weight: 900; }
+.catalog-upgrade .catalog-buy { margin-top: 4px; }
+.catalog-upgrade__hint { font-size: .84rem; }
+
+@media print {
+  .catalog-head__actions, .catalog-buy, .catalog-cta--soft { display: none !important; }
+  .catalog-upgrade { break-before: page; page-break-before: always; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

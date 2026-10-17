@@ -22,7 +22,7 @@ const newToken = () => randomBytes(18).toString('base64url');
 const image = z
   .string()
   .max(2_000_000)
-  .refine((value) => !value || /^https:\/\//i.test(value) || /^data:image\//i.test(value), 'A foto da capa precisa ser HTTPS ou uma imagem do produto.');
+  .refine((value) => !value || value === 'none' || /^https:\/\//i.test(value) || /^data:image\//i.test(value), 'A foto da capa precisa ser HTTPS ou uma imagem do produto.');
 const catalogSchema = z.object({
   title: z.string().trim().min(1, 'Informe o título do catálogo.').max(60),
   subtitle: z.string().trim().max(80).default(''),
@@ -55,11 +55,11 @@ const view = (row: any) => ({
 });
 
 /** Itens atuais do estoque para os produtos escolhidos (sem custo e sem IMEI). */
-async function catalogItems(db: Db, storeId: string, productIds: string[], hideSoldOut: boolean) {
+export async function catalogItems(db: Db, storeId: string, productIds: string[], hideSoldOut: boolean) {
   if (!productIds.length) return [];
   const products = (
     await db.query(
-      `SELECT s.id, s.name, s.brand, s.images, s.price, s.qty, s.variations, s.condition, s.battery_level, s.color, s.capacity, s.active, s.created_at,
+      `SELECT s.id, s.name, s.brand, s.images, s.price, s.qty, s.variations, s.condition, s.battery_level, s.color, s.capacity, s.active, s.created_at, s.pickup_prices,
               (SELECT max(e.created_at) FROM stock_supplier_entries e WHERE e.store_id = s.store_id AND e.stock_item_id = s.id) AS last_purchase_at
          FROM stock_items s WHERE s.store_id = $1 AND s.id = ANY($2::text[])`,
       [storeId, productIds],
@@ -80,7 +80,21 @@ async function catalogItems(db: Db, storeId: string, productIds: string[], hideS
     list.push({ variationId: entry.variation_id ?? null, battery: entry.battery_level === null ? null : Number(entry.battery_level), free: Number(entry.free) || 0 });
     units.set(entry.stock_item_id, list);
   }
-  return buildCatalogItems(products, productIds, attributes, units, { hideSoldOut });
+  return buildCatalogItems(products, productIds, attributes, units, { hideSoldOut, orderMethod: await orderMethodOf(db, storeId) });
+}
+
+/** Modalidade "sob encomenda" ativa da loja (prazo e preço por produto). */
+export async function orderMethodOf(db: Db, storeId: string) {
+  const row = (await db.query("SELECT id, lead_days FROM pickup_methods WHERE store_id = $1 AND kind = 'order' AND active = true ORDER BY name LIMIT 1", [storeId])).rows[0];
+  if (!row) return null;
+  // Prazo por dia da semana: o catálogo mostra o maior ("até N dias").
+  const days = row.lead_days && typeof row.lead_days === 'object' ? Object.values(row.lead_days).map(Number).filter((n) => Number.isFinite(n)) : [Number(row.lead_days) || 0];
+  return { id: String(row.id), leadDays: Math.max(0, ...days) };
+}
+
+/** Vendedores ativos para o cliente dizer quem o atendeu (só o nome). */
+async function activeSellers(db: Db, storeId: string) {
+  return (await db.query('SELECT id, name FROM sellers WHERE store_id = $1 AND active = true ORDER BY name', [storeId])).rows.map((row) => ({ id: row.id, name: row.name }));
 }
 
 async function storeInfo(db: Db, storeId: string) {
@@ -203,7 +217,7 @@ salesCatalogsRouter.get('/api/v1/public/sales-catalogs/:token', async (req, res,
     const items = await catalogItems(pool, row.store_id, catalog.productIds, catalog.hideSoldOut);
     const { token: _token, createdBy: _by, productIds: _ids, ...publicCatalog } = catalog;
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ success: true, data: { catalog: publicCatalog, store: await storeInfo(pool, row.store_id), items: catalog.showPrices ? items : items.map((item) => ({ ...item, price: 0, variants: item.variants.map((variant) => ({ ...variant, price: 0 })) })) } });
+    res.json({ success: true, data: { catalog: publicCatalog, sellers: await activeSellers(pool, row.store_id), store: await storeInfo(pool, row.store_id), items: catalog.showPrices ? items : items.map((item) => ({ ...item, price: 0, variants: item.variants.map((variant) => ({ ...variant, price: 0 })) })) } });
   } catch (error) {
     next(error);
   }

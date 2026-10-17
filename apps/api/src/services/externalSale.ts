@@ -7,6 +7,7 @@ import { receiveTradeInIntoExistingProduct } from './tradeInStock.js';
 import { recordTradeInEntry } from './supplierEntries.js';
 import { markUnitsSold } from './soldUnits.js';
 import { lineUnitCost } from './saleCost.js';
+import { closeCatalogOrder } from '../routes/catalogOrders.js';
 import { primaryImei } from './imeiPairs.js';
 import { applyRealSaleCost, findEntryByImei, moveSaleToDate } from './saleHistory.js';
 import { pickedAttributeSchema, validateSaleAttributes } from './saleAttributes.js';
@@ -88,6 +89,8 @@ export const externalSaleSchema = z.object({
   warrantyTerms: z.string().default('Garantia legal de 90 dias balcão cobrindo defeitos de fabricação. Não cobre quedas ou umidade.'),
   lines: z.array(saleLineSchema).min(1, 'Informe ao menos um produto para a venda.'),
   tradeIn: tradeInSchema.optional().nullable(),
+  /** Pedido do catálogo que esta venda finaliza (sai da fila). */
+  catalogOrderId: z.string().max(80).optional().nullable(),
 });
 
 export type ExternalSaleInput = z.infer<typeof externalSaleSchema>;
@@ -552,6 +555,7 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
       [entId, storeId, `Venda Externa #${orderId} - ${body.customerName} (${label})`, payment.amount, orderId, body.sellerName || operator],
     );
   }
+  if (body.catalogOrderId) await closeCatalogOrder(client, storeId, body.catalogOrderId, orderId);
   if (saleAt && body.saleDate) await moveSaleToDate(client, { storeId, saleId: orderId, saleDate: body.saleDate, saleAt, today });
 
   return {

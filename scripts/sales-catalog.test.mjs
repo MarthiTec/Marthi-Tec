@@ -61,12 +61,13 @@ test('the store saves a catalog and the customer opens it by link, without login
   const { data } = await res.json();
   assert.equal(data.catalog.title, 'Novidades da semana');
   assert.equal(data.catalog.token, undefined, 'the token is not repeated in the page data');
-  assert.deepEqual(data.items.map((i) => i.name), ['IPHONE 15'], 'sold-out products are hidden');
+  // Sem estoque mas com encomenda (padrão da loja): continua disponível, como sob encomenda.
+  assert.deepEqual(data.items.map((i) => [i.name, i.orderOnly]), [['IPHONE 15', false], ['CAPINHA MAGSAFE', true]]);
   const item = data.items[0];
   assert.equal(item.image, 'https://cdsassets.apple.com/x/iphone-15.png');
   assert.equal(item.price, 2850);
   assert.equal(item.condition, 'Usado');
-  assert.deepEqual(item.variants.map((v) => [v.color, v.capacity, v.batteries, v.price]), [['Preto', '128GB', [91, 87], 2850]]);
+  assert.deepEqual(item.variants.map((v) => [v.color, v.capacity, v.batteries, v.price, v.availability]), [['Preto', '128GB', [91, 87], 2850, 'in_stock'], ['Azul', '256GB', [], 3300, 'order']]);
   assert.equal(item.isNew, true);
   const text = JSON.stringify(data);
   assert.doesNotMatch(text, /2400|3511?0000000010/, 'no cost and no IMEI reach the customer');
@@ -74,7 +75,7 @@ test('the store saves a catalog and the customer opens it by link, without login
 
 test('the live preview shows unsaved choices; prices can be hidden; the link can be replaced', async () => {
   const preview = await call('/sales-catalogs/preview', 'POST', { productIds: [capinha.id, iphone.id], hideSoldOut: false });
-  assert.deepEqual(preview.data.items.map((i) => [i.name, i.soldOut]), [['CAPINHA MAGSAFE', true], ['IPHONE 15', false]]);
+  assert.deepEqual(preview.data.items.map((i) => [i.name, i.soldOut, i.orderOnly]), [['CAPINHA MAGSAFE', false, true], ['IPHONE 15', false, false]]);
   const saved = await call(`/sales-catalogs/${catalog.id}`, 'PATCH', { ...store, showPrices: false });
   assert.equal(saved.status, 200, JSON.stringify(saved.error));
   const hidden = (await (await fetch(`${base}/public/sales-catalogs/${catalog.token}`)).json()).data;

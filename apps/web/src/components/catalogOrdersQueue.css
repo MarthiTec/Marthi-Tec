@@ -1,0 +1,20 @@
+/* Fila de pedidos do catálogo (venda externa). */
+.cat-queue { display: grid; gap: 10px; }
+.cat-queue__head { display: flex; align-items: center; gap: 8px; }
+.cat-queue__head h2 { margin: 0; }
+.cat-queue__count { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: #e4572e; color: #fff; font-size: .8rem; font-weight: 800; }
+.cat-queue__muted { margin: 0; color: var(--mute, #64748b); font-size: .84rem; }
+.cat-queue__error { margin: 0; color: #dc2626; font-weight: 600; }
+.cat-queue__notice { margin: 0; color: var(--accent, #0f766e); font-weight: 600; }
+.cat-queue__list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.cat-queue__item { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line, #e2e8f0); border-left: 4px solid #e4572e; border-radius: 12px; background: var(--card, #fff); }
+.cat-queue__item.is-service { border-left-color: #2563eb; }
+.cat-queue__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cat-queue__top small { margin-left: auto; color: var(--mute, #64748b); }
+.cat-queue__badge { padding: 2px 8px; border-radius: 999px; background: rgba(228, 87, 46, .12); color: #c2410c; font-size: .72rem; font-weight: 800; }
+.is-service .cat-queue__badge { background: rgba(37, 99, 235, .12); color: #1d4ed8; }
+.cat-queue__customer, .cat-queue__meta, .cat-queue__trade { margin: 0; font-size: .86rem; overflow-wrap: anywhere; }
+.cat-queue__lines { display: grid; gap: 2px; margin: 0; padding-left: 18px; font-size: .86rem; }
+.cat-queue__order { color: #1d4ed8; font-weight: 700; }
+.cat-queue__trade { padding: 6px 8px; border-radius: 8px; background: rgba(15, 118, 110, .07); }
+.cat-queue__actions { display: flex; flex-wrap: wrap; gap: 8px; }

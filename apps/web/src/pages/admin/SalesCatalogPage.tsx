@@ -392,6 +392,9 @@ export function SalesCatalogPage() {
                       <button type="button" className={`salescat__cover${!form.coverImage ? ' is-on' : ''}`} onClick={() => update({ coverImage: '' })}>
                         Automática
                       </button>
+                      <button type="button" className={`salescat__cover${form.coverImage === 'none' ? ' is-on' : ''}`} onClick={() => update({ coverImage: 'none' })}>
+                        Sem foto
+                      </button>
                       {coverChoices.map((row) => (
                         <button key={row.id} type="button" title={row.name} className={`salescat__cover${form.coverImage === row.images![0] ? ' is-on' : ''}`} onClick={() => update({ coverImage: row.images![0] })}>
                           <img src={row.images![0]} alt={row.name} referrerPolicy="no-referrer" />

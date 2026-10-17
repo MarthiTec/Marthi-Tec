@@ -66,6 +66,8 @@ import { QuickAddButton } from '../../components/QuickModal';
 import { QuickCreateCustomer, QuickCreateSeller } from '../../components/QuickCreate';
 import { ExternalSalesHistory } from '../../components/ExternalSalesHistory';
 import { TradeEvaluationPanel, tradeEvaluationSummary } from '../../components/TradeEvaluationPanel';
+import { CatalogOrdersQueue, catalogTradeSummary } from '../../components/CatalogOrdersQueue';
+import type { CatalogOrder } from '../../services/salesCatalogApi';
 
 import { saleLinePickupProduct, saleLineUnitPrice } from '../../data/productPickup';
 import { totemCardFee } from '../../data/variantQuote';
@@ -173,6 +175,8 @@ export function ExternalSalePage() {
   const [warrantyMonths, setWarrantyMonths] = useState(3);
   const [warrantyTerms, setWarrantyTerms] = useState(WARRANTY_TERMS.store);
   const [saleNotes, setSaleNotes] = useState('');
+  /** Pedido do catálogo que esta venda finaliza (sai da fila ao concluir). */
+  const [catalogOrder, setCatalogOrder] = useState<{ id: string; code: string } | null>(null);
 
   // Correção de venda concluída: número, data, motivo e as correções anteriores.
   const [editing, setEditing] = useState<{ id: string; saleDate: string; reason: string; revisions: Array<{ id: string; reason: string; operator: string; at: string }> } | null>(null);
@@ -596,6 +600,7 @@ export function ExternalSalePage() {
           imei: l.imei || '',
         })),
         tradeIn: hasTradeIn && tradeIn.tradeValue > 0 ? tradeIn : null,
+        catalogOrderId: catalogOrder?.id ?? null,
       };
 
       const result = editing
@@ -660,9 +665,58 @@ export function ExternalSalePage() {
     if (refreshed && storeRef.current === storeId) setStockItems(refreshed.filter((it: any) => it.active !== false).map(toStockOption));
   }
 
+  /** Pedido do catálogo: cliente aprovado, produtos, troca, pagamento e vendedor já na venda. */
+  function attendCatalogOrder(order: CatalogOrder, customer: { id: string; name: string; phone: string; document: string; email: string }) {
+    handleResetForm();
+    setCatalogOrder({ id: order.id, code: order.code });
+    setCustomers((list) => (list.some((c: any) => c.id === customer.id) ? list : [...list, customer]));
+    setSelectedCustomerId(customer.id);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setCustomerDocument(customer.document);
+    if (order.sellerId) setSelectedSellerId(order.sellerId);
+    if (order.items.length) {
+      setLines(
+        order.items.map((line) => {
+          const stock = stockItems.find((item) => item.id === line.productId);
+          return {
+            stockId: line.productId,
+            name: line.name,
+            qty: line.qty,
+            unitPrice: line.price,
+            unitCost: stock?.cost ?? 0,
+            discount: 0,
+            surcharge: 0,
+            imei: '',
+            attributes: line.attributes,
+            pickupMethodId: line.pickupMethodId ?? undefined,
+          };
+        }),
+      );
+    }
+    if (order.tradeIn) {
+      const trade = order.tradeIn;
+      setHasTradeIn(true);
+      setTradeIn({
+        deviceName: trade.device.toUpperCase(),
+        imei: trade.imei,
+        capacity: trade.capacity,
+        color: trade.color,
+        conditionState: trade.condition === 'damaged' ? 'damaged' : trade.condition === 'marks' ? 'refurbished' : 'used',
+        batteryLevel: trade.battery,
+        notes: `Informado pelo cliente: ${catalogTradeSummary(trade)}`.slice(0, 500),
+        tradeValue: 0,
+      });
+    }
+    if (order.payment) setPayments([{ method: order.payment, installments: order.installments || 1, amount: 0 }]);
+    setSaleNotes([`Pedido do catálogo ${order.code}`, order.fulfillment === 'delivery' ? 'entrega no endereço do cliente' : '', order.notes].filter(Boolean).join(' · '));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function handleResetForm() {
     requestId.current = crypto.randomUUID();
     setSavedSaleId(null);
+    setCatalogOrder(null);
     setLines([{ name: '', qty: 1, unitPrice: 0, stockId: '' }]);
     setSelectedCustomerId('');
     setSelectedSellerId('');
@@ -747,6 +801,8 @@ export function ExternalSalePage() {
       {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
 
       {quickRegister ? <QuickStockRegisterModal initialText={quickRegister.text} products={stockItems} onClose={() => setQuickRegister(null)} onDone={handleQuickRegistered} /> : null}
+      <CatalogOrdersQueue storeId={storeId} onAttend={attendCatalogOrder} />
+      {catalogOrder ? <p role="status" className="xsale-promo"><span className="xsale-promo__tag">Catálogo</span><span className="xsale-promo__text">Finalizando o pedido <strong>{catalogOrder.code}</strong> do catálogo: ao concluir, ele sai da fila.</span></p> : null}
       <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPayments([{method:ticket.payment==='Parcelado'?CREDIT_METHOD:'PIX',installments:ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1,amount:0}]);requestId.current=crypto.randomUUID();}}/>
       <form onSubmit={handleSubmit} className="xsale-layout">
         <div className="xsale-main">
