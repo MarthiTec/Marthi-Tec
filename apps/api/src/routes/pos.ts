@@ -10,6 +10,8 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { reduceStockQtyInMemory } from './stock.js';
+import { lineUnitCost } from '../services/saleCost.js';
+import { applyRealSaleCost } from '../services/saleHistory.js';
 
 export const posRouter = Router();
 
@@ -448,13 +450,17 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
         );
 
         // 4. Insere as linhas e BAIXA O ESTOQUE
+        let saleCost = 0;
         for (const line of body.lines) {
           // Dual chip: a venda guarda o IMEI principal do aparelho, mesmo que tenham lido o 2º.
           line.imei = await primaryImei(client, storeId, line.imei);
+          // Custo do aparelho/variação vendido: sem ele o lucro do PDV era o valor inteiro da venda.
+          const lineCost = line.stockId ? await lineUnitCost(client, { storeId, stockId: line.stockId, attributes: line.attributes, imei: line.imei }) : 0;
+          saleCost += lineCost * line.qty;
           const lineId = `LIN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           await client.query(
-            `INSERT INTO sales_order_lines (id, order_id, stock_id, name, qty, unit_price, total_price, imei, is_ad_hoc, item_type, attributes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            `INSERT INTO sales_order_lines (id, order_id, stock_id, name, qty, unit_price, total_price, imei, is_ad_hoc, item_type, attributes, unit_cost, total_cost)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
             [
               lineId,
               orderId,
@@ -467,6 +473,8 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
               line.isAdHoc,
               line.itemType,
               JSON.stringify(line.attributes),
+              lineCost,
+              Math.round(lineCost * line.qty * 100) / 100,
             ],
           );
 
@@ -478,12 +486,12 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
             // Marca o aparelho vendido (IMEI lido no PDV ou a entrada mais antiga).
             await markUnitsSold(client, { storeId, stockId: line.stockId, variationId: soldVariationId, qty: line.qty, imei: line.imei, saleId: orderId, lineId, unitPrice: line.unitPrice, operator: req.user!.name });
             const stockCheck = await client.query(
-              `SELECT qty, cost FROM stock_items WHERE id = $1 AND store_id = $2`,
+              `SELECT qty FROM stock_items WHERE id = $1 AND store_id = $2`,
               [line.stockId, storeId],
             );
             if (stockCheck.rows.length > 0) {
               const prev = Number(stockCheck.rows[0].qty);
-              const cost = Number(stockCheck.rows[0].cost);
+              const cost = lineCost;
               const newQty = prev - line.qty;
 
               await client.query(
@@ -513,6 +521,12 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           }
         }
 
+        // Custo, lucro e margem da venda (relatórios e metas de lucro); depois, o custo real das unidades que saíram.
+        {
+          const profit = Math.round((total - saleCost) * 100) / 100;
+          await client.query('UPDATE sales_orders SET cost_total = $2, gross_profit = $3, margin_percent = $4 WHERE id = $1', [orderId, Math.round(saleCost * 100) / 100, profit, total > 0 ? Math.round((profit / total) * 10000) / 100 : 0]);
+          await applyRealSaleCost(client, storeId, orderId, total);
+        }
         await client.query('INSERT INTO sale_payments(id,sale_id,method,method_name,amount) VALUES($1,$2,$3,$3,$4)', ['PAY-'+orderId,orderId,body.paymentName,total]);
         // 5. Integração com Financeiro: Cria Recebível Baixado e Lançamento no Livro Caixa
         const recId = `REC-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;

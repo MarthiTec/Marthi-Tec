@@ -68,3 +68,23 @@ export function availableImeis(product: ProductLike | undefined, variation: Stoc
   const list = [...entries.flatMap((entry) => entryImeis(entry)), variation ? variation.imei ?? '' : product?.variations?.length ? '' : product?.imei ?? ''];
   return [...new Set(list.map((imei) => imei.trim()).filter(Boolean))];
 }
+
+/**
+ * Custo da linha na prévia da venda (o mesmo critério do servidor): o da entrada do aparelho escolhido
+ * pelo IMEI, senão o da variação (cor/capacidade/condição), senão o do produto. O custo do produto é o
+ * da primeira variação e não serve para as outras.
+ */
+export function lineUnitCost(product: (ProductLike & { cost?: number }) | undefined, picked: Picked, imei = '') {
+  if (!product) return 0;
+  const variation = lineVariation(product, picked, false);
+  const typed = imei.trim();
+  if (typed) {
+    const entries = [...(variation?.supplierEntries ?? []), ...(product.supplierEntries ?? []), ...(product.variations ?? []).flatMap((v) => v.supplierEntries ?? [])];
+    const entry = entries.find((item) => entryImeis(item, true).includes(typed) || Object.values(item.secondaryImeis ?? {}).includes(typed));
+    if (entry && Number(entry.unitCost) > 0) return Number(entry.unitCost);
+    const byImei = (product.variations ?? []).find((v) => String(v.imei ?? '').trim() === typed);
+    if (byImei && Number(byImei.cost) > 0) return Number(byImei.cost);
+  }
+  if (variation && Number(variation.cost) > 0) return Number(variation.cost);
+  return Number(product.cost) || 0;
+}

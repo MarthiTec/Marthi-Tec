@@ -56,18 +56,18 @@ export async function applyRealSaleCost(db: Db, storeId: string, saleId: string,
                FROM stock_sold_units u JOIN stock_supplier_entries e ON e.id = u.entry_id
               WHERE u.store_id = $1 AND u.sale_id = $2 AND u.reverted_at IS NULL
               GROUP BY u.sale_line_id) x
-      WHERE l.id = x.sale_line_id AND l.sale_id = $2
+      WHERE l.id = x.sale_line_id AND (l.sale_id = $2 OR l.order_id = $2)
       RETURNING l.id`,
     [storeId, saleId],
   );
   if (!lines.rows.length) return;
   await db.query(
     `UPDATE stock_movements m SET unit_cost = x.cost, cost = x.cost
-       FROM (SELECT stock_id, avg(unit_cost) AS cost FROM sales_order_lines WHERE sale_id = $2 GROUP BY stock_id) x
+       FROM (SELECT stock_id, avg(unit_cost) AS cost FROM sales_order_lines WHERE sale_id = $2 OR order_id = $2 GROUP BY stock_id) x
       WHERE m.store_id = $1 AND m.ref_id = $2 AND m.type = 'sale' AND m.stock_id = x.stock_id`,
     [storeId, saleId],
   );
-  const cost = Number((await db.query('SELECT COALESCE(sum(total_cost), 0) AS cost FROM sales_order_lines WHERE sale_id = $1', [saleId])).rows[0].cost) || 0;
+  const cost = Number((await db.query('SELECT COALESCE(sum(total_cost), 0) AS cost FROM sales_order_lines WHERE sale_id = $1 OR order_id = $1', [saleId])).rows[0].cost) || 0;
   const profit = Math.round((storeRevenue - cost) * 100) / 100;
   const margin = storeRevenue > 0 ? Math.round((profit / storeRevenue) * 10000) / 100 : 0;
   await db.query('UPDATE sales_orders SET cost_total = $2, gross_profit = $3, margin_percent = $4 WHERE id = $1', [saleId, cost, profit, margin]);

@@ -6,6 +6,7 @@ import { changeVariationQuantity } from './variationInventory.js';
 import { receiveTradeInIntoExistingProduct } from './tradeInStock.js';
 import { recordTradeInEntry } from './supplierEntries.js';
 import { markUnitsSold } from './soldUnits.js';
+import { lineUnitCost } from './saleCost.js';
 import { primaryImei } from './imeiPairs.js';
 import { applyRealSaleCost, findEntryByImei, moveSaleToDate } from './saleHistory.js';
 import { pickedAttributeSchema, validateSaleAttributes } from './saleAttributes.js';
@@ -182,8 +183,8 @@ export async function recordExternalSale(client: PoolClient, ctx: ExternalSaleCo
         throw new Error(`Estoque insuficiente para o produto "${stockRow.name}". Disponível: ${currentQty}, Solicitado: ${line.qty}`);
       }
 
-      // Custo unitário real registrado no cadastro de estoque (imutável por usuário comum)
-      lineCost = Number(stockRow.cost) || 0;
+      // Custo do aparelho/variação vendido (não o do produto, que é o da primeira variação).
+      lineCost = await lineUnitCost(client, { storeId, stockId: line.stockId, attributes: line.attributes, imei: line.imei });
     } else if (line.unitCost !== undefined && ctx.userRole === 'admin') {
       lineCost = Number(line.unitCost) || 0;
     }

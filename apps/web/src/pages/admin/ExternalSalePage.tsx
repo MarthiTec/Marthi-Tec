@@ -75,7 +75,7 @@ import type { StockVariationRow, SupplierEntry } from '../../data/adminStore';
 import { StockSearchPicker, type StockPick } from '../../components/StockSearchPicker';
 import { QuickStockRegisterModal, type QuickStockResult } from '../../components/QuickStockRegisterModal';
 import { CONDITION_ATTR_ID, CONDITION_LABEL, conditionCode } from '../../data/productCondition';
-import { availableImeis, lineVariation, restoreSaleUnits } from '../../data/saleVariation';
+import { availableImeis, lineUnitCost, lineVariation, restoreSaleUnits } from '../../data/saleVariation';
 
 /** Cartão de crédito: até 18 parcelas, como no totem. */
 const MAX_CARD_INSTALLMENTS = 18;
@@ -469,8 +469,13 @@ export function ExternalSalePage() {
   }, [lines, campaignDiscount]);
 
   const totalCost = useMemo(() => {
-    return lines.reduce((sum, l) => sum + (Number(l.qty) || 1) * (Number(l.unitCost) || 0), 0);
-  }, [lines]);
+    // Custo do aparelho/variação de cada linha (o do produto é o da primeira variação).
+    return lines.reduce((sum, l) => {
+      const prod = stockItems.find((item) => item.id === l.stockId);
+      const unit = prod ? lineUnitCost(prod, l.attributes ?? [], String(l.imei ?? '')) : Number(l.unitCost) || 0;
+      return sum + (Number(l.qty) || 1) * unit;
+    }, 0);
+  }, [lines, stockItems]);
 
   const grossTotal = Math.max(0, subtotal - Number(generalDiscount || 0) + Number(generalSurcharge || 0));
   const tradeInCredit = hasTradeIn ? Number(tradeIn.tradeValue || 0) : 0;

@@ -21,3 +21,10 @@ export async function changeVariationQuantity(db:Pick<PoolClient,'query'>,storeI
  if(variation.id)await db.query('UPDATE stock_item_variations SET qty=$4 WHERE store_id=$1 AND stock_item_id=$2 AND id=$3',[storeId,stockId,variation.id,qty]);
  return variation.id??null;
 }
+/** Variação da venda pela cor/capacidade/condição (sem alterar nada); undefined quando não dá para saber qual é. */
+export function findVariation(variations: any[], attributes: { id: string; value: string }[]): any | undefined {
+ if (!variations.length) return undefined;
+ const picked = Object.fromEntries((attributes ?? []).map((a) => [a.id, a.value]));
+ const matches = variations.filter((v: any) => Object.entries(v.attrs ?? {}).every(([id, value]) => sameAttributeValue(picked[id], value)) && conditionMatches(v, picked));
+ return matches.length === 1 ? matches[0] : undefined;
+}
