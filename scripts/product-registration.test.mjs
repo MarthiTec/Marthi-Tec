@@ -236,7 +236,7 @@ test('seller can sell by order a color the product does not have yet; immediate 
   ] });
   assert.equal(created.status, 201, JSON.stringify(created.json));
   const line = { stockId: created.json.data.id, name: 'IPHONE 17', qty: 1, unitPrice: 5600, attributes: [{ id: 'ATTR-cor-sale', name: 'Cor', value: 'Preto' }] };
-  const byOrder = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Ramon', customerPhone: '24992259927', lines: [{ ...line, pickupMethodId: 'pm-order' }] });
+  const byOrder = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Ramon', customerPhone: '24992259927', lines: [{ ...line, unitPrice: 0, pickupMethodId: 'pm-order' }] }); // sem preço: vale o da encomenda (a tela já manda o da modalidade)
   assert.equal(byOrder.status, 201, JSON.stringify(byOrder.json));
   const sold = (await query('SELECT unit_price, attributes FROM sales_order_lines WHERE sale_id=$1 OR order_id=$1', [byOrder.json.data.id || byOrder.json.data.saleId])).rows[0];
   assert.equal(Number(sold.unit_price), 5200, 'order price of the product');

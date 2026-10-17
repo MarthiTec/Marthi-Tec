@@ -116,3 +116,20 @@ test('a trade-in already resold stays in the corrected sale with the new credit;
   const swapped = await call(`/sales/${created.data.id}`, 'PUT', { ...withTrade, reason: 'Troca era outro aparelho', tradeIn: { ...withTrade.tradeIn, imei: '444444444444444' } });
   assert.equal(swapped.status, 409);
 });
+
+test('a sale picked up in hand can be corrected (the in-hand pickup is born completed and used to block every correction)', async () => {
+  const methods = (await call('/pickup-methods')).data;
+  const inHand = methods.find((m) => m.kind === 'immediate');
+  assert.ok(inHand, 'store has the in-hand pickup method');
+  await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,active,kind) VALUES('capa-hand','store-a','CAPINHA',5,10,50,true,'product')");
+  const line = { stockId: 'capa-hand', name: 'CAPINHA', qty: 1, unitPrice: 50, pickupMethodId: inHand.id };
+  const sale = await call('/sales/external', 'POST', { sellerId: 'seller-1', paymentMethod: 'PIX', lines: [line] });
+  assert.equal(sale.status, 201, JSON.stringify(sale.error));
+  assert.equal((await query("SELECT status FROM pickup_requests WHERE reference_id=$1", [sale.data.id])).rows[0].status, 'completed');
+  const fixed = await call(`/sales/${sale.data.id}`, 'PUT', { sellerId: 'seller-1', paymentMethod: 'PIX', lines: [{ ...line, unitPrice: 45 }], reason: 'Preço combinado era 45' });
+  assert.equal(fixed.status, 200, JSON.stringify(fixed.error));
+  assert.equal(Number((await query('SELECT subtotal FROM sales_orders WHERE id=$1', [sale.data.id])).rows[0].subtotal), 45);
+  // Encomenda já entregue continua travando a correção.
+  await query("UPDATE pickup_requests SET kind='order', status='completed' WHERE reference_id=$1", [sale.data.id]);
+  assert.equal((await call(`/sales/${sale.data.id}`, 'PUT', { sellerId: 'seller-1', paymentMethod: 'PIX', lines: [line], reason: 'Teste' })).status, 409);
+});

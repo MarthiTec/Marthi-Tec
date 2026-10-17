@@ -67,7 +67,8 @@ export async function undoExternalSale(db: Db, storeId: string, sale: any, newTr
     const received = await db.query("SELECT 1 FROM receivables WHERE sale_id = $1 AND store_id = $2 AND received_amount > 0 AND notes LIKE 'Parcela %' LIMIT 1", [saleId, storeId]);
     if (received.rows.length) throw httpError('Esta venda tem parcela já recebida: estorne o recebimento no Financeiro antes de alterar a venda.', 409);
   }
-  const delivered = await db.query("SELECT 1 FROM pickup_requests WHERE store_id = $1 AND reference_id = $2 AND status = 'completed' LIMIT 1", [storeId, saleId]);
+  // Só encomenda/entrega entregue trava: a retirada 'em mãos' nasce concluída e não pode impedir a correção.
+  const delivered = await db.query("SELECT 1 FROM pickup_requests WHERE store_id = $1 AND reference_id = $2 AND status = 'completed' AND COALESCE(kind, '') <> 'immediate' LIMIT 1", [storeId, saleId]);
   if (delivered.rows.length) throw httpError('Encomenda já entregue: registre a devolução pelo estoque antes de alterar a venda.', 409);
 
   // Aparelhos e quantidades voltam ao estoque.

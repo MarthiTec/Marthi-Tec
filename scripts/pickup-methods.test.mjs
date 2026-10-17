@@ -50,7 +50,7 @@ test('product prices and delivery address are validated and retained on the orde
  assert.equal(stock.pickupPrices[order.id],90);
  const foreign=(await query("SELECT id FROM pickup_methods WHERE store_id='store-b' LIMIT 1")).rows[0].id;
  assert.equal((await request('/stock/'+stock.id,'PATCH',{pickupPrices:{[foreign]:1}})).status,400);
- const line={stockId:stock.id,name:'Test device',qty:1,unitPrice:1,pickupMethodId:delivery.id};
+ const line={stockId:stock.id,name:'Test device',qty:1,unitPrice:0,pickupMethodId:delivery.id};
  assert.equal((await request('/sales/external','POST',{lines:[line],paymentMethod:'Pix'})).status,400);
  const address={zipCode:'25800000',street:'Rua Teste',number:'1',district:'Centro',city:'Tres Rios',state:'RJ'};
  const sale=await request('/sales/external','POST',{lines:[{...line,deliveryAddress:address}],paymentMethod:'Pix'});
@@ -95,7 +95,7 @@ test('PDV uses persisted pickup prices, applies discounts after quoting and safe
  const method=(await request('/pickup-methods')).json.data.find(m=>m.kind==='immediate');
  const created=await request('/stock','POST',{name:'Last device',kind:'device',qty:1,price:100,pickupPrices:{[method.id]:80}});
  assert.equal(created.status,201);const stock=created.json.data;
- const body={idempotencyKey:'pickup-last-unit',paymentName:'Pix',discount:10,lines:[{stockId:stock.id,name:stock.name,qty:1,unitPrice:1,pickupMethodId:method.id}]};
+ const body={idempotencyKey:'pickup-last-unit',paymentName:'Pix',discount:10,lines:[{stockId:stock.id,name:stock.name,qty:1,unitPrice:0,pickupMethodId:method.id}]};
  const sale=await request('/pos/sales','POST',body);assert.equal(sale.status,201,JSON.stringify(sale.json));
  const row=(await query('SELECT * FROM sales_orders WHERE id=$1',[sale.json.data.id])).rows[0];assert.equal(Number(row.total_amount),70);
  assert.equal((await query('SELECT qty FROM stock_items WHERE id=$1',[stock.id])).rows[0].qty,0);
@@ -103,3 +103,12 @@ test('PDV uses persisted pickup prices, applies discounts after quoting and safe
 });
 
 after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));await db.close();});
+test('the price the seller negotiated is kept even with a pickup method (it used to be replaced by the list price)',async()=>{
+ const methods=(await request('/pickup-methods')).json.data;const inHand=methods.find(m=>m.kind==='immediate');
+ const created=await request('/stock','POST',{name:'IPHONE NEGOCIADO',kind:'device',qty:2,price:8500});assert.equal(created.status,201,JSON.stringify(created.json));
+ const sale=await request('/sales/external','POST',{paymentMethod:'Pix',lines:[{stockId:created.json.data.id,name:'IPHONE NEGOCIADO',qty:1,unitPrice:8200,pickupMethodId:inHand.id}]});
+ assert.equal(sale.status,201,JSON.stringify(sale.json));
+ const order=(await query('SELECT subtotal,total_amount FROM sales_orders WHERE id=$1',[sale.json.data.id])).rows[0];
+ assert.deepEqual([Number(order.subtotal),Number(order.total_amount)],[8200,8200]);
+ assert.equal(Number((await query('SELECT price FROM pickup_requests WHERE reference_id=$1',[sale.json.data.id])).rows[0].price),8200);
+});
