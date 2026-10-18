@@ -7325,3 +7325,25 @@ select.caixa-mov-input {
 .stock-variation-container tbody tr { grid-auto-columns: minmax(118px, 1fr); }
 .stock-variation-container .admin-picker__trigger { min-width: 0; max-width: 100%; }
 .stock-variation-container .admin-picker__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Celular — cartões dos cadastros (clientes, fornecedores, vendedores, funcionários…): o nome vira o
+   título do cartão, os dados ficam embaixo e as ações numa faixa própria (antes a coluna de ações
+   ficava com a largura do computador e os botões saíam da tela). */
+@media (max-width: 640px) {
+  .admin-table:has(td[data-label]) td { width: auto !important; max-width: none !important; }
+  .admin-table:has(td[data-label]) tr > td:first-child[data-label] { justify-content: flex-start; padding-bottom: 6px; text-align: left; font-size: .95rem; font-weight: 800; }
+  .admin-table:has(td[data-label]) tr > td:first-child[data-label]::before { display: none; }
+  .admin-table:has(td[data-label]) td.admin-table__actions { justify-content: flex-end; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--line, #e2e8f0); }
+  .admin-table:has(td[data-label]) td.admin-table__actions .crud-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: 100%; }
+  .admin-table:has(td[data-label]) td.admin-table__actions .crud-ico-btn { width: 40px; height: 40px; }
+}
+
+/* Itens do formulário nunca alargam a coluna (texto longo num seletor saía da tela no celular). */
+.admin-form > * { min-width: 0; }
+@media (max-width: 640px) {
+  .admin-form { grid-template-columns: minmax(0, 1fr); }
+  .admin-form > .span-2, .admin-form > [class*='span-'] { grid-column: 1 / -1; }
+}
+/* Seletor: a coluna acompanha a largura disponível (texto longo trunca com "…" em vez de alargar). */
+.admin-picker { grid-template-columns: minmax(0, 1fr); }
+.admin-picker__trigger { min-width: 0; }

@@ -177,9 +177,15 @@
   .address-search__street {
     grid-column: 1 / -1;
   }
+  /* Celular: campos curtos lado a lado (CEP + Número, Complemento + Bairro, Cidade + UF). */
   .address-fields__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .addr-cep, .addr-number, .addr-uf { grid-column: span 2; }
-  .addr-street, .addr-complement, .addr-district, .addr-city { grid-column: 1 / -1; }
+  .addr-cep { order: 1; grid-column: span 2; }
+  .addr-number { order: 2; grid-column: span 2; }
+  .addr-street { order: 3; grid-column: 1 / -1; }
+  .addr-complement { order: 4; grid-column: span 2; }
+  .addr-district { order: 5; grid-column: span 2; }
+  .addr-city { order: 6; grid-column: span 3; }
+  .addr-uf { order: 7; grid-column: span 1; }
 }
 
 /* Os campos nunca passam da coluna (o input tem largura mínima própria no navegador). */
