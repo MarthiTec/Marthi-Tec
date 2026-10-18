@@ -247,10 +247,16 @@ export function SalesCatalogPage() {
     const out = new Set(filtered.map((row) => row.id));
     update({ productIds: form.productIds.filter((id) => !out.has(id)) });
   };
-  const coverChoices = useMemo(
-    () => form.productIds.map((id) => stock.find((row) => row.id === id)).filter((row): row is StockRow => Boolean(row?.images?.[0])).slice(0, 12),
-    [form.productIds, stock],
-  );
+  /** Fotos para a capa: de todos os produtos que aparecem no catálogo (marcados e os sob encomenda que entram sozinhos). */
+  const coverChoices = useMemo(() => {
+    const fromPreview = (preview?.items ?? []).filter((item) => item.image).map((item) => ({ id: item.id, name: item.name, image: item.image! }));
+    const fromMarked = form.productIds
+      .map((id) => stock.find((row) => row.id === id))
+      .filter((row): row is StockRow => Boolean(row?.images?.[0]))
+      .map((row) => ({ id: row.id, name: row.name, image: row.images![0] }));
+    const seen = new Set<string>();
+    return [...fromPreview, ...fromMarked].filter((row) => !seen.has(row.image) && Boolean(seen.add(row.image)));
+  }, [preview, form.productIds, stock]);
 
   async function save() {
     setBusy(true);
@@ -533,8 +539,8 @@ export function SalesCatalogPage() {
                         Sem foto
                       </button>
                       {coverChoices.map((row) => (
-                        <button key={row.id} type="button" title={row.name} className={`salescat__cover${form.coverImage === row.images![0] ? ' is-on' : ''}`} onClick={() => update({ coverImage: row.images![0] })}>
-                          <img src={row.images![0]} alt={row.name} referrerPolicy="no-referrer" />
+                        <button key={row.id} type="button" title={row.name} className={`salescat__cover${form.coverImage === row.image ? ' is-on' : ''}`} onClick={() => update({ coverImage: row.image })}>
+                          <img src={row.image} alt={row.name} referrerPolicy="no-referrer" />
                         </button>
                       ))}
                     </div>

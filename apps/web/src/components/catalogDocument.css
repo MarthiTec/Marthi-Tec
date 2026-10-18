@@ -14,6 +14,8 @@
   color: var(--cat-ink);
   font-family: inherit;
   -webkit-font-smoothing: antialiased;
+  /* Layout pelo espaço do próprio catálogo (link do cliente ou prévia estreita do painel). */
+  container: catalog / inline-size;
 }
 
 /* ── Capa ─────────────────────────────────────────── */
@@ -113,14 +115,14 @@
 .catalog-foot strong { color: var(--cat-ink); }
 .catalog-foot__note { padding: 10px 12px; border-radius: 12px; background: #fff; color: var(--cat-ink); font-weight: 600; }
 
-@media (min-width: 620px) {
-  .catalog { gap: 18px; padding: 18px; }
+@media (min-width: 620px) { .catalog { gap: 18px; padding: 18px; } }
+@container catalog (min-width: 620px) {
   .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
   .catalog-card__body { padding: 14px; }
   .catalog-card__body h2 { font-size: 1rem; }
 }
 /* Computador: duas linhas alinhadas — loja | busca em cima; filtros rápidos | ordenar, marca e bateria embaixo. */
-@media (min-width: 980px) {
+@container catalog (min-width: 980px) {
   .catalog-head { grid-template-columns: minmax(0, 1fr) minmax(360px, max-content); grid-template-areas: 'brand search' 'chips filters'; align-items: center; gap: 12px 16px; padding: 14px 16px; }
   .catalog-head__brand { grid-area: brand; }
   .catalog-head__tools { display: contents; }
@@ -195,7 +197,7 @@
 .catalog-featured strong { overflow: hidden; font-size: .84rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-featured__price { color: var(--cat-accent); font-weight: 900; }
 .catalog-featured__price small { color: var(--cat-mute); font-weight: 600; }
-@media (min-width: 620px) { .catalog-featured ul { grid-auto-columns: 190px; } }
+@container catalog (min-width: 620px) { .catalog-featured ul { grid-auto-columns: 190px; } }
 @media print {
   .catalog-featured, .catalog-filters { display: none !important; }
   .catalog-card__summary { display: none; }
@@ -209,7 +211,7 @@
 .catalog-cover__store:not(:has(img)) { padding-left: 12px; }
 .catalog-cover__store img { width: 26px; height: 26px; border-radius: 50%; object-fit: contain; background: #fff; }
 .catalog-cover__store strong { overflow: hidden; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.catalog-cover--modern h1 { margin: 0; color: var(--cat-ink); font-size: clamp(1.7rem, 7.4vw, 3.6rem); font-weight: 900; line-height: .98; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.catalog-cover--modern h1 { margin: 0; color: var(--cat-ink); font-size: clamp(1.35rem, 6.6cqw, 3.6rem); font-weight: 900; line-height: .98; letter-spacing: -.025em; overflow-wrap: break-word; hyphens: manual; }
 .catalog-cover--modern p { margin: 0; color: var(--cat-accent); font-size: clamp(.92rem, 2.6vw, 1.25rem); font-weight: 700; line-height: 1.25; }
 .catalog-cover--modern small { color: var(--cat-mute); font-size: clamp(.7rem, 1.8vw, .82rem); font-weight: 600; }
 .catalog-cover__art { position: relative; align-self: stretch; min-height: 150px; isolation: isolate; }
@@ -239,7 +241,7 @@
 .catalog-cover--dark .catalog-cover__store { background: rgba(255, 255, 255, 0.1); color: #fff; box-shadow: none; }
 .catalog-cover--dark .catalog-cover__art::before { content: ''; position: absolute; inset: 4% 6%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, #fff 62%, rgba(255, 255, 255, 0) 100%); }
 
-@media (max-width: 520px) {
+@container catalog (max-width: 520px) {
   .catalog-cover--modern { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); min-height: 190px; padding: 18px 16px; border-radius: 18px; }
   .catalog-cover__art { min-height: 130px; }
   .catalog-cover__mosaic span { min-height: 56px; border-radius: 12px; }

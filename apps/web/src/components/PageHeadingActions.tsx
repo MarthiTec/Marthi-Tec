@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import './recordNav.css';
 
 const HEADING_SLOT_ID = 'panel-page-actions';
 
@@ -100,5 +101,65 @@ export function HeadingEditButton({ onClick, disabled, label = 'Editar' }: Headi
       <img src="/pdv/edit.png" alt="" className="page-heading-btn__ico page-heading-btn__ico--on-primary" />
       {label}
     </button>
+  );
+}
+
+/**
+ * Navegar entre os cadastros da lista sem fechar a ficha: primeiro, anterior, próximo e último,
+ * na ordem (e com os filtros) da lista que está na tela. Só aparece consultando um item.
+ */
+export function HeadingRecordNav<T extends { id: string }>({
+  items,
+  currentId,
+  onOpen,
+}: {
+  items: readonly T[];
+  currentId: string | null | undefined;
+  onOpen: (item: T) => void;
+}) {
+  const index = items.findIndex((item) => item.id === currentId);
+  // Celular: o título não tem espaço; as setas vão para uma pílula flutuante embaixo da tela.
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 640px)');
+    const sync = () => setPhone(media.matches);
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+  if (items.length < 2 || index < 0) return null;
+  const go = (to: number) => {
+    const target = items[Math.max(0, Math.min(items.length - 1, to))];
+    if (target && target.id !== currentId) onOpen(target);
+  };
+  const first = index === 0;
+  const last = index === items.length - 1;
+  const nav = (
+    <nav className={`record-nav${phone ? ' record-nav--floating' : ''}`} aria-label="Navegar entre os cadastros">
+      <button type="button" disabled={first} onClick={() => go(0)} aria-label="Primeiro" title="Primeiro">
+        <RecordNavIcon d="M17 6l-6 6 6 6M7 6v12" />
+      </button>
+      <button type="button" disabled={first} onClick={() => go(index - 1)} aria-label="Anterior" title="Anterior">
+        <RecordNavIcon d="M15 6l-6 6 6 6" />
+      </button>
+      <span className="record-nav__count" aria-live="polite">
+        {index + 1}
+        <small>/{items.length}</small>
+      </span>
+      <button type="button" disabled={last} onClick={() => go(index + 1)} aria-label="Próximo" title="Próximo">
+        <RecordNavIcon d="M9 6l6 6-6 6" />
+      </button>
+      <button type="button" disabled={last} onClick={() => go(items.length - 1)} aria-label="Último" title="Último">
+        <RecordNavIcon d="M7 6l6 6-6 6M17 6v12" />
+      </button>
+    </nav>
+  );
+  return phone ? createPortal(nav, document.body) : nav;
+}
+
+function RecordNavIcon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
   );
 }

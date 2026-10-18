@@ -11,7 +11,7 @@ import {
   type CrudStatusFilter,
 } from '../../components/CrudKit';
 import { CurrencyInput } from '../../components/CurrencyInput';
-import { HeadingCancelButton, HeadingEditButton, HeadingNewButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
+import { HeadingCancelButton, HeadingEditButton, HeadingNewButton, HeadingRecordNav, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { useAuth } from '../../contexts/AuthContext';
@@ -197,6 +197,7 @@ export function SellersPage() {
           <HeadingNewButton onClick={startNew} label="Novo vendedor" />
         ) : readOnly ? (
           <>
+            <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
             <HeadingCancelButton onClick={closeForm} label="Fechar" />
             <HeadingEditButton onClick={() => setMode('edit')} />
           </>

@@ -1,0 +1,13 @@
+/* Setas sutis no título para ir ao primeiro / anterior / próximo / último cadastro da lista. */
+.record-nav { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 4px; border: 1px solid var(--line, #e2e8f0); border-radius: 999px; background: var(--card, #fff); }
+.record-nav button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--mute, #64748b); cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
+.record-nav button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent, #0f766e) 10%, transparent); color: var(--accent, #0f766e); }
+.record-nav button:focus-visible { outline: 2px solid var(--accent, #0f766e); outline-offset: 1px; }
+.record-nav button:disabled { opacity: .3; cursor: default; }
+.record-nav__count { min-width: 38px; padding: 0 2px; color: var(--ink, #16181d); font-size: .78rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.record-nav__count small { color: var(--mute, #64748b); font-size: .7rem; font-weight: 600; }
+.admin.admin--dark .record-nav { background: #121820; border-color: rgba(148, 163, 184, 0.28); }
+.admin.admin--dark .record-nav__count { color: #e8eef4; }
+/* Celular: pílula flutuante embaixo, perto do polegar (fora do título, que não tem espaço). */
+.record-nav--floating { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30; height: 44px; padding: 0 6px; transform: translateX(-50%); box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18); }
+.record-nav--floating button { width: 36px; height: 36px; }

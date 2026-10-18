@@ -26,17 +26,12 @@ import {
 } from '../../components/CrudKit';
 
 import {
-
   HeadingCancelButton,
-
   HeadingEditButton,
-
   HeadingNewButton,
-
+  HeadingRecordNav,
   HeadingSaveButton,
-
   PageHeadingActions,
-
 } from '../../components/PageHeadingActions';
 
 import { getAdminState, removePriceTable, savePriceTables, type PriceTable } from '../../data/adminStore';
@@ -305,6 +300,7 @@ export function PriceTablesPage() {
 
         <>
 
+          <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
           <HeadingCancelButton onClick={closeForm} label="Fechar" />
 
           <HeadingEditButton onClick={() => setMode('edit')} />

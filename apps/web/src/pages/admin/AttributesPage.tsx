@@ -19,6 +19,7 @@ import {
   HeadingCancelButton,
   HeadingEditButton,
   HeadingNewButton,
+  HeadingRecordNav,
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
@@ -371,6 +372,7 @@ export function AttributesPage() {
         <HeadingNewButton onClick={startNew} label="Novo atributo" />
       ) : readOnly ? (
         <>
+          <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
           <HeadingCancelButton onClick={closeForm} label="Fechar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>

@@ -39,6 +39,7 @@ import {
   HeadingCancelButton,
   HeadingEditButton,
   HeadingNewButton,
+  HeadingRecordNav,
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
@@ -1372,6 +1373,7 @@ export function StockPage() {
         <HeadingNewButton onClick={startNewProduct} label="Novo Produto" />
       ) : readOnly ? (
         <>
+          <HeadingRecordNav items={visible} currentId={selectedId} onOpen={(item) => openForm(item, 'view')} />
           <HeadingCancelButton onClick={closeForm} label="Fechar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
