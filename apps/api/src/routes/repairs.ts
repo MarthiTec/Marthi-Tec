@@ -481,7 +481,9 @@ repairsRouter.get('/api/v1/public/sales-catalogs/:token/repairs', async (req, re
     const brands = new Map<string, string[]>();
     for (const row of rows) brands.set(row.brand, [...(brands.get(row.brand) ?? []), row.model]);
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ success: true, data: { brands: [...brands].map(([brand, models]) => ({ brand, models })) } });
+    // Ordem natural dos números (IPHONE 7 antes de IPHONE 13; A05 antes de A10).
+    const natural = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+    res.json({ success: true, data: { brands: [...brands].sort((a, b) => natural.compare(a[0], b[0])).map(([brand, models]) => ({ brand, models: [...models].sort(natural.compare) })) } });
   } catch (error) {
     next(error);
   }
