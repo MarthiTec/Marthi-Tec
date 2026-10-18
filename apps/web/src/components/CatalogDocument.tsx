@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { colorHex, isLightColor } from '../data/catalogColors';
+import { CatalogSelect } from './CatalogSelect';
 import './catalogDocument.css';
 
 export type CatalogAvailability = 'in_stock' | 'order' | 'sold_out';
@@ -245,39 +246,33 @@ export function CatalogDocument({
               ))}
             </div>
             <div className="catalog-filters">
-              <label>
-                <span>Ordenar</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                  <option value="relevance">Relevância</option>
-                  <option value="price_asc">Menor preço</option>
-                  <option value="price_desc">Maior preço</option>
-                  <option value="new">Novidades</option>
-                </select>
-              </label>
+              <CatalogSelect
+                label="Ordenar"
+                value={sort}
+                onChange={(value) => setSort(value as Sort)}
+                options={[
+                  { value: 'relevance', label: 'Relevância' },
+                  { value: 'price_asc', label: 'Menor preço' },
+                  { value: 'price_desc', label: 'Maior preço' },
+                  { value: 'new', label: 'Novidades' },
+                ]}
+              />
               {brands.length > 1 ? (
-                <label>
-                  <span>Marca</span>
-                  <select value={brand} onChange={(e) => setBrand(e.target.value)}>
-                    <option value="">Todas</option>
-                    {brands.map((name) => (
-                      <option key={name} value={name}>
-                        {name.charAt(0).toUpperCase() + name.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <CatalogSelect label="Marca" value={brand} onChange={setBrand} options={[{ value: '', label: 'Todas' }, ...brands.map((name) => ({ value: name, label: name.charAt(0).toUpperCase() + name.slice(1) }))]} />
               ) : null}
               {hasBattery ? (
-                <label>
-                  <span>Bateria</span>
-                  <select value={minBattery} onChange={(e) => setMinBattery(Number(e.target.value))}>
-                    <option value={0}>Qualquer</option>
-                    <option value={80}>Acima de 80%</option>
-                    <option value={85}>Acima de 85%</option>
-                    <option value={90}>Acima de 90%</option>
-                    <option value={95}>Acima de 95%</option>
-                  </select>
-                </label>
+                <CatalogSelect
+                  label="Bateria"
+                  value={String(minBattery)}
+                  onChange={(value) => setMinBattery(Number(value))}
+                  options={[
+                    { value: '0', label: 'Qualquer' },
+                    { value: '80', label: 'Acima de 80%' },
+                    { value: '85', label: 'Acima de 85%' },
+                    { value: '90', label: 'Acima de 90%' },
+                    { value: '95', label: 'Acima de 95%' },
+                  ]}
+                />
               ) : null}
             </div>
           </div>

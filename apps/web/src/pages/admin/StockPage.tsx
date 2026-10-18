@@ -3000,7 +3000,7 @@ export function StockPage() {
 
           {formTab === 'specs' ? specsNode : null}
           {formTab === 'ficha' ? (
-            <ProductSpecsPanel videoUrl={form.videoUrl ?? ''} specs={form.specs ?? []} readOnly={readOnly} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+            <ProductSpecsPanel videoUrl={form.videoUrl ?? ''} specs={form.specs ?? []} readOnly={readOnly} productName={form.name ?? ''} brand={findBrand(brands, form.brand)?.name ?? form.brand ?? ''} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
           ) : null}
           {formTab === 'movimentos' ? <ProductMovementsPanel stockId={selectedId} /> : null}
 

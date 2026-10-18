@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { UppercaseToggle, useUppercase } from './UppercaseToggle';
+import { apiSuggestDeviceSpecs } from '../services/deviceSpecsApi';
 import './productSpecs.css';
 
 export type ProductSpec = { label: string; value: string };
@@ -44,16 +46,69 @@ export function ProductSpecsPanel({
   videoUrl,
   specs,
   readOnly,
+  productName = '',
+  brand = '',
   onChange,
 }: {
   videoUrl: string;
   specs: ProductSpec[];
   readOnly?: boolean;
+  /** Nome do produto no cadastro: é por ele que a ficha oficial é encontrada. */
+  productName?: string;
+  brand?: string;
   onChange: (patch: { videoUrl?: string; specs?: ProductSpec[] }) => void;
 }) {
   const embed = videoEmbed(videoUrl);
   const { uppercase, setUppercase, upper } = useUppercase();
   const set = (index: number, patch: Partial<ProductSpec>) => onChange({ specs: specs.map((line, i) => (i === index ? { ...line, ...patch } : line)) });
+  const [helpBusy, setHelpBusy] = useState(false);
+  const [help, setHelp] = useState<{ ok: boolean; text: string; source?: string; url?: string } | null>(null);
+
+  /** Busca a ficha pelo nome do produto e completa só o que está vazio (o que a loja já escreveu fica). */
+  async function fillFromName() {
+    const name = productName.trim();
+    if (name.length < 3) {
+      setHelp({ ok: false, text: 'Preencha o nome do produto na aba Dados (ex.: IPHONE 15 PRO MAX) para buscar a ficha.' });
+      return;
+    }
+    setHelpBusy(true);
+    setHelp(null);
+    try {
+      const found = await apiSuggestDeviceSpecs(name, brand);
+      if (!found.found || !found.specs.length) {
+        setHelp({ ok: false, text: found.message || 'Não encontramos a ficha desse aparelho.' });
+        return;
+      }
+      const key = (label: string) => label.trim().toLowerCase();
+      const next = specs.map((line) => ({ ...line }));
+      let filled = 0;
+      for (const line of found.specs) {
+        const value = upper(line.value);
+        const existing = next.find((row) => key(row.label) === key(line.label));
+        if (existing) {
+          if (!existing.value.trim()) {
+            existing.value = value;
+            filled++;
+          }
+        } else {
+          next.push({ label: line.label, value });
+          filled++;
+        }
+      }
+      onChange({ specs: next });
+      setHelp({
+        ok: true,
+        text: filled ? `${filled} ${filled === 1 ? 'item preenchido' : 'itens preenchidos'} com a ficha do ${found.model}. Confira e salve o produto.` : `A ficha do ${found.model} já estava completa — nada foi alterado.`,
+        source: found.source,
+        url: found.sourceUrl,
+      });
+    } catch (err) {
+      setHelp({ ok: false, text: err instanceof Error ? err.message : 'Não foi possível buscar a ficha agora.' });
+    } finally {
+      setHelpBusy(false);
+    }
+  }
+
   const fillTemplate = () => {
     const have = new Set(specs.map((line) => line.label.trim().toLowerCase()));
     onChange({ specs: [...specs, ...PHONE_TEMPLATE.filter((label) => !have.has(label.toLowerCase())).map((label) => ({ label, value: '' }))] });
@@ -90,6 +145,30 @@ export function ProductSpecsPanel({
           ) : null}
         </div>
         <p className="pspecs__muted">Opcional. Só as linhas preenchidas aparecem para o cliente, nesta ordem.</p>
+        {!readOnly ? (
+          <div className={`pspecs__help${help && !help.ok ? ' is-error' : ''}`}>
+            <p>
+              {help ? (
+                <>
+                  {help.text}
+                  {help.url ? (
+                    <>
+                      {' '}
+                      <a href={help.url} target="_blank" rel="noreferrer">
+                        Fonte: {help.source}
+                      </a>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>Preenche a ficha com os dados oficiais do aparelho a partir do nome do produto{productName.trim() ? <> (<strong>{productName.trim()}</strong>)</> : null}. O que você já escreveu não é alterado.</>
+              )}
+            </p>
+            <button type="button" className="btn btn--primary btn--sm" disabled={helpBusy} onClick={() => void fillFromName()}>
+              {helpBusy ? 'Buscando…' : 'Preencher pela descrição'}
+            </button>
+          </div>
+        ) : null}
         {specs.length ? (
           <ul className="pspecs__rows">
             {specs.map((line, index) => (
