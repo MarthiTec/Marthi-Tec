@@ -25,8 +25,38 @@ await db.exec(`
   ALTER TABLE work_orders DROP COLUMN device_brand, DROP COLUMN device_model, DROP COLUMN serial_or_imei,
     DROP COLUMN defect_description, DROP COLUMN technical_report, DROP COLUMN labor_cost,
     DROP COLUMN parts_cost, DROP COLUMN total_amount;
+  CREATE TYPE plan_id AS ENUM ('bronze', 'silver', 'golden');
+  CREATE TYPE module_id AS ENUM ('totem', 'presales', 'os', 'erp');
+  CREATE TYPE signup_status AS ENUM ('pending', 'contacted', 'converted');
+  DROP TABLE partner_signups;
+  CREATE TABLE partner_signups (
+    id TEXT PRIMARY KEY,
+    plan plan_id NOT NULL,
+    modules module_id[] NOT NULL,
+    document_type document_type NOT NULL,
+    document TEXT NOT NULL,
+    legal_name TEXT NOT NULL,
+    trade_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    zip_code TEXT NOT NULL,
+    street TEXT NOT NULL,
+    number TEXT NOT NULL,
+    complement TEXT NOT NULL DEFAULT '',
+    district TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state CHAR(2) NOT NULL,
+    segment TEXT NOT NULL DEFAULT '',
+    contact_name TEXT NOT NULL,
+    contact_role TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    status signup_status NOT NULL DEFAULT 'pending',
+    converted_store_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
 `);
 await db.exec(fs.readFileSync('apps/api/src/db/migrations/0058_repair_legacy_prisma_columns.sql', 'utf8'));
+await db.exec(fs.readFileSync('apps/api/src/db/migrations/0061_legacy_enums_to_text.sql', 'utf8'));
 
 const { app } = await import('../dist/app.js');
 const { pool } = await import('../dist/db/pool.js');
@@ -51,6 +81,35 @@ async function request(path, method = 'GET', body) {
   return { status: response.status, json: await response.json() };
 }
 after(async () => { server.close(); await once(server, 'close'); await pool.end(); await db.close(); });
+
+test('partner signup works on the legacy partner_signups table with module_id[] converted to jsonb', async () => {
+  const signup = await request('/partners/signup', 'POST', {
+    planId: 'golden',
+    modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
+    documentType: 'cnpj',
+    document: '11.222.333/0001-81',
+    legalName: 'Oficina Exemplo LTDA',
+    tradeName: 'Oficina Exemplo',
+    email: 'contato@oficinaexemplo.com.br',
+    phone: '(24) 99999-1122',
+    zipCode: '25800-000',
+    street: 'Rua Direita',
+    number: '100',
+    complement: 'Sala 1',
+    district: 'Centro',
+    city: 'Três Rios',
+    state: 'RJ',
+    segment: 'Oficina & Celulares',
+    contactName: 'Thiago',
+    contactRole: 'Diretor',
+    notes: 'Teste de cadastro',
+    payNow: false,
+    paymentMethod: 'pix',
+  });
+  assert.equal(signup.status, 201, JSON.stringify(signup.json));
+  assert.ok(signup.json.data.id.startsWith('PRT-'));
+  assert.equal(signup.json.data.status, 'aguardando_pagamento');
+});
 
 test('customers can be created and edited on the legacy production table', async () => {
   const created = await request('/customers', 'POST', { name: 'RAMON FREITAS', phone: '24992259927', document: '15350830775', email: 'cliente@example.com', city: 'PARAIBA DO SUL' });

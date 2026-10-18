@@ -1,3 +1,10 @@
+-- [0059_store_brand_logos.sql]
+-- Ícone de cada marca (Apple, Samsung, Xiaomi…) para a vitrine do totem.
+-- logo_source: 'upload' (enviado pela loja), 'auto' (buscado pelo nome da marca) ou vazio.
+ALTER TABLE store_brands ADD COLUMN IF NOT EXISTS logo TEXT;
+ALTER TABLE store_brands ADD COLUMN IF NOT EXISTS logo_source TEXT NOT NULL DEFAULT '';
+
+-- [0060_people_address_contacts.sql]
 -- Cadastro de pessoas mais completo: endereço inteiro, pessoa física/jurídica e vários telefones
 -- e e-mails para clientes, fornecedores e vendedores; vendedor responsável pelo cliente.
 -- Só acrescenta colunas com padrão: nada existente é alterado.

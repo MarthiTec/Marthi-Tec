@@ -3,6 +3,13 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { AdminPicker } from '../components/AdminPicker';
+import { QrCodeView } from '../components/QrCodeView';
+import { MARTHI_COMPANY, marthiWhatsAppHref } from '../data/companyContact';
+import {
+  buildPixBrCode,
+  fetchPublicPixInfo,
+  type PublicPixInfo,
+} from '../utils/pixBrCode';
 import {
   BRAZIL_UFS,
   PARTNER_MODULES,
@@ -137,6 +144,15 @@ export function PartnerSignupPage() {
   if (!ready) return <div className="partner"><p role={error ? 'alert' : 'status'}>{error || 'Carregando planos disponíveis…'}</p><Link to="/">Voltar ao site</Link></div>;
   return <PartnerSignupForm />;
 }
+function parsePlanNumericPrice(plan: { price: string; priceNumeric?: number }): number {
+  if ('priceNumeric' in plan && typeof plan.priceNumeric === 'number' && plan.priceNumeric > 0) {
+    return plan.priceNumeric;
+  }
+  const cleaned = plan.price.replace(/[^\d,.-]/g, '').replace(',', '.');
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function PartnerSignupForm() {
   const [params] = useSearchParams();
   const planFromQuery = params.get('plano');
@@ -147,6 +163,13 @@ function PartnerSignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [protocol, setProtocol] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<'pix' | 'card'>('pix');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [pixInfo, setPixInfo] = useState<PublicPixInfo>({
+    keyType: 'email',
+    keyValue: MARTHI_COMPANY.email,
+    receiverName: MARTHI_COMPANY.legalName,
+  });
+  const [pixCopied, setPixCopied] = useState(false);
   const [cepStatus, setCepStatus] = useState<string | null>(null);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cnpjStatus, setCnpjStatus] = useState<{
@@ -155,9 +178,38 @@ function PartnerSignupForm() {
   } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<StoreSegmentId>('assistencia_tecnica');
 
+  useEffect(() => {
+    void fetchPublicPixInfo().then((info) => setPixInfo(info));
+  }, []);
+
   const selectedPlan = useMemo(() => getPlanById(form.planId), [form.planId]);
   const moduleLimit = getPlanModuleLimit(form.planId);
   const lockedAllModules = planIncludesAllModules(form.planId);
+  const planAmount = useMemo(() => parsePlanNumericPrice(selectedPlan), [selectedPlan]);
+
+  const pixBrCode = useMemo(
+    () =>
+      buildPixBrCode({
+        keyType: pixInfo.keyType,
+        keyValue: pixInfo.keyValue,
+        receiverName: pixInfo.receiverName,
+        city: MARTHI_COMPANY.city,
+        amount: planAmount,
+        txid: protocol || `MARTHI${form.planId.toUpperCase()}`,
+        description: `Plano ${selectedPlan.name} Marthi`,
+      }),
+    [pixInfo, planAmount, protocol, form.planId, selectedPlan.name],
+  );
+
+  async function handleCopyPix() {
+    try {
+      await navigator.clipboard.writeText(pixBrCode);
+      setPixCopied(true);
+      window.setTimeout(() => setPixCopied(false), 3000);
+    } catch {
+      setPixCopied(false);
+    }
+  }
 
   async function handleCnpjLookup(raw: string) {
     const digits = onlyDigits(raw);
@@ -359,8 +411,8 @@ function PartnerSignupForm() {
 
     const ieInfo = form.stateRegistration.trim() ? `IE: ${form.stateRegistration.trim()}` : '';
     const imInfo = form.municipalRegistration.trim() ? `IM: ${form.municipalRegistration.trim()}` : '';
-    const notesMerged = [form.notes.trim(), ieInfo, imInfo].filter(Boolean).join(' · ');
-
+    const txInfo = transactionRef.trim() ? `Comprovante/ID Pix: ${transactionRef.trim()}` : '';
+    const notesMerged = [form.notes.trim(), ieInfo, imInfo, txInfo].filter(Boolean).join(' · ');
 
     try {
       const result = await submitPartnerSignup({
@@ -385,6 +437,7 @@ function PartnerSignupForm() {
         notes: notesMerged,
         payNow: false,
         paymentMethod: payMethod,
+        transactionRef: transactionRef.trim() || undefined,
       });
 
       setProtocol(result.id);
@@ -396,39 +449,83 @@ function PartnerSignupForm() {
   }
 
   if (protocol) {
+    const whatsappReceiptUrl = marthiWhatsAppHref(
+      payMethod === 'pix'
+        ? `Olá! Acabei de concluir o cadastro de parceiro na Marthi Tecnologia.\n\n*Protocolo:* ${protocol}\n*Empresa:* ${form.tradeName} (${form.document})\n*Plano:* ${selectedPlan.name} (${selectedPlan.price}${selectedPlan.period})\n*E-mail:* ${form.email}\n${transactionRef.trim() ? `*Comprovante/ID Pix:* ${transactionRef.trim()}\n` : ''}\nSegue o comprovante do Pix para liberação imediata do meu acesso!`
+        : `Olá! Acabei de concluir o cadastro de parceiro na Marthi Tecnologia e gostaria de receber o link para pagamento no Cartão.\n\n*Protocolo:* ${protocol}\n*Empresa:* ${form.tradeName} (${form.document})\n*Plano:* ${selectedPlan.name} (${selectedPlan.price}${selectedPlan.period})\n*E-mail:* ${form.email}`,
+    );
+
     return (
       <div className="partner">
-        <div className="partner__shell partner__shell--success" style={{ maxWidth: '620px', textAlign: 'center' }}>
+        <div className="partner__shell partner__shell--success" style={{ maxWidth: '680px', textAlign: 'center' }}>
           <BrandLogo variant="lockup" className="partner__lockup" />
-          <h1 style={{ color: '#38bdf8', margin: '20px 0 12px' }}>Solicitação de Contratação Registrada! 🚀</h1>
-          <p style={{ fontSize: '16px', lineHeight: 1.6, color: '#e2e8f0' }}>
-            Parabéns! O pedido de contratação para o plano <strong>{selectedPlan.name}</strong> da empresa <strong>{form.tradeName}</strong> foi registrado com sucesso.
+          <h1 className="partner__success-title">Solicitação de Contratação Registrada! 🚀</h1>
+          <p className="partner__success-lead">
+            Parabéns! O pedido de contratação para o plano <strong>{selectedPlan.name}</strong> da empresa{' '}
+            <strong>{form.tradeName}</strong> foi registrado com sucesso.
           </p>
 
-          <div
-            style={{
-              background: 'rgba(245, 158, 11, 0.12)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              borderRadius: '8px',
-              padding: '16px',
-              margin: '20px 0',
-              textAlign: 'left',
-            }}
-          >
-            <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#fde68a', fontWeight: 600 }}>
-              ⏳ Status: Aguardando Confirmação do Pagamento Pix &amp; Liberação de Acesso
+          <p className="partner__protocol" style={{ margin: '8px 0' }}>
+            Protocolo da Contratação: <strong>{protocol}</strong>
+          </p>
+
+          {payMethod === 'pix' && (
+            <div className="partner__pix-box partner__pix-box--compact">
+              <div className="partner__pix-qr">
+                <QrCodeView value={pixBrCode} size={156} />
+                <span className="partner__pix-qr-caption">Escaneie no app do seu banco</span>
+              </div>
+              <div className="partner__pix-details" style={{ textAlign: 'left' }}>
+                <div className="partner__pix-meta">
+                  <div>
+                    <small>Beneficiário</small>
+                    <strong>{pixInfo.receiverName}</strong>
+                  </div>
+                  <div>
+                    <small>Chave Pix</small>
+                    <strong>{pixInfo.keyValue}</strong>
+                  </div>
+                  <div>
+                    <small>Valor</small>
+                    <strong>
+                      {selectedPlan.price}
+                      {selectedPlan.period}
+                    </strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`partner__pix-copy-btn ${pixCopied ? 'is-copied' : ''}`}
+                  onClick={() => void handleCopyPix()}
+                >
+                  {pixCopied ? '✓ Código Pix copiado!' : '📋 Copiar código Pix (Copia e Cola)'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="partner__status-banner">
+            <p className="partner__status-banner-title">
+              ⏳ Próximo passo: Envie o comprovante para liberação imediata
             </p>
-            <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1', lineHeight: 1.5 }}>
-              O cadastro da sua empresa já consta em nosso painel administrativo (/admin). Assim que o pagamento via Pix for identificado pela nossa equipe, seu acesso será liberado imediatamente e você receberá no e-mail <strong style={{ color: '#38bdf8' }}>{form.email}</strong> o link oficial e seguro para definir sua senha de acesso.
+            <p className="partner__status-banner-text">
+              O cadastro da sua empresa já consta em nosso painel administrativo (<code>/admin</code>). Clique no botão
+              abaixo para enviar o comprovante no nosso WhatsApp comercial — liberamos sua licença na hora e enviamos no
+              e-mail <strong>{form.email}</strong> o link oficial para você definir sua senha de acesso.
             </p>
           </div>
 
-          {/* Card do Token de Acesso da Empresa */}
-          <p>O acesso será enviado ao e-mail cadastrado após a confirmação do pagamento.</p>
-          <p className="partner__protocol" style={{ margin: '16px 0' }}>
-            Protocolo da Contratação: <strong>{protocol}</strong>
-          </p>
-          <div className="partner__actions" style={{ justifyContent: 'center', marginTop: '24px' }}>
+          <div className="partner__actions" style={{ justifyContent: 'center', marginTop: '12px' }}>
+            <a
+              href={whatsappReceiptUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn partner__whatsapp-btn"
+            >
+              {payMethod === 'pix'
+                ? '📲 Enviar Comprovante no WhatsApp e Liberar Acesso'
+                : '💳 Solicitar Link de Cartão no WhatsApp'}
+            </a>
             <Link to="/login" className="btn btn--primary">
               Ir para Tela de Acesso
             </Link>
@@ -1065,7 +1162,7 @@ function PartnerSignupForm() {
                   className={payMethod === 'pix' ? 'is-active' : ''}
                   onClick={() => setPayMethod('pix')}
                 >
-                  PIX
+                  PIX (Liberação Rápida)
                 </button>
                 <button
                   type="button"
@@ -1075,10 +1172,77 @@ function PartnerSignupForm() {
                   Cartão
                 </button>
               </div>
-              <p className="partner__lead" style={{ marginTop: 12, marginBottom: 0 }}>
-                A solicitação ficará aguardando pagamento. Esta etapa não emite cobrança nem confirma o recebimento.
-                O pagamento com cartão dependerá do checkout seguro do provedor configurado.
-              </p>
+
+              {payMethod === 'pix' ? (
+                <div className="partner__pix-box">
+                  <div className="partner__pix-qr">
+                    <QrCodeView value={pixBrCode} size={184} />
+                    <span className="partner__pix-qr-caption">Escaneie no app do seu banco</span>
+                  </div>
+                  <div className="partner__pix-details">
+                    <div className="partner__pix-meta">
+                      <div>
+                        <small>Beneficiário</small>
+                        <strong>{pixInfo.receiverName}</strong>
+                      </div>
+                      <div>
+                        <small>Chave Pix</small>
+                        <strong>{pixInfo.keyValue}</strong>
+                      </div>
+                      <div>
+                        <small>Valor da 1ª mensalidade</small>
+                        <strong>
+                          {selectedPlan.price}
+                          {selectedPlan.period}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="partner__pix-copy-row">
+                      <input
+                        type="text"
+                        readOnly
+                        value={pixBrCode}
+                        className="partner__pix-code-preview"
+                        aria-label="Código Pix Copia e Cola"
+                        onClick={(e) => e.currentTarget.select()}
+                      />
+                      <button
+                        type="button"
+                        className={`partner__pix-copy-btn ${pixCopied ? 'is-copied' : ''}`}
+                        onClick={() => void handleCopyPix()}
+                      >
+                        {pixCopied ? '✓ Código Pix copiado!' : '📋 Copiar Pix Copia e Cola'}
+                      </button>
+                    </div>
+
+                    <label className="partner__pix-tx-label">
+                      Código / ID do comprovante Pix (opcional)
+                      <input
+                        type="text"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        placeholder="Ex.: E123456789... ou horário do pagamento"
+                      />
+                    </label>
+
+                    <p className="partner__pix-note">
+                      💡 <strong>Como funciona:</strong> Escaneie o QR Code ou use o Pix Copia e Cola acima e clique em{' '}
+                      <strong>Concluir contratação</strong>. Na próxima tela você terá o botão direto para enviar o
+                      comprovante no nosso WhatsApp ({MARTHI_COMPANY.whatsappDisplay}) e ter o acesso liberado na hora!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="partner__card-box">
+                  <strong>💳 Pagamento via Cartão de Crédito</strong>
+                  <p>
+                    Ao clicar em <strong>Concluir contratação</strong> abaixo, seu cadastro e protocolo serão gerados
+                    imediatamente e você poderá solicitar o link seguro de pagamento por cartão direto no nosso WhatsApp
+                    comercial ({MARTHI_COMPANY.whatsappDisplay}).
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -1099,7 +1263,7 @@ function PartnerSignupForm() {
             <button type="submit" className="btn btn--primary" disabled={submitting}>
               {submitting
                 ? 'Processando…'
-                : `Pagar ${selectedPlan.price}${selectedPlan.period} e concluir`}
+                : `Concluir contratação (${selectedPlan.price}${selectedPlan.period})`}
             </button>
           )}
         </div>

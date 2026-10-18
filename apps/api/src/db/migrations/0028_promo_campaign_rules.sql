@@ -1,1 +1,0 @@
-ALTER TABLE promo_campaigns ADD COLUMN IF NOT EXISTS rules JSONB NOT NULL DEFAULT '{}'::jsonb;

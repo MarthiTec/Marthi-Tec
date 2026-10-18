@@ -93,10 +93,45 @@ const paymentConfirmSchema = z.object({
   notes: z.string().optional(),
 });
 
+function parseModulesColumn(raw: unknown): PartnerSignupRecord['modules'] {
+  if (Array.isArray(raw)) return raw as PartnerSignupRecord['modules'];
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      return trimmed
+        .slice(1, -1)
+        .split(',')
+        .map((s) => s.replace(/^"|"$/g, '').trim())
+        .filter(Boolean) as PartnerSignupRecord['modules'];
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? (parsed as PartnerSignupRecord['modules']) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 async function calculatePlanAmount(planId: string, modules: string[]): Promise<number> {
   const id = planId === 'scale' ? 'golden' : planId === 'growth' ? 'silver' : planId === 'start' ? 'bronze' : planId;
-  const result = await pool.query('SELECT settings FROM platform_commercial_plans WHERE id=$1', [id]);
-  const plan = result.rows[0]?.settings;
+  const fallbackPlans: Record<string, { priceNumeric: number; maxModules: number; allModules: boolean; active: boolean }> = {
+    bronze: { priceNumeric: 197, maxModules: 1, allModules: false, active: true },
+    silver: { priceNumeric: 497, maxModules: 2, allModules: false, active: true },
+    golden: { priceNumeric: 597, maxModules: 5, allModules: true, active: true },
+  };
+  let plan = fallbackPlans[id];
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT settings FROM platform_commercial_plans WHERE id=$1', [id]);
+      if (result.rows[0]?.settings) {
+        plan = result.rows[0].settings;
+      }
+    } catch {
+      // Usa plano padrão se a tabela ainda não estiver populada
+    }
+  }
   if (!plan || plan.active === false) throw Object.assign(new Error('Plano indisponível para contratação.'), { status: 409 });
   if (!Number.isFinite(plan.priceNumeric) || plan.priceNumeric < 0) throw Object.assign(new Error('Preço do plano inválido no catálogo.'), { status: 409 });
   if (plan.allModules !== true && modules.length > plan.maxModules) throw Object.assign(new Error('Quantidade de módulos excede o limite do plano contratado.'), { status: 400 });
@@ -130,12 +165,86 @@ function resolveRequestFrontendUrl(req: any): string {
 }
 
 
+let partnerSignupsSchemaEnsured = false;
+
+async function ensurePartnerSignupsSchema(): Promise<void> {
+  if (partnerSignupsSchemaEnsured || !pool) return;
+  try {
+    await pool.query(`
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'golden';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS modules JSONB NOT NULL DEFAULT '[]'::jsonb;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT 'cnpj';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS legal_name TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS trade_name TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS zip_code TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS street TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS number TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS complement TEXT DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS district TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS segment TEXT DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_name TEXT NOT NULL DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_role TEXT DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'aguardando_pagamento';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'pix';
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS transaction_ref TEXT;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS activation_token_sent_at TIMESTAMPTZ;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS audit_trail JSONB NOT NULL DEFAULT '[]'::jsonb;
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'partner_signups' AND column_name = 'plan'
+        ) THEN
+          EXECUTE 'ALTER TABLE partner_signups ALTER COLUMN plan DROP NOT NULL';
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'partner_signups'
+            AND column_name = 'modules'
+            AND data_type <> 'jsonb'
+        ) THEN
+          ALTER TABLE partner_signups ALTER COLUMN modules DROP DEFAULT;
+          ALTER TABLE partner_signups ALTER COLUMN modules TYPE JSONB USING to_jsonb(modules);
+          ALTER TABLE partner_signups ALTER COLUMN modules SET DEFAULT '[]'::jsonb;
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'store_licenses'
+            AND column_name = 'modules'
+            AND data_type = 'ARRAY'
+            AND udt_name <> '_text'
+        ) THEN
+          ALTER TABLE store_licenses ALTER COLUMN modules DROP DEFAULT;
+          ALTER TABLE store_licenses ALTER COLUMN modules TYPE TEXT[] USING modules::text[];
+          ALTER TABLE store_licenses ALTER COLUMN modules SET DEFAULT ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[];
+        END IF;
+      END $$;
+    `);
+    partnerSignupsSchemaEnsured = true;
+  } catch (err) {
+    console.warn('[partners] Falha não-bloqueante ao reparar schema de partner_signups:', err);
+  }
+}
+
 /**
  * 1. Conclusão da Contratação
  * Registra o pedido de contratação, previne duplicidades e aguarda confirmação de pagamento.
  */
 partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
   try {
+  await ensurePartnerSignupsSchema();
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -160,7 +269,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
   if (pool) {
     try {
       const existingRes = await pool.query(
-        `SELECT id, status, created_at, audit_trail FROM partner_signups
+        `SELECT id, status FROM partner_signups
          WHERE lower(email) = $1 OR regexp_replace(document, '\\D', '', 'g') = $2
          LIMIT 1`,
         [normEmail, cleanDoc],
@@ -215,12 +324,16 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
           state, segment, contact_name, contact_role, notes, status, monthly_amount,
           payment_method, transaction_ref, audit_trail, created_at, updated_at
         ) VALUES (
-          $1, $2, $3::jsonb, $4, $5, $6, $7,
+          $1, $2,
+          (jsonb_populate_record(NULL::partner_signups, jsonb_build_object('modules', $3::jsonb))).modules,
+          $4, $5, $6, $7,
           $8, $9, $10, $11, $12, $13, $14, $15,
           $16, $17, $18, $19, $20, $21, $22,
           $23, $24, $25::jsonb, $26, $27
         ) ON CONFLICT (id) DO UPDATE SET
-          plan_id = $2, modules = $3::jsonb, legal_name = $6, trade_name = $7,
+          plan_id = $2,
+          modules = EXCLUDED.modules,
+          legal_name = $6, trade_name = $7,
           email = $8, phone = $9, status = $21, monthly_amount = $22,
           audit_trail = $25::jsonb, updated_at = $27`,
         [
@@ -357,8 +470,8 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
           record = {
             id: row.id,
             payNow: false,
-            planId: row.plan_id,
-            modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules,
+            planId: row.plan_id || row.plan || 'golden',
+            modules: parseModulesColumn(row.modules),
             documentType: row.document_type,
             document: row.document,
             legalName: row.legal_name,
@@ -436,8 +549,8 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) =
         record = {
           id: row.id,
           payNow: false,
-          planId: row.plan_id,
-          modules: typeof row.modules === 'string' ? JSON.parse(row.modules) : row.modules,
+          planId: row.plan_id || row.plan || 'golden',
+          modules: parseModulesColumn(row.modules),
           documentType: row.document_type,
           document: row.document,
           legalName: row.legal_name,
@@ -520,7 +633,7 @@ partnersRouter.get('/api/v1/partners/signup/pending', requireSession, requirePla
             createdAt: item.created_at,
             planId: item.plan_id,
             planName: planDisplayName(item.plan_id),
-            modules: typeof item.modules === 'string' ? JSON.parse(item.modules) : item.modules,
+            modules: parseModulesColumn(item.modules),
             tradeName: item.trade_name,
             legalName: item.legal_name,
             email: item.email,

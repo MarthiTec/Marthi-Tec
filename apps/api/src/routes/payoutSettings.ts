@@ -20,6 +20,50 @@ const pixSchema = z.object({
   if (!valid) ctx.addIssue({ code: 'custom', message: 'Formato da chave Pix inválido.' });
 });
 const path = '/api/v1/admin/payout-settings';
+
+payoutSettingsRouter.get('/api/v1/payout-settings/public', async (_req, res) => {
+  try {
+    const result = pool
+      ? await pool.query("SELECT bank_account, pix FROM platform_payout_settings WHERE id = 'platform'")
+      : { rows: [] };
+    const bank = result.rows[0]?.bank_account ?? {};
+    const pix = result.rows[0]?.pix ?? {};
+    const keyValue = typeof pix.keyValue === 'string' && pix.keyValue.trim()
+      ? pix.keyValue.trim()
+      : 'marthi.tecnologia@gmail.com';
+    const keyType = typeof pix.keyType === 'string' && pix.keyType.trim()
+      ? pix.keyType
+      : 'email';
+    const receiverName =
+      (typeof pix.receiverName === 'string' && pix.receiverName.trim()) ||
+      (typeof bank.holderName === 'string' && bank.holderName.trim()) ||
+      'Marthi Tecnologia';
+    const bankName =
+      (typeof bank.bankName === 'string' && bank.bankName.trim()) ||
+      (typeof pix.receiverInstitution === 'string' && pix.receiverInstitution.trim()) ||
+      '';
+    res.json({
+      success: true,
+      data: {
+        pix: { keyType, keyValue, receiverName },
+        bankAccount: { holderName: receiverName, bankName },
+      },
+    });
+  } catch {
+    res.json({
+      success: true,
+      data: {
+        pix: {
+          keyType: 'email',
+          keyValue: 'marthi.tecnologia@gmail.com',
+          receiverName: 'Marthi Tecnologia',
+        },
+        bankAccount: { holderName: 'Marthi Tecnologia', bankName: '' },
+      },
+    });
+  }
+});
+
 payoutSettingsRouter.get(path, requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
     const result = await pool.query("SELECT bank_account, pix FROM platform_payout_settings WHERE id = 'platform'");

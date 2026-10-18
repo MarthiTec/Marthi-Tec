@@ -1,3 +1,83 @@
+-- [0047_clean_test_companies_and_fix_signup_status.sql]
+-- Quarantined tenant-specific repair. Original SQL remains in Git history at e34b799.
+-- Startup migrations must not delete tenants, fabricate business records, or move account ownership.
+SELECT 1;
+
+-- [0048_keep_only_demo_and_cellponto_clients.sql]
+-- Quarantined tenant-specific repair. Original SQL remains in Git history at e34b799.
+-- Startup migrations must not delete tenants, fabricate business records, or move account ownership.
+SELECT 1;
+
+-- [0049_unify_cellponto_and_remove_filial.sql]
+-- Quarantined tenant-specific repair. Original SQL remains in Git history at e34b799.
+-- Startup migrations must not delete tenants, fabricate business records, or move account ownership.
+SELECT 1;
+
+-- [0050_restore_cellponto_operation_and_fix_segment.sql]
+-- Schema only: no tenant-specific catalog, prices, stock quantities or user replacement.
+  -- 1. Assegurar colunas e tabelas essenciais
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS segment TEXT NOT NULL DEFAULT 'assistencia_tecnica';
+  ALTER TABLE stores ADD COLUMN IF NOT EXISTS attribute_automation_enabled BOOLEAN NOT NULL DEFAULT true;
+
+  CREATE TABLE IF NOT EXISTS commercial_store_customization (
+    store_id TEXT PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
+    settings JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS commercial_profiles (
+    store_id TEXT PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
+    segment_id TEXT NOT NULL,
+    settings JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+-- [0051_reconcile_cellponto_real_data.sql]
+-- Quarantined tenant-specific repair. Original SQL remains in Git history at e34b799.
+-- Startup migrations must not delete tenants, fabricate business records, or move account ownership.
+SELECT 1;
+
+-- [0052_restore_strict_account_guard.sql]
+-- Restore the ownership guard even where a prior manual repair weakened it.
+-- Does not move stores/users, alter passwords, activate licenses or invent inventory.
+CREATE OR REPLACE FUNCTION marthi_guard_account_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF OLD.client_account_id IS NOT NULL AND NEW.client_account_id IS DISTINCT FROM OLD.client_account_id THEN
+  RAISE EXCEPTION 'Account ownership cannot be reassigned' USING ERRCODE = '23514';
+ END IF;
+ RETURN NEW;
+END $$;
+
+-- [0053_explicit_demo_accounts.sql]
+-- Classification is persisted; commercial metrics must not infer demo status from names.
+ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+-- Older deployments did not contain the audit table from the initial schema.
+CREATE TABLE IF NOT EXISTS audit_logs (
+ id TEXT PRIMARY KEY, store_id TEXT, user_id TEXT, action TEXT NOT NULL,
+ entity TEXT NOT NULL, entity_id TEXT, details JSONB DEFAULT '{}'::jsonb,
+ ip TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_store ON audit_logs(store_id);
+
+-- [0054_restore_audit_logs.sql]
+-- Restore the existing audit contract on installations whose baseline was incomplete.
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id TEXT PRIMARY KEY,
+  store_id TEXT,
+  user_id TEXT,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id TEXT,
+  details JSONB DEFAULT '{}'::jsonb,
+  ip TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_store ON audit_logs(store_id);
+
+-- [0055_totem_ticket_product_name.sql]
+ALTER TABLE pos_tickets ADD COLUMN IF NOT EXISTS product_name TEXT NOT NULL DEFAULT '';
+
+-- [0056_work_orders_complete_fields.sql]
 -- Migration 0056: Completa colunas da tabela work_orders para o modulo ERP / Oficina
 ALTER TABLE work_orders
   ADD COLUMN IF NOT EXISTS customer_document TEXT NOT NULL DEFAULT '',
