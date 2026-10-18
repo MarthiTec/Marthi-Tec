@@ -66,8 +66,15 @@
 .repair-parts__links { display: grid; gap: 8px; max-height: min(55vh, 460px); overflow-y: auto; margin: 10px 0; padding: 0; list-style: none; }
 .repair-parts__links li { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; }
 .repair-parts__links li > strong { font-size: .85rem; }
-.repair-parts__links label { display: flex; align-items: center; gap: 8px; font-size: .82rem; cursor: pointer; }
-.repair-parts__links small { color: #64748b; }
+/* Dentro da janela rápida: vence o estilo de campo de texto do modal (largura 100%, 42px). */
+.quick-modal__body .repair-parts__links label.repair-parts__option { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: .84rem; font-weight: 600; cursor: pointer; }
+.quick-modal__body .repair-parts__links label.repair-parts__option:hover { background: color-mix(in srgb, var(--accent, #0f766e) 6%, transparent); }
+.quick-modal__body .repair-parts__links label.repair-parts__option.is-on { background: color-mix(in srgb, var(--accent, #0f766e) 9%, transparent); }
+.quick-modal__body .repair-parts__links .repair-parts__option input[type='checkbox'] { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; border-radius: 4px; accent-color: var(--accent, #0f766e); cursor: pointer; }
+.repair-parts__option-name { display: grid; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.repair-parts__option-name small { font-size: .72rem; color: #b45309 !important; }
+.repair-parts__option b { color: var(--mute, #475569); font-size: .8rem; font-weight: 700; white-space: nowrap; }
+.repair-parts__links li > strong small { color: #64748b; font-weight: 500; }
 @media (max-width: 760px) {
   .repair-parts__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

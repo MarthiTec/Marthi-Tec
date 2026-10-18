@@ -312,13 +312,13 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
               const key = `${service.id}|${option.id}`;
               const elsewhere = option.stockItemId && option.stockItemId !== part.id;
               return (
-                <label key={key}>
+                <label key={key} className={`repair-parts__option${chosen.has(key) ? ' is-on' : ''}`}>
                   <input type="checkbox" checked={chosen.has(key)} onChange={() => flip(key)} />
-                  {option.name}
-                  <small>
-                    {option.price === null ? 'sob avaliação' : repairMoney(option.price)}
-                    {elsewhere && !chosen.has(key) ? ' · já tem outra peça vinculada' : ''}
-                  </small>
+                  <span className="repair-parts__option-name">
+                    {option.name}
+                    {elsewhere && !chosen.has(key) ? <small>já tem outra peça vinculada</small> : null}
+                  </span>
+                  <b>{option.price === null ? 'sob avaliação' : repairMoney(option.price)}</b>
                 </label>
               );
             })}
