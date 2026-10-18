@@ -40,6 +40,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/venda-externa': { kicker: 'Vendas', title: 'Venda externa' },
   '/painel/catalogo': { kicker: 'Vendas', title: 'Catálogo digital' },
+  '/painel/os/solicitacoes': { kicker: 'OS', title: 'Solicitações de orçamento' },
+  '/painel/os/manutencoes': { kicker: 'OS', title: 'Catálogo de manutenções' },
   '/painel/calculadora': { kicker: 'PDV', title: 'Calculadora de parcelamento' },
   '/painel/cotacao': { kicker: 'PDV', title: 'Cotação rápida' },
   '/painel/ads': { kicker: 'Marthi ADS', title: 'Anúncios Ads' },

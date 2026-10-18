@@ -1,0 +1,79 @@
+/* "Solicitar manutenção" no catálogo digital (celular primeiro). */
+.repairflow { --cat-accent: #e4572e; display: grid; gap: 12px; width: 100%; max-width: 760px; margin: 0 auto; color: #16181d; }
+.repairflow__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; padding: 4px 4px 0; }
+.repairflow__head h2 { margin: 0; font-size: 1.25rem; font-weight: 900; letter-spacing: -.01em; }
+.repairflow__head p { margin: 2px 0 0; color: #6b7280; font-size: .86rem; }
+.repairflow__link { padding: 6px 0; border: 0; background: none; color: var(--cat-accent); font: inherit; font-size: .86rem; font-weight: 800; cursor: pointer; }
+.repairflow__card { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: #fff; box-shadow: 0 3px 14px rgba(22, 24, 29, 0.06); }
+.repairflow__card h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1rem; font-weight: 800; }
+.repairflow__card h3 span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--cat-accent) 14%, #fff); color: var(--cat-accent); font-size: .78rem; font-weight: 900; }
+.repairflow__muted { margin: 0; color: #6b7280; font-size: .82rem; line-height: 1.4; }
+.repairflow__error { margin: 0; color: #dc2626; font-size: .86rem; font-weight: 700; }
+.repairflow__chips, .repairflow__models { display: flex; flex-wrap: wrap; gap: 8px; }
+.repairflow__chips button, .repairflow__models button { min-height: 42px; padding: 0 16px; border: 1px solid #d8dbe0; border-radius: 999px; background: #fff; color: #16181d; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; }
+.repairflow__chips button.is-on, .repairflow__models button.is-on { border-color: var(--cat-accent); background: var(--cat-accent); color: #fff; }
+.repairflow__input { width: 100%; box-sizing: border-box; min-height: 46px; padding: 10px 14px; border: 1px solid #d8dbe0; border-radius: 14px; background: #fff; color: #16181d; font: inherit; font-size: 16px; }
+textarea.repairflow__input { resize: vertical; min-height: 84px; }
+.repairflow__input:focus { outline: 2px solid var(--cat-accent); outline-offset: 0; border-color: transparent; }
+.repairflow__field { display: grid; gap: 4px; color: #4b5563; font-size: .8rem; font-weight: 700; }
+.repairflow__hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+.repairflow__services { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.repairflow__services li { border: 1px solid #e6e7eb; border-radius: 14px; background: #fff; transition: border-color 150ms ease, background-color 150ms ease; }
+.repairflow__services li.is-on { border-color: var(--cat-accent); background: color-mix(in srgb, var(--cat-accent) 5%, #fff); }
+.repairflow__service { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.repairflow__check { display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid #c3c7cd; border-radius: 50%; color: #fff; font-size: .8rem; font-weight: 900; }
+.repairflow__services li.is-on .repairflow__check { border-color: #16181d; background: #16181d; }
+.repairflow__service-text { display: grid; gap: 2px; min-width: 0; }
+.repairflow__service-text strong { font-size: .95rem; }
+.repairflow__service-text small { color: #6b7280; font-size: .8rem; }
+.repairflow__service-price { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.repairflow__service-price b { font-size: .82rem; }
+.repairflow__service-price small { color: #6b7280; font-size: .72rem; }
+.repairflow__options { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 0 14px 12px 52px; }
+.repairflow__options button { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid #d8dbe0; border-radius: 12px; background: #fff; color: #16181d; font: inherit; text-align: left; cursor: pointer; }
+.repairflow__options button span { font-size: .86rem; font-weight: 700; }
+.repairflow__options button b { color: #4b5563; font-size: .78rem; }
+.repairflow__options button.is-on { border-color: var(--cat-accent); box-shadow: inset 0 0 0 1px var(--cat-accent); }
+.repairflow__options button.is-on b { color: var(--cat-accent); }
+
+.repairflow__summary ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.repairflow__summary li { display: flex; justify-content: space-between; gap: 10px; font-size: .86rem; }
+.repairflow__summary p { margin: 0; }
+.repairflow__total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px dashed #e6e7eb; color: #4b5563; font-size: .84rem; }
+.repairflow__total strong { color: #16181d; font-size: 1.15rem; }
+.repairflow__send { width: 100%; min-height: 52px; border: 0; border-radius: 999px; background: #16181d; color: #fff; font: inherit; font-size: 1rem; font-weight: 800; cursor: pointer; }
+.repairflow__send:disabled { opacity: .45; cursor: default; }
+
+.repairflow--done { justify-items: center; padding: 28px 18px; border-radius: 22px; background: #fff; text-align: center; }
+.repairflow--done h2 { margin: 0; font-size: 1.4rem; }
+.repairflow--done p { margin: 0; max-width: 520px; }
+.repairflow__ok { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 2rem; font-weight: 900; }
+.repairflow__protocol { font-size: 1.05rem; }
+.repairflow__protocol strong { padding: 2px 10px; border-radius: 10px; background: color-mix(in srgb, var(--cat-accent) 12%, #fff); color: var(--cat-accent); letter-spacing: .04em; }
+.repairflow__notice { padding: 10px 12px; border-radius: 12px; background: #f5f6f8; color: #4b5563; font-size: .84rem; line-height: 1.45; }
+.repairflow__wa { display: grid; place-items: center; width: 100%; max-width: 360px; min-height: 50px; border-radius: 999px; background: #16a34a; color: #fff; font-weight: 800; text-decoration: none; }
+.repairflow__ghost { width: 100%; max-width: 360px; min-height: 46px; border: 1px solid #d8dbe0; border-radius: 999px; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.repairflow__status { margin: 0; color: var(--cat-accent); font-size: 1.05rem; font-weight: 800; }
+.repairflow__timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.repairflow__timeline li { position: relative; padding-top: 14px; color: #9ca3af; font-size: .74rem; font-weight: 700; text-align: center; }
+.repairflow__timeline li::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; border-radius: 999px; background: #e6e7eb; }
+.repairflow__timeline li.is-done { color: #16181d; }
+.repairflow__timeline li.is-done::before { background: var(--cat-accent); }
+
+/* Comprar produtos | Solicitar manutenção (topo do catálogo). */
+.catalog-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: min(100%, 520px); margin: 12px auto 0; padding: 5px; border-radius: 18px; background: #fff; box-shadow: 0 3px 14px rgba(22, 24, 29, 0.06); box-sizing: border-box; }
+.catalog-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border: 0; border-radius: 14px; background: transparent; color: #4b5563; font: inherit; font-size: .92rem; font-weight: 800; cursor: pointer; }
+.catalog-switch button.is-on { background: color-mix(in srgb, var(--cat-accent, #e4572e) 12%, #fff); color: var(--cat-accent, #e4572e); }
+.catalog-switch svg { width: 18px; height: 18px; }
+@media (max-width: 560px) {
+  .repairflow__service { grid-template-columns: 24px minmax(0, 1fr); }
+  .repairflow__service-price { grid-column: 2; justify-items: start; text-align: left; }
+  .repairflow__options { padding-left: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media print { .catalog-switch, .repairflow { display: none !important; } }
+@media (max-width: 420px) {
+  .catalog-switch { width: calc(100% - 24px); }
+  .catalog-switch button { gap: 6px; padding: 0 6px; font-size: .82rem; white-space: nowrap; }
+  .catalog-switch svg { width: 16px; height: 16px; }
+}

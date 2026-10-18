@@ -7,6 +7,8 @@ export type SalesCatalog = CatalogLook & {
   hideSoldOut: boolean;
   /** Produtos sob encomenda entram sempre (mesmo sem marcar). */
   includeOrderProducts: boolean;
+  /** Mostra "Solicitar manutenção" no link (com serviços no Catálogo de manutenções). */
+  showRepairs?: boolean;
   productIds: string[];
   /** Faixa "Destaques" no topo da página de venda. */
   featuredIds: string[];

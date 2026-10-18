@@ -47,6 +47,7 @@ const blank = (): SalesCatalogInput => ({
   showPrices: true,
   hideSoldOut: true,
   includeOrderProducts: true,
+  showRepairs: true,
   featuredIds: [],
   note: '',
   productIds: [],
@@ -565,6 +566,9 @@ export function SalesCatalogPage() {
               </label>
               <label className="salescat__switch">
                 <input type="checkbox" checked={form.includeOrderProducts} onChange={(e) => update({ includeOrderProducts: e.target.checked })} /> Incluir sempre os produtos sob encomenda (mesmo sem marcar, inclusive os novos)
+              </label>
+              <label className="salescat__switch">
+                <input type="checkbox" checked={form.showRepairs !== false} onChange={(e) => update({ showRepairs: e.target.checked })} /> Mostrar “Solicitar manutenção” (serviços do Catálogo de manutenções da OS)
               </label>
               <label className="admin-field">
                 Observação no rodapé

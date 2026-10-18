@@ -4,6 +4,8 @@ import { CatalogDocument, catalogMoney, type CatalogItem, type CatalogVariant } 
 import { CatalogCheckout, type BagLine, type CheckoutMode } from '../components/CatalogCheckout';
 import { CatalogProductSheet } from '../components/CatalogProductSheet';
 import { apiPublicSalesCatalog } from '../services/salesCatalogApi';
+import { CatalogRepairFlow } from '../components/CatalogRepairFlow';
+import { apiPublicRepairBrands } from '../services/repairsApi';
 
 type Loaded = Awaited<ReturnType<typeof apiPublicSalesCatalog>>;
 const REFRESH_MS = 45_000;
@@ -37,6 +39,18 @@ export function CatalogPublicPage() {
   /** Produto aberto (página do produto). */
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  /** Comprar produtos | Solicitar manutenção (só aparece se a loja tem serviços no Catálogo de manutenções). */
+  const [tab, setTab] = useState<'shop' | 'repair'>(() => (params.get('manutencao') === '1' ? 'repair' : 'shop'));
+  const [repairBrands, setRepairBrands] = useState<Array<{ brand: string; models: string[] }>>([]);
+  useEffect(() => {
+    let alive = true;
+    apiPublicRepairBrands(token)
+      .then((result) => alive && setRepairBrands(result.brands))
+      .catch(() => alive && setRepairBrands([]));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
   const toastTimer = useRef<number | undefined>(undefined);
 
   const load = useCallback(
@@ -64,7 +78,7 @@ export function CatalogPublicPage() {
   // Página aberta há tempo (cliente ou loja): quando o Marthi atualiza, recarrega sozinha para o visual
   // ficar igual ao configurado — só se não houver nada na sacola nem pedido/produto aberto.
   const idle = useRef(true);
-  idle.current = !bag.length && !checkout && !openId;
+  idle.current = !bag.length && !checkout && !openId && tab !== 'repair';
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.hidden || !idle.current) return;
@@ -139,14 +153,37 @@ export function CatalogPublicPage() {
   const total = bag.reduce((sum, line) => sum + (line.variant?.price ?? line.item.price) * line.qty, 0);
   return (
     <main style={{ minHeight: '100dvh', background: '#f3f4f6', paddingBottom: count ? 88 : 0 }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-        <CatalogDocument
-          look={data.catalog}
-          store={data.store}
-          items={data.items}
-          shop={{ canBuy: sells, onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
-        />
-      </div>
+      {repairBrands.length ? (
+        <div className="catalog-switch" role="tablist" aria-label="O que você procura" style={{ ['--cat-accent' as string]: data.catalog.accent }}>
+          <button type="button" role="tab" aria-selected={tab === 'shop'} className={tab === 'shop' ? 'is-on' : ''} onClick={() => setTab('shop')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 8h12l-1 12H7L6 8z" />
+              <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+            </svg>
+            Comprar produtos
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'repair'} className={tab === 'repair' ? 'is-on' : ''} onClick={() => setTab('repair')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5 2.5-2.5z" />
+            </svg>
+            Solicitar manutenção
+          </button>
+        </div>
+      ) : null}
+      {tab === 'repair' && repairBrands.length ? (
+        <div style={{ padding: 12 }}>
+          <CatalogRepairFlow token={token} brands={repairBrands} store={data.store} accent={data.catalog.accent} />
+        </div>
+      ) : (
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <CatalogDocument
+            look={data.catalog}
+            store={data.store}
+            items={data.items}
+            shop={{ canBuy: sells, onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
+          />
+        </div>
+      )}
       {openId && data.items.find((item) => item.id === openId) ? (
         <CatalogProductSheet
           item={data.items.find((item) => item.id === openId)!}

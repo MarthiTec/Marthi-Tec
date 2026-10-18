@@ -16,6 +16,7 @@ import { usePanelTheme } from '../../hooks/usePanelTheme';
 import { AdminPicker } from '../../components/AdminPicker';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import { OsEcosystemMenu } from './OsEcosystemMenu';
+import { useNewRepairRequests } from './RepairRequestsBadge';
 import { getActiveOperation, listOperations, OS_STATE_EVENT } from '../../data/osStore';
 import '../admin/admin.css';
 import './os.css';
@@ -26,6 +27,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/os/conta': { kicker: 'Oficina', title: 'Meu perfil' },
   '/os/nova': { kicker: 'Oficina', title: 'Nova ordem de serviço' },
   '/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
+  '/os/solicitacoes': { kicker: 'Oficina', title: 'Solicitações de orçamento' },
+  '/os/manutencoes': { kicker: 'Oficina', title: 'Catálogo de manutenções' },
 };
 
 function resolveTitle(pathname: string, search: string) {
@@ -107,6 +110,7 @@ export function OsLayout() {
   }, [datePresetParam, rawOpParam, activeOp.id]);
 
   const title = resolveTitle(location.pathname, location.search);
+  const newRepairs = useNewRepairRequests();
   const isBoard = location.pathname === '/os';
   const isProfile =
     location.pathname === '/os/perfil' || location.pathname === '/os/conta';
@@ -366,6 +370,15 @@ export function OsLayout() {
             <button type="button" onClick={() => go('/os?quote=sent')}>
               <kbd>Alt+Q</kbd>
               <span>Orçamentos</span>
+            </button>
+            <button type="button" onClick={() => go('/os/solicitacoes')} title="Pedidos de manutenção feitos pelo catálogo digital">
+              <AdminIcon name="inbox" />
+              <span>Solicitações de orçamento</span>
+              {newRepairs ? <em className="os-app__nav-badge" aria-label={`${newRepairs} novas`}>{newRepairs}</em> : null}
+            </button>
+            <button type="button" onClick={() => go('/os/manutencoes')}>
+              <AdminIcon name="wrench" />
+              <span>Catálogo de manutenções</span>
             </button>
             <button type="button" onClick={() => go('/os?status=progress')}>
               <kbd>F9</kbd>

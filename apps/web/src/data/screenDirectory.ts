@@ -38,6 +38,8 @@ const WORDS: Record<string, string> = {
   '/os': 'ordem de servico conserto assistencia reparo oficina',
   '/painel/os': 'ordem de servico conserto assistencia',
   '/painel/os/agenda': 'agenda agendamento',
+  '/painel/os/solicitacoes': 'orcamento manutencao conserto pedido cliente catalogo protocolo',
+  '/painel/os/manutencoes': 'servicos manutencao tela bateria preco conserto catalogo',
   '/erp': 'retaguarda erp',
   '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',

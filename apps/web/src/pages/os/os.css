@@ -9840,3 +9840,8 @@
 .is-theme-dark .os-ecosystem-card.is-locked:hover {
   background: transparent;
 }
+/* Indicador de novas solicitações de orçamento no menu da oficina. */
+.os-app__nav-badge { margin-left: auto; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #dc2626; color: #fff; font-size: .7rem; font-style: normal; font-weight: 800; text-align: center; }
+/* A coluna do app acompanha a largura da tela (no celular o conteúdo passava de 375px e era cortado). */
+.os-app { grid-template-columns: minmax(0, 1fr); }
+.os-app__body { grid-template-columns: minmax(0, 1fr); }

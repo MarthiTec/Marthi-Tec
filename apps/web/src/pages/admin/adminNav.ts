@@ -69,6 +69,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/os', label: 'Abrir oficina', openApp: true, accent: '#b45309' },
       { to: '/painel/os', label: 'Visão no painel', end: true },
       { to: '/painel/os/agenda', label: 'Agenda' },
+      { to: '/painel/os/solicitacoes', label: 'Solicitações de orçamento' },
+      { to: '/painel/os/manutencoes', label: 'Catálogo de manutenções' },
     ],
   },
   {
