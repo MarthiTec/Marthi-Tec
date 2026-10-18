@@ -6,6 +6,7 @@ import { DemoLeadGate } from '../components/DemoLeadGate';
 import { useAuth } from '../contexts/AuthContext';
 import {
   MARTHI_PRODUCTS,
+  MARTHI_PUBLIC_PRODUCT_IDS,
   MARTHI_SEGMENTS,
   type MarthiProduct,
   type MarthiProductId,
@@ -40,22 +41,25 @@ function productUnlocked(product: MarthiProduct, contracted: boolean) {
   return false;
 }
 
-type ProductCategory = 'all' | 'loja' | 'food' | 'oficina' | 'gestao' | 'fiscal-ecom';
+type ProductCategory = 'all' | 'loja' | 'oficina' | 'gestao' | 'fiscal';
 
 const CATEGORY_FILTERS: Array<{ id: ProductCategory; label: string }> = [
-  { id: 'all', label: 'Todos os Módulos' },
-  { id: 'loja', label: 'Frente de Loja & Balcão' },
-  { id: 'food', label: 'Alimentação & Cardápio' },
-  { id: 'oficina', label: 'Oficina & Serviços' },
-  { id: 'gestao', label: 'Retaguarda & Gestão' },
-  { id: 'fiscal-ecom', label: 'Fiscal & Canais Online' },
+  { id: 'all', label: 'Todos os módulos' },
+  { id: 'loja', label: 'Vitrine & balcão' },
+  { id: 'oficina', label: 'Manutenção & OS' },
+  { id: 'gestao', label: 'Retaguarda & gestão' },
+  { id: 'fiscal', label: 'Fiscal & CRM' },
 ];
+
+const PUBLIC_PRODUCTS = MARTHI_PUBLIC_PRODUCT_IDS.map(
+  (id) => MARTHI_PRODUCTS.find((item) => item.id === id)!,
+).filter(Boolean);
 
 export function ProductsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [contracted, setContracted] = useState(() => isStoreContracted());
-  const [activeId, setActiveId] = useState<MarthiProductId>(MARTHI_PRODUCTS[0]?.id ?? 'totem');
+  const [activeId, setActiveId] = useState<MarthiProductId>(PUBLIC_PRODUCTS[0]?.id ?? 'catalogo');
   const [category, setCategory] = useState<ProductCategory>('all');
   const [demoGate, setDemoGate] = useState<{ product: 'totem' | 'caixa' | 'os'; to: string } | null>(
     null,
@@ -84,10 +88,10 @@ export function ProductsPage() {
     if (user) setContracted(true);
   }, [user]);
 
-  const active = MARTHI_PRODUCTS.find((item) => item.id === activeId) ?? MARTHI_PRODUCTS[0];
-  const activeIndex = MARTHI_PRODUCTS.findIndex((item) => item.id === activeId);
+  const active = PUBLIC_PRODUCTS.find((item) => item.id === activeId) ?? PUBLIC_PRODUCTS[0];
+  const activeIndex = PUBLIC_PRODUCTS.findIndex((item) => item.id === activeId);
   const isEdgeFirst = activeIndex <= 0;
-  const isEdgeLast = activeIndex === MARTHI_PRODUCTS.length - 1;
+  const isEdgeLast = activeIndex === PUBLIC_PRODUCTS.length - 1;
 
   useLayoutEffect(() => {
     function updateBridge() {
@@ -166,24 +170,23 @@ export function ProductsPage() {
     setContactPhone('');
   }
 
-  // Filter products for the quick grid
-  const filteredProducts = MARTHI_PRODUCTS.filter((product) => {
+  // Filter products for the quick grid (marketing público: celular-first)
+  const filteredProducts = PUBLIC_PRODUCTS.filter((product) => {
     if (category === 'all') return true;
     if (category === 'loja') {
       return (
         product.id === 'totem' ||
         product.id === 'pdv' ||
         product.id === 'catalogo' ||
-        product.id === 'cotacao'
+        product.id === 'cotacao' ||
+        product.id === 'ads'
       );
     }
-    if (category === 'food') return product.id === 'cardapio';
     if (category === 'oficina') return product.id === 'os';
     if (category === 'gestao') {
-      return product.id === 'erp' || product.id === 'painel' || product.id === 'ads';
+      return product.id === 'erp' || product.id === 'painel';
     }
-    if (category === 'fiscal-ecom')
-      return product.id === 'fiscal' || product.id === 'ecommerce' || product.id === 'crm';
+    if (category === 'fiscal') return product.id === 'fiscal' || product.id === 'crm';
     return true;
   });
 
@@ -199,11 +202,10 @@ export function ProductsPage() {
         <section className="products-hero">
           <div className="products-hero__copy">
             <p className="eyebrow">Catálogo Marthi</p>
-            <h1>Tudo que o seu negócio precisa — da vitrine e cardápio ao fiscal.</h1>
+            <h1>Para loja de celular — da vitrine à oficina.</h1>
             <p>
-              Totem touch, Cardápio Digital com QR Code e KDS, PDV veloz com persistência blindada,
-              Orçamentos comerciais em PDF por WhatsApp, ordem de serviço técnica, Retaguarda completa,
-              emissor fiscal e integração com marketplaces.
+              Catálogo e cotação de aparelhos, Marthi ADS, totem, PDV, OS de manutenção, estoque,
+              fiscal e CRM — o ecossistema focado em varejo e assistência de celular.
             </p>
             <div className="products-hero__actions">
               <a href="#catalogo" className="btn btn--primary btn--with-icon">
@@ -235,8 +237,8 @@ export function ProductsPage() {
         {/* Segmentos Atendidos */}
         <section className="section products-segments" aria-labelledby="segments-title">
           <div className="section__head">
-            <p className="eyebrow">Soluções por Ramo</p>
-            <h2 id="segments-title">Projetado para o seu modelo de negócio</h2>
+            <p className="eyebrow">Foco atual</p>
+            <h2 id="segments-title">Feito para loja e assistência de celular</h2>
           </div>
           <div className="products-segments__grid">
             {MARTHI_SEGMENTS.map((segment) => (
@@ -252,9 +254,9 @@ export function ProductsPage() {
         <section id="catalogo" className="section products-catalog">
           <div className="section__head">
             <p className="eyebrow">Ecossistema Integrado</p>
-            <h2>Oito módulos. Uma experiência completa.</h2>
+            <h2>Módulos para operar a loja de celular.</h2>
             <p style={{ margin: '8px auto 0', maxWidth: '48ch', color: '#64748b' }}>
-              Clique em cada solução para conferir as funcionalidades detalhadas, abrir a demonstração ou
+              Clique em cada solução para conferir as funcionalidades, abrir a demonstração ou
               adicionar ao seu plano.
             </p>
           </div>
@@ -271,7 +273,7 @@ export function ProductsPage() {
             style={{ ['--product-accent' as string]: active.accent }}
           >
             <nav className="products-catalog__nav" aria-label="Lista de produtos">
-              {MARTHI_PRODUCTS.map((product) => (
+              {PUBLIC_PRODUCTS.map((product) => (
                 <button
                   key={product.id}
                   type="button"
@@ -402,7 +404,7 @@ export function ProductsPage() {
               <h2>Quer ver funcionando na prática?</h2>
               <p>
                 Deixe seu contato ou chame no WhatsApp. Um especialista Marthi monta uma demonstração
-                completa personalizada com a realidade do seu ramo.
+                com a realidade da sua loja ou assistência de celular.
               </p>
             </div>
             <form onSubmit={submitInterest}>

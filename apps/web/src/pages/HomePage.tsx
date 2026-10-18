@@ -17,24 +17,22 @@ import {
   marthiWhatsAppHref,
 } from '../data/companyContact';
 import { hasModule } from '../data/storePlan';
-import { useStoreCustomization } from '../data/storeSegment';
 import './home.css';
 import './products.css';
 
 const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
 const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
 
+/** Produtos em evidência na home — foco comercial atual: loja / assistência de celular. */
 const HOME_PRODUCT_IDS = [
   'catalogo',
   'cotacao',
   'ads',
   'totem',
-  'cardapio',
   'pdv',
   'os',
   'erp',
   'fiscal',
-  'ecommerce',
   'crm',
   'painel',
 ] as const;
@@ -44,7 +42,7 @@ const HOME_PILLARS = [
     id: 'catalogo',
     eyebrow: 'Vitrine',
     title: 'Catálogo digital',
-    text: 'Link ou PDF com o estoque real: o cliente vê, chama no WhatsApp ou compra na página de venda.',
+    text: 'Aparelhos novos e usados do estoque, com link ou PDF: o cliente vê, chama no WhatsApp ou compra na página de venda.',
     href: '/produtos',
     cta: 'Conhecer o catálogo',
   },
@@ -52,7 +50,7 @@ const HOME_PILLARS = [
     id: 'cotacao',
     eyebrow: 'Balcão',
     title: 'Cotação de preços',
-    text: 'Custo do dia, margem, cartão e troca — preço certo na frente do cliente, virando orçamento.',
+    text: 'Custo do dia, margem, cartão e troca de aparelho — preço certo na frente do cliente, virando orçamento.',
     href: '/produtos',
     cta: 'Ver cotação',
   },
@@ -60,7 +58,7 @@ const HOME_PILLARS = [
     id: 'ads',
     eyebrow: 'Alcance',
     title: 'Marthi ADS',
-    text: 'Anuncie produtos do cadastro no Facebook e acompanhe campanhas sem sair do painel.',
+    text: 'Anuncie celulares e acessórios do cadastro no Facebook e acompanhe campanhas sem sair do painel.',
     href: '/produtos',
     cta: 'Conhecer o ADS',
   },
@@ -118,7 +116,7 @@ export function HomePage() {
   const [jobExp, setJobExp] = useState('');
   const [jobFeedback, setJobFeedback] = useState('');
 
-  const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os' | 'cardapio'>('erp');
+  const [showcase, setShowcase] = useState<'pdv' | 'erp' | 'painel' | 'os'>('erp');
 
   const showcaseImage =
     showcase === 'pdv'
@@ -127,26 +125,21 @@ export function HomePage() {
         ? '/home/showcase-erp.jpg'
         : showcase === 'painel'
           ? '/home/showcase-painel.jpg'
-          : showcase === 'cardapio'
-            ? '/home/showcase-painel.jpg'
-            : '/home/showcase-os.jpg';
+          : '/home/showcase-os.jpg';
 
   const showcaseCaption =
     showcase === 'pdv'
-      ? 'PDV · Caixa blindado com persistência e promoções'
+      ? 'PDV · Venda de aparelhos novos e usados no balcão'
       : showcase === 'erp'
-        ? 'Marthi · Retaguarda com Orçamentos e Campanhas'
+        ? 'Marthi · Estoque, orçamentos e campanhas da loja de celular'
         : showcase === 'painel'
           ? 'Painel da operação · KPIs e gráficos'
-          : showcase === 'cardapio'
-            ? 'Cardápio Digital & Food · QR Code na mesa e KDS Cozinha'
-            : 'Marthi OS · Quadro da oficina e garantia';
+          : 'Marthi OS · Manutenção e garantia de celulares';
 
   const showCaixa = contracted && hasModule('erp');
   const showTotem = contracted && hasModule('totem');
   const showOs = contracted && hasModule('os');
   const showFiscal = contracted && hasModule('fiscal');
-  const storeCustom = useStoreCustomization();
   /** Em apresentação ao vivo, abre módulos direto (sem pedir login). */
   const liveOpen =
     liveReady || hasDemoAccess('totem') || hasDemoAccess('caixa') || hasDemoAccess('os');
@@ -279,10 +272,10 @@ export function HomePage() {
             <p className="hero__brand" aria-label="Marthi">
               Marthi
             </p>
-            <h1>Do catálogo ao fechamento — a loja no comando.</h1>
+            <h1>Loja de celular no comando — da vitrine à oficina.</h1>
             <p>
-              Plataforma para o varejo brasileiro: vitrine digital, cotação no balcão, anúncios e operação
-              completa no mesmo ritmo.
+              Venda de aparelhos novos e usados, manutenção com OS e operação completa: catálogo,
+              cotação, PDV, estoque e fiscal no mesmo ritmo.
             </p>
             <div className="hero__actions">
               <Link to="/parceiro" className="btn btn--primary btn--hero">
@@ -299,10 +292,10 @@ export function HomePage() {
           <div className="pillars__inner">
             <header className="pillars__head">
               <p className="eyebrow">Em evidência</p>
-              <h2 id="pillars-title">O que a loja usa para vender agora.</h2>
+              <h2 id="pillars-title">O que a loja de celular usa para vender agora.</h2>
               <p>
-                Três frentes que o mercado pede — e que já estão na Marthi, integradas ao estoque e ao
-                painel.
+                Vitrine de aparelhos, preço certo no balcão e anúncios — integrados ao estoque e ao
+                painel Marthi.
               </p>
             </header>
             <ul className="pillars__list">
@@ -330,11 +323,11 @@ export function HomePage() {
               <p className="eyebrow">Produto em destaque</p>
               <h2 id="spotlight-title">Totem de autoatendimento</h2>
               <p>
-                O cliente escolhe no touch, a loja recebe o interesse no WhatsApp e no painel.
-                Ideal para varejo, assistência e showroom — sem fila no balcão.
+                O cliente escolhe aparelhos e serviços no touch; a loja recebe o interesse no WhatsApp
+                e no painel — ideal para varejo de celular e assistência, sem fila no balcão.
               </p>
               <ul className="spotlight__list">
-                <li>Catálogo touch com fotos e opções</li>
+                <li>Catálogo touch de aparelhos e acessórios</li>
                 <li>Lead automático no WhatsApp da loja</li>
                 <li>Insights de conversão no painel</li>
                 <li>Marca da loja personalizável</li>
@@ -371,22 +364,22 @@ export function HomePage() {
         <section className="journey" aria-labelledby="journey-title">
           <div className="journey__inner">
             <p className="eyebrow">Como funciona</p>
-            <h2 id="journey-title">Da vitrine ao fechamento, sem fricção.</h2>
+            <h2 id="journey-title">Da vitrine à bancada, sem fricção.</h2>
             <ol className="journey__steps">
               <li>
                 <span className="journey__num">01</span>
                 <strong>Cliente encontra</strong>
-                <p>Catálogo digital, totem ou anúncio Marthi ADS — o estoque real chega ao cliente.</p>
+                <p>Catálogo, totem ou Marthi ADS — aparelhos novos e usados do estoque real.</p>
               </li>
               <li>
                 <span className="journey__num">02</span>
                 <strong>A loja fecha</strong>
-                <p>Cotação no balcão, WhatsApp e PDV no mesmo ritmo do interesse.</p>
+                <p>Cotação com troca, WhatsApp e PDV no mesmo ritmo do interesse.</p>
               </li>
               <li>
                 <span className="journey__num">03</span>
                 <strong>Equipe opera</strong>
-                <p>ERP, OS, fiscal, CRM e e-commerce — a retaguarda acompanha a venda.</p>
+                <p>Estoque, OS de manutenção, fiscal e CRM — a retaguarda acompanha a venda.</p>
               </li>
             </ol>
           </div>
@@ -396,10 +389,10 @@ export function HomePage() {
           <div className="showcase__inner">
             <div className="showcase__copy">
               <p className="eyebrow">Por dentro do sistema</p>
-              <h2 id="showcase-title">Retaguarda, painel e oficina — as telas reais da loja.</h2>
+              <h2 id="showcase-title">Retaguarda, PDV e oficina — as telas da loja de celular.</h2>
               <p>
-                Retaguarda dark da Marthi, painel de operação e quadro da oficina. Troque as
-                abas e veja o visual que a equipe usa no dia a dia.
+                Estoque de aparelhos, caixa no balcão e quadro de manutenção. Troque as abas e veja
+                o visual que a equipe usa no dia a dia.
               </p>
               <div className="showcase__tabs" role="tablist" aria-label="Telas do sistema">
                 <button
@@ -423,15 +416,6 @@ export function HomePage() {
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={showcase === 'cardapio'}
-                  className={showcase === 'cardapio' ? 'is-active' : ''}
-                  onClick={() => setShowcase('cardapio')}
-                >
-                  Cardápio & Food
-                </button>
-                <button
-                  type="button"
-                  role="tab"
                   aria-selected={showcase === 'os'}
                   className={showcase === 'os' ? 'is-active' : ''}
                   onClick={() => setShowcase('os')}
@@ -451,30 +435,23 @@ export function HomePage() {
               <ul className="showcase__bullets">
                 {showcase === 'erp' ? (
                   <>
-                    <li>Orçamentos comerciais em PDF com envio por WhatsApp e E-mail</li>
-                    <li>Motor de Campanhas Promocionais: Leve X Pague Y e faixas por volume</li>
-                    <li>Estoque com custo médio, balanço, fornecedores e financeiro integrado</li>
+                    <li>Orçamentos de aparelhos em PDF com envio por WhatsApp e E-mail</li>
+                    <li>Campanhas promocionais e controle de estoque (IMEI, novos e usados)</li>
+                    <li>Fornecedores, custo médio e financeiro integrados à loja</li>
                   </>
                 ) : null}
                 {showcase === 'pdv' ? (
                   <>
-                    <li>Caixa veloz com persistência blindada contra queda de energia e F5</li>
-                    <li>Conversão direta de Orçamentos em venda no balcão com 1 clique</li>
-                    <li>Aplicação automática de campanhas, desconto e emissão de NFC-e</li>
-                  </>
-                ) : null}
-                {showcase === 'cardapio' ? (
-                  <>
-                    <li>Cardápio interativo via QR Code nas mesas e comanda digital</li>
-                    <li>Fila ao vivo na TV da cozinha (KDS) e pedidos em tablets para garçons</li>
-                    <li>Integração instantânea com estoque e fechamento no caixa</li>
+                    <li>Caixa veloz para venda de celulares e acessórios no balcão</li>
+                    <li>Conversão de orçamentos e trocas em venda com 1 clique</li>
+                    <li>Campanhas, desconto e emissão de NFC-e no fechamento</li>
                   </>
                 ) : null}
                 {showcase === 'os' ? (
                   <>
-                    <li>Quadro Kanban: aberta, diagnóstico, aguardando, em serviço, pronta</li>
-                    <li>Envio de Ordem de Serviço e Termo de Garantia em PDF por WhatsApp</li>
-                    <li>Integração de peças com o estoque e recebimento direto no PDV</li>
+                    <li>Quadro Kanban da assistência: aberta, diagnóstico, em serviço, pronta</li>
+                    <li>OS e termo de garantia em PDF por WhatsApp</li>
+                    <li>Peças no estoque e recebimento direto no PDV</li>
                   </>
                 ) : null}
                 {showcase === 'painel' ? (
@@ -505,11 +482,6 @@ export function HomePage() {
                       Ver demo do PDV
                     </button>
                   )
-                ) : null}
-                {showcase === 'cardapio' ? (
-                  <Link to="/cardapio" className="btn btn--primary">
-                    Abrir Cardápio Digital
-                  </Link>
                 ) : null}
                 {showcase === 'os' ? (
                   showOs || liveOpen ? (
@@ -555,26 +527,10 @@ export function HomePage() {
                   <span>Abrir autoatendimento</span>
                 </Link>
               ) : null}
-              <Link to="/cardapio" className="launch-card launch-card--accent">
-                <strong>Cardápio Digital</strong>
-                <span>QR Code e pedidos na mesa</span>
-              </Link>
               {showCaixa ? (
                 <Link to={caixaHref} className="launch-card">
                   <strong>Caixa / PDV</strong>
                   <span>{user || liveOpen ? 'Abrir caixa blindado' : 'Entrar e abrir o caixa'}</span>
-                </Link>
-              ) : null}
-              {(showCaixa || showTotem) && storeCustom.showTablesAndKitchen ? (
-                <Link to="/mesa" className="launch-card">
-                  <strong>Mesas</strong>
-                  <span>Garçom lança pedido no tablet</span>
-                </Link>
-              ) : null}
-              {(showCaixa || showTotem) && storeCustom.showTablesAndKitchen ? (
-                <Link to="/cozinha" className="launch-card">
-                  <strong>Cozinha</strong>
-                  <span>Fila ao vivo na TV da cozinha</span>
                 </Link>
               ) : null}
               {showOs ? (
@@ -601,10 +557,10 @@ export function HomePage() {
           </figure>
           <div className="split__copy">
             <p className="eyebrow">Sobre nós</p>
-            <h2 id="split-title">Construímos a operação completa da loja.</h2>
+            <h2 id="split-title">Operação completa para loja de celular.</h2>
             <p>
-              Catálogo digital, cotação, Marthi ADS, totem, PDV, OS, fiscal, CRM e e-commerce — um
-              ecossistema para vender e operar sem fricção entre canais.
+              Catálogo, cotação, Marthi ADS, totem, PDV, OS de manutenção, estoque, fiscal e CRM —
+              tudo pensado para varejo e assistência de aparelhos.
             </p>
             <Link to="/produtos" className="btn btn--primary">
               Conhecer os produtos
@@ -615,7 +571,7 @@ export function HomePage() {
         <section id="produtos" className="section home-products">
           <div className="section__head">
             <p className="eyebrow">Produtos</p>
-            <h2>Catálogo, cotação, ADS e a operação completa</h2>
+            <h2>Do aparelho na vitrine à OS na bancada</h2>
           </div>
           <div className="home-products__grid">
             {homeProducts.map((product) => (
@@ -641,11 +597,10 @@ export function HomePage() {
         <section id="planos" className="section section--plans">
           <div className="section__head">
             <p className="eyebrow">Planos</p>
-            <h2>Escolha o ritmo da sua operação</h2>
+            <h2>Escolha o ritmo da sua loja de celular</h2>
             <p className="section__sub">
-              O painel da loja entra em todo plano. Catálogo digital, cotação, Marthi ADS, Totem e
-              Cardápio, OS, PDV + Retaguarda, Fiscal ou E-commerce — você combina conforme Bronze,
-              Silver ou Golden.
+              O painel entra em todo plano. Catálogo, cotação, Marthi ADS, Totem, OS de manutenção,
+              PDV + Retaguarda e Fiscal — combine conforme Bronze, Silver ou Golden.
             </p>
           </div>
           <div className="plans">
@@ -700,7 +655,7 @@ export function HomePage() {
               <h2>Trabalhe conosco</h2>
               <p>
                 Quer vender Marthi? Cadastre-se e fale com a gente no WhatsApp. Buscamos vendedores
-                para atender lojas e levar totem, PDV, OS, fiscal e CRM ao mercado.
+                para atender lojas de celular e assistência com totem, PDV, OS, fiscal e CRM.
               </p>
               <ul className="careers__list">
                 <li>Comissão por negócio fechado</li>
