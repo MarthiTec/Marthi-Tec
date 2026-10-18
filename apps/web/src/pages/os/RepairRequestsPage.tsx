@@ -132,7 +132,7 @@ export function RepairRequestsPage() {
                     <b>{request.customerName}</b> · {request.brand} {request.model}
                   </span>
                   <small>
-                    {request.items.length ? request.items.map(itemLabel).join(', ') : 'Sem serviço escolhido — ver relato'} · {request.estimatedTotal > 0 ? repairMoney(request.estimatedTotal) : 'Valor a avaliar'}
+                    {request.items.length ? request.items.map(itemLabel).join(', ') : request.wantsDiagnosis ? 'Avaliação técnica — cliente não sabe o defeito' : 'Sem serviço escolhido — ver relato'} · {request.estimatedTotal > 0 ? repairMoney(request.estimatedTotal) : 'Valor a avaliar'}
                     {request.hasEvaluation && request.estimatedTotal > 0 ? ' + avaliação' : ''} · {when(request.createdAt)}
                   </small>
                 </button>
@@ -239,7 +239,9 @@ function RepairRequestDetail({
   const cleanEvaluation = (): RepairEvaluation => ({ ...evaluation, items: items.filter((item) => item.name.trim()) });
 
   async function convert() {
-    if (!window.confirm(`Abrir a OS de ${request.brand} ${request.model} para ${evaluation.customer?.name || request.customerName} no valor de ${repairMoney(total)}?`)) return;
+    const forDiagnosis = request.wantsDiagnosis && !items.some((item) => item.name.trim()) && !evaluation.diagnosis?.found;
+    const who = evaluation.customer?.name || request.customerName;
+    if (!window.confirm(forDiagnosis ? `Abrir a OS de ${request.brand} ${request.model} para ${who} para avaliação técnica? O técnico diagnostica e faz o orçamento dentro da OS.` : `Abrir a OS de ${request.brand} ${request.model} para ${who} no valor de ${repairMoney(total)}?`)) return;
     const savedNow = await update({ evaluation: cleanEvaluation() }, 'Avaliação salva.');
     if (!savedNow) return;
     setBusy(true);
@@ -301,6 +303,7 @@ function RepairRequestDetail({
           Estimativa: <b>{request.estimatedTotal > 0 ? repairMoney(request.estimatedTotal) : 'a avaliar'}</b>
           {request.hasEvaluation && request.estimatedTotal > 0 ? ' + itens sob avaliação' : ''}
         </p>
+        {request.wantsDiagnosis ? <p className="repairs__diagnosis">Cliente não sabe o que o aparelho tem: pediu avaliação técnica. Dá para abrir a OS sem serviço — o técnico diagnostica e orça dentro da OS.</p> : null}
         {request.description ? <blockquote>{request.description}</blockquote> : null}
       </section>
 
@@ -325,8 +328,13 @@ function RepairRequestDetail({
               Aguardar aparelho
             </button>
           ) : null}
+          {!evaluating && request.wantsDiagnosis && !request.items.length ? (
+            <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void convert()}>
+              Aparelho na loja: abrir OS para avaliação
+            </button>
+          ) : null}
           {!evaluating ? (
-            <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void update({ status: 'evaluating' }, 'Avaliação presencial iniciada.')}>
+            <button type="button" className={`btn ${request.wantsDiagnosis && !request.items.length ? 'btn--ghost' : 'btn--primary'}`} disabled={busy} onClick={() => void update({ status: 'evaluating' }, 'Avaliação presencial iniciada.')}>
               Iniciar avaliação presencial
             </button>
           ) : null}
@@ -539,8 +547,8 @@ function RepairRequestDetail({
               </label>
             </div>
             <p className="repairs__muted">O orçamento inicial não autoriza o reparo: só abra a OS depois de o cliente aprovar serviços, valor e prazo.</p>
-            <button type="button" className="btn btn--primary repairs__convert" disabled={busy || (!items.length && !evaluation.diagnosis?.found)} onClick={() => void convert()}>
-              {busy ? 'Abrindo…' : 'Aprovar e abrir Ordem de Serviço'}
+            <button type="button" className="btn btn--primary repairs__convert" disabled={busy || (!items.length && !evaluation.diagnosis?.found && !request.wantsDiagnosis)} onClick={() => void convert()}>
+              {busy ? 'Abrindo…' : !items.length && !evaluation.diagnosis?.found && request.wantsDiagnosis ? 'Abrir OS para avaliação técnica' : 'Aprovar e abrir Ordem de Serviço'}
             </button>
           </section>
         </>

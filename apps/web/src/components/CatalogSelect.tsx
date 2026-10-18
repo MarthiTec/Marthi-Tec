@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { filterChoices } from './ChoiceField';
 import './catalogSelect.css';
 
 export type CatalogSelectOption = { value: string; label: string };
@@ -21,7 +22,12 @@ export function CatalogSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [term, setTerm] = useState('');
   const [place, setPlace] = useState<CSSProperties | null>(null);
+  /** Muitas opções (ex.: várias marcas): a lista ganha busca. */
+  const searchable = options.length > 8;
+  const shown = searchable ? filterChoices(options, term) : options;
+  const search = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const listId = useId();
@@ -42,21 +48,30 @@ export function CatalogSelect({
   useEffect(() => {
     if (!open) return;
     setActive(Math.max(0, options.findIndex((option) => option.value === value)));
+    setTerm('');
     const outside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!trigger.current?.contains(target) && !list.current?.contains(target)) setOpen(false);
     };
-    const close = () => setOpen(false);
+    // Fecha ao rolar a página ou girar a tela — mas não ao rolar a própria lista nem quando o teclado
+    // do celular abre (só a altura muda).
+    const width = window.innerWidth;
+    const onResize = () => window.innerWidth !== width && setOpen(false);
+    const onScroll = (event: Event) => {
+      if (event.target instanceof Node && list.current?.contains(event.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', outside);
-    window.addEventListener('resize', close);
-    window.addEventListener('scroll', close, true);
-    window.setTimeout(() => list.current?.focus(), 0);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onScroll, true);
+    window.setTimeout(() => (searchable ? search.current : list.current)?.focus({ preventScroll: true }), 0);
     return () => {
       document.removeEventListener('mousedown', outside);
-      window.removeEventListener('resize', close);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll, true);
     };
-  }, [open, options, value]);
+  }, [open, options, value, searchable]);
+  useEffect(() => setActive(0), [term]);
 
   function pick(next: string) {
     onChange(next);
@@ -68,13 +83,13 @@ export function CatalogSelect({
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (!open) setOpen(true);
-      else setActive((index) => Math.min(index + 1, options.length - 1));
+      else setActive((index) => Math.min(index + 1, shown.length - 1));
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       setActive((index) => Math.max(index - 1, 0));
-    } else if ((event.key === 'Enter' || event.key === ' ') && open) {
+    } else if ((event.key === 'Enter' || (event.key === ' ' && !searchable)) && open) {
       event.preventDefault();
-      if (options[active]) pick(options[active].value);
+      if (shown[active]) pick(shown[active].value);
     } else if (event.key === 'Escape' || event.key === 'Tab') {
       setOpen(false);
     }
@@ -116,7 +131,13 @@ export function CatalogSelect({
                 <li className="catalog-select__title" aria-hidden="true">
                   {label}
                 </li>
-                {options.map((option, index) => (
+                {searchable ? (
+                  <li className="catalog-select__search" role="presentation">
+                    <input ref={search} type="search" value={term} placeholder={`Buscar ${label.toLowerCase()}…`} aria-label={`Buscar ${label.toLowerCase()}`} onChange={(event) => setTerm(event.target.value)} onKeyDown={onKey} />
+                  </li>
+                ) : null}
+                {!shown.length ? <li className="catalog-select__empty">Nada encontrado.</li> : null}
+                {shown.map((option, index) => (
                   <li
                     key={option.value}
                     id={`${listId}-${index}`}

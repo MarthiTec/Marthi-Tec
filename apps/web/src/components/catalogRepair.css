@@ -93,3 +93,17 @@ textarea.repairflow__input { resize: vertical; min-height: 84px; }
 .repairflow__combo-panel li.is-on { color: var(--cat-accent); }
 .repairflow__combo-empty { padding: 10px 12px; color: #6b7280; font-size: .84rem; }
 @keyframes combo-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* "Não sei o que é": avaliação técnica sem escolher serviço. */
+.repairflow__diagnosis { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; margin: 0 0 4px; padding: 12px 14px; border: 1.5px dashed #c3c7cd; border-radius: 14px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
+.repairflow__diagnosis:hover { border-color: var(--cat-accent); }
+.repairflow__diagnosis.is-on { border-style: solid; border-color: var(--cat-accent); background: color-mix(in srgb, var(--cat-accent) 5%, #fff); }
+.repairflow__diagnosis.is-on .repairflow__check { border-color: #16181d; background: #16181d; }
+.repairflow__diagnosis-tag { padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--cat-accent) 12%, #fff); color: var(--cat-accent); font-size: .74rem; font-weight: 800; white-space: nowrap; }
+.repairflow__or { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; color: #8a8f98; font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.repairflow__or::before, .repairflow__or::after { content: ''; flex: 1; height: 1px; background: #e6e7eb; }
+.repairflow__optional { margin-left: 8px; color: #8a8f98; font-size: .74rem; font-style: normal; font-weight: 600; }
+@media (max-width: 520px) {
+  .repairflow__diagnosis { grid-template-columns: 24px minmax(0, 1fr); }
+  .repairflow__diagnosis-tag { grid-column: 2; justify-self: start; }
+}

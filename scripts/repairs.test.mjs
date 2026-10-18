@@ -174,6 +174,27 @@ test('cliente acompanha pelo protocolo + WhatsApp; link sem manutenção não mo
   assert.equal((await pub(`/public/sales-catalogs/${catalog.token}/repairs`)).status, 404);
 });
 
+test('"não sei o que é": cliente pede só a avaliação técnica e a loja abre a OS para o técnico diagnosticar', async () => {
+  const shop = (await call('/sales-catalogs', 'POST', { title: 'Diagnóstico', productIds: [] })).data;
+  const sent = await pub(`/public/sales-catalogs/${shop.token}/repairs`, { ...M, diagnosis: true, items: [{ serviceId: battery.id }], customer: { name: 'Rita Gomes', phone: '(32) 96666-2222' } });
+  assert.equal(sent.status, 201, JSON.stringify(sent.error));
+  assert.equal(sent.data.estimatedTotal, 0);
+  assert.equal(sent.data.hasEvaluation, true);
+  assert.deepEqual(sent.data.items, [], 'avaliação técnica não leva serviço');
+  const saved = (await call('/repair-requests?q=' + sent.data.protocol)).data[0];
+  assert.equal(saved.wantsDiagnosis, true);
+  const track = await pub(`/public/sales-catalogs/${shop.token}/repairs/track?protocol=${sent.data.protocol}&phone=32966662222`);
+  assert.deepEqual(track.data.items, ['Avaliação técnica']);
+  const done = await call(`/repair-requests/${saved.id}/convert`, 'POST', { approvalMethod: 'presencial' });
+  assert.equal(done.status, 201, JSON.stringify(done.error));
+  const os = (await call(`/work-orders/${done.data.workOrderId}`)).data;
+  assert.equal(os.status, 'open');
+  assert.equal(os.quoteStatus, 'none', 'o orçamento é feito na OS depois do diagnóstico');
+  assert.equal(os.labor, 0);
+  assert.match(os.defect, /avaliação técnica/);
+  assert.match(os.notes, /não sabe o que o aparelho tem/);
+});
+
 test('manutenção ligada ao produto do cadastro, com venda e custo; custo nunca vai para o cliente', async () => {
   const phone = (await call('/stock', 'POST', { name: 'IPHONE 13', brand: 'apple', kind: 'device', qty: 0, price: 2500, cost: 2000 })).data;
   const otherPhone = (await call('/stock', 'POST', { name: 'IPHONE DA OUTRA', kind: 'device', qty: 0, price: 1, cost: 1 }, other, 'store-b')).data;

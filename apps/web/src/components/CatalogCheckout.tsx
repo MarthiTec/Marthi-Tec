@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { availabilityText, catalogMoney as money, UPGRADE_CHECKLIST, whatsappLink, type CatalogItem, type CatalogStore, type CatalogVariant } from './CatalogDocument';
 import { apiSubmitCatalogOrder, type CatalogCustomerInput, type CatalogSeller, type CatalogTradeInInput } from '../services/salesCatalogApi';
+import { ChoiceField } from './ChoiceField';
 import './catalogCheckout.css';
 
 export type BagLine = { key: string; item: CatalogItem; variant: CatalogVariant | null; qty: number };
@@ -269,16 +270,14 @@ export function CatalogCheckout({
         {sellers.length ? (
           <section className="checkout__card">
             <h3>Quem te atendeu?</h3>
-            <div className="checkout__chips">
-              <button type="button" className={!sellerId ? 'is-on' : ''} onClick={() => setSellerId('')}>
-                Ninguém ainda
-              </button>
-              {sellers.map((seller) => (
-                <button key={seller.id} type="button" className={sellerId === seller.id ? 'is-on' : ''} onClick={() => setSellerId(seller.id)}>
-                  {seller.name}
-                </button>
-              ))}
-            </div>
+            <ChoiceField
+              label="Quem te atendeu"
+              noun="vendedores"
+              placeholder="Ninguém ainda"
+              choices={[{ value: '', label: 'Ninguém ainda' }, ...sellers.map((seller) => ({ value: seller.id, label: seller.name }))]}
+              value={sellerId}
+              onChange={setSellerId}
+            />
           </section>
         ) : null}
 

@@ -60,6 +60,8 @@ export type RepairRequest = {
   items: RepairItem[];
   estimatedTotal: number;
   hasEvaluation: boolean;
+  /** Cliente não sabe o defeito: pediu só a avaliação técnica. */
+  wantsDiagnosis: boolean;
   description: string;
   evaluation: RepairEvaluation;
   history: Array<{ at: string; by: string; action: string; from?: string; to?: string; note?: string }>;
@@ -94,7 +96,7 @@ export const apiPublicRepairServices = (token: string, brand: string, model: str
   nestGet<PublicRepairService[]>(`${pub(token)}/services?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`);
 export const apiPublicSendRepair = (
   token: string,
-  body: { requestKey: string; brand: string; model: string; items: Array<{ serviceId: string; optionId?: string | null }>; description: string; customer: { name: string; phone: string }; website?: string },
+  body: { requestKey: string; brand: string; model: string; items: Array<{ serviceId: string; optionId?: string | null }>; diagnosis?: boolean; description: string; customer: { name: string; phone: string }; website?: string },
 ) => nestPost<{ protocol: string; estimatedTotal: number; hasEvaluation: boolean; items: RepairItem[] }>(pub(token), body);
 export type RepairTracking = { protocol: string; status: RepairStatus; statusLabel: string; device: string; items: string[]; createdAt: string; workOrder: { status: string; statusLabel: string; estimatedReadyAt: string } | null };
 export const apiPublicTrackRepair = (token: string, protocol: string, phone: string) =>

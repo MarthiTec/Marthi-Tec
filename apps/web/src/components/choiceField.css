@@ -1,0 +1,24 @@
+/* Escolha única do link do cliente: botões (poucas opções) ou lista com busca (muitas). */
+.choice-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice-chips button { min-height: 42px; padding: 0 16px; border: 1px solid #d8dbe0; border-radius: 999px; background: #fff; color: #16181d; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
+.choice-chips button:hover { border-color: var(--cat-accent, #e4572e); }
+.choice-chips button.is-on { border-color: var(--cat-accent, #e4572e); background: var(--cat-accent, #e4572e); color: #fff; }
+.choice-combo { position: relative; display: grid; gap: 8px; min-width: 0; }
+.choice-combo__btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 50px; padding: 0 16px; border: 1px solid #d8dbe0; border-radius: 14px; background: #fff; color: #16181d; font: inherit; font-size: 1rem; font-weight: 800; text-align: left; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease; box-sizing: border-box; }
+.choice-combo__btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-combo__btn span.is-placeholder { color: #6b7280; font-weight: 600; }
+.choice-combo__btn svg { flex: 0 0 auto; width: 12px; height: 8px; fill: none; stroke: #6b7280; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform 150ms ease; }
+.choice-combo.is-open .choice-combo__btn { border-color: var(--cat-accent, #e4572e); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat-accent, #e4572e) 14%, transparent); }
+.choice-combo.is-open .choice-combo__btn svg { transform: rotate(180deg); }
+.choice-combo__panel { display: grid; gap: 6px; padding: 8px; border: 1px solid #e6e7eb; border-radius: 16px; background: #fff; box-shadow: 0 12px 30px rgba(22, 24, 29, 0.1); animation: choice-in 140ms ease; }
+.choice-combo__panel input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #d8dbe0; border-radius: 12px; background: #fff; color: #16181d; font: inherit; font-size: 16px; box-sizing: border-box; }
+.choice-combo__panel input:focus { outline: 2px solid var(--cat-accent, #e4572e); outline-offset: 0; border-color: transparent; }
+.choice-combo__panel ul { display: grid; gap: 2px; max-height: 280px; margin: 0; padding: 0; overflow-y: auto; list-style: none; overscroll-behavior: contain; }
+.choice-combo__panel li[role='option'] { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 4px 12px; border-radius: 10px; font-size: .95rem; font-weight: 700; cursor: pointer; }
+.choice-combo__panel li span { display: grid; min-width: 0; }
+.choice-combo__panel li small { color: #6b7280; font-size: .74rem; font-weight: 600; }
+.choice-combo__panel li.is-active { background: #f3f4f6; }
+.choice-combo__panel li.is-on { color: var(--cat-accent, #e4572e); }
+.choice-combo__empty { padding: 10px 12px; color: #6b7280; font-size: .84rem; }
+@keyframes choice-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .choice-combo__panel { animation: none; } }

@@ -195,6 +195,7 @@ const viewRequest = (row: any) => ({
   items: Array.isArray(row.items) ? row.items : [],
   estimatedTotal: Number(row.estimated_total) || 0,
   hasEvaluation: row.has_evaluation === true,
+  wantsDiagnosis: row.wants_diagnosis === true,
   description: row.description,
   evaluation: row.evaluation && typeof row.evaluation === 'object' ? row.evaluation : {},
   history: Array.isArray(row.history) ? row.history : [],
@@ -361,7 +362,11 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
 
     const evaluation = row.evaluation && typeof row.evaluation === 'object' ? row.evaluation : {};
     const items: any[] = Array.isArray(evaluation.items) && evaluation.items.length ? evaluation.items : Array.isArray(row.items) ? row.items : [];
-    if (!items.length && !String(evaluation.diagnosis?.found ?? '').trim()) throw httpError('Confirme na avaliação os serviços (ou o diagnóstico) antes de abrir a OS.');
+    const wantsDiagnosis = row.wants_diagnosis === true;
+    const found = String(evaluation.diagnosis?.found ?? '').trim();
+    // Pedido de avaliação técnica pode virar OS sem serviço: o técnico diagnostica e orça dentro da OS.
+    if (!items.length && !found && !wantsDiagnosis) throw httpError('Confirme na avaliação os serviços (ou o diagnóstico) antes de abrir a OS.');
+    const quoteStatus = items.length || found ? 'approved' : 'none';
     const priced = items.filter((item) => item.price !== null && item.price !== undefined);
     const finalTotal = evaluation.finalTotal !== null && evaluation.finalTotal !== undefined ? Number(evaluation.finalTotal) : priced.reduce((sum, item) => sum + Number(item.price), 0);
     if (!(finalTotal >= 0)) throw httpError('Informe o valor final na avaliação.');
@@ -385,7 +390,11 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
     const by = req.user?.name ?? '';
     const at = new Date().toISOString();
     const approval = `Aprovado pelo cliente (${APPROVAL_LABEL[body.approvalMethod]}) em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} por ${by || 'equipe'}${body.approvalNote ? ` — ${body.approvalNote}` : ''}.`;
-    const notes = [`Origem: Catálogo Digital — protocolo ${row.protocol}.`, `Serviços aprovados: ${serviceList.join('; ') || '—'}.`, approval, customer.address ? `Endereço: ${customer.address}` : ''].filter(Boolean).join('\n');
+    const notes = [
+      `Origem: Catálogo Digital — protocolo ${row.protocol}.`,
+      wantsDiagnosis ? 'Cliente pediu avaliação técnica (não sabe o que o aparelho tem).' : '',
+      `Serviços aprovados: ${serviceList.join('; ') || (wantsDiagnosis ? 'a definir no diagnóstico' : '—')}.`,
+      approval, customer.address ? `Endereço: ${customer.address}` : ''].filter(Boolean).join('\n');
     const techNotes = [device.techNotes, diagnosis.risks ? `Riscos/condições: ${diagnosis.risks}` : ''].filter(Boolean).join('\n');
     const osId = `OS-${Date.now().toString().slice(-6)}${Math.floor(10 + Math.random() * 90)}`;
     const osHistory = [{ at, by, action: 'created', note: `OS aberta a partir da solicitação ${row.protocol} (Catálogo Digital). ${approval}` }];
@@ -405,7 +414,7 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
         $12, $13, $14, $14, $15, $15,
         $16, $17, $18, '', '', 'normal', 'open',
         $19::numeric, $19::numeric, 0, 0, $19::numeric, '',
-        'approved', $20, now(),
+        $22, $20, CASE WHEN $22 = 'approved' THEN now() ELSE NULL END,
         '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, $21::jsonb, '[]'::jsonb, now(), now()
       )`,
       [
@@ -422,7 +431,7 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
         String(device.imei ?? ''),
         String(device.accessories ?? ''),
         condition,
-        String(diagnosis.reported || row.description || serviceList.join('; ')).slice(0, 2000),
+        String(diagnosis.reported || row.description || serviceList.join('; ') || (wantsDiagnosis ? 'Cliente não sabe o defeito — avaliação técnica.' : '')).slice(0, 2000),
         String(diagnosis.found ?? ''),
         notes,
         techNotes,
@@ -430,6 +439,7 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
         finalTotal,
         serviceList.join('\n'),
         JSON.stringify(osHistory),
+        quoteStatus,
       ],
     );
     const history = [...(Array.isArray(row.history) ? row.history : []), { at, by, action: 'converted', from: row.status, to: 'converted', note: `${approval} OS ${osId}.` }];
@@ -507,6 +517,8 @@ const requestSchema = z.object({
   brand: z.string().trim().min(1).max(60),
   model: z.string().trim().min(1).max(80),
   items: z.array(z.object({ serviceId: z.string().trim().min(1).max(80), optionId: z.string().trim().max(60).nullish() })).max(10).default([]),
+  /** "Não sei o que é": só a avaliação técnica, sem escolher serviço. */
+  diagnosis: z.boolean().default(false),
   description: text(1000),
   customer: z.object({
     name: z.string().trim().min(3, 'Informe seu nome completo.').max(120),
@@ -521,7 +533,8 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
     const catalog = await catalogByToken(req.params.token);
     const body = requestSchema.parse(req.body ?? {});
     if (body.website) throw httpError('Não foi possível enviar.', 400);
-    if (!body.items.length && body.description.length < 10) throw httpError('Escolha um serviço ou conte o que está acontecendo com o aparelho.');
+    if (body.diagnosis) body.items = [];
+    if (!body.items.length && !body.diagnosis && body.description.length < 10) throw httpError('Escolha um serviço, conte o que está acontecendo ou peça a avaliação técnica.');
     const storeId = catalog.store_id;
 
     if (body.requestKey) {
@@ -566,8 +579,8 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
       try {
         saved = (
           await pool.query(
-            `INSERT INTO repair_requests (id, store_id, seq, protocol, catalog_id, request_key, status, customer_id, customer_name, customer_phone, phone_digits, brand, model, items, estimated_total, has_evaluation, description, history)
-             VALUES ($1, $2, $3::int, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13::jsonb, $14::numeric, $15, $16, $17::jsonb) RETURNING *`,
+            `INSERT INTO repair_requests (id, store_id, seq, protocol, catalog_id, request_key, status, customer_id, customer_name, customer_phone, phone_digits, brand, model, items, estimated_total, has_evaluation, description, history, wants_diagnosis)
+             VALUES ($1, $2, $3::int, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13::jsonb, $14::numeric, $15, $16, $17::jsonb, $18) RETURNING *`,
             [
               `RPR-${randomUUID()}`,
               storeId,
@@ -585,7 +598,8 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
               estimatedTotal,
               hasEvaluation,
               body.description,
-              JSON.stringify([{ at, by: body.customer.name, action: 'created', to: 'pending', note: 'Solicitação enviada pelo Catálogo Digital' }]),
+              JSON.stringify([{ at, by: body.customer.name, action: 'created', to: 'pending', note: body.diagnosis ? 'Avaliação técnica pedida pelo Catálogo Digital' : 'Solicitação enviada pelo Catálogo Digital' }]),
+              body.diagnosis,
             ],
           )
         ).rows[0];
@@ -623,7 +637,7 @@ repairsRouter.get('/api/v1/public/sales-catalogs/:token/repairs/track', async (r
         status: row.status,
         statusLabel: REPAIR_STATUS_LABEL[row.status] ?? row.status,
         device: `${row.brand} ${row.model}`,
-        items: (Array.isArray(row.items) ? row.items : []).map((item: any) => `${item.name}${item.optionName ? ` (${item.optionName})` : ''}`),
+        items: (Array.isArray(row.items) ? row.items : []).map((item: any) => `${item.name}${item.optionName ? ` (${item.optionName})` : ''}`).concat(row.wants_diagnosis && !(row.items ?? []).length ? ['Avaliação técnica'] : []),
         createdAt: row.created_at,
         workOrder,
       },

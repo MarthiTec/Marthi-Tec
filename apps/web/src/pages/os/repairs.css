@@ -175,3 +175,4 @@
 }
 .admin.admin--dark .repairs__manual input, .admin.admin--dark .repairs__devices input, .admin.admin--dark .repairs__row--add input, .admin.admin--dark .repairs__time input, .admin.admin--dark .repairs__time select { background: #121820; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
 .repairs__neg { color: #dc2626; }
+.repairs__diagnosis { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 12%, transparent); color: inherit; font-size: .84rem; line-height: 1.4; }

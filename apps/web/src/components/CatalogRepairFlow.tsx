@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   apiPublicRepairServices,
   apiPublicSendRepair,
@@ -9,6 +9,7 @@ import {
   type RepairTracking,
 } from '../services/repairsApi';
 import { whatsappLink, type CatalogStore } from './CatalogDocument';
+import { ChoiceField } from './ChoiceField';
 import './catalogRepair.css';
 
 const formatPhone = (value: string) => {
@@ -28,81 +29,6 @@ const servicePrice = (service: PublicRepairService) => {
 };
 
 type Choice = { serviceId: string; optionId: string | null };
-/** Até esta quantidade os modelos aparecem como botões; acima, numa lista com busca. */
-const MODEL_CHIPS_MAX = 8;
-const plainText = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
-/** Combobox do modelo: botão com o escolhido; abre uma lista com busca (digitar "a12", "13 pro"…). */
-function ModelCombobox({ models, value, onChange }: { models: string[]; value: string; onChange: (model: string) => void }) {
-  const [open, setOpen] = useState(!value);
-  const [term, setTerm] = useState('');
-  const [active, setActive] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const list = useMemo(() => {
-    const words = plainText(term).split(' ').filter(Boolean);
-    return words.length ? models.filter((model) => words.every((word) => plainText(model).replace(/ /g, '').includes(word) || plainText(model).includes(word))) : models;
-  }, [models, term]);
-  useEffect(() => setActive(0), [term]);
-  useEffect(() => {
-    if (!open) return;
-    window.setTimeout(() => input.current?.focus(), 30);
-    const outside = (event: MouseEvent) => {
-      if (value && box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', outside);
-    return () => document.removeEventListener('mousedown', outside);
-  }, [open, value]);
-  function pick(model: string) {
-    onChange(model);
-    setTerm('');
-    setOpen(false);
-  }
-  return (
-    <div className={`repairflow__combo${open ? ' is-open' : ''}`} ref={box}>
-      <button type="button" className="repairflow__combo-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-        <span>{value || 'Selecione o modelo'}</span>
-        <svg viewBox="0 0 10 6" aria-hidden="true">
-          <path d="M1 1l4 4 4-4" />
-        </svg>
-      </button>
-      {open ? (
-        <div className="repairflow__combo-panel">
-          <input
-            ref={input}
-            className="repairflow__input"
-            type="search"
-            value={term}
-            placeholder={`Buscar entre ${models.length} modelos…`}
-            aria-label="Buscar modelo"
-            onChange={(event) => setTerm(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setActive((index) => Math.min(index + 1, list.length - 1));
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setActive((index) => Math.max(index - 1, 0));
-              } else if (event.key === 'Enter' && list[active]) {
-                event.preventDefault();
-                pick(list[active]);
-              } else if (event.key === 'Escape' && value) setOpen(false);
-            }}
-          />
-          <ul role="listbox" aria-label="Modelos">
-            {list.map((model, index) => (
-              <li key={model} role="option" aria-selected={model === value} className={`${model === value ? 'is-on' : ''}${index === active ? ' is-active' : ''}`} onMouseEnter={() => setActive(index)} onClick={() => pick(model)}>
-                {model}
-                {model === value ? <span aria-hidden>✓</span> : null}
-              </li>
-            ))}
-            {!list.length ? <li className="repairflow__combo-empty">Nenhum modelo com esse nome. Escolha o mais parecido ou conte o problema abaixo que a loja avalia.</li> : null}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 /**
  * "Solicitar manutenção" no catálogo digital: o cliente escolhe o aparelho e os serviços cadastrados
@@ -124,9 +50,10 @@ export function CatalogRepairFlow({
   const [view, setView] = useState<'form' | 'track'>(initialView);
   const [brand, setBrand] = useState(brands.length === 1 ? brands[0].brand : '');
   const [model, setModel] = useState('');
-  const [modelQuery, setModelQuery] = useState('');
   const [services, setServices] = useState<PublicRepairService[] | null>(null);
   const [choices, setChoices] = useState<Choice[]>([]);
+  /** "Não sei o que é": só a avaliação técnica (o técnico descobre o defeito na OS). */
+  const [diagnosis, setDiagnosis] = useState(false);
   const [description, setDescription] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -138,11 +65,6 @@ export function CatalogRepairFlow({
   const servicesRef = useRef<HTMLElement>(null);
   const style = { '--cat-accent': accent || '#e4572e' } as CSSProperties;
 
-  const models = useMemo(() => {
-    const list = brands.find((entry) => entry.brand === brand)?.models ?? [];
-    const term = modelQuery.trim().toLowerCase();
-    return term ? list.filter((entry) => entry.toLowerCase().includes(term)) : list;
-  }, [brands, brand, modelQuery]);
 
   useEffect(() => {
     if (!brand || !model) {
@@ -174,9 +96,10 @@ export function CatalogRepairFlow({
   const anyEvaluation = chosen.some((entry) => entry.price === null);
   const longest = Math.max(0, ...chosen.map((entry) => entry.service?.estimatedMinutes ?? 0));
   const phoneOk = phone.replace(/\D/g, '').length >= 10;
-  const canSend = Boolean(model) && (choices.length > 0 || description.trim().length >= 10) && !missingOption && name.trim().length >= 3 && phoneOk;
+  const canSend = Boolean(model) && (choices.length > 0 || diagnosis || description.trim().length >= 10) && !missingOption && name.trim().length >= 3 && phoneOk;
 
   function toggle(service: PublicRepairService) {
+    setDiagnosis(false);
     setChoices((list) =>
       list.some((entry) => entry.serviceId === service.id)
         ? list.filter((entry) => entry.serviceId !== service.id)
@@ -194,7 +117,8 @@ export function CatalogRepairFlow({
         requestKey: requestKey.current,
         brand,
         model,
-        items: choices.map((choice) => ({ serviceId: choice.serviceId, optionId: choice.optionId })),
+        items: diagnosis ? [] : choices.map((choice) => ({ serviceId: choice.serviceId, optionId: choice.optionId })),
+        diagnosis,
         description: description.trim(),
         customer: { name: name.trim(), phone },
         website,
@@ -212,6 +136,7 @@ export function CatalogRepairFlow({
     requestKey.current = newKey();
     setDone(null);
     setChoices([]);
+    setDiagnosis(false);
     setDescription('');
     setModel('');
     setError('');
@@ -226,15 +151,19 @@ export function CatalogRepairFlow({
         <span className="repairflow__ok" aria-hidden>
           ✓
         </span>
-        <h2>Orçamento enviado!</h2>
+        <h2>{diagnosis ? 'Pedido de avaliação enviado!' : 'Orçamento enviado!'}</h2>
         <p className="repairflow__protocol">
           Protocolo <strong>{done.protocol}</strong>
         </p>
         <p>
-          {brand} {model} · {done.estimatedTotal > 0 ? `estimativa ${repairMoney(done.estimatedTotal)}` : 'valor a confirmar'}
+          {brand} {model} · {diagnosis ? 'avaliação técnica' : done.estimatedTotal > 0 ? `estimativa ${repairMoney(done.estimatedTotal)}` : 'valor a confirmar'}
           {done.hasEvaluation && done.estimatedTotal > 0 ? ' + itens sob avaliação' : ''}
         </p>
-        <p className="repairflow__notice">Os valores apresentados são estimativas e estão sujeitos à avaliação técnica presencial. Nossa equipe irá confirmar os serviços e os prazos antes de iniciar qualquer manutenção.</p>
+        <p className="repairflow__notice">
+          {diagnosis
+            ? 'Leve o aparelho até a loja: o técnico descobre o que ele tem e passa o orçamento para você aprovar antes de qualquer reparo.'
+            : 'Os valores apresentados são estimativas e estão sujeitos à avaliação técnica presencial. Nossa equipe irá confirmar os serviços e os prazos antes de iniciar qualquer manutenção.'}
+        </p>
         {wa ? (
           <a className="repairflow__wa" href={wa} target="_blank" rel="noreferrer">
             Falar com a loja no WhatsApp
@@ -267,37 +196,21 @@ export function CatalogRepairFlow({
           <span>1</span> Selecione seu aparelho
         </h3>
         {brands.length > 1 ? (
-          <div className="repairflow__chips" role="radiogroup" aria-label="Marca">
-            {brands.map((entry) => (
-              <button
-                key={entry.brand}
-                type="button"
-                role="radio"
-                aria-checked={brand === entry.brand}
-                className={brand === entry.brand ? 'is-on' : ''}
-                onClick={() => {
-                  setBrand(entry.brand);
-                  setModel('');
-                  setModelQuery('');
-                }}
-              >
-                {entry.brand}
-              </button>
-            ))}
-          </div>
+          <ChoiceField
+            label="Marca"
+            noun="marcas"
+            placeholder="Selecione a marca"
+            choices={brands.map((entry) => ({ value: entry.brand, label: entry.brand, hint: `${entry.models.length} ${entry.models.length === 1 ? 'modelo' : 'modelos'}` }))}
+            value={brand}
+            onChange={(next) => {
+              if (next === brand) return;
+              setBrand(next);
+              setModel('');
+            }}
+          />
         ) : null}
         {brand ? (
-          (brands.find((entry) => entry.brand === brand)?.models.length ?? 0) > MODEL_CHIPS_MAX ? (
-            <ModelCombobox models={brands.find((entry) => entry.brand === brand)?.models ?? []} value={model} onChange={setModel} />
-          ) : (
-            <div className="repairflow__models" role="radiogroup" aria-label="Modelo">
-              {models.map((entry) => (
-                <button key={entry} type="button" role="radio" aria-checked={model === entry} className={model === entry ? 'is-on' : ''} onClick={() => setModel(entry)}>
-                  {entry}
-                </button>
-              ))}
-            </div>
-          )
+          <ChoiceField key={brand} label="Modelo" noun="modelos" placeholder="Selecione o modelo" choices={(brands.find((entry) => entry.brand === brand)?.models ?? []).map((entry) => ({ value: entry, label: entry }))} value={model} onChange={setModel} />
         ) : (
           <p className="repairflow__muted">Escolha a marca.</p>
         )}
@@ -308,8 +221,26 @@ export function CatalogRepairFlow({
           <h3>
             <span>2</span> Qual manutenção você precisa?
           </h3>
+          <button
+            type="button"
+            className={`repairflow__diagnosis${diagnosis ? ' is-on' : ''}`}
+            aria-pressed={diagnosis}
+            onClick={() => {
+              setDiagnosis((current) => !current);
+              setChoices([]);
+            }}
+          >
+            <span className="repairflow__check" aria-hidden>
+              {diagnosis ? '✓' : ''}
+            </span>
+            <span className="repairflow__service-text">
+              <strong>Não sei o que é</strong>
+              <small>Meu aparelho não está funcionando direito — quero que um técnico avalie.</small>
+            </span>
+            <span className="repairflow__diagnosis-tag">avaliação na loja</span>
+          </button>
           {services === null ? <p className="repairflow__muted">Carregando serviços…</p> : null}
-          {services && !services.length ? <p className="repairflow__muted">A loja ainda não cadastrou serviços para este modelo. Conte o problema abaixo que avaliamos para você.</p> : null}
+          {services && services.length ? <p className="repairflow__or">ou escolha o serviço</p> : null}
           <ul className="repairflow__services">
             {services?.map((service) => {
               const choice = choices.find((entry) => entry.serviceId === service.id);
@@ -349,9 +280,16 @@ export function CatalogRepairFlow({
         <>
           <section className="repairflow__card">
             <h3>
-              <span>3</span> Conte o que está acontecendo
+              <span>3</span> Conte o que está acontecendo{diagnosis || choices.length ? <em className="repairflow__optional">opcional</em> : null}
             </h3>
-            <textarea className="repairflow__input" rows={3} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Meu celular caiu, a tela ficou verde e o touch parou de funcionar." />
+            <textarea
+              className="repairflow__input"
+              rows={3}
+              maxLength={1000}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={diagnosis ? 'Se souber, conte o que percebeu. Ex.: não liga, desliga sozinho, esquenta, caiu na água…' : 'Ex.: Meu celular caiu, a tela ficou verde e o touch parou de funcionar.'}
+            />
           </section>
           <section className="repairflow__card">
             <h3>
@@ -387,24 +325,31 @@ export function CatalogRepairFlow({
                   </li>
                 ))}
               </ul>
+            ) : diagnosis ? (
+              <ul>
+                <li>
+                  <span>Avaliação técnica do aparelho</span>
+                  <b>na loja</b>
+                </li>
+              </ul>
             ) : (
               <p className="repairflow__muted">Nenhum serviço escolhido — a loja avalia pelo seu relato.</p>
             )}
             <p className="repairflow__total">
               <span>
-                {chosen.length} {chosen.length === 1 ? 'serviço' : 'serviços'}
+                {diagnosis ? 'Diagnóstico pelo técnico' : `${chosen.length} ${chosen.length === 1 ? 'serviço' : 'serviços'}`}
                 {longest ? ` · prazo estimado ${repairDuration(longest)}` : ''}
               </span>
-              <strong>{total > 0 ? repairMoney(total) : 'Valor a consultar'}</strong>
+              <strong>{diagnosis ? 'Valor após a avaliação' : total > 0 ? repairMoney(total) : 'Valor a consultar'}</strong>
             </p>
             {anyEvaluation ? <p className="repairflow__muted">Itens “sob avaliação” têm o valor confirmado pela loja depois do diagnóstico.</p> : null}
             {error ? <p className="repairflow__error" role="alert">{error}</p> : null}
             <button type="button" className="repairflow__send" disabled={!canSend || busy} onClick={() => void send()}>
-              {busy ? 'Enviando…' : 'Enviar solicitação de orçamento →'}
+              {busy ? 'Enviando…' : diagnosis ? 'Pedir avaliação técnica →' : 'Enviar solicitação de orçamento →'}
             </button>
             {!canSend ? (
               <p className="repairflow__muted">
-                {missingOption ? 'Escolha a peça/qualidade dos serviços marcados.' : !choices.length && description.trim().length < 10 ? 'Escolha um serviço ou conte o problema.' : name.trim().length < 3 ? 'Informe seu nome.' : !phoneOk ? 'Informe o WhatsApp com DDD.' : ''}
+                {missingOption ? 'Escolha a peça/qualidade dos serviços marcados.' : !choices.length && !diagnosis && description.trim().length < 10 ? 'Escolha um serviço, marque “Não sei o que é” ou conte o problema.' : name.trim().length < 3 ? 'Informe seu nome.' : !phoneOk ? 'Informe o WhatsApp com DDD.' : ''}
               </p>
             ) : null}
           </section>
