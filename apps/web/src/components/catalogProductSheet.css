@@ -52,9 +52,13 @@
 .psheet__bar-price small { overflow: hidden; color: #6b7280; font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
 .psheet__add { flex: 0 0 auto; min-height: 50px; padding: 0 22px; border: 0; border-radius: 14px; background: var(--cat-accent); color: #fff; font: inherit; font-size: 1rem; font-weight: 800; cursor: pointer; }
 .psheet__add:disabled { background: #9ca3af; }
+/* Computador: foto fixa à esquerda; informações, vídeo e ficha técnica rolam na coluna da direita
+   (nada passa por trás da foto). */
 @media (min-width: 860px) {
-  .psheet__body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-  .psheet__media { position: sticky; top: 0; }
-  .psheet__section { grid-column: 1 / -1; }
+  .psheet__body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; column-gap: 20px; padding: 20px 20px 32px; }
+  .psheet__media { grid-column: 1; grid-row: 1 / span 20; position: sticky; top: 0; }
+  .psheet__info, .psheet__section { grid-column: 2; }
+  .psheet__bar { padding-inline: max(20px, calc((100% - 980px) / 2 + 20px)); }
 }
 @media print { .psheet { display: none !important; } }
+.psheet__add--wa { display: inline-grid; place-items: center; background: #16a34a; text-decoration: none; }

@@ -201,3 +201,52 @@
   .catalog-card__summary { display: none; }
   .catalog-variants--print { display: grid; }
 }
+
+/* ── Capas modernas: faixa larga na tela, página inteira no PDF ── */
+.catalog-cover--modern { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: clamp(10px, 3vw, 28px); max-width: none; aspect-ratio: auto; min-height: clamp(196px, 44vw, 380px); padding: clamp(18px, 4.5vw, 44px); box-sizing: border-box; border-radius: 22px; box-shadow: 0 10px 30px rgba(22, 24, 29, 0.08); }
+.catalog-cover__copy { position: relative; z-index: 1; display: grid; align-content: center; gap: clamp(6px, 1.4vw, 12px); min-width: 0; }
+.catalog-cover__store { display: inline-flex; align-items: center; gap: 8px; justify-self: start; max-width: 100%; padding: 4px 12px 4px 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.78); box-shadow: 0 1px 0 rgba(22, 24, 29, 0.06); color: var(--cat-ink); font-size: .76rem; }
+.catalog-cover__store:not(:has(img)) { padding-left: 12px; }
+.catalog-cover__store img { width: 26px; height: 26px; border-radius: 50%; object-fit: contain; background: #fff; }
+.catalog-cover__store strong { overflow: hidden; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-cover--modern h1 { margin: 0; color: var(--cat-ink); font-size: clamp(1.7rem, 7.4vw, 3.6rem); font-weight: 900; line-height: .98; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.catalog-cover--modern p { margin: 0; color: var(--cat-accent); font-size: clamp(.92rem, 2.6vw, 1.25rem); font-weight: 700; line-height: 1.25; }
+.catalog-cover--modern small { color: var(--cat-mute); font-size: clamp(.7rem, 1.8vw, .82rem); font-weight: 600; }
+.catalog-cover__art { position: relative; align-self: stretch; min-height: 150px; isolation: isolate; }
+.catalog-cover__art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.catalog-cover__mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(6px, 1.4vw, 12px); align-self: stretch; }
+.catalog-cover__mosaic span { position: relative; overflow: hidden; min-height: 70px; border-radius: 16px; background: #fff; box-shadow: 0 6px 16px rgba(22, 24, 29, 0.08); isolation: isolate; }
+.catalog-cover__mosaic img { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; mix-blend-mode: multiply; }
+.catalog-cover__mosaic--3 span:first-child { grid-row: span 2; }
+.catalog-cover__mosaic--2 { grid-template-columns: 1fr; }
+
+/* Destaque: degradê suave na cor da loja. */
+.catalog-cover--hero { background: radial-gradient(70% 90% at 100% 0%, color-mix(in srgb, var(--cat-accent) 30%, #fff) 0%, transparent 70%), radial-gradient(60% 80% at 0% 100%, color-mix(in srgb, var(--cat-accent) 14%, #fff) 0%, transparent 70%), #fff; }
+.catalog-cover--hero .catalog-cover__art::before { content: ''; position: absolute; inset: 8% 10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0)); }
+/* Minimal: branco, título grande e um traço na cor da loja. */
+.catalog-cover--minimal { background: #fff; box-shadow: inset 0 0 0 1px var(--cat-line); }
+.catalog-cover--minimal h1::after { content: ''; display: block; width: 56px; height: 5px; margin-top: clamp(8px, 1.6vw, 14px); border-radius: 999px; background: var(--cat-accent); }
+.catalog-cover--minimal p { color: var(--cat-mute); font-weight: 600; }
+.catalog-cover--minimal .catalog-cover__store { background: var(--cat-bg); }
+.catalog-cover--minimal .catalog-cover__art::before { content: ''; position: absolute; inset: 6% 8%; z-index: -1; border-radius: 28px; background: var(--cat-bg); }
+/* Mosaico: várias fotos dos produtos. */
+.catalog-cover--mosaic { background: color-mix(in srgb, var(--cat-accent) 9%, #fff); }
+/* Escura: fundo grafite com brilho na cor da loja; a foto fica num disco claro. */
+.catalog-cover--dark { background: radial-gradient(60% 80% at 85% 35%, color-mix(in srgb, var(--cat-accent) 55%, transparent) 0%, transparent 70%), linear-gradient(160deg, #1b1e24, #0f1115); }
+.catalog-cover--dark h1 { color: #fff; }
+.catalog-cover--dark p { color: color-mix(in srgb, var(--cat-accent) 60%, #fff); }
+.catalog-cover--dark small { color: rgba(255, 255, 255, 0.6); }
+.catalog-cover--dark .catalog-cover__store { background: rgba(255, 255, 255, 0.1); color: #fff; box-shadow: none; }
+.catalog-cover--dark .catalog-cover__art::before { content: ''; position: absolute; inset: 4% 6%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, #fff 62%, rgba(255, 255, 255, 0) 100%); }
+
+@media (max-width: 520px) {
+  .catalog-cover--modern { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); min-height: 190px; padding: 18px 16px; border-radius: 18px; }
+  .catalog-cover__art { min-height: 130px; }
+  .catalog-cover__mosaic span { min-height: 56px; border-radius: 12px; }
+}
+@media print {
+  .catalog-cover--modern { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); align-items: stretch; gap: 10mm; padding: 18mm 16mm; }
+  .catalog-cover--modern h1 { font-size: 3.4rem; }
+  .catalog-cover--modern p { font-size: 1.3rem; }
+  .catalog-cover__mosaic span { min-height: 0; }
+}

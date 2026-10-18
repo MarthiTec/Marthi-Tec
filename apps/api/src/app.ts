@@ -49,6 +49,7 @@ import { saleCostAuditRouter } from './routes/saleCostAudit.js';
 import { productImagesRouter } from './routes/productImages.js';
 import { salesCatalogsRouter } from './routes/salesCatalogs.js';
 import { screenVisitsRouter } from './routes/screenVisits.js';
+import { userPreferencesRouter } from './routes/userPreferences.js';
 import { catalogOrdersRouter } from './routes/catalogOrders.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
@@ -115,6 +116,7 @@ app.use(saleCostAuditRouter);
 app.use(productImagesRouter);
 app.use(salesCatalogsRouter);
 app.use(screenVisitsRouter);
+app.use(userPreferencesRouter);
 app.use(catalogOrdersRouter);
 app.use(posRouter);
 app.use(salesRouter);

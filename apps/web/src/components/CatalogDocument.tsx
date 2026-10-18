@@ -37,7 +37,9 @@ export type CatalogLook = {
   title: string;
   subtitle: string;
   showCover: boolean;
-  coverStyle: 'diagonal' | 'band';
+  coverStyle: CoverStyle;
+  /** catalog = catálogo digital (vitrine, "Tenho interesse" no WhatsApp); sales = página de venda (sacola e pedido). */
+  mode?: 'catalog' | 'sales';
   coverImage: string;
   accent: string;
   showPrices: boolean;
@@ -45,8 +47,14 @@ export type CatalogLook = {
   /** Produtos da faixa "Destaques" no topo. */
   featuredIds?: string[];
 };
+export type CoverStyle = 'hero' | 'minimal' | 'mosaic' | 'dark' | 'diagonal' | 'band';
+/** Capas novas: faixa larga na tela (os produtos aparecem logo) e página inteira no PDF. */
+const MODERN_COVERS: CoverStyle[] = ['hero', 'minimal', 'mosaic', 'dark'];
+
 /** Pedido pelo catálogo (só no link do cliente). */
 export type CatalogShop = {
+  /** Página de venda: sacola e pedido. No catálogo digital, o cliente fala com a loja pelo WhatsApp. */
+  canBuy: boolean;
   onAdd: (item: CatalogItem, variant: CatalogVariant | null) => void;
   onOpen: (item: CatalogItem) => void;
   onUpgrade: () => void;
@@ -151,6 +159,8 @@ export function CatalogDocument({
   const style = { '--cat-accent': look.accent || '#e4572e' } as CSSProperties;
   // 'none' = capa sem foto; vazio = a foto do primeiro produto com foto.
   const coverImage = look.coverImage === 'none' ? '' : look.coverImage || items.find((item) => item.image)?.image || '';
+  // Mosaico: a foto escolhida primeiro e as dos outros produtos (até 4, sem repetir).
+  const mosaic = [...new Set([coverImage, ...items.map((item) => item.image)].filter(Boolean) as string[])].slice(0, 4);
   const hasUsed = items.some((item) => item.variants.some((variant) => variant.condition !== 'Novo') || (item.condition && item.condition !== 'Novo'));
   const hasNew = items.some((item) => item.isNew);
   const hasOrder = items.some((item) => item.orderOnly || item.variants.some((variant) => variant.availability === 'order'));
@@ -179,7 +189,34 @@ export function CatalogDocument({
 
   return (
     <div className="catalog" style={style}>
-      {look.showCover ? (
+      {look.showCover && MODERN_COVERS.includes(look.coverStyle) ? (
+        <section className={`catalog-cover catalog-cover--modern catalog-cover--${look.coverStyle}`} aria-label="Capa do catálogo">
+          <div className="catalog-cover__copy">
+            <span className="catalog-cover__store">
+              {store.logo ? <img src={store.logo} alt="" /> : null}
+              <strong>{store.name}</strong>
+            </span>
+            <h1>{look.title || 'Catálogo'}</h1>
+            {look.subtitle ? <p>{look.subtitle}</p> : null}
+            <small>
+              {items.length} {items.length === 1 ? 'produto' : 'produtos'} · {monthYear()}
+            </small>
+          </div>
+          {look.coverStyle === 'mosaic' && mosaic.length >= 2 ? (
+            <div className={`catalog-cover__mosaic catalog-cover__mosaic--${Math.min(mosaic.length, 4)}`} aria-hidden>
+              {mosaic.map((src) => (
+                <span key={src}>
+                  <img src={src} alt="" referrerPolicy="no-referrer" />
+                </span>
+              ))}
+            </div>
+          ) : coverImage ? (
+            <div className="catalog-cover__art" aria-hidden>
+              <img src={coverImage} alt="" referrerPolicy="no-referrer" />
+            </div>
+          ) : null}
+        </section>
+      ) : look.showCover ? (
         <section className={`catalog-cover catalog-cover--${look.coverStyle}`} aria-label="Capa do catálogo">
           {look.coverStyle === 'diagonal' ? (
             <>
@@ -381,12 +418,12 @@ export function CatalogDocument({
                     ) : (
                       <span className="catalog-price catalog-price--ask">Consulte o preço</span>
                     )}
-                    {shop && !item.soldOut ? (
+                    {shop?.canBuy && !item.soldOut ? (
                       <button type="button" className="catalog-buy" onClick={() => (single ? shop.onAdd(item, item.variants[0] ?? null) : shop.onOpen(item))}>
                         {single ? 'Adicionar à sacola' : 'Ver opções'}
                       </button>
                     ) : null}
-                    {interactive && interest && !item.soldOut && !shop ? (
+                    {(interactive || shop) && interest && !item.soldOut && !shop?.canBuy ? (
                       <a className="catalog-cta" href={interest} target="_blank" rel="noreferrer">
                         Tenho interesse
                       </a>

@@ -109,6 +109,8 @@ export function CatalogPublicPage() {
   if (!data) {
     return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f3f4f6', color: '#6b7280' }}>Carregando catálogo…</main>;
   }
+  /** Página de venda tem sacola; o catálogo digital é vitrine (o cliente chama a loja no WhatsApp). */
+  const sells = data.catalog.mode !== 'catalog';
   const count = bag.reduce((sum, line) => sum + line.qty, 0);
   const total = bag.reduce((sum, line) => sum + (line.variant?.price ?? line.item.price) * line.qty, 0);
   return (
@@ -118,7 +120,7 @@ export function CatalogPublicPage() {
           look={data.catalog}
           store={data.store}
           items={data.items}
-          shop={{ onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
+          shop={{ canBuy: sells, onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
         />
       </div>
       {openId && data.items.find((item) => item.id === openId) ? (
@@ -131,6 +133,7 @@ export function CatalogPublicPage() {
             setOpenId(null);
           }}
           onClose={() => setOpenId(null)}
+          canBuy={sells}
         />
       ) : null}
       {count && !checkout && !openId ? (

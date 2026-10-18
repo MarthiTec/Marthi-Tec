@@ -34,13 +34,14 @@ const sold = async (imei) => (await query("SELECT count(*)::int n FROM stock_sol
 const qty = async (id) => Number((await query('SELECT qty FROM stock_items WHERE id=$1', [id])).rows[0].qty);
 after(async () => { server.close(); await once(server, 'close'); await pool.end(); await db.close(); });
 
+const orderMethodId = (await query("SELECT id FROM pickup_methods WHERE store_id = 'store-a' AND kind = 'order'")).rows[0].id;
 const cor = (await call('/attributes', 'POST', { name: 'Cor', values: ['Preto', 'Azul'] })).data.id;
 const cap = (await call('/attributes', 'POST', { name: 'Capacidade', values: ['128GB', '256GB'] })).data.id;
 const iphone = (await call('/stock', 'POST', {
   name: 'IPHONE 15', kind: 'device', qty: 0, price: 2850, images: ['https://cdsassets.apple.com/x/iphone-15.png'],
   variations: [
     { attrs: { [cor]: 'Preto', [cap]: '128GB' }, price: 2850, cost: 2400, qty: 0, minQty: 0, condition: 'used' },
-    { attrs: { [cor]: 'Azul', [cap]: '256GB' }, price: 3300, cost: 2900, qty: 0, minQty: 0, condition: 'used' },
+    { attrs: { [cor]: 'Azul', [cap]: '256GB' }, price: 3300, cost: 2900, qty: 0, minQty: 0, condition: 'used', pickupPrices: { [orderMethodId]: 3300 } },
   ],
 })).data;
 const pretoId = iphone.variations[0].id;
@@ -48,7 +49,7 @@ for (const [imei, battery] of [['351000000000101', 87], ['351000000000102', 91]]
   const r = await call(`/stock/${iphone.id}/entries`, 'POST', { variation: { id: pretoId, attrs: { [cor]: 'Preto', [cap]: '128GB' }, condition: 'used' }, entry: { qty: 1, unitCost: 2400, imeis: [imei], batteryLevel: battery, payment: 'none' } });
   assert.equal(r.status, 201, JSON.stringify(r.error));
 }
-const capinha = (await call('/stock', 'POST', { name: 'CAPINHA MAGSAFE', kind: 'product', qty: 0, price: 89, cost: 20 })).data;
+const capinha = (await call('/stock', 'POST', { name: 'CAPINHA MAGSAFE', kind: 'product', qty: 0, price: 89, cost: 20, pickupPrices: { [orderMethodId]: 89 } })).data;
 const store = { title: 'Novidades da semana', subtitle: 'Seminovos com garantia', accent: '#e4572e', productIds: [iphone.id, capinha.id] };
 
 let catalog;

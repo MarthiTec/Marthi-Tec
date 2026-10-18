@@ -110,6 +110,8 @@ catalogOrdersRouter.post('/api/v1/public/sales-catalogs/:token/orders', async (r
     if (!catalog) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const body = orderSchema.parse(req.body ?? {});
     if (body.website) throw httpError('Não foi possível enviar.', 400);
+    // Catálogo digital é só vitrine: aceita o cadastro do cliente, mas não pedido com produtos.
+    if (catalog.mode === 'catalog' && (body.items ?? []).length) throw httpError('Este catálogo é só para consulta. Fale com a loja pelo WhatsApp para comprar.', 400);
     rateLimit(`${catalog.id}:${req.ip}`);
     const storeId = catalog.store_id;
 

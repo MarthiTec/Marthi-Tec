@@ -18,10 +18,13 @@ export function CatalogProductSheet({
   store,
   onAdd,
   onClose,
+  canBuy: sells = true,
 }: {
   item: CatalogItem;
   look: CatalogLook;
   store: CatalogStore;
+  /** Página de venda (sacola). No catálogo digital o botão vira "Tenho interesse" no WhatsApp. */
+  canBuy?: boolean;
   onAdd: (item: CatalogItem, variant: CatalogVariant | null) => void;
   onClose: () => void;
 }) {
@@ -60,6 +63,7 @@ export function CatalogProductSheet({
   const embed = videoEmbed(item.videoUrl || '');
   const doubt = whatsappLink(store.phone, `Olá! Vi o ${item.name}${variant?.label ? ` (${variant.label})` : ''} no catálogo da ${store.name || 'loja'}. Pode me ajudar?`);
   const style = { '--cat-accent': look.accent || '#e4572e' } as CSSProperties;
+  const interest = whatsappLink(store.phone, `Olá! Tenho interesse no ${item.name}${variant?.label ? ` (${variant.label})` : ''}${look.showPrices && price > 0 ? ` de ${money(price)}` : ''}, que vi no catálogo da ${store.name || 'loja'}.`);
 
   return (
     <div className="psheet" style={style} role="dialog" aria-modal="true" aria-label={item.name}>
@@ -200,9 +204,19 @@ export function CatalogProductSheet({
           {look.showPrices && price > 0 ? <strong>{money(price)}</strong> : <strong>Consulte</strong>}
           <small>{variant?.label || item.condition || ''}</small>
         </div>
-        <button type="button" className="psheet__add" disabled={!canBuy} onClick={() => onAdd(item, variants.length ? variant : null)}>
-          {canBuy ? 'Adicionar à sacola' : 'Indisponível'}
-        </button>
+        {sells ? (
+          <button type="button" className="psheet__add" disabled={!canBuy} onClick={() => onAdd(item, variants.length ? variant : null)}>
+            {canBuy ? 'Adicionar à sacola' : 'Indisponível'}
+          </button>
+        ) : interest && canBuy ? (
+          <a className="psheet__add psheet__add--wa" href={interest} target="_blank" rel="noreferrer">
+            Tenho interesse
+          </a>
+        ) : (
+          <button type="button" className="psheet__add" disabled>
+            {canBuy ? 'Fale com a loja' : 'Indisponível'}
+          </button>
+        )}
       </footer>
     </div>
   );

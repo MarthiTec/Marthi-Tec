@@ -76,3 +76,20 @@
 .salescat__item { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 6px; align-items: center; }
 .salescat__star { width: 44px; height: 44px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: transparent; color: #94a3b8; font-size: 1.3rem; cursor: pointer; }
 .salescat__star.is-on { border-color: #f59e0b; background: rgba(245, 158, 11, .12); color: #d97706; }
+
+/* Uso do link: catálogo digital x página de venda. */
+.salescat__modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 6px; }
+.salescat__mode { display: grid; gap: 4px; padding: 12px 14px; border: 2px solid var(--line, #e2e8f0); border-radius: 14px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
+.salescat__mode strong { font-size: .92rem; }
+.salescat__mode small { color: var(--mute, #64748b); font-size: .78rem; line-height: 1.35; }
+.salescat__mode.is-on { border-color: var(--accent, #0f766e); background: color-mix(in srgb, var(--accent, #0f766e) 7%, transparent); }
+.salescat__autosave { margin: 0; color: var(--mute, #64748b); font-size: .78rem; font-weight: 600; }
+
+/* Miniaturas das capas (6 estilos). */
+.salescat__styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.salescat__style--hero span, .salescat__style--minimal span, .salescat__style--mosaic span, .salescat__style--dark span { width: 76px; height: 46px; border-radius: 8px; }
+.salescat__style--hero span { background: radial-gradient(70% 90% at 100% 0%, color-mix(in srgb, var(--cat-accent) 45%, #fff), transparent 70%), linear-gradient(#2b2f36, #2b2f36) 10% 32% / 40% 5px no-repeat, linear-gradient(var(--cat-accent), var(--cat-accent)) 10% 52% / 26% 4px no-repeat, #fff; }
+.salescat__style--minimal span { background: linear-gradient(#2b2f36, #2b2f36) 10% 32% / 40% 6px no-repeat, linear-gradient(var(--cat-accent), var(--cat-accent)) 10% 58% / 14% 3px no-repeat, linear-gradient(#eef0f3, #eef0f3) 88% 50% / 32% 70% no-repeat, #fff; }
+.salescat__style--mosaic span { background: linear-gradient(#2b2f36, #2b2f36) 10% 40% / 30% 5px no-repeat, linear-gradient(#fff, #fff) 64% 22% / 14% 34% no-repeat, linear-gradient(#fff, #fff) 88% 22% / 14% 34% no-repeat, linear-gradient(#fff, #fff) 64% 80% / 14% 34% no-repeat, linear-gradient(#fff, #fff) 88% 80% / 14% 34% no-repeat, color-mix(in srgb, var(--cat-accent) 14%, #fff); }
+.salescat__style--dark span { background: radial-gradient(40% 60% at 78% 50%, #fff 40%, transparent 42%), radial-gradient(70% 90% at 80% 40%, color-mix(in srgb, var(--cat-accent) 60%, transparent), transparent 70%), linear-gradient(#fff, #fff) 10% 34% / 36% 5px no-repeat, #15181d; }
+@media (max-width: 520px) { .salescat__styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

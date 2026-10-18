@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useUserPreference } from '../../hooks/useUserPreference';
 import { AdminPicker } from '../../components/AdminPicker';
 import { AdminIcon } from '../../components/AdminIcons';
 import { CatalogDocument, type CatalogItem, type CatalogStore } from '../../components/CatalogDocument';
@@ -39,7 +40,8 @@ const blank = (): SalesCatalogInput => ({
   title: 'Catálogo',
   subtitle: 'Novidades da loja',
   showCover: true,
-  coverStyle: 'diagonal',
+  coverStyle: 'hero',
+  mode: 'sales',
   coverImage: '',
   accent: ACCENTS[0],
   showPrices: true,
@@ -64,34 +66,67 @@ const priceRange = (row: StockRow) => {
 const isUsed = (row: StockRow) =>
   (row.variations?.length ? row.variations.map((v) => conditionCode(v.condition) || 'new') : [conditionCode(row.condition) || 'new']).some((code) => code !== 'new');
 
+type Tab = 'products' | 'look' | 'preview';
+type Availability = 'available' | 'stock' | 'order' | 'all';
+type Condition = 'all' | 'new' | 'used';
+/** Configuração da tela de cada usuário (fica no banco): catálogo aberto, aba e filtros. */
+const SCREEN = { currentId: '', tab: 'products', query: '', groupId: '', brand: '', condition: 'all', availability: 'available', onlyPhoto: false, onlyMarked: false };
+
+const COVER_STYLES: Array<[SalesCatalogInput['coverStyle'], string]> = [
+  ['hero', 'Destaque'],
+  ['minimal', 'Minimal'],
+  ['mosaic', 'Mosaico'],
+  ['dark', 'Escura'],
+  ['diagonal', 'Diagonal'],
+  ['band', 'Faixa'],
+];
+
 /**
- * Catálogo para clientes (painel do lojista): marcar os produtos com filtro, escolher capa e cor,
- * pré-visualizar e mandar o link (WhatsApp) ou imprimir / salvar em PDF. Tudo salvo no banco.
+ * Catálogo digital (painel do lojista): marcar os produtos com filtro, escolher capa e cor, usar como
+ * catálogo (vitrine) ou página de venda (sacola e pedido), pré-visualizar e mandar o link ou o PDF.
+ * O catálogo e a configuração da tela ficam no banco.
  */
 export function SalesCatalogPage() {
   const [catalogs, setCatalogs] = useState<SalesCatalog[]>([]);
   const [currentId, setCurrentId] = useState<string>('');
   const [form, setForm] = useState<SalesCatalogInput>(blank);
+  const { value: screen, update: setScreen, loaded: screenLoaded } = useUserPreference('sales-catalog.screen', SCREEN);
+  const [listLoaded, setListLoaded] = useState(false);
+  const opened = useRef(false);
+  /** Último estado gravado no banco (para salvar sozinho só quando mudar algo). */
+  const lastSaved = useRef('');
+  const [autoState, setAutoState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [stock, setStock] = useState<StockRow[]>([]);
   const [groups, setGroups] = useState<ProductGroup[]>([]);
   const [preview, setPreview] = useState<{ store: CatalogStore; items: CatalogItem[] } | null>(null);
-  const [tab, setTab] = useState<'products' | 'look' | 'preview'>('products');
-  const [query, setQuery] = useState('');
-  const [groupId, setGroupId] = useState('');
-  const [brand, setBrand] = useState('');
-  const [condition, setCondition] = useState<'all' | 'new' | 'used'>('all');
+  const tab = screen.tab as Tab;
+  const setTab = (value: Tab) => setScreen({ tab: value });
+  const query = String(screen.query ?? '');
+  const setQuery = (value: string) => setScreen({ query: value });
+  const groupId = String(screen.groupId ?? '');
+  const setGroupId = (value: string) => setScreen({ groupId: value });
+  const brand = String(screen.brand ?? '');
+  const setBrand = (value: string) => setScreen({ brand: value });
+  const condition = screen.condition as Condition;
+  const setCondition = (value: Condition) => setScreen({ condition: value });
   /** Disponível = tem estoque ou aceita encomenda (produto sob encomenda aparece mesmo sem unidade na loja). */
-  const [availability, setAvailability] = useState<'available' | 'stock' | 'order' | 'all'>('available');
+  const availability = screen.availability as Availability;
+  const setAvailability = (value: Availability) => setScreen({ availability: value });
   const { methods: pickupMethods } = usePickupMethods();
   const orderMethodId = pickupMethods.find((method) => method.kind === 'order' && method.active)?.id ?? '';
-  /** Mesma regra do servidor: preço da variação por cima do do produto; null = encomenda desligada. */
+  /** Mesma regra do servidor: só aceita encomenda quando "Sob encomenda" está marcado na variação (ou no produto). */
   const orderable = (row: StockRow) => {
     if (!orderMethodId) return false;
     const lines = row.variations?.length ? row.variations : [{}];
-    return lines.some((v: { pickupPrices?: Record<string, number | null> }) => ({ ...(row.pickupPrices ?? {}), ...(v.pickupPrices ?? {}) })[orderMethodId] !== null);
+    return lines.some((v: { pickupPrices?: Record<string, number | null> }) => {
+      const own = v.pickupPrices && Object.keys(v.pickupPrices).length ? v.pickupPrices : row.pickupPrices ?? {};
+      return Object.prototype.hasOwnProperty.call(own, orderMethodId) && own[orderMethodId] !== null;
+    });
   };
-  const [onlyPhoto, setOnlyPhoto] = useState(false);
-  const [onlyMarked, setOnlyMarked] = useState(false);
+  const onlyPhoto = Boolean(screen.onlyPhoto);
+  const setOnlyPhoto = (value: boolean) => setScreen({ onlyPhoto: value });
+  const onlyMarked = Boolean(screen.onlyMarked);
+  const setOnlyMarked = (value: boolean) => setScreen({ onlyMarked: value });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -100,16 +135,14 @@ export function SalesCatalogPage() {
   useEffect(() => {
     const load = () => {
       setError('');
+      opened.current = false;
+      setListLoaded(false);
       Promise.all([apiListSalesCatalogs(), apiListStock(), apiListProductGroups().catch(() => ({ groups: [] as ProductGroup[] }))])
         .then(([list, items, groupData]) => {
           setCatalogs(list);
           setStock((items as unknown as StockRow[]).filter((item) => item.active !== false));
           setGroups(groupData.groups ?? []);
-          if (list[0]) open(list[0]);
-          else {
-            setCurrentId('');
-            setForm(blank());
-          }
+          setListLoaded(true);
         })
         .catch((err) => setError(err instanceof Error ? err.message : 'Não foi possível carregar os produtos.'));
     };
@@ -117,6 +150,41 @@ export function SalesCatalogPage() {
     window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
     return () => window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
   }, []);
+
+  // Abre o catálogo em que a pessoa estava (configuração salva no banco) ou o mais recente.
+  useEffect(() => {
+    if (!listLoaded || !screenLoaded || opened.current) return;
+    opened.current = true;
+    const saved = catalogs.find((item) => item.id === screen.currentId) ?? catalogs[0];
+    if (saved) open(saved);
+    else {
+      setCurrentId('');
+      setForm(blank());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listLoaded, screenLoaded, catalogs]);
+
+  // Catálogo já criado: cada mudança é salva sozinha no banco (sem precisar clicar em Salvar).
+  useEffect(() => {
+    if (!currentId) return;
+    const json = JSON.stringify(form);
+    if (json === lastSaved.current) return;
+    const id = currentId;
+    const timer = window.setTimeout(() => {
+      setAutoState('saving');
+      apiUpdateSalesCatalog(id, form)
+        .then((saved) => {
+          lastSaved.current = json;
+          setCatalogs((list) => list.map((item) => (item.id === saved.id ? saved : item)));
+          setAutoState('saved');
+        })
+        .catch((err) => {
+          setAutoState('idle');
+          setError(err instanceof Error ? err.message : 'Não foi possível salvar o catálogo.');
+        });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [form, currentId]);
 
   // Prévia ao vivo com os dados do servidor (preço, variações e bateria como o cliente vai ver).
   useEffect(() => {
@@ -135,8 +203,12 @@ export function SalesCatalogPage() {
   function open(catalog: SalesCatalog) {
     setCurrentId(catalog.id);
     const { id: _id, token: _token, createdBy: _by, createdAt: _c, updatedAt: _u, ...input } = catalog;
-    setForm(input);
+    const next = { ...blank(), ...input };
+    lastSaved.current = JSON.stringify(next);
+    setForm(next);
+    setAutoState('idle');
     setNotice('');
+    if (screen.currentId !== catalog.id) setScreen({ currentId: catalog.id });
   }
 
   const update = (patch: Partial<SalesCatalogInput>) => setForm((value) => ({ ...value, ...patch }));
@@ -185,8 +257,10 @@ export function SalesCatalogPage() {
     setError('');
     try {
       const saved = currentId ? await apiUpdateSalesCatalog(currentId, form) : await apiCreateSalesCatalog(form);
+      lastSaved.current = JSON.stringify(form);
       setCatalogs((list) => [saved, ...list.filter((item) => item.id !== saved.id)]);
       setCurrentId(saved.id);
+      setScreen({ currentId: saved.id });
       setNotice('Catálogo salvo.');
       return saved;
     } catch (err) {
@@ -255,8 +329,8 @@ export function SalesCatalogPage() {
     <section className="admin-page salescat">
       <header className="salescat__head">
         <div>
-          <h1>Catálogo para clientes</h1>
-          <p className="salescat__muted">Marque os produtos, escolha a capa e mande o link. Foto, preço, cor, capacidade e bateria sempre atualizados do estoque.</p>
+          <h1>Catálogo digital</h1>
+          <p className="salescat__muted">Marque os produtos, escolha a capa e mande o link — como catálogo (vitrine) ou página de venda. Foto, preço, cor, capacidade e bateria sempre atualizados do estoque.</p>
         </div>
         <div className="salescat__pick">
           <AdminPicker
@@ -267,6 +341,7 @@ export function SalesCatalogPage() {
               if (value === '__new') {
                 setCurrentId('');
                 setForm(blank());
+                setScreen({ currentId: '' });
               } else {
                 const found = catalogs.find((item) => item.id === value);
                 if (found) open(found);
@@ -303,6 +378,15 @@ export function SalesCatalogPage() {
           </>
         ) : null}
       </div>
+      <p className="salescat__autosave" role="status">
+        {currentId
+          ? autoState === 'saving'
+            ? 'Salvando…'
+            : autoState === 'saved'
+              ? '✓ Alterações salvas automaticamente'
+              : 'As alterações são salvas automaticamente.'
+          : 'Catálogo novo: clique em Salvar para criar. Depois, tudo é salvo sozinho.'}
+      </p>
       {error ? <p role="alert" className="salescat__error">{error}</p> : null}
       {notice ? <p role="status" className="salescat__notice">{notice}</p> : null}
 
@@ -310,7 +394,7 @@ export function SalesCatalogPage() {
         {(
           [
             ['products', `Produtos (${form.productIds.length})`],
-            ['look', 'Capa e aparência'],
+            ['look', 'Uso, capa e aparência'],
             ['preview', 'Prévia'],
           ] as const
         ).map(([value, label]) => (
@@ -402,6 +486,22 @@ export function SalesCatalogPage() {
 
           {tab === 'look' ? (
             <div className="salescat__panel salescat__look">
+              <div>
+                <span className="admin-label">Como o cliente vai usar este link</span>
+                <div className="salescat__modes" role="radiogroup" aria-label="Uso do link">
+                  {(
+                    [
+                      ['catalog', 'Catálogo digital', 'Vitrine: o cliente vê os produtos e chama no WhatsApp ("Tenho interesse").'],
+                      ['sales', 'Página de venda', 'Loja online: sacola, escolha do vendedor e da forma de pagamento; o pedido cai na fila da venda externa.'],
+                    ] as const
+                  ).map(([value, label, hint]) => (
+                    <button key={value} type="button" role="radio" aria-checked={(form.mode ?? 'sales') === value} className={`salescat__mode${(form.mode ?? 'sales') === value ? ' is-on' : ''}`} onClick={() => update({ mode: value })}>
+                      <strong>{label}</strong>
+                      <small>{hint}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="admin-field">
                 Título
                 <input className="admin-input" maxLength={60} value={form.title} onChange={(e) => update({ title: e.target.value })} placeholder="Catálogo" />
@@ -416,12 +516,7 @@ export function SalesCatalogPage() {
               {form.showCover ? (
                 <>
                   <div className="salescat__styles" role="radiogroup" aria-label="Estilo da capa">
-                    {(
-                      [
-                        ['diagonal', 'Diagonal'],
-                        ['band', 'Faixa central'],
-                      ] as const
-                    ).map(([value, label]) => (
+                    {COVER_STYLES.map(([value, label]) => (
                       <button key={value} type="button" role="radio" aria-checked={form.coverStyle === value} className={`salescat__style salescat__style--${value}${form.coverStyle === value ? ' is-on' : ''}`} style={{ ['--cat-accent' as string]: form.accent }} onClick={() => update({ coverStyle: value })}>
                         <span aria-hidden />
                         {label}

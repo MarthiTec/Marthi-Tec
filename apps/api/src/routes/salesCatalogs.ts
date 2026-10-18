@@ -27,7 +27,9 @@ const catalogSchema = z.object({
   title: z.string().trim().min(1, 'Informe o título do catálogo.').max(60),
   subtitle: z.string().trim().max(80).default(''),
   showCover: z.boolean().default(true),
-  coverStyle: z.enum(['diagonal', 'band']).default('diagonal'),
+  coverStyle: z.enum(['diagonal', 'band', 'hero', 'minimal', 'mosaic', 'dark']).default('hero'),
+  /** catalog = catálogo digital (vitrine, contato pelo WhatsApp); sales = página de venda (sacola e pedido). */
+  mode: z.enum(['catalog', 'sales']).default('sales'),
   coverImage: image.default(''),
   accent: z.string().regex(/^#[0-9a-f]{6}$/i, 'Cor inválida.').default('#e4572e'),
   showPrices: z.boolean().default(true),
@@ -46,6 +48,7 @@ const view = (row: any) => ({
   subtitle: row.subtitle,
   showCover: row.show_cover,
   coverStyle: row.cover_style,
+  mode: row.mode === 'catalog' ? 'catalog' : 'sales',
   coverImage: row.cover_image,
   accent: row.accent,
   showPrices: row.show_prices,
@@ -145,8 +148,8 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
     const body = catalogSchema.parse(req.body ?? {});
     const row = (
       await pool.query(
-        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products, featured_ids)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16::jsonb) RETURNING *`,
+        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products, featured_ids, mode)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16::jsonb, $17) RETURNING *`,
         [
           `CAT-${randomUUID()}`,
           req.storeId,
@@ -164,6 +167,7 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
           req.user?.name ?? '',
           body.includeOrderProducts,
           JSON.stringify(body.featuredIds),
+          body.mode,
         ],
       )
     ).rows[0];
@@ -179,7 +183,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
     const row = (
       await pool.query(
         `UPDATE sales_catalogs SET title = $3, subtitle = $4, show_cover = $5, cover_style = $6, cover_image = $7, accent = $8, show_prices = $9,
-                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, featured_ids = $14::jsonb, updated_at = now()
+                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, featured_ids = $14::jsonb, mode = $15, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
         [
           req.params.id,
@@ -196,6 +200,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
           JSON.stringify(body.productIds),
           body.includeOrderProducts,
           JSON.stringify(body.featuredIds),
+          body.mode,
         ],
       )
     ).rows[0];

@@ -78,13 +78,19 @@ const httpsImage = (value: unknown) => {
   return /^https:\/\//i.test(text) || /^data:image\//i.test(text) ? text : null;
 };
 
-/** Sem estoque: dá para encomendar? (null em pickup_prices = modalidade desligada para o produto/variação). */
+/**
+ * Sem estoque: dá para encomendar? Mesma regra do cadastro ("Preço por tipo de retirada"): só quando a
+ * modalidade "Sob encomenda" está marcada no produto/variação. Sem nada marcado vale só a pronta entrega.
+ */
 function orderPrice(orderMethod: OrderMethod, prices: Record<string, any>, fallback: number) {
   if (!orderMethod) return null;
-  if (prices[orderMethod.id] === null) return null;
+  if (!Object.prototype.hasOwnProperty.call(prices, orderMethod.id) || prices[orderMethod.id] === null) return null;
   const price = num(prices[orderMethod.id]);
   return price > 0 ? price : fallback > 0 ? fallback : null;
 }
+
+/** A variação com as formas de retirada marcadas usa as dela; sem nada marcado, vale o que o produto marcou. */
+const ownPrices = (variation: Record<string, any>, product: Record<string, any>) => (Object.keys(variation).length ? variation : product);
 
 /** Monta os itens do catálogo na ordem escolhida pela loja. */
 export function buildCatalogItems(
@@ -134,7 +140,7 @@ export function buildCatalogItems(
         const code = conditionCode(variation.condition) || 'new';
         const condition = CONDITION_LABEL[code] ?? 'Novo';
         const qty = Math.max(0, num(variation.qty));
-        const state = availabilityOf(qty, num(variation.price) || num(product.price), { ...productPrices, ...asObject(variation.pickupPrices ?? variation.pickup_prices) });
+        const state = availabilityOf(qty, num(variation.price) || num(product.price), ownPrices(asObject(variation.pickupPrices ?? variation.pickup_prices), productPrices));
         return {
           attributes: [
             ...attrs.map(([attrId, value]) => ({ id: attrId, name: attrName.get(attrId) ?? attrId, value: String(value) })),

@@ -40,7 +40,7 @@ const WORDS: Record<string, string> = {
   '/painel/os/agenda': 'agenda agendamento',
   '/erp': 'retaguarda erp',
   '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei',
-  '/painel/catalogo': 'catalogo link pdf cliente pagina de venda sacola',
+  '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
   '/erp/entrada-estoque': 'entrada compra nota fornecedor estoque',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada',
   '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro',

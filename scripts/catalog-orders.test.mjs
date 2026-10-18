@@ -112,13 +112,18 @@ test('the external sale that finishes the order takes it out of the queue; cance
 });
 
 test('products sold by order always show in the catalog and can be ordered, even when not marked (option on by default)', async () => {
-  const byOrder = (await call('/stock', 'POST', { name: 'IPHONE 18 PRO ENCOMENDA', kind: 'device', qty: 0, price: 9800, cost: 9000 })).data;
+  const byOrder = (await call('/stock', 'POST', { name: 'IPHONE 18 PRO ENCOMENDA', kind: 'device', qty: 0, price: 9800, cost: 9000, pickupPrices: { [order.id]: 9800 } })).data;
+  // Sem "Sob encomenda" marcado no cadastro (só pronta entrega) e sem estoque: não aparece no catálogo.
+  await call('/stock', 'POST', { name: 'XIAOMI SEM ENCOMENDA', kind: 'device', qty: 0, price: 1500, cost: 1000 });
   const onlyMarked = (await call('/sales-catalogs', 'POST', { title: 'Só o iPhone 17', productIds: [iphone.id] })).data;
   assert.equal(onlyMarked.includeOrderProducts, true);
   const page = (await (await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}`)).json()).data;
   const names = page.items.map((i) => i.name);
   assert.ok(names.includes('IPHONE 18 PRO ENCOMENDA'), 'order-only product shows without being marked');
   assert.equal(names.includes('FONE ESGOTADO'), false, 'no stock and no order: still hidden');
+  assert.equal(names.includes('XIAOMI SEM ENCOMENDA'), false, 'order not ticked in the product: not offered');
+  const notTicked = await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}/orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customer: { ...customer, phone: '(32) 95555-0000' }, items: [{ productId: (await query("SELECT id FROM stock_items WHERE name = 'XIAOMI SEM ENCOMENDA'")).rows[0].id, attributes: [] }] }) });
+  assert.notEqual(notTicked.status, 201, 'cannot order a product without order ticked');
   assert.equal(names[0], 'IPHONE 17 PRO MAX', 'the marked products come first');
   const ordered = await fetch(`${base}/public/sales-catalogs/${onlyMarked.token}/orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customer: { ...customer, phone: '(32) 96666-0000' }, items: [{ productId: byOrder.id, attributes: [] }] }) });
   assert.equal(ordered.status, 201, JSON.stringify(await ordered.clone().json()));
