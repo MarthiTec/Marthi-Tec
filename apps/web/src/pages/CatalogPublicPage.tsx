@@ -7,6 +7,16 @@ import { apiPublicSalesCatalog } from '../services/salesCatalogApi';
 
 type Loaded = Awaited<ReturnType<typeof apiPublicSalesCatalog>>;
 const REFRESH_MS = 45_000;
+const VERSION_CHECK_MS = 5 * 60_000;
+
+/** Saiu uma versão nova do Marthi? (o arquivo principal do site mudou desde que a página abriu) */
+async function newVersionAvailable() {
+  const mine = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/"]')?.src;
+  if (!mine) return false;
+  const html = await (await fetch('/', { cache: 'no-store' })).text();
+  const live = html.match(/<script[^>]+type="module"[^>]+src="([^"]*\/assets\/[^"]+\.js)"/)?.[1];
+  return Boolean(live) && new URL(live!, window.location.origin).href !== mine;
+}
 
 /** Mesma variação = mesma linha da sacola. */
 const lineKey = (item: CatalogItem, variant: CatalogVariant | null) => `${item.id}|${(variant?.attributes ?? []).map((a) => `${a.id}=${a.value}`).join(',')}`;
@@ -50,6 +60,20 @@ export function CatalogPublicPage() {
         .catch((err) => setError(err instanceof Error ? err.message : 'Catálogo indisponível.')),
     [token],
   );
+
+  // Página aberta há tempo (cliente ou loja): quando o Marthi atualiza, recarrega sozinha para o visual
+  // ficar igual ao configurado — só se não houver nada na sacola nem pedido/produto aberto.
+  const idle = useRef(true);
+  idle.current = !bag.length && !checkout && !openId;
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.hidden || !idle.current) return;
+      void newVersionAvailable()
+        .then((fresh) => fresh && idle.current && window.location.reload())
+        .catch(() => undefined);
+    }, VERSION_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     void load();

@@ -270,3 +270,23 @@
 .catalog-cover--dark .catalog-cover__art { border-radius: 50%; background: radial-gradient(closest-side, #fff 70%, rgba(255, 255, 255, 0.92) 100%); aspect-ratio: 1; align-self: center; justify-self: center; width: min(100%, 320px); height: auto; min-height: 0; }
 .catalog-cover--dark .catalog-cover__art::before { display: none; }
 .catalog-cover--dark .catalog-cover__art img { inset: 14%; width: 72%; height: 72%; }
+
+/* Minimal: sem painel atrás da foto — o aparelho fica solto no branco, do tamanho do espaço, com uma
+   sombra suave embaixo. */
+.catalog-cover--minimal .catalog-cover__art { overflow: visible; border-radius: 0; background: transparent; }
+.catalog-cover--minimal .catalog-cover__art img { inset: 0; width: 100%; height: 100%; }
+.catalog-cover--minimal .catalog-cover__art::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: 0; z-index: -1; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgba(22, 24, 29, 0.16), transparent); }
+
+/* Sem card atrás da foto em nenhuma capa moderna: só o aparelho sobre o degradê da capa. O branco do
+   fundo da foto some (multiply direto sobre a capa) e as bordas da imagem esfumam. */
+.catalog-cover--hero .catalog-cover__art,
+.catalog-cover--minimal .catalog-cover__art,
+.catalog-cover--mosaic .catalog-cover__art { isolation: auto; overflow: visible; border-radius: 0; background: none; }
+.catalog-cover--hero .catalog-cover__art::before,
+.catalog-cover--minimal .catalog-cover__art::before,
+.catalog-cover--mosaic .catalog-cover__art::before { display: none; }
+.catalog-cover--hero .catalog-cover__art img,
+.catalog-cover--minimal .catalog-cover__art img,
+.catalog-cover--mosaic .catalog-cover__art img { inset: 0; width: 100%; height: 100%; mix-blend-mode: multiply; }
+.catalog-cover__mosaic span { isolation: auto; overflow: visible; border-radius: 0; background: none; box-shadow: none; }
+.catalog-cover__mosaic img { inset: 4%; width: 92%; height: 92%; }
