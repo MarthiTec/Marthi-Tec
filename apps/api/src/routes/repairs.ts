@@ -46,16 +46,21 @@ const optionSchema = z.object({
   id: z.string().trim().max(60).optional(),
   name: z.string().trim().min(1, 'Informe o nome da opção (ex.: Tela OLED).').max(80),
   price: z.number().min(0).max(1_000_000).nullable().default(null),
+  /** Custo da peça/serviço para a loja (nunca vai para o cliente). */
+  cost: z.number().min(0).max(1_000_000).nullable().default(null),
   stockItemId: z.string().trim().max(80).nullable().default(null),
   active: z.boolean().default(true),
 });
 const serviceSchema = z.object({
+  /** Aparelho do cadastro de produtos (preenche marca e modelo). */
+  productId: z.string().trim().max(80).nullable().default(null),
   brand: z.string().trim().min(1, 'Informe a marca.').max(60),
   model: z.string().trim().min(1, 'Informe o modelo.').max(80),
   category: text(40),
   name: z.string().trim().min(1, 'Informe o nome do serviço.').max(80),
   description: text(400),
   price: z.number().min(0).max(1_000_000).nullable().default(null),
+  cost: z.number().min(0).max(1_000_000).nullable().default(null),
   estimatedMinutes: z.number().int().min(0).max(60 * 24 * 60).nullable().default(null),
   active: z.boolean().default(true),
   internalNotes: text(600),
@@ -65,12 +70,14 @@ const serviceSchema = z.object({
 
 const viewService = (row: any) => ({
   id: row.id,
+  productId: row.product_id ?? null,
   brand: row.brand,
   model: row.model,
   category: row.category,
   name: row.name,
   description: row.description,
   price: num(row.price),
+  cost: num(row.cost),
   estimatedMinutes: row.estimated_minutes === null || row.estimated_minutes === undefined ? null : Number(row.estimated_minutes),
   active: row.active !== false,
   internalNotes: row.internal_notes,
@@ -92,6 +99,13 @@ const publicService = (row: any) => ({
     .map((option: any) => ({ id: option.id, name: option.name, price: num(option.price) })),
 });
 
+/** O produto escolhido precisa ser desta loja. */
+async function checkProduct(db: Db, storeId: string, productId: string | null) {
+  if (!productId) return;
+  const found = (await db.query('SELECT id FROM stock_items WHERE id = $1 AND store_id = $2', [productId, storeId])).rows[0];
+  if (!found) throw httpError('O aparelho escolhido não é do cadastro desta loja.');
+}
+
 async function cleanOptions(db: Db, storeId: string, options: z.infer<typeof optionSchema>[]) {
   const out = [];
   for (const option of options) {
@@ -106,7 +120,10 @@ async function cleanOptions(db: Db, storeId: string, options: z.infer<typeof opt
 
 repairsRouter.get('/api/v1/repair-services', async (req, res, next) => {
   try {
-    const rows = (await pool.query('SELECT * FROM repair_services WHERE store_id = $1 ORDER BY brand, model, sort, category, name', [req.storeId])).rows;
+    const productId = String(req.query.productId ?? '').trim();
+    const rows = productId
+      ? (await pool.query('SELECT * FROM repair_services WHERE store_id = $1 AND product_id = $2 ORDER BY sort, category, name', [req.storeId, productId])).rows
+      : (await pool.query('SELECT * FROM repair_services WHERE store_id = $1 ORDER BY brand, model, sort, category, name', [req.storeId])).rows;
     res.json({ success: true, data: rows.map(viewService) });
   } catch (error) {
     next(error);
@@ -116,12 +133,13 @@ repairsRouter.get('/api/v1/repair-services', async (req, res, next) => {
 repairsRouter.post('/api/v1/repair-services', async (req, res, next) => {
   try {
     const body = serviceSchema.parse(req.body ?? {});
+    await checkProduct(pool, req.storeId!, body.productId);
     const options = await cleanOptions(pool, req.storeId!, body.options);
     const row = (
       await pool.query(
-        `INSERT INTO repair_services (id, store_id, brand, model, category, name, description, price, estimated_minutes, active, internal_notes, options, sort)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric, $9::int, $10, $11, $12::jsonb, $13::int) RETURNING *`,
-        [`RPS-${randomUUID()}`, req.storeId, body.brand, body.model, body.category, body.name, body.description, body.price, body.estimatedMinutes, body.active, body.internalNotes, JSON.stringify(options), body.sort],
+        `INSERT INTO repair_services (id, store_id, brand, model, category, name, description, price, estimated_minutes, active, internal_notes, options, sort, product_id, cost)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric, $9::int, $10, $11, $12::jsonb, $13::int, $14, $15::numeric) RETURNING *`,
+        [`RPS-${randomUUID()}`, req.storeId, body.brand, body.model, body.category, body.name, body.description, body.price, body.estimatedMinutes, body.active, body.internalNotes, JSON.stringify(options), body.sort, body.productId, body.cost],
       )
     ).rows[0];
     res.status(201).json({ success: true, data: viewService(row) });
@@ -133,13 +151,14 @@ repairsRouter.post('/api/v1/repair-services', async (req, res, next) => {
 repairsRouter.patch('/api/v1/repair-services/:id', async (req, res, next) => {
   try {
     const body = serviceSchema.parse(req.body ?? {});
+    await checkProduct(pool, req.storeId!, body.productId);
     const options = await cleanOptions(pool, req.storeId!, body.options);
     const row = (
       await pool.query(
         `UPDATE repair_services SET brand = $3, model = $4, category = $5, name = $6, description = $7, price = $8::numeric, estimated_minutes = $9::int,
-                active = $10, internal_notes = $11, options = $12::jsonb, sort = $13::int, updated_at = now()
+                active = $10, internal_notes = $11, options = $12::jsonb, sort = $13::int, product_id = $14, cost = $15::numeric, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
-        [req.params.id, req.storeId, body.brand, body.model, body.category, body.name, body.description, body.price, body.estimatedMinutes, body.active, body.internalNotes, JSON.stringify(options), body.sort],
+        [req.params.id, req.storeId, body.brand, body.model, body.category, body.name, body.description, body.price, body.estimatedMinutes, body.active, body.internalNotes, JSON.stringify(options), body.sort, body.productId, body.cost],
       )
     ).rows[0];
     if (!row) throw httpError('Serviço não encontrado nesta loja.', 404);
@@ -245,6 +264,7 @@ const finalItemSchema = z.object({
   optionName: z.string().trim().max(80).default(''),
   stockItemId: z.string().trim().max(80).nullable().default(null),
   price: z.number().min(0).max(1_000_000).nullable().default(null),
+  cost: z.number().min(0).max(1_000_000).nullable().default(null),
 });
 const evaluationSchema = z.object({
   customer: z
@@ -434,6 +454,9 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
 
 /* ── Público: link do catálogo ──────────────────────────────────────────────── */
 
+/** Item da solicitação como o cliente pode ver (sem custo e sem vínculo de estoque). */
+const publicItem = (item: any) => ({ serviceId: item.serviceId, name: item.name, optionName: item.optionName ?? '', price: item.price ?? null, estimatedMinutes: item.estimatedMinutes ?? null });
+
 async function catalogByToken(token: string) {
   const row = (await pool.query('SELECT id, store_id, show_repairs FROM sales_catalogs WHERE token = $1', [String(token).slice(0, 64)])).rows[0];
   if (!row || row.show_repairs === false) throw httpError('Manutenção indisponível neste link.', 404);
@@ -502,7 +525,7 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
     if (body.requestKey) {
       const again = (await pool.query('SELECT * FROM repair_requests WHERE store_id = $1 AND request_key = $2', [storeId, body.requestKey])).rows[0];
       if (again) {
-        res.status(200).json({ success: true, data: { protocol: again.protocol, estimatedTotal: Number(again.estimated_total), hasEvaluation: again.has_evaluation, items: again.items } });
+        res.status(200).json({ success: true, data: { protocol: again.protocol, estimatedTotal: Number(again.estimated_total), hasEvaluation: again.has_evaluation, items: (Array.isArray(again.items) ? again.items : []).map(publicItem) } });
         return;
       }
     }
@@ -524,7 +547,8 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
         if (!option) throw httpError(`Escolha a opção de "${service.name}".`);
       }
       const price = option ? num(option.price) : num(service.price);
-      return { serviceId: service.id, name: service.name, category: service.category, optionId: option?.id ?? null, optionName: option?.name ?? '', price, estimatedMinutes: service.estimated_minutes === null ? null : Number(service.estimated_minutes) };
+      const cost = option ? num(option.cost) : num(service.cost);
+      return { serviceId: service.id, name: service.name, category: service.category, optionId: option?.id ?? null, optionName: option?.name ?? '', stockItemId: option?.stockItemId ?? null, price, cost, estimatedMinutes: service.estimated_minutes === null ? null : Number(service.estimated_minutes) };
     });
     const hasEvaluation = items.some((item) => item.price === null) || !items.length;
     const estimatedTotal = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
@@ -568,7 +592,7 @@ repairsRouter.post('/api/v1/public/sales-catalogs/:token/repairs', async (req, r
       }
     }
     if (!saved) throw httpError('Não foi possível gerar o protocolo agora. Tente de novo.', 503);
-    res.status(201).json({ success: true, data: { protocol: saved.protocol, estimatedTotal, hasEvaluation, items } });
+    res.status(201).json({ success: true, data: { protocol: saved.protocol, estimatedTotal, hasEvaluation, items: items.map(publicItem) } });
   } catch (error) {
     next(error);
   }

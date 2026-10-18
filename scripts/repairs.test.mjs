@@ -173,3 +173,35 @@ test('cliente acompanha pelo protocolo + WhatsApp; link sem manutenção não mo
   await call(`/sales-catalogs/${catalog.id}`, 'PATCH', { title: 'Catálogo', productIds: [], showRepairs: false });
   assert.equal((await pub(`/public/sales-catalogs/${catalog.token}/repairs`)).status, 404);
 });
+
+test('manutenção ligada ao produto do cadastro, com venda e custo; custo nunca vai para o cliente', async () => {
+  const phone = (await call('/stock', 'POST', { name: 'IPHONE 13', brand: 'apple', kind: 'device', qty: 0, price: 2500, cost: 2000 })).data;
+  const otherPhone = (await call('/stock', 'POST', { name: 'IPHONE DA OUTRA', kind: 'device', qty: 0, price: 1, cost: 1 }, other, 'store-b')).data;
+  assert.equal((await call('/repair-services', 'POST', { productId: otherPhone.id, brand: 'Apple', model: 'IPHONE 13', name: 'Troca de tela', price: 500 })).status, 400, 'produto de outra loja é recusado');
+  const tela13 = await call('/repair-services', 'POST', {
+    productId: phone.id, brand: 'Apple', model: 'IPHONE 13', category: 'Tela', name: 'Troca de tela',
+    options: [{ name: 'Compatível', price: 450, cost: 220 }, { name: 'Original', price: 900, cost: 610 }],
+  });
+  assert.equal(tela13.status, 201, JSON.stringify(tela13.error));
+  const bateria13 = (await call('/repair-services', 'POST', { productId: phone.id, brand: 'Apple', model: 'IPHONE 13', name: 'Troca de bateria', price: 300, cost: 120 })).data;
+  assert.equal(bateria13.cost, 120);
+  const byProduct = (await call(`/repair-services?productId=${phone.id}`)).data;
+  assert.deepEqual(byProduct.map((s) => s.name).sort(), ['Troca de bateria', 'Troca de tela']);
+  assert.deepEqual(byProduct.find((s) => s.name === 'Troca de tela').options.map((o) => [o.name, o.price, o.cost]), [['Compatível', 450, 220], ['Original', 900, 610]]);
+  const row = (await query('SELECT product_id, cost FROM repair_services WHERE id = $1', [bateria13.id])).rows[0];
+  assert.equal(row.product_id, phone.id);
+  assert.equal(Number(row.cost), 120);
+
+  // Link do cliente (outro catálogo, com manutenção ligada).
+  const shop = (await call('/sales-catalogs', 'POST', { title: 'Loja', productIds: [] })).data;
+  const services = await pub(`/public/sales-catalogs/${shop.token}/repairs/services?brand=Apple&model=IPHONE%2013`);
+  const keys = services.data.flatMap((s) => [...Object.keys(s), ...s.options.flatMap((o) => Object.keys(o))]);
+  assert.ok(!keys.includes('cost') && !keys.includes('internalNotes') && !keys.includes('stockItemId') && !keys.includes('productId'), 'custo e dados internos não vão para o cliente');
+  const original = services.data.find((s) => s.name === 'Troca de tela').options.find((o) => o.name === 'Original');
+  const sent = await pub(`/public/sales-catalogs/${shop.token}/repairs`, { brand: 'Apple', model: 'IPHONE 13', items: [{ serviceId: tela13.data.id, optionId: original.id }, { serviceId: bateria13.id }], customer: { name: 'Pedro Alves', phone: '(32) 97777-1111' } });
+  assert.equal(sent.status, 201, JSON.stringify(sent.error));
+  assert.equal(sent.data.estimatedTotal, 1200);
+  assert.ok(!JSON.stringify(sent.data).includes('cost'), 'resposta do envio não leva custo');
+  const saved = (await call('/repair-requests?q=' + sent.data.protocol)).data[0];
+  assert.deepEqual(saved.items.map((i) => [i.name, i.price, i.cost]), [['Troca de tela', 900, 610], ['Troca de bateria', 300, 120]], 'a loja vê o custo de cada item');
+});

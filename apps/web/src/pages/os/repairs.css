@@ -113,3 +113,65 @@
   .repairs__history li { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 .admin.admin--dark .repairs__grid input, .admin.admin--dark .repairs__grid textarea, .admin.admin--dark .repairs__final input, .admin.admin--dark .repairs__filters input, .admin.admin--dark .repairs__search { background: #121820; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
+
+/* Catálogo de manutenções por aparelho (escolhe o aparelho → tabela de manutenções com venda, custo e margem). */
+.repairs__picker { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 16px; background: var(--card, #fff); }
+.repairs__manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; align-items: end; }
+.repairs__manual label { display: grid; gap: 4px; min-width: 0; color: var(--mute, #64748b); font-size: .74rem; font-weight: 700; }
+.repairs__manual input, .repairs__devices input, .repairs__row--add input, .repairs__time input, .repairs__time select { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--line, #d8dde3); border-radius: 10px; background: #fff; color: var(--ink, #16181d); font: inherit; font-size: .86rem; box-sizing: border-box; }
+.repairs__workspace { display: grid; gap: 14px; align-items: start; }
+.repairs__workspace.has-device, .repairs__workspace:has(.repairs__device-empty) { grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); }
+.repairs__devices { position: sticky; top: 12px; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 16px; background: var(--card, #fff); max-height: calc(100vh - 160px); overflow-y: auto; }
+.repairs__devices ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.repairs__devices li button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.repairs__devices li button span { display: grid; min-width: 0; }
+.repairs__devices li button small { color: var(--mute, #64748b); font-size: .68rem; font-weight: 700; text-transform: uppercase; }
+.repairs__devices li button strong { overflow: hidden; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.repairs__devices li button em { min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--line, #eef0f3); font-size: .72rem; font-style: normal; font-weight: 800; text-align: center; }
+.repairs__devices li button:hover { background: color-mix(in srgb, var(--accent, #0f766e) 6%, transparent); }
+.repairs__devices li button.is-on { background: color-mix(in srgb, var(--accent, #0f766e) 12%, transparent); color: var(--accent, #0f766e); }
+.repairs__device { display: grid; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 18px; background: var(--card, #fff); }
+.repairs__device > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.repairs__device > header small { color: var(--mute, #64748b); font-size: .74rem; font-weight: 700; }
+.repairs__device > header h3 { margin: 2px 0 0; font-size: 1.15rem; }
+.repairs__device-empty { align-content: center; min-height: 160px; text-align: center; justify-items: center; }
+.repairs__table { display: grid; gap: 4px; min-width: 0; }
+.repairs__row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(96px, 1fr) minmax(90px, .9fr) minmax(90px, .9fr) minmax(70px, .7fr) 48px minmax(0, auto); gap: 8px; align-items: center; padding: 6px 8px; border-radius: 12px; font-size: .84rem; }
+.repairs__row > * { min-width: 0; }
+.repairs__row--head { padding-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line, #e2e8f0); border-radius: 0; color: var(--mute, #64748b); font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.repairs__row:not(.repairs__row--head):not(.repairs__row--add):hover { background: color-mix(in srgb, var(--accent, #0f766e) 5%, transparent); }
+.repairs__row.is-off { opacity: .55; }
+.repairs__row-name { display: grid; gap: 1px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.repairs__row-name strong { font-size: .88rem; }
+.repairs__row-name small { color: var(--mute, #64748b); font-size: .72rem; }
+.repairs__row .is-neg, .repairs__margin.is-neg { color: #dc2626; font-weight: 800; }
+.repairs__row input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--accent, #0f766e); cursor: pointer; }
+.repairs__row-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.repairs__row-empty { padding: 8px; }
+.repairs__row--add { margin-top: 4px; padding: 10px 8px; border: 1px dashed var(--line, #cbd5e1); background: color-mix(in srgb, var(--accent, #0f766e) 3%, transparent); }
+.repairs__add-name { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 6px; }
+.repairs__time { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(64px, auto); gap: 4px; }
+.repairs__margin { color: var(--mute, #64748b); font-size: .76rem; font-weight: 700; white-space: nowrap; }
+.repairs__money { align-items: end; }
+.repairs__option { grid-template-columns: minmax(0, 1.2fr) minmax(100px, .7fr) minmax(100px, .7fr) auto minmax(0, 1fr) auto auto 34px; }
+@media (max-width: 1100px) {
+  .repairs__option { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 34px; padding-bottom: 8px; border-bottom: 1px dashed var(--line, #e2e8f0); }
+  .repairs__option > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .repairs__workspace.has-device, .repairs__workspace:has(.repairs__device-empty) { grid-template-columns: minmax(0, 1fr); }
+  .repairs__workspace.has-device .repairs__devices { display: none; }
+  .repairs__devices { position: static; max-height: 320px; }
+  .repairs__row--head { display: none; }
+  .repairs__row { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; border: 1px solid var(--line, #e2e8f0); }
+  .repairs__row > .repairs__row-name, .repairs__row > .repairs__add-name, .repairs__row > .repairs__row-actions { grid-column: 1 / -1; }
+  .repairs__row > [data-label]::before { content: attr(data-label); display: block; color: var(--mute, #64748b); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+  .repairs__row-actions { justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .repairs__manual { grid-template-columns: minmax(0, 1fr); }
+  .repairs__add-name { grid-template-columns: minmax(0, 1fr); }
+  .repairs__option { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; }
+}
+.admin.admin--dark .repairs__manual input, .admin.admin--dark .repairs__devices input, .admin.admin--dark .repairs__row--add input, .admin.admin--dark .repairs__time input, .admin.admin--dark .repairs__time select { background: #121820; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
+.repairs__neg { color: #dc2626; }

@@ -2,9 +2,11 @@ import { nestDelete, nestGet, nestPatch, nestPost } from './nestClient';
 
 /** Orçamento de manutenção: catálogo de serviços (painel), solicitações (fila da OS) e link do cliente. */
 
-export type RepairOption = { id?: string; name: string; price: number | null; stockItemId?: string | null; active?: boolean };
+export type RepairOption = { id?: string; name: string; price: number | null; cost?: number | null; stockItemId?: string | null; active?: boolean };
 export type RepairService = {
   id: string;
+  /** Aparelho do cadastro de produtos (preenche marca e modelo). */
+  productId: string | null;
   brand: string;
   model: string;
   category: string;
@@ -12,6 +14,8 @@ export type RepairService = {
   description: string;
   /** null = valor sob avaliação. */
   price: number | null;
+  /** Custo para a loja (nunca aparece para o cliente). */
+  cost: number | null;
   estimatedMinutes: number | null;
   active: boolean;
   internalNotes: string;
@@ -31,7 +35,7 @@ export const REPAIR_STATUS: Array<{ value: RepairStatus; label: string; tone: st
   { value: 'cancelled', label: 'Cancelada', tone: '#64748b' },
 ];
 
-export type RepairItem = { serviceId: string | null; name: string; category?: string; optionId?: string | null; optionName?: string; stockItemId?: string | null; price: number | null; estimatedMinutes?: number | null };
+export type RepairItem = { serviceId: string | null; name: string; category?: string; optionId?: string | null; optionName?: string; stockItemId?: string | null; price: number | null; cost?: number | null; estimatedMinutes?: number | null };
 export type RepairEvaluation = {
   customer?: { name?: string; phone?: string; document?: string; address?: string };
   device?: { color?: string; capacity?: string; imei?: string; physicalState?: string; screen?: string; body?: string; accessories?: string; techNotes?: string };
@@ -65,7 +69,7 @@ export type RepairRequest = {
   updatedAt: string;
 };
 
-export const apiListRepairServices = () => nestGet<RepairService[]>('/repair-services');
+export const apiListRepairServices = (productId?: string) => nestGet<RepairService[]>(`/repair-services${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`);
 export const apiCreateRepairService = (body: RepairServiceInput) => nestPost<RepairService>('/repair-services', body);
 export const apiUpdateRepairService = (id: string, body: RepairServiceInput) => nestPatch<RepairService>(`/repair-services/${encodeURIComponent(id)}`, body);
 export const apiDeleteRepairService = (id: string) => nestDelete<{ ok: true }>(`/repair-services/${encodeURIComponent(id)}`);

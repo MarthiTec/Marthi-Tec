@@ -189,6 +189,9 @@ function RepairRequestDetail({
   const items = evaluation.items ?? [];
   const itemsTotal = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   const total = evaluation.finalTotal ?? itemsTotal;
+  /** Custo dos serviços (cadastro do Catálogo de manutenções) — só a loja vê. */
+  const costTotal = items.reduce((sum, item) => sum + (item.cost ?? 0), 0);
+  const hasCost = items.some((item) => item.cost !== null && item.cost !== undefined);
 
   const setPart = <K extends 'customer' | 'device' | 'diagnosis'>(key: K, patch: NonNullable<RepairEvaluation[K]>) =>
     setEvaluation((value) => ({ ...value, [key]: { ...(value[key] as object), ...patch } }));
@@ -213,7 +216,7 @@ function RepairRequestDetail({
     const option = service.options.find((entry) => entry.id === optionId);
     setEvaluation((current) => ({
       ...current,
-      items: [...(current.items ?? []), { serviceId, name: service.name, optionId: option?.id ?? null, optionName: option?.name ?? '', stockItemId: option?.stockItemId ?? null, price: option ? option.price : service.price }],
+      items: [...(current.items ?? []), { serviceId, name: service.name, optionId: option?.id ?? null, optionName: option?.name ?? '', stockItemId: option?.stockItemId ?? null, price: option ? option.price : service.price, cost: option ? option.cost ?? null : service.cost }],
     }));
     setAdding('');
   }
@@ -504,6 +507,15 @@ function RepairRequestDetail({
                 <span>Valor final</span>
                 <b>{repairMoney(total)}</b>
               </li>
+              {hasCost ? (
+                <li>
+                  <span>Custo · margem (interno)</span>
+                  <b className={total - costTotal < 0 ? 'repairs__neg' : ''}>
+                    {repairMoney(costTotal)} · {repairMoney(total - costTotal)}
+                    {total ? ` (${Math.round(((total - costTotal) / total) * 100)}%)` : ''}
+                  </b>
+                </li>
+              ) : null}
               <li>
                 <span>Previsão</span>
                 <b>{evaluation.eta ? new Date(evaluation.eta).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'a definir'}</b>
