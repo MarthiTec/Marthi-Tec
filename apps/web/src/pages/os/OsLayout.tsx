@@ -280,6 +280,7 @@ export function OsLayout() {
           <span className="os-app__period-icon" aria-hidden="true">📅</span>
           <AdminPicker
             compact
+            searchable={false}
             aria-label="Filtrar por período ou data da oficina"
             value={currentPeriodValue}
             options={[

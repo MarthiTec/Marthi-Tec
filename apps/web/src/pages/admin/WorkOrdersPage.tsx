@@ -710,6 +710,7 @@ export function WorkOrdersPage() {
           <div className="os-jira-priority-picker-wrap">
             <AdminPicker
               compact
+              searchable={false}
               aria-label="Filtrar OS por período de data"
               value={datePreset}
               options={[
@@ -776,6 +777,7 @@ export function WorkOrdersPage() {
         <div className="os-jira-priority-picker-wrap">
           <AdminPicker
             compact
+            searchable={false}
             aria-label="Filtrar por prioridade"
             value={selectedPriority}
             options={[

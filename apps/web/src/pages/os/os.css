@@ -1351,7 +1351,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
 }
 
 .os-app__period-icon {
@@ -1360,12 +1360,13 @@
   flex-shrink: 0;
 }
 
-.os-app__period-picker {
-  min-width: 250px;
+.os-app__top .os-app__period-picker.admin-picker {
+  min-width: 265px;
   width: auto;
 }
 
 .os-app__top .os-app__period-picker .admin-picker__trigger {
+  min-width: 265px;
   min-height: 36px;
   height: 36px;
   background: rgba(255, 255, 255, 0.08);
@@ -1376,6 +1377,7 @@
   font-weight: 600;
   padding: 0 12px;
   box-shadow: none;
+  white-space: nowrap;
 }
 
 .os-app__top .os-app__period-picker .admin-picker__trigger:hover,
@@ -1393,14 +1395,26 @@
   border-bottom-color: #ffffff;
 }
 
-.os-app__top .os-app__period-picker .admin-picker__menu {
+.os-app__top .os-app__period-picker .admin-picker__dropdown {
+  min-width: 295px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  left: auto;
+  right: 0;
   background: #181f2a;
   border: 1px solid #334155;
   border-radius: 10px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
   z-index: 180;
+}
+
+.os-app__top .os-app__period-picker .admin-picker__menu {
+  background: #181f2a;
+  border: none;
+  border-radius: 10px;
   padding: 6px;
-  min-width: 280px;
+  min-width: 100%;
+  width: max-content;
 }
 
 .os-app__top .os-app__period-picker .admin-picker__menu button {
@@ -1408,6 +1422,7 @@
   border-radius: 6px;
   font-size: 0.84rem;
   padding: 8px 12px;
+  white-space: nowrap;
 }
 
 .os-app__top .os-app__period-picker .admin-picker__menu button:hover {
@@ -1423,6 +1438,13 @@
 
 .os-app__top .os-app__period-picker .admin-picker__check {
   border-color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .os-app__top .os-app__period-picker.admin-picker,
+  .os-app__top .os-app__period-picker .admin-picker__trigger {
+    min-width: 165px;
+  }
 }
 
 /* ==========================================================================
@@ -1555,14 +1577,21 @@
   min-width: 170px;
 }
 
-/* Combobox de Prioridades no padrão do sistema (AdminPicker) */
+/* Combobox de Prioridades e Datas no padrão do sistema (AdminPicker) */
 .os-jira-priority-picker-wrap {
   display: inline-flex;
   align-items: center;
-  min-width: 170px;
+  min-width: 195px;
+  flex-shrink: 0;
+}
+
+.os-jira-priority-combobox.admin-picker {
+  min-width: 195px;
+  width: 100%;
 }
 
 .os-jira-priority-combobox .admin-picker__trigger {
+  min-width: 195px;
   height: 36px;
   min-height: 36px;
   padding: 0 12px;
@@ -1573,10 +1602,29 @@
   font-weight: 600;
   color: #334155;
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .os-jira-priority-combobox .admin-picker__trigger:hover {
   background: #e2e8f0;
+}
+
+.os-jira-priority-combobox .admin-picker__dropdown {
+  min-width: 235px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  left: 0;
+  right: auto;
+  z-index: 150;
+}
+
+.os-jira-priority-combobox .admin-picker__menu {
+  min-width: 100%;
+  width: max-content;
+}
+
+.os-jira-priority-combobox .admin-picker__menu button {
+  white-space: nowrap;
 }
 
 .os-jira-bar__search {
@@ -2214,13 +2262,19 @@
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
 }
 
-.is-theme-dark .os-jira-priority-combobox .admin-picker__menu {
+.is-theme-dark .os-jira-priority-combobox .admin-picker__dropdown {
   background: #181d24 !important;
   border: 1px solid #2b333e !important;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65) !important;
+  z-index: 150 !important;
+}
+
+.is-theme-dark .os-jira-priority-combobox .admin-picker__menu {
+  background: #181d24 !important;
+  border: none !important;
   color: #f1f5f9 !important;
-  min-width: 210px;
-  z-index: 120 !important;
+  min-width: 100%;
+  width: max-content;
 }
 
 .is-theme-dark .os-jira-priority-combobox .admin-picker__menu button {
