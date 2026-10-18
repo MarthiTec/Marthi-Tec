@@ -190,10 +190,10 @@ export function MarthiAssinaturasPage() {
     <section className="admin-page marthi-billing">
       <div className="marthi-billing__intro">
         <div>
-          <h2>Plano &amp; Faturamento</h2>
+          <h2>Assinaturas (backoffice Marthi)</h2>
           <p>
-            Controle de assinaturas SaaS no MarthiDB (mesmo padrão conceitual do Discloud). Cobrança automática
-            depende das variáveis do provedor no Site — sem mock de cliente ou plano.
+            Operação interna no MarthiDB: sync de licenças, Customer Stripe e faturas manuais. O cliente paga em{' '}
+            <strong>/painel/lojas</strong> (Licenciamento) — esta tela não substitui o painel do lojista.
           </p>
         </div>
         <button type="button" className="btn btn--ghost" onClick={() => void loadList()} disabled={loading || busy}>

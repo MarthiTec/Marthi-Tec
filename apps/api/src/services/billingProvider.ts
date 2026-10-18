@@ -127,15 +127,21 @@ export function stripeWebhookSecret(): string | null {
   return value || null;
 }
 
-export function portalReturnUrl(): string {
+export type PortalAudience = 'store' | 'admin';
+
+export function portalReturnUrl(audience: PortalAudience = 'store'): string {
   const explicit = process.env.STRIPE_PORTAL_RETURN_URL?.trim();
   if (explicit) return explicit;
   const front = process.env.FRONTEND_URL?.trim() || 'https://marthi-totem.discloud.app';
-  return `${front.replace(/\/$/, '')}/admin/assinaturas`;
+  const path = audience === 'admin' ? '/admin/assinaturas' : '/painel/lojas';
+  return `${front.replace(/\/$/, '')}${path}`;
 }
 
 /** Cria sessão do Customer Portal Stripe via API HTTP (sem SDK). */
-export async function createStripeBillingPortalSession(customerId: string): Promise<{ url: string }> {
+export async function createStripeBillingPortalSession(
+  customerId: string,
+  audience: PortalAudience = 'store',
+): Promise<{ url: string }> {
   const secret = stripeSecretKey();
   if (!secret) {
     throw Object.assign(new Error('Stripe não configurado: ausente STRIPE_SECRET_KEY.'), {
@@ -145,7 +151,7 @@ export async function createStripeBillingPortalSession(customerId: string): Prom
   }
   const body = new URLSearchParams({
     customer: customerId,
-    return_url: portalReturnUrl(),
+    return_url: portalReturnUrl(audience),
   });
   const response = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
     method: 'POST',

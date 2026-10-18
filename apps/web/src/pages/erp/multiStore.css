@@ -475,6 +475,39 @@
   color: #94a3b8;
 }
 
+.multi-store-stat-value--money {
+  color: var(--accent, #0f766e);
+}
+
+.is-theme-dark .multi-store-stat-value--money {
+  color: var(--accent, #2dd4bf);
+}
+
+.multi-store-stat-economy {
+  color: var(--accent, #0f766e);
+  font-weight: 600;
+}
+
+.is-theme-dark .multi-store-stat-economy {
+  color: var(--accent, #5eead4);
+}
+
+.multi-store-stat-pay-link {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent, #0d9488);
+  text-decoration: none;
+}
+
+.multi-store-stat-pay-link:hover {
+  text-decoration: underline;
+}
+
+.is-theme-dark .multi-store-stat-pay-link {
+  color: var(--accent, #2dd4bf);
+}
+
 /* Cards & Isolation */
 .multi-store-card {
   background: var(--admin-surface, #ffffff);
