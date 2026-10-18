@@ -131,6 +131,7 @@ export function AddressFields({
   onChange,
   onCityCode,
   legend = 'Endereço',
+  uppercase = false,
 }: {
   value: AddressValue;
   disabled?: boolean;
@@ -138,6 +139,8 @@ export function AddressFields({
   /** Código IBGE do município, quando a busca pelo CEP o devolve (cadastro da loja / fiscal). */
   onCityCode?: (code: string) => void;
   legend?: string;
+  /** "Sempre em MAIÚSCULAS" do cadastro: rua, número, complemento, bairro e cidade em caixa alta. */
+  uppercase?: boolean;
 }) {
   const store = getActiveStore();
   const [searchCity, setSearchCity] = useState(value.city || store?.city || '');
@@ -150,8 +153,15 @@ export function AddressFields({
   const listId = useId();
   const lastCep = useRef('');
 
+  const emit = (next: AddressValue) =>
+    onChange(
+      uppercase
+        ? { ...next, street: next.street.toUpperCase(), number: next.number.toUpperCase(), complement: next.complement.toUpperCase(), district: next.district.toUpperCase(), city: next.city.toUpperCase() }
+        : next,
+    );
+
   function apply(address: ApiAddress) {
-    onChange({
+    emit({
       ...value,
       zipCode: address.zipCode || value.zipCode,
       street: address.street || value.street,
@@ -205,7 +215,7 @@ export function AddressFields({
     }
   }
 
-  const set = (patch: Partial<AddressValue>) => onChange({ ...value, ...patch });
+  const set = (patch: Partial<AddressValue>) => emit({ ...value, ...patch });
 
   return (
     <fieldset className="address-fields span-2" disabled={disabled}>

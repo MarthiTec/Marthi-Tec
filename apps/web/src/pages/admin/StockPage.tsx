@@ -1,5 +1,6 @@
 import {productSku,supplierSkuName} from '../../data/productSku';
 import {ProductTotemPreview} from '../../components/ProductTotemPreview';
+import { useUppercase } from '../../components/UppercaseToggle';
 import {ProductDayOffers} from '../../components/ProductDayOffers';
 import {ProductPriceMetrics,ProductPriceSuggestion,LastStockEntry} from '../../components/ProductPricingFields';
 import {ProductPickupPrices,PickupPriceList,offeredPickupIds} from '../../components/PickupFields';
@@ -200,13 +201,8 @@ export function StockPage() {
   const [items, setItems] = useState(() => getAdminState().stock);
   const [form, setForm] = useState(() => emptyForm(attrDefs.map((item) => item.id), totemSurface));
   const qtyDecimals = form.unit === 'KG' ? 3 : 0;
-  // Preferência só de digitação (não é dado de negócio) — por isso fica no navegador, não no banco.
-  const [autoUppercase, setAutoUppercase] = useState(() => {
-    try { return localStorage.getItem('marthi.stock.autoUppercase') !== 'false'; } catch { return true; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('marthi.stock.autoUppercase', String(autoUppercase)); } catch { /* ignore */ }
-  }, [autoUppercase]);
+  // "Sempre em MAIÚSCULAS": marcado ao abrir, igual aos outros cadastros (nada guardado no navegador).
+  const { uppercase: autoUppercase, setUppercase: setAutoUppercase } = useUppercase();
   const [mode, setMode] = useState<Mode>('new');
   const [formVisible, setFormVisible] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);

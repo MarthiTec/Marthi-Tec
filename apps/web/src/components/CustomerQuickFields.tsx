@@ -1,5 +1,6 @@
 import { createCustomer, type Customer } from '../data/adminStore';
 import { formatCnpj, formatCpf, isValidCnpj, isValidCpf } from '../utils/documentUtils';
+import { UppercaseToggle, useUppercase } from './UppercaseToggle';
 import { AddressFields, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from './PersonFields';
 
 /**
@@ -82,12 +83,18 @@ export function CustomerQuickFields({
 }) {
   const isCompany = value.documentType === 'cnpj';
   const set = (patch: Partial<CustomerDraft>) => onChange({ ...value, ...patch });
+  const { uppercase, setUppercase, upper } = useUppercase();
+  function toggleUppercase(on: boolean) {
+    setUppercase(on);
+    if (on) set({ name: value.name.toUpperCase() });
+  }
   return (
     <div className="customer-quick">
+      <UppercaseToggle checked={uppercase} onChange={toggleUppercase} />
       <PersonTypeField type={value.documentType} document={value.document} onChange={(documentType, document) => set({ documentType, document })} />
       <label className="customer-quick__wide">
         {isCompany ? 'Razão social *' : 'Nome completo *'}
-        <input value={value.name} maxLength={160} autoFocus onChange={(event) => set({ name: event.target.value })} />
+        <input value={value.name} maxLength={160} autoFocus onChange={(event) => set({ name: upper(event.target.value) })} />
       </label>
       {requireDocument ? <small className="customer-quick__wide customer-quick__hint">{isCompany ? 'CNPJ' : 'CPF'} obrigatório nesta tela.</small> : null}
       {!isCompany ? (
@@ -104,7 +111,7 @@ export function CustomerQuickFields({
         E-mail
         <input value={value.email} type="email" maxLength={160} placeholder="opcional" onChange={(event) => set({ email: event.target.value })} />
       </label>
-      <AddressFields value={value.address} onChange={(address) => set({ address })} />
+      <AddressFields value={value.address} uppercase={uppercase} onChange={(address) => set({ address })} />
     </div>
   );
 }

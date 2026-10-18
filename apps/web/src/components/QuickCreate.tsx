@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { QuickModal } from './QuickModal';
+import { UppercaseToggle, useUppercase } from './UppercaseToggle';
 import { createBrand, type Brand } from '../data/brandStore';
 import { createAttribute, updateAttribute, type ProductAttribute } from '../data/attributeStore';
 import { getErpRegistry, upsertSupplier } from '../data/erpRegistry';
@@ -13,6 +14,7 @@ const message = (err: unknown, fallback: string) => (err instanceof Error && err
 export function QuickCreateSupplier({ onClose, onCreated }: { onClose: () => void; onCreated: (supplierId: string) => void }) {
   const [name, setName] = useState('');
   const [tradeName, setTradeName] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [document, setDocument] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -38,14 +40,15 @@ export function QuickCreateSupplier({ onClose, onCreated }: { onClose: () => voi
 
   return (
     <QuickModal title="Novo fornecedor" subtitle="Cadastro rápido. Os demais dados podem ser completados depois." busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar fornecedor">
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       <label>
         Razão social / Nome *
-        <input value={name} maxLength={160} onChange={(event) => setName(event.target.value)} />
+        <input value={name} maxLength={160} onChange={(event) => setName(upper(event.target.value))} />
       </label>
       <div className="quick-modal__row">
         <label>
           Nome fantasia
-          <input value={tradeName} maxLength={160} onChange={(event) => setTradeName(event.target.value)} />
+          <input value={tradeName} maxLength={160} onChange={(event) => setTradeName(upper(event.target.value))} />
         </label>
         <label>
           CNPJ / CPF
@@ -68,6 +71,7 @@ export function QuickCreateSupplier({ onClose, onCreated }: { onClose: () => voi
 
 export function QuickCreateBrand({ onClose, onCreated }: { onClose: () => void; onCreated: (brand: Brand) => void }) {
   const [name, setName] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -87,9 +91,10 @@ export function QuickCreateBrand({ onClose, onCreated }: { onClose: () => void; 
 
   return (
     <QuickModal title="Nova marca" busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar marca">
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       <label>
         Nome da marca *
-        <input value={name} maxLength={80} placeholder="Ex.: Samsung" onChange={(event) => setName(event.target.value)} />
+        <input value={name} maxLength={80} placeholder="Ex.: Samsung" onChange={(event) => setName(upper(event.target.value))} />
       </label>
     </QuickModal>
   );
@@ -99,6 +104,7 @@ export function QuickCreateBrand({ onClose, onCreated }: { onClose: () => void; 
 export function QuickCreateAttribute({ onClose, onCreated }: { onClose: () => void; onCreated: (attribute: ProductAttribute) => void }) {
   const [name, setName] = useState('');
   const [values, setValues] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [filterOnTotem, setFilterOnTotem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -134,13 +140,14 @@ export function QuickCreateAttribute({ onClose, onCreated }: { onClose: () => vo
 
   return (
     <QuickModal title="Novo atributo" subtitle="Ex.: Cor, Capacidade, Tamanho, Sabor." busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar atributo">
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       <label>
         Nome do atributo *
-        <input value={name} maxLength={60} placeholder="Ex.: Cor" onChange={(event) => setName(event.target.value)} />
+        <input value={name} maxLength={60} placeholder="Ex.: Cor" onChange={(event) => setName(upper(event.target.value))} />
       </label>
       <label>
         Valores *
-        <textarea rows={3} value={values} placeholder="Ex.: Preto, Branco, Azul" onChange={(event) => setValues(event.target.value)} />
+        <textarea rows={3} value={values} placeholder="Ex.: Preto, Branco, Azul" onChange={(event) => setValues(upper(event.target.value))} />
         <small>Separe os valores por vírgula. Dá para acrescentar outros depois em Atributos.</small>
       </label>
       <label className="quick-modal__check">
@@ -191,6 +198,7 @@ export function QuickCreateSeller({ onClose, onCreated }: { onClose: () => void;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [commission, setCommission] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -213,9 +221,10 @@ export function QuickCreateSeller({ onClose, onCreated }: { onClose: () => void;
 
   return (
     <QuickModal title="Novo vendedor" subtitle="Cadastro rápido. Os demais dados podem ser completados em Pessoas › Vendedores." busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar vendedor">
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       <label>
         Nome do vendedor *
-        <input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} />
+        <input value={name} maxLength={120} onChange={(event) => setName(upper(event.target.value))} />
       </label>
       <div className="quick-modal__row">
         <label>
@@ -237,6 +246,7 @@ export function QuickCreateSeller({ onClose, onCreated }: { onClose: () => void;
  */
 export function QuickCreateAttributeValue({ attribute, onClose, onCreated }: { attribute: ProductAttribute; onClose: () => void; onCreated: (value: string) => void }) {
   const [value, setValue] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -266,9 +276,10 @@ export function QuickCreateAttributeValue({ attribute, onClose, onCreated }: { a
 
   return (
     <QuickModal title={`Nova ${attribute.name.toLowerCase()}`} subtitle={`Fica salva em ${attribute.name} para todos os produtos.`} busy={busy} error={error} onClose={onClose} onSubmit={save} submitLabel="Salvar">
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       <label>
         {attribute.name} *
-        <input value={value} maxLength={100} autoFocus placeholder={/cor/i.test(attribute.name) ? 'Ex.: Laranja Cósmico' : /capac/i.test(attribute.name) ? 'Ex.: 2TB' : ''} onChange={(event) => setValue(event.target.value)} />
+        <input value={value} maxLength={100} autoFocus placeholder={/cor/i.test(attribute.name) ? 'Ex.: Laranja Cósmico' : /capac/i.test(attribute.name) ? 'Ex.: 2TB' : ''} onChange={(event) => setValue(upper(event.target.value))} />
       </label>
     </QuickModal>
   );

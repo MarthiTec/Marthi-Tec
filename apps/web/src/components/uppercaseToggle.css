@@ -1,0 +1,35 @@
+/* "Sempre em MAIÚSCULAS": linha discreta no topo do cadastro, vale para os campos de texto dele. */
+label.uppercase-toggle,
+.admin-form label.uppercase-toggle,
+.customer-quick > label.uppercase-toggle,
+.quick-modal__body label.uppercase-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  width: auto;
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: var(--mute, #64748b);
+  text-transform: none;
+  cursor: pointer;
+  user-select: none;
+}
+label.uppercase-toggle input[type='checkbox'],
+.admin-form label.uppercase-toggle input[type='checkbox'],
+.customer-quick > label.uppercase-toggle input[type='checkbox'],
+.quick-modal__body label.uppercase-toggle input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent, #0f766e);
+  cursor: pointer;
+}
+.admin-form > label.uppercase-toggle,
+.customer-quick > label.uppercase-toggle {
+  grid-column: 1 / -1;
+}

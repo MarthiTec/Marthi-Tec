@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +30,7 @@ export function ProductGroupsPage() {
   const [labelForm, setLabelForm] = useState<ProductGroupLabels>({ group: 'Grupo', subgroup: 'Subgrupo' });
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [form, setForm] = useState<Form | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -185,9 +187,10 @@ export function ProductGroupsPage() {
             {readOnly ? 'Consultar' : form.id ? 'Editar' : 'Novo'} {(form.parentId ? labels.subgroup : labels.group).toLowerCase()}
           </h3>
           <div className="admin-form">
+            <UppercaseToggle checked={uppercase} disabled={readOnly || saving} onChange={setUppercase} />
             <label>
               Nome
-              <input autoFocus required maxLength={80} value={form.name} disabled={readOnly || saving} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input autoFocus required maxLength={80} value={form.name} disabled={readOnly || saving} onChange={(e) => setForm({ ...form, name: upper(e.target.value) })} />
             </label>
             <AdminPicker
               label={`Dentro de qual ${labels.group.toLowerCase()}`}

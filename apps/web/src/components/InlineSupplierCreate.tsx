@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiCreateSupplier } from '../services/erpApi';
+import { UppercaseToggle, useUppercase } from './UppercaseToggle';
 
 export type CreatedSupplier = { id: string; name: string; origin: 'company' | 'upgrade' };
 
@@ -12,6 +13,7 @@ export function InlineSupplierCreate({ origin, disabled, onCreated }: { origin: 
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
 
   async function save() {
     const value = name.trim();
@@ -44,7 +46,7 @@ export function InlineSupplierCreate({ origin, disabled, onCreated }: { origin: 
         autoFocus
         maxLength={160}
         placeholder={origin === 'upgrade' ? 'Nome do cliente / upgrade' : 'Nome do fornecedor'}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) => setName(upper(e.target.value))}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -59,6 +61,7 @@ export function InlineSupplierCreate({ origin, disabled, onCreated }: { origin: 
       <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setOpen(false)}>
         Cancelar
       </button>
+      <UppercaseToggle checked={uppercase} onChange={setUppercase} />
       {error ? <p role="alert" className="inline-supplier__error">{error}</p> : null}
     </div>
   );

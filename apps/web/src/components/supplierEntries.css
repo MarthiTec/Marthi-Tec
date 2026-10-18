@@ -166,3 +166,5 @@
   .imei-list__row { flex-wrap: wrap; }
   .imei-list__row input.imei-list__second { flex-basis: calc(100% - 40px); }
 }
+.inline-supplier .uppercase-toggle { flex-basis: 100%; }
+.inline-supplier .uppercase-toggle input { flex: 0 0 auto; }

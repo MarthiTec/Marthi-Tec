@@ -1,3 +1,4 @@
+import { UppercaseToggle, useUppercase } from './UppercaseToggle';
 import './productSpecs.css';
 
 export type ProductSpec = { label: string; value: string };
@@ -51,6 +52,7 @@ export function ProductSpecsPanel({
   onChange: (patch: { videoUrl?: string; specs?: ProductSpec[] }) => void;
 }) {
   const embed = videoEmbed(videoUrl);
+  const { uppercase, setUppercase, upper } = useUppercase();
   const set = (index: number, patch: Partial<ProductSpec>) => onChange({ specs: specs.map((line, i) => (i === index ? { ...line, ...patch } : line)) });
   const fillTemplate = () => {
     const have = new Set(specs.map((line) => line.label.trim().toLowerCase()));
@@ -79,9 +81,12 @@ export function ProductSpecsPanel({
         <div className="pspecs__head">
           <h3>Ficha técnica</h3>
           {!readOnly ? (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={fillTemplate}>
-              Usar modelo de celular
-            </button>
+            <span className="pspecs__tools">
+              <UppercaseToggle checked={uppercase} onChange={setUppercase} />
+              <button type="button" className="btn btn--ghost btn--sm" onClick={fillTemplate}>
+                Usar modelo de celular
+              </button>
+            </span>
           ) : null}
         </div>
         <p className="pspecs__muted">Opcional. Só as linhas preenchidas aparecem para o cliente, nesta ordem.</p>
@@ -89,8 +94,8 @@ export function ProductSpecsPanel({
           <ul className="pspecs__rows">
             {specs.map((line, index) => (
               <li key={index}>
-                <input className="admin-input" value={line.label} maxLength={80} disabled={readOnly} placeholder="Ex.: Processador" aria-label={`Item ${index + 1}`} onChange={(e) => set(index, { label: e.target.value })} />
-                <input className="admin-input" value={line.value} maxLength={600} disabled={readOnly} placeholder="Ex.: Chip A18" aria-label={`Valor de ${line.label || `item ${index + 1}`}`} onChange={(e) => set(index, { value: e.target.value })} />
+                <input className="admin-input" value={line.label} maxLength={80} disabled={readOnly} placeholder="Ex.: Processador" aria-label={`Item ${index + 1}`} onChange={(e) => set(index, { label: upper(e.target.value) })} />
+                <input className="admin-input" value={line.value} maxLength={600} disabled={readOnly} placeholder="Ex.: Chip A18" aria-label={`Valor de ${line.label || `item ${index + 1}`}`} onChange={(e) => set(index, { value: upper(e.target.value) })} />
                 {!readOnly ? (
                   <button type="button" className="pspecs__drop" aria-label={`Remover ${line.label || 'linha'}`} onClick={() => onChange({ specs: specs.filter((_, i) => i !== index) })}>
                     ×

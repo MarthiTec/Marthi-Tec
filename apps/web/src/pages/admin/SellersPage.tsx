@@ -13,6 +13,7 @@ import {
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { HeadingCancelButton, HeadingEditButton, HeadingNewButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAction } from '../../data/auditLog';
 import { hydrateErpRegistryFromApi } from '../../data/erpRegistry';
@@ -72,6 +73,7 @@ export function SellersPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
 
   const reload = useCallback(async () => {
     try {
@@ -253,10 +255,11 @@ export function SellersPage() {
           <p className="empty">Usado no PDV, na venda externa e na OS para comissão; pode ficar vinculado aos clientes.</p>
           {error ? <p role="alert" className="qty-low">{error}</p> : null}
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+            <UppercaseToggle checked={uppercase} disabled={readOnly} onChange={setUppercase} />
             <PersonTypeField type={form.documentType} document={form.document} disabled={readOnly} onChange={(documentType, document) => setForm({ ...form, documentType, document })} />
             <label>
               {form.documentType === 'cnpj' ? 'Razão social' : 'Nome completo'}
-              <input value={form.name} disabled={readOnly} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input value={form.name} disabled={readOnly} onChange={(e) => setForm({ ...form, name: upper(e.target.value) })} />
             </label>
             <label>
               Comissão (%)
@@ -264,7 +267,7 @@ export function SellersPage() {
             </label>
             <ContactListField kind="phone" primary={form.phone} extras={form.phones} disabled={readOnly} onChange={(phone, phones) => setForm({ ...form, phone, phones })} />
             <ContactListField kind="email" primary={form.email} extras={form.emails} disabled={readOnly} onChange={(email, emails) => setForm({ ...form, email, emails })} />
-            <AddressFields value={form.address} disabled={readOnly} onChange={(address) => setForm({ ...form, address })} />
+            <AddressFields value={form.address} disabled={readOnly} uppercase={uppercase} onChange={(address) => setForm({ ...form, address })} />
             <AdminPicker
               label="Situação"
               value={form.active ? '1' : '0'}

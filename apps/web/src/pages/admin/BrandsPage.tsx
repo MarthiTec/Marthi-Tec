@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useAuth } from '../../contexts/AuthContext';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
 import { autoBrandLogo, autoFillBrandLogos, createBrand, deleteBrand, updateBrand, useBrands, type Brand } from '../../data/brandStore';
@@ -24,6 +25,7 @@ export function BrandsPage() {
   const canEdit = ['admin', 'manager', 'superadmin'].includes(user?.role ?? '');
   const { brands, loading, error, reload } = useBrands();
   const [query, setQuery] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [form, setForm] = useState<BrandForm | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -101,7 +103,8 @@ export function BrandsPage() {
       {form && <form className="admin-card" onSubmit={e => { e.preventDefault(); void save(); }}>
         <h3>{readOnly ? 'Consultar marca' : form.id ? 'Editar marca' : 'Nova marca'}</h3>
         <div className="admin-form">
-          <label>Nome da marca<input autoFocus required maxLength={80} value={form.name} disabled={readOnly || saving} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
+          <UppercaseToggle checked={uppercase} disabled={readOnly || saving} onChange={setUppercase} />
+          <label>Nome da marca<input autoFocus required maxLength={80} value={form.name} disabled={readOnly || saving} onChange={e => setForm({ ...form, name: upper(e.target.value) })} /></label>
           <AdminPicker label="Situação" value={form.active ? 'active' : 'inactive'} options={[{ value: 'active', label: 'Ativa' }, { value: 'inactive', label: 'Inativa' }]} disabled={readOnly || saving} onChange={value => setForm({ ...form, active: value === 'active' })} />
         </div>
         {readOnly ? (

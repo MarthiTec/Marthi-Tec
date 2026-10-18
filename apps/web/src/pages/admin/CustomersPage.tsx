@@ -19,6 +19,7 @@ import {
 } from '../../components/PageHeadingActions';
 import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
 import { CustomerSummaryPanel } from '../../components/CustomerSummaryPanel';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { listQuotesForCustomer, POS_QUOTES_EVENT, QUOTE_STATUS_COLOR, QUOTE_STATUS_LABEL, type PosQuote } from '../../data/posQuotesStore';
 import { QuoteCommercialPrintModal } from '../../components/QuoteCommercialPrintModal';
@@ -94,6 +95,7 @@ function formFrom(customer: ApiCustomerRecord): Form {
 /** Clientes da loja: tudo lido e gravado direto no banco. */
 export function CustomersPage() {
   const [query, setQuery] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   const [status, setStatus] = useState<CrudStatusFilter>('all');
   const [form, setForm] = useState<Form>(EMPTY);
   const [mode, setMode] = useState<Mode>('new');
@@ -337,6 +339,7 @@ export function CustomersPage() {
             <h2>{crudFormTitle(mode, 'cliente')}</h2>
             {error ? <p role="alert" className="qty-low">{error}</p> : null}
             <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+              <UppercaseToggle checked={uppercase} disabled={readOnly} onChange={setUppercase} />
               <PersonTypeField
                 type={form.documentType}
                 document={form.document}
@@ -348,7 +351,7 @@ export function CustomersPage() {
                 <input
                   value={form.name}
                   disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => setForm({ ...form, name: upper(e.target.value) })}
                   placeholder={isCompany ? 'Razão social da empresa' : 'Nome do cliente'}
                 />
               </label>
@@ -361,7 +364,7 @@ export function CustomersPage() {
               {isCompany ? (
                 <label>
                   Nome fantasia
-                  <input value={form.tradeName} disabled={readOnly} onChange={(e) => setForm({ ...form, tradeName: e.target.value })} />
+                  <input value={form.tradeName} disabled={readOnly} onChange={(e) => setForm({ ...form, tradeName: upper(e.target.value) })} />
                 </label>
               ) : null}
               <AdminPicker
@@ -383,7 +386,7 @@ export function CustomersPage() {
               />
               <ContactListField kind="phone" primary={form.phone} extras={form.phones} disabled={readOnly} onChange={(phone, phones) => setForm({ ...form, phone, phones })} />
               <ContactListField kind="email" primary={form.email} extras={form.emails} disabled={readOnly} onChange={(email, emails) => setForm({ ...form, email, emails })} />
-              <AddressFields value={form.address} disabled={readOnly} onChange={(address) => setForm({ ...form, address })} />
+              <AddressFields value={form.address} disabled={readOnly} uppercase={uppercase} onChange={(address) => setForm({ ...form, address })} />
               <label className="span-2">
                 Observações
                 <textarea rows={3} value={form.notes} disabled={readOnly} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

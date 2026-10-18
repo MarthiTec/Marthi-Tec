@@ -3,6 +3,7 @@ import { apiListStores } from '../../services/erpApi';
 import { nestPost } from '../../services/nestClient';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { AdminPicker } from '../../components/AdminPicker';
 import {
   confirmDelete,
@@ -77,6 +78,7 @@ export function AttributesPage() {
   });
   const [form, setForm] = useState(() => emptyForm(totemSurface));
   const [valueDraft, setValueDraft] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
   // Renomear valor: valores salvos no banco (ao abrir o atributo) e o que virou cada um (antigo → novo).
   const [savedValues, setSavedValues] = useState<string[]>([]);
   const [renames, setRenames] = useState<Record<string, string>>({});
@@ -500,12 +502,13 @@ export function AttributesPage() {
             </p>
           ) : null}
           <div className={`admin-form ${readOnly ? 'is-readonly' : ''}`}>
+            <UppercaseToggle checked={uppercase} disabled={atLimit || readOnly || saving} onChange={setUppercase} />
             <label>
               Atributo
               <input
                 value={form.name}
                 onChange={(e) => {
-                  setForm({ ...form, name: e.target.value });
+                  setForm({ ...form, name: upper(e.target.value) });
                   if (error) setError('');
                 }}
                 placeholder="Cor, tamanho, armação…"
@@ -527,7 +530,7 @@ export function AttributesPage() {
               <input
                 value={valueDraft}
                 onChange={(e) => {
-                  setValueDraft(e.target.value);
+                  setValueDraft(upper(e.target.value));
                   if (error) setError('');
                 }}
                 onKeyDown={(e) => {
@@ -620,7 +623,7 @@ export function AttributesPage() {
                               value={renaming.text}
                               maxLength={100}
                               aria-label={`Novo nome de ${value}`}
-                              onChange={(e) => setRenaming({ value, text: e.target.value })}
+                              onChange={(e) => setRenaming({ value, text: upper(e.target.value) })}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();

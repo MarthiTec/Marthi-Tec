@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { QuickModal } from '../../components/QuickModal';
 import { nestRequest } from '../../services/nestClient';
 import type { PickupMethod } from '../../data/pickup';
@@ -54,6 +55,7 @@ export function PickupMethodsPage() {
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const { uppercase, setUppercase, upper } = useUppercase();
 
   const reload = useCallback(async () => {
     try {
@@ -234,9 +236,10 @@ export function PickupMethodsPage() {
           onClose={() => setForm(null)}
           onSubmit={save}
         >
+          <UppercaseToggle checked={uppercase} onChange={setUppercase} />
           <label>
             <span>Nome</span>
-            <input value={form.name} maxLength={80} placeholder="Ex.: Em mãos, Sob encomenda, Entrega" onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <input value={form.name} maxLength={80} placeholder="Ex.: Em mãos, Sob encomenda, Entrega" onChange={(event) => setForm({ ...form, name: upper(event.target.value) })} />
           </label>
           <div className="pickup-kinds-pick" role="radiogroup" aria-label="Como funciona">
             {KINDS.map((kind) => (
