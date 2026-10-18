@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { PanelAppsMenu } from '../../components/PanelAppsMenu';
+import { SidebarFinder } from '../../components/SidebarFinder';
+import type { Screen } from '../../data/screenDirectory';
 import { ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
@@ -133,6 +135,7 @@ export function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [menuQuery, setMenuQuery] = useState('');
   const [, setPlanTick] = useState(0);
   const [openGroups, setOpenGroups] = useState<string[]>(() => {
     const current = navGroupForPath(window.location.pathname, window.location.search);
@@ -168,6 +171,21 @@ export function AdminLayout() {
   const requiredModule = moduleForPath(location.pathname);
   const moduleAllowed = !requiredModule || hasModule(requiredModule);
   const aclAllowed = isAdmin || canAccessPath(location.pathname, userEmail);
+
+  /** Busca e "Mais acessadas" só mostram telas que a pessoa pode abrir. */
+  const screenVisible = useCallback(
+    (screen: Screen) => {
+      if (screen.groupId === 'cardapio' && !storeCustom.showCardapioDigital) return false;
+      if (screen.path.includes('/cardapio') && !storeCustom.showCardapioDigital) return false;
+      if ((screen.path === '/mesa' || screen.path === '/cozinha') && !storeCustom.showTablesAndKitchen) return false;
+      if (isAdmin) return true;
+      if (screen.adminOnly) return false;
+      if (screen.module && !hasModule(screen.module)) return false;
+      const area = navPathToAccessArea(screen.path);
+      return !area || userCanAccessArea(userEmail, area);
+    },
+    [isAdmin, userEmail, storeCustom.showCardapioDigital, storeCustom.showTablesAndKitchen],
+  );
 
   const page = useMemo(
     () => resolveTitle(location.pathname, location.search),
@@ -277,10 +295,18 @@ export function AdminLayout() {
         <UserChip variant="sidebar" to="/painel/perfil" />
 
         <nav className="admin__nav" aria-label="Módulos da Retaguarda">
-          {ADMIN_NAV
+          <SidebarFinder
+            query={menuQuery}
+            onQuery={setMenuQuery}
+            visible={screenVisible}
+            collapsed={collapsed}
+            onExpand={() => setSidebarCollapsed(false)}
+            onNavigate={closeMobileMenu}
+          />
+          {menuQuery.trim() ? null : ADMIN_NAV
             .filter((group) => {
-              // Painel, Usuários, Operações, Lojas e Log-out ficam no menu de grade do topo.
-              if (group.id === 'home') return false;
+              // Painel, Usuários, Operações, Lojas, Central de ajuda e Log-out ficam no menu de grade do topo.
+              if (group.id === 'home' || group.id === 'help') return false;
               if (group.id === 'cardapio' && !storeCustom.showCardapioDigital) {
                 return false;
               }

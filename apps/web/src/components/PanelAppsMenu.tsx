@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminIcon, type AdminIconName } from './AdminIcons';
+import { TOP_SHORTCUTS } from '../data/screenDirectory';
 import './panelAppsMenu.css';
 
 type PanelApp = { id: string; label: string; hint: string; icon: AdminIconName; to?: string; adminOnly?: boolean };
 
+// Log-out é sempre a última opção.
 const PANEL_APPS: PanelApp[] = [
-  { id: 'painel', label: 'Painel', hint: 'Visão geral da loja', icon: 'home', to: '/painel' },
-  { id: 'usuarios', label: 'Usuários', hint: 'Equipe e permissões', icon: 'people', to: '/painel/usuarios', adminOnly: true },
-  { id: 'operacoes', label: 'Operações', hint: 'Ramo, comunicação e ajustes', icon: 'ops', to: '/painel/operacoes', adminOnly: true },
-  { id: 'lojas', label: 'Lojas & Licenças', hint: 'Filiais e plano', icon: 'store', to: '/painel/lojas', adminOnly: true },
+  ...TOP_SHORTCUTS.map(({ id, label, hint, icon, path, adminOnly }) => ({ id, label, hint, icon, to: path, adminOnly })),
   { id: 'logout', label: 'Log-out', hint: 'Encerrar a sessão', icon: 'logout' },
 ];
 
 /**
- * Atalhos gerais do painel (Painel, Usuários, Operações, Lojas, Log-out) num botão de grade
+ * Atalhos gerais do painel (Painel, Usuários, Operações, Lojas, Central de ajuda, Log-out) num botão de grade
  * no topo, como nas outras telas. A barra lateral fica só com os módulos (Totem, PDV, OS…).
  */
 export function PanelAppsMenu({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
@@ -49,7 +48,7 @@ export function PanelAppsMenu({ isAdmin, onLogout }: { isAdmin: boolean; onLogou
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Atalhos do painel"
-        title="Painel, usuários, operações, lojas e log-out"
+        title="Painel, usuários, operações, lojas, ajuda e log-out"
         onClick={() => setOpen((current) => !current)}
       >
         <AdminIcon name="apps" />

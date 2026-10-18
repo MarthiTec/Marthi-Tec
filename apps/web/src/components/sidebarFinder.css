@@ -1,0 +1,28 @@
+/* Busca e "Mais acessadas" no topo da barra lateral (fundo escuro do painel). */
+.sfinder { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.sfinder--collapsed { gap: 3px; }
+.sfinder--collapsed .admin__link { justify-content: center; padding: 0; width: 100%; border: 0; background: transparent; font: inherit; cursor: pointer; }
+.sfinder__search { position: relative; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 8px 0 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.55); transition: border-color 150ms ease, background-color 150ms ease; }
+.sfinder__search:focus-within { border-color: rgba(45, 212, 191, 0.7); background: rgba(255, 255, 255, 0.08); color: #fff; }
+.sfinder__search .admin-ico { flex: 0 0 auto; width: 17px; height: 17px; }
+.sfinder__search input { flex: 1; min-width: 0; height: 38px; padding: 0; border: 0; outline: none; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 500; }
+.sfinder__search input::placeholder { color: rgba(255, 255, 255, 0.42); }
+.sfinder__search input::-webkit-search-cancel-button { display: none; }
+@media (min-width: 961px) { .sfinder__search input { font-size: 0.86rem; } }
+.sfinder__clear { flex: 0 0 auto; width: 26px; height: 26px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.08); color: #fff; font: inherit; font-size: 1rem; line-height: 1; cursor: pointer; }
+.sfinder__results { display: grid; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(0, 0, 0, 0.18); border: 1px solid rgba(255, 255, 255, 0.04); }
+.sfinder__item { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: rgba(255, 255, 255, 0.7); font: inherit; text-align: left; cursor: pointer; }
+.sfinder__item .admin-ico { flex: 0 0 auto; width: 17px; height: 17px; opacity: 0.8; }
+.sfinder__item span { display: grid; min-width: 0; }
+.sfinder__item strong { overflow: hidden; color: #fff; font-size: 0.86rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.sfinder__item small { overflow: hidden; color: rgba(255, 255, 255, 0.45); font-size: 0.72rem; text-overflow: ellipsis; white-space: nowrap; }
+.sfinder__item.is-active { background: rgba(15, 118, 110, 0.32); box-shadow: inset 2px 0 0 #2dd4bf; }
+.sfinder__item.is-current strong::after { content: ' · aberta'; color: #5eead4; font-weight: 600; }
+.sfinder__empty { margin: 0; padding: 8px 10px; color: rgba(255, 255, 255, 0.5); font-size: 0.78rem; line-height: 1.35; }
+.sfinder__top-link { gap: 10px; width: 100%; min-height: 38px; border: 0; background: transparent; font-family: inherit; font-size: 0.84rem; font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer; }
+.sfinder__rank { flex: 0 0 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.7); font-size: 0.68rem; font-weight: 800; }
+.sfinder__top-link.is-active .sfinder__rank { background: #2dd4bf; color: #0e141a; }
+.sfinder__top-label { display: grid; min-width: 0; }
+.sfinder__top-label, .sfinder__top-label small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sfinder__top-label small { color: rgba(255, 255, 255, 0.4); font-size: 0.68rem; font-weight: 600; }
+.sfinder > * { min-width: 0; }

@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
 import { AuthProvider } from './contexts/AuthContext';
+import { ScreenVisitTracker } from './components/ScreenVisitTracker';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AreaGuard } from './components/AreaGuard';
 import './styles/operatorThemeDark.css';
@@ -140,6 +141,7 @@ function TotemKioskGate({ children }: { children: ReactNode }) {
 export function App() {
   return (
     <AuthProvider>
+      <ScreenVisitTracker />
       <ErrorBoundary fallbackTitle="Ocorreu um erro no sistema">
         <TotemKioskGate>
         <Routes>
