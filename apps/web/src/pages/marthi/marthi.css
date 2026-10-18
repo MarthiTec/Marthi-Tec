@@ -1553,3 +1553,181 @@
   font-size: 0.82rem;
   color: var(--mute, #64748b);
 }
+
+/* —— Plano & Faturamento (/admin/assinaturas) —— */
+.marthi-billing__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.marthi-billing__intro h2 {
+  margin: 0 0 6px;
+  color: var(--ink, #0f172a);
+}
+.marthi-billing__intro p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--mute, #64748b);
+  font-size: 0.92rem;
+}
+.marthi-billing__gates {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #d8dde3);
+  background: var(--card-2, #f8fafc);
+  color: var(--ink, #0f172a);
+}
+.marthi-billing__gates ul {
+  margin: 8px 0 0;
+  padding-left: 1.1rem;
+  color: var(--mute, #64748b);
+  font-size: 0.86rem;
+}
+.marthi-billing__gates-meta {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mute, #64748b);
+}
+.marthi-billing__flash {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent, #0f766e) 12%, transparent);
+  color: var(--ink, #0f172a);
+  font-size: 0.88rem;
+}
+.marthi-billing__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 16px;
+  border-bottom: 1px solid var(--line, #d8dde3);
+}
+.marthi-billing__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--mute, #64748b);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.marthi-billing__tab.is-active {
+  color: var(--ink, #0f172a);
+  border-bottom-color: var(--ink, #0f172a);
+}
+.marthi-billing__plan-head,
+.marthi-billing__plan-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.marthi-billing__plan-head h3,
+.marthi-billing__empty h3 {
+  margin: 0;
+}
+.marthi-billing__plan-body {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+.marthi-billing__plan-title {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.marthi-billing__plan-title strong {
+  display: block;
+  font-size: 1.35rem;
+  text-transform: capitalize;
+  color: var(--ink, #0f172a);
+}
+.marthi-billing__plan-title p,
+.marthi-billing__meta {
+  margin: 4px 0 0;
+  color: var(--mute, #64748b);
+  font-size: 0.9rem;
+}
+.marthi-billing__gem {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  background: linear-gradient(145deg, #94a3b8, #64748b);
+}
+.marthi-billing__gem--bronze {
+  background: linear-gradient(145deg, #d97706, #92400e);
+}
+.marthi-billing__gem--silver {
+  background: linear-gradient(145deg, #cbd5e1, #64748b);
+}
+.marthi-billing__gem--golden,
+.marthi-billing__gem--gold {
+  background: linear-gradient(145deg, #fbbf24, #b45309);
+}
+.marthi-billing__resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.marthi-billing__resource {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #d8dde3);
+  background: var(--card-2, #f8fafc);
+  color: var(--ink, #0f172a);
+  font-size: 0.85rem;
+}
+.marthi-billing__resource span {
+  color: var(--mute, #64748b);
+}
+.marthi-billing__cancel {
+  color: #b91c1c !important;
+}
+.marthi-billing__empty {
+  text-align: center;
+  padding: 36px 20px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  color: var(--mute, #64748b);
+}
+.marthi-billing__empty h3 {
+  color: var(--ink, #0f172a);
+}
+.marthi-billing__stack {
+  display: grid;
+  gap: 14px;
+}
+.marthi-billing-store {
+  margin-top: 16px;
+}
+.is-theme-dark .marthi-billing__gates,
+.admin--dark .marthi-billing__gates,
+.is-theme-dark .marthi-billing__resource,
+.admin--dark .marthi-billing__resource {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink, #e8eef4);
+}
+@media (max-width: 720px) {
+  .marthi-billing__tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .marthi-billing__tab {
+    white-space: nowrap;
+  }
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -17,6 +17,15 @@ import {
   saveStoreEntitlement,
 } from '../../data/storePlan';
 import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
+import {
+  fetchStoreBillingSubscription,
+  formatBillingDate,
+  formatBillingMoney,
+  openStoreBillingPortal,
+  type BillingInvoice,
+  type ClientSubscription,
+} from '../../data/billingSubscriptionsApi';
+import { NestApiError, isNestAuthed } from '../../services/nestClient';
 
 export function PlanPage() {
   const { user } = useAuth();
@@ -25,7 +34,24 @@ export function PlanPage() {
   const [modules, setModules] = useState<PartnerModuleId[]>(current.modules);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [billingSub, setBillingSub] = useState<ClientSubscription | null>(null);
+  const [billingInvoices, setBillingInvoices] = useState<BillingInvoice[]>([]);
+  const [billingNote, setBillingNote] = useState('');
+  const [portalBusy, setPortalBusy] = useState(false);
   const isAdmin = userIsStoreAdmin(user?.email);
+
+  useEffect(() => {
+    if (!isNestAuthed()) return;
+    void fetchStoreBillingSubscription()
+      .then((data) => {
+        setBillingSub(data.subscription);
+        setBillingInvoices(data.invoices);
+        if (data.provider.gates[0]) setBillingNote(data.provider.gates[0]);
+      })
+      .catch((err) => {
+        setBillingNote(err instanceof Error ? err.message : 'Assinatura indisponível no MarthiDB.');
+      });
+  }, []);
 
   const lockedAll = planIncludesAllModules(planId);
   const limit = getPlanModuleLimit(planId);
@@ -74,8 +100,52 @@ export function PlanPage() {
     }
   }
 
+  async function openPortal() {
+    setPortalBusy(true);
+    setBillingNote('');
+    try {
+      const data = await openStoreBillingPortal();
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setBillingNote(err instanceof NestApiError ? err.message : 'Portal de pagamento indisponível.');
+    } finally {
+      setPortalBusy(false);
+    }
+  }
+
   return (
     <section className="admin-page">
+      {billingSub ? (
+        <article className="admin-card marthi-billing-store">
+          <h2>Plano &amp; Faturamento</h2>
+          <p>
+            Assinatura da conta no MarthiDB. Cartão via portal Stripe e Pix automático dependem da ativação do provedor
+            pela Marthi.
+          </p>
+          <p>
+            <strong style={{ textTransform: 'capitalize' }}>{billingSub.planId}</strong>
+            {' · '}
+            {formatBillingMoney(billingSub.amount, billingSub.currency)} /{' '}
+            {billingSub.billingCycle === 'yearly' ? 'ano' : 'mês'}
+          </p>
+          <p className="empty">Próxima cobrança: {formatBillingDate(billingSub.nextChargeAt)}</p>
+          <div className="admin-toolbar admin-toolbar--stack">
+            <button type="button" className="btn btn--ghost" disabled={portalBusy} onClick={() => void openPortal()}>
+              Gerenciar no Stripe
+            </button>
+          </div>
+          {billingInvoices.length ? (
+            <p className="empty">Última fatura: {formatBillingMoney(billingInvoices[0].amount)} ({billingInvoices[0].status})</p>
+          ) : null}
+          {billingNote ? <p className="empty">{billingNote}</p> : null}
+        </article>
+      ) : billingNote ? (
+        <article className="admin-card">
+          <h2>Plano &amp; Faturamento</h2>
+          <p className="empty">{billingNote}</p>
+        </article>
+      ) : null}
+
       <article className="admin-card">
         <h2>Plano da loja</h2>
         <p>

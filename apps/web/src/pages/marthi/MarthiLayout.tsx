@@ -16,6 +16,7 @@ function resolveMarthiTitle(pathname: string): { kicker: string; title: string }
   if (pathname.startsWith('/admin/planos')) return { kicker: 'Comercial & Precificação', title: 'Planos Comerciais' };
   if (pathname.startsWith('/admin/descontos')) return { kicker: 'Licenciamento Multi-Loja', title: 'Desconto Progressivo' };
   if (pathname.startsWith('/admin/recebimentos')) return { kicker: 'Financeiro & Pix', title: 'Recebimentos & Pix' };
+  if (pathname.startsWith('/admin/assinaturas')) return { kicker: 'Plano & Faturamento', title: 'Assinaturas' };
   return { kicker: 'Administração', title: 'Painel Marthi' };
 }
 
@@ -121,6 +122,15 @@ export function MarthiLayout() {
           >
             <AdminIcon name="ops" />
             <span className="admin__link-label">Desconto progressivo</span>
+          </NavLink>
+          <NavLink
+            to="/admin/assinaturas"
+            title="Assinaturas"
+            onClick={() => setMenuOpen(false)}
+            className={({ isActive }) => `admin__link ${isActive ? 'is-active' : ''}`}
+          >
+            <AdminIcon name="card" />
+            <span className="admin__link-label">Assinaturas</span>
           </NavLink>
           <NavLink
             to="/admin/recebimentos"
