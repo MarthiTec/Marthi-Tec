@@ -447,11 +447,11 @@ subscriptionsRouter.post(
         });
         return;
       }
-      const session = await createStripeBillingPortalSession(sub.provider_customer_id);
+      const session = await createStripeBillingPortalSession(sub.provider_customer_id, 'admin');
       await pool.query(
         `INSERT INTO billing_payment_events(id, client_account_id, subscription_id, event_type, provider, payload)
          VALUES ($1,$2,$3,'portal.session_created','stripe',$4::jsonb)`,
-        [randomUUID(), req.params.clientId, sub.id, JSON.stringify({ actorId: req.user!.id })],
+        [randomUUID(), req.params.clientId, sub.id, JSON.stringify({ actorId: req.user!.id, audience: 'admin' })],
       );
       res.json({ success: true, data: { url: session.url } });
     } catch (error) {
@@ -560,7 +560,7 @@ subscriptionsRouter.post(
   },
 );
 
-/** Assinatura da conta logada (loja) — leitura para /painel/plano. */
+/** Assinatura da conta logada (loja) — leitura para /painel/lojas e /painel/plano. */
 subscriptionsRouter.get('/api/v1/billing/subscription', requireAuth, async (req, res, next) => {
   try {
     if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
@@ -645,7 +645,7 @@ subscriptionsRouter.post('/api/v1/billing/portal', requireAuth, async (req, res,
       });
       return;
     }
-    const session = await createStripeBillingPortalSession(sub.provider_customer_id);
+    const session = await createStripeBillingPortalSession(sub.provider_customer_id, 'store');
     res.json({ success: true, data: { url: session.url } });
   } catch (error) {
     next(error);

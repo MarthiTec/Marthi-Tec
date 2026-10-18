@@ -27,6 +27,7 @@ import {
   REPLICATION_EVENT,
   type ReplicationLog,
 } from '../../data/storeReplicationStore';
+import { StoreBillingPanel } from '../../components/StoreBillingPanel';
 import './multiStore.css';
 
 type Tab = 'stores' | 'licensing' | 'isolation';
@@ -503,20 +504,25 @@ export function MultiStoreManagementPage() {
 
             <div className="multi-store-stat-card multi-store-stat-card--highlight">
               <span className="multi-store-stat-label">Total Mensal da Conta</span>
-              <strong className="multi-store-stat-value" style={{ color: '#16a34a' }}>
+              <strong className="multi-store-stat-value multi-store-stat-value--money">
                 R$ {licensingSummary.totalFinal.toFixed(2).replace('.', ',')}
               </strong>
               <span className="multi-store-stat-sub">
                 {licensingSummary.totalDiscount > 0 ? (
-                  <span style={{ color: '#15803d', fontWeight: 600 }}>
+                  <span className="multi-store-stat-economy">
                     Economia de R$ {licensingSummary.totalDiscount.toFixed(2).replace('.', ',')} / mês
                   </span>
                 ) : (
                   'Preço base sem desconto'
                 )}
               </span>
+              <a href="#plano-faturamento" className="multi-store-stat-pay-link">
+                Pagar assinatura ↓
+              </a>
             </div>
           </div>
+
+          <StoreBillingPanel variant="embedded" showPlanLink />
 
           <div className="multi-store-card">
             <div className="multi-store-card__header">
