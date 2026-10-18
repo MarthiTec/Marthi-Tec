@@ -126,49 +126,26 @@ export function generateStoreAccessToken(cnpj: string, email: string, storeId?: 
 /**
  * Conta comercial padrão para a empresa de demonstração Marthi
  */
+/**
+ * Empty shell used only when localStorage has no account and API has not synced yet.
+ * Real client accounts are registered in MarthiDB (never hardcoded business tenants here).
+ */
 export const DEFAULT_CLIENT_ACCOUNT: ClientAccount = {
-  id: 'ACC-MARTHI-DEMO',
-  legalName: 'Marthi Tecnologia e Demonstração LTDA',
-  tradeName: 'Marthi Demonstração',
-  document: '00.000.000/0001-91',
-  email: 'contato@marthi.com.br',
-  phone: '(11) 3000-0000',
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: new Date().toISOString(),
+  id: '',
+  legalName: '',
+  tradeName: '',
+  document: '',
+  email: '',
+  phone: '',
+  createdAt: new Date(0).toISOString(),
+  updatedAt: new Date(0).toISOString(),
 };
 
 /**
- * Loja padrão única habilitada para a Demonstração Marthi
+ * Offline-only placeholder shape. Runtime stores must come from MarthiDB via API.
+ * Never invent client/store business rows in the browser for production/demo paths.
  */
-export const DEFAULT_STORES: Store[] = [
-  {
-    id: 'STR-DEMO-01',
-    clientAccountId: 'ACC-MARTHI-DEMO',
-    code: '001',
-    name: 'Loja Demonstração Marthi',
-    tradeName: 'Marthi Demonstração',
-    cnpj: '00.000.000/0001-91',
-    stateRegistration: 'ISENTO',
-    municipalRegistration: '12345',
-    accessToken: 'TK-DEMO-000191-MDEM-01',
-    email: 'loja@marthi.com.br',
-    phone: '(11) 3000-0000',
-    zipCode: '01310-100',
-    street: 'Avenida Paulista',
-    number: '1000',
-    complement: 'Sala Demo',
-    neighborhood: 'Bela Vista',
-    city: 'São Paulo',
-    state: 'SP',
-    ibgeCityCode: '3550308',
-    taxRegime: 'simples_nacional',
-    active: true,
-    isMatrix: true,
-    segmentId: 'assistencia_tecnica',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-];
+export const DEFAULT_STORES: Store[] = [];
 
 export const DEFAULT_DISCOUNT_RULES: LicensingDiscountRule[] = [
   {
@@ -397,15 +374,15 @@ export function getClientAccount(): ClientAccount {
   cleanLegacyMocks();
   const key = tenantScopedKey(STORAGE_KEY_CLIENT_ACCOUNT);
   const account = readJson<ClientAccount>(key, resolveDefaultClientAccount());
-  if (
+  const isLegacyMock =
     account.legalName.includes('Grupo Varejista') ||
     account.document.includes('12.345.678') ||
-    account.document === '00.000.000/0001-00' ||
-    !account.document
-  ) {
-    const fixed = resolveDefaultClientAccount();
-    writeJson(key, fixed);
-    return fixed;
+    account.document === '00.000.000/0001-00';
+  if (isLegacyMock) {
+    // Drop invented tenants — real account comes from MarthiDB via API sync.
+    const empty = resolveDefaultClientAccount();
+    writeJson(key, empty);
+    return empty;
   }
   return account;
 }
@@ -424,12 +401,14 @@ export function saveClientAccount(account: ClientAccount): ClientAccount {
 export function listStores(): Store[] {
   cleanLegacyMocks();
   const key = tenantScopedKey(STORAGE_KEY_STORES);
+  // Authenticated sessions: only MarthiDB-backed stores (API sync). No hardcoded demo rows.
   const fallback = isNestAuthed() ? [] : resolveDefaultStores();
   const stores = readJson<Store[]>(key, fallback);
 
   // Filtragem definitiva para evitar que qualquer mock residual seja exibido
   const filtered = stores.filter(
     (s) =>
+      Boolean(s.id) &&
       !s.cnpj.includes('12.345.678') &&
       !s.name.includes('Shopping Plaza') &&
       !s.name.includes('Loja Matriz Centro') &&

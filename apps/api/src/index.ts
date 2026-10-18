@@ -1,6 +1,6 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
-import { checkDatabaseConnection } from './db/pool.js';
+import { checkDatabaseConnection, dbConfigured } from './db/pool.js';
 import { runMigrations } from './db/migrate.js';
 import { startOrderReminderWorker } from './services/orderReminders.js';
 import { startAdsSyncWorker } from './services/ads/metaCampaigns.js';
@@ -8,7 +8,12 @@ import { startSocialPostsWorker } from './services/ads/socialPosts.js';
 
 // Schema is maintained by versioned migrations. Startup must not insert demonstration
 // stock, overwrite customer records or delete registrations based on fixed identifiers.
+// Demo/loja data: only via explicit `npm run db:seed-demo` (writes to MarthiDB).
 async function bootstrapDatabase() {
+  if (!dbConfigured) {
+    console.warn('[marthi-api] DATABASE_URL/DB_* ausente — sem bootstrap de schema.');
+    return;
+  }
   const check = await checkDatabaseConnection();
   if (!check.connected) {
     console.warn('[marthi-api] MarthiDB indisponível; operações dependentes do banco não serão confirmadas.');

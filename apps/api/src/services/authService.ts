@@ -233,16 +233,20 @@ export async function loginWithPassword(email: string, password: string): Promis
   const expectedEmail = process.env.AUTH_DEV_EMAIL?.trim();
   const expectedPassword = process.env.AUTH_DEV_PASSWORD?.trim();
   if (expectedEmail && expectedPassword && normEmail === expectedEmail.toLowerCase() && password === expectedPassword) {
-    let devStoreId = 'STR-DEMO-01';
-    let devAccountId = 'ACC-MARTHI-DEMO';
-    if (pool) {
-      try {
-        const storeRes = await pool.query('SELECT id, client_account_id FROM stores WHERE active = true ORDER BY is_matrix DESC, created_at ASC LIMIT 1');
-        if (storeRes.rows[0]) {
-          devStoreId = storeRes.rows[0].id;
-          devAccountId = storeRes.rows[0].client_account_id;
-        }
-      } catch {}
+    // AUTH_DEV_* only binds to a real store/account already registered in MarthiDB.
+    let storeRes;
+    try {
+      storeRes = await pool.query(
+        'SELECT id, client_account_id FROM stores WHERE active = true ORDER BY is_matrix DESC, created_at ASC LIMIT 1',
+      );
+    } catch {
+      throw Object.assign(new Error('MarthiDB indisponível para login de desenvolvimento.'), { status: 503 });
+    }
+    if (!storeRes.rows[0]) {
+      throw Object.assign(
+        new Error('Nenhuma loja ativa no MarthiDB. Cadastre a loja demo com npm run db:seed-demo.'),
+        { status: 503 },
+      );
     }
     const user: AuthUser = {
       id: `dev:${expectedEmail.toLowerCase()}`,
@@ -251,7 +255,7 @@ export async function loginWithPassword(email: string, password: string): Promis
       picture: null,
       provider: 'password',
       role: 'superadmin',
-      clientAccountId: devAccountId,
+      clientAccountId: storeRes.rows[0].client_account_id,
     };
     return {
       token: await createSessionToken(user),

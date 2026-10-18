@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node ../../dist/index.js",
     "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed-demo": "tsx src/db/seed-demo-store.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

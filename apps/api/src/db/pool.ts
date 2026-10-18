@@ -35,7 +35,6 @@ function buildPoolConfig(): PoolConfig {
     };
   }
 
-
   return {
     host: env.DB_HOST,
     port: env.DB_PORT,
@@ -52,14 +51,46 @@ function buildPoolConfig(): PoolConfig {
   };
 }
 
-const poolConfig = buildPoolConfig();
+export const dbConfigured = Boolean(
+  env.DATABASE_URL || (env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD),
+);
 
-export const dbConfigured = Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD));
-export const pool = new Pool(poolConfig);
+/**
+ * When DATABASE_URL / DB_* are missing, expose a Pool-shaped proxy that fails closed.
+ * Business routes must not fall through to in-memory demo data.
+ */
+function createUnconfiguredPool(): Pool {
+  const fail = (): never => {
+    throw Object.assign(
+      new Error('MarthiDB indisponível. Configure DATABASE_URL (ou DB_HOST/DB_DATABASE/DB_USERNAME/DB_PASSWORD).'),
+      { status: 503 },
+    );
+  };
+  return new Proxy({} as Pool, {
+    get(_target, prop) {
+      if (prop === 'on') {
+        return () => createUnconfiguredPool();
+      }
+      if (prop === 'then') {
+        return undefined;
+      }
+      if (prop === 'end' || prop === 'close') {
+        return async () => undefined;
+      }
+      return (..._args: unknown[]) => fail();
+    },
+  });
+}
 
-pool.on('error', (err) => {
-  console.warn('[marthi-api] Pool de conexões PostgreSQL emitiu erro não crítico:', err.message);
-});
+function createLivePool(): Pool {
+  const live = new Pool(buildPoolConfig());
+  live.on('error', (err) => {
+    console.warn('[marthi-api] Pool de conexões PostgreSQL emitiu erro não crítico:', err.message);
+  });
+  return live;
+}
+
+export const pool: Pool = dbConfigured ? createLivePool() : createUnconfiguredPool();
 
 function publicDbError(error: unknown): string {
   if (!(error instanceof Error)) return 'Falha ao conectar no PostgreSQL.';
