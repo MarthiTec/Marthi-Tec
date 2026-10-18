@@ -1,0 +1,111 @@
+/* Página inicial do link do cliente (celular primeiro). */
+.chome { --cat-accent: #e4572e; display: grid; gap: 18px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 12px 12px 40px; box-sizing: border-box; color: #16181d; }
+
+/* Topo: saudação + busca, num cartão com brilho na cor da loja. */
+.chome__hero { position: relative; display: grid; gap: 14px; overflow: hidden; padding: 22px 18px 18px; border-radius: 26px; background: #fff; box-shadow: 0 14px 40px rgba(22, 24, 29, 0.08); isolation: isolate; animation: chome-rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+.chome__glow { position: absolute; inset: -40% -20% auto auto; z-index: -1; width: 70%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--cat-accent) 30%, transparent), transparent); animation: chome-float 9s ease-in-out infinite alternate; }
+.chome__brand { display: flex; align-items: center; gap: 10px; }
+.chome__brand img, .chome__mono { width: 44px; height: 44px; border-radius: 14px; object-fit: contain; background: #fff; box-shadow: 0 2px 10px rgba(22, 24, 29, 0.1); }
+.chome__mono { display: grid; place-items: center; background: var(--cat-accent); color: #fff; font-size: 1.2rem; font-weight: 900; }
+.chome__brand div { display: grid; }
+.chome__brand small { color: #6b7280; font-size: .78rem; font-weight: 600; }
+.chome__brand strong { font-size: 1.05rem; font-weight: 900; }
+.chome__hero h1 { margin: 0; font-size: clamp(1.6rem, 6.4vw, 2.6rem); font-weight: 900; line-height: 1.05; letter-spacing: -.025em; }
+.chome__search { display: flex; align-items: center; gap: 8px; min-height: 54px; padding: 0 6px 0 16px; border: 1px solid #e6e7eb; border-radius: 999px; background: #f7f8fa; transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease; }
+.chome__search:focus-within { border-color: var(--cat-accent); background: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--cat-accent) 14%, transparent); }
+.chome__search svg { flex: 0 0 auto; width: 20px; height: 20px; fill: none; stroke: #6b7280; stroke-width: 2; stroke-linecap: round; }
+.chome__search input { flex: 1; min-width: 0; height: 48px; border: 0; outline: none; background: transparent; color: #16181d; font: inherit; font-size: 16px; }
+.chome__search button { flex: 0 0 auto; height: 42px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--cat-accent); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+
+/* Cartões grandes de escolha. */
+.chome__actions { display: grid; gap: 10px; }
+.chome__action { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) 28px; align-items: center; gap: 14px; min-height: 92px; padding: 16px; overflow: hidden; border: 0; border-radius: 22px; background: #fff; color: #16181d; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 8px 26px rgba(22, 24, 29, 0.07); transition: transform 180ms ease, box-shadow 180ms ease; animation: chome-rise .55s cubic-bezier(.2, .8, .2, 1) both; }
+.chome__action:nth-child(2) { animation-delay: .07s; }
+.chome__action:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(22, 24, 29, 0.12); }
+.chome__action:active { transform: scale(.98); }
+.chome__action--shop { background: linear-gradient(135deg, var(--cat-accent), color-mix(in srgb, var(--cat-accent) 70%, #16181d)); color: #fff; }
+.chome__action--shop::after { content: ''; position: absolute; right: -30px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+.chome__action--repair { background: linear-gradient(135deg, #16181d, #2b2f36); color: #fff; }
+.chome__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: rgba(255, 255, 255, 0.18); }
+.chome__icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chome__action-text { position: relative; z-index: 1; display: grid; gap: 2px; min-width: 0; }
+.chome__action-text strong { font-size: 1.12rem; font-weight: 900; }
+.chome__action-text small { opacity: .85; font-size: .84rem; font-weight: 600; }
+.chome__go { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); font-weight: 900; transition: transform 180ms ease; }
+.chome__action:hover .chome__go { transform: translateX(3px); }
+.chome__mini { display: flex; gap: 8px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
+.chome__mini::-webkit-scrollbar { display: none; }
+.chome__mini button, .chome__mini a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 14px; border: 1px solid #e6e7eb; border-radius: 999px; background: #fff; color: #16181d; font: inherit; font-size: .86rem; font-weight: 700; text-decoration: none; cursor: pointer; transition: border-color 150ms ease, transform 150ms ease; }
+.chome__mini button:hover, .chome__mini a:hover { border-color: var(--cat-accent); }
+.chome__mini button:active, .chome__mini a:active { transform: scale(.96); }
+
+/* Seções: vitrines e marcas. */
+.chome__section { display: grid; gap: 10px; min-width: 0; }
+.chome__section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding: 0 4px; }
+.chome__section-head h2 { margin: 0; font-size: 1.2rem; font-weight: 900; letter-spacing: -.01em; }
+.chome__section-head small { color: #6b7280; font-size: .8rem; font-weight: 600; }
+.chome__arrows { display: inline-flex; align-items: center; gap: 6px; }
+.chome__arrows button { display: none; width: 36px; height: 36px; border: 1px solid #e6e7eb; border-radius: 50%; background: #fff; font: inherit; font-size: 1.2rem; cursor: pointer; }
+.chome__arrows button:disabled { opacity: .35; cursor: default; }
+.chome__arrows .chome__more { display: inline-flex; align-items: center; width: auto; padding: 0 14px; border-radius: 999px; color: var(--cat-accent); font-size: .84rem; font-weight: 800; }
+.chome__rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(152px, 46%); gap: 10px; margin: 0; padding: 4px 4px 10px; overflow-x: auto; list-style: none; scroll-snap-type: x mandatory; scroll-padding: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.chome__rail::-webkit-scrollbar { display: none; }
+.chome__rail li { scroll-snap-align: start; animation: chome-rise .5s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.chome__card { display: grid; gap: 8px; width: 100%; height: 100%; padding: 8px; border: 0; border-radius: 20px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 6px 20px rgba(22, 24, 29, 0.07); transition: transform 180ms ease, box-shadow 180ms ease; }
+.chome__card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(22, 24, 29, 0.12); }
+.chome__card:active { transform: scale(.97); }
+.chome__card-media { position: relative; display: block; aspect-ratio: 1; overflow: hidden; border-radius: 14px; background: radial-gradient(80% 80% at 50% 40%, #fff 0%, #f1f2f4 100%); isolation: isolate; }
+.chome__card-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 10px; box-sizing: border-box; mix-blend-mode: multiply; transition: transform 300ms ease; }
+.chome__card:hover .chome__card-media img { transform: scale(1.05); }
+.chome__card-name { display: grid; place-items: center; width: 100%; height: 100%; padding: 12px; box-sizing: border-box; color: #2b2f36; font-size: .95rem; font-weight: 900; text-align: center; text-transform: uppercase; background: linear-gradient(135deg, color-mix(in srgb, var(--cat-accent) 14%, #fff), #f1f2f4); }
+.chome__card-media em { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 999px; background: var(--cat-accent); color: #fff; font-size: .66rem; font-style: normal; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.chome__card-body { display: grid; gap: 2px; padding: 0 4px 4px; }
+.chome__card-body small { color: #6b7280; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.chome__card-body strong { display: -webkit-box; overflow: hidden; font-size: .88rem; line-height: 1.2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.chome__card-body b { color: var(--cat-accent); font-size: .98rem; font-weight: 900; }
+.chome__card-body b i { color: #6b7280; font-size: .7rem; font-style: normal; font-weight: 600; }
+.chome__ask { color: #6b7280 !important; font-size: .82rem !important; }
+.chome__brands { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.chome__brands button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; padding: 0 14px; border: 1px solid #e6e7eb; border-radius: 16px; background: #fff; color: #16181d; font: inherit; cursor: pointer; transition: border-color 150ms ease, transform 150ms ease, background-color 150ms ease; }
+.chome__brands button:hover { border-color: var(--cat-accent); background: color-mix(in srgb, var(--cat-accent) 6%, #fff); transform: translateY(-1px); }
+.chome__brands strong { font-size: .92rem; }
+.chome__brands small { min-width: 24px; padding: 2px 7px; border-radius: 999px; background: #f1f2f4; color: #4b5563; font-size: .72rem; font-weight: 800; text-align: center; }
+.chome__foot { display: grid; justify-items: center; gap: 4px; padding: 18px; color: #6b7280; font-size: .82rem; text-align: center; }
+.chome__foot strong { color: #16181d; }
+.chome__foot p { margin: 4px 0 0; max-width: 560px; }
+
+/* Navegação fixa no topo: Início | Catálogo | Manutenção. */
+.cnav { position: sticky; top: 0; z-index: 30; display: flex; justify-content: center; padding: 8px 12px; background: color-mix(in srgb, #f3f4f6 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.cnav__bar { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; width: min(100%, 560px); padding: 4px; border-radius: 18px; background: #fff; box-shadow: 0 4px 18px rgba(22, 24, 29, 0.08); }
+.cnav__bar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 8px; border: 0; border-radius: 14px; background: transparent; color: #4b5563; font: inherit; font-size: .86rem; font-weight: 800; white-space: nowrap; cursor: pointer; transition: background-color 180ms ease, color 180ms ease; }
+.cnav__bar button.is-on { background: color-mix(in srgb, var(--cat-accent, #e4572e) 13%, #fff); color: var(--cat-accent, #e4572e); }
+.cnav__bar svg { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@keyframes chome-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes chome-float { from { transform: translate(0, 0) scale(1); } to { transform: translate(-30px, 20px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .chome__hero, .chome__action, .chome__rail li, .chome__glow { animation: none; }
+  .chome__card, .chome__action, .chome__card-media img { transition: none; }
+}
+@media (min-width: 720px) {
+  .chome { padding: 18px 18px 48px; gap: 22px; }
+  .chome__hero { padding: 34px 32px 28px; }
+  .chome__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chome__actions > .chome__mini { grid-column: 1 / -1; }
+  .chome__actions:not(:has(.chome__action--repair)) .chome__action--shop { grid-column: 1 / -1; }
+  .chome__action { min-height: 120px; padding: 22px; }
+  .chome__arrows button { display: inline-grid; place-items: center; }
+  .chome__rail { grid-auto-columns: minmax(190px, 220px); }
+}
+@media (max-width: 380px) {
+  .cnav__bar button { font-size: .78rem; gap: 4px; }
+  .cnav__bar svg { display: none; }
+}
+@media print { .chome, .cnav { display: none !important; } }
+/* Com a barra Início | Catálogo | Manutenção fixa, o cabeçalho do catálogo gruda logo abaixo dela. */
+.cnav ~ * .catalog-head { top: 62px; }
+.chome__hero, .chome__section { grid-template-columns: minmax(0, 1fr); }
+.chome__actions > * { min-width: 0; }
+.chome__hero > *, .chome__search { min-width: 0; }
+.chome__search input { width: 100%; }
+@media (max-width: 380px) { .chome__search button { padding: 0 14px; } }

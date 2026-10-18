@@ -38,13 +38,15 @@ export function CatalogRepairFlow({
   brands,
   store,
   accent,
+  initialView = 'form',
 }: {
+  initialView?: 'form' | 'track';
   token: string;
   brands: Array<{ brand: string; models: string[] }>;
   store: CatalogStore;
   accent: string;
 }) {
-  const [view, setView] = useState<'form' | 'track'>('form');
+  const [view, setView] = useState<'form' | 'track'>(initialView);
   const [brand, setBrand] = useState(brands.length === 1 ? brands[0].brand : '');
   const [model, setModel] = useState('');
   const [modelQuery, setModelQuery] = useState('');

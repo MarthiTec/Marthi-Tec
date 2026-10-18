@@ -5,6 +5,7 @@ import { CatalogCheckout, type BagLine, type CheckoutMode } from '../components/
 import { CatalogProductSheet } from '../components/CatalogProductSheet';
 import { apiPublicSalesCatalog } from '../services/salesCatalogApi';
 import { CatalogRepairFlow } from '../components/CatalogRepairFlow';
+import { CatalogHome, type HomeShopIntent } from '../components/CatalogHome';
 import { apiPublicRepairBrands } from '../services/repairsApi';
 
 type Loaded = Awaited<ReturnType<typeof apiPublicSalesCatalog>>;
@@ -40,7 +41,16 @@ export function CatalogPublicPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   /** Comprar produtos | Solicitar manutenção (só aparece se a loja tem serviços no Catálogo de manutenções). */
-  const [tab, setTab] = useState<'shop' | 'repair'>(() => (params.get('manutencao') === '1' ? 'repair' : 'shop'));
+  /** Início (escolha), Catálogo ou Manutenção. Links com ?manutencao=1 / ?catalogo=1 (ou PDF) abrem direto. */
+  const [tab, setTab] = useState<'home' | 'shop' | 'repair'>(() =>
+    params.get('manutencao') === '1' ? 'repair' : params.get('catalogo') === '1' || params.get('imprimir') === '1' ? 'shop' : 'home',
+  );
+  const [shopIntent, setShopIntent] = useState<HomeShopIntent & { key: number }>({ key: 0 });
+  const [repairView, setRepairView] = useState<'form' | 'track'>('form');
+  const go = (next: 'home' | 'shop' | 'repair') => {
+    setTab(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [repairBrands, setRepairBrands] = useState<Array<{ brand: string; models: string[] }>>([]);
   useEffect(() => {
     let alive = true;
@@ -153,33 +163,85 @@ export function CatalogPublicPage() {
   const total = bag.reduce((sum, line) => sum + (line.variant?.price ?? line.item.price) * line.qty, 0);
   return (
     <main style={{ minHeight: '100dvh', background: '#f3f4f6', paddingBottom: count ? 88 : 0 }}>
-      {repairBrands.length ? (
-        <div className="catalog-switch" role="tablist" aria-label="O que você procura" style={{ ['--cat-accent' as string]: data.catalog.accent }}>
-          <button type="button" role="tab" aria-selected={tab === 'shop'} className={tab === 'shop' ? 'is-on' : ''} onClick={() => setTab('shop')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <nav className="cnav" aria-label="Navegação da loja" style={{ ['--cat-accent' as string]: data.catalog.accent }}>
+        <div className="cnav__bar" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'home'} className={tab === 'home' ? 'is-on' : ''} onClick={() => go('home')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z" />
+            </svg>
+            Início
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'shop'}
+            className={tab === 'shop' ? 'is-on' : ''}
+            onClick={() => {
+              setShopIntent((current) => ({ key: current.key + 1 }));
+              go('shop');
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 8h12l-1 12H7L6 8z" />
               <path d="M9 8V6a3 3 0 0 1 6 0v2" />
             </svg>
-            Comprar produtos
+            Catálogo
           </button>
-          <button type="button" role="tab" aria-selected={tab === 'repair'} className={tab === 'repair' ? 'is-on' : ''} onClick={() => setTab('repair')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5 2.5-2.5z" />
-            </svg>
-            Solicitar manutenção
-          </button>
+          {repairBrands.length ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'repair'}
+              className={tab === 'repair' ? 'is-on' : ''}
+              onClick={() => {
+                setRepairView('form');
+                go('repair');
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5 2.5-2.5z" />
+              </svg>
+              Manutenção
+            </button>
+          ) : null}
         </div>
-      ) : null}
-      {tab === 'repair' && repairBrands.length ? (
+      </nav>
+      {tab === 'home' ? (
+        <CatalogHome
+          look={data.catalog}
+          store={data.store}
+          items={data.items}
+          hasRepairs={repairBrands.length > 0}
+          canBuy={sells}
+          onShop={(intent) => {
+            setShopIntent((current) => ({ ...intent, key: current.key + 1 }));
+            go('shop');
+          }}
+          onRepair={() => {
+            setRepairView('form');
+            go('repair');
+          }}
+          onTrack={() => {
+            setRepairView('track');
+            go('repair');
+          }}
+          onOpenItem={(item) => setOpenId(item.id)}
+          onSignup={() => setCheckout('signup')}
+        />
+      ) : tab === 'repair' && repairBrands.length ? (
         <div style={{ padding: 12 }}>
-          <CatalogRepairFlow token={token} brands={repairBrands} store={data.store} accent={data.catalog.accent} />
+          <CatalogRepairFlow key={repairView} token={token} brands={repairBrands} store={data.store} accent={data.catalog.accent} initialView={repairView} />
         </div>
       ) : (
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <CatalogDocument
+            key={shopIntent.key}
             look={data.catalog}
             store={data.store}
             items={data.items}
+            initialQuery={shopIntent.query}
+            initialBrand={shopIntent.brand}
+            initialFilter={shopIntent.filter}
             shop={{ canBuy: sells, onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
           />
         </div>

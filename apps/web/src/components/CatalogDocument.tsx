@@ -142,19 +142,26 @@ export function CatalogDocument({
   items,
   interactive = true,
   shop,
+  initialQuery = '',
+  initialBrand = '',
+  initialFilter = 'all',
 }: {
   look: CatalogLook;
   store: CatalogStore;
   items: CatalogItem[];
+  /** Abrir já com busca / marca / filtro (atalhos da página inicial do link). */
+  initialQuery?: string;
+  initialBrand?: string;
+  initialFilter?: 'all' | 'new' | 'order';
   /** Busca, filtros e "Tenho interesse"; na prévia do painel também funcionam. */
   interactive?: boolean;
   /** Pedido pelo próprio catálogo (link do cliente). */
   shop?: CatalogShop;
 }) {
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState(initialQuery);
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [sort, setSort] = useState<Sort>('relevance');
-  const [brand, setBrand] = useState('');
+  const [brand, setBrand] = useState(initialBrand);
   const [minBattery, setMinBattery] = useState(0);
   const style = { '--cat-accent': look.accent || '#e4572e' } as CSSProperties;
   // 'none' = capa sem foto; vazio = a foto do primeiro produto com foto.
