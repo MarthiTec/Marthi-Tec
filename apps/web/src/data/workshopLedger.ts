@@ -46,7 +46,7 @@ function patchWorkOrderCache(order: WorkOrder) {
   return order;
 }
 
-async function refreshStockFinance() {
+export async function refreshStockFinance() {
   try {
     const { apiListStock, apiListFinance } = await import('../services/erpApi');
     const [stock, finance] = await Promise.all([apiListStock(), apiListFinance()]);

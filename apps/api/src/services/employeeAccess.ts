@@ -13,7 +13,7 @@ type Queryable = { query: (sql: string, args?: unknown[]) => Promise<{ rows: any
 type Rule = { group: RegExp; areas: string[]; guardReads?: boolean; registry?: boolean };
 
 const RULES: Rule[] = [
-  { group: /^(work-orders|repair-requests|repair-services)$/, areas: ['os'] },
+  { group: /^(work-orders|repair-requests|repair-services|repair-parts)$/, areas: ['os'] },
   { group: /^(finance|payables|receivables|bank-accounts|boletos|treasury)$/, areas: ['erp_finance'], guardReads: true, registry: true },
   { group: /^employees$/, areas: ['erp_employees'], guardReads: true, registry: true },
   { group: /^reports$/, areas: ['erp_audit', 'pdv'], guardReads: true },

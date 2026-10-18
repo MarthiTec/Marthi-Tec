@@ -15,7 +15,10 @@ import {
 } from '../../data/osStore';
 import { useStoreCustomization } from '../../data/storeSegment';
 import { OsCreatedShareModal } from './OsCreatedShareModal';
+import { refreshStockFinance } from '../../data/workshopLedger';
+import type { StockPartChoice } from '../../services/repairPartsApi';
 import { OsDeviceRepairSelector, type OsRepairSelectionResult } from './OsDeviceRepairSelector';
+import { OsRepairPartsPicker } from './OsRepairPartsPicker';
 
 type Props = {
   open: boolean;
@@ -60,6 +63,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
   const [labor, setLabor] = useState(0);
   const [parts, setParts] = useState(0);
   const [selectedLines, setSelectedLines] = useState<WorkOrderLine[]>([]);
+  const [stockParts, setStockParts] = useState<StockPartChoice[]>([]);
   const [quoteNotes, setQuoteNotes] = useState('');
   const [resetSignal, setResetSignal] = useState(0);
   const lastAutoDefectRef = useRef('');
@@ -98,6 +102,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
     setLabor(0);
     setParts(0);
     setSelectedLines([]);
+    setStockParts([]);
     setQuoteNotes('');
     lastAutoDefectRef.current = '';
     setResetSignal((s) => s + 1);
@@ -229,7 +234,10 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
         lines: selectedLines,
         quoteStatus: selectedLines.length > 0 ? 'approved' : 'none',
         quoteNotes: quoteNotes.trim(),
+        stockParts,
       });
+      // As peças saíram do estoque no servidor: atualiza o saldo na tela.
+      if (stockParts.length) void refreshStockFinance();
 
       // Limpa todos os campos do formulário imediatamente após gerar a OS
       resetForm();
@@ -357,6 +365,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
               }}
               onSelectionChange={handleRepairSelectionChange}
             />
+            <OsRepairPartsPicker brand={itemBrand} model={itemModel} serviceLines={selectedLines} resetSignal={resetSignal} onChange={setStockParts} />
 
             <div className="os-form-grid os-form-grid--3" style={{ marginTop: 12 }}>
               <label>
@@ -568,12 +577,14 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
               </label>
 
               <label>
-                <span style={{ whiteSpace: 'nowrap' }}>Peças estimadas (R$)</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{stockParts.length ? 'Peças do estoque (R$)' : 'Peças estimadas (R$)'}</span>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
-                  value={parts || ''}
+                  value={stockParts.length ? stockParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0) || '' : parts || ''}
+                  readOnly={stockParts.length > 0}
+                  title={stockParts.length ? 'Soma das peças cobradas à parte (as incluídas no serviço não somam)' : undefined}
                   onChange={(e) => setParts(parseFloat(e.target.value) || 0)}
                   placeholder="0,00"
                 />

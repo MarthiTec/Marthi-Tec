@@ -76,6 +76,7 @@ import { WorkOrderDetailPage } from './pages/admin/WorkOrderDetailPage';
 import { WorkOrderReportPage } from './pages/admin/WorkOrderReportPage';
 import { RepairRequestsPage } from './pages/os/RepairRequestsPage';
 import { RepairServicesPage } from './pages/os/RepairServicesPage';
+import { RepairPartsPage } from './pages/os/RepairPartsPage';
 import { AgendaPage } from './pages/admin/AgendaPage';
 import { PlanPage } from './pages/admin/PlanPage';
 import { StoreSegmentPage } from './pages/admin/StoreSegmentPage';
@@ -196,6 +197,7 @@ export function App() {
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="solicitacoes" element={<RepairRequestsPage />} />
           <Route path="manutencoes" element={<RepairServicesPage />} />
+          <Route path="pecas" element={<RepairPartsPage />} />
           <Route path=":id/relatorio" element={<WorkOrderReportPage />} />
           <Route path=":id" element={<WorkOrderDetailPage />} />
         </Route>
@@ -337,6 +339,7 @@ export function App() {
           <Route path="os/agenda" element={<AgendaPage />} />
           <Route path="os/solicitacoes" element={<RepairRequestsPage />} />
           <Route path="os/manutencoes" element={<RepairServicesPage />} />
+          <Route path="os/pecas" element={<RepairPartsPage />} />
           <Route path="os/:id/relatorio" element={<WorkOrderReportPage />} />
           <Route path="os/:id" element={<WorkOrderDetailPage />} />
           <Route path="perfil" element={<ProfilePage />} />

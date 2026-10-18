@@ -29,6 +29,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },
   '/os/solicitacoes': { kicker: 'Oficina', title: 'Solicitações de orçamento' },
   '/os/manutencoes': { kicker: 'Oficina', title: 'Catálogo de manutenções' },
+  '/os/pecas': { kicker: 'Oficina', title: 'Peças de manutenção' },
 };
 
 function resolveTitle(pathname: string, search: string) {
@@ -380,6 +381,10 @@ export function OsLayout() {
             <button type="button" onClick={() => go('/os/manutencoes')}>
               <AdminIcon name="wrench" />
               <span>Catálogo de manutenções</span>
+            </button>
+            <button type="button" onClick={() => go('/os/pecas')} title="Estoque das peças usadas nos reparos">
+              <AdminIcon name="box" />
+              <span>Peças de manutenção</span>
             </button>
             <button type="button" onClick={() => go('/os?status=progress')}>
               <kbd>F9</kbd>

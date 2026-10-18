@@ -16,7 +16,10 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { osHref, useOsBase } from '../os/osPaths';
 import { OsCreatedShareModal } from '../os/OsCreatedShareModal';
+import { refreshStockFinance } from '../../data/workshopLedger';
+import type { StockPartChoice } from '../../services/repairPartsApi';
 import { OsDeviceRepairSelector, type OsRepairSelectionResult } from '../os/OsDeviceRepairSelector';
+import { OsRepairPartsPicker } from '../os/OsRepairPartsPicker';
 import '../os/os.css';
 
 const EMPTY = {
@@ -52,6 +55,7 @@ export function WorkOrderNewPage() {
   const sellers = listSellers(true);
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
   const [selectedLines, setSelectedLines] = useState<WorkOrderLine[]>([]);
+  const [stockParts, setStockParts] = useState<StockPartChoice[]>([]);
   const [quoteNotes, setQuoteNotes] = useState('');
   const [resetSignal, setResetSignal] = useState(0);
   const lastAutoDefectRef = useRef('');
@@ -100,9 +104,12 @@ export function WorkOrderNewPage() {
         lines: selectedLines,
         quoteStatus: selectedLines.length > 0 ? 'approved' : 'none',
         quoteNotes,
+        stockParts,
       });
+      if (stockParts.length) void refreshStockFinance();
       setForm({ ...EMPTY, technician: profile.displayName });
       setSelectedLines([]);
+      setStockParts([]);
       setQuoteNotes('');
       lastAutoDefectRef.current = '';
       setResetSignal((s) => s + 1);
@@ -198,6 +205,7 @@ export function WorkOrderNewPage() {
               }}
               onSelectionChange={handleRepairSelectionChange}
             />
+            <OsRepairPartsPicker brand={form.itemBrand} model={form.itemModel} serviceLines={selectedLines} resetSignal={resetSignal} onChange={setStockParts} />
           </div>
 
           <label>

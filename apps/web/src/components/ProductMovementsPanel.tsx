@@ -16,6 +16,8 @@ const ORIGIN_LABEL: Record<string, string> = {
   trade_in: 'Aparelho recebido na troca',
   trade_in_reversal: 'Estorno de troca',
   adjustment: 'Ajuste de estoque',
+  work_order: 'Peça usada na OS',
+  work_order_reversal: 'Peça devolvida da OS',
 };
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

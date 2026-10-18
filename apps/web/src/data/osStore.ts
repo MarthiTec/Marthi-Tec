@@ -180,6 +180,9 @@ export type WorkOrderLine = {
   unitPrice: number;
   kind: WorkOrderLineKind;
   financeId?: string;
+  /** Peça de outro aparelho usada no lugar (improviso). */
+  improvised?: boolean;
+  note?: string;
 };
 
 export type WorkOrder = {
@@ -811,6 +814,8 @@ export async function createWorkOrder(
     quoteStatus?: QuoteStatus;
     quoteNotes?: string;
     quoteValidUntil?: string;
+    /** Peças do estoque que saem junto com a abertura da OS. */
+    stockParts?: Array<{ stockId: string; qty: number; unitPrice: number; improvised: boolean; note: string }>;
   },
 ) {
   try {
@@ -841,6 +846,7 @@ export async function createWorkOrder(
       lines: input.lines,
       quoteStatus: input.quoteStatus,
       quoteNotes: input.quoteNotes,
+      stockParts: input.stockParts ?? [],
     });
     return upsertLocal(normalizeWorkOrder(created));
   } catch (error) {

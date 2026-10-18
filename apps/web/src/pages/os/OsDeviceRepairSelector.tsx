@@ -184,6 +184,8 @@ export function OsDeviceRepairSelector({
     }
 
     for (const row of stock) {
+      // Peças e insumos (telas, baterias…) não são aparelhos: aparecem nas peças da OS, não aqui.
+      if (row.kind === 'part' || row.kind === 'supply') continue;
       const bName = resolveBrandName(row.brand).trim();
       const keyByProd = deviceKey(row.id, bName, row.name);
       const keyByModel = deviceKey(null, bName, row.name);

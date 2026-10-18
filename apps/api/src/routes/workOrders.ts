@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
+import { consumeStockPart, returnStockPart, stockPartSchema } from './repairParts.js';
 
 export const workOrdersRouter = Router();
 workOrdersRouter.use('/api/v1/work-orders', requireAuth);
@@ -175,6 +176,8 @@ const createWorkOrderSchema = z.object({
   lines: z.array(z.any()).optional().default([]),
   quoteStatus: z.string().optional().default('none'),
   quoteNotes: z.string().optional().default(''),
+  /** Peças do estoque usadas na manutenção: saem do estoque junto com a abertura da OS. */
+  stockParts: z.array(stockPartSchema).max(30).optional().default([]),
 });
 
 /* ── Rotas ─────────────────────────────────────────────── */
@@ -270,6 +273,11 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
       RETURNING *
     `;
 
+    // Linha de peça só existe com baixa de estoque de verdade (stockParts); a que vem pronta do
+    // navegador perde o vínculo para o cancelamento não devolver ao estoque o que nunca saiu.
+    const clientLines = (Array.isArray(body.lines) ? body.lines : []).map((line: any) =>
+      line && line.kind === 'part' && line.stockId ? { ...line, stockId: '' } : line,
+    );
     const totalAmount = (body.labor || 0) + (body.parts || 0);
 
     const values = [
@@ -302,11 +310,40 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
       now,
       body.quoteStatus || 'none',
       body.quoteNotes?.trim() || '',
-      JSON.stringify(Array.isArray(body.lines) ? body.lines : []),
+      JSON.stringify(clientLines),
     ];
 
-    const result = await pool.query(insertSql, values);
-    res.status(201).json({ success: true, data: rowToWorkOrder(result.rows[0]) });
+    if (!body.stockParts.length) {
+      const result = await pool.query(insertSql, values);
+      res.status(201).json({ success: true, data: rowToWorkOrder(result.rows[0]) });
+      return;
+    }
+    const client = await pool.connect();
+    let open = false;
+    try {
+      await client.query('BEGIN');
+      open = true;
+      await client.query(insertSql, values);
+      const partLines = [];
+      for (const part of body.stockParts) {
+        partLines.push(await consumeStockPart(client, { ...part, storeId, osId, operator: req.user?.name ?? '' }));
+      }
+      const lines = [...clientLines, ...partLines];
+      const partsTotal = partLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+      const result = await client.query(
+        `UPDATE work_orders SET lines = $3::jsonb, parts = $4::numeric, parts_cost = $4::numeric, total_amount = $5::numeric, updated_at = now()
+          WHERE id = $1 AND store_id = $2 RETURNING *`,
+        [osId, storeId, JSON.stringify(lines), partsTotal, (body.labor || 0) + partsTotal],
+      );
+      await client.query('COMMIT');
+      open = false;
+      res.status(201).json({ success: true, data: rowToWorkOrder(result.rows[0]) });
+    } catch (error) {
+      if (open) await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     next(error);
   }
@@ -387,50 +424,33 @@ workOrdersRouter.post('/api/v1/work-orders/:id/parts', async (req: Request, res:
     if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
     const storeId = req.storeId!;
     const osId = req.params.id;
-    const { stockId, qty, unitPrice } = req.body;
+    const part = stockPartSchema.parse(req.body ?? {});
 
-    const osRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
-    if (!osRes.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
-
-    const stockRes = await pool.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2', [stockId, storeId]);
-    if (!stockRes.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Item de estoque não encontrado.' } });
-
-    const stockItem = stockRes.rows[0];
-    const consumeQty = Math.max(1, Number(qty) || 1);
-    const itemPrice = unitPrice !== undefined ? Number(unitPrice) : Number(stockItem.price || 0);
-    const itemCost = Number(stockItem.cost || 0);
-
-    // Baixa estoque
-    await pool.query('UPDATE stock_items SET qty = GREATEST(0, qty - $1), updated_at = now() WHERE id = $2', [consumeQty, stockId]);
-
-    // Registra lançamento financeiro de custo
-    const finId = `FIN-${Date.now()}`;
-    await pool.query(
-      `INSERT INTO finance_entries (id, store_id, type, label, amount, source, ref_id, created_at)
-       VALUES ($1, $2, 'out', $3, $4, 'os_part', $5, now())`,
-      [finId, storeId, `Consumo de peça OS ${osId}: ${stockItem.name}`, itemCost * consumeQty, osId]
-    );
-
-    const currentLines = safeJson(osRes.rows[0].lines, []);
-    const newLine = {
-      id: `OL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      stockId,
-      name: stockItem.name,
-      qty: consumeQty,
-      unitCost: itemCost,
-      unitPrice: itemPrice,
-      kind: 'part',
-      financeId: finId,
-    };
-    const nextLines = [...currentLines, newLine];
-    const newPartsTotal = nextLines.reduce((sum: number, l: any) => sum + (l.unitPrice * l.qty), 0);
-
-    const updated = await pool.query(
-      `UPDATE work_orders SET lines = $1::jsonb, parts = $2, parts_cost = $2, updated_at = now() WHERE id = $3 AND store_id = $4 RETURNING *`,
-      [JSON.stringify(nextLines), newPartsTotal, osId, storeId]
-    );
-
-    res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
+    const client = await pool.connect();
+    let open = false;
+    try {
+      await client.query('BEGIN');
+      open = true;
+      const osRes = await client.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2 FOR UPDATE', [osId, storeId]);
+      if (!osRes.rows[0]) throw Object.assign(new Error('OS não encontrada.'), { status: 404 });
+      if (['cancelled', 'delivered'].includes(osRes.rows[0].status)) throw Object.assign(new Error('OS encerrada — não dá para baixar peças.'), { status: 409 });
+      // Baixa o estoque (sem deixar negativo), registra a movimentação e o custo no financeiro.
+      const newLine = await consumeStockPart(client, { ...part, storeId, osId, operator: req.user?.name ?? '' });
+      const nextLines = [...safeJson(osRes.rows[0].lines, []), newLine];
+      const newPartsTotal = nextLines.filter((l: any) => l.kind === 'part').reduce((sum: number, l: any) => sum + (Number(l.unitPrice) || 0) * (Number(l.qty) || 0), 0);
+      const updated = await client.query(
+        `UPDATE work_orders SET lines = $1::jsonb, parts = $2, parts_cost = $2, updated_at = now() WHERE id = $3 AND store_id = $4 RETURNING *`,
+        [JSON.stringify(nextLines), newPartsTotal, osId, storeId]
+      );
+      await client.query('COMMIT');
+      open = false;
+      res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
+    } catch (error) {
+      if (open) await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     next(error);
   }
@@ -451,8 +471,8 @@ workOrdersRouter.delete('/api/v1/work-orders/:id/parts/:lineId', async (req: Req
     if (lineIndex < 0) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Linha de peça não encontrada.' } });
 
     const [removed] = currentLines.splice(lineIndex, 1);
-    if (removed.stockId) {
-      await pool.query('UPDATE stock_items SET qty = qty + $1, updated_at = now() WHERE id = $2 AND store_id = $3', [removed.qty, removed.stockId, storeId]);
+    if (removed.stockId && removed.kind === 'part') {
+      await returnStockPart(pool, { storeId, osId, line: removed, operator: req.user?.name ?? '' });
     }
 
     const finId = `FIN-${Date.now()}`;
@@ -462,7 +482,7 @@ workOrdersRouter.delete('/api/v1/work-orders/:id/parts/:lineId', async (req: Req
       [finId, storeId, `Estorno de peça OS ${osId}: ${removed.name}`, (removed.unitCost || 0) * (removed.qty || 1), osId]
     );
 
-    const newPartsTotal = currentLines.reduce((sum: number, l: any) => sum + (l.unitPrice * l.qty), 0);
+    const newPartsTotal = currentLines.filter((l: any) => l.kind === 'part').reduce((sum: number, l: any) => sum + (Number(l.unitPrice) || 0) * (Number(l.qty) || 0), 0);
     const updated = await pool.query(
       `UPDATE work_orders SET lines = $1::jsonb, parts = $2, parts_cost = $2, updated_at = now() WHERE id = $3 AND store_id = $4 RETURNING *`,
       [JSON.stringify(currentLines), newPartsTotal, osId, storeId]
@@ -519,12 +539,14 @@ workOrdersRouter.post('/api/v1/work-orders/:id/cancel', async (req: Request, res
     if (!osRes.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
 
     const row = osRes.rows[0];
+    // Já cancelada: não devolve as peças de novo ao estoque.
+    if (row.status === 'cancelled') return res.json({ success: true, data: rowToWorkOrder(row) });
     const currentLines = safeJson(row.lines, []);
 
     // Reverte todas as peças consumidas
     for (const line of currentLines) {
       if (line.stockId && line.kind === 'part') {
-        await pool.query('UPDATE stock_items SET qty = qty + $1, updated_at = now() WHERE id = $2 AND store_id = $3', [line.qty || 1, line.stockId, storeId]);
+        await returnStockPart(pool, { storeId, osId, line, operator: req.user?.name ?? '' });
       }
     }
 
@@ -552,10 +574,10 @@ workOrdersRouter.delete('/api/v1/work-orders/:id', async (req: Request, res: Res
     const row = osRes.rows[0];
     const currentLines = safeJson(row.lines, []);
 
-    // Reverte todas as peças consumidas de volta ao estoque
-    for (const line of currentLines) {
+    // Reverte todas as peças consumidas de volta ao estoque (a cancelada já devolveu)
+    for (const line of row.status === 'cancelled' ? [] : currentLines) {
       if (line.stockId && line.kind === 'part') {
-        await pool.query('UPDATE stock_items SET qty = qty + $1, updated_at = now() WHERE id = $2 AND store_id = $3', [line.qty || 1, line.stockId, storeId]);
+        await returnStockPart(pool, { storeId, osId, line, operator: req.user?.name ?? '' });
       }
     }
 

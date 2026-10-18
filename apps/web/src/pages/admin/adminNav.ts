@@ -71,6 +71,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/os/agenda', label: 'Agenda' },
       { to: '/painel/os/solicitacoes', label: 'Solicitações de orçamento' },
       { to: '/painel/os/manutencoes', label: 'Catálogo de manutenções' },
+      { to: '/painel/os/pecas', label: 'Peças de manutenção' },
     ],
   },
   {

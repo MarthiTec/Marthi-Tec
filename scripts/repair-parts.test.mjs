@@ -1,0 +1,114 @@
+import assert from 'node:assert/strict';
+import { test, after } from 'node:test';
+import fs from 'node:fs';
+import { once } from 'node:events';
+import { PGlite } from '@electric-sql/pglite';
+
+process.env.JWT_SECRET = 'test-only-secret-'.repeat(4);
+process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/test';
+const db = new PGlite();
+for (const file of fs.readdirSync('apps/api/src/db/migrations').filter((x) => x.endsWith('.sql')).sort()) await db.exec(fs.readFileSync('apps/api/src/db/migrations/' + file, 'utf8'));
+const { app } = await import('../dist/app.js');
+const { pool } = await import('../dist/db/pool.js');
+const auth = await import('../dist/services/authService.js');
+const query = async (sql, args = []) => { const result = await db.query(sql, args); return { ...result, rowCount: result.affectedRows ?? result.rows.length }; };
+pool.query = query;
+pool.connect = async () => ({ query, release() {} });
+await query(`INSERT INTO client_accounts(id,trade_name,legal_name,document,email,phone,contact_name) VALUES('a','a','a','a','a','','Test'),('b','b','b','b','b','','Outra')`);
+await query(`INSERT INTO stores(id,client_account_id,trade_name,legal_name,document) VALUES('store-a','a','Loja','Loja','1'),('store-b','b','Outra','Outra','2')`);
+await query(`INSERT INTO users(id,client_account_id,email,name,global_role,active) VALUES('user-a','a','a@example.com','Gestora','admin',true),('user-b','b','b@example.com','Outra','admin',true)`);
+await query(`INSERT INTO user_stores(id,user_id,store_id,role) VALUES('m-a','user-a','store-a','admin'),('m-b','user-b','store-b','admin')`);
+const admin = await auth.createSessionToken({ id: 'user-a', email: 'a@example.com', name: 'Gestora', role: 'admin', clientAccountId: 'a' });
+const other = await auth.createSessionToken({ id: 'user-b', email: 'b@example.com', name: 'Outra', role: 'admin', clientAccountId: 'b' });
+const server = app.listen(0, '127.0.0.1');
+await once(server, 'listening');
+const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+const call = async (path, method = 'GET', body, token = admin, store = 'store-a') => {
+  const res = await fetch(base + path, { method, headers: { authorization: 'Bearer ' + token, 'x-store-id': store, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const json = await res.json();
+  return { status: res.status, data: json.data, error: json.error };
+};
+after(async () => { server.close(); await once(server, 'close'); await pool.end(); await db.close(); });
+
+const qtyOf = async (id) => Number((await query('SELECT qty FROM stock_items WHERE id = $1', [id])).rows[0].qty);
+const newOs = (extra = {}) => ({ customerName: 'Ana', itemName: 'SAMSUNG A01', itemBrand: 'SAMSUNG', itemModel: 'A01', defect: 'Tela quebrada', labor: 75, ...extra });
+let telaA01, telaA02, bateria, outra, servico;
+
+test('peças de manutenção: vínculo com o aparelho pelo catálogo de manutenções, estoque mínimo, custo e venda', async () => {
+  telaA01 = (await call('/stock', 'POST', { name: 'TELA SAMSUNG A01 INCELL', sku: 'TELA-0001', kind: 'part', category: 'Tela', brand: 'Samsung', qty: 3, minQty: 2, cost: 34, price: 75 })).data;
+  telaA02 = (await call('/stock', 'POST', { name: 'TELA SAMSUNG A02 INCELL', sku: 'TELA-0002', kind: 'part', category: 'Tela', brand: 'Samsung', qty: 1, minQty: 1, cost: 33, price: 75 })).data;
+  bateria = (await call('/stock', 'POST', { name: 'BATERIA GENÉRICA', kind: 'part', qty: 0, minQty: 1, cost: 20, price: 60 })).data;
+  outra = (await call('/stock', 'POST', { name: 'TELA DA OUTRA LOJA', kind: 'part', qty: 5, cost: 1, price: 2 }, other, 'store-b')).data;
+  servico = (await call('/repair-services', 'POST', { brand: 'SAMSUNG', model: 'A01', category: 'Tela', name: 'TROCA DE TELA', options: [{ name: 'INCELL', price: 75, cost: 34 }] })).data;
+  const core = (await call('/repair-services', 'POST', { brand: 'SAMSUNG', model: 'A01 CORE', category: 'Tela', name: 'TROCA DE TELA', options: [{ name: 'INCELL', price: 75, cost: 34 }] })).data;
+
+  const linked = await call(`/repair-parts/${telaA01.id}/links`, 'PUT', { links: [{ serviceId: servico.id, optionId: servico.options[0].id }, { serviceId: core.id, optionId: core.options[0].id }] });
+  assert.equal(linked.status, 200, JSON.stringify(linked.error));
+  assert.deepEqual(linked.data.links.map((l) => l.model), ['A01', 'A01 CORE'], 'uma tela serve para dois aparelhos');
+  assert.equal((await call(`/repair-parts/${outra.id}/links`, 'PUT', { links: [] })).status, 404, 'peça de outra loja não');
+
+  const forA01 = (await call('/repair-parts?brand=Samsung&model=a01')).data;
+  assert.deepEqual(forA01.map((p) => [p.name, p.qty, p.minQty, p.cost, p.price, p.status]), [['TELA SAMSUNG A01 INCELL', 3, 2, 34, 75, 'ok']]);
+  assert.deepEqual((await call('/repair-parts?brand=Samsung&model=A99')).data, [], 'aparelho sem peça vinculada');
+
+  const all = (await call('/repair-parts')).data;
+  assert.deepEqual(all.map((p) => [p.name, p.status]), [['BATERIA GENÉRICA', 'out'], ['TELA SAMSUNG A01 INCELL', 'ok'], ['TELA SAMSUNG A02 INCELL', 'low']]);
+  assert.ok(!all.some((p) => p.id === outra.id), 'nada de outra loja');
+
+  const edited = await call(`/repair-parts/${telaA02.id}`, 'PATCH', { minQty: 3, cost: 35.5, price: 80 });
+  assert.deepEqual([edited.data.minQty, edited.data.cost, edited.data.price, edited.data.qty], [3, 35.5, 80, 1]);
+  assert.equal((await call(`/repair-parts/${outra.id}`, 'PATCH', { minQty: 9 })).status, 404);
+});
+
+test('abrir OS com a peça do aparelho e uma peça improvisada: baixa, movimentação e custo na mesma transação', async () => {
+  const created = await call('/work-orders', 'POST', newOs({
+    lines: [{ id: 'srv-1', stockId: telaA01.id, name: 'TROCA DE TELA (INCELL)', qty: 1, unitCost: 34, unitPrice: 75, kind: 'labor' }],
+    stockParts: [{ stockId: telaA01.id, qty: 1, unitPrice: 0 }, { stockId: telaA02.id, qty: 1, unitPrice: 0, improvised: true, note: 'aro da A02 no lugar' }],
+  }));
+  assert.equal(created.status, 201, JSON.stringify(created.error));
+  const os = created.data;
+  assert.equal(await qtyOf(telaA01.id), 2);
+  assert.equal(await qtyOf(telaA02.id), 0);
+  const parts = os.lines.filter((l) => l.kind === 'part');
+  assert.deepEqual(parts.map((l) => [l.name, l.qty, l.unitCost, l.unitPrice, l.improvised]), [['TELA SAMSUNG A01 INCELL', 1, 34, 0, false], ['TELA SAMSUNG A02 INCELL', 1, 33, 0, true]], 'custo médio das compras (a unidade em estoque custou 33)');
+  assert.equal(os.parts, 0, 'peça incluída no serviço não cobra de novo');
+  assert.equal(os.labor, 75);
+  const moves = (await query(`SELECT qty, previous_qty, new_qty, ref_type, notes FROM stock_movements WHERE ref_id = $1 ORDER BY notes`, [os.id])).rows;
+  assert.equal(moves.length, 2);
+  assert.ok(moves.every((m) => m.ref_type === 'work_order'));
+  assert.ok(moves.some((m) => /improviso/.test(m.notes) && /aro da A02/.test(m.notes)));
+  const costs = (await query(`SELECT amount FROM finance_entries WHERE ref_id = $1 AND source = 'os_part'`, [os.id])).rows.map((r) => Number(r.amount)).sort();
+  assert.deepEqual(costs, [33, 34]);
+
+  // Peça sem saldo: a OS inteira não é aberta e nada sai do estoque.
+  const before = Number((await query('SELECT count(*)::int n FROM work_orders')).rows[0].n);
+  const blocked = await call('/work-orders', 'POST', newOs({ stockParts: [{ stockId: telaA01.id, qty: 1 }, { stockId: bateria.id, qty: 1 }] }));
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.error.message, /Estoque insuficiente de "BATERIA GENÉRICA"/);
+  assert.equal(Number((await query('SELECT count(*)::int n FROM work_orders')).rows[0].n), before);
+  assert.equal(await qtyOf(telaA01.id), 2, 'nada saiu do estoque');
+  assert.equal((await call('/work-orders', 'POST', newOs({ stockParts: [{ stockId: outra.id }] }))).status, 404, 'peça de outra loja não');
+
+  // Linha de peça vinda pronta do navegador não vira estorno no cancelamento.
+  const fake = (await call('/work-orders', 'POST', newOs({ lines: [{ id: 'x', stockId: telaA01.id, name: 'TELA', qty: 5, unitCost: 1, unitPrice: 1, kind: 'part' }] }))).data;
+  await call(`/work-orders/${fake.id}/cancel`, 'POST');
+  assert.equal(await qtyOf(telaA01.id), 2);
+
+  // Na ficha: baixa avulsa cobrada à parte, estorno e cancelamento devolvem uma vez só.
+  const added = await call(`/work-orders/${os.id}/parts`, 'POST', { stockId: telaA01.id, qty: 1 });
+  assert.equal(added.status, 200, JSON.stringify(added.error));
+  assert.equal(added.data.parts, 75, 'sem preço informado = preço de venda da peça');
+  assert.equal(await qtyOf(telaA01.id), 1);
+  assert.equal((await call(`/work-orders/${os.id}/parts`, 'POST', { stockId: telaA02.id, qty: 1 })).status, 409, 'sem saldo não baixa');
+  const line = added.data.lines.filter((l) => l.kind === 'part').at(-1);
+  const removed = await call(`/work-orders/${os.id}/parts/${line.id}`, 'DELETE');
+  assert.equal(removed.data.parts, 0);
+  assert.equal(await qtyOf(telaA01.id), 2);
+  await call(`/work-orders/${os.id}/cancel`, 'POST');
+  await call(`/work-orders/${os.id}/cancel`, 'POST');
+  assert.equal(await qtyOf(telaA01.id), 3, 'cancelar duas vezes não devolve em dobro');
+  assert.equal(await qtyOf(telaA02.id), 1);
+  const back = (await query(`SELECT count(*)::int n FROM stock_movements WHERE ref_id = $1 AND ref_type = 'work_order_reversal'`, [os.id])).rows[0].n;
+  assert.equal(back, 3);
+  assert.equal((await call(`/work-orders/${os.id}/parts`, 'POST', { stockId: telaA01.id })).status, 409, 'OS cancelada não baixa peça');
+});

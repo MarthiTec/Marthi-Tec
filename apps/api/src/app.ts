@@ -52,6 +52,7 @@ import { salesCatalogsRouter } from './routes/salesCatalogs.js';
 import { screenVisitsRouter } from './routes/screenVisits.js';
 import { userPreferencesRouter } from './routes/userPreferences.js';
 import { repairsRouter } from './routes/repairs.js';
+import { repairPartsRouter } from './routes/repairParts.js';
 import { catalogOrdersRouter } from './routes/catalogOrders.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
@@ -120,6 +121,7 @@ app.use(salesCatalogsRouter);
 app.use(screenVisitsRouter);
 app.use(userPreferencesRouter);
 app.use(repairsRouter);
+app.use(repairPartsRouter);
 app.use(catalogOrdersRouter);
 app.use(posRouter);
 app.use(salesRouter);
