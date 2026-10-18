@@ -45,6 +45,9 @@ test('peças de manutenção: vínculo com o aparelho pelo catálogo de manuten�
   const linked = await call(`/repair-parts/${telaA01.id}/links`, 'PUT', { links: [{ serviceId: servico.id, optionId: servico.options[0].id }, { serviceId: core.id, optionId: core.options[0].id }] });
   assert.equal(linked.status, 200, JSON.stringify(linked.error));
   assert.deepEqual(linked.data.links.map((l) => l.model), ['A01', 'A01 CORE'], 'uma tela serve para dois aparelhos');
+  await query('UPDATE repair_services SET active = false WHERE id = $1', [core.id]);
+  const stillLinked = (await call('/repair-parts')).data.find((p) => p.id === telaA01.id).links;
+  assert.deepEqual(stillLinked.map((l) => [l.model, l.serviceActive]), [['A01', true], ['A01 CORE', false]], 'serviço inativo continua mostrando a peça vinculada');
   assert.equal((await call(`/repair-parts/${outra.id}/links`, 'PUT', { links: [] })).status, 404, 'peça de outra loja não');
 
   const forA01 = (await call('/repair-parts?brand=Samsung&model=a01')).data;

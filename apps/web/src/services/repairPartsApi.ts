@@ -2,7 +2,7 @@ import { nestGet, nestPatch, nestPut } from './nestClient';
 
 /** Peças de manutenção: itens do estoque ligados às qualidades do catálogo de manutenções. */
 
-export type RepairPartLink = { serviceId: string; serviceName: string; optionId: string; optionName: string; brand: string; model: string; price: number | null };
+export type RepairPartLink = { serviceId: string; serviceName: string; optionId: string; optionName: string; brand: string; model: string; price: number | null; serviceActive: boolean };
 export type RepairPartStatus = 'ok' | 'low' | 'out';
 export type RepairPart = {
   id: string;

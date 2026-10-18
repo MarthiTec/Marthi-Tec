@@ -236,7 +236,7 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
 
   useEffect(() => {
     apiListRepairServices()
-      .then((list) => setServices(list.filter((service) => service.active !== false && service.options.length)))
+      .then((list) => setServices(list.filter((service) => service.options.length)))
       .catch((err) => setError(err instanceof Error ? err.message : 'Não foi possível carregar os serviços.'));
   }, []);
 
@@ -306,6 +306,7 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
           <li key={service.id}>
             <strong>
               {service.brand} {service.model} · {service.name}
+              {service.active === false ? <small> (serviço inativo no catálogo)</small> : null}
             </strong>
             {service.options.map((option) => {
               const key = `${service.id}|${option.id}`;

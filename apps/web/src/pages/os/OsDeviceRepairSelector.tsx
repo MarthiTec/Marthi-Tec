@@ -210,12 +210,6 @@ export function OsDeviceRepairSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services, stock, brands]);
 
-  // Aparelhos que têm manutenções cadastradas em /os/manutencoes
-  const catalogDevices = useMemo(
-    () => devices.filter((d) => d.serviceCount > 0),
-    [devices],
-  );
-
   // Lista de marcas (priorizando marcas com manutenções no catálogo)
   const brandOptions = useMemo(() => {
     const brandMap = new Map<string, { brand: string; modelCount: number; serviceCount: number }>();
@@ -556,8 +550,6 @@ export function OsDeviceRepairSelector({
     [matchingServices, extraChosenServices],
   );
 
-  const hasSelectedDevice = Boolean(selectedDeviceKey || itemName.trim() || itemModel.trim());
-
   return (
     <div className="os-repair-catalog-box">
       <div className="os-repair-catalog-box__head">
@@ -653,28 +645,6 @@ export function OsDeviceRepairSelector({
           </label>
         </div>
       )}
-
-      {/* Atalhos rápidos dos aparelhos que já têm manutenções cadastradas */}
-      {!hasSelectedDevice && catalogDevices.length > 0 ? (
-        <div className="os-repair-quick-devices">
-          <span className="os-repair-quick-devices__label">
-            Aparelhos com manutenções cadastradas:
-          </span>
-          <div className="os-repair-quick-devices__chips">
-            {catalogDevices.slice(0, 12).map((dev) => (
-              <button
-                key={dev.key}
-                type="button"
-                className="os-repair-device-chip"
-                onClick={() => handlePickDevice(dev.key)}
-              >
-                <strong>{dev.displayName}</strong>
-                <span>{dev.serviceCount} {dev.serviceCount === 1 ? 'serviço' : 'serviços'}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {/* Painel 2: Qual manutenção / serviço será feito? */}
       <div className="os-repair-services-panel">

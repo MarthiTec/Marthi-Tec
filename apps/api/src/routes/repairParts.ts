@@ -18,17 +18,20 @@ const httpError = (message: string, status = 400) => Object.assign(new Error(mes
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 
-export type PartLink = { serviceId: string; serviceName: string; optionId: string; optionName: string; brand: string; model: string; price: number | null };
+export type PartLink = { serviceId: string; serviceName: string; optionId: string; optionName: string; brand: string; model: string; price: number | null; serviceActive: boolean };
 
-/** Qualidades (opções) de cada serviço ativo da loja que apontam para uma peça do estoque. */
+/**
+ * Qualidades (opções) dos serviços da loja que apontam para uma peça do estoque. Serviço inativo também
+ * conta: a peça serve no aparelho mesmo que o serviço ainda não apareça para o cliente.
+ */
 async function linksByPart(db: Db, storeId: string) {
-  const rows = (await db.query('SELECT id, brand, model, name, options FROM repair_services WHERE store_id = $1 AND active = true', [storeId])).rows;
+  const rows = (await db.query('SELECT id, brand, model, name, options, active FROM repair_services WHERE store_id = $1', [storeId])).rows;
   const map = new Map<string, PartLink[]>();
   for (const row of rows) {
     for (const option of Array.isArray(row.options) ? row.options : []) {
       if (!option?.stockItemId || option.active === false) continue;
       const list = map.get(option.stockItemId) ?? [];
-      list.push({ serviceId: row.id, serviceName: row.name, optionId: option.id, optionName: option.name, brand: row.brand, model: row.model, price: option.price ?? null });
+      list.push({ serviceId: row.id, serviceName: row.name, optionId: option.id, optionName: option.name, brand: row.brand, model: row.model, price: option.price ?? null, serviceActive: row.active !== false });
       map.set(option.stockItemId, list);
     }
   }

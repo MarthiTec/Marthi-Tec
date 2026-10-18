@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AdminIcon } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickModal } from '../../components/QuickModal';
@@ -313,14 +314,17 @@ export function RepairServicesPage() {
                       <input type="checkbox" checked={service.active} aria-label={`${service.name} ativo`} onChange={() => void patchService(service, { active: !service.active })} />
                     </span>
                     <span className="repairs__row-actions">
-                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => open(service)}>
-                        Editar
+                      <button type="button" className="repairs__icon" title="Editar" aria-label={`Editar ${service.name}`} onClick={() => open(service)}>
+                        <AdminIcon name="edit" />
                       </button>
-                      <button type="button" className="btn btn--ghost btn--sm" title="Copiar para outro aparelho" onClick={() => open(service, true)}>
-                        Copiar
+                      <button type="button" className="repairs__icon" title="Copiar para outro aparelho" aria-label={`Copiar ${service.name} para outro aparelho`} onClick={() => open(service, true)}>
+                        <svg className="admin-ico" viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="9" y="9" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                          <path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                        </svg>
                       </button>
-                      <button type="button" className="btn btn--ghost btn--sm repairs__danger" onClick={() => void remove(service)} aria-label={`Excluir ${service.name}`}>
-                        Excluir
+                      <button type="button" className="repairs__icon repairs__icon--danger" title="Excluir" aria-label={`Excluir ${service.name}`} onClick={() => void remove(service)}>
+                        <AdminIcon name="trash" />
                       </button>
                     </span>
                   </div>
@@ -328,19 +332,28 @@ export function RepairServicesPage() {
               })}
               {!deviceServices.length ? <p className="repairs__muted repairs__row-empty">Nenhuma manutenção para este aparelho ainda. Adicione abaixo.</p> : null}
 
-              <div className="repairs__row repairs__row--add" role="row">
-                <span className="repairs__add-name">
-                  <input value={quick.name} maxLength={80} placeholder="Nova manutenção (ex.: TROCA DE BATERIA)" aria-label="Nome da manutenção" onChange={(e) => setQuick((value) => ({ ...value, name: upper(e.target.value) }))} onKeyDown={(e) => e.key === 'Enter' && void addQuick()} />
-                  <input value={quick.category} list="repair-categories" maxLength={40} placeholder="Categoria" aria-label="Categoria" onChange={(e) => setQuick((value) => ({ ...value, category: upper(e.target.value) }))} />
-                </span>
-                <span data-label="Venda">
-                  <CurrencyInput value={quick.price} ariaLabel="Valor de venda" onChange={(price) => setQuick((value) => ({ ...value, price }))} />
-                </span>
-                <span data-label="Custo">
-                  <CurrencyInput value={quick.cost} ariaLabel="Custo" onChange={(cost) => setQuick((value) => ({ ...value, cost }))} />
-                </span>
-                <span data-label="Margem">{quick.price ? repairMoney(quick.price - quick.cost) : '—'}</span>
-                <span data-label="Prazo" className="repairs__time">
+            </div>
+
+            <div className="repairs__add" role="group" aria-label="Adicionar manutenção">
+              <label className="repairs__add-wide">
+                Nova manutenção
+                <input value={quick.name} maxLength={80} placeholder="Ex.: TROCA DE BATERIA" onChange={(e) => setQuick((value) => ({ ...value, name: upper(e.target.value) }))} onKeyDown={(e) => e.key === 'Enter' && void addQuick()} />
+              </label>
+              <label>
+                Categoria
+                <input value={quick.category} list="repair-categories" maxLength={40} placeholder="Ex.: BATERIA" onChange={(e) => setQuick((value) => ({ ...value, category: upper(e.target.value) }))} />
+              </label>
+              <label>
+                Venda
+                <CurrencyInput value={quick.price} ariaLabel="Valor de venda" onChange={(price) => setQuick((value) => ({ ...value, price }))} />
+              </label>
+              <label>
+                Custo
+                <CurrencyInput value={quick.cost} ariaLabel="Custo" onChange={(cost) => setQuick((value) => ({ ...value, cost }))} />
+              </label>
+              <label>
+                Prazo
+                <span className="repairs__time">
                   <input value={quick.time} inputMode="decimal" placeholder="0" aria-label="Prazo" onChange={(e) => setQuick((value) => ({ ...value, time: e.target.value }))} />
                   <select value={quick.unit} aria-label="Unidade do prazo" onChange={(e) => setQuick((value) => ({ ...value, unit: e.target.value as Unit }))}>
                     <option value="min">min</option>
@@ -348,12 +361,12 @@ export function RepairServicesPage() {
                     <option value="d">dias</option>
                   </select>
                 </span>
-                <span />
-                <span className="repairs__row-actions">
-                  <button type="button" className="btn btn--primary btn--sm" disabled={quickBusy || !quick.name.trim()} onClick={() => void addQuick()}>
-                    {quickBusy ? 'Salvando…' : 'Adicionar'}
-                  </button>
-                </span>
+              </label>
+              <div className="repairs__add-go">
+                {quick.price ? <small>Margem {repairMoney(quick.price - quick.cost)}</small> : null}
+                <button type="button" className="btn btn--primary" disabled={quickBusy || !quick.name.trim()} onClick={() => void addQuick()}>
+                  {quickBusy ? 'Salvando…' : '＋ Adicionar'}
+                </button>
               </div>
             </div>
             <datalist id="repair-categories">
