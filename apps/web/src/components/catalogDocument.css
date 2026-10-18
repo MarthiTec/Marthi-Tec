@@ -250,3 +250,21 @@
   .catalog-cover--modern p { font-size: 1.3rem; }
   .catalog-cover__mosaic span { min-height: 0; }
 }
+
+/* Foto da capa sempre dentro do painel: o fundo da própria foto (sombra, cinza de estúdio) não vira
+   um quadrado fora dele, e as bordas da imagem somem suavemente. */
+.catalog-cover__art { overflow: hidden; border-radius: 24px; }
+.catalog-cover__art img {
+  inset: 6%; width: 88%; height: 88%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 6%, #000 88%, transparent 100%), linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 6%, #000 88%, transparent 100%), linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-composite: intersect;
+}
+.catalog-cover--minimal .catalog-cover__art { background: var(--cat-bg); }
+.catalog-cover--minimal .catalog-cover__art::before { display: none; }
+.catalog-cover--hero .catalog-cover__art { background: rgba(255, 255, 255, 0.6); }
+.catalog-cover--hero .catalog-cover__art::before { display: none; }
+.catalog-cover--dark .catalog-cover__art { border-radius: 50%; background: radial-gradient(closest-side, #fff 70%, rgba(255, 255, 255, 0.92) 100%); aspect-ratio: 1; align-self: center; justify-self: center; width: min(100%, 320px); height: auto; min-height: 0; }
+.catalog-cover--dark .catalog-cover__art::before { display: none; }
+.catalog-cover--dark .catalog-cover__art img { inset: 14%; width: 72%; height: 72%; }
