@@ -1,39 +1,61 @@
 # Marthi Tec
 
-Plataforma moderna de autoatendimento — **Node.js + React + PostgreSQL + React Native (em breve)**.
+Plataforma integrada Marthi Tecnologia: **ERP**, **PDV**, **OS** (oficina), **Fiscal**, **CRM** e **totem** de autoatendimento — **Node.js + React + PostgreSQL**.
 
 Time: **Matheus Marçal** e **Thiago Barcelos**.
+
+## Estágio comercial (atual)
+
+| Situação | Detalhe |
+|---|---|
+| Cliente ativo | **Cell Ponto** (operação em produção) |
+| Loja demo | **Loja Demonstração** — registrada no **MarthiDB** |
+| Pipeline | Novos clientes em negociação (sem nomes inventados neste README) |
+
+Cliente ativo, loja demo e futuros clientes existem como **registros no PostgreSQL**. Não usar mocks de runtime nem dados de negócio hardcoded.
 
 ## Stack
 
 | Camada | Tecnologia |
 |---|---|
-| API | Node.js + Express + TypeScript |
-| Web Admin | React + Vite + TypeScript |
-| Banco | PostgreSQL (Discloud) |
-| Deploy API | Discloud (`discloud.config`) |
-| Mobile | React Native (próxima fase) |
+| API | Node.js + Express + TypeScript (`apps/api`) |
+| Web | React + Vite + TypeScript (`apps/web`) |
+| Banco | PostgreSQL **MarthiDB** (Discloud) — conexão só via `DATABASE_URL` |
+| Deploy | Discloud Site `marthi-totem` |
+| Mobile | React Native (fase futura) |
+
+## Infra Discloud
+
+| Recurso | Onde |
+|---|---|
+| Site | App [`marthi-totem`](https://discloud.com/dashboard/app/marthi-totem) → `https://marthi-totem.discloud.app` |
+| Banco | MarthiDB — [dashboard databases](https://discloud.com/dashboard/databases/1789687025416db) |
+| Config | `discloud.config` (`TYPE=site`, `ID=marthi-totem`) |
+
+Defina `DATABASE_URL` (e demais secrets) no painel do Site ou em `.env` local. **Nunca** commitá-los nem documentar senhas/connection strings.
 
 ## Estrutura
 
 ```text
 apps/
-  api/          → API REST
-  web/          → Painel React
+  api/          → API REST (/api/v1)
+  web/          → Painel + módulos (ERP, PDV, OS, Fiscal, CRM, totem, home)
 packages/
-  shared/       → Tipos compartilhados
-docs/           → Arquitetura, decisões, divisão de tarefas
+  shared/       → Tipos compartilhados (bootstrap)
+docs/           → Arquitetura, ADRs, manuais, specs, auditorias
 ```
+
+Mapa detalhado: [`docs/architecture.md`](docs/architecture.md). Índice: [`docs/README.md`](docs/README.md).
 
 ## Setup local
 
 1. Copie o ambiente:
 
 ```bash
-copy .env.example .env
+cp .env.example .env
 ```
 
-2. Preencha as variáveis do PostgreSQL (painel Discloud).
+2. Preencha **`DATABASE_URL`** (e JWT/OAuth conforme `.env.example`) a partir do painel Discloud — sem colar secrets em docs ou commits.
 
 3. Instale dependências (na raiz):
 
@@ -51,17 +73,23 @@ npm run dev:web
 - API: http://localhost:8080/health  
 - Web: http://localhost:5173  
 
-## Discloud
+## Dados de negócio
 
-- Arquivo `discloud.config` na raiz (sobe a **API**).
-- Variáveis de ambiente no painel (nunca commitar `.env`).
-- Ajuste o `ID` do subdomínio se necessário.
+- **Obrigatório:** persistir no MarthiDB (multi-loja por `storeId`).
+- **Proibido daqui em diante:** mocks de runtime e hardcode de clientes/lojas/dados operacionais.
+- Massa de teste automatizado usa bancos isolados (ex.: PGlite nos scripts) — não misturar com produção.
 
-## Divisão do time
+## Documentação
 
-Ver [`docs/team-split.md`](docs/team-split.md).
+| Doc | Conteúdo |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | Apps, deploy, fluxo Site |
+| [`docs/decisions.md`](docs/decisions.md) | ADRs resumidos + constraints atuais |
+| [`docs/GUIA_RAPIDO_COMECE_AQUI.md`](docs/GUIA_RAPIDO_COMECE_AQUI.md) | Primeiro dia do cliente |
+| [`docs/MANUAL_COMPLETO_SISTEMA_MARTHI.md`](docs/MANUAL_COMPLETO_SISTEMA_MARTHI.md) | Manual operacional |
+| [`docs/system-module-audit.md`](docs/system-module-audit.md) | Limites do que está certificado |
+| [`.cursor/skills/discloud-marthi-deploy/`](.cursor/skills/discloud-marthi-deploy/) | Deploy/troubleshooting Discloud |
 
 ## Decisão de arquitetura
 
-Backend mudou de PHP → **Node.js** porque o Thiago tem mais domínio na stack.  
-Ver [`docs/decisions.md`](docs/decisions.md).
+Backend mudou de PHP → **Node.js** (domínio do time). Ver [`docs/decisions.md`](docs/decisions.md).
