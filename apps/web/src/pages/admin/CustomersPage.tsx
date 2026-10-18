@@ -202,7 +202,7 @@ export function CustomersPage() {
     setSaving(true);
     setError('');
     try {
-      await apiSaveCustomerRecord(mode === 'edit' ? selectedId : undefined, {
+      const saved = await apiSaveCustomerRecord(mode === 'edit' ? selectedId : undefined, {
         name: form.name.trim(),
         tradeName: form.documentType === 'cnpj' ? form.tradeName.trim() : '',
         documentType: form.documentType,
@@ -218,7 +218,9 @@ export function CustomersPage() {
         active: form.active,
       });
       await reload();
-      closeForm();
+      // Fica no cadastro salvo (visualização): setas para o próximo, Editar de novo ou Fechar para a lista.
+      if (saved?.id) loadItem(saved, 'view');
+      else closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar cliente.');
     } finally {

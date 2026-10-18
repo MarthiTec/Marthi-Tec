@@ -1170,8 +1170,17 @@ export function StockPage() {
         });
       }
 
-      resetForm();
-      setFormVisible(false);
+      // Depois de salvar, o produto fica aberto em visualização (na mesma aba): dá para seguir para o
+      // próximo pelas setas ou editar de novo; Fechar volta para a lista.
+      const saved = savedId ? state.stock.find((row) => row.id === savedId) : undefined;
+      if (saved) {
+        const tab = formTab;
+        openForm(saved, 'view');
+        setFormTab(tab);
+      } else {
+        resetForm();
+        setFormVisible(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar estoque.');
     } finally {

@@ -163,12 +163,13 @@ export function SuppliersPage() {
       active: form.active,
     };
     try {
-      if (mode === 'edit' && selectedId) await apiUpdateSupplier(selectedId, body);
-      else await apiCreateSupplier(body);
+      const saved = mode === 'edit' && selectedId ? await apiUpdateSupplier(selectedId, body) : await apiCreateSupplier(body);
       logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: mode === 'edit' ? 'fornecedor.atualizar' : 'fornecedor.criar', detail: form.name });
       await reload();
       void hydrateErpRegistryFromApi().catch(() => undefined);
-      closeForm();
+      // Fica no cadastro salvo (visualização): setas para o próximo, Editar de novo ou Fechar para a lista.
+      if (saved?.id) loadItem(saved, 'view');
+      else closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar fornecedor.');
     } finally {

@@ -152,12 +152,13 @@ export function SellersPage() {
       active: form.active,
     };
     try {
-      if (mode === 'edit' && selectedId) await apiUpdateSeller(selectedId, body);
-      else await apiCreateSeller(body);
+      const saved = mode === 'edit' && selectedId ? await apiUpdateSeller(selectedId, body) : await apiCreateSeller(body);
       logAction({ actorName: user?.name ?? 'Operador', actorEmail: user?.email ?? '', action: mode === 'edit' ? 'vendedor.atualizar' : 'vendedor.criar', detail: form.name });
       await reload();
       void hydrateErpRegistryFromApi().catch(() => undefined);
-      closeForm();
+      // Fica no cadastro salvo (visualização): setas para o próximo, Editar de novo ou Fechar para a lista.
+      if (saved?.id) loadItem(saved, 'view');
+      else closeForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar vendedor.');
     } finally {

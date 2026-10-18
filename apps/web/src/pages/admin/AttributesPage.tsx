@@ -244,20 +244,26 @@ export function AttributesPage() {
     };
 
     setSaving(true);
+    let list: ProductAttribute[] | unknown = [];
     try {
       if (mode === 'edit' && selectedId) {
         // Só os valores que já existiam no banco são renomeados nos produtos.
         const renamed = Object.entries(renames)
           .filter(([from, to]) => savedValues.includes(from) && from !== to)
           .map(([from, to]) => ({ from, to }));
-        const updated = await updateAttribute(selectedId, { ...payload, renames: renamed });
-        setItems(Array.isArray(updated) ? updated : []);
+        list = await updateAttribute(selectedId, { ...payload, renames: renamed });
       } else {
-        const created = await createAttribute(payload);
-        setItems(Array.isArray(created) ? created : []);
+        list = await createAttribute(payload);
       }
-      resetForm();
-      setFormVisible(false);
+      const all = Array.isArray(list) ? list : [];
+      setItems(all);
+      // Fica no atributo salvo (visualização): setas para o próximo, Editar de novo ou Fechar para a lista.
+      const saved = (mode === 'edit' && selectedId ? all.find((item) => item.id === selectedId) : undefined) ?? all.find((item) => item.name.trim().toLowerCase() === payload.name.trim().toLowerCase());
+      if (saved) loadItem(saved, 'view');
+      else {
+        resetForm();
+        setFormVisible(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao salvar atributo.');
     } finally {
