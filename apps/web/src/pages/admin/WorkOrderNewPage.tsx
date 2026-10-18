@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { QuickCreateCustomer } from '../../components/QuickCreate';
@@ -6,10 +6,18 @@ import { QuickAddButton } from '../../components/QuickModal';
 import { getAdminState } from '../../data/adminStore';
 import { listSellers } from '../../data/erpRegistry';
 import { getOperatorProfile } from '../../data/operatorProfile';
-import { createWorkOrder, PRIORITY_LABEL, type WorkOrder, type WorkOrderPriority } from '../../data/osStore';
+import {
+  createWorkOrder,
+  PRIORITY_LABEL,
+  type WorkOrder,
+  type WorkOrderLine,
+  type WorkOrderPriority,
+} from '../../data/osStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { osHref, useOsBase } from '../os/osPaths';
 import { OsCreatedShareModal } from '../os/OsCreatedShareModal';
+import { OsDeviceRepairSelector, type OsRepairSelectionResult } from '../os/OsDeviceRepairSelector';
+import '../os/os.css';
 
 const EMPTY = {
   customerName: '',
@@ -43,6 +51,10 @@ export function WorkOrderNewPage() {
   const customers = getAdminState().customers;
   const sellers = listSellers(true);
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
+  const [selectedLines, setSelectedLines] = useState<WorkOrderLine[]>([]);
+  const [quoteNotes, setQuoteNotes] = useState('');
+  const [resetSignal, setResetSignal] = useState(0);
+  const lastAutoDefectRef = useRef('');
   const [error, setError] = useState('');
   const [createdOrder, setCreatedOrder] = useState<WorkOrder | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -60,13 +72,40 @@ export function WorkOrderNewPage() {
     }));
   }
 
+  function handleRepairSelectionChange(res: OsRepairSelectionResult) {
+    setSelectedLines(res.lines);
+    setQuoteNotes(res.quoteNotes);
+    setForm((current) => {
+      const trimmed = current.defect.trim();
+      let nextDefect = current.defect;
+      if (!trimmed || trimmed === lastAutoDefectRef.current) {
+        nextDefect = res.summaryText;
+      }
+      lastAutoDefectRef.current = res.summaryText;
+      return {
+        ...current,
+        labor: res.totalPrice,
+        defect: nextDefect,
+      };
+    });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!form.customerName.trim() || !form.itemName.trim() || !form.defect.trim()) return;
     setError('');
     try {
-      const created = await createWorkOrder(form);
+      const created = await createWorkOrder({
+        ...form,
+        lines: selectedLines,
+        quoteStatus: selectedLines.length > 0 ? 'approved' : 'none',
+        quoteNotes,
+      });
       setForm({ ...EMPTY, technician: profile.displayName });
+      setSelectedLines([]);
+      setQuoteNotes('');
+      lastAutoDefectRef.current = '';
+      setResetSignal((s) => s + 1);
       setCreatedOrder(created);
       setShareOpen(true);
     } catch (err) {
@@ -142,6 +181,24 @@ export function WorkOrderNewPage() {
               onChange={(event) => setForm({ ...form, customerEmail: event.target.value })}
             />
           </label>
+
+          <div className="span-2">
+            <OsDeviceRepairSelector
+              itemName={form.itemName}
+              itemBrand={form.itemBrand}
+              itemModel={form.itemModel}
+              resetSignal={resetSignal}
+              onSelectDevice={({ itemName: nextName, itemBrand: nextBrand, itemModel: nextModel }) => {
+                setForm((current) => ({
+                  ...current,
+                  itemName: nextName,
+                  itemBrand: nextBrand,
+                  itemModel: nextModel,
+                }));
+              }}
+              onSelectionChange={handleRepairSelectionChange}
+            />
+          </div>
 
           <label>
             Equipamento

@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { QuickCreateCustomer } from '../../components/QuickCreate';
 import { QuickAddButton } from '../../components/QuickModal';
@@ -10,10 +10,12 @@ import {
   PRIORITY_LABEL,
   TECHNICIANS_LIST,
   type WorkOrder,
+  type WorkOrderLine,
   type WorkOrderPriority,
 } from '../../data/osStore';
 import { useStoreCustomization } from '../../data/storeSegment';
 import { OsCreatedShareModal } from './OsCreatedShareModal';
+import { OsDeviceRepairSelector, type OsRepairSelectionResult } from './OsDeviceRepairSelector';
 
 type Props = {
   open: boolean;
@@ -57,6 +59,10 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
   });
   const [labor, setLabor] = useState(0);
   const [parts, setParts] = useState(0);
+  const [selectedLines, setSelectedLines] = useState<WorkOrderLine[]>([]);
+  const [quoteNotes, setQuoteNotes] = useState('');
+  const [resetSignal, setResetSignal] = useState(0);
+  const lastAutoDefectRef = useRef('');
 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,9 +97,28 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
     setEstimatedReadyAt(d.toISOString().split('T')[0]);
     setLabor(0);
     setParts(0);
+    setSelectedLines([]);
+    setQuoteNotes('');
+    lastAutoDefectRef.current = '';
+    setResetSignal((s) => s + 1);
 
     setError('');
     setBusy(false);
+  }
+
+  function handleRepairSelectionChange(res: OsRepairSelectionResult) {
+    setSelectedLines(res.lines);
+    setQuoteNotes(res.quoteNotes);
+    setLabor(res.totalPrice);
+    setDefect((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed || trimmed === lastAutoDefectRef.current) {
+        lastAutoDefectRef.current = res.summaryText;
+        return res.summaryText;
+      }
+      lastAutoDefectRef.current = res.summaryText;
+      return prev;
+    });
   }
 
   // Limpa os campos sempre que o modal for reaberto
@@ -201,6 +226,9 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
         priority,
         labor: Number(labor) || 0,
         parts: Number(parts) || 0,
+        lines: selectedLines,
+        quoteStatus: selectedLines.length > 0 ? 'approved' : 'none',
+        quoteNotes: quoteNotes.trim(),
       });
 
       // Limpa todos os campos do formulário imediatamente após gerar a OS
@@ -314,9 +342,23 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
           <fieldset className="os-form-section">
             <legend className="os-form-section__legend">
               <span className="os-form-section__num">2</span>
-              Equipamento & Estado de Entrada
+              Equipamento, Serviços Tabelados &amp; Estado de Entrada
             </legend>
-            <div className="os-form-grid os-form-grid--3">
+
+            <OsDeviceRepairSelector
+              itemName={itemName}
+              itemBrand={itemBrand}
+              itemModel={itemModel}
+              resetSignal={resetSignal}
+              onSelectDevice={(dev) => {
+                setItemName(dev.itemName);
+                setItemBrand(dev.itemBrand);
+                setItemModel(dev.itemModel);
+              }}
+              onSelectionChange={handleRepairSelectionChange}
+            />
+
+            <div className="os-form-grid os-form-grid--3" style={{ marginTop: 12 }}>
               <label>
                 <span>{customization.showImei ? 'Equipamento / Aparelho *' : 'Item / Descrição do Serviço *'}</span>
                 <input

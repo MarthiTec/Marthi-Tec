@@ -172,6 +172,9 @@ const createWorkOrderSchema = z.object({
   labor: z.coerce.number().default(0),
   parts: z.coerce.number().default(0),
   operationId: z.string().optional(),
+  lines: z.array(z.any()).optional().default([]),
+  quoteStatus: z.string().optional().default('none'),
+  quoteNotes: z.string().optional().default(''),
 });
 
 /* ── Rotas ─────────────────────────────────────────────── */
@@ -251,6 +254,7 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
         accessories, condition_on_entry, defect, defect_description, diagnosis, technical_report,
         notes, tech_notes, estimated_ready_at, technician, seller_id, priority, status,
         labor, labor_cost, parts, parts_cost, total_amount, operation_id,
+        quote_status, quote_notes,
         checklist, photos, lines, comments, history, worklogs,
         created_at, updated_at
       ) VALUES (
@@ -259,7 +263,8 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
         $13, $14, $15, $15, $16, $16,
         $17, $18, $19, $20, $21, $22, 'open',
         $23, $23, $24, $24, $25, $26,
-        '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb,
+        $28, $29,
+        '[]'::jsonb, '[]'::jsonb, $30::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb,
         $27, $27
       )
       RETURNING *
@@ -295,6 +300,9 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
       totalAmount,
       body.operationId || '',
       now,
+      body.quoteStatus || 'none',
+      body.quoteNotes?.trim() || '',
+      JSON.stringify(Array.isArray(body.lines) ? body.lines : []),
     ];
 
     const result = await pool.query(insertSql, values);

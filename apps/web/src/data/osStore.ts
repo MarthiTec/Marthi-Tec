@@ -838,6 +838,9 @@ export async function createWorkOrder(
       labor: input.labor,
       parts: input.parts,
       operationId: input.operationId,
+      lines: input.lines,
+      quoteStatus: input.quoteStatus,
+      quoteNotes: input.quoteNotes,
     });
     return upsertLocal(normalizeWorkOrder(created));
   } catch (error) {
