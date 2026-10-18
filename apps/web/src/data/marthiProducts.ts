@@ -33,12 +33,12 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'catalogo',
     name: 'Catálogo digital',
-    tagline: 'Vitrine e página de venda com link ou PDF',
+    tagline: 'Vitrine de aparelhos com link ou PDF',
     summary:
-      'Monte a vitrine com os produtos do estoque, escolha capa e cor, e compartilhe o link ou o PDF. O cliente vê preços e chama no WhatsApp — ou compra na página de venda com sacola.',
-    audience: 'Lojas que precisam mostrar o estoque real sem depender de planilha ou Instagram.',
+      'Monte a vitrine com celulares e acessórios do estoque, escolha capa e cor, e compartilhe o link ou o PDF. O cliente vê preços e chama no WhatsApp — ou compra na página de venda.',
+    audience: 'Lojas de celular que precisam mostrar aparelhos novos e usados sem depender de planilha ou Instagram.',
     features: [
-      'Vitrine com produtos do estoque (filtro, capa e cor da loja)',
+      'Vitrine com aparelhos do estoque (filtro, capa e cor da loja)',
       'Modo catálogo (interesse no WhatsApp) ou página de venda com sacola',
       'Link público e PDF para enviar ao cliente',
       'Solicitação de manutenção integrada à oficina',
@@ -53,11 +53,11 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     tagline: 'Preço certo na frente do cliente',
     summary:
       'Custo do fornecedor muda o dia todo: calcule à vista e no cartão com margem e taxa da maquininha, troque aparelho na conta e formalize em orçamento válido no dia.',
-    audience: 'Varejo de eletrônicos, assistência e lojas que cotam na hora no balcão.',
+    audience: 'Lojas de celular e assistência que cotam aparelhos na hora no balcão.',
     features: [
       'Custo + margem (% ou R$) → preço à vista',
       'Parcelas com taxa da maquininha da loja',
-      'Troca (trade-in) descontada no valor final',
+      'Troca (trade-in) de aparelho descontada no valor final',
       'Comparativo por fornecedor e formalização em orçamento',
     ],
     href: '/painel/cotacao',
@@ -67,10 +67,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'ads',
     name: 'Marthi ADS',
-    tagline: 'Anúncios dos seus produtos no Facebook',
+    tagline: 'Anúncios dos seus aparelhos no Facebook',
     summary:
-      'Anuncie produtos do cadastro na Meta: conecte a conta, crie campanha, acompanhe status e pause pelo painel — sem sair da operação Marthi.',
-    audience: 'Lojas que querem impulsionar o estoque com anúncios pagos e publicações.',
+      'Anuncie celulares e acessórios do cadastro na Meta: conecte a conta, crie campanha, acompanhe status e pause pelo painel — sem sair da operação Marthi.',
+    audience: 'Lojas de celular que querem impulsionar o estoque com anúncios pagos.',
     features: [
       'Criar anúncio a partir do produto cadastrado',
       'Conexão Meta (Página e conta de anúncios)',
@@ -84,12 +84,12 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'totem',
     name: 'Totem de autoatendimento',
-    tagline: 'Vitrine digital na loja',
+    tagline: 'Vitrine digital na loja de celular',
     summary:
-      'Touch grande, fluxo guiado e lead no WhatsApp da loja. O cliente escolhe; a equipe atende sem fila no balcão.',
-    audience: 'Varejo, showroom, assistência e qualquer loja com fluxo de atendimento.',
+      'Touch grande, fluxo guiado e lead no WhatsApp da loja. O cliente escolhe aparelhos e serviços; a equipe atende sem fila no balcão.',
+    audience: 'Lojas de celular, showroom e assistência com fluxo de atendimento.',
     features: [
-      'Catálogo touch com fotos e opções',
+      'Catálogo touch de aparelhos e acessórios',
       'Lead automático no WhatsApp da loja',
       'Insights no painel (interesses e conversão)',
       'Marca da loja personalizável',
@@ -120,10 +120,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'pdv',
     name: 'PDV / Caixa',
-    tagline: 'Caixa veloz com persistência blindada',
+    tagline: 'Caixa para venda de aparelhos',
     summary:
-      'Caixa rápido com persistência contra queda de energia ou F5, recuperação com 1 clique, motor de campanhas promocionais e conversão direta de orçamentos.',
-    audience: 'Lojas físicas, mercados e comércios que precisam de caixa ultra-estável e integrado.',
+      'Caixa rápido para celulares e acessórios, com persistência contra queda de energia ou F5, campanhas promocionais e conversão direta de orçamentos e trocas.',
+    audience: 'Lojas de celular que precisam de caixa estável e integrado ao estoque e à OS.',
     features: [
       'Persistência local blindada: nunca perca itens por F5 ou falta de energia',
       'Motor de campanhas promocionais: Leve X Pague Y e faixas de volume',
@@ -139,10 +139,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'os',
     name: 'Ordem de serviço',
-    tagline: 'Oficina técnica e bancada sob controle',
+    tagline: 'Manutenção de celular sob controle',
     summary:
-      'Abertura de OS, agenda de bancada, envio de proposta e garantia em PDF via WhatsApp e E-mail, integração direta de peças com o estoque e recebimento no PDV.',
-    audience: 'Assistências técnicas, oficinas mecânicas, serviços especializados e lojas com pós-venda.',
+      'Abertura de OS para aparelhos, agenda de bancada, proposta e garantia em PDF via WhatsApp e E-mail, peças no estoque e recebimento no PDV.',
+    audience: 'Assistências técnicas de celular e lojas com pós-venda e garantia.',
     features: [
       'Abertura de OS, checklist técnico e agenda de bancada',
       'Envio de Termo de Garantia e OS em PDF via WhatsApp e E-mail',
@@ -157,10 +157,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'erp',
     name: 'Retaguarda da loja',
-    tagline: 'Orçamentos, Campanhas, Estoque e Financeiro',
+    tagline: 'Estoque, orçamentos e financeiro',
     summary:
-      'Gestão integrada completa com geração de propostas comerciais em PDF via WhatsApp e E-mail, motor de campanhas de desconto, estoque com custo médio e financeiro.',
-    audience: 'Lojas e comércios que cresceram além da planilha e precisam de um centro de comando unificado.',
+      'Gestão da loja de celular: propostas em PDF via WhatsApp e E-mail, campanhas, estoque com custo médio (incluindo IMEI) e financeiro.',
+    audience: 'Lojas de celular que cresceram além da planilha e precisam de um centro de comando.',
     features: [
       'Orçamentos comerciais em PDF com envio por WhatsApp e E-mail',
       'Motor de campanhas promocionais com regras e proteção de margem',
@@ -177,8 +177,8 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     name: 'Emissor Fiscal',
     tagline: 'Notas no ritmo da reforma',
     summary:
-      'NF-e, NFS-e, CT-e e MDF-e em app próprio. NFC-e no PDV. NCM, CFOP, CST e preparação para IBS/CBS.',
-    audience: 'Empresas que emitem documento fiscal e querem centralizar no Marthi.',
+      'NF-e e NFC-e no ritmo da venda de aparelhos. NFS-e, CT-e e MDF-e em app próprio. NCM, CFOP, CST e preparação para IBS/CBS.',
+    audience: 'Lojas de celular que emitem documento fiscal e querem centralizar no Marthi.',
     features: [
       'NF-e, NFS-e, CT-e e MDF-e',
       'Cadastro de emitente e CST',
@@ -192,10 +192,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'ecommerce',
     name: 'E-commerce e marketplaces',
-    tagline: 'Venda online conectada ao estoque',
+    tagline: 'Canais online conectados ao estoque',
     summary:
-      'Hub de canais: Mercado Livre, Shopee, iFood, Amazon e Tray. Anúncios, pedidos e sincronização de estoque.',
-    audience: 'Lojas omnichannel que vendem no físico e nos marketplaces.',
+      'Hub de canais para anunciar aparelhos online: Mercado Livre, Shopee, Amazon e Tray. Anúncios, pedidos e sincronização de estoque.',
+    audience: 'Lojas de celular que vendem no físico e nos marketplaces.',
     features: [
       'Conexões por marketplace e hub',
       'Pedidos e anúncios no mesmo lugar',
@@ -209,10 +209,10 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   {
     id: 'crm',
     name: 'CRM Marthi',
-    tagline: 'Uso interno da equipe Marthi',
+    tagline: 'Leads e funil comercial',
     summary:
-      'Kanban, conversas e perfil do vendedor Marthi. Ferramenta interna do time comercial — não faz parte do plano da loja.',
-    audience: 'Vendedores e comercial Marthi.',
+      'Kanban, conversas e perfil do vendedor. Funil de leads da homepage e demos — uso interno da equipe Marthi e acompanhamento comercial.',
+    audience: 'Vendedores e comercial Marthi; lojas que acompanham leads de interesse.',
     features: [
       'Funil: primeiro contato → pagamento → fechamento',
       'Conversas com leads e entre a equipe',
@@ -228,8 +228,8 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
     name: 'Painel da loja',
     tagline: 'O centro de comando',
     summary:
-      'Atalhos para PDV, totem, OS, Retaguarda, plano e ajuda. É de onde a gestão acompanha a operação.',
-    audience: 'Gestores e equipe operacional da loja.',
+      'Atalhos para PDV, totem, OS, Retaguarda, plano e ajuda. É de onde a gestão acompanha a operação da loja de celular.',
+    audience: 'Gestores e equipe operacional da loja de celular.',
     features: [
       'Dashboard e atalhos por módulo',
       'Perfil do operador unificado (foto e contato)',
@@ -242,26 +242,22 @@ export const MARTHI_PRODUCTS: MarthiProduct[] = [
   },
 ];
 
+/** Segmentos em evidência no site público (foco comercial atual: celular). */
 export const MARTHI_SEGMENTS = [
   {
-    id: 'varejo',
-    name: 'Varejo e loja física',
-    text: 'Catálogo digital, cotação no balcão, totem na vitrine, PDV com campanhas e estoque no mesmo painel.',
+    id: 'varejo-celular',
+    name: 'Loja de celular',
+    text: 'Venda de aparelhos novos e usados: catálogo digital, cotação no balcão, totem, PDV e estoque no mesmo painel.',
   },
   {
-    id: 'food',
-    name: 'Restaurantes e Food Service',
-    text: 'Cardápio digital via QR Code, mesas e comandas, tela KDS na cozinha e caixa ágil.',
+    id: 'assistencia',
+    name: 'Assistência técnica de celular',
+    text: 'OS com agenda de bancada, propostas e garantia em PDF via WhatsApp — do atendimento à entrega do aparelho.',
   },
   {
-    id: 'oficina',
-    name: 'Oficina e assistência',
-    text: 'OS com agenda, propostas e garantia em PDF via WhatsApp/E-mail — do atendimento à bancada.',
-  },
-  {
-    id: 'omni',
-    name: 'Omnichannel',
-    text: 'Marthi ADS, marketplaces, estoque único e fiscal quando a operação pede nota.',
+    id: 'ads-vitrine',
+    name: 'Vitrine e anúncios',
+    text: 'Marthi ADS e catálogo público para impulsionar o estoque de celulares sem sair da operação.',
   },
   {
     id: 'comercial',
@@ -269,6 +265,20 @@ export const MARTHI_SEGMENTS = [
     text: 'CRM interno Marthi — funil e rede da equipe comercial.',
   },
 ] as const;
+
+/** IDs promovidos no marketing público (home / produtos). Módulos food/ecom permanecem no app. */
+export const MARTHI_PUBLIC_PRODUCT_IDS: MarthiProductId[] = [
+  'catalogo',
+  'cotacao',
+  'ads',
+  'totem',
+  'pdv',
+  'os',
+  'erp',
+  'fiscal',
+  'crm',
+  'painel',
+];
 
 export function getMarthiProduct(id: MarthiProductId) {
   return MARTHI_PRODUCTS.find((item) => item.id === id) ?? null;

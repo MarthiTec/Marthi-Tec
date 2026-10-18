@@ -37,8 +37,8 @@ const FAQ_ITEMS = [
     a: 'Você define promoções como Leve X Pague Y, Faixas de Preço por Quantidade/Volume, Preço Fixo Promocional ou Brindes com critérios de categoria, marca ou grupo de clientes. O PDV valida e aplica a promoção em tempo real com regras de margem de lucro.',
   },
   {
-    q: 'O que o módulo de Cardápio Digital & Food oferece?',
-    a: 'Inclui cardápio interativo acessado por QR Code nas mesas ou salão, gerador de display de mesa para impressão, gestão de mesas/comandas, painel KDS ao vivo na TV da cozinha e fechamento direto no caixa.',
+    q: 'A Marthi atende loja de celular e assistência técnica?',
+    a: 'Sim — esse é o foco atual. Você vende aparelhos novos e usados no PDV, cotação com troca no balcão, catálogo digital e Marthi ADS, e opera a manutenção com OS, garantia em PDF e peças no estoque.',
   },
   {
     q: 'Posso trocar de plano ou adicionar novos módulos depois?',
@@ -96,10 +96,10 @@ export function PlansPublicPage() {
         {/* Hero */}
         <section className="public-hero">
           <span className="public-hero__badge">Planos transparentes & escaláveis</span>
-          <h1>A solução certa para cada fase da sua empresa.</h1>
+          <h1>Planos para loja de celular e assistência.</h1>
           <p>
-            Sem contratos com letrinhas miúdas ou surpresas na fatura. Escolha os módulos que seu negócio
-            precisa agora e expanda com tranquilidade.
+            Sem contratos com letrinhas miúdas ou surpresas na fatura. Escolha os módulos da operação
+            de celular agora e expanda com tranquilidade.
           </p>
         </section>
 
@@ -270,28 +270,22 @@ export function PlansPublicPage() {
                   <td><strong>✓ Incluso completo</strong></td>
                 </tr>
                 <tr>
-                  <td><strong>Cardápio Digital QR Code, Mesas & KDS Cozinha</strong></td>
+                  <td><strong>Catálogo digital, Cotação e Marthi ADS</strong></td>
                   <td>Se escolhido</td>
                   <td>Se escolhido</td>
                   <td><strong>✓ Incluso completo</strong></td>
                 </tr>
                 <tr>
-                  <td>Ordens de Serviço (OS) com Garantia em PDF</td>
+                  <td>Ordens de Serviço (OS) — manutenção de celular</td>
                   <td>Se escolhido</td>
                   <td>Se escolhido</td>
                   <td>✓ Completo com agenda e bancada</td>
                 </tr>
                 <tr>
-                  <td>Emissor Fiscal (NF-e, NFC-e, NFS-e, CT-e, MDF-e)</td>
+                  <td>Emissor Fiscal (NF-e, NFC-e, NFS-e)</td>
                   <td>Se escolhido</td>
                   <td>Se escolhido</td>
                   <td>✓ Completo & integrado</td>
-                </tr>
-                <tr>
-                  <td>Sincronização com Marketplaces (E-commerce)</td>
-                  <td>Se escolhido</td>
-                  <td>Se escolhido</td>
-                  <td>✓ Completo</td>
                 </tr>
                 <tr>
                   <td>Backup em nuvem automático</td>

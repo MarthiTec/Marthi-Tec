@@ -30,8 +30,8 @@ export function PublicFooter() {
               <BrandLogo variant="lockup" className="public-footer__logo" />
             </Link>
             <p className="public-footer__tagline">
-              Ecossistema completo de tecnologia para o varejo e serviços: do balcão à retaguarda,
-              do totem à emissão fiscal.
+              Plataforma para lojas de celular e assistência técnica: vitrine, balcão, oficina,
+              totem e fiscal no mesmo ecossistema.
             </p>
             <div className="public-footer__address">
               <strong>{MARTHI_COMPANY.legalName}</strong>
@@ -74,7 +74,7 @@ export function PublicFooter() {
                 <Link to="/produtos">Emissor Fiscal (NF-e/NFC-e)</Link>
               </li>
               <li>
-                <Link to="/produtos">E-commerce Integrado</Link>
+                <Link to="/produtos">Catálogo & Cotação</Link>
               </li>
             </ul>
           </div>
