@@ -201,29 +201,6 @@ export function WorkOrderNewPage() {
           </div>
 
           <label>
-            Equipamento
-            <input
-              value={form.itemName}
-              onChange={(event) => setForm({ ...form, itemName: event.target.value })}
-              placeholder="Ex.: iPhone 15, Notebook Dell"
-              required
-            />
-          </label>
-          <label>
-            Marca
-            <input
-              value={form.itemBrand}
-              onChange={(event) => setForm({ ...form, itemBrand: event.target.value })}
-            />
-          </label>
-          <label>
-            Modelo
-            <input
-              value={form.itemModel}
-              onChange={(event) => setForm({ ...form, itemModel: event.target.value })}
-            />
-          </label>
-          <label>
             Cor
             <input
               value={form.itemColor}

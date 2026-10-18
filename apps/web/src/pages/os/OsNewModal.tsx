@@ -342,7 +342,7 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
           <fieldset className="os-form-section">
             <legend className="os-form-section__legend">
               <span className="os-form-section__num">2</span>
-              Equipamento, Serviços Tabelados &amp; Estado de Entrada
+              Aparelho, Manutenções Tabeladas &amp; Estado de Entrada
             </legend>
 
             <OsDeviceRepairSelector
@@ -359,31 +359,6 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
             />
 
             <div className="os-form-grid os-form-grid--3" style={{ marginTop: 12 }}>
-              <label>
-                <span>{customization.showImei ? 'Equipamento / Aparelho *' : 'Item / Descrição do Serviço *'}</span>
-                <input
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  placeholder={customization.showImei ? 'Ex.: iPhone 15, Notebook Dell Inspiron' : 'Ex.: Ajuste de terno, Conserto de mesa, Buffet evento'}
-                  required
-                />
-              </label>
-              <label>
-                <span>Marca</span>
-                <input
-                  value={itemBrand}
-                  onChange={(e) => setItemBrand(e.target.value)}
-                  placeholder="Ex.: Apple, Samsung, Dell"
-                />
-              </label>
-              <label>
-                <span>Modelo</span>
-                <input
-                  value={itemModel}
-                  onChange={(e) => setItemModel(e.target.value)}
-                  placeholder="Ex.: A2848, G15 5530"
-                />
-              </label>
               <label>
                 <span>Cor</span>
                 <input
@@ -435,16 +410,20 @@ export function OsNewModal({ open, onClose, onCreated }: Props) {
           <fieldset className="os-form-section">
             <legend className="os-form-section__legend">
               <span className="os-form-section__num">3</span>
-              Defeito, Diagnóstico & Observações do Técnico
+              Serviço Solicitado, Diagnóstico &amp; Observações do Técnico
             </legend>
             <div className="os-form-grid os-form-grid--2">
               <label>
-                <span>Defeito reclamado pelo cliente *</span>
+                <span>
+                  {selectedLines.length > 0
+                    ? 'Serviços selecionados / Relato adicional do cliente'
+                    : 'Serviço solicitado / Defeito reclamado pelo cliente *'}
+                </span>
                 <textarea
                   rows={3}
                   value={defect}
                   onChange={(e) => setDefect(e.target.value)}
-                  placeholder="Descreva o problema detalhadamente..."
+                  placeholder="Preenchido automaticamente ao clicar nos serviços acima, ou descreva aqui..."
                   required
                 />
               </label>

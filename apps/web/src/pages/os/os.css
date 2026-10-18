@@ -9906,25 +9906,114 @@
 .os-repair-catalog-box {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 16px;
   margin-bottom: 14px;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border: 1px solid #cbd5e1;
   border-radius: 12px;
 }
 
-.os-repair-catalog-box__row {
+.os-repair-catalog-box__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.os-repair-catalog-box__title {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.os-repair-catalog-box__subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.os-repair-catalog-box__subtitle a {
+  color: #0284c7;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.os-repair-catalog-box__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.os-repair-catalog-box__pickers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.os-repair-quick-devices {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-top: 4px;
+}
+
+.os-repair-quick-devices__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.os-repair-quick-devices__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.os-repair-device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.os-repair-device-chip:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.os-repair-device-chip strong {
+  font-weight: 700;
+}
+
+.os-repair-device-chip span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
 }
 
 .os-repair-services-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 8px;
+  padding-top: 12px;
   border-top: 1px dashed #cbd5e1;
 }
 
@@ -9937,26 +10026,96 @@
 }
 
 .os-repair-services-panel__title {
-  font-size: 0.84rem;
-  font-weight: 700;
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 800;
   color: #0f172a;
+}
+
+.os-repair-services-panel__subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: #64748b;
 }
 
 .os-repair-services-panel__total {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   background: #dcfce7;
   border: 1px solid #86efac;
   color: #166534;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
 .os-repair-services-panel__total strong {
   font-weight: 800;
-  margin-left: 3px;
+  margin-left: 5px;
+}
+
+.os-repair-diagnosis-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1.5px dashed #94a3b8;
+  border-radius: 10px;
+  text-align: left;
+  font: inherit;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.os-repair-diagnosis-btn:hover {
+  border-color: #0284c7;
+  background: #f8fafc;
+}
+
+.os-repair-diagnosis-btn.is-selected {
+  border-style: solid;
+  border-color: #0284c7;
+  background: #f0f9ff;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.14);
+}
+
+.os-repair-diagnosis-btn.is-selected .os-repair-srv-card__check {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.os-repair-diagnosis-btn__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.os-repair-diagnosis-btn__text strong {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.os-repair-diagnosis-btn__text small {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.os-repair-diagnosis-btn__tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .os-repair-services-grid {
@@ -10106,6 +10265,13 @@
   font-weight: 800;
 }
 
+.os-repair-services-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
 .os-repair-services-empty {
   padding: 8px 12px;
   border-radius: 8px;
@@ -10115,6 +10281,52 @@
   color: #475569;
 }
 
+.os-repair-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #14532d;
+}
+
+.os-repair-summary-bar__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.os-repair-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #86efac;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.os-repair-summary-bar__total {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.os-repair-summary-bar__total strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #15803d;
+}
+
 /* Tema Escuro (.is-theme-dark / .admin--dark) */
 .is-theme-dark .os-repair-catalog-box,
 .admin--dark .os-repair-catalog-box {
@@ -10122,14 +10334,47 @@
   border-color: #2b3544;
 }
 
-.is-theme-dark .os-repair-services-panel,
-.admin--dark .os-repair-services-panel {
-  border-top-color: #2b3544;
-}
-
+.is-theme-dark .os-repair-catalog-box__title,
+.admin--dark .os-repair-catalog-box__title,
 .is-theme-dark .os-repair-services-panel__title,
 .admin--dark .os-repair-services-panel__title {
   color: #f1f5f9;
+}
+
+.is-theme-dark .os-repair-catalog-box__subtitle,
+.admin--dark .os-repair-catalog-box__subtitle,
+.is-theme-dark .os-repair-services-panel__subtitle,
+.admin--dark .os-repair-services-panel__subtitle {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-repair-quick-devices__label,
+.admin--dark .os-repair-quick-devices__label {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-repair-device-chip,
+.admin--dark .os-repair-device-chip {
+  background: #1b232e;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-repair-device-chip:hover,
+.admin--dark .os-repair-device-chip:hover {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.is-theme-dark .os-repair-device-chip span,
+.admin--dark .os-repair-device-chip span {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+}
+
+.is-theme-dark .os-repair-services-panel,
+.admin--dark .os-repair-services-panel {
+  border-top-color: #2b3544;
 }
 
 .is-theme-dark .os-repair-services-panel__total,
@@ -10137,6 +10382,41 @@
   background: rgba(22, 163, 74, 0.18);
   border-color: rgba(34, 197, 94, 0.4);
   color: #4ade80;
+}
+
+.is-theme-dark .os-repair-diagnosis-btn,
+.admin--dark .os-repair-diagnosis-btn {
+  background: #1b232e;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.is-theme-dark .os-repair-diagnosis-btn:hover,
+.admin--dark .os-repair-diagnosis-btn:hover {
+  border-color: #38bdf8;
+  background: #202a37;
+}
+
+.is-theme-dark .os-repair-diagnosis-btn.is-selected,
+.admin--dark .os-repair-diagnosis-btn.is-selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.is-theme-dark .os-repair-diagnosis-btn__text strong,
+.admin--dark .os-repair-diagnosis-btn__text strong {
+  color: #f8fafc;
+}
+
+.is-theme-dark .os-repair-diagnosis-btn__text small,
+.admin--dark .os-repair-diagnosis-btn__text small {
+  color: #94a3b8;
+}
+
+.is-theme-dark .os-repair-diagnosis-btn__tag,
+.admin--dark .os-repair-diagnosis-btn__tag {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
 }
 
 .is-theme-dark .os-repair-srv-card,
@@ -10227,9 +10507,32 @@
   color: #94a3b8;
 }
 
+.is-theme-dark .os-repair-summary-bar,
+.admin--dark .os-repair-summary-bar {
+  background: rgba(22, 163, 74, 0.14);
+  border-color: rgba(34, 197, 94, 0.38);
+  color: #dcfce7;
+}
+
+.is-theme-dark .os-repair-summary-chip,
+.admin--dark .os-repair-summary-chip {
+  background: #121820;
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}
+
+.is-theme-dark .os-repair-summary-bar__total strong,
+.admin--dark .os-repair-summary-bar__total strong {
+  color: #4ade80;
+}
+
 @media (max-width: 768px) {
   .os-repair-catalog-box {
     padding: 12px;
+  }
+
+  .os-repair-catalog-box__pickers {
+    grid-template-columns: 1fr;
   }
 
   .os-repair-services-grid {
@@ -10241,4 +10544,5 @@
     justify-content: space-between;
   }
 }
+
 

@@ -90,8 +90,8 @@ export function QuickModal({
         </footer>
       </form>
     </div>,
-    // Dentro do contêiner do painel para herdar as cores do tema claro/escuro.
-    document.querySelector('.admin') ?? document.body,
+    // Dentro do contêiner do painel ou da oficina para herdar as cores do tema claro/escuro.
+    document.querySelector('.admin') ?? document.querySelector('.os-app') ?? document.body,
   );
 }
 

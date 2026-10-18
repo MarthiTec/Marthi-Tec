@@ -25,6 +25,7 @@ export type OsRepairSelectionResult = {
   totalPrice: number;
   totalCost: number;
   hasEvaluationItem: boolean;
+  wantsDiagnosis: boolean;
   maxEstimatedMinutes: number;
   summaryText: string;
   quoteNotes: string;
@@ -50,8 +51,15 @@ type Props = {
 };
 
 function norm(value: string) {
-  return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
+
+const naturalCompare = (a: string, b: string) =>
+  a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
 
 function deviceKey(productId: string | null, brand: string, model: string) {
   if (productId) return `p:${productId}`;
@@ -77,7 +85,9 @@ function servicePriceBadge(service: RepairService): string {
     const priced = opts.map((o) => o.price).filter((p): p is number => p !== null && p !== undefined);
     return priced.length > 0 ? `a partir de ${repairMoney(Math.min(...priced))}` : 'Sob avaliação';
   }
-  return service.price === null || service.price === undefined ? 'Sob avaliação' : repairMoney(service.price);
+  return service.price === null || service.price === undefined
+    ? 'Sob avaliação'
+    : repairMoney(service.price);
 }
 
 export function OsDeviceRepairSelector({
@@ -93,12 +103,19 @@ export function OsDeviceRepairSelector({
   const [services, setServices] = useState<RepairService[]>([]);
   const [stock, setStock] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedDeviceKey, setSelectedDeviceKey] = useState('');
+  const [manualMode, setManualMode] = useState(false);
+  const [wantsDiagnosis, setWantsDiagnosis] = useState(false);
   const [choices, setChoices] = useState<SelectedRepairChoice[]>([]);
 
   useEffect(() => {
     setChoices([]);
+    setSelectedBrand('');
     setSelectedDeviceKey('');
+    setManualMode(false);
+    setWantsDiagnosis(false);
   }, [resetSignal]);
 
   useEffect(() => {
@@ -111,7 +128,8 @@ export function OsDeviceRepairSelector({
       ])
         .then(([srvList, stockList]) => {
           if (!alive) return;
-          setServices(srvList.filter((s) => s.active !== false));
+          const activeServices = srvList.filter((s) => s.active !== false);
+          setServices(activeServices);
           setStock(
             (stockList as unknown as StockRow[]).map((row) => ({
               id: row.id,
@@ -121,6 +139,11 @@ export function OsDeviceRepairSelector({
               qty: row.qty,
             })),
           );
+          // Se houver apenas 1 marca cadastrada no catálogo de manutenções, já pré-seleciona
+          const uniqueRepairBrands = [...new Set(activeServices.map((s) => s.brand.trim()).filter(Boolean))];
+          if (uniqueRepairBrands.length === 1) {
+            setSelectedBrand((prev) => prev || uniqueRepairBrands[0]);
+          }
         })
         .finally(() => {
           if (alive) setLoading(false);
@@ -137,12 +160,14 @@ export function OsDeviceRepairSelector({
   const resolveBrandName = (value?: string) =>
     findBrand(brands, value)?.name ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
 
-  // Lista unificada de aparelhos: primeiro os que possuem manutenções cadastradas, depois os do estoque
+  // Lista unificada de aparelhos: primeiro os que possuem manutenções cadastradas em /os/manutencoes, depois os do estoque
   const devices = useMemo(() => {
     const map = new Map<string, DeviceEntry>();
 
     for (const srv of services) {
-      const key = deviceKey(srv.productId, srv.brand, srv.model);
+      const b = srv.brand.trim();
+      const m = srv.model.trim();
+      const key = deviceKey(srv.productId, b, m);
       const existing = map.get(key);
       if (existing) {
         existing.serviceCount += 1;
@@ -150,16 +175,16 @@ export function OsDeviceRepairSelector({
         map.set(key, {
           key,
           productId: srv.productId,
-          brand: srv.brand,
-          model: srv.model,
-          displayName: buildDisplayName(srv.brand, srv.model),
+          brand: b,
+          model: m,
+          displayName: buildDisplayName(b, m),
           serviceCount: 1,
         });
       }
     }
 
     for (const row of stock) {
-      const bName = resolveBrandName(row.brand);
+      const bName = resolveBrandName(row.brand).trim();
       const keyByProd = deviceKey(row.id, bName, row.name);
       const keyByModel = deviceKey(null, bName, row.name);
       if (!map.has(keyByProd) && !map.has(keyByModel)) {
@@ -175,32 +200,89 @@ export function OsDeviceRepairSelector({
     }
 
     return [...map.values()].sort((a, b) => {
-      if (b.serviceCount !== a.serviceCount) return b.serviceCount - a.serviceCount;
-      return a.displayName.localeCompare(b.displayName);
+      if ((a.serviceCount > 0) !== (b.serviceCount > 0)) {
+        return a.serviceCount > 0 ? -1 : 1;
+      }
+      return naturalCompare(a.displayName, b.displayName);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services, stock, brands]);
 
-  const devicePickerOptions = useMemo(
-    () => [
-      { value: '', label: 'Digitar equipamento manualmente ou selecionar da lista…' },
-      ...devices.map((d) => ({
-        value: d.key,
-        label: d.displayName,
-        hint:
-          d.serviceCount > 0
-            ? `${d.serviceCount} ${d.serviceCount === 1 ? 'manutenção' : 'manutenções'}`
-            : d.brand || 'Produto',
-        keywords: `${d.brand} ${d.model}`,
-      })),
-    ],
+  // Aparelhos que têm manutenções cadastradas em /os/manutencoes
+  const catalogDevices = useMemo(
+    () => devices.filter((d) => d.serviceCount > 0),
     [devices],
   );
 
-  // Serviços disponíveis para o aparelho selecionado (ou correspondente ao marca/modelo digitado)
+  // Lista de marcas (priorizando marcas com manutenções no catálogo)
+  const brandOptions = useMemo(() => {
+    const brandMap = new Map<string, { brand: string; modelCount: number; serviceCount: number }>();
+    for (const dev of devices) {
+      const b = dev.brand.trim();
+      if (!b) continue;
+      const k = norm(b);
+      const prev = brandMap.get(k);
+      if (prev) {
+        prev.modelCount += 1;
+        prev.serviceCount += dev.serviceCount;
+      } else {
+        brandMap.set(k, { brand: b, modelCount: 1, serviceCount: dev.serviceCount });
+      }
+    }
+    const sorted = [...brandMap.values()].sort((a, b) => {
+      if ((a.serviceCount > 0) !== (b.serviceCount > 0)) {
+        return a.serviceCount > 0 ? -1 : 1;
+      }
+      return naturalCompare(a.brand, b.brand);
+    });
+
+    return [
+      { value: '', label: 'Todas as marcas' },
+      ...sorted.map((entry) => ({
+        value: entry.brand,
+        label: entry.brand,
+        hint:
+          entry.serviceCount > 0
+            ? `${entry.modelCount} ${entry.modelCount === 1 ? 'aparelho' : 'aparelhos'} · ${entry.serviceCount} ${entry.serviceCount === 1 ? 'serviço' : 'serviços'}`
+            : `${entry.modelCount} ${entry.modelCount === 1 ? 'produto' : 'produtos'}`,
+      })),
+      { value: '__manual__', label: '✏️ Outra marca (digitar manualmente)…' },
+    ];
+  }, [devices]);
+
+  // Modelos filtrados pela marca escolhida
+  const filteredDevices = useMemo(() => {
+    if (!selectedBrand) return devices;
+    const target = norm(selectedBrand);
+    return devices.filter((d) => norm(d.brand) === target);
+  }, [devices, selectedBrand]);
+
+  const devicePickerOptions = useMemo(
+    () => [
+      {
+        value: '',
+        label: selectedBrand
+          ? `Selecione o modelo de ${selectedBrand}…`
+          : 'Selecione o aparelho / modelo da lista…',
+      },
+      ...filteredDevices.map((d) => ({
+        value: d.key,
+        label: selectedBrand ? d.model : d.displayName,
+        hint:
+          d.serviceCount > 0
+            ? `${d.serviceCount} ${d.serviceCount === 1 ? 'manutenção tabelada' : 'manutenções tabeladas'}`
+            : d.brand || 'Estoque',
+        keywords: `${d.brand} ${d.model} ${d.displayName}`,
+      })),
+      { value: '__manual__', label: '✏️ Outro aparelho (digitar manualmente)…' },
+    ],
+    [filteredDevices, selectedBrand],
+  );
+
+  // Serviços disponíveis para o aparelho selecionado (ou correspondente ao marca/modelo)
   const matchingServices = useMemo(() => {
     const chosenDevice = devices.find((d) => d.key === selectedDeviceKey);
-    const targetBrand = norm(chosenDevice?.brand || itemBrand);
+    const targetBrand = norm(chosenDevice?.brand || selectedBrand || itemBrand);
     const targetModel = norm(chosenDevice?.model || itemModel || itemName);
     const targetProductId = chosenDevice?.productId || null;
 
@@ -214,15 +296,18 @@ export function OsDeviceRepairSelector({
         const sFull = norm(buildDisplayName(srv.brand, srv.model));
         if (targetBrand && sBrand === targetBrand && sModel === targetModel) return true;
         if (sModel && (targetModel === sModel || sFull === targetModel)) return true;
-        if (sModel.length >= 3 && (norm(itemName).includes(sModel) || norm(itemModel).includes(sModel))) {
+        if (
+          sModel.length >= 3 &&
+          (norm(itemName).includes(sModel) || norm(itemModel).includes(sModel))
+        ) {
           return !targetBrand || !sBrand || sBrand === targetBrand;
         }
         return false;
       })
-      .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
-  }, [services, devices, selectedDeviceKey, itemBrand, itemModel, itemName]);
+      .sort((a, b) => a.sort - b.sort || naturalCompare(a.name, b.name));
+  }, [services, devices, selectedDeviceKey, selectedBrand, itemBrand, itemModel, itemName]);
 
-  // Opções para adicionar rapidamente qualquer serviço do catálogo mesmo sem filtro de aparelho
+  // Opções para buscar rapidamente qualquer serviço do catálogo
   const allServicesPickerOptions = useMemo(() => {
     return services.flatMap((service) => {
       const opts = getActiveOptions(service);
@@ -246,7 +331,21 @@ export function OsDeviceRepairSelector({
     });
   }, [services]);
 
-  function emitChanges(nextChoices: SelectedRepairChoice[]) {
+  function emitChanges(nextChoices: SelectedRepairChoice[], nextDiagnosis = wantsDiagnosis) {
+    if (nextDiagnosis && nextChoices.length === 0) {
+      onSelectionChange({
+        totalPrice: 0,
+        totalCost: 0,
+        hasEvaluationItem: true,
+        wantsDiagnosis: true,
+        maxEstimatedMinutes: 0,
+        summaryText: 'Avaliação técnica — identificar defeito na bancada',
+        quoteNotes: 'Avaliação técnica presencial solicitada na abertura da OS.',
+        lines: [],
+      });
+      return;
+    }
+
     const resolved = nextChoices
       .map((choice) => {
         const service = services.find((s) => s.id === choice.serviceId);
@@ -270,16 +369,29 @@ export function OsDeviceRepairSelector({
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
-    const totalPrice = resolved.reduce((sum, item) => sum + (typeof item.price === 'number' ? item.price : 0), 0);
-    const totalCost = resolved.reduce((sum, item) => sum + (typeof item.cost === 'number' ? item.cost : 0), 0);
-    const hasEvaluationItem = resolved.some((item) => item.price === null || item.price === undefined);
-    const maxEstimatedMinutes = Math.max(0, ...resolved.map((item) => item.service.estimatedMinutes ?? 0));
+    const totalPrice = resolved.reduce(
+      (sum, item) => sum + (typeof item.price === 'number' ? item.price : 0),
+      0,
+    );
+    const totalCost = resolved.reduce(
+      (sum, item) => sum + (typeof item.cost === 'number' ? item.cost : 0),
+      0,
+    );
+    const hasEvaluationItem = resolved.some(
+      (item) => item.price === null || item.price === undefined,
+    );
+    const maxEstimatedMinutes = Math.max(
+      0,
+      ...resolved.map((item) => item.service.estimatedMinutes ?? 0),
+    );
     const summaryText = resolved.map((item) => item.label).join('; ');
     const quoteNotes = resolved
       .map(
         (item) =>
           `${item.label} — ${
-            item.price !== null && item.price !== undefined ? repairMoney(item.price) : 'Sob avaliação'
+            item.price !== null && item.price !== undefined
+              ? repairMoney(item.price)
+              : 'Sob avaliação'
           }`,
       )
       .join('\n');
@@ -298,6 +410,7 @@ export function OsDeviceRepairSelector({
       totalPrice,
       totalCost,
       hasEvaluationItem,
+      wantsDiagnosis: false,
       maxEstimatedMinutes,
       summaryText,
       quoteNotes,
@@ -305,20 +418,58 @@ export function OsDeviceRepairSelector({
     });
   }
 
+  function handlePickBrand(brandVal: string) {
+    if (brandVal === '__manual__') {
+      setManualMode(true);
+      return;
+    }
+    setManualMode(false);
+    setSelectedBrand(brandVal);
+    setSelectedDeviceKey('');
+    setChoices([]);
+    setWantsDiagnosis(false);
+    emitChanges([], false);
+    onSelectDevice({
+      itemName: '',
+      itemBrand: brandVal,
+      itemModel: '',
+    });
+  }
+
   function handlePickDevice(key: string) {
+    if (key === '__manual__') {
+      setManualMode(true);
+      setSelectedDeviceKey('');
+      return;
+    }
+    setManualMode(false);
     setSelectedDeviceKey(key);
     const dev = devices.find((d) => d.key === key);
     if (!dev) return;
+    if (dev.brand) setSelectedBrand(dev.brand);
     onSelectDevice({
       itemName: dev.displayName,
       itemBrand: dev.brand,
       itemModel: dev.model,
     });
     setChoices([]);
-    emitChanges([]);
+    setWantsDiagnosis(false);
+    emitChanges([], false);
+  }
+
+  function toggleDiagnosis() {
+    const next = !wantsDiagnosis;
+    setWantsDiagnosis(next);
+    if (next) {
+      setChoices([]);
+      emitChanges([], true);
+    } else {
+      emitChanges([], false);
+    }
   }
 
   function toggleService(service: RepairService) {
+    setWantsDiagnosis(false);
     const exists = choices.some((c) => c.serviceId === service.id);
     const opts = getActiveOptions(service);
     const defaultOptId = opts.length > 0 ? (opts[0].id ?? '0') : null;
@@ -326,16 +477,17 @@ export function OsDeviceRepairSelector({
       ? choices.filter((c) => c.serviceId !== service.id)
       : [...choices, { serviceId: service.id, optionId: defaultOptId }];
     setChoices(next);
-    emitChanges(next);
+    emitChanges(next, false);
   }
 
   function selectServiceOption(serviceId: string, optionId: string) {
+    setWantsDiagnosis(false);
     const exists = choices.some((c) => c.serviceId === serviceId);
     const next = exists
       ? choices.map((c) => (c.serviceId === serviceId ? { ...c, optionId } : c))
       : [...choices, { serviceId, optionId }];
     setChoices(next);
-    emitChanges(next);
+    emitChanges(next, false);
   }
 
   function handleAddFromGlobalPicker(val: string) {
@@ -344,9 +496,10 @@ export function OsDeviceRepairSelector({
     const service = services.find((s) => s.id === serviceId);
     if (!service) return;
 
-    // Se o aparelho ainda estiver em branco, preenche com o aparelho desse serviço
-    if (!itemName.trim() && (service.brand || service.model)) {
+    setWantsDiagnosis(false);
+    if (service.brand || service.model) {
       const devDisplay = buildDisplayName(service.brand, service.model);
+      setSelectedBrand(service.brand);
       onSelectDevice({
         itemName: devDisplay,
         itemBrand: service.brand,
@@ -362,7 +515,7 @@ export function OsDeviceRepairSelector({
       ? choices.map((c) => (c.serviceId === serviceId ? { ...c, optionId } : c))
       : [...choices, { serviceId, optionId }];
     setChoices(next);
-    emitChanges(next);
+    emitChanges(next, false);
   }
 
   const chosenSummary = useMemo(() => {
@@ -389,7 +542,6 @@ export function OsDeviceRepairSelector({
     0,
   );
 
-  // Serviços escolhidos pelo picker global que não fazem parte de matchingServices
   const extraChosenServices = useMemo(() => {
     const matchIds = new Set(matchingServices.map((s) => s.id));
     return choices
@@ -402,54 +554,174 @@ export function OsDeviceRepairSelector({
     [matchingServices, extraChosenServices],
   );
 
+  const hasSelectedDevice = Boolean(selectedDeviceKey || itemName.trim() || itemModel.trim());
+
   return (
     <div className="os-repair-catalog-box">
-      <div className="os-repair-catalog-box__top">
-        <div className="os-repair-catalog-box__picker">
+      <div className="os-repair-catalog-box__head">
+        <div>
+          <strong className="os-repair-catalog-box__title">
+            📱 1. Selecione o Aparelho
+          </strong>
+          <small className="os-repair-catalog-box__subtitle">
+            Escolha a marca e o modelo para carregar os serviços e preços tabelados de{' '}
+            <Link to={osHref(osBase, '/manutencoes')}>/os/manutencoes</Link>
+          </small>
+        </div>
+        <div className="os-repair-catalog-box__actions">
+          <button
+            type="button"
+            className={`btn btn--ghost btn--sm ${manualMode ? 'is-active' : ''}`}
+            onClick={() => setManualMode((m) => !m)}
+          >
+            {manualMode ? '📋 Usar lista do catálogo' : '✏️ Digitar aparelho manualmente'}
+          </button>
+          <Link
+            to={osHref(osBase, '/manutencoes')}
+            className="btn btn--ghost btn--sm"
+            title="Abrir Catálogo de Manutenções para cadastrar ou editar serviços e preços"
+          >
+            ⚙️ Catálogo de Manutenções
+          </Link>
+        </div>
+      </div>
+
+      {/* Seleção de Marca e Modelo (padrão) ou Digitação Manual */}
+      {!manualMode && devices.length > 0 ? (
+        <div className="os-repair-catalog-box__pickers">
           <AdminPicker
-            label="Aparelho do Catálogo de Manutenções / Produtos"
+            label="Marca do Aparelho"
+            value={selectedBrand}
+            searchable
+            placeholder={loading ? 'Carregando marcas…' : 'Selecione a marca (ex.: Apple, Samsung)…'}
+            options={brandOptions}
+            onChange={handlePickBrand}
+          />
+          <AdminPicker
+            label="Modelo / Aparelho *"
             value={selectedDeviceKey}
             searchable
             placeholder={
               loading
-                ? 'Carregando aparelhos e catálogo de manutenções…'
-                : 'Selecione o aparelho (ex.: iPhone 15, Galaxy S23) para carregar os serviços e preços…'
+                ? 'Carregando modelos…'
+                : selectedBrand
+                  ? `Selecione o modelo de ${selectedBrand}…`
+                  : 'Selecione o aparelho (ex.: iPhone 13, Galaxy A12)…'
             }
             options={devicePickerOptions}
             onChange={handlePickDevice}
           />
         </div>
-        <Link
-          to={osHref(osBase, '/manutencoes')}
-          className="btn btn--ghost btn--sm os-repair-catalog-box__manage-link"
-          title="Abrir Catálogo de Manutenções para cadastrar ou editar preços"
-        >
-          ⚙️ Catálogo de Manutenções
-        </Link>
-      </div>
+      ) : (
+        <div className="os-form-grid os-form-grid--3">
+          <label>
+            <span>Marca *</span>
+            <input
+              value={itemBrand}
+              onChange={(e) => {
+                const nextBrand = e.target.value;
+                const nextDisplay = buildDisplayName(nextBrand, itemModel) || itemName;
+                onSelectDevice({ itemName: nextDisplay, itemBrand: nextBrand, itemModel });
+              }}
+              placeholder="Ex.: Apple, Samsung, Motorola"
+            />
+          </label>
+          <label>
+            <span>Modelo *</span>
+            <input
+              value={itemModel}
+              onChange={(e) => {
+                const nextModel = e.target.value;
+                const nextDisplay = buildDisplayName(itemBrand, nextModel);
+                onSelectDevice({ itemName: nextDisplay, itemBrand, itemModel: nextModel });
+              }}
+              placeholder="Ex.: iPhone 15, Galaxy S23"
+            />
+          </label>
+          <label>
+            <span>Descrição do Equipamento *</span>
+            <input
+              value={itemName}
+              onChange={(e) =>
+                onSelectDevice({ itemName: e.target.value, itemBrand, itemModel })
+              }
+              placeholder="Ex.: Apple iPhone 15 128GB"
+              required
+            />
+          </label>
+        </div>
+      )}
 
-      {displayedServices.length > 0 ? (
-        <div className="os-repair-services-panel">
-          <div className="os-repair-services-panel__head">
-            <div>
-              <strong>
-                🛠️ Serviços / Manutenções disponíveis ({displayedServices.length})
-              </strong>
-              <span>
-                Clique nos serviços desejados para preencher o defeito e configurar o preço automaticamente
-              </span>
-            </div>
-            {chosenSummary.length > 0 ? (
-              <div className="os-repair-services-panel__total">
-                <span>
-                  {chosenSummary.length}{' '}
-                  {chosenSummary.length === 1 ? 'serviço selecionado' : 'serviços selecionados'}
-                </span>
-                <strong>{repairMoney(totalSelectedPrice)}</strong>
-              </div>
-            ) : null}
+      {/* Atalhos rápidos dos aparelhos que já têm manutenções cadastradas */}
+      {!hasSelectedDevice && catalogDevices.length > 0 ? (
+        <div className="os-repair-quick-devices">
+          <span className="os-repair-quick-devices__label">
+            Aparelhos com manutenções cadastradas:
+          </span>
+          <div className="os-repair-quick-devices__chips">
+            {catalogDevices.slice(0, 12).map((dev) => (
+              <button
+                key={dev.key}
+                type="button"
+                className="os-repair-device-chip"
+                onClick={() => handlePickDevice(dev.key)}
+              >
+                <strong>{dev.displayName}</strong>
+                <span>{dev.serviceCount} {dev.serviceCount === 1 ? 'serviço' : 'serviços'}</span>
+              </button>
+            ))}
           </div>
+        </div>
+      ) : null}
 
+      {/* Painel 2: Qual manutenção / serviço será feito? */}
+      <div className="os-repair-services-panel">
+        <div className="os-repair-services-panel__head">
+          <div>
+            <strong className="os-repair-services-panel__title">
+              🛠️ 2. Qual manutenção você precisa? (Tipo de Serviço)
+              {displayedServices.length > 0 ? ` · ${displayedServices.length} disponíveis` : ''}
+            </strong>
+            <span className="os-repair-services-panel__subtitle">
+              Clique nos serviços abaixo para configurar automaticamente o tipo de serviço e o preço da OS
+            </span>
+          </div>
+          {chosenSummary.length > 0 ? (
+            <div className="os-repair-services-panel__total">
+              <span>
+                {chosenSummary.length}{' '}
+                {chosenSummary.length === 1 ? 'serviço selecionado' : 'serviços selecionados'}:
+              </span>
+              <strong>{repairMoney(totalSelectedPrice)}</strong>
+            </div>
+          ) : wantsDiagnosis ? (
+            <div className="os-repair-services-panel__total">
+              <span>Modo selecionado:</span>
+              <strong>Avaliação técnica</strong>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Opção "Não sei o que é / Avaliação técnica" igual ao fluxo do catálogo */}
+        <button
+          type="button"
+          className={`os-repair-diagnosis-btn ${wantsDiagnosis ? 'is-selected' : ''}`}
+          onClick={toggleDiagnosis}
+          aria-pressed={wantsDiagnosis}
+        >
+          <span className="os-repair-srv-card__check" aria-hidden="true">
+            {wantsDiagnosis ? '✓' : '?'}
+          </span>
+          <span className="os-repair-diagnosis-btn__text">
+            <strong>Não sei o que é / Avaliação técnica na bancada</strong>
+            <small>
+              O aparelho precisa de diagnóstico do técnico antes de definir o serviço e o orçamento final
+            </small>
+          </span>
+          <span className="os-repair-diagnosis-btn__tag">Avaliação técnica</span>
+        </button>
+
+        {displayedServices.length > 0 ? (
           <div className="os-repair-services-grid">
             {displayedServices.map((service) => {
               const choice = choices.find((c) => c.serviceId === service.id);
@@ -487,9 +759,9 @@ export function OsDeviceRepairSelector({
                   {opts.length > 0 && isSelected ? (
                     <div className="os-repair-srv-card__options">
                       <span className="os-repair-srv-card__options-label">
-                        Peça / Qualidade:
+                        Escolha a peça / qualidade:
                       </span>
-                      <div className="os-repair-srv-card__options-list">
+                      <div className="os-repair-srv-card__options-pills">
                         {opts.map((opt, idx) => {
                           const optKey = opt.id ?? String(idx);
                           const optActive = (choice?.optionId ?? (opts[0].id ?? '0')) === optKey;
@@ -503,7 +775,7 @@ export function OsDeviceRepairSelector({
                               <span>{opt.name}</span>
                               <strong>
                                 {opt.price === null || opt.price === undefined
-                                  ? 'Avaliar'
+                                  ? 'Sob avaliação'
                                   : repairMoney(opt.price)}
                               </strong>
                             </button>
@@ -516,26 +788,57 @@ export function OsDeviceRepairSelector({
               );
             })}
           </div>
-        </div>
-      ) : services.length > 0 ? (
-        <div className="os-repair-services-empty">
-          <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-            <AdminPicker
-              compact
-              searchable
-              label="Buscar serviço no Catálogo de Manutenções"
-              value=""
-              placeholder="Pesquisar serviço cadastrado (ex.: Troca de Tela, Bateria, Conector)…"
-              options={allServicesPickerOptions}
-              onChange={handleAddFromGlobalPicker}
-            />
+        ) : null}
+
+        {/* Busca rápida de qualquer serviço do catálogo */}
+        {services.length > 0 ? (
+          <div className="os-repair-services-search-row">
+            <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+              <AdminPicker
+                compact
+                searchable
+                label={
+                  displayedServices.length > 0
+                    ? 'Adicionar outro serviço do Catálogo de Manutenções'
+                    : 'Buscar serviço diretamente no Catálogo de Manutenções'
+                }
+                value=""
+                placeholder="Pesquisar serviço cadastrado (ex.: Troca de Tela, Bateria, Conector)…"
+                options={allServicesPickerOptions}
+                onChange={handleAddFromGlobalPicker}
+              />
+            </div>
           </div>
-          <span className="os-repair-services-empty__hint">
-            Selecione um aparelho acima ou busque qualquer serviço cadastrado em{' '}
-            <Link to={osHref(osBase, '/manutencoes')}>/os/manutencoes</Link> para preencher o valor automaticamente.
-          </span>
-        </div>
-      ) : null}
+        ) : !loading ? (
+          <div className="os-repair-services-empty">
+            Nenhum serviço cadastrado ainda em{' '}
+            <Link to={osHref(osBase, '/manutencoes')}>/os/manutencoes</Link>. Cadastre os serviços por
+            aparelho lá para selecioná-los com 1 clique aqui.
+          </div>
+        ) : null}
+
+        {/* Resumo dos serviços selecionados */}
+        {chosenSummary.length > 0 ? (
+          <div className="os-repair-summary-bar">
+            <div className="os-repair-summary-bar__items">
+              {chosenSummary.map((item) => (
+                <span key={item.serviceId} className="os-repair-summary-chip">
+                  ✓ {item.label}{' '}
+                  <strong>
+                    {item.price !== null && item.price !== undefined
+                      ? repairMoney(item.price)
+                      : 'Sob avaliação'}
+                  </strong>
+                </span>
+              ))}
+            </div>
+            <div className="os-repair-summary-bar__total">
+              <span>Valor configurado na OS:</span>
+              <strong>{repairMoney(totalSelectedPrice)}</strong>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
