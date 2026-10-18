@@ -92,8 +92,11 @@ export function apiListStock(query?: {
   condition?: StockCondition;
   q?: string;
   low?: boolean;
+  /** Sem valor: só o estoque da loja. 'all' inclui as peças da oficina (PDV e OS). */
+  scope?: 'all' | 'workshop';
 }) {
   const params = new URLSearchParams();
+  if (query?.scope) params.set('scope', query.scope);
   if (query?.kind) params.set('kind', query.kind);
   if (query?.condition) params.set('condition', query.condition);
   if (query?.q) params.set('q', query.q);

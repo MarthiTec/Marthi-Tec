@@ -557,6 +557,8 @@ export function StockPage() {
 
   const visible = useMemo(() => {
     const filtered = items.filter((item) => {
+      // Peças da oficina têm o estoque próprio na OS (Peças de manutenção).
+      if (item.scope === 'workshop') return false;
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
       if (conditionFilter !== 'all' && item.condition !== conditionFilter) return false;
       if (brandFilter !== 'all' && normalizeBrand(item.brand) !== normalizeBrand(brandFilter)) return false;

@@ -182,7 +182,7 @@ export function OsRepairPartsPicker({
           </div>
         ) : empty ? (
           <p className="os-parts__hint">
-            Sem estoque — <Link to="/erp/entrada-estoque">dar entrada</Link> ou use uma peça de outro aparelho.
+            Sem estoque — <Link to={osHref(osBase, '/pecas')}>dar entrada</Link> ou use uma peça de outro aparelho.
           </p>
         ) : null}
       </li>

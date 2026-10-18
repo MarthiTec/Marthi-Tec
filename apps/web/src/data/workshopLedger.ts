@@ -49,7 +49,7 @@ function patchWorkOrderCache(order: WorkOrder) {
 export async function refreshStockFinance() {
   try {
     const { apiListStock, apiListFinance } = await import('../services/erpApi');
-    const [stock, finance] = await Promise.all([apiListStock(), apiListFinance()]);
+    const [stock, finance] = await Promise.all([apiListStock({ scope: 'all' }), apiListFinance()]);
     replaceAdminState({ ...getAdminState(), stock, finance });
   } catch {
     /* ignore */

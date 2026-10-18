@@ -230,6 +230,7 @@ export function formatStockRow(row: any) {
   return {
     id: row.id,
     name: row.name,
+    scope: row.scope === 'workshop' ? 'workshop' : 'store',
     sku: row.sku || '',
     barcode: row.barcode || '',
     imei: row.imei || '',
@@ -314,13 +315,17 @@ export function reduceStockQtyInMemory(_stockId: string, _qty: number): never {
 stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
   try {
     const storeId = req.storeId!;
-    const { kind, condition, q, low } = req.query;
+    const { kind, condition, q, low, scope } = req.query;
 
     if (pool) {
       try {
         const conditions: string[] = ['store_id = $1'];
         const values: any[] = [storeId];
         let pIdx = 2;
+
+        // Peças da oficina (OS) ficam fora do estoque da loja; ?scope=all traz tudo (PDV e OS).
+        if (scope === 'workshop') conditions.push(`scope = 'workshop'`);
+        else if (scope !== 'all') conditions.push(`scope <> 'workshop'`);
 
         if (kind && typeof kind === 'string') {
           conditions.push(`kind = $${pIdx++}`);
@@ -342,7 +347,7 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
         const sql = `
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
-                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name,
+                 pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, scope, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name,
                  (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
                  (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items

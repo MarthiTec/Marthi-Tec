@@ -104,7 +104,8 @@ export async function bootstrapErpFromApi(): Promise<boolean> {
       posTickets,
     ] = await Promise.all([
       apiListCustomers(),
-      apiListStock(),
+      // Tudo (inclui peças da oficina): o PDV pode vender uma peça e a OS baixa peças.
+      apiListStock({ scope: 'all' }),
       apiListOrders(),
       apiListFinance(),
       apiListPriceTables(),
@@ -173,7 +174,7 @@ export async function refreshAdminSlices(slices?: Array<'customers' | 'stock' | 
   const want = new Set(slices ?? ['customers', 'stock', 'orders', 'finance', 'pricing']);
   const [customers, stock, orders, finance, priceTables, payments] = await Promise.all([
     want.has('customers') ? apiListCustomers() : Promise.resolve(null),
-    want.has('stock') ? apiListStock() : Promise.resolve(null),
+    want.has('stock') ? apiListStock({ scope: 'all' }) : Promise.resolve(null),
     want.has('orders') ? apiListOrders() : Promise.resolve(null),
     want.has('finance') ? apiListFinance() : Promise.resolve(null),
     want.has('pricing') ? apiListPriceTables() : Promise.resolve(null),

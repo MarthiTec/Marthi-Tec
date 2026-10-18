@@ -168,6 +168,8 @@ export type StockItem = {
   /** Custo unitário da última compra. */
   lastPurchaseCost: number;
   kind: StockKind;
+  /** 'workshop' = peça da oficina (estoque da OS), fora das telas da Retaguarda. */
+  scope?: 'store' | 'workshop';
   condition: StockCondition;
   /** Unidade de medida: UN (inteiro) ou KG (pesado). */
   unit: StockUnit;

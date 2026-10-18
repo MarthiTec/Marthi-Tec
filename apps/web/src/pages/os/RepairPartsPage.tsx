@@ -1,12 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AdminIcon } from '../../components/AdminIcons';
+import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickModal } from '../../components/QuickModal';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
-import { apiListRepairParts, apiSetRepairPartLinks, apiUpdateRepairPart, REPAIR_PART_STATUS, type RepairPart, type RepairPartStatus } from '../../services/repairPartsApi';
+import { fileToProductImage } from '../../data/operatorProfile';
+import { apiListSuppliers, type ApiSupplier } from '../../services/erpApi';
+import {
+  apiCreateRepairPart,
+  apiListRepairParts,
+  apiRepairPartEntry,
+  apiSetRepairPartLinks,
+  apiUpdateRepairPart,
+  REPAIR_PART_STATUS,
+  type RepairPart,
+  type RepairPartEntry,
+  type RepairPartStatus,
+} from '../../services/repairPartsApi';
 import { apiListRepairServices, repairMoney, type RepairService } from '../../services/repairsApi';
-import { OsProductQuickModal } from './OsProductQuickModal';
 import { osHref, useOsBase } from './osPaths';
+import './repairs.css';
 import './repairParts.css';
 
 const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
@@ -48,7 +62,14 @@ export function RepairPartsPage() {
   const [error, setError] = useState('');
   const [flash, setFlash] = useState('');
   const [linking, setLinking] = useState<RepairPart | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [entering, setEntering] = useState<RepairPart | null>(null);
+  /** null = fechado; 'new' = nova peça; peça = editar nome e foto. */
+  const [editing, setEditing] = useState<RepairPart | 'new' | null>(null);
+  const replace = (updated: RepairPart) => setParts((list) => (list ?? []).map((item) => (item.id === updated.id ? updated : item)));
+  const notify = (text: string) => {
+    setFlash(text);
+    window.setTimeout(() => setFlash(''), 3000);
+  };
 
   function load() {
     apiListRepairParts()
@@ -101,16 +122,11 @@ export function RepairPartsPage() {
         <div className="admin-card__head" style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
             <h2>Peças de manutenção</h2>
-            <p>Saldo, estoque mínimo, custo e preço de venda das peças usadas nos reparos. A quantidade muda pela entrada de estoque e pelas OS.</p>
+            <p>Estoque próprio da oficina: as peças usadas nos reparos, separadas do estoque da loja. A quantidade muda pela entrada de peças (aqui) e pelas OS.</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Link to="/erp/entrada-estoque" className="btn btn--ghost">
-              Entrada de estoque
-            </Link>
-            <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-              + Nova peça
-            </button>
-          </div>
+          <button type="button" className="btn btn--primary" onClick={() => setEditing('new')}>
+            + Nova peça
+          </button>
         </div>
 
         <div className="repair-parts__stats">
@@ -168,9 +184,12 @@ export function RepairPartsPage() {
                     return (
                       <tr key={part.id}>
                         <td data-label="Peça">
-                          <span className="repair-parts__name">
-                            <strong>{part.name}</strong>
-                            <small>{[part.sku, part.category, part.brand].filter(Boolean).join(' · ')}</small>
+                          <span className="repair-parts__cell-name">
+                            {part.images[0] ? <img src={part.images[0]} alt="" className="repair-parts__thumb" /> : <span className="repair-parts__thumb repair-parts__thumb--empty" aria-hidden>🔩</span>}
+                            <span className="repair-parts__name">
+                              <strong>{part.name}</strong>
+                              <small>{[part.sku, part.category, part.brand].filter(Boolean).join(' · ')}</small>
+                            </span>
                           </span>
                         </td>
                         <td data-label="Aparelhos" className="repair-parts__devices">
@@ -192,9 +211,18 @@ export function RepairPartsPage() {
                           {repairMoney(margin)}
                           {part.price > 0 ? ` (${Math.round((margin / part.price) * 100)}%)` : ''}
                         </td>
-                        <td>
-                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setLinking(part)}>
-                            Aparelhos
+                        <td className="repair-parts__actions">
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEntering(part)}>
+                            + Entrada
+                          </button>
+                          <button type="button" className="repairs__icon" title="Aparelhos que usam a peça" aria-label={`Aparelhos de ${part.name}`} onClick={() => setLinking(part)}>
+                            <svg className="admin-ico" viewBox="0 0 24 24" aria-hidden="true">
+                              <rect x="7" y="3" width="10" height="18" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                              <path d="M11 18h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                          <button type="button" className="repairs__icon" title="Editar nome e foto" aria-label={`Editar ${part.name}`} onClick={() => setEditing(part)}>
+                            <AdminIcon name="edit" />
                           </button>
                         </td>
                       </tr>
@@ -221,7 +249,29 @@ export function RepairPartsPage() {
           }}
         />
       ) : null}
-      <OsProductQuickModal open={creating} onClose={() => setCreating(false)} onCreated={() => load()} />
+      {entering ? (
+        <PartEntryModal
+          part={entering}
+          onClose={() => setEntering(null)}
+          onSaved={(updated, qty) => {
+            replace(updated);
+            setEntering(null);
+            notify(`Entrada de ${qty} un. de ${updated.name} — saldo ${updated.qty}.`);
+          }}
+        />
+      ) : null}
+      {editing ? (
+        <PartFormModal
+          part={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={(saved, isNew) => {
+            if (isNew) setParts((list) => [saved, ...(list ?? [])]);
+            else replace(saved);
+            setEditing(null);
+            notify(isNew ? `${saved.name} cadastrada. Dê entrada e vincule aos aparelhos.` : `${saved.name} salva.`);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -325,6 +375,192 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
           </li>
         ))}
       </ul>
+    </QuickModal>
+  );
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Entrada de peças pela oficina: quantidade, custo, fornecedor e como a compra entra no financeiro. */
+function PartEntryModal({ part, onClose, onSaved }: { part: RepairPart; onClose: () => void; onSaved: (part: RepairPart, qty: number) => void }) {
+  const [form, setForm] = useState<RepairPartEntry>({ qty: 1, unitCost: part.cost, supplierId: null, entryDate: today(), notes: '', payment: 'paid', dueDate: '' });
+  const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    apiListSuppliers(true).then(setSuppliers).catch(() => setSuppliers([]));
+  }, []);
+  const set = (patch: Partial<RepairPartEntry>) => setForm((current) => ({ ...current, ...patch }));
+
+  async function save() {
+    if (!(form.qty >= 1)) {
+      setError('Informe a quantidade.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      onSaved(await apiRepairPartEntry(part.id, { ...form, dueDate: form.payment === 'pending' ? form.dueDate || form.entryDate : '' }), form.qty);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível dar entrada.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <QuickModal title="Entrada de peças" subtitle={`${part.name} · saldo atual ${part.qty}`} submitLabel={`Dar entrada (${form.qty || 0} un.)`} busy={busy} error={error} onClose={onClose} onSubmit={save}>
+      <div className="quick-modal__row">
+        <label>
+          Quantidade
+          <input type="number" min={1} value={form.qty || ''} onChange={(e) => set({ qty: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
+        </label>
+        <label>
+          Custo unitário
+          <CurrencyInput value={form.unitCost} ariaLabel="Custo unitário" onChange={(unitCost) => set({ unitCost })} />
+        </label>
+      </div>
+      <AdminPicker
+        label="Fornecedor (opcional)"
+        value={form.supplierId ?? ''}
+        searchable
+        options={[{ value: '', label: 'Sem fornecedor' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.tradeName || supplier.name }))]}
+        onChange={(value) => set({ supplierId: value || null })}
+      />
+      <div className="quick-modal__row">
+        <label>
+          Data da entrada
+          <input type="date" value={form.entryDate} onChange={(e) => set({ entryDate: e.target.value })} />
+        </label>
+        <AdminPicker
+          label="Financeiro"
+          value={form.payment}
+          options={[
+            { value: 'paid', label: 'Compra paga' },
+            { value: 'pending', label: 'A pagar (contas a pagar)' },
+            { value: 'none', label: 'Sem lançamento (já estava na bancada)' },
+          ]}
+          onChange={(value) => set({ payment: value as RepairPartEntry['payment'] })}
+        />
+      </div>
+      {form.payment === 'pending' ? (
+        <label>
+          Vencimento
+          <input type="date" value={form.dueDate || form.entryDate} onChange={(e) => set({ dueDate: e.target.value })} />
+        </label>
+      ) : null}
+      <label>
+        Observação
+        <input value={form.notes} maxLength={300} placeholder="Ex.: nota 1234, lote da distribuidora" onChange={(e) => set({ notes: e.target.value })} />
+      </label>
+      <p className="repairs__muted">
+        Total {repairMoney((form.qty || 0) * form.unitCost)} · o custo médio da peça é recalculado com esta entrada.
+      </p>
+    </QuickModal>
+  );
+}
+
+/** Nova peça da oficina (ou editar nome e foto de uma existente). */
+function PartFormModal({ part, onClose, onSaved }: { part: RepairPart | null; onClose: () => void; onSaved: (part: RepairPart, isNew: boolean) => void }) {
+  const [name, setName] = useState(part?.name ?? '');
+  const [category, setCategory] = useState(part?.category ?? '');
+  const [brand, setBrand] = useState(part?.brand ?? '');
+  const [sku, setSku] = useState(part?.sku ?? '');
+  const [cost, setCost] = useState(part?.cost ?? 0);
+  const [price, setPrice] = useState(part?.price ?? 0);
+  const [minQty, setMinQty] = useState(part?.minQty ?? 1);
+  const [images, setImages] = useState<string[]>(part?.images ?? []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const upper = (value: string) => value.toUpperCase();
+
+  async function addPhoto(files: FileList | null) {
+    if (!files?.length) return;
+    try {
+      const added = await Promise.all([...files].slice(0, 6 - images.length).map((file) => fileToProductImage(file)));
+      setImages((current) => [...current, ...added].slice(0, 6));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível usar essa foto.');
+    }
+  }
+
+  async function save() {
+    if (name.trim().length < 2) {
+      setError('Informe o nome da peça.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      if (part) onSaved(await apiUpdateRepairPart(part.id, { name: name.trim(), images, minQty, cost, price }), false);
+      else onSaved(await apiCreateRepairPart({ name: name.trim(), sku: sku.trim(), category: category.trim(), brand: brand.trim(), cost, price, minQty, images }), true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <QuickModal title={part ? 'Editar peça' : 'Nova peça da oficina'} subtitle={part ? part.sku : 'Fica no estoque da OS, separado do estoque da loja.'} submitLabel={part ? 'Salvar' : 'Cadastrar peça'} busy={busy} error={error} onClose={onClose} onSubmit={save}>
+      <label>
+        Nome da peça
+        <input value={name} maxLength={160} placeholder="Ex.: CONECTOR DE CARGA TIPO C" onChange={(e) => setName(upper(e.target.value))} />
+      </label>
+      {!part ? (
+        <div className="quick-modal__row">
+          <label>
+            Categoria
+            <input value={category} maxLength={60} placeholder="Ex.: TELA, BATERIA, CONECTOR" onChange={(e) => setCategory(upper(e.target.value))} />
+          </label>
+          <label>
+            Marca / fabricante
+            <input value={brand} maxLength={60} placeholder="Ex.: SAMSUNG" onChange={(e) => setBrand(upper(e.target.value))} />
+          </label>
+        </div>
+      ) : null}
+      <div className="quick-modal__row">
+        <label>
+          Custo
+          <CurrencyInput value={cost} ariaLabel="Custo" onChange={setCost} />
+        </label>
+        <label>
+          Venda
+          <CurrencyInput value={price} ariaLabel="Venda" onChange={setPrice} />
+        </label>
+      </div>
+      <div className="quick-modal__row">
+        <label>
+          Estoque mínimo
+          <input type="number" min={0} value={minQty} onChange={(e) => setMinQty(Math.max(0, Math.round(Number(e.target.value) || 0)))} />
+        </label>
+        {!part ? (
+          <label>
+            Código (opcional)
+            <input value={sku} maxLength={60} placeholder="Gerado se vazio" onChange={(e) => setSku(upper(e.target.value))} />
+          </label>
+        ) : null}
+      </div>
+      <div className="repair-parts__photos">
+        <span>Fotos ({images.length}/6)</span>
+        <div>
+          {images.map((src, index) => (
+            <span key={index} className="repair-parts__photo">
+              <img src={src} alt="" />
+              <button type="button" aria-label="Remover foto" onClick={() => setImages((current) => current.filter((_, i) => i !== index))}>
+                ×
+              </button>
+            </span>
+          ))}
+          {images.length < 6 ? (
+            <label className="repair-parts__photo repair-parts__photo--add">
+              <input type="file" accept="image/*" multiple onChange={(e) => void addPhoto(e.target.files)} />
+              + Foto
+            </label>
+          ) : null}
+        </div>
+      </div>
+      {!part ? <p className="repairs__muted">A quantidade entra depois, em “+ Entrada”. Vincule aos aparelhos em “Aparelhos”.</p> : null}
     </QuickModal>
   );
 }

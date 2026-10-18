@@ -78,3 +78,18 @@
 @media (max-width: 760px) {
   .repair-parts__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Foto, ações e janelas da oficina */
+.repair-parts__cell-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.repair-parts__thumb { flex: none; width: 38px; height: 38px; border-radius: 10px; object-fit: cover; background: #f1f5f9; }
+.repair-parts__thumb--empty { display: grid; place-items: center; font-size: 1rem; opacity: .55; }
+.repair-parts__actions { white-space: nowrap; }
+.repair-parts__actions > * { vertical-align: middle; }
+.repair-parts__actions .btn { margin-right: 4px; }
+.repair-parts__actions .repairs__icon { margin-left: 4px; }
+.repair-parts__photos { display: grid; gap: 6px; font-size: .84rem; font-weight: 600; }
+.repair-parts__photos > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-modal__body .repair-parts__photo { position: relative; display: grid; place-items: center; width: 72px; height: 72px; border: 1px dashed var(--line, #cbd5e1); border-radius: 12px; overflow: hidden; font-size: .78rem; font-weight: 700; color: var(--mute, #64748b); cursor: pointer; }
+.repair-parts__photo img { width: 100%; height: 100%; object-fit: cover; }
+.repair-parts__photo button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(15, 23, 42, .7); color: #fff; font-size: .8rem; cursor: pointer; }
+.quick-modal__body .repair-parts__photo--add input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }

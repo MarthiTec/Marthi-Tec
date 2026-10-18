@@ -36,8 +36,11 @@ let telaA01, telaA02, bateria, outra, servico;
 
 test('peças de manutenção: vínculo com o aparelho pelo catálogo de manutenções, estoque mínimo, custo e venda', async () => {
   telaA01 = (await call('/stock', 'POST', { name: 'TELA SAMSUNG A01 INCELL', sku: 'TELA-0001', kind: 'part', category: 'Tela', brand: 'Samsung', qty: 3, minQty: 2, cost: 34, price: 75 })).data;
-  telaA02 = (await call('/stock', 'POST', { name: 'TELA SAMSUNG A02 INCELL', sku: 'TELA-0002', kind: 'part', category: 'Tela', brand: 'Samsung', qty: 1, minQty: 1, cost: 33, price: 75 })).data;
-  bateria = (await call('/stock', 'POST', { name: 'BATERIA GENÉRICA', kind: 'part', qty: 0, minQty: 1, cost: 20, price: 60 })).data;
+  // Peças cadastradas pela oficina (estoque da OS); a A01 veio do estoque da loja e entra pela ligação.
+  telaA02 = (await call('/repair-parts', 'POST', { name: 'TELA SAMSUNG A02 INCELL', sku: 'TELA-0002', category: 'Tela', brand: 'Samsung', minQty: 1, cost: 33, price: 75 })).data;
+  await call(`/repair-parts/${telaA02.id}/entries`, 'POST', { qty: 1, unitCost: 33, payment: 'none' });
+  bateria = (await call('/repair-parts', 'POST', { name: 'BATERIA GENÉRICA', minQty: 1, cost: 20, price: 60 })).data;
+  await call('/stock', 'POST', { name: 'CAPINHA DA LOJA', kind: 'part', qty: 4, cost: 5, price: 20 });
   outra = (await call('/stock', 'POST', { name: 'TELA DA OUTRA LOJA', kind: 'part', qty: 5, cost: 1, price: 2 }, other, 'store-b')).data;
   servico = (await call('/repair-services', 'POST', { brand: 'SAMSUNG', model: 'A01', category: 'Tela', name: 'TROCA DE TELA', options: [{ name: 'INCELL', price: 75, cost: 34 }] })).data;
   const core = (await call('/repair-services', 'POST', { brand: 'SAMSUNG', model: 'A01 CORE', category: 'Tela', name: 'TROCA DE TELA', options: [{ name: 'INCELL', price: 75, cost: 34 }] })).data;
@@ -114,4 +117,46 @@ test('abrir OS com a peça do aparelho e uma peça improvisada: baixa, movimenta
   const back = (await query(`SELECT count(*)::int n FROM stock_movements WHERE ref_id = $1 AND ref_type = 'work_order_reversal'`, [os.id])).rows[0].n;
   assert.equal(back, 3);
   assert.equal((await call(`/work-orders/${os.id}/parts`, 'POST', { stockId: telaA01.id })).status, 409, 'OS cancelada não baixa peça');
+});
+
+test('estoque da oficina: peça nova e entrada pela OS, fora do estoque da loja (Retaguarda)', async () => {
+  const created = await call('/repair-parts', 'POST', { name: 'CONECTOR DE CARGA TIPO C', category: 'CONECTOR', brand: 'GENÉRICO', cost: 8, price: 40, minQty: 3, images: ['data:image/jpeg;base64,AAAA'] });
+  assert.equal(created.status, 201, JSON.stringify(created.error));
+  const part = created.data;
+  assert.equal(part.scope, 'workshop');
+  assert.match(part.sku, /^PEC-/);
+  assert.deepEqual([part.qty, part.minQty, part.status, part.images.length], [0, 3, 'out', 1]);
+
+  const loja = (await call('/stock')).data;
+  assert.ok(!loja.some((item) => item.id === part.id), 'Retaguarda não mostra peça da oficina');
+  assert.ok(loja.some((item) => item.id === telaA01.id), 'estoque da loja continua igual');
+  assert.ok((await call('/stock?scope=all')).data.some((item) => item.id === part.id), 'PDV/OS enxergam com scope=all');
+  assert.ok((await call('/repair-parts')).data.some((item) => item.id === part.id));
+
+  const entry = await call(`/repair-parts/${part.id}/entries`, 'POST', { qty: 5, unitCost: 10, payment: 'paid', notes: 'Compra na distribuidora' });
+  assert.equal(entry.status, 201, JSON.stringify(entry.error));
+  assert.deepEqual([entry.data.qty, entry.data.cost, entry.data.status], [5, 10, 'ok']);
+  const second = await call(`/repair-parts/${part.id}/entries`, 'POST', { qty: 5, unitCost: 6, payment: 'none' });
+  assert.deepEqual([second.data.qty, second.data.cost], [10, 8], 'custo médio');
+  const payables = (await query(`SELECT amount, status FROM payables WHERE store_id = 'store-a' AND description LIKE '%CONECTOR%'`)).rows;
+  assert.deepEqual(payables.map((p) => [Number(p.amount), p.status]), [[50, 'paid']], 'só a compra paga entra no financeiro');
+  const moves = (await query(`SELECT qty, ref_type FROM stock_movements WHERE stock_id = $1 ORDER BY created_at`, [part.id])).rows;
+  assert.deepEqual(moves.map((m) => [Number(m.qty), m.ref_type]), [[5, 'supplier_entry'], [5, 'supplier_entry']]);
+  assert.equal((await call(`/repair-parts/${part.id}/entries`, 'POST', { qty: 1, unitCost: 1 }, other, 'store-b')).status, 404, 'outra loja não');
+
+  // Usada na OS: sai do estoque da oficina.
+  const os = await call('/work-orders', 'POST', newOs({ stockParts: [{ stockId: part.id, qty: 2, unitPrice: 0 }] }));
+  assert.equal(os.status, 201, JSON.stringify(os.error));
+  assert.equal(await qtyOf(part.id), 8);
+  const renamed = await call(`/repair-parts/${part.id}`, 'PATCH', { name: 'CONECTOR TIPO C', images: [] });
+  assert.deepEqual([renamed.data.name, renamed.data.images.length], ['CONECTOR TIPO C', 0]);
+});
+
+test('migração 0109: peça já ligada a uma qualidade passa para o estoque da oficina; o resto da loja não', async () => {
+  const capinha = (await query(`SELECT id FROM stock_items WHERE name = 'CAPINHA DA LOJA'`)).rows[0].id;
+  assert.equal((await query('SELECT scope FROM stock_items WHERE id = $1', [telaA01.id])).rows[0].scope, 'store', 'veio do estoque da loja');
+  await db.exec(fs.readFileSync('apps/api/src/db/migrations/0109_workshop_stock_scope.sql', 'utf8'));
+  assert.equal((await query('SELECT scope FROM stock_items WHERE id = $1', [telaA01.id])).rows[0].scope, 'workshop');
+  assert.equal((await query('SELECT scope FROM stock_items WHERE id = $1', [capinha])).rows[0].scope, 'store');
+  assert.ok(!(await call('/stock')).data.some((item) => item.id === telaA01.id), 'some da Retaguarda');
 });
