@@ -28,6 +28,81 @@ const servicePrice = (service: PublicRepairService) => {
 };
 
 type Choice = { serviceId: string; optionId: string | null };
+/** Até esta quantidade os modelos aparecem como botões; acima, numa lista com busca. */
+const MODEL_CHIPS_MAX = 8;
+const plainText = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Combobox do modelo: botão com o escolhido; abre uma lista com busca (digitar "a12", "13 pro"…). */
+function ModelCombobox({ models, value, onChange }: { models: string[]; value: string; onChange: (model: string) => void }) {
+  const [open, setOpen] = useState(!value);
+  const [term, setTerm] = useState('');
+  const [active, setActive] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const list = useMemo(() => {
+    const words = plainText(term).split(' ').filter(Boolean);
+    return words.length ? models.filter((model) => words.every((word) => plainText(model).replace(/ /g, '').includes(word) || plainText(model).includes(word))) : models;
+  }, [models, term]);
+  useEffect(() => setActive(0), [term]);
+  useEffect(() => {
+    if (!open) return;
+    window.setTimeout(() => input.current?.focus(), 30);
+    const outside = (event: MouseEvent) => {
+      if (value && box.current && !box.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', outside);
+    return () => document.removeEventListener('mousedown', outside);
+  }, [open, value]);
+  function pick(model: string) {
+    onChange(model);
+    setTerm('');
+    setOpen(false);
+  }
+  return (
+    <div className={`repairflow__combo${open ? ' is-open' : ''}`} ref={box}>
+      <button type="button" className="repairflow__combo-btn" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+        <span>{value || 'Selecione o modelo'}</span>
+        <svg viewBox="0 0 10 6" aria-hidden="true">
+          <path d="M1 1l4 4 4-4" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="repairflow__combo-panel">
+          <input
+            ref={input}
+            className="repairflow__input"
+            type="search"
+            value={term}
+            placeholder={`Buscar entre ${models.length} modelos…`}
+            aria-label="Buscar modelo"
+            onChange={(event) => setTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setActive((index) => Math.min(index + 1, list.length - 1));
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setActive((index) => Math.max(index - 1, 0));
+              } else if (event.key === 'Enter' && list[active]) {
+                event.preventDefault();
+                pick(list[active]);
+              } else if (event.key === 'Escape' && value) setOpen(false);
+            }}
+          />
+          <ul role="listbox" aria-label="Modelos">
+            {list.map((model, index) => (
+              <li key={model} role="option" aria-selected={model === value} className={`${model === value ? 'is-on' : ''}${index === active ? ' is-active' : ''}`} onMouseEnter={() => setActive(index)} onClick={() => pick(model)}>
+                {model}
+                {model === value ? <span aria-hidden>✓</span> : null}
+              </li>
+            ))}
+            {!list.length ? <li className="repairflow__combo-empty">Nenhum modelo com esse nome. Escolha o mais parecido ou conte o problema abaixo que a loja avalia.</li> : null}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * "Solicitar manutenção" no catálogo digital: o cliente escolhe o aparelho e os serviços cadastrados
@@ -212,19 +287,17 @@ export function CatalogRepairFlow({
           </div>
         ) : null}
         {brand ? (
-          <>
-            {(brands.find((entry) => entry.brand === brand)?.models.length ?? 0) > 6 ? (
-              <input className="repairflow__input" type="search" value={modelQuery} onChange={(e) => setModelQuery(e.target.value)} placeholder="Buscar modelo…" aria-label="Buscar modelo" />
-            ) : null}
+          (brands.find((entry) => entry.brand === brand)?.models.length ?? 0) > MODEL_CHIPS_MAX ? (
+            <ModelCombobox models={brands.find((entry) => entry.brand === brand)?.models ?? []} value={model} onChange={setModel} />
+          ) : (
             <div className="repairflow__models" role="radiogroup" aria-label="Modelo">
               {models.map((entry) => (
                 <button key={entry} type="button" role="radio" aria-checked={model === entry} className={model === entry ? 'is-on' : ''} onClick={() => setModel(entry)}>
                   {entry}
                 </button>
               ))}
-              {!models.length ? <p className="repairflow__muted">Nenhum modelo com esse nome. Conte o problema abaixo que a loja avalia.</p> : null}
             </div>
-          </>
+          )
         ) : (
           <p className="repairflow__muted">Escolha a marca.</p>
         )}
