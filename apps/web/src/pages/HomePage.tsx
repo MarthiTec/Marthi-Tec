@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PublicHeader } from '../components/public/PublicHeader';
 import { PublicFooter } from '../components/public/PublicFooter';
@@ -24,7 +24,47 @@ import './products.css';
 const WHATSAPP_HREF = MARTHI_COMPANY.whatsappHref;
 const INSTAGRAM_HREF = MARTHI_COMPANY.instagramHref;
 
-const HOME_PRODUCT_IDS = ['totem', 'cardapio', 'pdv', 'os', 'erp', 'fiscal', 'ecommerce', 'crm', 'painel'] as const;
+const HOME_PRODUCT_IDS = [
+  'catalogo',
+  'cotacao',
+  'ads',
+  'totem',
+  'cardapio',
+  'pdv',
+  'os',
+  'erp',
+  'fiscal',
+  'ecommerce',
+  'crm',
+  'painel',
+] as const;
+
+const HOME_PILLARS = [
+  {
+    id: 'catalogo',
+    eyebrow: 'Vitrine',
+    title: 'Catálogo digital',
+    text: 'Link ou PDF com o estoque real: o cliente vê, chama no WhatsApp ou compra na página de venda.',
+    href: '/produtos',
+    cta: 'Conhecer o catálogo',
+  },
+  {
+    id: 'cotacao',
+    eyebrow: 'Balcão',
+    title: 'Cotação de preços',
+    text: 'Custo do dia, margem, cartão e troca — preço certo na frente do cliente, virando orçamento.',
+    href: '/produtos',
+    cta: 'Ver cotação',
+  },
+  {
+    id: 'ads',
+    eyebrow: 'Alcance',
+    title: 'Marthi ADS',
+    text: 'Anuncie produtos do cadastro no Facebook e acompanhe campanhas sem sair do painel.',
+    href: '/produtos',
+    cta: 'Conhecer o ADS',
+  },
+] as const;
 
 function IconWhatsApp() {
   return (
@@ -231,7 +271,7 @@ export function HomePage() {
 
         <section className="hero">
           <div className="hero__media" aria-hidden="false">
-            <img src="/home/showcase-pdv.jpg" alt="" />
+            <img src="/home/showcase-pdv.jpg" alt="Operação Marthi na loja" />
             <div className="hero__veil" />
             <div className="hero__grain" aria-hidden />
           </div>
@@ -239,19 +279,48 @@ export function HomePage() {
             <p className="hero__brand" aria-label="Marthi">
               Marthi
             </p>
-            <h1>Tecnologia que coloca o seu negócio no comando.</h1>
+            <h1>Do catálogo ao fechamento — a loja no comando.</h1>
             <p>
-              Totem, Cardápio Digital, PDV, Orçamentos comerciais, OS, Fiscal e E-commerce no mesmo ritmo —
-              feitos para o varejo e food service operarem com máxima eficiência.
+              Plataforma para o varejo brasileiro: vitrine digital, cotação no balcão, anúncios e operação
+              completa no mesmo ritmo.
             </p>
             <div className="hero__actions">
               <Link to="/parceiro" className="btn btn--primary btn--hero">
                 Solicitar demonstração
               </Link>
-              <Link to="/produtos" className="btn btn--ghost hero__ghost">
-                Ver produtos
-              </Link>
+              <a href="#destaques" className="btn btn--ghost hero__ghost">
+                Ver destaques
+              </a>
             </div>
+          </div>
+        </section>
+
+        <section id="destaques" className="pillars" aria-labelledby="pillars-title">
+          <div className="pillars__inner">
+            <header className="pillars__head">
+              <p className="eyebrow">Em evidência</p>
+              <h2 id="pillars-title">O que a loja usa para vender agora.</h2>
+              <p>
+                Três frentes que o mercado pede — e que já estão na Marthi, integradas ao estoque e ao
+                painel.
+              </p>
+            </header>
+            <ul className="pillars__list">
+              {HOME_PILLARS.map((pillar, index) => (
+                <li
+                  key={pillar.id}
+                  className={`pillars__item pillars__item--${pillar.id}`}
+                  style={{ '--pillar-i': index } as CSSProperties}
+                >
+                  <p className="pillars__eyebrow">{pillar.eyebrow}</p>
+                  <h3>{pillar.title}</h3>
+                  <p>{pillar.text}</p>
+                  <Link to={pillar.href} className="pillars__link">
+                    {pillar.cta}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -306,18 +375,18 @@ export function HomePage() {
             <ol className="journey__steps">
               <li>
                 <span className="journey__num">01</span>
-                <strong>Cliente escolhe</strong>
-                <p>Totem touch ou balcão — o mesmo catálogo, com fotos e opções reais.</p>
+                <strong>Cliente encontra</strong>
+                <p>Catálogo digital, totem ou anúncio Marthi ADS — o estoque real chega ao cliente.</p>
               </li>
               <li>
                 <span className="journey__num">02</span>
-                <strong>A loja recebe</strong>
-                <p>WhatsApp, painel e PDV sincronizados com o interesse ou o pedido.</p>
+                <strong>A loja fecha</strong>
+                <p>Cotação no balcão, WhatsApp e PDV no mesmo ritmo do interesse.</p>
               </li>
               <li>
                 <span className="journey__num">03</span>
                 <strong>Equipe opera</strong>
-                <p>OS, fiscal e e-commerce no mesmo ecossistema — gestão com autoridade.</p>
+                <p>ERP, OS, fiscal, CRM e e-commerce — a retaguarda acompanha a venda.</p>
               </li>
             </ol>
           </div>
@@ -534,8 +603,8 @@ export function HomePage() {
             <p className="eyebrow">Sobre nós</p>
             <h2 id="split-title">Construímos a operação completa da loja.</h2>
             <p>
-              A Marthi une totem, PDV, OS, fiscal e e-commerce para o varejo vender e atender sem
-              fricção entre canais — com painel, permissões e marca da loja.
+              Catálogo digital, cotação, Marthi ADS, totem, PDV, OS, fiscal, CRM e e-commerce — um
+              ecossistema para vender e operar sem fricção entre canais.
             </p>
             <Link to="/produtos" className="btn btn--primary">
               Conhecer os produtos
@@ -546,7 +615,7 @@ export function HomePage() {
         <section id="produtos" className="section home-products">
           <div className="section__head">
             <p className="eyebrow">Produtos</p>
-            <h2>O que a Marthi entrega</h2>
+            <h2>Catálogo, cotação, ADS e a operação completa</h2>
           </div>
           <div className="home-products__grid">
             {homeProducts.map((product) => (
@@ -574,7 +643,9 @@ export function HomePage() {
             <p className="eyebrow">Planos</p>
             <h2>Escolha o ritmo da sua operação</h2>
             <p className="section__sub">
-              O painel da loja entra em todo plano. Os módulos (Totem & Cardápio Digital, OS, PDV + Retaguarda integrado com campanhas e orçamentos em PDF, Fiscal ou E-commerce) você combina conforme o Bronze, Silver ou Golden.
+              O painel da loja entra em todo plano. Catálogo digital, cotação, Marthi ADS, Totem e
+              Cardápio, OS, PDV + Retaguarda, Fiscal ou E-commerce — você combina conforme Bronze,
+              Silver ou Golden.
             </p>
           </div>
           <div className="plans">

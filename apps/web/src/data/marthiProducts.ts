@@ -3,6 +3,9 @@
  */
 
 export type MarthiProductId =
+  | 'catalogo'
+  | 'cotacao'
+  | 'ads'
   | 'totem'
   | 'cardapio'
   | 'pdv'
@@ -27,6 +30,57 @@ export type MarthiProduct = {
 };
 
 export const MARTHI_PRODUCTS: MarthiProduct[] = [
+  {
+    id: 'catalogo',
+    name: 'Catálogo digital',
+    tagline: 'Vitrine e página de venda com link ou PDF',
+    summary:
+      'Monte a vitrine com os produtos do estoque, escolha capa e cor, e compartilhe o link ou o PDF. O cliente vê preços e chama no WhatsApp — ou compra na página de venda com sacola.',
+    audience: 'Lojas que precisam mostrar o estoque real sem depender de planilha ou Instagram.',
+    features: [
+      'Vitrine com produtos do estoque (filtro, capa e cor da loja)',
+      'Modo catálogo (interesse no WhatsApp) ou página de venda com sacola',
+      'Link público e PDF para enviar ao cliente',
+      'Solicitação de manutenção integrada à oficina',
+    ],
+    href: '/painel/catalogo',
+    cta: 'Abrir catálogo digital',
+    accent: '#e4572e',
+  },
+  {
+    id: 'cotacao',
+    name: 'Cotação de preços',
+    tagline: 'Preço certo na frente do cliente',
+    summary:
+      'Custo do fornecedor muda o dia todo: calcule à vista e no cartão com margem e taxa da maquininha, troque aparelho na conta e formalize em orçamento válido no dia.',
+    audience: 'Varejo de eletrônicos, assistência e lojas que cotam na hora no balcão.',
+    features: [
+      'Custo + margem (% ou R$) → preço à vista',
+      'Parcelas com taxa da maquininha da loja',
+      'Troca (trade-in) descontada no valor final',
+      'Comparativo por fornecedor e formalização em orçamento',
+    ],
+    href: '/painel/cotacao',
+    cta: 'Abrir cotação rápida',
+    accent: '#0f766e',
+  },
+  {
+    id: 'ads',
+    name: 'Marthi ADS',
+    tagline: 'Anúncios dos seus produtos no Facebook',
+    summary:
+      'Anuncie produtos do cadastro na Meta: conecte a conta, crie campanha, acompanhe status e pause pelo painel — sem sair da operação Marthi.',
+    audience: 'Lojas que querem impulsionar o estoque com anúncios pagos e publicações.',
+    features: [
+      'Criar anúncio a partir do produto cadastrado',
+      'Conexão Meta (Página e conta de anúncios)',
+      'Campanhas, mídias e calendário de publicações',
+      'Acompanhar, pausar e tratar pendências no painel',
+    ],
+    href: '/painel/ads',
+    cta: 'Abrir Marthi ADS',
+    accent: '#0369a1',
+  },
   {
     id: 'totem',
     name: 'Totem de autoatendimento',
@@ -192,7 +246,7 @@ export const MARTHI_SEGMENTS = [
   {
     id: 'varejo',
     name: 'Varejo e loja física',
-    text: 'Totem na vitrine, PDV no balcão com campanhas e persistência, estoque e clientes no mesmo painel.',
+    text: 'Catálogo digital, cotação no balcão, totem na vitrine, PDV com campanhas e estoque no mesmo painel.',
   },
   {
     id: 'food',
@@ -207,7 +261,7 @@ export const MARTHI_SEGMENTS = [
   {
     id: 'omni',
     name: 'Omnichannel',
-    text: 'Marketplaces + estoque único + fiscal quando a operação pede nota.',
+    text: 'Marthi ADS, marketplaces, estoque único e fiscal quando a operação pede nota.',
   },
   {
     id: 'comercial',

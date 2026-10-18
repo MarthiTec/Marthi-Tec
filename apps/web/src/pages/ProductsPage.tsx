@@ -29,6 +29,9 @@ function productUnlocked(product: MarthiProduct, contracted: boolean) {
   if (!contracted) return false;
   if (product.id === 'totem') return hasModule('totem');
   if (product.id === 'cardapio') return true;
+  if (product.id === 'catalogo' || product.id === 'cotacao' || product.id === 'ads') {
+    return hasModule('erp');
+  }
   if (product.id === 'pdv' || product.id === 'erp' || product.id === 'painel') return hasModule('erp');
   if (product.id === 'os') return hasModule('os');
   if (product.id === 'fiscal') return hasModule('fiscal');
@@ -166,10 +169,19 @@ export function ProductsPage() {
   // Filter products for the quick grid
   const filteredProducts = MARTHI_PRODUCTS.filter((product) => {
     if (category === 'all') return true;
-    if (category === 'loja') return product.id === 'totem' || product.id === 'pdv';
+    if (category === 'loja') {
+      return (
+        product.id === 'totem' ||
+        product.id === 'pdv' ||
+        product.id === 'catalogo' ||
+        product.id === 'cotacao'
+      );
+    }
     if (category === 'food') return product.id === 'cardapio';
     if (category === 'oficina') return product.id === 'os';
-    if (category === 'gestao') return product.id === 'erp' || product.id === 'painel';
+    if (category === 'gestao') {
+      return product.id === 'erp' || product.id === 'painel' || product.id === 'ads';
+    }
     if (category === 'fiscal-ecom')
       return product.id === 'fiscal' || product.id === 'ecommerce' || product.id === 'crm';
     return true;
