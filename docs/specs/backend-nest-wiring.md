@@ -14,14 +14,17 @@
 
 ## Variáveis Discloud
 
+**Regra:** dados de negócio só no MarthiDB. Sem mocks/hardcode em runtime.  
+Defina `DATABASE_URL` no painel (nunca commitar senha). Placeholders: ver `.env.example` e `discloud.*.vars.env`.
+
 ### Site `marthi-backend` (Nest — upload ZIP do Marthi-Backend)
 
 ```text
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/MarthiDB?schema=public
 JWT_SECRET=...
 JWT_EXPIRES_IN=7d
-AUTH_DEV_EMAIL=teste@marthi.com.br
-AUTH_DEV_PASSWORD=123
+AUTH_DEV_EMAIL=...
+AUTH_DEV_PASSWORD=...
 GOOGLE_CLIENT_ID=...
 CORS_ORIGINS=https://marthi-totem.discloud.app,http://localhost:5173
 PORT=8080

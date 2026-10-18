@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { blockedMemoryMap } from '../db/requireDb.js';
 import { assertBillAmountEditable, assertBillDeletable, assertBillRevertible } from '../services/billRules.js';
 
 export const financeRouter = Router();
@@ -105,10 +106,10 @@ const settlementMoment = (value?: string) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00-03:00`).toISOString() : value;
 };
 
-const memoryPayables = new Map<string, any>();
-const memoryReceivables = new Map<string, any>();
-const memoryAccounts = new Map<string, any>();
-const memoryEntries = new Map<string, any>();
+const memoryPayables = blockedMemoryMap('finance-payables');
+const memoryReceivables = blockedMemoryMap('finance-receivables');
+const memoryAccounts = blockedMemoryMap('finance-accounts');
+const memoryEntries = blockedMemoryMap('finance-entries');
 
 /* ── 1. Contas Bancárias & Tesouraria ──────────────────── */
 

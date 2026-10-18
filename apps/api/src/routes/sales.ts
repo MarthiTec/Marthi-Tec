@@ -217,7 +217,11 @@ salesRouter.get('/api/v1/sales/:id/receipt', requireOrDemoAuth, async (req, res,
       res.status(404).json({ success: false, error: { message: 'Venda não encontrada.' } });
       return;
     }
-    const receipt = await buildReceipt(req.params.id, req.storeId || 'STR-DEMO-01');
+    if (!req.storeId) {
+      res.status(400).json({ success: false, error: { message: 'Loja (storeId) obrigatória.' } });
+      return;
+    }
+    const receipt = await buildReceipt(req.params.id, req.storeId);
     if (!receipt) {
       res.status(404).json({ success: false, error: { message: 'Venda não encontrada.' } });
       return;

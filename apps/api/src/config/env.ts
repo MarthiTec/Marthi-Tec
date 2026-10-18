@@ -71,6 +71,19 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-if (!env.DATABASE_URL && !(env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD)) {
-  console.warn('[marthi-api] MarthiDB não configurado com credenciais completas.');
+const hasDatabase =
+  Boolean(env.DATABASE_URL) ||
+  Boolean(env.DB_HOST && env.DB_DATABASE && env.DB_USERNAME && env.DB_PASSWORD);
+
+if (!hasDatabase) {
+  const onDiscloud = Boolean(process.env.DISCLOUD_APP_ID || process.env.DISCLOUD_APP_TYPE);
+  if (env.APP_ENV === 'production' || onDiscloud) {
+    console.error(
+      '[marthi-api] FATAL: MarthiDB obrigatório em produção/Discloud. Defina DATABASE_URL (sem gravar senha no git).',
+    );
+    process.exit(1);
+  }
+  console.warn(
+    '[marthi-api] MarthiDB não configurado. Rotas de negócio retornarão 503 até definir DATABASE_URL ou DB_*.',
+  );
 }

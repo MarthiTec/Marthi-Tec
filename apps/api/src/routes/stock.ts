@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { requireAuth, requireOrDemoAuth } from '../middlewares/authMiddleware.js';
 import { unreservedQuantity } from '../services/commercialReservations.js';
 import { pool } from '../db/pool.js';
+import { blockedMemoryMap, dbUnavailableError } from '../db/requireDb.js';
 import { ensureProductAttributeValues } from '../services/attributeValues.js';
 
 export const stockRouter = Router();
@@ -300,16 +301,11 @@ export function formatStockRow(row: any) {
   };
 }
 
-export const memoryStock = new Map<string, any>();
+/** Retired: stock must be read/written in MarthiDB. */
+export const memoryStock = blockedMemoryMap('stock');
 
-export function reduceStockQtyInMemory(stockId: string, qty: number): boolean {
-  const item = memoryStock.get(stockId);
-  if (item) {
-    item.qty = Math.max(0, (Number(item.qty) || 0) - qty);
-    item.updatedAt = new Date().toISOString();
-    return true;
-  }
-  return false;
+export function reduceStockQtyInMemory(_stockId: string, _qty: number): never {
+  throw dbUnavailableError('Baixa de estoque em memória desativada.');
 }
 
 /**

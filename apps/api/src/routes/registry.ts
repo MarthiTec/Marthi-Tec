@@ -3,13 +3,14 @@ import { personDetailsFromRow, personDetailsSchema, savePersonDetails } from '..
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middlewares/authMiddleware.js';
-import { pool } from '../db/pool.js';
+import { pool, dbConfigured } from '../db/pool.js';
 import { hashPassword, upsertClientUserInMemory } from '../services/authService.js';
+import { blockedMemoryMap } from '../db/requireDb.js';
 import { randomBytes } from 'node:crypto';
 
 export const registryRouter = Router();
 registryRouter.use((req,res,next)=>{
- if(!pool) { res.status(503).json({success:false,error:{code:'DATABASE_UNAVAILABLE',message:'Banco indisponível. Nenhum cadastro foi gravado.'}});return; }
+ if(!dbConfigured) { res.status(503).json({success:false,error:{code:'DATABASE_UNAVAILABLE',message:'Banco indisponível. Nenhum cadastro foi gravado.'}});return; }
  next();
 });
 
@@ -98,12 +99,12 @@ const sellerSchema = z.object({
   employeeId: z.string().optional(),
 });
 
-/* ── In-Memory Fallbacks ────────────────────────────────── */
+/* ── In-memory fallbacks retired (fail closed → MarthiDB) ── */
 
-const memoryEmployees = new Map<string, any>();
-const memoryCustomers = new Map<string, any>();
-const memorySuppliers = new Map<string, any>();
-const memorySellers = new Map<string, any>();
+const memoryEmployees = blockedMemoryMap('employees');
+const memoryCustomers = blockedMemoryMap('customers');
+const memorySuppliers = blockedMemoryMap('suppliers');
+const memorySellers = blockedMemoryMap('sellers');
 
 function onlyDigits(v: string) {
   return v.replace(/\D/g, '');

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireSession, requirePlatformAdmin, getPlanUserLimit } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
+import { blockedMemoryMap } from '../db/requireDb.js';
 
 export const storesRouter = Router();
 
@@ -52,39 +53,8 @@ export function generateStoreAccessToken(cnpj: string, email: string, storeId?: 
   return `TK-${prefix || 'STR'}-${docPart}-${hashPart}-${randPart}`;
 }
 
-const memoryStores = new Map<string, any>([
-  [
-    'STR-DEMO-01',
-    {
-      id: 'STR-DEMO-01',
-      clientAccountId: 'ACC-MARTHI-DEMO',
-      tradeName: 'Loja Demonstração Marthi',
-      legalName: 'Marthi Tecnologia e Demonstração LTDA',
-      documentType: 'cnpj',
-      document: '00.000.000/0001-91',
-      stateRegistration: 'ISENTO',
-      municipalRegistration: '12345',
-      accessToken: 'TK-DEMO-000191-MDEM-01',
-      email: 'loja@marthi.com.br',
-      phone: '(11) 3000-0000',
-      zipCode: '01310-100',
-      street: 'Avenida Paulista',
-      number: '1000',
-      complement: 'Sala Demo',
-      district: 'Bela Vista',
-      city: 'São Paulo',
-      state: 'SP',
-      taxRegime: 'simples_nacional',
-      isMatrix: true,
-      active: true,
-      planId: 'golden',
-      modules: ['totem', 'os', 'erp', 'fiscal'],
-      discountPercent: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-]);
+/** Retired: no hardcoded demo store. Seed via `npm run db:seed-demo`. */
+const memoryStores = blockedMemoryMap('stores');
 
 /**
  * Consulta da conta comercial contratante do cliente logado
