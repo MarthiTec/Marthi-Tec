@@ -16,6 +16,7 @@ import { nestRequest } from '../../services/nestClient';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickAddButton } from '../../components/QuickModal';
 import { PhotoSuggestions } from '../../components/PhotoSuggestions';
+import { ProductSpecsPanel } from '../../components/ProductSpecsPanel';
 import { QuickCreateAttribute, QuickCreateBrand, QuickCreateSupplier } from '../../components/QuickCreate';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -93,7 +94,7 @@ import { PriceTablesPage } from './PriceTablesPage';
 import { PromoCampaignsPage } from '../erp/PromoCampaignsPage';
 
 type Mode = 'new' | 'edit' | 'view';
-type FormTab = 'principal' | 'specs' | 'config' | 'ofertas' | 'fiscal' | 'movimentos';
+type FormTab = 'principal' | 'specs' | 'ficha' | 'config' | 'ofertas' | 'fiscal' | 'movimentos';
 type RegistryPanel = 'kit' | 'warehouse' | 'lot' | 'fiscal' | 'campaign' | 'prices';
 
 /** Cadastros que podem ser abertos de dentro do produto, sem perder o que já foi preenchido. */
@@ -463,12 +464,14 @@ export function StockPage() {
     ? [
         { id: 'principal', label: 'Cadastro' },
         { id: 'specs', label: 'Especificações' },
+        { id: 'ficha', label: 'Ficha técnica' },
         { id: 'movimentos', label: 'Entradas e saídas' },
       ]
     : [
     { id: 'principal', label: 'Cadastro' },
     { id: 'config', label: 'Configurações' },
     { id: 'ofertas', label: 'Ofertas do dia' },
+    { id: 'ficha', label: 'Ficha técnica' },
     ...(!lite || totemSurface ? [{ id: 'fiscal' as const, label: 'Fiscal e logística' }] : []),
     { id: 'movimentos', label: 'Entradas e saídas' },
   ];
@@ -997,6 +1000,8 @@ export function StockPage() {
       batteryLevel: item.batteryLevel ?? null,
       showConditionOnTotem: item.showConditionOnTotem !== false,
       interestFreeInstallments: item.interestFreeInstallments ?? 0,
+      videoUrl: item.videoUrl ?? '',
+      specs: item.specs ?? [],
       groupId: item.groupId ?? '',
       subgroupId: item.subgroupId ?? '',
       catalogTypeId: item.catalogTypeId ?? '',
@@ -2998,6 +3003,9 @@ export function StockPage() {
           ) : null}
 
           {formTab === 'specs' ? specsNode : null}
+          {formTab === 'ficha' ? (
+            <ProductSpecsPanel videoUrl={form.videoUrl ?? ''} specs={form.specs ?? []} readOnly={readOnly} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+          ) : null}
           {formTab === 'movimentos' ? <ProductMovementsPanel stockId={selectedId} /> : null}
 
           {registryPanel ? (
@@ -3051,6 +3059,8 @@ function emptyForm(attrIds: string[], preferTotem = false): Omit<StockItem, 'id'
     batteryLevel: 100,
     showConditionOnTotem: true,
     interestFreeInstallments: 0,
+    videoUrl: '',
+    specs: [],
     groupId: '',
     subgroupId: '',
     // Padrão: entrou hoje; o usuário pode escolher outra data.

@@ -1,0 +1,16 @@
+/* Aba "Ficha técnica" do cadastro do produto. */
+.pspecs { display: grid; gap: 14px; }
+.pspecs__card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 14px; background: var(--card, #fff); }
+.pspecs__card h3 { margin: 0; font-size: 1rem; }
+.pspecs__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.pspecs__muted { margin: 0; color: var(--mute, #64748b); font-size: .82rem; }
+.pspecs__warn { margin: 0; color: #b45309; font-size: .82rem; font-weight: 600; }
+.pspecs__video { position: relative; width: 100%; max-width: 520px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: #000; }
+.pspecs__video iframe, .pspecs__video video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.pspecs__rows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pspecs__rows li { display: grid; grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.6fr) 34px; gap: 6px; align-items: center; }
+.pspecs__drop { width: 34px; height: 34px; border: 1px solid var(--line, #e2e8f0); border-radius: 10px; background: transparent; color: #dc2626; font: inherit; font-weight: 800; cursor: pointer; }
+@media (max-width: 560px) {
+  .pspecs__rows li { grid-template-columns: minmax(0, 1fr) 34px; }
+  .pspecs__rows li input:nth-child(2) { grid-column: 1 / 2; }
+}

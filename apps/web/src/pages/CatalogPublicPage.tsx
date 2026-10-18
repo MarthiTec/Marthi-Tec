@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { CatalogDocument, catalogMoney, type CatalogItem, type CatalogVariant } from '../components/CatalogDocument';
 import { CatalogCheckout, type BagLine, type CheckoutMode } from '../components/CatalogCheckout';
+import { CatalogProductSheet } from '../components/CatalogProductSheet';
 import { apiPublicSalesCatalog } from '../services/salesCatalogApi';
 
 type Loaded = Awaited<ReturnType<typeof apiPublicSalesCatalog>>;
@@ -23,6 +24,8 @@ export function CatalogPublicPage() {
   const [error, setError] = useState('');
   const [bag, setBag] = useState<BagLine[]>([]);
   const [checkout, setCheckout] = useState<CheckoutMode | null>(null);
+  /** Produto aberto (página do produto). */
+  const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -115,10 +118,22 @@ export function CatalogPublicPage() {
           look={data.catalog}
           store={data.store}
           items={data.items}
-          shop={{ onAdd: add, onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
+          shop={{ onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
         />
       </div>
-      {count && !checkout ? (
+      {openId && data.items.find((item) => item.id === openId) ? (
+        <CatalogProductSheet
+          item={data.items.find((item) => item.id === openId)!}
+          look={data.catalog}
+          store={data.store}
+          onAdd={(item, variant) => {
+            add(item, variant);
+            setOpenId(null);
+          }}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
+      {count && !checkout && !openId ? (
         <div className="catalog-bagbar" style={{ ['--cat-accent' as string]: data.catalog.accent }}>
           <span>
             {count} {count === 1 ? 'item' : 'itens'} · {catalogMoney(total)}

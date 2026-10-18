@@ -111,6 +111,9 @@ export type StockItem = {
   showConditionOnTotem?: boolean;
   /** Juros no cartão: 0 = com juros (padrão); N = sem juros até N parcelas. */
   interestFreeInstallments?: number;
+  /** Página de venda: vídeo do aparelho e ficha técnica (opcionais). */
+  videoUrl?: string;
+  specs?: Array<{ label: string; value: string }>;
   /** Tipo e modelo do catálogo (Marca + Tipo + Modelo = descrição). */
   catalogTypeId?: string;
   catalogModelId?: string;
@@ -384,6 +387,8 @@ function normalizeStock(item: StockItem): StockItem {
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
     interestFreeInstallments: Math.max(0, Number(item.interestFreeInstallments) || 0),
+    videoUrl: item.videoUrl ?? '',
+    specs: Array.isArray(item.specs) ? item.specs : [],
     catalogTypeId: item.catalogTypeId ?? '',
     catalogModelId: item.catalogModelId ?? '',
     catalogTypeName: item.catalogTypeName ?? '',
@@ -635,6 +640,8 @@ function toNestStockBody(item: StockItem) {
     batteryLevel: item.batteryLevel ?? null,
     showConditionOnTotem: item.showConditionOnTotem !== false,
     interestFreeInstallments: Math.max(0, Number(item.interestFreeInstallments) || 0),
+    videoUrl: item.videoUrl ?? '',
+    specs: Array.isArray(item.specs) ? item.specs : [],
     catalogTypeId: item.catalogTypeId ?? undefined,
     catalogModelId: item.catalogModelId ?? undefined,
     groupId: item.groupId ?? undefined,

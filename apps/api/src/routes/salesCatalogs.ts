@@ -36,6 +36,8 @@ const catalogSchema = z.object({
   includeOrderProducts: z.boolean().default(true),
   note: z.string().trim().max(300).default(''),
   productIds: z.array(z.string().min(1).max(80)).max(500).default([]),
+  /** Produtos em destaque (faixa no topo da página de venda). */
+  featuredIds: z.array(z.string().min(1).max(80)).max(30).default([]),
 });
 
 const view = (row: any) => ({
@@ -51,6 +53,7 @@ const view = (row: any) => ({
   includeOrderProducts: row.include_order_products !== false,
   note: row.note,
   productIds: Array.isArray(row.product_ids) ? row.product_ids : [],
+  featuredIds: Array.isArray(row.featured_ids) ? row.featured_ids : [],
   token: row.token,
   createdBy: row.created_by,
   createdAt: row.created_at,
@@ -69,7 +72,7 @@ export async function catalogItems(db: Db, storeId: string, chosenIds: string[],
   if (!productIds.length) return [];
   const products = (
     await db.query(
-      `SELECT s.id, s.name, s.brand, s.images, s.price, s.qty, s.variations, s.condition, s.battery_level, s.color, s.capacity, s.active, s.created_at, s.pickup_prices,
+      `SELECT s.id, s.name, s.brand, s.images, s.price, s.qty, s.variations, s.condition, s.battery_level, s.color, s.capacity, s.active, s.created_at, s.pickup_prices, s.video_url, s.specs,
               (SELECT max(e.created_at) FROM stock_supplier_entries e WHERE e.store_id = s.store_id AND e.stock_item_id = s.id) AS last_purchase_at
          FROM stock_items s WHERE s.store_id = $1 AND s.id = ANY($2::text[])`,
       [storeId, productIds],
@@ -142,8 +145,8 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
     const body = catalogSchema.parse(req.body ?? {});
     const row = (
       await pool.query(
-        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15) RETURNING *`,
+        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products, featured_ids)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16::jsonb) RETURNING *`,
         [
           `CAT-${randomUUID()}`,
           req.storeId,
@@ -160,6 +163,7 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
           newToken(),
           req.user?.name ?? '',
           body.includeOrderProducts,
+          JSON.stringify(body.featuredIds),
         ],
       )
     ).rows[0];
@@ -175,7 +179,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
     const row = (
       await pool.query(
         `UPDATE sales_catalogs SET title = $3, subtitle = $4, show_cover = $5, cover_style = $6, cover_image = $7, accent = $8, show_prices = $9,
-                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, updated_at = now()
+                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, featured_ids = $14::jsonb, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
         [
           req.params.id,
@@ -191,6 +195,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
           body.note,
           JSON.stringify(body.productIds),
           body.includeOrderProducts,
+          JSON.stringify(body.featuredIds),
         ],
       )
     ).rows[0];

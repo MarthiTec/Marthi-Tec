@@ -71,3 +71,8 @@
 .salescat > * { flex-shrink: 0; min-width: 0; }
 .salescat__tabs { min-height: 44px; align-items: center; }
 .salescat__cover img { width: 54px; }
+
+/* Estrela de destaque ao lado de cada produto. */
+.salescat__item { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 6px; align-items: center; }
+.salescat__star { width: 44px; height: 44px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: transparent; color: #94a3b8; font-size: 1.3rem; cursor: pointer; }
+.salescat__star.is-on { border-color: #f59e0b; background: rgba(245, 158, 11, .12); color: #d97706; }

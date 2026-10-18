@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
+import { colorHex, isLightColor } from '../data/catalogColors';
 import './catalogDocument.css';
 
 export type CatalogAvailability = 'in_stock' | 'order' | 'sold_out';
@@ -27,6 +28,8 @@ export type CatalogItem = {
   isNew: boolean;
   soldOut: boolean;
   orderOnly: boolean;
+  videoUrl: string;
+  specs: Array<{ label: string; value: string }>;
 };
 export type CatalogStore = { name: string; logo: string | null; phone: string; instagram: string; website: string };
 export type CatalogLook = {
@@ -38,10 +41,13 @@ export type CatalogLook = {
   accent: string;
   showPrices: boolean;
   note: string;
+  /** Produtos da faixa "Destaques" no topo. */
+  featuredIds?: string[];
 };
 /** Pedido pelo catálogo (só no link do cliente). */
 export type CatalogShop = {
   onAdd: (item: CatalogItem, variant: CatalogVariant | null) => void;
+  onOpen: (item: CatalogItem) => void;
   onUpgrade: () => void;
   onSignup: () => void;
   onPdf: () => void;
@@ -75,11 +81,51 @@ export const UPGRADE_CHECKLIST = [
 ];
 
 type Filter = 'all' | 'new' | 'Novo' | 'used' | 'order';
+type Sort = 'relevance' | 'price_asc' | 'price_desc' | 'new';
+
+const openVariants = (item: CatalogItem) => item.variants.filter((v) => v.availability !== 'sold_out');
+const uniq = (list: string[]) => [...new Set(list.filter(Boolean))];
+/** Maior bateria entre os usados disponíveis do produto (para filtro e etiqueta "até X%"). */
+const bestBattery = (item: CatalogItem) => Math.max(0, ...openVariants(item).flatMap((v) => v.batteries));
+
+/** Foto do produto; sem foto (ou foto que não carrega) aparece o nome do produto no lugar. */
+function ProductImage({ item }: { item: CatalogItem }) {
+  const [failed, setFailed] = useState(false);
+  return item.image && !failed ? (
+    <img src={item.image} alt={item.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+  ) : (
+    <span className="catalog-card__noimg" aria-hidden>
+      {item.name}
+    </span>
+  );
+}
+
+/** Bolinhas das cores disponíveis (até 6 e "+N"). */
+function ColorDots({ colors }: { colors: string[] }) {
+  if (!colors.length) return null;
+  const shown = colors.slice(0, 6);
+  return (
+    <span className="catalog-dots" aria-label={`Cores: ${colors.join(', ')}`}>
+      {shown.map((name) => {
+        const hex = colorHex(name);
+        return hex ? (
+          <span key={name} className={`catalog-dot${isLightColor(hex) ? ' is-light' : ''}`} style={{ background: hex }} title={name} />
+        ) : (
+          <span key={name} className="catalog-tag" title={name}>
+            {name}
+          </span>
+        );
+      })}
+      {colors.length > shown.length ? <span className="catalog-dots__more">+{colors.length - shown.length}</span> : null}
+    </span>
+  );
+}
 
 /**
- * Catálogo para o cliente: capa (opcional), os produtos com uma foto, o nome, o preço e cada variação
- * (cor, capacidade, condição, bateria do usado, pronta entrega ou sob encomenda) e, no fim, o "Upgrade"
- * (o que adiantar do aparelho da troca). Mesmo desenho na prévia do painel, no link e no PDF.
+ * Catálogo / página de venda: capa (opcional), destaques, busca e filtros (ordem, marca, bateria),
+ * os produtos (foto ou nome, cores em bolinhas, capacidades, bateria, preço) e, no fim, o "Upgrade".
+ * Tocar no produto abre a página dele (cores, capacidade, vídeo, ficha técnica, sacola fixa).
+ * No PDF cada produto sai com a lista completa de opções.
  */
 export function CatalogDocument({
   look,
@@ -98,18 +144,25 @@ export function CatalogDocument({
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
-  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [sort, setSort] = useState<Sort>('relevance');
+  const [brand, setBrand] = useState('');
+  const [minBattery, setMinBattery] = useState(0);
   const style = { '--cat-accent': look.accent || '#e4572e' } as CSSProperties;
   // 'none' = capa sem foto; vazio = a foto do primeiro produto com foto.
   const coverImage = look.coverImage === 'none' ? '' : look.coverImage || items.find((item) => item.image)?.image || '';
   const hasUsed = items.some((item) => item.variants.some((variant) => variant.condition !== 'Novo') || (item.condition && item.condition !== 'Novo'));
   const hasNew = items.some((item) => item.isNew);
   const hasOrder = items.some((item) => item.orderOnly || item.variants.some((variant) => variant.availability === 'order'));
+  const hasBattery = items.some((item) => bestBattery(item) > 0);
+  const brands = uniq(items.map((item) => item.brand)).sort();
+  const featured = (look.featuredIds ?? []).map((id) => items.find((item) => item.id === id)).filter((item): item is CatalogItem => Boolean(item && !item.soldOut));
 
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return items.filter((item) => {
+    const list = items.filter((item) => {
       if (term && !`${item.name} ${item.brand} ${item.variants.map((v) => v.label).join(' ')}`.toLowerCase().includes(term)) return false;
+      if (brand && item.brand !== brand) return false;
+      if (minBattery && bestBattery(item) < minBattery) return false;
       if (filter === 'new') return item.isNew;
       if (filter === 'order') return item.orderOnly || item.variants.some((v) => v.availability === 'order');
       const conditions = item.variants.length ? item.variants.map((v) => v.condition) : [item.condition || 'Novo'];
@@ -117,13 +170,11 @@ export function CatalogDocument({
       if (filter === 'used') return conditions.some((condition) => condition !== 'Novo');
       return true;
     });
-  }, [items, query, filter]);
-
-  const choiceOf = (item: CatalogItem) => {
-    const open = item.variants.map((variant, index) => ({ variant, index })).filter(({ variant }) => variant.availability !== 'sold_out');
-    const index = picked[item.id] ?? open[0]?.index ?? 0;
-    return item.variants[index] ?? null;
-  };
+    if (sort === 'price_asc') return [...list].sort((a, b) => a.price - b.price);
+    if (sort === 'price_desc') return [...list].sort((a, b) => b.price - a.price);
+    if (sort === 'new') return [...list].sort((a, b) => Number(b.isNew) - Number(a.isNew));
+    return list;
+  }, [items, query, filter, sort, brand, minBattery]);
 
   return (
     <div className="catalog" style={style}>
@@ -193,26 +244,91 @@ export function CatalogDocument({
                 </button>
               ))}
             </div>
+            <div className="catalog-filters">
+              <label>
+                <span>Ordenar</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                  <option value="relevance">Relevância</option>
+                  <option value="price_asc">Menor preço</option>
+                  <option value="price_desc">Maior preço</option>
+                  <option value="new">Novidades</option>
+                </select>
+              </label>
+              {brands.length > 1 ? (
+                <label>
+                  <span>Marca</span>
+                  <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+                    <option value="">Todas</option>
+                    {brands.map((name) => (
+                      <option key={name} value={name}>
+                        {name.charAt(0).toUpperCase() + name.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {hasBattery ? (
+                <label>
+                  <span>Bateria</span>
+                  <select value={minBattery} onChange={(e) => setMinBattery(Number(e.target.value))}>
+                    <option value={0}>Qualquer</option>
+                    <option value={80}>Acima de 80%</option>
+                    <option value={85}>Acima de 85%</option>
+                    <option value={90}>Acima de 90%</option>
+                    <option value={95}>Acima de 95%</option>
+                  </select>
+                </label>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </header>
+
+      {featured.length && interactive ? (
+        <section className="catalog-featured" aria-label="Destaques">
+          <h2>Destaques</h2>
+          <ul>
+            {featured.map((item) => (
+              <li key={item.id}>
+                <button type="button" onClick={() => shop?.onOpen(item)} disabled={!shop}>
+                  <span className="catalog-featured__media">
+                    <ProductImage item={item} />
+                  </span>
+                  <strong>{item.name}</strong>
+                  {look.showPrices && item.price > 0 ? (
+                    <span className="catalog-featured__price">
+                      {item.priceFrom ? <small>a partir de </small> : null}
+                      {money(item.price)}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {visible.length ? (
         <ul className="catalog-grid">
           {visible.map((item) => {
             const interest = whatsappLink(store.phone, `Olá! Vi o catálogo da ${store.name || 'loja'} e tenho interesse no ${item.name}.`);
-            const choice = choiceOf(item);
-            const selectable = Boolean(shop) && item.variants.length > 1;
+            const open = openVariants(item);
+            const colors = uniq(open.map((v) => v.color));
+            const capacities = uniq(open.map((v) => v.capacity));
+            const battery = bestBattery(item);
+            const single = item.variants.length <= 1;
+            const lead = item.orderOnly ? open.find((v) => v.leadDays) : null;
             return (
               <li key={item.id} className={`catalog-card${item.soldOut ? ' is-sold-out' : ''}`}>
-                <div className="catalog-card__media">
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} loading="lazy" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="catalog-card__noimg" aria-hidden>
-                      {item.name}
-                    </span>
-                  )}
+                <div
+                  className={`catalog-card__media${shop ? ' is-link' : ''}`}
+                  role={shop ? 'button' : undefined}
+                  tabIndex={shop ? 0 : undefined}
+                  aria-label={shop ? `Ver ${item.name}` : undefined}
+                  onClick={() => shop?.onOpen(item)}
+                  onKeyDown={(e) => (e.key === 'Enter' ? shop?.onOpen(item) : undefined)}
+                >
+                  <ProductImage item={item} />
                   <span className="catalog-card__badges">
                     {item.isNew ? <span className="catalog-badge catalog-badge--new">Novidade</span> : null}
                     {item.condition && item.condition !== 'Novo' ? <span className="catalog-badge">{item.condition}</span> : null}
@@ -222,65 +338,62 @@ export function CatalogDocument({
                 </div>
                 <div className="catalog-card__body">
                   {item.brand ? <span className="catalog-card__brand">{item.brand}</span> : null}
-                  <h2>{item.name}</h2>
+                  <h2 className={shop ? 'is-link' : ''} onClick={() => shop?.onOpen(item)}>
+                    {item.name}
+                  </h2>
+                  {/* Tela: resumo (cores em bolinhas, capacidades, bateria). PDF: lista completa abaixo. */}
+                  <div className="catalog-card__summary">
+                    <ColorDots colors={colors} />
+                    {capacities.length ? (
+                      <span className="catalog-variants__tags">
+                        {capacities.map((cap) => (
+                          <span key={cap} className="catalog-tag catalog-tag--cap">
+                            {cap}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                    {battery ? <span className="catalog-tag catalog-tag--battery">🔋 até {battery}%</span> : null}
+                  </div>
                   {item.variants.length ? (
-                    <ul className="catalog-variants" role={selectable ? 'radiogroup' : undefined} aria-label={selectable ? `Opções de ${item.name}` : undefined}>
-                      {item.variants.map((variant, index) => {
-                        const isChoice = selectable && choice === variant;
-                        const off = variant.availability === 'sold_out';
-                        const content = (
-                          <>
-                            <span className="catalog-variants__tags">
-                              {variant.color ? <span className="catalog-tag">{variant.color}</span> : null}
-                              {variant.capacity ? <span className="catalog-tag catalog-tag--cap">{variant.capacity}</span> : null}
-                              {variant.others.map((other) => (
-                                <span key={other} className="catalog-tag">
-                                  {other}
-                                </span>
-                              ))}
-                              {!item.condition || item.condition !== variant.condition ? <span className="catalog-tag catalog-tag--cond">{variant.condition}</span> : null}
-                              {variant.batteries.length ? (
-                                <span className="catalog-tag catalog-tag--battery" title="Saúde da bateria">
-                                  🔋 {variant.batteries.map((value) => `${value}%`).join(' · ')}
-                                </span>
-                              ) : null}
-                              {variant.availability === 'order' && !item.orderOnly ? <span className="catalog-tag catalog-tag--order">{availabilityText(variant)}</span> : null}
-                            </span>
-                            {look.showPrices && variant.price > 0 && item.variants.length > 1 ? <strong>{money(variant.price)}</strong> : null}
-                          </>
-                        );
-                        return (
-                          <li key={index} className={`${off ? 'is-out' : ''}${isChoice ? ' is-choice' : ''}`}>
-                            {selectable && !off ? (
-                              <button type="button" role="radio" aria-checked={isChoice} className="catalog-variants__pick" onClick={() => setPicked((value) => ({ ...value, [item.id]: index }))}>
-                                {content}
-                              </button>
-                            ) : (
-                              content
-                            )}
-                          </li>
-                        );
-                      })}
+                    <ul className="catalog-variants catalog-variants--print">
+                      {item.variants.map((variant, index) => (
+                        <li key={index} className={variant.availability === 'sold_out' ? 'is-out' : ''}>
+                          <span className="catalog-variants__tags">
+                            {variant.color ? <span className="catalog-tag">{variant.color}</span> : null}
+                            {variant.capacity ? <span className="catalog-tag catalog-tag--cap">{variant.capacity}</span> : null}
+                            {variant.others.map((other) => (
+                              <span key={other} className="catalog-tag">
+                                {other}
+                              </span>
+                            ))}
+                            {!item.condition || item.condition !== variant.condition ? <span className="catalog-tag catalog-tag--cond">{variant.condition}</span> : null}
+                            {variant.batteries.length ? <span className="catalog-tag catalog-tag--battery">🔋 {variant.batteries.map((value) => `${value}%`).join(' · ')}</span> : null}
+                            {variant.availability === 'order' && !item.orderOnly ? <span className="catalog-tag catalog-tag--order">{availabilityText(variant)}</span> : null}
+                          </span>
+                          {look.showPrices && variant.price > 0 && item.variants.length > 1 ? <strong>{money(variant.price)}</strong> : null}
+                        </li>
+                      ))}
                     </ul>
                   ) : null}
-                  {item.orderOnly && item.variants[0]?.leadDays ? <small className="catalog-card__lead">{availabilityText(item.variants[0])}</small> : null}
+                  {lead ? <small className="catalog-card__lead">{availabilityText(lead)}</small> : null}
                   <div className="catalog-card__foot">
                     {look.showPrices && item.price > 0 ? (
                       <div className="catalog-price">
-                        {item.priceFrom && !(selectable && choice) ? <small>a partir de</small> : null}
-                        <strong>{money(selectable && choice ? choice.price : item.price)}</strong>
+                        {item.priceFrom ? <small>a partir de</small> : null}
+                        <strong>{money(item.price)}</strong>
                       </div>
                     ) : (
                       <span className="catalog-price catalog-price--ask">Consulte o preço</span>
                     )}
                     {shop && !item.soldOut ? (
-                      <button type="button" className="catalog-buy" onClick={() => shop.onAdd(item, item.variants.length ? choice : null)}>
-                        Quero este
+                      <button type="button" className="catalog-buy" onClick={() => (single ? shop.onAdd(item, item.variants[0] ?? null) : shop.onOpen(item))}>
+                        {single ? 'Adicionar à sacola' : 'Ver opções'}
                       </button>
                     ) : null}
-                    {interactive && interest && !item.soldOut ? (
-                      <a className={shop ? 'catalog-cta catalog-cta--soft' : 'catalog-cta'} href={interest} target="_blank" rel="noreferrer">
-                        {shop ? 'Tirar dúvida no WhatsApp' : 'Tenho interesse'}
+                    {interactive && interest && !item.soldOut && !shop ? (
+                      <a className="catalog-cta" href={interest} target="_blank" rel="noreferrer">
+                        Tenho interesse
                       </a>
                     ) : null}
                   </div>

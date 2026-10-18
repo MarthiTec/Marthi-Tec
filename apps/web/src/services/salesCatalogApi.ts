@@ -8,6 +8,8 @@ export type SalesCatalog = CatalogLook & {
   /** Produtos sob encomenda entram sempre (mesmo sem marcar). */
   includeOrderProducts: boolean;
   productIds: string[];
+  /** Faixa "Destaques" no topo da página de venda. */
+  featuredIds: string[];
   token: string;
   createdBy: string;
   createdAt: string;

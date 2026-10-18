@@ -45,6 +45,7 @@ const blank = (): SalesCatalogInput => ({
   showPrices: true,
   hideSoldOut: true,
   includeOrderProducts: true,
+  featuredIds: [],
   note: '',
   productIds: [],
 });
@@ -160,6 +161,14 @@ export function SalesCatalogPage() {
     });
   }, [stock, query, groupId, brand, condition, availability, orderMethodId, onlyPhoto, onlyMarked, marked]);
 
+  const featured = useMemo(() => new Set(form.featuredIds ?? []), [form.featuredIds]);
+  /** Destaque: faixa no topo da página de venda (até 12); destacar também marca o produto. */
+  const toggleFeatured = (id: string) => {
+    const list = form.featuredIds ?? [];
+    if (list.includes(id)) return update({ featuredIds: list.filter((x) => x !== id) });
+    if (list.length >= 12) return setNotice('No máximo 12 destaques.');
+    update({ featuredIds: [...list, id], productIds: marked.has(id) ? form.productIds : [...form.productIds, id] });
+  };
   const toggle = (id: string) => update({ productIds: marked.has(id) ? form.productIds.filter((x) => x !== id) : [...form.productIds, id] });
   const markAll = () => update({ productIds: [...form.productIds, ...filtered.map((row) => row.id).filter((id) => !marked.has(id))] });
   const unmarkFiltered = () => {
@@ -362,7 +371,7 @@ export function SalesCatalogPage() {
               </div>
               <ul className="salescat__list">
                 {filtered.map((row) => (
-                  <li key={row.id}>
+                  <li key={row.id} className="salescat__item">
                     <label className={`salescat__row${marked.has(row.id) ? ' is-on' : ''}`}>
                       <input type="checkbox" checked={marked.has(row.id)} onChange={() => toggle(row.id)} aria-label={`Exibir ${row.name} no catálogo`} />
                       <span className="salescat__thumb">{row.images?.[0] ? <img src={row.images[0]} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span>{row.name.slice(0, 1)}</span>}</span>
@@ -375,6 +384,15 @@ export function SalesCatalogPage() {
                         </small>
                       </span>
                     </label>
+                    <button
+                      type="button"
+                      className={`salescat__star${featured.has(row.id) ? ' is-on' : ''}`}
+                      aria-pressed={featured.has(row.id)}
+                      title={featured.has(row.id) ? 'Tirar dos destaques' : 'Colocar nos destaques (faixa no topo)'}
+                      onClick={() => toggleFeatured(row.id)}
+                    >
+                      {featured.has(row.id) ? '★' : '☆'}
+                    </button>
                   </li>
                 ))}
                 {!filtered.length ? <li className="salescat__muted">Nenhum produto com esses filtros.</li> : null}

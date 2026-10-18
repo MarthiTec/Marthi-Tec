@@ -36,6 +36,9 @@ export type CatalogItem = {
   soldOut: boolean;
   /** Tudo o que está disponível é sob encomenda (nada em estoque agora). */
   orderOnly: boolean;
+  /** Vídeo do aparelho (YouTube ou arquivo HTTPS) e ficha técnica, quando cadastrados. */
+  videoUrl: string;
+  specs: Array<{ label: string; value: string }>;
 };
 /** Modalidade "sob encomenda" ativa da loja (preço por produto/variação em pickup_prices). */
 export type OrderMethod = { id: string; leadDays: number } | null;
@@ -43,7 +46,8 @@ export type OrderMethod = { id: string; leadDays: number } | null;
 type Attr = { id: string; name: string };
 type EntryUnits = { variationId: string | null; battery: number | null; free: number };
 
-const NEW_DAYS = 15;
+/** Novidade: produto cadastrado nos últimos 3 dias. */
+const NEW_DAYS = 3;
 const num = (value: unknown) => Number(value) || 0;
 const asArray = (value: unknown): any[] => {
   if (Array.isArray(value)) return value;
@@ -176,7 +180,7 @@ export function buildCatalogItems(
     const priced = (open.length ? open : variants).map((variant) => variant.price).filter((price) => price > 0);
     const price = priced.length ? Math.min(...priced) : num(product.price);
     const conditions = [...new Set(variants.map((variant) => variant.condition))];
-    const recent = [product.last_purchase_at, product.created_at].map((value) => (value ? new Date(value).getTime() : 0)).filter(Boolean);
+    const createdAt = product.created_at ? new Date(product.created_at).getTime() : 0;
     const single = variants.length === 1 && !variants[0].label && !variants[0].batteries.length;
     items.push({
       id: String(product.id),
@@ -188,9 +192,13 @@ export function buildCatalogItems(
       condition: conditions.length === 1 ? conditions[0] : '',
       // Produto sem grade: a "variação" única só aparece quando tem algo a dizer (cor, bateria, encomenda).
       variants: single && variants[0].availability === 'in_stock' ? [] : variants,
-      isNew: recent.some((time) => now - time < NEW_DAYS * 86400000),
+      isNew: createdAt > 0 && now - createdAt < NEW_DAYS * 86400000,
       soldOut,
       orderOnly: !soldOut && open.every((variant) => variant.availability === 'order'),
+      videoUrl: /^https:\/\//i.test(String(product.video_url ?? '')) ? String(product.video_url) : '',
+      specs: asArray(product.specs)
+        .map((line: any) => ({ label: String(line?.label ?? '').trim(), value: String(line?.value ?? '').trim() }))
+        .filter((line) => line.label && line.value),
     });
   }
   return items;

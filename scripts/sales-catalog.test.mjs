@@ -97,3 +97,39 @@ test('only products of the store; sellers cannot delete; management can', async 
   assert.equal((await call(`/sales-catalogs/${catalog.id}`, 'DELETE')).status, 200);
   assert.equal((await call('/sales-catalogs')).data.length, 0);
 });
+
+test('novelty = registered in the last 3 days; video, technical sheet and highlights reach the sales page', async () => {
+  const old = (await call('/stock', 'POST', { name: 'MOTO G85', kind: 'device', qty: 2, price: 1500, cost: 1100 })).data;
+  await query("UPDATE stock_items SET created_at = now() - interval '4 days' WHERE id = $1", [old.id]);
+  const saved = await call(`/stock/${iphone.id}`, 'PATCH', {
+    videoUrl: 'https://www.youtube.com/watch?v=abcdefghijk',
+    specs: [{ label: 'Processador', value: 'Chip A16' }, { label: 'Tela', value: '6,1"' }, { label: 'Peso', value: '' }],
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.error));
+  assert.equal((await call(`/stock/${iphone.id}`, 'PATCH', { videoUrl: 'ftp://video' })).status, 400, 'only HTTPS video links');
+  const created = await call('/sales-catalogs', 'POST', { title: 'Página', productIds: [iphone.id, old.id], featuredIds: [iphone.id], includeOrderProducts: false });
+  const page = (await (await fetch(`${base}/public/sales-catalogs/${created.data.token}`)).json()).data;
+  assert.deepEqual(page.catalog.featuredIds, [iphone.id]);
+  const byName = Object.fromEntries(page.items.map((i) => [i.name, i]));
+  assert.equal(byName['MOTO G85'].isNew, false, 'registered 4 days ago: not a novelty');
+  assert.equal(byName['IPHONE 15'].isNew, true);
+  assert.equal(byName['IPHONE 15'].videoUrl, 'https://www.youtube.com/watch?v=abcdefghijk');
+  assert.deepEqual(byName['IPHONE 15'].specs, [{ label: 'Processador', value: 'Chip A16' }, { label: 'Tela', value: '6,1"' }], 'empty lines are dropped');
+});
+
+test('the technical sheet and video are saved in the database, per store: another store can neither change nor see them', async () => {
+  const row = (await query('SELECT store_id, video_url, specs FROM stock_items WHERE id = $1', [iphone.id])).rows[0];
+  assert.deepEqual([row.store_id, row.video_url, row.specs.map((s) => s.label)], ['store-a', 'https://www.youtube.com/watch?v=abcdefghijk', ['Processador', 'Tela']]);
+  await query("INSERT INTO stock_items(id,store_id,name,qty,cost,price,active,kind,specs,video_url) VALUES('b-phone','store-z','DA OUTRA LOJA',1,1,999,true,'device','[{\"label\":\"Segredo\",\"value\":\"loja B\"}]','https://b.example/video.mp4')");
+  // Loja A tentando alterar o produto da loja B: não encontra e nada muda.
+  const cross = await call('/stock/b-phone', 'PATCH', { specs: [{ label: 'Invadido', value: 'x' }], videoUrl: 'https://a.example/x.mp4' });
+  assert.equal(cross.status, 404);
+  const untouched = (await query('SELECT specs, video_url FROM stock_items WHERE id = $1', ['b-phone'])).rows[0];
+  assert.deepEqual([untouched.specs[0].label, untouched.video_url], ['Segredo', 'https://b.example/video.mp4']);
+  // Nem a lista de produtos nem um catálogo da loja A trazem a ficha da loja B.
+  const list = (await call('/stock')).data;
+  assert.equal(list.some((p) => p.id === 'b-phone' || JSON.stringify(p.specs ?? []).includes('Segredo')), false);
+  const created = (await call('/sales-catalogs', 'POST', { title: 'Isolamento', productIds: ['b-phone', iphone.id] })).data;
+  const page = JSON.stringify((await (await fetch(`${base}/public/sales-catalogs/${created.token}`)).json()).data);
+  assert.equal(page.includes('Segredo') || page.includes('DA OUTRA LOJA'), false);
+});
