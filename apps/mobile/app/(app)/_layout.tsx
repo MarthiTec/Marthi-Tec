@@ -69,6 +69,7 @@ export default function AppLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="menu-outline" color={color} size={size} />,
         }}
       />
+      <Tabs.Screen name="activities" options={{ href: null }} />
     </Tabs>
   );
 }

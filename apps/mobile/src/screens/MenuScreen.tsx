@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../auth/AuthContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
@@ -18,6 +19,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function MenuScreen() {
   const c = useThemeColors();
+  const router = useRouter();
   const { user, access, storeId, stores, logout } = useAuth();
   const store = stores.find((s) => s.id === storeId);
 
@@ -35,17 +37,19 @@ export function MenuScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: c.card, borderColor: c.line }]}>
-        <Text style={[styles.section, { color: c.ink }]}>Em breve</Text>
+        <Text style={[styles.section, { color: c.ink }]}>Atalhos</Text>
+        <Pressable style={styles.soon} onPress={() => router.push('/(app)/activities')}>
+          <Text style={{ color: c.ink, fontWeight: '700' }}>Atividades / auditoria</Text>
+        </Pressable>
         {[
-          { label: 'Atividades', ok: true },
           { label: 'Relatórios', ok: canSeeReports(access) },
           { label: 'Loja', ok: true },
           { label: 'Configurações', ok: true },
         ].map((item) => (
           <Pressable key={item.label} disabled style={styles.soon}>
-            <Text style={{ color: item.ok ? c.mute : c.mute }}>
+            <Text style={{ color: c.mute }}>
               {item.label}
-              {item.ok ? '' : ' (sem permissão)'} · fase posterior
+              {item.ok ? '' : ' (sem permissão)'} · em breve
             </Text>
           </Pressable>
         ))}
