@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { AdminIcon } from '../../components/AdminIcons';
@@ -21,9 +21,9 @@ import {
   type WorkOrderStatus,
 } from '../../data/osStore';
 import { cancelWorkOrderWithReversal } from '../../data/workshopLedger';
-import { osHref, useOsBase } from '../os/osPaths';
 import { OsDetailModal } from '../os/OsDetailModal';
 import { OsNewModal } from '../os/OsNewModal';
+import { OsCycleMenu } from '../os/OsCycleMenu';
 import { OsPrintModal } from '../os/OsPrintModal';
 import { OsWarrantyModal } from '../os/OsWarrantyModal';
 import { OsSprintModal } from '../os/OsSprintModal';
@@ -114,8 +114,9 @@ function priorityMeta(p: WorkOrderPriority) {
 
 export function WorkOrdersPage() {
   const { user } = useAuth();
-  const osBase = useOsBase();
   const [params, setParams] = useSearchParams();
+  // No painel não há o topo da oficina: o ciclo fica na linha das visões.
+  const inPanel = useLocation().pathname.startsWith('/painel');
 
   const statusFilter = params.get('status') as WorkOrderStatus | null;
   const quoteFilter = params.get('quote') as QuoteStatus | null;
@@ -198,7 +199,6 @@ export function WorkOrdersPage() {
   }
 
   const [compactMode, setCompactMode] = useState(false);
-  const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [mobileColFilter, setMobileColFilter] = useState<WorkOrderStatus | 'all'>('all');
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false,
@@ -218,7 +218,6 @@ export function WorkOrdersPage() {
   const [selectedDetailOrder, setSelectedDetailOrder] = useState<WorkOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<WorkOrder | null>(null);
   const [warrantyOrder, setWarrantyOrder] = useState<WorkOrder | null>(null);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Drag & drop
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -330,8 +329,18 @@ export function WorkOrdersPage() {
     function handleOpenNewModal() {
       setNewModalOpen(true);
     }
+    function handleOpenSprint() {
+      setSprintModalOpen(true);
+    }
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('os:open-new-modal', handleOpenNewModal);
+    window.addEventListener('os:open-sprint-modal', handleOpenSprint);
+    if (params.get('sprint') === '1') {
+      setSprintModalOpen(true);
+      const next = new URLSearchParams(params);
+      next.delete('sprint');
+      setParams(next, { replace: true });
+    }
     if (params.get('new') === '1') {
       setNewModalOpen(true);
       const next = new URLSearchParams(params);
@@ -341,6 +350,7 @@ export function WorkOrdersPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('os:open-new-modal', handleOpenNewModal);
+      window.removeEventListener('os:open-sprint-modal', handleOpenSprint);
     };
   }, [params, setParams]);
 
@@ -424,13 +434,6 @@ export function WorkOrdersPage() {
   const readyCount = orders.filter((item) => item.status === 'ready').length;
   const quoteWaiting = orders.filter((item) => item.quoteStatus === 'sent').length;
 
-  const currentOpOrders = orders.filter(
-    (o) => (!o.operationId || o.operationId === currentOp.id) && o.status !== 'cancelled',
-  );
-  const currentOpDelivered = currentOpOrders.filter((o) => o.status === 'delivered').length;
-  const sprintProgress = currentOpOrders.length > 0
-    ? Math.round((currentOpDelivered / currentOpOrders.length) * 100)
-    : 100;
 
   const columns = useMemo(() => {
     if (statusFilter && BOARD_COLUMNS.includes(statusFilter)) return [statusFilter];
@@ -474,6 +477,18 @@ export function WorkOrdersPage() {
     }
   }
 
+  /** Filtro rápido liga/desliga (status=progress, quote=sent…). */
+  function toggleParam(key: 'status' | 'quote', value: string) {
+    const next = new URLSearchParams(params);
+    if (next.get(key) === value) next.delete(key);
+    else {
+      next.delete('status');
+      next.delete('quote');
+      next.set(key, value);
+    }
+    setParams(next, { replace: true });
+  }
+
   function clearDateFilter() {
     setDatePreset('all');
     setDateFrom('');
@@ -513,51 +528,91 @@ export function WorkOrdersPage() {
 
   return (
     <section className={`admin-page os-page-root ${compactMode ? 'is-compact-view' : ''}`}>
-      {/* Banner do Ciclo de Tarefas / Operação do Mês */}
-      {!optimizeSpace ? (
-        <div className="os-sprint-banner">
-          <div className="os-sprint-banner__info">
-            <div className="os-sprint-banner__title-row">
-              <span className="os-sprint-badge">
-                {currentOp.status === 'active' ? '⚡ Tarefas Ativas' : '✓ Concluído'}
-              </span>
-              <strong>{currentOp.title}</strong>
-              <small>
-                {currentOpDelivered} de {currentOpOrders.length} tarefas concluídas ({sprintProgress}%)
-              </small>
-            </div>
-
-            <div className="os-sprint-banner__progress-bar">
-              <div
-                className="os-sprint-banner__progress-fill"
-                style={{ width: `${sprintProgress}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="os-sprint-banner__actions">
-            {currentOp.status === 'active' ? (
-              <button
-                type="button"
-                className={`btn btn--sm ${isMaster ? 'btn--primary' : 'btn--ghost is-locked'}`}
-                title={
-                  isMaster
-                    ? 'Concluir ciclo de tarefas mensal e transferir pendências para a próxima operação'
-                    : 'Apenas Operador Master pode concluir as tarefas deste ciclo'
-                }
-                onClick={() => setSprintModalOpen(true)}
-              >
-                {isMaster ? 'Concluir Tarefas' : '🔒 Concluir (Master)'}
-              </button>
-            ) : (
-              <span className="os-sprint-finished-tag">Ciclo Arquivado</span>
-            )}
-          </div>
+      {/* Topo do quadro estilo Jira: visões à esquerda; exibição e Nova OS à direita */}
+      <div className="os-board-top">
+        {/* Alternador de Visão: Resumo / Quadro / Backlog / Roadmap / Lista */}
+        <div className="os-view-switch">
+          <button
+            type="button"
+            className={`os-view-btn ${viewMode === 'dashboard' ? 'is-active' : ''}`}
+            onClick={() => changeView('dashboard')}
+            title="Painel Geral / Resumo da Oficina (Gráficos e Indicadores)"
+          >
+            📊 Resumo
+          </button>
+          <button
+            type="button"
+            className={`os-view-btn ${viewMode === 'board' ? 'is-active' : ''}`}
+            onClick={() => changeView('board')}
+            title="Quadro Kanban da Oficina"
+          >
+            📋 Quadro
+          </button>
+          <button
+            type="button"
+            className={`os-view-btn ${viewMode === 'backlog' ? 'is-active' : ''}`}
+            onClick={() => changeView('backlog')}
+            title="Tela exclusiva de Backlog e Triagem de Tarefas Não Inicializadas"
+          >
+            ⏳ Backlog
+            {backlogCount > 0 ? (
+              <span className="os-jira-badge-count">{backlogCount}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            className={`os-view-btn ${viewMode === 'roadmap' ? 'is-active' : ''}`}
+            onClick={() => changeView('roadmap')}
+            title="Roadmap do Técnico"
+          >
+            🗺️ Roadmap
+          </button>
+          <button
+            type="button"
+            className={`os-view-btn ${viewMode === 'list' ? 'is-active' : ''}`}
+            onClick={() => changeView('list')}
+            title="Lista geral de ordens de serviço"
+          >
+            📑 Lista
+          </button>
         </div>
-      ) : null}
+        <div className="os-board-top__right">
+          {inPanel ? (
+            <OsCycleMenu
+              light
+              operation={currentOp}
+              showingAll={params.get('op') === 'all'}
+              onShowAll={(all) => {
+                const next = new URLSearchParams(params);
+                if (all) next.set('op', 'all');
+                else next.delete('op');
+                setParams(next, { replace: true });
+              }}
+              onFinish={() => setSprintModalOpen(true)}
+            />
+          ) : null}
+          <button
+            type="button"
+            className={`os-board-icon${compactMode ? ' is-on' : ''}`}
+            onClick={() => setCompactMode((v) => !v)}
+            title={compactMode ? 'Mostrar cards detalhados' : 'Mostrar cards compactos'}
+            aria-pressed={compactMode}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              {compactMode ? <path d="M4 5h16v6H4zM4 13h16v6H4z" /> : <path d="M4 5h16M4 10h16M4 15h16M4 20h16" />}
+            </svg>
+            <span>{compactMode ? 'Detalhados' : 'Compactos'}</span>
+          </button>
+          <button type="button" className="btn btn--primary os-btn-new-os" onClick={() => setNewModalOpen(true)}>
+            <AdminIcon name="plus" />
+            <span>Nova OS</span>
+            <kbd>F2</kbd>
+          </button>
+        </div>
+      </div>
 
       {/* Barra de Filtros & Técnicos estilo Jira (Imagem 2) */}
-      <div className="os-jira-bar">
+      <div className="os-jira-bar os-board-filters">
         {/* Campo de Busca & Filtro de OPs estilo Jira Omnibox com Reimpressão */}
         <div className="os-jira-search-filter" ref={searchContainerRef}>
           <div className={`os-jira-bar__search ${searchFocused ? 'is-focused' : ''}`}>
@@ -728,6 +783,7 @@ export function WorkOrdersPage() {
             />
           </div>
 
+          {datePreset === 'custom' ? (
           <div className="os-jira-date-inputs" title="Filtrar OS por data inicial e final">
             <input
               type="date"
@@ -771,6 +827,7 @@ export function WorkOrdersPage() {
               </button>
             ) : null}
           </div>
+          ) : null}
         </div>
 
         {/* Combobox Padrão de Prioridades com Ícones (AdminPicker) */}
@@ -856,190 +913,28 @@ export function WorkOrdersPage() {
           })}
         </div>
 
-        {/* Botão Filtrar por Data */}
-        <button
-          type="button"
-          className={`os-jira-pill-btn ${filterDrawerOpen || hasDateFilter ? 'is-active' : ''}`}
-          onClick={() => setFilterDrawerOpen((v) => !v)}
-          title="Abrir filtro de data para listar suas OS"
-        >
-          <AdminIcon name="filter" />
-          <span>Data</span>
-          {hasDateFilter ? <span className="os-jira-badge-count">1</span> : null}
-        </button>
-
-        {/* Botão Limpar Filtros */}
-        {activeFiltersCount > 0 ? (
-          <button
-            type="button"
-            className="os-jira-link-btn"
-            onClick={clearAllFilters}
-          >
-            Remover filtros ({activeFiltersCount})
+        {/* Filtros rápidos (no lugar dos cartões grandes): também filtram o quadro */}
+        <div className="os-board-quick" role="group" aria-label="Filtros rápidos">
+          <span className="os-board-quick__total" title="Ordens ainda não entregues">
+            <strong>{openCount}</strong> em oficina
+          </span>
+          <button type="button" className={`os-board-chip${statusFilter === 'progress' ? ' is-on' : ''}`} onClick={() => toggleParam('status', 'progress')} title="Técnico trabalhando agora">
+            Em serviço <b>{progressCount}</b>
           </button>
-        ) : null}
-
-        {/* Alternador de Visão: Resumo / Quadro / Backlog / Roadmap / Lista */}
-        <div className="os-view-switch">
-          <button
-            type="button"
-            className={`os-view-btn ${viewMode === 'dashboard' ? 'is-active' : ''}`}
-            onClick={() => changeView('dashboard')}
-            title="Painel Geral / Resumo da Oficina (Gráficos e Indicadores)"
-          >
-            📊 Resumo
+          <button type="button" className={`os-board-chip${statusFilter === 'ready' ? ' is-on' : ''}`} onClick={() => toggleParam('status', 'ready')} title="Aguardando o cliente retirar">
+            Prontas <b>{readyCount}</b>
           </button>
-          <button
-            type="button"
-            className={`os-view-btn ${viewMode === 'board' ? 'is-active' : ''}`}
-            onClick={() => changeView('board')}
-            title="Quadro Kanban da Oficina"
-          >
-            📋 Quadro
+          <button type="button" className={`os-board-chip${quoteFilter === 'sent' ? ' is-on' : ''}`} onClick={() => toggleParam('quote', 'sent')} title="Orçamentos aguardando aprovação do cliente">
+            Orçamentos <b>{quoteWaiting}</b>
           </button>
-          <button
-            type="button"
-            className={`os-view-btn ${viewMode === 'backlog' ? 'is-active' : ''}`}
-            onClick={() => changeView('backlog')}
-            title="Tela exclusiva de Backlog e Triagem de Tarefas Não Inicializadas"
-          >
-            ⏳ Backlog
-            {backlogCount > 0 ? (
-              <span className="os-jira-badge-count">{backlogCount}</span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            className={`os-view-btn ${viewMode === 'roadmap' ? 'is-active' : ''}`}
-            onClick={() => changeView('roadmap')}
-            title="Roadmap do Técnico"
-          >
-            🗺️ Roadmap
-          </button>
-          <button
-            type="button"
-            className={`os-view-btn ${viewMode === 'list' ? 'is-active' : ''}`}
-            onClick={() => changeView('list')}
-            title="Lista geral de ordens de serviço"
-          >
-            📑 Lista
-          </button>
+          {activeFiltersCount > 0 ? (
+            <button type="button" className="os-jira-link-btn" onClick={clearAllFilters}>
+              Limpar filtros ({activeFiltersCount})
+            </button>
+          ) : null}
         </div>
-
-        {/* Botão Otimizar Espaço / Modo Foco */}
-        <button
-          type="button"
-          className={`os-jira-pill-btn ${optimizeSpace ? 'is-active' : ''}`}
-          onClick={() => setOptimizeSpace((v) => !v)}
-          title="Inibir cabeçalho e estatísticas para otimizar espaço de tela"
-        >
-          <AdminIcon name={optimizeSpace ? 'expand' : 'collapse'} />
-          <span>{optimizeSpace ? 'Exibir tudo' : 'Inibir topo'}</span>
-        </button>
-
-        {/* Botão Modo Compacto */}
-        <button
-          type="button"
-          className={`os-jira-pill-btn ${compactMode ? 'is-active' : ''}`}
-          onClick={() => setCompactMode((v) => !v)}
-          title="Alternar entre cards compactos e detalhados"
-        >
-          <span>{compactMode ? 'Cards expandidos' : 'Cards compactos'}</span>
-        </button>
-
-        {/* Botão Nova OS */}
-        <button
-          type="button"
-          className="btn btn--primary os-btn-new-os"
-          onClick={() => setNewModalOpen(true)}
-        >
-          <AdminIcon name="plus" />
-          <span>Nova OS</span>
-          <kbd>F2</kbd>
-        </button>
       </div>
 
-      {/* Painel Retrátil Simplificado: Apenas Filtro de Data */}
-      {filterDrawerOpen ? (
-        <aside className="os-filter-drawer">
-          <div className="os-filter-drawer__head">
-            <strong>📅 Filtrar OS por Data</strong>
-            <button
-              type="button"
-              className="os-filter-drawer__close"
-              onClick={() => setFilterDrawerOpen(false)}
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="os-filter-drawer__presets">
-            {(
-              [
-                { key: 'all', label: 'Todas as datas' },
-                { key: 'today', label: 'Hoje' },
-                { key: 'yesterday', label: 'Ontem' },
-                { key: '7d', label: 'Últimos 7 dias' },
-                { key: '30d', label: 'Últimos 30 dias' },
-                { key: 'this_month', label: 'Este mês' },
-                { key: 'last_month', label: 'Mês passado' },
-              ] as const
-            ).map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                className={`os-p-filter-pill ${datePreset === p.key ? 'is-active' : ''}`}
-                onClick={() => applyDatePreset(p.key)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="os-filter-drawer__body">
-            <label>
-              <span>Data inicial (De):</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDatePreset('custom');
-                  setDateFrom(v);
-                  if (v && !dateTo) setDateTo(v);
-                }}
-              />
-            </label>
-
-            <label>
-              <span>Data final (Até):</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDatePreset('custom');
-                  setDateTo(v);
-                  if (v && !dateFrom) setDateFrom(v);
-                }}
-              />
-            </label>
-
-            <div className="os-filter-drawer__actions">
-              <button type="button" className="btn btn--ghost" onClick={clearDateFilter}>
-                Limpar Data
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setFilterDrawerOpen(false)}
-              >
-                Listar OS ({filtered.length} encontradas)
-              </button>
-            </div>
-          </div>
-        </aside>
-      ) : null}
 
       {error ? <p className="qty-low">{error}</p> : null}
       {successMessage ? (
@@ -1067,34 +962,6 @@ export function WorkOrdersPage() {
         </div>
       ) : null}
 
-      {/* Cards de Métricas (inibe se optimizeSpace estiver ativo ou se estiver no Dashboard/Backlog) */}
-      {!optimizeSpace && viewMode !== 'dashboard' && viewMode !== 'backlog' ? (
-        <div className="admin-grid os-metrics-grid">
-          <article className="admin-card">
-            <h2>Em oficina</h2>
-            <strong>{openCount}</strong>
-            <p>Ordens ainda não entregues.</p>
-          </article>
-          <article className="admin-card">
-            <h2>Em serviço</h2>
-            <strong>{progressCount}</strong>
-            <p>Técnico trabalhando agora.</p>
-          </article>
-          <article className="admin-card">
-            <h2>Prontas</h2>
-            <strong>{readyCount}</strong>
-            <p>Aguardando o cliente retirar.</p>
-          </article>
-          <article className="admin-card">
-            <h2>Orçamentos</h2>
-            <strong>{quoteWaiting}</strong>
-            <p>
-              Aguardando aprovação.{' '}
-              <Link to={osHref(osBase, '?quote=sent')}>Ver lista</Link>
-            </p>
-          </article>
-        </div>
-      ) : null}
 
       {/* Conteúdo Principal conforme ViewMode */}
       {viewMode === 'dashboard' ? (

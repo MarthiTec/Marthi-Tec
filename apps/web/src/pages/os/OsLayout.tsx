@@ -13,13 +13,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { usePresenceSession } from '../../hooks/usePresence';
 import { usePanelTheme } from '../../hooks/usePanelTheme';
-import { AdminPicker } from '../../components/AdminPicker';
+import { OsCycleMenu } from './OsCycleMenu';
 import { OsHotkeysBar, OsPanelHost, type OsPanel } from './OsPanels';
 import { OsEcosystemMenu } from './OsEcosystemMenu';
 import { useNewRepairRequests } from './RepairRequestsBadge';
 import { getActiveOperation, listOperations, OS_STATE_EVENT } from '../../data/osStore';
 import '../admin/admin.css';
 import './os.css';
+import './osBoard.css';
 
 const TITLES: Record<string, { kicker: string; title: string }> = {
   '/os': { kicker: 'Oficina', title: 'Quadro da oficina' },
@@ -87,7 +88,6 @@ export function OsLayout() {
   const operations = useMemo(() => listOperations(), [opsRevision]);
   const activeOp = useMemo(() => getActiveOperation(), [opsRevision, operations]);
   const rawOpParam = params.get('op');
-  const datePresetParam = params.get('period');
 
   // Limpa automaticamente IDs antigos/inválidos na URL (ex.: ?op=op-mv7dp5so)
   useEffect(() => {
@@ -102,13 +102,6 @@ export function OsLayout() {
     }
   }, [rawOpParam, operations, params, setParams]);
 
-  const currentPeriodValue = useMemo(() => {
-    if (datePresetParam && ['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(datePresetParam)) {
-      return datePresetParam;
-    }
-    if (rawOpParam === 'all') return 'all';
-    return activeOp.id;
-  }, [datePresetParam, rawOpParam, activeOp.id]);
 
   const title = resolveTitle(location.pathname, location.search);
   const newRepairs = useNewRepairRequests();
@@ -133,19 +126,17 @@ export function OsLayout() {
     navigate(path);
   }
 
-  function handlePeriodChange(val: string) {
+  /** Quadro com o ciclo atual ou com todas as OS (o período por data fica na barra de filtros). */
+  function showAllOrders(all: boolean) {
     const next = new URLSearchParams(params);
-    if (['today', 'yesterday', '7d', '30d', 'this_month', 'last_month'].includes(val)) {
-      next.set('period', val);
-      next.set('op', 'all');
-    } else if (val === 'all') {
-      next.delete('period');
-      next.set('op', 'all');
-    } else {
-      next.delete('period');
-      next.delete('op');
-    }
+    if (all) next.set('op', 'all');
+    else next.delete('op');
     setParams(next);
+  }
+
+  function finishCycle() {
+    if (location.pathname === '/os') window.dispatchEvent(new CustomEvent('os:open-sprint-modal'));
+    else navigate('/os?sprint=1');
   }
 
   useEffect(() => {
@@ -276,28 +267,8 @@ export function OsLayout() {
           <strong>Marthi OS</strong>
         </div>
 
-        {/* Filtro centralizado ao topo usando o combobox padrão do sistema AdminPicker */}
-        <div className="os-app__period-picker-wrap">
-          <span className="os-app__period-icon" aria-hidden="true">📅</span>
-          <AdminPicker
-            compact
-            searchable={false}
-            aria-label="Filtrar por período ou data da oficina"
-            value={currentPeriodValue}
-            options={[
-              { value: activeOp.id, label: `${activeOp.title} (Ciclo Atual)` },
-              { value: 'today', label: 'OS de Hoje' },
-              { value: 'yesterday', label: 'OS de Ontem' },
-              { value: '7d', label: 'Últimos 7 dias' },
-              { value: '30d', label: 'Últimos 30 dias' },
-              { value: 'this_month', label: 'Este mês' },
-              { value: 'last_month', label: 'Mês passado' },
-              { value: 'all', label: 'Todas as OS (Histórico Total)' },
-            ]}
-            onChange={(val) => handlePeriodChange(val)}
-            className="os-app__period-picker"
-          />
-        </div>
+        {/* Ciclo da oficina: operação, progresso e "Concluir ciclo" num só lugar (sem banner no quadro). */}
+        <OsCycleMenu operation={activeOp} showingAll={rawOpParam === 'all'} onShowAll={showAllOrders} onFinish={finishCycle} />
 
         {userIsStoreAdmin(user?.email) ? (
           <Link to="/painel" className="app-to-panel-btn" title="Voltar ao Painel Administrativo">

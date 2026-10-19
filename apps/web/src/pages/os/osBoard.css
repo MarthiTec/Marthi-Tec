@@ -1,0 +1,109 @@
+/* Quadro da oficina enxuto (estilo Jira): ciclo no topo, abas + Nova OS numa linha, filtros em outra. */
+
+/* ── Ciclo no topo (no lugar do banner "Tarefas Ativas") ─────────────────── */
+.os-cycle { position: relative; flex: 0 0 auto; margin-left: auto; }
+.os-cycle__btn { display: inline-flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px; background: rgba(255, 255, 255, 0.08); color: #fff; font: inherit; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease; }
+.os-cycle__btn:hover, .os-cycle__btn.is-open { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.3); }
+.os-cycle__icon { font-size: .95rem; }
+.os-cycle__text { display: grid; gap: 4px; min-width: 0; text-align: left; }
+.os-cycle__text strong { max-width: 210px; overflow: hidden; font-size: .82rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.os-cycle__bar { display: block; width: 120px; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.2); }
+.os-cycle__bar > span { display: block; height: 100%; border-radius: inherit; background: #22c55e; transition: width 300ms ease; }
+.os-cycle__count { padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.os-cycle__chev { width: 10px; height: 6px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.os-cycle__panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 80; display: grid; gap: 12px; width: 300px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; color: #0f172a; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18); }
+.os-cycle__head { display: grid; gap: 4px; }
+.os-cycle__head strong { font-size: .95rem; }
+.os-cycle__tag { justify-self: start; padding: 2px 8px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: .7rem; font-weight: 800; }
+.os-cycle__tag.is-done { background: #dcfce7; color: #15803d; }
+.os-cycle__progress { display: grid; gap: 6px; }
+.os-cycle__progress small { color: #64748b; font-size: .78rem; }
+.os-cycle__bar--big { width: 100%; height: 8px; background: #e2e8f0; }
+.os-cycle__view { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f1f5f9; }
+.os-cycle__view button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: #64748b; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.os-cycle__view button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
+.os-cycle__finish { width: 100%; justify-content: center; }
+.is-theme-dark .os-cycle__panel { border-color: rgba(255, 255, 255, 0.1); background: #191f26; color: #e8eef4; }
+.is-theme-dark .os-cycle__view { border-color: rgba(255, 255, 255, 0.1); background: #11151a; }
+.is-theme-dark .os-cycle__view button.is-on { background: #232b35; color: #fff; }
+.is-theme-dark .os-cycle__bar--big { background: rgba(255, 255, 255, 0.12); }
+
+/* ── Linha das visões + Nova OS ─────────────────────────────────────────── */
+.os-board-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.os-board-top__right { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.os-board-top .os-btn-new-os { margin-left: 0; }
+.os-board-icon { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #475569; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.os-board-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.os-board-icon:hover, .os-board-icon.is-on { border-color: #2563eb; color: #1d4ed8; }
+.is-theme-dark .os-board-icon { border-color: rgba(255, 255, 255, 0.14); background: #191f26; color: #cbd5e1; }
+
+/* ── Barra de filtros numa linha (busca · técnicos · prioridade · período · filtros rápidos) ── */
+.os-jira-bar.os-board-filters { align-items: center; gap: 8px; margin-bottom: 10px; }
+.os-board-filters .os-jira-search-filter { flex: 1 1 220px; max-width: 320px; }
+.os-board-filters .os-jira-priority-picker-wrap,
+.os-board-filters .os-jira-priority-combobox.admin-picker,
+.os-board-filters .os-jira-priority-combobox .admin-picker__trigger { min-width: 168px; }
+.os-board-filters .os-jira-date-bar { display: inline-flex; align-items: center; gap: 6px; }
+.os-board-quick { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.os-board-quick__total { color: #64748b; font-size: .8rem; white-space: nowrap; }
+.os-board-quick__total strong { color: #0f172a; font-size: .9rem; }
+.os-board-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #334155; font: inherit; font-size: .78rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+.os-board-chip b { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: #f1f5f9; font-size: .72rem; text-align: center; }
+.os-board-chip:hover { border-color: #2563eb; color: #1d4ed8; }
+.os-board-chip.is-on { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+.os-board-chip.is-on b { background: #2563eb; color: #fff; }
+.is-theme-dark .os-board-quick__total strong { color: #fff; }
+.is-theme-dark .os-board-chip { border-color: rgba(255, 255, 255, 0.14); background: #11151a; color: #cbd5e1; }
+.is-theme-dark .os-board-chip b { background: rgba(255, 255, 255, 0.1); }
+.is-theme-dark .os-board-chip.is-on { border-color: #3b82f6; background: rgba(59, 130, 246, 0.16); color: #bfdbfe; }
+
+@media (max-width: 1180px) {
+  .os-board-quick { margin-left: 0; }
+}
+@media (max-width: 760px) {
+  .os-cycle__text strong { max-width: 120px; }
+  .os-cycle__bar { width: 70px; }
+  .os-cycle__panel { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; }
+  .os-board-top { align-items: stretch; }
+  .os-board-top .os-view-switch { width: 100%; overflow-x: auto; }
+  .os-board-top__right { width: 100%; }
+  .os-board-top__right .os-btn-new-os { flex: 1; justify-content: center; }
+  .os-board-quick { width: 100%; }
+}
+
+/* Ciclo dentro do painel (fundo claro) */
+.os-cycle--light { margin-left: 0; }
+.os-cycle--light .os-cycle__btn { height: 36px; border-color: #cbd5e1; background: #fff; color: #0f172a; }
+.os-cycle--light .os-cycle__btn:hover, .os-cycle--light .os-cycle__btn.is-open { border-color: #2563eb; background: #fff; }
+.os-cycle--light .os-cycle__bar { background: #e2e8f0; }
+.os-cycle--light .os-cycle__count { background: #f1f5f9; }
+
+/* Celular: topo enxuto (ciclo só com ícone e contagem) e filtros empilhados sem caixa vazia. */
+@media (max-width: 760px) {
+  .os-app__top .os-cycle__text, .os-app__top .os-cycle__chev { display: none; }
+  .os-app__top .os-cycle__btn { gap: 6px; padding: 0 8px; }
+  .os-app__top .os-app__brand, .os-app__top .os-app__mark { display: none; }
+  .os-jira-bar.os-board-filters .os-jira-search-filter { flex: none; width: 100%; max-width: none; min-width: 0; }
+  .os-jira-bar.os-board-filters .os-jira-date-bar,
+  .os-jira-bar.os-board-filters .os-jira-priority-picker-wrap { display: flex; width: 100%; min-width: 0; }
+  .os-jira-bar.os-board-filters .os-jira-date-bar > *,
+  .os-jira-bar.os-board-filters .os-jira-priority-combobox.admin-picker,
+  .os-jira-bar.os-board-filters .os-jira-priority-combobox .admin-picker__trigger { width: 100%; min-width: 0; }
+  .os-jira-bar.os-board-filters .os-jira-date-inputs { flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .os-app__top { gap: 6px; padding: 0 10px; }
+  .os-app__top .app-to-panel-btn { display: none; } /* "Abrir Painel" continua no menu da oficina */
+  .os-app__top .module-menu-btn span, .os-app__top .module-menu-btn kbd { display: none; }
+  .os-app__top .store-switcher { max-width: 118px; min-width: 0; }
+  .os-jira-bar.os-board-filters { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .os-jira-bar.os-board-filters > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+}
+/* A página do quadro é uma grade: a coluna não pode crescer com o conteúdo (evita rolagem lateral). */
+.admin-page.os-page-root { grid-template-columns: minmax(0, 1fr); }
+.admin-page.os-page-root > * { min-width: 0; }
+@media (max-width: 760px) {
+  .os-app__top .store-switcher__compact-tag, .os-app__top .store-switcher__chevron { display: none; }
+  .os-app__top .store-switcher__compact-btn { max-width: 118px; overflow: hidden; }
+  .os-app__top .store-switcher__compact-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
