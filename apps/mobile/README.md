@@ -53,6 +53,8 @@ npx eas-cli login
 npx eas-cli build -p android --profile preview
 ```
 
+No painel lojista: **Operações → Download do App**. Configure `MOBILE_ANDROID_APK_URL` / `MOBILE_IOS_INSTALL_URL` no Site Discloud (detalhes em `DISTRIBUTION.md`).
+
 ## Testes
 
 ```bash
