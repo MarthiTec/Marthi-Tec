@@ -49,7 +49,7 @@ const DEFAULT_OPS: OperationShortcut[] = [
   { id: 'notas', label: 'Notas emitidas', href: '/painel/notas', color: '#7c3aed', active: true, icon: 'fiscal', sortOrder: 130 },
   { id: 'ecom', label: 'Abrir e-commerce', href: '/ecommerce', color: '#db2777', active: true, icon: 'store', sortOrder: 140 },
   { id: 'ecom-visao', label: 'Visão e-commerce', href: '/painel/ecommerce', color: '#db2777', active: true, icon: 'store', sortOrder: 150 },
-  { id: 'plano', label: 'Plano', href: '/painel/plano', color: '#334155', active: true, icon: 'plan', sortOrder: 180 },
+  { id: 'plano', label: 'Planos & Faturamento', href: '/painel/plano', color: '#334155', active: true, icon: 'plan', sortOrder: 180 },
   { id: 'ajuda', label: 'Ajuda', href: '/painel/ajuda', color: '#334155', active: true, icon: 'help', sortOrder: 190 },
 ];
 

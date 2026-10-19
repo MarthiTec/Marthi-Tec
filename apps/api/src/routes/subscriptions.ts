@@ -9,6 +9,7 @@ import {
   stripeSecretKey,
   stripeWebhookSecret,
 } from '../services/billingProvider.js';
+import { buildBillingPixPayload } from '../services/pixBrCode.js';
 
 export const subscriptionsRouter = Router();
 
@@ -560,7 +561,7 @@ subscriptionsRouter.post(
   },
 );
 
-/** Assinatura da conta logada (loja) — leitura para /painel/lojas e /painel/plano. */
+/** Assinatura da conta logada (loja) — leitura para /painel/plano e app mobile. */
 subscriptionsRouter.get('/api/v1/billing/subscription', requireAuth, async (req, res, next) => {
   try {
     if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
@@ -597,17 +598,84 @@ subscriptionsRouter.get('/api/v1/billing/subscription', requireAuth, async (req,
        ORDER BY COALESCE(bi.due_at, bi.created_at) DESC LIMIT 20`,
       [clientAccountId],
     );
+    const mappedInvoices = invoices.rows.map(mapInvoice);
+    const openInvoice = mappedInvoices.find((item) => item.status === 'open') || null;
+    const subscription = mapSubscription(result.rows[0]);
+    const amountDue =
+      openInvoice && openInvoice.amount > 0
+        ? openInvoice.amount
+        : subscription.amount > 0
+          ? subscription.amount
+          : null;
+    const pix = await buildBillingPixPayload({
+      amount: amountDue,
+      currency: String(openInvoice?.currency || subscription.currency || 'BRL'),
+      subscriptionId: String(subscription.id),
+      planId: String(subscription.planId),
+    });
     const provider = getBillingProviderStatus();
     res.json({
       success: true,
       data: {
-        subscription: mapSubscription(result.rows[0]),
-        invoices: invoices.rows.map(mapInvoice),
+        subscription,
+        invoices: mappedInvoices,
+        amountDue,
+        pix,
         provider: {
           activeProvider: provider.activeProvider,
           portalAvailable: provider.stripe.portalReady && Boolean(result.rows[0].provider_customer_id),
           gates: provider.gates,
         },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Pix da assinatura (QR + Copia e Cola BR Code) — mesma conta do token; sem dados de outras lojas. */
+subscriptionsRouter.get('/api/v1/billing/pix', requireAuth, async (req, res, next) => {
+  try {
+    if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+    const clientAccountId = req.clientAccountId!;
+    const result = await pool.query(
+      `SELECT cs.*, c.trade_name, c.email, c.status as account_status
+       FROM client_subscriptions cs
+       JOIN client_accounts c ON c.id = cs.client_account_id
+       WHERE cs.client_account_id = $1`,
+      [clientAccountId],
+    );
+    if (!result.rows[0]) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Nenhuma assinatura registrada para esta conta.' },
+      });
+      return;
+    }
+    const open = await pool.query(
+      `SELECT amount, currency FROM billing_invoices
+       WHERE client_account_id = $1 AND status = 'open'
+       ORDER BY COALESCE(due_at, created_at) ASC LIMIT 1`,
+      [clientAccountId],
+    );
+    const subscription = mapSubscription(result.rows[0]);
+    const openAmount = open.rows[0] ? Number(open.rows[0].amount) : 0;
+    const amountDue =
+      openAmount > 0 ? openAmount : subscription.amount > 0 ? subscription.amount : null;
+    const pix = await buildBillingPixPayload({
+      amount: amountDue,
+      currency: String(open.rows[0]?.currency || subscription.currency || 'BRL'),
+      subscriptionId: String(subscription.id),
+      planId: String(subscription.planId),
+    });
+    res.json({
+      success: true,
+      data: {
+        amountDue,
+        currency: pix.currency,
+        planId: subscription.planId,
+        subscriptionId: subscription.id,
+        pix,
       },
     });
   } catch (error) {

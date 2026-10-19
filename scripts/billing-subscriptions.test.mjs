@@ -108,6 +108,28 @@ test('store user can read own billing subscription', async () => {
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.data.subscription.clientAccountId, 'cell');
+  assert.ok(body.data.pix);
+  assert.equal(body.data.pix.format, 'brcode_emv');
+  assert.equal(body.data.pix.keyValue, 'marthi.tecnologia@gmail.com');
+  assert.match(body.data.pix.brCode, /^000201/);
+  assert.ok(body.data.pix.qrDataUrl?.startsWith('data:image/'));
+  assert.equal(body.data.amountDue, 597);
+});
+
+test('store user billing pix endpoint returns BR Code for amount due', async () => {
+  const response = await fetch(`${base}/billing/pix`, {
+    headers: { authorization: `Bearer ${storeUser}`, 'x-store-id': 'store-cell' },
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.pix.keyValue, 'marthi.tecnologia@gmail.com');
+  assert.equal(body.data.amountDue, 597);
+  assert.match(body.data.pix.brCode, /br\.gov\.bcb\.pix/i);
+});
+
+test('unauthenticated billing pix is rejected', async () => {
+  const response = await fetch(`${base}/billing/pix`);
+  assert.equal(response.status, 401);
 });
 
 test('manual paid invoice persists in MarthiDB', async () => {

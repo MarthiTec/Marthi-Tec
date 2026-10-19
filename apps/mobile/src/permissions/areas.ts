@@ -27,6 +27,15 @@ export function canSeeFinance(access: AccessContext | null | undefined) {
   return hasArea(access, 'erp_finance');
 }
 
+/** Assinatura Marthi / Planos & Faturamento (admin da loja). */
+export function canSeeBilling(access: AccessContext | null | undefined) {
+  if (!access) return false;
+  if (access.fullAccess) return true;
+  if (hasArea(access, 'erp_plan')) return true;
+  const role = String(access.role || '').toLowerCase();
+  return role === 'admin' || role === 'owner' || role === 'manager' || role === 'superadmin';
+}
+
 export function canSeeReports(access: AccessContext | null | undefined) {
   return hasArea(access, 'erp_audit') || hasArea(access, 'pdv');
 }

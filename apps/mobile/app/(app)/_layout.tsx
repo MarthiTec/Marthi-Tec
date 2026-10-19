@@ -70,6 +70,7 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen name="activities" options={{ href: null }} />
+      <Tabs.Screen name="billing" options={{ href: null }} />
     </Tabs>
   );
 }

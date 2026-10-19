@@ -89,6 +89,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
+      { to: '/painel/plano', label: 'Planos & Faturamento' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },
     ],
@@ -196,6 +197,8 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/almoxarifado') ||
     pathname.startsWith('/painel/tabelas') ||
     pathname.startsWith('/painel/financeiro') ||
+    pathname.startsWith('/painel/plano') ||
+    pathname.startsWith('/painel/faturamento') ||
     pathname.startsWith('/painel/auditoria')
   ) {
     return 'erp';
