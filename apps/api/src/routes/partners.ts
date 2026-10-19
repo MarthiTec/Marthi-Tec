@@ -199,21 +199,47 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
           EXCEPTION WHEN others THEN NULL; END;
         END LOOP;
 
-        -- Garante DEFAULT now() em colunas created_at / updated_at legadas do Prisma
+        -- Garante DEFAULT em todas as colunas NOT NULL sem default herdadas do Prisma
+        -- (ADD COLUMN IF NOT EXISTS não aplica DEFAULT quando a coluna já existia sem default)
         FOR r IN
-          SELECT table_name, column_name
+          SELECT table_name, column_name, data_type, is_nullable
             FROM information_schema.columns
            WHERE table_schema = current_schema()
              AND table_name IN (
                'partner_signups', 'client_accounts', 'stores', 'store_licenses',
                'users', 'user_stores', 'employees', 'auth_tokens'
              )
-             AND column_name IN ('created_at', 'updated_at')
+             AND column_name <> 'id'
              AND column_default IS NULL
         LOOP
           BEGIN
-            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT now()', r.table_name, r.column_name);
-          EXCEPTION WHEN others THEN NULL; END;
+            IF r.column_name = 'totem_exit_password' THEN
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', r.table_name, r.column_name);
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''''', r.table_name, r.column_name);
+            ELSIF r.column_name IN ('created_at', 'updated_at', 'starts_at', 'confirmed_at') THEN
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT now()', r.table_name, r.column_name);
+            ELSIF r.is_nullable = 'NO' THEN
+              IF r.data_type IN ('text', 'character varying', 'character') THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''''', r.table_name, r.column_name);
+              ELSIF r.data_type IN ('integer', 'bigint', 'smallint', 'numeric', 'double precision', 'real') THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT 0', r.table_name, r.column_name);
+              ELSIF r.data_type = 'boolean' THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT false', r.table_name, r.column_name);
+              ELSIF r.data_type LIKE 'timestamp%' THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT now()', r.table_name, r.column_name);
+              ELSIF r.data_type = 'jsonb' THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''{}''::jsonb', r.table_name, r.column_name);
+              ELSIF r.data_type = 'json' THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT ''{}''::json', r.table_name, r.column_name);
+              ELSE
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', r.table_name, r.column_name);
+              END IF;
+            END IF;
+          EXCEPTION WHEN others THEN
+            BEGIN
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', r.table_name, r.column_name);
+            EXCEPTION WHEN others THEN NULL; END;
+          END;
         END LOOP;
 
         BEGIN
@@ -298,7 +324,9 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS access_token TEXT NOT NULL DEFAULT '';
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS ibge_city_code TEXT NOT NULL DEFAULT '';
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS segment TEXT NOT NULL DEFAULT 'assistencia_tecnica';
-          ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_exit_password TEXT DEFAULT '1234';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_exit_password TEXT DEFAULT '';
+          ALTER TABLE stores ALTER COLUMN totem_exit_password DROP NOT NULL;
+          ALTER TABLE stores ALTER COLUMN totem_exit_password SET DEFAULT '';
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_settings JSONB DEFAULT '{}'::jsonb;
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS communication_settings JSONB DEFAULT '{}'::jsonb;
           ALTER TABLE stores ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
@@ -961,11 +989,11 @@ async function executePaymentActivation(
           `INSERT INTO stores (
             id, client_account_id, trade_name, legal_name, document_type, document,
             email, phone, zip_code, street, number, complement, district, city, state,
-            tax_regime, is_matrix, active, created_at, updated_at
+            tax_regime, is_matrix, active, totem_exit_password, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6,
             $7, $8, $9, $10, $11, $12, $13, $14, $15,
-            'simples_nacional', true, true, now(), now()
+            'simples_nacional', true, true, '', now(), now()
           )`,
           [
             storeId,

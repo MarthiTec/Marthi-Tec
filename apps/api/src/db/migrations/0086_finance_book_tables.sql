@@ -551,6 +551,7 @@ ALTER TABLE sale_trade_ins ADD COLUMN IF NOT EXISTS stock_preexisting BOOLEAN NO
 -- [0085_totem_exit_password_no_default.sql]
 -- Sem senha padrão de saída do totem: cada loja define a sua (as lojas existentes mantêm a que já têm).
 ALTER TABLE stores ALTER COLUMN totem_exit_password DROP DEFAULT;
+ALTER TABLE stores ALTER COLUMN totem_exit_password DROP NOT NULL;
 
 -- [0086_finance_book_tables.sql]
 -- Tesouraria e adiantamentos no mesmo formato do banco de produção (lá as tabelas já existem assim).
