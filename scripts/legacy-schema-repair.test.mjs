@@ -82,7 +82,11 @@ async function request(path, method = 'GET', body) {
 }
 after(async () => { server.close(); await once(server, 'close'); await pool.end(); await db.close(); });
 
-test('partner signup works on the legacy partner_signups table with module_id[] converted to jsonb', async () => {
+test('partner signup and payment-confirm work on legacy MarthiDB schema (missing users.updated_at, module_id[])', async () => {
+  await db.exec(`
+    ALTER TABLE users DROP COLUMN IF EXISTS updated_at;
+  `);
+
   const signup = await request('/partners/signup', 'POST', {
     planId: 'golden',
     modules: ['totem', 'os', 'erp', 'fiscal', 'ecommerce'],
@@ -109,6 +113,29 @@ test('partner signup works on the legacy partner_signups table with module_id[] 
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.ok(signup.json.data.id.startsWith('PRT-'));
   assert.equal(signup.json.data.status, 'aguardando_pagamento');
+
+  // Simulate legacy users without updated_at right before payment-confirm
+  await db.exec(`ALTER TABLE users DROP COLUMN IF EXISTS updated_at;`);
+
+  const confirmSignup = await request('/partners/payment-confirm', 'POST', {
+    protocol: signup.json.data.id,
+    paymentMethod: 'Pix',
+    transactionRef: 'E2E-PIX-001',
+    notes: 'Ativação pelo admin',
+  });
+  assert.equal(confirmSignup.status, 200, JSON.stringify(confirmSignup.json));
+  assert.equal(confirmSignup.json.data.status, 'acesso_liberado');
+
+  // Re-confirming the converted client_account (now in client_accounts) also succeeds without 500
+  await db.exec(`ALTER TABLE users DROP COLUMN IF EXISTS updated_at;`);
+  const confirmExisting = await request('/partners/payment-confirm', 'POST', {
+    protocol: confirmSignup.json.data.id,
+    paymentMethod: 'Pix',
+    transactionRef: 'E2E-PIX-002',
+    notes: 'Reconfirmação',
+  });
+  assert.equal(confirmExisting.status, 200, JSON.stringify(confirmExisting.json));
+  assert.equal(confirmExisting.json.data.status, 'acesso_liberado');
 });
 
 test('customers can be created and edited on the legacy production table', async () => {

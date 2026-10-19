@@ -590,7 +590,12 @@ export async function identifyClientPaymentAndActivate(
     );
     // Re-read the authoritative state. A failed request never changes the local payment status.
     const persisted = await nestRequest<Partial<MarthiClient>[]>('/admin/clients');
-    const saved = persisted.find((item) => item.clientId === result.id);
+    const saved = persisted.find(
+      (item) =>
+        item.clientId === result.id ||
+        item.clientId === clientId ||
+        (client.email && item.email?.toLowerCase() === client.email.toLowerCase()),
+    );
     if (!saved || saved.paymentOk !== true) {
       return { ok: false, client: null, message: 'Não foi possível verificar a confirmação no MarthiDB. Atualize a lista antes de repetir.' };
     }

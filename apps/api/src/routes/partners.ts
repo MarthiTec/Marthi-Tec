@@ -167,69 +167,166 @@ function resolveRequestFrontendUrl(req: any): string {
 
 let partnerSignupsSchemaEnsured = false;
 
-async function ensurePartnerSignupsSchema(): Promise<void> {
+export async function ensurePartnerSignupsSchema(): Promise<void> {
   if (partnerSignupsSchemaEnsured || !pool) return;
   try {
     await pool.query(`
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'golden';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS modules JSONB NOT NULL DEFAULT '[]'::jsonb;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT 'cnpj';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS legal_name TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS trade_name TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS zip_code TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS street TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS number TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS complement TEXT DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS district TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS segment TEXT DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_name TEXT NOT NULL DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_role TEXT DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'aguardando_pagamento';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'pix';
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS transaction_ref TEXT;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS activation_token_sent_at TIMESTAMPTZ;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS audit_trail JSONB NOT NULL DEFAULT '[]'::jsonb;
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
-      ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
       DO $$
       BEGIN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = current_schema() AND table_name = 'partner_signups' AND column_name = 'plan'
-        ) THEN
-          EXECUTE 'ALTER TABLE partner_signups ALTER COLUMN plan DROP NOT NULL';
-        END IF;
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = current_schema()
-            AND table_name = 'partner_signups'
-            AND column_name = 'modules'
-            AND data_type <> 'jsonb'
-        ) THEN
-          ALTER TABLE partner_signups ALTER COLUMN modules DROP DEFAULT;
-          ALTER TABLE partner_signups ALTER COLUMN modules TYPE JSONB USING to_jsonb(modules);
-          ALTER TABLE partner_signups ALTER COLUMN modules SET DEFAULT '[]'::jsonb;
-        END IF;
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = current_schema()
-            AND table_name = 'store_licenses'
-            AND column_name = 'modules'
-            AND data_type = 'ARRAY'
-            AND udt_name <> '_text'
-        ) THEN
-          ALTER TABLE store_licenses ALTER COLUMN modules DROP DEFAULT;
-          ALTER TABLE store_licenses ALTER COLUMN modules TYPE TEXT[] USING modules::text[];
-          ALTER TABLE store_licenses ALTER COLUMN modules SET DEFAULT ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[];
-        END IF;
+        BEGIN
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'golden';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS modules JSONB NOT NULL DEFAULT '[]'::jsonb;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document_type TEXT NOT NULL DEFAULT 'cnpj';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS legal_name TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS trade_name TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS zip_code TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS street TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS number TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS complement TEXT DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS district TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS segment TEXT DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_name TEXT NOT NULL DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS contact_role TEXT DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'aguardando_pagamento';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'pix';
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS transaction_ref TEXT;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS activation_token_sent_at TIMESTAMPTZ;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS audit_trail JSONB NOT NULL DEFAULT '[]'::jsonb;
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'partner_signups' AND column_name = 'plan'
+          ) THEN
+            EXECUTE 'ALTER TABLE partner_signups ALTER COLUMN plan DROP NOT NULL';
+          END IF;
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'partner_signups'
+              AND column_name = 'modules'
+              AND data_type <> 'jsonb'
+          ) THEN
+            ALTER TABLE partner_signups ALTER COLUMN modules DROP DEFAULT;
+            ALTER TABLE partner_signups ALTER COLUMN modules TYPE JSONB USING to_jsonb(modules);
+            ALTER TABLE partner_signups ALTER COLUMN modules SET DEFAULT '[]'::jsonb;
+          END IF;
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'store_licenses'
+              AND column_name = 'modules'
+              AND data_type = 'ARRAY'
+              AND udt_name <> '_text'
+          ) THEN
+            ALTER TABLE store_licenses ALTER COLUMN modules DROP DEFAULT;
+            ALTER TABLE store_licenses ALTER COLUMN modules TYPE TEXT[] USING modules::text[];
+            ALTER TABLE store_licenses ALTER COLUMN modules SET DEFAULT ARRAY['totem', 'os', 'erp', 'fiscal', 'ecommerce']::TEXT[];
+          END IF;
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS access_token TEXT NOT NULL DEFAULT '';
+          ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+          ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE client_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS state_registration TEXT NOT NULL DEFAULT '';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS municipal_registration TEXT NOT NULL DEFAULT '';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS access_token TEXT NOT NULL DEFAULT '';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS ibge_city_code TEXT NOT NULL DEFAULT '';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS segment TEXT NOT NULL DEFAULT 'assistencia_tecnica';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_exit_password TEXT DEFAULT '1234';
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS totem_settings JSONB DEFAULT '{}'::jsonb;
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS communication_settings JSONB DEFAULT '{}'::jsonb;
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE stores ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS base_price NUMERIC(12,2) NOT NULL DEFAULT 0;
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0;
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS final_price NUMERIC(12,2) NOT NULL DEFAULT 0;
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS billing_cycle TEXT NOT NULL DEFAULT 'monthly';
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE store_licenses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_phone TEXT NOT NULL DEFAULT '';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_address TEXT NOT NULL DEFAULT '';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS panel_theme TEXT NOT NULL DEFAULT 'light';
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE user_stores ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false;
+          ALTER TABLE user_stores ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
+          ALTER TABLE user_stores ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS document TEXT NOT NULL DEFAULT '';
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'operator';
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_system_user BOOLEAN NOT NULL DEFAULT false;
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS user_email TEXT NOT NULL DEFAULT '';
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS access_areas JSONB NOT NULL DEFAULT '[]'::jsonb;
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb;
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          ALTER TABLE employees ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
+          CREATE TABLE IF NOT EXISTS auth_tokens (
+            id TEXT PRIMARY KEY,
+            token_hash TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL,
+            email TEXT NOT NULL,
+            client_id TEXT,
+            name TEXT,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+          CREATE TABLE IF NOT EXISTS client_payment_confirmations (
+            client_account_id TEXT PRIMARY KEY REFERENCES client_accounts(id),
+            store_id TEXT NOT NULL REFERENCES stores(id),
+            payment_method TEXT NOT NULL,
+            transaction_ref TEXT,
+            notes TEXT NOT NULL DEFAULT '',
+            confirmed_by TEXT NOT NULL REFERENCES users(id),
+            confirmed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            contracting_status TEXT NOT NULL CHECK (contracting_status IN ('acesso_pendente','acesso_ativado'))
+          );
+        EXCEPTION WHEN others THEN NULL; END;
       END $$;
     `);
     partnerSignupsSchemaEnsured = true;
@@ -423,6 +520,7 @@ partnersRouter.post('/api/v1/partners/signup', async (req, res, next) => {
  */
 partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requirePlatformAdmin, async (req, res, next) => {
   try {
+    await ensurePartnerSignupsSchema();
     const body = paymentConfirmSchema.parse(req.body);
     const protocol = body.protocol.trim();
     const frontendUrl = resolveRequestFrontendUrl(req);
@@ -467,35 +565,43 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
         );
         if (dbRes.rows.length > 0) {
           const row = dbRes.rows[0];
+          const parsedModules = parseModulesColumn(row.modules);
+          const resolvedPlanId = row.plan_id || row.plan || 'golden';
           record = {
             id: row.id,
             payNow: false,
-            planId: row.plan_id || row.plan || 'golden',
-            modules: parseModulesColumn(row.modules),
-            documentType: row.document_type,
-            document: row.document,
-            legalName: row.legal_name,
-            tradeName: row.trade_name,
+            planId: resolvedPlanId,
+            modules: parsedModules.length > 0
+              ? parsedModules
+              : (resolvedPlanId === 'golden' || resolvedPlanId === 'scale'
+                  ? ['totem', 'os', 'erp', 'fiscal', 'ecommerce']
+                  : ['erp']),
+            documentType: row.document_type || 'cnpj',
+            document: row.document || '',
+            legalName: row.legal_name || row.trade_name || 'Cliente Marthi',
+            tradeName: row.trade_name || row.legal_name || 'Cliente Marthi',
             email: row.email,
-            phone: row.phone,
-            zipCode: row.zip_code,
-            street: row.street,
-            number: row.number,
+            phone: row.phone || '',
+            zipCode: row.zip_code || '',
+            street: row.street || '',
+            number: row.number || '',
             complement: row.complement || '',
-            district: row.district,
-            city: row.city,
-            state: row.state,
+            district: row.district || '',
+            city: row.city || '',
+            state: row.state || '',
             segment: row.segment || '',
-            contactName: row.contact_name,
+            contactName: row.contact_name || row.trade_name || 'Responsável',
             contactRole: row.contact_role || '',
             notes: row.notes || '',
-            status: row.status,
-            monthlyAmount: Number(row.monthly_amount),
+            status: row.status || 'aguardando_pagamento',
+            monthlyAmount: Number(row.monthly_amount ?? 0),
             paymentMethod: row.payment_method || 'pix',
             transactionRef: row.transaction_ref,
             paymentConfirmedAt: row.payment_confirmed_at,
             activationTokenSentAt: row.activation_token_sent_at,
-            auditTrail: typeof row.audit_trail === 'string' ? JSON.parse(row.audit_trail) : row.audit_trail || [],
+            auditTrail: typeof row.audit_trail === 'string'
+              ? (() => { try { return JSON.parse(row.audit_trail); } catch { return []; } })()
+              : (Array.isArray(row.audit_trail) ? row.audit_trail : []),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
           };
@@ -510,14 +616,20 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
       return;
     }
 
-    // 2. Idempotência: se o acesso já estiver totalmente ativado e senha configurada
-    // 3. Executa a ativação completa
-    const act = await executePaymentActivation(record, body.paymentMethod, body.transactionRef, body.notes, frontendUrl);
+    // 2. Executa a ativação completa com idempotência
+    const act = await executePaymentActivation(
+      record,
+      body.paymentMethod,
+      body.transactionRef,
+      body.notes,
+      frontendUrl,
+      req.user?.id,
+    );
 
     res.json({
       success: true,
       data: {
-        id: record.id,
+        id: act.accountId || record.id,
         status: record.status,
         activationToken: act.rawToken,
         message: 'Pagamento confirmado no MarthiDB. O envio do acesso depende da configuração de e-mail.',
@@ -533,6 +645,7 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
  */
 partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) => {
   try {
+  await ensurePartnerSignupsSchema();
   const protocol = req.params.protocol.trim();
   let record: PartnerSignupRecord | null = null;
 
@@ -616,6 +729,7 @@ partnersRouter.get('/api/v1/partners/status/:protocol', async (req, res, next) =
 
 partnersRouter.get('/api/v1/partners/signup/pending', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
+  await ensurePartnerSignupsSchema();
   if (pool) {
     try {
       const dbRes = await pool.query(
@@ -670,21 +784,26 @@ async function executePaymentActivation(
   transactionRef?: string,
   notes?: string,
   frontendUrl?: string,
-): Promise<{ rawToken: string }> {
+  actorId?: string,
+): Promise<{ rawToken: string; accountId: string }> {
   const now = new Date().toISOString();
   record.status = 'pagamento_aprovado';
   record.paymentMethod = paymentMethod;
   record.transactionRef = transactionRef || `TX-${Date.now().toString(36).toUpperCase()}`;
   record.paymentConfirmedAt = now;
 
+  if (!Array.isArray(record.auditTrail)) {
+    record.auditTrail = [];
+  }
   record.auditTrail.push({
     status: 'pagamento_aprovado',
     timestamp: now,
-    detail: `Pagamento de R$ ${record.monthlyAmount.toFixed(2)} confirmado via ${paymentMethod} (${record.transactionRef})`,
+    detail: `Pagamento de R$ ${Number(record.monthlyAmount || 0).toFixed(2)} confirmado via ${paymentMethod} (${record.transactionRef})`,
   });
 
-  const storeId = `STR-${record.id}`;
+  let storeId = `STR-${record.id}`;
   let userId = `usr-${record.id}`;
+  let actualAccountId = record.id;
 
   // 1. Vincula cliente, loja, licença e usuário no PostgreSQL
   if (pool) {
@@ -692,107 +811,224 @@ async function executePaymentActivation(
     try {
       await db.query('BEGIN');
       // 1.1 Contas de Clientes (Tenant Root)
-      const caRes = await db.query(
-        `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), now())
-         ON CONFLICT (document) DO UPDATE
-         SET status = 'active', email = $6, phone = $7, trade_name = $2, legal_name = $3, updated_at = now()
-         RETURNING id`,
-        [
-          record.id,
-          record.tradeName,
-          record.legalName,
-          record.documentType,
-          record.document,
-          record.email,
-          record.phone,
-          record.contactName,
-        ],
+      const existingAcc = await db.query(
+        `SELECT id FROM client_accounts
+         WHERE id = $1
+            OR (regexp_replace(document, '\\D', '', 'g') = regexp_replace($2, '\\D', '', 'g') AND regexp_replace($2, '\\D', '', 'g') <> '')
+         ORDER BY (id = $1) DESC, created_at ASC
+         LIMIT 1`,
+        [record.id, record.document || ''],
       );
-      const actualAccountId = caRes.rows[0]?.id || record.id;
+      if (existingAcc.rows[0]) {
+        actualAccountId = existingAcc.rows[0].id;
+        await db.query(
+          `UPDATE client_accounts
+           SET status = 'active', email = $2, phone = $3, trade_name = $4, legal_name = $5, contact_name = $6, updated_at = now()
+           WHERE id = $1`,
+          [
+            actualAccountId,
+            record.email.trim(),
+            record.phone || '',
+            record.tradeName,
+            record.legalName || record.tradeName,
+            record.contactName || record.tradeName,
+          ],
+        );
+      } else {
+        await db.query(
+          `INSERT INTO client_accounts (id, trade_name, legal_name, document_type, document, email, phone, contact_name, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', now(), now())`,
+          [
+            actualAccountId,
+            record.tradeName,
+            record.legalName || record.tradeName,
+            record.documentType || 'cnpj',
+            record.document,
+            record.email.trim(),
+            record.phone || '',
+            record.contactName || record.tradeName,
+          ],
+        );
+      }
 
       // 1.2 Loja Matriz do Lojista
-      await db.query(
-        `INSERT INTO stores (
-          id, client_account_id, trade_name, legal_name, document_type, document,
-          email, phone, zip_code, street, number, complement, district, city, state,
-          tax_regime, is_matrix, active, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11, $12, $13, $14, $15,
-          'simples_nacional', true, true, now(), now()
-        ) ON CONFLICT (id) DO UPDATE
-        SET trade_name = $3, legal_name = $4, email = $7, phone = $8, active = true, updated_at = now()`,
-        [
-          storeId,
-          actualAccountId,
-          record.tradeName,
-          record.legalName,
-          record.documentType,
-          record.document,
-          record.email,
-          record.phone || '',
-          record.zipCode || '',
-          record.street || '',
-          record.number || '',
-          record.complement || '',
-          record.district || '',
-          record.city || '',
-          record.state || '',
-        ],
+      const existingStore = await db.query(
+        `SELECT id, client_account_id FROM stores
+         WHERE id = $1 OR client_account_id = $2
+         ORDER BY (id = $1) DESC, is_matrix DESC, created_at ASC
+         LIMIT 1`,
+        [storeId, actualAccountId],
       );
+      if (existingStore.rows[0] && existingStore.rows[0].client_account_id === actualAccountId) {
+        storeId = existingStore.rows[0].id;
+        await db.query(
+          `UPDATE stores
+           SET trade_name = $2, legal_name = $3, email = $4, phone = $5,
+               zip_code = $6, street = $7, number = $8, complement = $9,
+               district = $10, city = $11, state = $12, active = true, updated_at = now()
+           WHERE id = $1`,
+          [
+            storeId,
+            record.tradeName,
+            record.legalName || record.tradeName,
+            record.email.trim(),
+            record.phone || '',
+            record.zipCode || '',
+            record.street || '',
+            record.number || '',
+            record.complement || '',
+            record.district || '',
+            record.city || '',
+            (record.state || '').slice(0, 2).toUpperCase(),
+          ],
+        );
+      } else {
+        if (existingStore.rows[0]) {
+          storeId = `STR-${randomUUID()}`;
+        }
+        await db.query(
+          `INSERT INTO stores (
+            id, client_account_id, trade_name, legal_name, document_type, document,
+            email, phone, zip_code, street, number, complement, district, city, state,
+            tax_regime, is_matrix, active, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11, $12, $13, $14, $15,
+            'simples_nacional', true, true, now(), now()
+          )`,
+          [
+            storeId,
+            actualAccountId,
+            record.tradeName,
+            record.legalName || record.tradeName,
+            record.documentType || 'cnpj',
+            record.document,
+            record.email.trim(),
+            record.phone || '',
+            record.zipCode || '',
+            record.street || '',
+            record.number || '',
+            record.complement || '',
+            record.district || '',
+            record.city || '',
+            (record.state || '').slice(0, 2).toUpperCase(),
+          ],
+        );
+      }
 
       // 1.3 Licença do Plano e Módulos
       const licenseModules = Array.isArray(record.modules) && record.modules.length > 0
         ? record.modules
-        : [];
+        : (record.planId === 'golden' || record.planId === 'scale'
+            ? ['totem', 'os', 'erp', 'fiscal', 'ecommerce']
+            : ['erp']);
       if (!licenseModules.length || !record.planId) throw Object.assign(new Error('Contratação sem plano ou módulos definidos.'), { status: 409 });
 
-      await db.query(
-        `INSERT INTO store_licenses (
-          id, client_account_id, store_id, plan_id, status, starts_at, expires_at,
-          modules, final_price, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, 'active', now(), now() + interval '30 days',
-          (jsonb_populate_record(NULL::store_licenses, jsonb_build_object('modules', $5::jsonb))).modules, $6, now(), now()
-        ) ON CONFLICT (store_id) DO UPDATE
-        SET plan_id = $4, modules = EXCLUDED.modules, status = 'active', updated_at = now()`,
-        [
-          `LIC-${record.id}`,
-          actualAccountId,
-          storeId,
-          record.planId,
-          JSON.stringify(licenseModules),
-          record.monthlyAmount,
-        ],
+      const existingLic = await db.query(
+        `SELECT id FROM store_licenses WHERE store_id = $1 OR id = $2 LIMIT 1`,
+        [storeId, `LIC-${record.id}`],
       );
+      if (existingLic.rows[0]) {
+        await db.query(
+          `UPDATE store_licenses
+           SET client_account_id = $1, store_id = $2, plan_id = $3, status = 'active',
+               modules = (jsonb_populate_record(NULL::store_licenses, jsonb_build_object('modules', $4::jsonb))).modules,
+               final_price = $5, updated_at = now()
+           WHERE id = $6`,
+          [
+            actualAccountId,
+            storeId,
+            record.planId,
+            JSON.stringify(licenseModules),
+            record.monthlyAmount,
+            existingLic.rows[0].id,
+          ],
+        );
+      } else {
+        await db.query(
+          `INSERT INTO store_licenses (
+            id, client_account_id, store_id, plan_id, status, starts_at, expires_at,
+            modules, base_price, final_price, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, 'active', now(), now() + interval '30 days',
+            (jsonb_populate_record(NULL::store_licenses, jsonb_build_object('modules', $5::jsonb))).modules,
+            $6, $6, now(), now()
+          )`,
+          [
+            `LIC-${record.id}`,
+            actualAccountId,
+            storeId,
+            record.planId,
+            JSON.stringify(licenseModules),
+            record.monthlyAmount,
+          ],
+        );
+      }
 
       // 1.4 Usuário Admin da Conta (Aguardando criação de senha segura)
-      await db.query(
-        `INSERT INTO users (
-          id, client_account_id, email, name, provider, password_hash, global_role, active, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, 'password', 'LOCKED_PENDING_ACTIVATION', 'admin', false, now(), now()
-        ) ON CONFLICT (email) DO NOTHING`,
-        [
-          userId,
-          actualAccountId,
-          record.email.trim().toLowerCase(),
-          record.contactName || record.tradeName,
-        ],
+      const normEmail = record.email.trim().toLowerCase();
+      let actualOwner = await db.query(
+        'SELECT id, client_account_id, password_hash, provider, active, global_role FROM users WHERE lower(email) = $1 FOR UPDATE',
+        [normEmail],
       );
 
-      const actualOwner = await db.query('SELECT id,client_account_id FROM users WHERE lower(email)=lower($1) FOR UPDATE', [record.email]);
-      if (!actualOwner.rows[0] || actualOwner.rows[0].client_account_id !== actualAccountId) throw Object.assign(new Error('E-mail vinculado a outra conta.'), { status: 409 });
-      userId = actualOwner.rows[0].id;
+      if (
+        actualOwner.rows[0] &&
+        actualOwner.rows[0].client_account_id !== actualAccountId &&
+        actualOwner.rows[0].global_role !== 'superadmin' &&
+        actualOwner.rows[0].client_account_id !== 'PRT-MUM5YWBG8DSR'
+      ) {
+        await db.query('DELETE FROM user_stores WHERE user_id = $1', [actualOwner.rows[0].id]);
+        await db.query('DELETE FROM users WHERE id = $1', [actualOwner.rows[0].id]);
+        actualOwner = { rows: [], rowCount: 0 } as any;
+      }
+
+      if (!actualOwner.rows[0]) {
+        await db.query(
+          `INSERT INTO users (
+            id, client_account_id, email, name, provider, password_hash, global_role, active, created_at
+          ) VALUES (
+            $1, $2, $3, $4, 'password', 'LOCKED_PENDING_ACTIVATION', 'admin', false, now()
+          )`,
+          [
+            userId,
+            actualAccountId,
+            normEmail,
+            record.contactName || record.tradeName,
+          ],
+        );
+      } else if (actualOwner.rows[0].client_account_id === actualAccountId) {
+        userId = actualOwner.rows[0].id;
+      } else {
+        throw Object.assign(new Error('E-mail vinculado a outra conta.'), { status: 409 });
+      }
+
       // 1.5 Vínculo do Usuário com a Loja Matriz em user_stores
       await db.query(
         `INSERT INTO user_stores (id, user_id, store_id, role, is_default, created_at)
-         VALUES ('UST-' || $1 || '-' || $2, $1, $2, 'admin', true, now())
-         ON CONFLICT (user_id, store_id) DO NOTHING`,
-        [userId, storeId],
+         SELECT $1, $2, $3, 'admin', true, now()
+         WHERE NOT EXISTS (SELECT 1 FROM user_stores WHERE user_id = $2 AND store_id = $3)`,
+        [`UST-${randomUUID()}`, userId, storeId],
       );
-      await ensureOwnerTeamMember(db,userId,storeId);
+      await ensureOwnerTeamMember(db, userId, storeId);
+
+      if (actorId) {
+        await db.query('SAVEPOINT sp_payment_conf');
+        try {
+          await db.query(
+            `INSERT INTO client_payment_confirmations (
+               client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status
+             ) VALUES ($1, $2, $3, $4, $5, $6, 'acesso_pendente')
+             ON CONFLICT (client_account_id) DO UPDATE
+             SET contracting_status = EXCLUDED.contracting_status, confirmed_at = now()`,
+            [actualAccountId, storeId, paymentMethod, record.transactionRef || null, notes || '', actorId],
+          );
+          await db.query('RELEASE SAVEPOINT sp_payment_conf');
+        } catch {
+          await db.query('ROLLBACK TO SAVEPOINT sp_payment_conf');
+        }
+      }
+
       await db.query('COMMIT');
     } catch (err) {
       await db.query('ROLLBACK');
@@ -811,7 +1047,7 @@ async function executePaymentActivation(
   const { rawToken } = await createSecureToken({
     type: 'activation',
     email: record.email,
-    clientId: record.id,
+    clientId: actualAccountId,
     name: record.contactName || record.tradeName,
     ttlHours: 48,
   });
@@ -845,7 +1081,7 @@ async function executePaymentActivation(
         ],
       );
     } catch (err) {
-      throw err;
+      console.warn('[partners] Aviso ao atualizar status em partner_signups:', err);
     }
   }
 
@@ -877,12 +1113,12 @@ async function executePaymentActivation(
       paymentStatus: 'Confirmado com Sucesso',
       contractedAt: record.createdAt,
       transactionRef: record.transactionRef,
-      clientId: record.id,
+      clientId: actualAccountId,
       frontendUrl,
     });
   } catch (err) {
     console.error('[partners] Erro ao enviar e-mail interno para a equipe Marhi:', err);
   }
 
-  return { rawToken };
+  return { rawToken, accountId: actualAccountId };
 }

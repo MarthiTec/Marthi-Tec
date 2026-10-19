@@ -30,8 +30,8 @@ export async function confirmExistingClientPayment(input: {
     let owner = users.rows[0];
     if (owner && owner.client_account_id !== account.id) throw Object.assign(new Error('O e-mail do responsável pertence a outra conta.'), { status: 409 });
     if (!owner) {
-      const inserted = await db.query(`INSERT INTO users(id,client_account_id,email,name,provider,password_hash,global_role,active,created_at,updated_at)
-        VALUES($1,$2,$3,$4,'password','LOCKED_PENDING_ACTIVATION','admin',false,now(),now()) RETURNING *`,
+      const inserted = await db.query(`INSERT INTO users(id,client_account_id,email,name,provider,password_hash,global_role,active,created_at)
+        VALUES($1,$2,$3,$4,'password','LOCKED_PENDING_ACTIVATION','admin',false,now()) RETURNING *`,
         [randomUUID(), account.id, account.email.toLowerCase(), account.contact_name || account.trade_name]);
       owner = inserted.rows[0];
     }
@@ -45,10 +45,11 @@ export async function confirmExistingClientPayment(input: {
         VALUES($1,$2,'activation',$3,$4,$5,now()+interval '48 hours',now())`,
         [randomUUID(), createHash('sha256').update(rawToken).digest('hex'), account.email.toLowerCase(), account.id, account.contact_name || account.trade_name]);
     } else {
-      await db.query('UPDATE users SET active=true,updated_at=now() WHERE id=$1', [owner.id]);
+      await db.query('UPDATE users SET active=true WHERE id=$1', [owner.id]);
     }
     await db.query(`INSERT INTO user_stores(id,user_id,store_id,role,is_default,created_at)
-      VALUES($1,$2,$3,'admin',true,now()) ON CONFLICT(user_id,store_id) DO NOTHING`, [randomUUID(), owner.id, store.id]);
+      SELECT $1,$2,$3,'admin',true,now()
+      WHERE NOT EXISTS (SELECT 1 FROM user_stores WHERE user_id=$2 AND store_id=$3)`, [randomUUID(), owner.id, store.id]);
     await ensureOwnerTeamMember(db,owner.id,store.id);
     await db.query("UPDATE client_accounts SET status='active',updated_at=now() WHERE id=$1", [account.id]);
     await db.query('UPDATE stores SET active=true,updated_at=now() WHERE id=$1', [store.id]);

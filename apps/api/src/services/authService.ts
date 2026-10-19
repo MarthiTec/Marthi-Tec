@@ -746,7 +746,7 @@ async function updatePasswordUsingToken(token: string, password: string, type: '
         RETURNING email`, [createHash('sha256').update(token).digest('hex'), type]);
       if (!consumed.rows[0]) throw Object.assign(new Error('Token inválido, expirado ou já usado.'), { status: 400 });
       const salt = randomBytes(16).toString('hex');
-      const updated = await client.query('UPDATE users SET password_hash = $1, active = true, session_version = session_version + 1, updated_at = now() WHERE lower(email) = $2 RETURNING id',
+      const updated = await client.query('UPDATE users SET password_hash = $1, active = true, session_version = session_version + 1 WHERE lower(email) = $2 RETURNING id',
         [salt + ':' + hashPassword(password, salt), consumed.rows[0].email]);
       if (!updated.rowCount) throw Object.assign(new Error('Conta não cadastrada.'), { status: 400 });
       await client.query(`UPDATE employees SET active=true,updated_at=now() WHERE is_system_user=true AND lower(user_email)=$1 AND store_id IN (SELECT store_id FROM user_stores WHERE user_id=$2)`, [consumed.rows[0].email,updated.rows[0].id]);
