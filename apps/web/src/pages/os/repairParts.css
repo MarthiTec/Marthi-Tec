@@ -163,3 +163,13 @@
 @media print {
   .repair-parts__tabs, .parts-report__actions, .admin-card__head .btn { display: none !important; }
 }
+
+/* Janela "Aparelhos que usam a peça": uma rolagem só (a da janela), sem lista cortada por dentro. */
+.quick-modal__body .repair-parts__links { max-height: none; overflow: visible; margin: 6px 0 0; }
+.quick-modal__body .repair-parts__compat { gap: 4px; padding: 8px 10px; }
+.quick-modal__body .repair-parts__compat .repair-parts__add-device input { min-height: 38px; }
+.quick-modal__body .repair-parts__compat .repair-parts__add-device .btn { min-height: 38px; }
+@media (max-height: 760px) {
+  .quick-modal__body .repair-parts__compat > small, .quick-modal__body .repair-parts__section-title + .repairs__muted { display: none; }
+  .quick-modal__body .repair-parts__links li { padding: 8px 10px; }
+}
