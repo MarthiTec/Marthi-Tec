@@ -93,3 +93,73 @@
 .repair-parts__photo img { width: 100%; height: 100%; object-fit: cover; }
 .repair-parts__photo button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(15, 23, 42, .7); color: #fff; font-size: .8rem; cursor: pointer; }
 .quick-modal__body .repair-parts__photo--add input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }
+
+/* Campos da tabela no padrão do estoque (arredondados, mesma altura e fundo). */
+.repair-parts__table td input[type='number'],
+.repair-parts__table td input.repair-parts__money { box-sizing: border-box; width: 100%; max-width: 120px; min-height: 40px; padding: 0 12px; border: 1px solid var(--line, #d8dde3); border-radius: 10px; background: var(--card-2, #f8fafc); color: inherit; font: inherit; font-size: .88rem; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.repair-parts__table td input[type='number'] { max-width: 86px; }
+.repair-parts__table td input:focus { outline: none; border-color: var(--accent, #0f766e); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0f766e) 15%, transparent); background: #fff; }
+.repair-parts__stat small { color: #64748b; font-size: .72rem; }
+
+/* Abas Estoque · Encomendas · Relatório */
+.repair-parts__tabs { display: inline-flex; gap: 4px; margin: 4px 0 14px; padding: 3px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: #f1f5f9; }
+.repair-parts__tabs button { height: 34px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent; color: #64748b; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.repair-parts__tabs button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+
+/* Encomendas */
+.parts-orders { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.parts-order { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: #fff; }
+.parts-order.is-late { border-color: #fca5a5; background: #fff7f7; }
+.parts-order.is-closed { opacity: .75; }
+.parts-order__main { display: grid; gap: 2px; min-width: 0; }
+.parts-order__main strong { font-size: .88rem; overflow-wrap: anywhere; }
+.parts-order__main small { color: #64748b; font-size: .76rem; overflow-wrap: anywhere; }
+.parts-order__when { display: grid; justify-items: end; gap: 3px; white-space: nowrap; }
+.parts-order__when small { color: #64748b; font-size: .74rem; }
+.parts-order__actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.parts-order__notice { grid-column: 1 / -1; margin: 0; color: #15803d; font-size: .78rem; font-weight: 700; }
+.parts-orders-card { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 14px; background: var(--card, #fff); margin: 10px 0; }
+.parts-orders-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.parts-orders-card > header > div { display: grid; gap: 2px; min-width: 0; }
+.parts-orders-card > header small { color: #64748b; font-size: .78rem; }
+.admin-card > .parts-orders-card { margin: 0; padding: 0; border: 0; }
+.parts-orders-panel__filter { display: inline-grid; grid-template-columns: auto auto; }
+.parts-orders-panel__filter button { padding: 0 14px; }
+.parts-order-fields { display: grid; gap: 12px; }
+.parts-order-fields__part { margin: 0; padding: 8px 12px; border-radius: 10px; background: #f1f5f9; font-size: .86rem; }
+.parts-supplier { display: grid; gap: 4px; }
+@media (max-width: 640px) {
+  .parts-order { grid-template-columns: minmax(0, 1fr); }
+  .parts-order__when { justify-items: start; }
+  .parts-order__actions { justify-content: flex-start; }
+}
+
+/* Encomendar na abertura da OS */
+.os-parts__link { padding: 0; border: 0; background: none; color: #2563eb; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.os-parts__more-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.os-parts__orders { display: grid; gap: 6px; padding: 10px 12px; border: 1px dashed #f59e0b; border-radius: 12px; background: #fffbeb; }
+.os-parts__orders strong { color: #92400e; font-size: .82rem; }
+.os-parts__orders ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.os-parts__orders li { display: flex; align-items: center; gap: 8px; }
+.os-parts__orders li > span { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.os-parts__orders li small { color: #78716c; font-size: .74rem; }
+
+/* Aparelhos compatíveis (janela da peça) */
+.repair-parts__compat { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: #f8fafc; }
+.repair-parts__compat > small { color: #64748b; font-size: .76rem; font-weight: 400; }
+.repair-parts__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.repair-parts__chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--line, #cbd5e1); border-radius: 999px; background: #fff; font-size: .78rem; font-weight: 700; }
+.repair-parts__chip button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: #e2e8f0; color: #334155; cursor: pointer; }
+.repair-parts__add-device { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.repair-parts__section-title { margin-top: 6px; font-size: .86rem; }
+
+/* Relatório */
+.parts-report { display: grid; gap: 14px; }
+.parts-report__tools { align-items: flex-end; margin: 0; }
+.parts-report__tools label { display: grid; gap: 4px; color: #64748b; font-size: .74rem; font-weight: 800; }
+.parts-report__tools input[type='date'] { min-height: 40px; padding: 0 12px; border: 1px solid var(--line, #d8dde3); border-radius: 10px; background: var(--card-2, #f8fafc); font: inherit; }
+.parts-report__actions { display: inline-flex; gap: 8px; margin-left: auto; }
+.parts-report__section h3 { margin: 4px 0 8px; font-size: .95rem; }
+@media print {
+  .repair-parts__tabs, .parts-report__actions, .admin-card__head .btn { display: none !important; }
+}

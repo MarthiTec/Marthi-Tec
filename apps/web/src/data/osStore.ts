@@ -816,6 +816,8 @@ export async function createWorkOrder(
     quoteValidUntil?: string;
     /** Peças do estoque que saem junto com a abertura da OS. */
     stockParts?: Array<{ stockId: string; qty: number; unitPrice: number; improvised: boolean; note: string }>;
+    /** Peças encomendadas ao fornecedor (a OS abre "Aguardando"). */
+    partOrders?: import('../services/repairPartsApi').PartOrderInput[];
   },
 ) {
   try {
@@ -847,6 +849,7 @@ export async function createWorkOrder(
       quoteStatus: input.quoteStatus,
       quoteNotes: input.quoteNotes,
       stockParts: input.stockParts ?? [],
+      partOrders: input.partOrders ?? [],
     });
     return upsertLocal(normalizeWorkOrder(created));
   } catch (error) {

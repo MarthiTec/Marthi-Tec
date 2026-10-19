@@ -28,6 +28,7 @@ import {
   type WorkOrderStatus,
 } from '../../data/osStore';
 import { cancelWorkOrderWithReversal } from '../../data/workshopLedger';
+import { OsPartOrdersCard } from './OsPartOrders';
 import { useStoreCustomization } from '../../data/storeSegment';
 import {
   getWorkshopCheckoutMode,
@@ -872,6 +873,9 @@ export function OsDetailModal({
                 </table></div>
               </div>
             </section>
+
+            {/* Peças encomendadas ao fornecedor (OS aguardando a peça) */}
+            <OsPartOrdersCard workOrderId={order.id} locked={order.status === 'delivered' || order.status === 'cancelled'} />
 
             {/* Seção de Anexos (Exatamente como a Imagem 5!) */}
             <section className="os-jira-section">

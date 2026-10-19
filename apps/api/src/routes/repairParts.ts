@@ -39,8 +39,18 @@ async function linksByPart(db: Db, storeId: string) {
   return map;
 }
 
+export type PartDevice = { brand: string; model: string };
+
+/** Aparelhos compatíveis marcados direto na peça (sem precisar de serviço no catálogo). */
+async function devicesByPart(db: Db, storeId: string) {
+  const rows = (await db.query('SELECT stock_item_id, brand, model FROM repair_part_devices WHERE store_id = $1', [storeId])).rows;
+  const map = new Map<string, PartDevice[]>();
+  for (const row of rows) map.set(row.stock_item_id, [...(map.get(row.stock_item_id) ?? []), { brand: row.brand, model: row.model }]);
+  return map;
+}
+
 const partStatus = (qty: number, minQty: number) => (qty <= 0 ? 'out' : qty <= minQty ? 'low' : 'ok');
-const viewPart = (row: any, links: PartLink[] = []) => {
+const viewPart = (row: any, links: PartLink[] = [], devices: PartDevice[] = []) => {
   const qty = Number(row.qty) || 0;
   const minQty = Number(row.min_qty) || 0;
   return {
@@ -59,6 +69,7 @@ const viewPart = (row: any, links: PartLink[] = []) => {
     images: (Array.isArray(row.images) ? row.images : typeof row.images === 'string' ? (() => { try { return JSON.parse(row.images); } catch { return []; } })() : []).filter(Boolean),
     status: partStatus(qty, minQty),
     links: links.sort((a, b) => collator.compare(`${a.brand} ${a.model}`, `${b.brand} ${b.model}`)),
+    devices: devices.sort((a, b) => collator.compare(`${a.brand} ${a.model}`, `${b.brand} ${b.model}`)),
   };
 };
 const PART_COLUMNS = 'id, name, sku, brand, category, kind, qty, min_qty, cost, price, active, scope, images';
@@ -73,11 +84,14 @@ repairPartsRouter.get('/api/v1/repair-parts', async (req, res, next) => {
     const brand = norm(req.query.brand);
     const model = norm(req.query.model);
     const links = await linksByPart(pool, storeId);
+    const devices = await devicesByPart(pool, storeId);
     let ids: string[] | null = null;
     if (model) {
-      ids = [...links.entries()]
-        .filter(([, list]) => list.some((link) => norm(link.model) === model && (!brand || norm(link.brand) === brand)))
-        .map(([id]) => id);
+      const fits = (entry: { brand: string; model: string }) => norm(entry.model) === model && (!brand || !entry.brand || norm(entry.brand) === brand);
+      ids = [...new Set([
+        ...[...links.entries()].filter(([, list]) => list.some(fits)).map(([id]) => id),
+        ...[...devices.entries()].filter(([, list]) => list.some(fits)).map(([id]) => id),
+      ])];
       if (!ids.length) {
         res.json({ success: true, data: [] });
         return;
@@ -86,7 +100,7 @@ repairPartsRouter.get('/api/v1/repair-parts', async (req, res, next) => {
     const rows = ids
       ? (await pool.query(`SELECT ${PART_COLUMNS} FROM stock_items WHERE store_id = $1 AND id = ANY($2::text[])`, [storeId, ids])).rows
       : (await pool.query(`SELECT ${PART_COLUMNS} FROM stock_items WHERE store_id = $1 AND active = true AND (scope = 'workshop' OR id = ANY($2::text[]))`, [storeId, [...links.keys()]])).rows;
-    const data = rows.map((row: any) => viewPart(row, links.get(row.id) ?? [])).sort((a: any, b: any) => collator.compare(a.name, b.name));
+    const data = rows.map((row: any) => viewPart(row, links.get(row.id) ?? [], devices.get(row.id) ?? [])).sort((a: any, b: any) => collator.compare(a.name, b.name));
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -117,7 +131,7 @@ repairPartsRouter.patch('/api/v1/repair-parts/:id', async (req, res, next) => {
       )
     ).rows[0];
     if (!row) throw httpError('Peça não encontrada nesta loja.', 404);
-    res.json({ success: true, data: viewPart(row, (await linksByPart(pool, req.storeId!)).get(row.id) ?? []) });
+    res.json({ success: true, data: await partView(pool, req.storeId!, row.id) });
   } catch (error) {
     next(error);
   }
@@ -163,7 +177,7 @@ repairPartsRouter.put('/api/v1/repair-parts/:id/links', async (req, res, next) =
     if (missing.length) throw httpError('Uma das qualidades escolhidas não existe mais no catálogo de manutenções. Atualize a página.');
     await client.query('COMMIT');
     open = false;
-    res.json({ success: true, data: viewPart(part, (await linksByPart(pool, storeId)).get(part.id) ?? []) });
+    res.json({ success: true, data: await partView(pool, storeId, part.id) });
   } catch (error) {
     if (open) await client.query('ROLLBACK').catch(() => undefined);
     next(error);
@@ -217,16 +231,15 @@ const entrySchema = z.object({
 });
 
 /** Entrada de peças pela oficina: soma o saldo, recalcula o custo médio e lança a compra no financeiro. */
-repairPartsRouter.post('/api/v1/repair-parts/:id/entries', async (req, res, next) => {
-  const client = await pool.connect();
-  let open = false;
-  try {
-    const body = entrySchema.parse(req.body ?? {});
-    const storeId = req.storeId!;
-    await client.query('BEGIN');
-    open = true;
-    const part = (await client.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [req.params.id, storeId])).rows[0];
-    if (!part) throw httpError('Peça não encontrada nesta loja.', 404);
+export type WorkshopEntry = z.infer<typeof entrySchema>;
+
+/** Soma a entrada no saldo da peça (custo médio), registra entrada, movimentação e a compra no financeiro. */
+export async function addWorkshopEntry(client: Db, input: WorkshopEntry & { storeId: string; partId: string; operator: string }) {
+  const storeId = input.storeId;
+  const body = input;
+  const part = (await client.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [input.partId, storeId])).rows[0];
+  if (!part) throw httpError('Peça não encontrada nesta loja.', 404);
+  {
     let supplierName = '';
     if (body.supplierId) {
       const supplier = (await client.query(`SELECT COALESCE(NULLIF(trade_name, ''), name) AS name FROM suppliers WHERE id = $1 AND store_id = $2`, [body.supplierId, storeId])).rows[0];
@@ -245,9 +258,9 @@ repairPartsRouter.post('/api/v1/repair-parts/:id/entries', async (req, res, next
     await client.query(
       `INSERT INTO stock_movements (id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, ref_id, operator_name, notes)
        VALUES ($1, $2, $3, 'in', $4::int, $5::numeric, $6::int, $7::numeric, 'supplier_entry', $8, $9, $10)`,
-      [`MOV-${randomUUID()}`, storeId, part.id, body.qty, previousQty, previousQty + body.qty, body.unitCost, entryId, req.user?.name || 'Operador', ['Entrada de peças da oficina', supplierName, body.notes].filter(Boolean).join(' · ')],
+      [`MOV-${randomUUID()}`, storeId, part.id, body.qty, previousQty, previousQty + body.qty, body.unitCost, entryId, input.operator || 'Operador', ['Entrada de peças da oficina', supplierName, body.notes].filter(Boolean).join(' · ')],
     );
-    await postEntryPayable(client, {
+    await postEntryPayable(client as any, {
       storeId,
       entryId,
       payment: body.payment,
@@ -260,12 +273,60 @@ repairPartsRouter.post('/api/v1/repair-parts/:id/entries', async (req, res, next
       unitCost: body.unitCost,
       imeis: [],
       entryDate: body.entryDate || null,
-      operator: req.user?.name || 'Operador',
+      operator: input.operator || 'Operador',
     });
+    return { entryId, partId: part.id as string };
+  }
+}
+
+export const partView = async (db: Db, storeId: string, id: string) => {
+  const row = (await db.query(`SELECT ${PART_COLUMNS} FROM stock_items WHERE id = $1 AND store_id = $2`, [id, storeId])).rows[0];
+  return row ? viewPart(row, (await linksByPart(db, storeId)).get(id) ?? [], (await devicesByPart(db, storeId)).get(id) ?? []) : null;
+};
+
+const devicesSchema = z.object({
+  devices: z.array(z.object({ brand: z.string().trim().max(60).default(''), model: z.string().trim().min(1, 'Informe o modelo.').max(80) })).max(200),
+});
+
+/** Aparelhos compatíveis com a peça (substitui a lista). */
+repairPartsRouter.put('/api/v1/repair-parts/:id/devices', async (req, res, next) => {
+  const client = await pool.connect();
+  let open = false;
+  try {
+    const body = devicesSchema.parse(req.body ?? {});
+    const storeId = req.storeId!;
+    const part = (await client.query('SELECT id FROM stock_items WHERE id = $1 AND store_id = $2', [req.params.id, storeId])).rows[0];
+    if (!part) throw httpError('Peça não encontrada nesta loja.', 404);
+    const unique = new Map(body.devices.map((device) => [`${norm(device.brand)}\u0000${norm(device.model)}`, { brand: device.brand.toUpperCase(), model: device.model.toUpperCase() }]));
+    await client.query('BEGIN');
+    open = true;
+    await client.query('DELETE FROM repair_part_devices WHERE store_id = $1 AND stock_item_id = $2', [storeId, part.id]);
+    for (const device of unique.values()) {
+      await client.query('INSERT INTO repair_part_devices (id, store_id, stock_item_id, brand, model) VALUES ($1, $2, $3, $4, $5)', [`RPD-${randomUUID()}`, storeId, part.id, device.brand, device.model]);
+    }
     await client.query('COMMIT');
     open = false;
-    const row = (await pool.query(`SELECT ${PART_COLUMNS} FROM stock_items WHERE id = $1 AND store_id = $2`, [part.id, storeId])).rows[0];
-    res.status(201).json({ success: true, data: viewPart(row, (await linksByPart(pool, storeId)).get(part.id) ?? []) });
+    res.json({ success: true, data: await partView(pool, storeId, part.id) });
+  } catch (error) {
+    if (open) await client.query('ROLLBACK').catch(() => undefined);
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+repairPartsRouter.post('/api/v1/repair-parts/:id/entries', async (req, res, next) => {
+  const client = await pool.connect();
+  let open = false;
+  try {
+    const body = entrySchema.parse(req.body ?? {});
+    const storeId = req.storeId!;
+    await client.query('BEGIN');
+    open = true;
+    const { partId } = await addWorkshopEntry(client, { ...body, storeId, partId: req.params.id, operator: req.user?.name ?? '' });
+    await client.query('COMMIT');
+    open = false;
+    res.status(201).json({ success: true, data: await partView(pool, storeId, partId) });
   } catch (error) {
     if (open) await client.query('ROLLBACK').catch(() => undefined);
     next(error);

@@ -67,6 +67,7 @@ import {
 import { getFiscalIssuerSettings } from '../../data/fiscalIssuerStore';
 import { hasModule } from '../../data/storePlan';
 import { osHref, useOsBase } from '../os/osPaths';
+import { OsPartOrdersCard } from '../os/OsPartOrders';
 
 function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1228,6 +1229,10 @@ function WorkOrderDetailBody({ id }: { id: string }) {
             </div>
           </div>
         )}
+      </article>
+
+      <article className="admin-card">
+        <OsPartOrdersCard workOrderId={form.id} locked={locked} />
       </article>
 
       <article className="admin-card">

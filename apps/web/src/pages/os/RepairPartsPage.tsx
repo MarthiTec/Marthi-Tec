@@ -6,11 +6,11 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickModal } from '../../components/QuickModal';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { fileToProductImage } from '../../data/operatorProfile';
-import { apiListSuppliers, type ApiSupplier } from '../../services/erpApi';
 import {
   apiCreateRepairPart,
   apiListRepairParts,
   apiRepairPartEntry,
+  apiSetRepairPartDevices,
   apiSetRepairPartLinks,
   apiUpdateRepairPart,
   REPAIR_PART_STATUS,
@@ -20,12 +20,14 @@ import {
 } from '../../services/repairPartsApi';
 import { apiListRepairServices, repairMoney, type RepairService } from '../../services/repairsApi';
 import { osHref, useOsBase } from './osPaths';
+import { PartOrdersPanel, SupplierField } from './OsPartOrders';
+import { RepairPartsReport } from './RepairPartsReport';
 import './repairs.css';
 import './repairParts.css';
 
 const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 const plain = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const devicesOf = (part: RepairPart) => [...new Set(part.links.map((link) => link.model))];
+const devicesOf = (part: RepairPart) => [...new Set([...part.links.map((link) => link.model), ...(part.devices ?? []).map((device) => device.model)])];
 
 /** Valor editável na tabela: salva só ao sair do campo (não a cada tecla). */
 function MoneyCell({ value, label, onSave }: { value: number; label: string; onSave: (value: number) => void }) {
@@ -61,6 +63,10 @@ export function RepairPartsPage() {
   const [status, setStatus] = useState<RepairPartStatus | 'all'>('all');
   const [error, setError] = useState('');
   const [flash, setFlash] = useState('');
+  const [tab, setTab] = useState<'stock' | 'orders' | 'report'>(() => {
+    const wanted = new URLSearchParams(window.location.search).get('aba');
+    return wanted === 'encomendas' ? 'orders' : wanted === 'relatorio' ? 'report' : 'stock';
+  });
   const [linking, setLinking] = useState<RepairPart | null>(null);
   const [entering, setEntering] = useState<RepairPart | null>(null);
   /** null = fechado; 'new' = nova peça; peça = editar nome e foto. */
@@ -129,6 +135,24 @@ export function RepairPartsPage() {
           </button>
         </div>
 
+        <div className="repair-parts__tabs" role="tablist" aria-label="Peças de manutenção">
+          {(
+            [
+              ['stock', 'Estoque'],
+              ['orders', 'Encomendas'],
+              ['report', 'Relatório'],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'is-on' : ''} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'orders' ? <PartOrdersPanel /> : null}
+        {tab === 'report' ? <RepairPartsReport /> : null}
+        {tab === 'stock' ? (
+        <>
         <div className="repair-parts__stats">
           <button type="button" className={`repair-parts__stat${status === 'all' ? ' is-on' : ''}`} onClick={() => setStatus('all')}>
             <span>Peças</span>
@@ -233,6 +257,8 @@ export function RepairPartsPage() {
             </table>
           </div>
         ) : null}
+        </>
+        ) : null}
         <p className="repairs__muted" style={{ marginTop: 10 }}>
           A peça vinculada a uma qualidade (ex.: Troca de tela · Incell do A12) aparece sozinha na OS desse aparelho. Os serviços e qualidades ficam no{' '}
           <Link to={osHref(osBase, '/manutencoes')}>Catálogo de manutenções</Link>.
@@ -280,7 +306,9 @@ export function RepairPartsPage() {
 function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose: () => void; onSaved: (part: RepairPart) => void }) {
   const [services, setServices] = useState<RepairService[] | null>(null);
   const [chosen, setChosen] = useState(() => new Set(part.links.map((link) => `${link.serviceId}|${link.optionId}`)));
-  const [term, setTerm] = useState(() => devicesOf(part)[0] ?? '');
+  const [term, setTerm] = useState(() => part.links[0]?.model ?? '');
+  const [devices, setDevices] = useState(() => (part.devices ?? []).map((device) => ({ ...device })));
+  const [newDevice, setNewDevice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -304,6 +332,20 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
       .slice(0, 60);
   }, [services, term, chosen]);
 
+  // Sugestões de aparelhos: os que já têm serviço no catálogo.
+  const known = useMemo(() => {
+    const map = new Map<string, { brand: string; model: string }>();
+    for (const service of services ?? []) map.set(`${service.brand} ${service.model}`.toUpperCase(), { brand: service.brand, model: service.model });
+    return map;
+  }, [services]);
+  function addDevice() {
+    const text = newDevice.trim().toUpperCase();
+    if (!text) return;
+    const device = known.get(text) ?? { brand: part.brand, model: text.startsWith(`${part.brand.toUpperCase()} `) ? text.slice(part.brand.length + 1) : text };
+    if (!devices.some((item) => plain(item.model) === plain(device.model) && plain(item.brand) === plain(device.brand))) setDevices((list) => [...list, device]);
+    setNewDevice('');
+  }
+
   const flip = (key: string) =>
     setChosen((current) => {
       const next = new Set(current);
@@ -320,7 +362,8 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
         const [serviceId, optionId] = key.split('|');
         return { serviceId, optionId };
       });
-      onSaved(await apiSetRepairPartLinks(part.id, links));
+      await apiSetRepairPartLinks(part.id, links);
+      onSaved(await apiSetRepairPartDevices(part.id, devices));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
     } finally {
@@ -332,13 +375,53 @@ function PartLinksModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
     <QuickModal
       title="Aparelhos que usam a peça"
       subtitle={part.name}
-      submitLabel={`Salvar (${chosen.size} ${chosen.size === 1 ? 'qualidade' : 'qualidades'})`}
+      submitLabel="Salvar"
       busy={busy}
       error={error}
       onClose={onClose}
       onSubmit={save}
     >
-      <p className="repairs__muted">Marque as qualidades que usam esta peça. Na OS desses aparelhos ela aparece com o saldo e sai do estoque ao abrir a OS.</p>
+      <section className="repair-parts__compat">
+        <strong>Aparelhos compatíveis</strong>
+        <small>A mesma peça serve em outros aparelhos? Adicione aqui — na OS deles ela também aparece.</small>
+        <div className="repair-parts__chips">
+          {devices.map((device, index) => (
+            <span key={`${device.brand}-${device.model}`} className="repair-parts__chip">
+              {device.brand ? `${device.brand} ` : ''}
+              {device.model}
+              <button type="button" aria-label={`Remover ${device.model}`} onClick={() => setDevices((list) => list.filter((_, i) => i !== index))}>
+                ×
+              </button>
+            </span>
+          ))}
+          {!devices.length ? <em className="repairs__muted">Nenhum além das qualidades abaixo.</em> : null}
+        </div>
+        <div className="repair-parts__add-device">
+          <input
+            list="repair-part-devices"
+            value={newDevice}
+            placeholder="Ex.: IPHONE 8 PLUS"
+            aria-label="Aparelho compatível"
+            onChange={(e) => setNewDevice(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addDevice();
+              }
+            }}
+          />
+          <button type="button" className="btn btn--ghost" disabled={!newDevice.trim()} onClick={addDevice}>
+            + Adicionar
+          </button>
+          <datalist id="repair-part-devices">
+            {[...known.keys()].map((label) => (
+              <option key={label} value={label} />
+            ))}
+          </datalist>
+        </div>
+      </section>
+      <strong className="repair-parts__section-title">Qualidades do catálogo de manutenções</strong>
+      <p className="repairs__muted">Marque as qualidades que usam esta peça (ex.: Troca de tela · Incell). Ao escolher a qualidade na OS, a peça já vem marcada.</p>
       <div className="repair-parts__tools" style={{ margin: '8px 0 0' }}>
         <input
           type="search"
@@ -384,12 +467,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Entrada de peças pela oficina: quantidade, custo, fornecedor e como a compra entra no financeiro. */
 function PartEntryModal({ part, onClose, onSaved }: { part: RepairPart; onClose: () => void; onSaved: (part: RepairPart, qty: number) => void }) {
   const [form, setForm] = useState<RepairPartEntry>({ qty: 1, unitCost: part.cost, supplierId: null, entryDate: today(), notes: '', payment: 'paid', dueDate: '' });
-  const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => {
-    apiListSuppliers(true).then(setSuppliers).catch(() => setSuppliers([]));
-  }, []);
   const set = (patch: Partial<RepairPartEntry>) => setForm((current) => ({ ...current, ...patch }));
 
   async function save() {
@@ -420,13 +499,7 @@ function PartEntryModal({ part, onClose, onSaved }: { part: RepairPart; onClose:
           <CurrencyInput value={form.unitCost} ariaLabel="Custo unitário" onChange={(unitCost) => set({ unitCost })} />
         </label>
       </div>
-      <AdminPicker
-        label="Fornecedor (opcional)"
-        value={form.supplierId ?? ''}
-        searchable
-        options={[{ value: '', label: 'Sem fornecedor' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.tradeName || supplier.name }))]}
-        onChange={(value) => set({ supplierId: value || null })}
-      />
+      <SupplierField value={form.supplierId ?? null} onChange={(supplierId) => set({ supplierId })} />
       <div className="quick-modal__row">
         <label>
           Data da entrada

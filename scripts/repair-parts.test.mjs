@@ -160,3 +160,69 @@ test('migração 0109: peça já ligada a uma qualidade passa para o estoque da 
   assert.equal((await query('SELECT scope FROM stock_items WHERE id = $1', [capinha])).rows[0].scope, 'store');
   assert.ok(!(await call('/stock')).data.some((item) => item.id === telaA01.id), 'some da Retaguarda');
 });
+
+test('encomenda de peça: OS abre aguardando, peça chega, entra no estoque da oficina e vai para a OS', async () => {
+  const fornecedor = (await query(`INSERT INTO suppliers (id, store_id, name, trade_name) VALUES ('sup-1', 'store-a', 'Distribuidora', 'Distribuidora Peças') RETURNING id`)).rows[0];
+  const created = await call('/work-orders', 'POST', newOs({
+    customerPhone: '(32) 98888-7777',
+    partOrders: [{ stockId: null, description: 'Tela Moto G04 com aro', qty: 1, unitCost: 45, supplierId: fornecedor.id, expectedAt: '2026-10-21', deviceAtStore: false }],
+  }));
+  assert.equal(created.status, 201, JSON.stringify(created.error));
+  const os = created.data;
+  assert.equal(os.status, 'waiting', 'OS aguardando a peça');
+  const orders = (await call(`/repair-part-orders?workOrderId=${os.id}`)).data;
+  assert.equal(orders.length, 1);
+  assert.deepEqual([orders[0].partName, orders[0].supplierName, orders[0].expectedAt, orders[0].deviceAtStore, orders[0].status, orders[0].customerName], ['Tela Moto G04 com aro', 'Distribuidora Peças', '2026-10-21', false, 'ordered', 'Ana']);
+  assert.equal((await call('/repair-part-orders', 'GET', undefined, other, 'store-b')).data.length, 0, 'outra loja não vê');
+
+  const rescheduled = await call(`/repair-part-orders/${orders[0].id}`, 'PATCH', { expectedAt: '2026-10-23', notes: 'Fornecedor atrasou' });
+  assert.equal(rescheduled.data.expectedAt, '2026-10-23');
+
+  const arrived = await call(`/repair-part-orders/${orders[0].id}/arrive`, 'POST', { unitCost: 48, payment: 'pending', dueDate: '2026-11-05' });
+  assert.equal(arrived.status, 200, JSON.stringify(arrived.error));
+  assert.equal(arrived.data.usedOn, os.id);
+  assert.equal(arrived.data.order.status, 'arrived');
+  const part = (await call('/repair-parts')).data.find((p) => p.id === arrived.data.order.stockId);
+  assert.deepEqual([part.name, part.qty, part.cost, part.scope], ['TELA MOTO G04 COM ARO', 0, 48, 'workshop'], 'entrou e já saiu para a OS');
+  const fresh = (await call(`/work-orders/${os.id}`)).data;
+  assert.equal(fresh.status, 'open', 'OS volta para aberta');
+  assert.ok(fresh.lines.some((l) => l.kind === 'part' && l.stockId === part.id && l.unitPrice === 0));
+  const payable = (await query(`SELECT amount, status, due_date FROM payables WHERE description LIKE '%MOTO G04%'`)).rows[0];
+  assert.deepEqual([Number(payable.amount), payable.status], [48, 'open'], 'compra a pagar');
+  assert.equal((await call(`/repair-part-orders/${orders[0].id}/arrive`, 'POST', { unitCost: 48 })).status, 409, 'não recebe duas vezes');
+
+  // Encomenda avulsa (repor estoque) e cancelada.
+  const avulsa = await call('/repair-part-orders', 'POST', { order: { stockId: telaA02.id, qty: 2, expectedAt: '2020-01-01' } });
+  assert.equal(avulsa.status, 201, JSON.stringify(avulsa.error));
+  assert.equal(avulsa.data.late, true, 'prazo vencido aparece atrasado');
+  const cancelled = await call(`/repair-part-orders/${avulsa.data.id}`, 'PATCH', { status: 'cancelled' });
+  assert.equal(cancelled.data.status, 'cancelled');
+  assert.equal((await call('/repair-part-orders', 'POST', { order: { description: 'x' } })).status, 400);
+});
+
+test('relatório de peças: estoque, no mínimo, consumo nas OS e compras do período, encomendas pendentes', async () => {
+  await call('/repair-part-orders', 'POST', { order: { description: 'Bateria iPhone 11', qty: 1, expectedAt: '2020-01-02' } });
+  const today = new Date().toISOString().slice(0, 10);
+  const report = await call(`/repair-part-orders/report?from=2020-01-01&to=${today}`);
+  assert.equal(report.status, 200, JSON.stringify(report.error));
+  const r = report.data;
+  assert.ok(r.stock.parts >= 4);
+  assert.ok(r.stock.value > 0);
+  assert.ok(r.stock.low.some((p) => p.name === 'BATERIA GENÉRICA' && p.missing >= 1), 'peça sem estoque aparece para comprar');
+  const conector = r.usage.find((u) => u.name.startsWith('CONECTOR'));
+  assert.equal(conector.qty, 2, 'consumo nas OS');
+  assert.ok(r.entries.some((e) => e.name.startsWith('CONECTOR') && e.qty === 10), 'compras do período');
+  assert.equal(r.orders.pending, 1);
+  assert.equal(r.orders.late, 1);
+});
+
+test('aparelhos compatíveis: a mesma peça serve em outros aparelhos, mesmo sem serviço cadastrado', async () => {
+  const set = await call(`/repair-parts/${telaA02.id}/devices`, 'PUT', { devices: [{ brand: 'Samsung', model: 'A02s' }, { brand: 'SAMSUNG', model: 'a02S' }, { brand: 'Samsung', model: 'M02' }] });
+  assert.equal(set.status, 200, JSON.stringify(set.error));
+  assert.deepEqual(set.data.devices.map((d) => d.model), ['A02S', 'M02'], 'sem repetir');
+  assert.ok((await call('/repair-parts?brand=Samsung&model=M02')).data.some((p) => p.id === telaA02.id), 'aparece na OS do M02');
+  assert.equal((await call('/repair-parts?brand=Motorola&model=M02')).data.length, 0, 'marca diferente não');
+  assert.equal((await call(`/repair-parts/${telaA02.id}/devices`, 'PUT', { devices: [] }, other, 'store-b')).status, 404);
+  const cleared = await call(`/repair-parts/${telaA02.id}/devices`, 'PUT', { devices: [] });
+  assert.deepEqual(cleared.data.devices, []);
+});

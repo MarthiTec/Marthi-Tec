@@ -53,6 +53,7 @@ import { screenVisitsRouter } from './routes/screenVisits.js';
 import { userPreferencesRouter } from './routes/userPreferences.js';
 import { repairsRouter } from './routes/repairs.js';
 import { repairPartsRouter } from './routes/repairParts.js';
+import { repairPartOrdersRouter } from './routes/repairPartOrders.js';
 import { catalogOrdersRouter } from './routes/catalogOrders.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
@@ -122,6 +123,7 @@ app.use(screenVisitsRouter);
 app.use(userPreferencesRouter);
 app.use(repairsRouter);
 app.use(repairPartsRouter);
+app.use(repairPartOrdersRouter);
 app.use(catalogOrdersRouter);
 app.use(posRouter);
 app.use(salesRouter);

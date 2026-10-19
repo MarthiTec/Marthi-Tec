@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { QuickModal } from '../../components/QuickModal';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import type { WorkOrderLine } from '../../data/osStore';
-import { apiListRepairParts, REPAIR_PART_STATUS, type RepairPart, type StockPartChoice } from '../../services/repairPartsApi';
+import { apiListRepairParts, REPAIR_PART_STATUS, type PartOrderInput, type RepairPart, type StockPartChoice } from '../../services/repairPartsApi';
 import { repairMoney } from '../../services/repairsApi';
+import { emptyPartOrder, PartOrderFields } from './OsPartOrders';
 import { osHref, useOsBase } from './osPaths';
 import './repairParts.css';
 
@@ -22,6 +24,7 @@ export function OsRepairPartsPicker({
   serviceLines,
   resetSignal = 0,
   onChange,
+  onOrdersChange,
 }: {
   brand: string;
   model: string;
@@ -29,7 +32,15 @@ export function OsRepairPartsPicker({
   serviceLines: WorkOrderLine[];
   resetSignal?: number;
   onChange: (parts: StockPartChoice[]) => void;
+  /** Peças sem estoque encomendadas ao fornecedor (a OS abre "Aguardando"). */
+  onOrdersChange?: (orders: PartOrderInput[]) => void;
 }) {
+  const [orders, setOrders] = useState<PartOrderInput[]>([]);
+  /** Encomenda sendo preenchida (nova ou editando a de índice n). */
+  const [ordering, setOrdering] = useState<{ index: number | null; value: PartOrderInput } | null>(null);
+  const emitOrders = useRef(onOrdersChange);
+  emitOrders.current = onOrdersChange;
+  useEffect(() => emitOrders.current?.(orders), [orders]);
   const osBase = useOsBase();
   const [linked, setLinked] = useState<RepairPart[] | null>(null);
   const [all, setAll] = useState<RepairPart[] | null>(null);
@@ -43,6 +54,7 @@ export function OsRepairPartsPicker({
   useEffect(() => {
     setPicked([]);
     setOther(false);
+    setOrders([]);
   }, [resetSignal]);
 
   // Peças ligadas ao aparelho (recarrega ao trocar de aparelho ou de loja).
@@ -182,7 +194,11 @@ export function OsRepairPartsPicker({
           </div>
         ) : empty ? (
           <p className="os-parts__hint">
-            Sem estoque — <Link to={osHref(osBase, '/pecas')}>dar entrada</Link> ou use uma peça de outro aparelho.
+            Sem estoque —{' '}
+            <button type="button" className="os-parts__link" onClick={() => setOrdering({ index: null, value: emptyPartOrder(part) })}>
+              encomendar ao fornecedor
+            </button>
+            , <Link to={osHref(osBase, '/pecas')}>dar entrada</Link> ou usar uma peça de outro aparelho.
           </p>
         ) : null}
       </li>
@@ -232,10 +248,56 @@ export function OsRepairPartsPicker({
           />
         </div>
       ) : (
-        <button type="button" className="os-parts__more" onClick={() => setOther(true)}>
-          + Usar peça de outro aparelho / fora da lista
-        </button>
+        <div className="os-parts__more-row">
+          <button type="button" className="os-parts__more" onClick={() => setOther(true)}>
+            + Usar peça de outro aparelho / fora da lista
+          </button>
+          <button type="button" className="os-parts__more" onClick={() => setOrdering({ index: null, value: emptyPartOrder() })}>
+            + Encomendar peça
+          </button>
+        </div>
       )}
+      {orders.length ? (
+        <div className="os-parts__orders">
+          <strong>Peças a encomendar · a OS abre “Aguardando” a chegada</strong>
+          <ul>
+            {orders.map((order, index) => (
+              <li key={index}>
+                <span>
+                  <b>
+                    {order.qty}× {order.description || 'Peça'}
+                  </b>
+                  <small>
+                    {[order.supplierName || 'sem fornecedor', order.expectedAt ? `previsão ${order.expectedAt.split('-').reverse().join('/')}` : 'sem prazo', order.deviceAtStore ? 'aparelho fica na loja' : 'cliente traz quando chegar'].join(' · ')}
+                  </small>
+                </span>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setOrdering({ index, value: order })}>
+                  Editar
+                </button>
+                <button type="button" className="btn btn--ghost btn--sm repairs__danger" aria-label="Remover encomenda" onClick={() => setOrders((list) => list.filter((_, i) => i !== index))}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {ordering ? (
+        <QuickModal
+          title="Encomendar peça"
+          subtitle={`Para a OS de ${[brand, model].filter(Boolean).join(' ')}`}
+          submitLabel={ordering.index === null ? 'Adicionar à OS' : 'Salvar'}
+          onClose={() => setOrdering(null)}
+          onSubmit={() => {
+            if (!ordering.value.stockId && ordering.value.description.trim().length < 2) return;
+            setOrders((list) => (ordering.index === null ? [...list, ordering.value] : list.map((item, i) => (i === ordering.index ? ordering.value : item))));
+            setOrdering(null);
+          }}
+        >
+          <PartOrderFields value={ordering.value} onChange={(value) => setOrdering((current) => (current ? { ...current, value } : current))} parts={all ?? linked ?? []} lockPart={Boolean(ordering.value.stockId) && ordering.index === null && (linked ?? []).some((p) => p.id === ordering.value.stockId)} />
+          <p className="repairs__muted">A encomenda é gravada junto com a OS. Quando a peça chegar, dê “Chegou” na OS ou em Peças de manutenção › Encomendas.</p>
+        </QuickModal>
+      ) : null}
       {picked.length ? (
         <p className="os-parts__total">
           <span>

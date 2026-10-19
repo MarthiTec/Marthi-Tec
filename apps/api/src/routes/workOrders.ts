@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { consumeStockPart, returnStockPart, stockPartSchema } from './repairParts.js';
+import { createPartOrders, markWaiting, partOrderSchema } from './repairPartOrders.js';
 
 export const workOrdersRouter = Router();
 workOrdersRouter.use('/api/v1/work-orders', requireAuth);
@@ -178,6 +179,8 @@ const createWorkOrderSchema = z.object({
   quoteNotes: z.string().optional().default(''),
   /** Peças do estoque usadas na manutenção: saem do estoque junto com a abertura da OS. */
   stockParts: z.array(stockPartSchema).max(30).optional().default([]),
+  /** Peças sem estoque, encomendadas ao fornecedor: a OS abre "Aguardando" a chegada. */
+  partOrders: z.array(partOrderSchema).max(20).optional().default([]),
 });
 
 /* ── Rotas ─────────────────────────────────────────────── */
@@ -313,7 +316,7 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
       JSON.stringify(clientLines),
     ];
 
-    if (!body.stockParts.length) {
+    if (!body.stockParts.length && !body.partOrders.length) {
       const result = await pool.query(insertSql, values);
       res.status(201).json({ success: true, data: rowToWorkOrder(result.rows[0]) });
       return;
@@ -329,15 +332,23 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
         partLines.push(await consumeStockPart(client, { ...part, storeId, osId, operator: req.user?.name ?? '' }));
       }
       const lines = [...clientLines, ...partLines];
-      const partsTotal = partLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+      // Sem peça do estoque (só encomenda), mantém a estimativa de peças informada na abertura.
+      const partsTotal = partLines.length ? partLines.reduce((sum, line) => sum + line.unitPrice * line.qty, 0) : body.parts || 0;
       const result = await client.query(
         `UPDATE work_orders SET lines = $3::jsonb, parts = $4::numeric, parts_cost = $4::numeric, total_amount = $5::numeric, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
         [osId, storeId, JSON.stringify(lines), partsTotal, (body.labor || 0) + partsTotal],
       );
+      let row = result.rows[0];
+      if (body.partOrders.length) {
+        await createPartOrders(client, { storeId, workOrderId: osId, orders: body.partOrders, operator: req.user?.name ?? '' });
+        const first = body.partOrders.find((order) => order.expectedAt) ?? body.partOrders[0];
+        await markWaiting(client, storeId, osId, req.user?.name ?? '', { description: body.partOrders.length > 1 ? `${body.partOrders.length} peças` : first.description, expectedAt: first.expectedAt });
+        row = (await client.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId])).rows[0];
+      }
       await client.query('COMMIT');
       open = false;
-      res.status(201).json({ success: true, data: rowToWorkOrder(result.rows[0]) });
+      res.status(201).json({ success: true, data: rowToWorkOrder(row) });
     } catch (error) {
       if (open) await client.query('ROLLBACK').catch(() => undefined);
       throw error;

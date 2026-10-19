@@ -17,7 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { osHref, useOsBase } from '../os/osPaths';
 import { OsCreatedShareModal } from '../os/OsCreatedShareModal';
 import { refreshStockFinance } from '../../data/workshopLedger';
-import type { StockPartChoice } from '../../services/repairPartsApi';
+import type { PartOrderInput, StockPartChoice } from '../../services/repairPartsApi';
 import { OsDeviceRepairSelector, type OsRepairSelectionResult } from '../os/OsDeviceRepairSelector';
 import { OsRepairPartsPicker } from '../os/OsRepairPartsPicker';
 import '../os/os.css';
@@ -56,6 +56,7 @@ export function WorkOrderNewPage() {
   const [form, setForm] = useState({ ...EMPTY, technician: profile.displayName });
   const [selectedLines, setSelectedLines] = useState<WorkOrderLine[]>([]);
   const [stockParts, setStockParts] = useState<StockPartChoice[]>([]);
+  const [partOrders, setPartOrders] = useState<PartOrderInput[]>([]);
   const [quoteNotes, setQuoteNotes] = useState('');
   const [resetSignal, setResetSignal] = useState(0);
   const lastAutoDefectRef = useRef('');
@@ -105,11 +106,13 @@ export function WorkOrderNewPage() {
         quoteStatus: selectedLines.length > 0 ? 'approved' : 'none',
         quoteNotes,
         stockParts,
+        partOrders,
       });
       if (stockParts.length) void refreshStockFinance();
       setForm({ ...EMPTY, technician: profile.displayName });
       setSelectedLines([]);
       setStockParts([]);
+      setPartOrders([]);
       setQuoteNotes('');
       lastAutoDefectRef.current = '';
       setResetSignal((s) => s + 1);
@@ -205,7 +208,7 @@ export function WorkOrderNewPage() {
               }}
               onSelectionChange={handleRepairSelectionChange}
             />
-            <OsRepairPartsPicker brand={form.itemBrand} model={form.itemModel} serviceLines={selectedLines} resetSignal={resetSignal} onChange={setStockParts} />
+            <OsRepairPartsPicker brand={form.itemBrand} model={form.itemModel} serviceLines={selectedLines} resetSignal={resetSignal} onChange={setStockParts} onOrdersChange={setPartOrders} />
           </div>
 
           <label>
