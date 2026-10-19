@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
+import { requireAuth, requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
 import { z } from 'zod';
 import {
   activateStoredClientUser,
@@ -20,6 +20,8 @@ import {
 import { inspectToken } from '../services/tokenService.js';
 import { sendPhoneOtp, verifyPhoneOtp } from '../services/otpService.js';
 import { env } from '../config/env.js';
+import { pool } from '../db/pool.js';
+import { AREA_LABEL } from '../services/employeeAccess.js';
 
 export const authRouter = Router();
 
@@ -353,6 +355,88 @@ authRouter.get('/api/v1/auth/me', async (req, res, next) => {
 
     const user = await verifySessionToken(header.slice('Bearer '.length));
     res.json({ success: true, data: { user } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const FULL_ACCESS_ROLES = new Set(['admin', 'superadmin', 'owner', 'manager']);
+
+/**
+ * Contexto de acesso da loja ativa (mobile / UI). A API continua barrando por área em cada rota;
+ * este endpoint só espelha áreas liberadas em Pessoas › Permissões para esconder telas.
+ */
+authRouter.get('/api/v1/auth/access', requireAuth, async (req, res, next) => {
+  try {
+    if (!pool) throw Object.assign(new Error('MarthiDB indisponível.'), { status: 503 });
+    const role = String(req.user?.role ?? 'operator').toLowerCase();
+    const storeId = req.storeId!;
+    const email = req.user?.email ?? '';
+    const fullAccess = FULL_ACCESS_ROLES.has(role);
+
+    if (fullAccess) {
+      res.json({
+        success: true,
+        data: {
+          storeId,
+          role,
+          fullAccess: true,
+          accessAreas: Object.keys(AREA_LABEL).concat(['painel', 'erp']),
+          permissions: {},
+          areaLabels: AREA_LABEL,
+        },
+      });
+      return;
+    }
+
+    const employee = (
+      await pool.query(
+        `SELECT role, access_areas, permissions, active, home_area
+           FROM employees
+          WHERE store_id = $1 AND is_system_user = true
+            AND lower(coalesce(nullif(user_email, ''), email)) = lower($2)
+          ORDER BY active DESC, updated_at DESC LIMIT 1`,
+        [storeId, email],
+      )
+    ).rows[0];
+
+    if (!employee) {
+      // Login sem cadastro de funcionário nesta loja (ex.: dono sem linha em employees): sem restrição de UI.
+      res.json({
+        success: true,
+        data: {
+          storeId,
+          role,
+          fullAccess: true,
+          accessAreas: Object.keys(AREA_LABEL).concat(['painel', 'erp']),
+          permissions: {},
+          areaLabels: AREA_LABEL,
+        },
+      });
+      return;
+    }
+
+    const empRole = String(employee.role || '').toLowerCase();
+    const empFull = Boolean(employee.active) && (empRole === 'admin' || empRole === 'manager');
+    const accessAreas: string[] = Array.isArray(employee.access_areas)
+      ? employee.access_areas.map(String)
+      : [];
+    const permissions =
+      employee.permissions && typeof employee.permissions === 'object' ? employee.permissions : {};
+
+    res.json({
+      success: true,
+      data: {
+        storeId,
+        role: empRole || role,
+        fullAccess: empFull,
+        accessAreas: employee.active ? accessAreas : [],
+        permissions,
+        homeArea: employee.home_area ? String(employee.home_area) : null,
+        active: Boolean(employee.active),
+        areaLabels: AREA_LABEL,
+      },
+    });
   } catch (error) {
     next(error);
   }
