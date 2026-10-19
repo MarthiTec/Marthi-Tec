@@ -350,6 +350,7 @@ export function App() {
           <Route path="perfil" element={<ProfilePage />} />
           <Route path="conta" element={<Navigate to="/painel/perfil" replace />} />
           <Route path="plano" element={<PlanPage />} />
+          <Route path="faturamento" element={<Navigate to="/painel/plano" replace />} />
           <Route path="ramo" element={<StoreSegmentPage />} />
           <Route path="personalizacao" element={<StoreSegmentPage />} />
           <Route path="cardapio" element={<CardapioAdminPage />} />

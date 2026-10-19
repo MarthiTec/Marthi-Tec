@@ -48,7 +48,7 @@ export function PanelAppsMenu({ isAdmin, onLogout }: { isAdmin: boolean; onLogou
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Atalhos do painel"
-        title="Painel, usuários, operações, lojas, ajuda e log-out"
+        title="Painel, usuários, operações, lojas, faturamento, ajuda e log-out"
         onClick={() => setOpen((current) => !current)}
       >
         <AdminIcon name="apps" />

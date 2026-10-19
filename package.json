@@ -8,7 +8,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "test:client-payments": "npm run build:api && node --test scripts/client-payment-activation.test.mjs scripts/client-payment-ui.test.mjs",
-    "test:billing": "npm run build:api && node --test scripts/billing-subscriptions.test.mjs",
+    "test:billing": "npm run build:api && node --test scripts/billing-subscriptions.test.mjs scripts/planos-faturamento-tab.test.mjs",
     "test:commercial": "npm run build:api && node --test scripts/commercial-orders.test.mjs",
     "test:security": "npm run build:api && node --test scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs scripts/whatsapp-auto-provision.test.mjs scripts/work-orders-security.test.mjs scripts/goals-security.test.mjs scripts/totem-unlock.test.mjs scripts/legacy-schema-repair.test.mjs scripts/brand-logos.test.mjs scripts/people-details.test.mjs scripts/legacy-enums.test.mjs scripts/employee-access.test.mjs scripts/store-brand-profile.test.mjs",
     "test:mobile-access": "npm run build:api && node --test scripts/mobile-auth-access.test.mjs",

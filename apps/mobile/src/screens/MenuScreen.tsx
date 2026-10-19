@@ -38,6 +38,10 @@ export function MenuScreen() {
 
       <View style={[styles.card, { backgroundColor: c.card, borderColor: c.line }]}>
         <Text style={[styles.section, { color: c.ink }]}>Atalhos</Text>
+        <Pressable style={styles.soon} onPress={() => router.push('/(app)/billing')}>
+          <Text style={{ color: c.ink, fontWeight: '700' }}>Planos & Faturamento</Text>
+          <Text style={{ color: c.mute, fontSize: 12, marginTop: 2 }}>Assinatura, faturas e Pix</Text>
+        </Pressable>
         <Pressable style={styles.soon} onPress={() => router.push('/(app)/activities')}>
           <Text style={{ color: c.ink, fontWeight: '700' }}>Atividades / auditoria</Text>
         </Pressable>

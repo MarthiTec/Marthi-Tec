@@ -143,12 +143,38 @@ export async function createAdminInvoice(body: {
   });
 }
 
+export type BillingPixPayload = {
+  keyType: 'email' | 'cpf_cnpj' | 'telefone' | 'aleatoria';
+  keyValue: string;
+  receiverName: string;
+  bankName: string;
+  amount: number | null;
+  currency: string;
+  brCode: string;
+  qrDataUrl: string | null;
+  format: 'brcode_emv';
+  source: 'database' | 'env' | 'default';
+  instructions: string;
+};
+
 export async function fetchStoreBillingSubscription() {
   return nestRequest<{
     subscription: ClientSubscription;
     invoices: BillingInvoice[];
+    amountDue: number | null;
+    pix: BillingPixPayload;
     provider: { activeProvider: string; portalAvailable: boolean; gates: string[] };
   }>('/billing/subscription');
+}
+
+export async function fetchStoreBillingPix() {
+  return nestRequest<{
+    amountDue: number | null;
+    currency: string;
+    planId: string;
+    subscriptionId: string;
+    pix: BillingPixPayload;
+  }>('/billing/pix');
 }
 
 export async function openStoreBillingPortal() {

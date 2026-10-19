@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireSession, requirePlatformAdmin } from '../middlewares/authMiddleware.js';
+import { loadPlatformPixInfo } from '../services/pixBrCode.js';
 
 export const payoutSettingsRouter = Router();
 const bankSchema = z.object({
@@ -23,30 +24,17 @@ const path = '/api/v1/admin/payout-settings';
 
 payoutSettingsRouter.get('/api/v1/payout-settings/public', async (_req, res) => {
   try {
-    const result = pool
-      ? await pool.query("SELECT bank_account, pix FROM platform_payout_settings WHERE id = 'platform'")
-      : { rows: [] };
-    const bank = result.rows[0]?.bank_account ?? {};
-    const pix = result.rows[0]?.pix ?? {};
-    const keyValue = typeof pix.keyValue === 'string' && pix.keyValue.trim()
-      ? pix.keyValue.trim()
-      : 'marthi.tecnologia@gmail.com';
-    const keyType = typeof pix.keyType === 'string' && pix.keyType.trim()
-      ? pix.keyType
-      : 'email';
-    const receiverName =
-      (typeof pix.receiverName === 'string' && pix.receiverName.trim()) ||
-      (typeof bank.holderName === 'string' && bank.holderName.trim()) ||
-      'Marthi Tecnologia';
-    const bankName =
-      (typeof bank.bankName === 'string' && bank.bankName.trim()) ||
-      (typeof pix.receiverInstitution === 'string' && pix.receiverInstitution.trim()) ||
-      '';
+    const pix = await loadPlatformPixInfo();
     res.json({
       success: true,
       data: {
-        pix: { keyType, keyValue, receiverName },
-        bankAccount: { holderName: receiverName, bankName },
+        pix: {
+          keyType: pix.keyType,
+          keyValue: pix.keyValue,
+          receiverName: pix.receiverName,
+          source: pix.source,
+        },
+        bankAccount: { holderName: pix.receiverName, bankName: pix.bankName },
       },
     });
   } catch {
@@ -57,6 +45,7 @@ payoutSettingsRouter.get('/api/v1/payout-settings/public', async (_req, res) => 
           keyType: 'email',
           keyValue: 'marthi.tecnologia@gmail.com',
           receiverName: 'Marthi Tecnologia',
+          source: 'default',
         },
         bankAccount: { holderName: 'Marthi Tecnologia', bankName: '' },
       },

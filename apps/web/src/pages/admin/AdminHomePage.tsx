@@ -303,7 +303,7 @@ export function AdminHomePage() {
               <>
                 <Link to="/painel/plano" className="btn btn--ghost">
                   <AdminIcon name="plan" />
-                  Plano
+                  Planos &amp; Faturamento
                 </Link>
                 <Link to="/painel/ajuda" className="btn btn--ghost">
                   <AdminIcon name="help" />

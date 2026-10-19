@@ -85,6 +85,8 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/pagamentos': { kicker: 'Vendas', title: 'Formas de pagamento' },
   '/painel/taxas-cartao': { kicker: 'Vendas & Financeiro', title: 'Taxas de Cartão & Maquininhas' },
   '/painel/financeiro': { kicker: 'Retaguarda', title: 'Financeiro' },
+  '/painel/plano': { kicker: 'Assinatura', title: 'Planos & Faturamento' },
+  '/painel/faturamento': { kicker: 'Assinatura', title: 'Planos & Faturamento' },
   '/painel/auditoria': { kicker: 'Retaguarda', title: 'Auditoria e acessos' },
   '/painel/os': { kicker: 'Oficina', title: 'Ordens de serviço' },
   '/painel/os/agenda': { kicker: 'Oficina', title: 'Agenda da oficina' },

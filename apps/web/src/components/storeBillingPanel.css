@@ -186,6 +186,38 @@
   word-break: break-word;
 }
 
+.store-billing-panel__pix-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px 20px;
+  align-items: start;
+}
+
+.store-billing-panel__pix-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-2, var(--admin-surface-subtle, #f8fafc));
+  border: 1px solid var(--line, var(--admin-border, #e2e8f0));
+}
+
+.is-theme-dark .store-billing-panel__pix-qr,
+.admin--dark .store-billing-panel__pix-qr {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.store-billing-panel__pix-qr img {
+  display: block;
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .store-billing-panel__pix-copy {
   display: flex;
   flex-direction: column;
@@ -318,6 +350,10 @@
 
 @media (max-width: 768px) {
   .store-billing-panel__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .store-billing-panel__pix-layout {
     grid-template-columns: 1fr;
   }
 

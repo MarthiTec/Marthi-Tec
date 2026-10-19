@@ -70,6 +70,13 @@ const envSchema = z.object({
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : typeof value === 'string' ? value.trim() : value),
     z.string().url().optional(),
   ),
+  /**
+   * Fallback da chave Pix de recebimento da Marthi quando `platform_payout_settings` estiver vazio.
+   * Preferir gravar em /admin/recebimentos (MarthiDB). Default operacional: e-mail oficial.
+   */
+  PLATFORM_PIX_KEY: z.string().optional(),
+  PLATFORM_PIX_KEY_TYPE: z.enum(['email', 'cpf_cnpj', 'telefone', 'aleatoria']).optional(),
+  PLATFORM_PIX_RECEIVER_NAME: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

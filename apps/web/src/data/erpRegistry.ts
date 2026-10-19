@@ -70,7 +70,7 @@ export const ACCESS_AREA_LABEL: Record<AccessArea, string> = {
   erp_fiscal: 'Fiscal (NCM/CFOP)',
   ecommerce: 'E-commerce',
   ads: 'Anúncios Ads (montar anúncios; autorizar gasto e conectar contas é só do administrador)',
-  erp_plan: 'Plano da loja (admin)',
+  erp_plan: 'Planos & Faturamento (admin)',
 };
 
 export const ALL_ACCESS_AREAS = Object.keys(ACCESS_AREA_LABEL) as AccessArea[];
@@ -761,7 +761,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   }
   if (pathname.startsWith('/ecommerce')) return 'ecommerce';
   if (pathname.startsWith('/painel/ads')) return 'ads';
-  if (pathname.startsWith('/painel/plano')) return 'erp_plan';
+  if (pathname.startsWith('/painel/plano') || pathname.startsWith('/painel/faturamento')) return 'erp_plan';
   return null;
 }
 

@@ -6,10 +6,11 @@ import {
   formatBillingMoney,
   openStoreBillingPortal,
   type BillingInvoice,
+  type BillingPixPayload,
   type ClientSubscription,
 } from '../data/billingSubscriptionsApi';
 import { NestApiError, isNestAuthed } from '../services/nestClient';
-import { buildPixBrCode, fetchPublicPixInfo, type PublicPixInfo } from '../utils/pixBrCode';
+import { QrCodeView } from './QrCodeView';
 import './storeBillingPanel.css';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,6 +40,8 @@ type StoreBillingPanelProps = {
 export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }: StoreBillingPanelProps) {
   const [subscription, setSubscription] = useState<ClientSubscription | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [amountDue, setAmountDue] = useState<number | null>(null);
+  const [pix, setPix] = useState<BillingPixPayload | null>(null);
   const [activeProvider, setActiveProvider] = useState('manual');
   const [portalAvailable, setPortalAvailable] = useState(false);
   const [gates, setGates] = useState<string[]>([]);
@@ -46,7 +49,6 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
   const [note, setNote] = useState('');
   const [portalBusy, setPortalBusy] = useState(false);
   const [showPix, setShowPix] = useState(false);
-  const [pixInfo, setPixInfo] = useState<PublicPixInfo | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
@@ -61,6 +63,8 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
         if (cancelled) return;
         setSubscription(data.subscription);
         setInvoices(data.invoices);
+        setAmountDue(data.amountDue);
+        setPix(data.pix);
         setActiveProvider(data.provider.activeProvider);
         setPortalAvailable(data.provider.portalAvailable);
         setGates(data.provider.gates || []);
@@ -85,19 +89,8 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
     [invoices],
   );
 
-  const amountDue = openInvoice?.amount ?? subscription?.amount ?? 0;
-
-  const pixBrCode = useMemo(() => {
-    if (!pixInfo || !subscription) return '';
-    return buildPixBrCode({
-      keyType: pixInfo.keyType,
-      keyValue: pixInfo.keyValue,
-      receiverName: pixInfo.receiverName,
-      amount: amountDue > 0 ? amountDue : undefined,
-      txid: `MARTHI${subscription.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 18).toUpperCase() || 'SUB'}`,
-      description: `Assinatura Marthi ${subscription.planId}`,
-    });
-  }, [pixInfo, subscription, amountDue]);
+  const displayAmount = amountDue ?? openInvoice?.amount ?? subscription?.amount ?? 0;
+  const pixBrCode = pix?.brCode || '';
 
   async function handleOpenPortal() {
     setPortalBusy(true);
@@ -112,15 +105,11 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
     }
   }
 
-  async function handleShowPix() {
+  function handleShowPix() {
     setShowPix(true);
     setNote('');
-    if (pixInfo) return;
-    try {
-      const info = await fetchPublicPixInfo();
-      setPixInfo(info);
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : 'Não foi possível carregar a chave Pix da Marthi.');
+    if (!pix) {
+      setNote('Pix da Marthi indisponível. Confira /admin/recebimentos ou PLATFORM_PIX_KEY no Site.');
     }
   }
 
@@ -149,14 +138,14 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
       <header className="store-billing-panel__head">
         <div>
           <p className="store-billing-panel__kicker">Assinatura Marthi</p>
-          <h3 id="store-billing-title">Plano &amp; Faturamento</h3>
+          <h3 id="store-billing-title">Planos &amp; Faturamento</h3>
           <p className="store-billing-panel__lead">
-            Valor devido, próxima cobrança e pagamento da conta comercial — dados do MarthiDB.
+            Plano atual, próxima cobrança, histórico de faturas e pagamento via Pix — dados do MarthiDB.
           </p>
         </div>
         {showPlanLink && variant === 'embedded' ? (
           <Link to="/painel/plano" className="btn btn--ghost store-billing-panel__plan-link">
-            Abrir /painel/plano
+            Abrir Planos &amp; Faturamento
           </Link>
         ) : null}
       </header>
@@ -180,7 +169,7 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
                 {openInvoice ? 'Valor em aberto' : 'Valor da assinatura'}
               </span>
               <strong className="store-billing-panel__metric-value store-billing-panel__metric-value--money">
-                {formatBillingMoney(amountDue, subscription.currency)}
+                {formatBillingMoney(displayAmount, subscription.currency)}
               </strong>
               <span className="store-billing-panel__metric-sub">
                 / {subscription.billingCycle === 'yearly' ? 'ano' : 'mês'}
@@ -199,7 +188,7 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
 
           <div className="store-billing-panel__actions">
             {isManual ? (
-              <button type="button" className="btn btn--primary" onClick={() => void handleShowPix()}>
+              <button type="button" className="btn btn--primary" onClick={() => handleShowPix()}>
                 Pagar via Pix
               </button>
             ) : (
@@ -223,46 +212,67 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
               </button>
             ) : null}
             {activeProvider === 'manual' && !showPix ? (
-              <button type="button" className="btn btn--ghost" onClick={() => void handleShowPix()}>
-                Ver instruções Pix
+              <button type="button" className="btn btn--ghost" onClick={() => handleShowPix()}>
+                Ver QR e Copia e Cola
               </button>
             ) : null}
           </div>
 
           {showPix && isManual ? (
-            <div className="store-billing-panel__pix" role="region" aria-label="Pagamento Pix manual">
-              <h4>Pagamento Pix (manual)</h4>
+            <div className="store-billing-panel__pix" role="region" aria-label="Pagamento Pix">
+              <h4>Pagamento Pix</h4>
               <p>
-                Enquanto o gateway automático não estiver ativo (<code>BILLING_PROVIDER=manual</code>), pague com a
-                chave Pix da Marthi. Após o pagamento, a liberação é confirmada pela equipe Marthi.
+                QR e Copia e Cola usam o <strong>BR Code EMV</strong> oficial do Banco Central, com a chave Pix da
+                Marthi (MarthiDB / <code>/admin/recebimentos</code>
+                {pix?.source === 'env' ? ' ou env PLATFORM_PIX_KEY' : ''}). O valor vem só da assinatura/fatura no
+                MarthiDB — não inventamos valores.
               </p>
-              {pixInfo ? (
-                <dl className="store-billing-panel__pix-grid">
-                  <div>
-                    <dt>Beneficiário</dt>
-                    <dd>{pixInfo.receiverName}</dd>
+              {pix ? (
+                <>
+                  <div className="store-billing-panel__pix-layout">
+                    <div className="store-billing-panel__pix-qr">
+                      {pix.qrDataUrl ? (
+                        <img src={pix.qrDataUrl} alt="QR Code Pix da assinatura Marthi" width={200} height={200} />
+                      ) : pixBrCode ? (
+                        <QrCodeView value={pixBrCode} size={200} />
+                      ) : (
+                        <p className="store-billing-panel__muted">QR indisponível.</p>
+                      )}
+                      <p className="store-billing-panel__muted">Aponte a câmera do banco</p>
+                    </div>
+                    <dl className="store-billing-panel__pix-grid">
+                      <div>
+                        <dt>Beneficiário</dt>
+                        <dd>{pix.receiverName}</dd>
+                      </div>
+                      <div>
+                        <dt>Tipo de chave</dt>
+                        <dd>{pix.keyType}</dd>
+                      </div>
+                      <div>
+                        <dt>Chave Pix</dt>
+                        <dd>
+                          <code>{pix.keyValue}</code>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Valor</dt>
+                        <dd>
+                          {pix.amount != null
+                            ? formatBillingMoney(pix.amount, pix.currency || subscription.currency)
+                            : 'Sem valor em aberto no MarthiDB'}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                  <div>
-                    <dt>Tipo de chave</dt>
-                    <dd>{pixInfo.keyType}</dd>
-                  </div>
-                  <div>
-                    <dt>Chave Pix</dt>
-                    <dd>
-                      <code>{pixInfo.keyValue}</code>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Valor</dt>
-                    <dd>{formatBillingMoney(amountDue, subscription.currency)}</dd>
-                  </div>
-                </dl>
+                  <p className="store-billing-panel__hint">{pix.instructions}</p>
+                </>
               ) : (
                 <p className="store-billing-panel__muted">Carregando chave Pix…</p>
               )}
               {pixBrCode ? (
                 <div className="store-billing-panel__pix-copy">
-                  <label htmlFor="store-billing-pix-code">Pix Copia e Cola</label>
+                  <label htmlFor="store-billing-pix-code">Pix Copia e Cola (BR Code)</label>
                   <textarea id="store-billing-pix-code" readOnly rows={3} value={pixBrCode} />
                   <button type="button" className="btn btn--ghost" onClick={() => void handleCopyPix()}>
                     {pixCopied ? 'Copiado!' : 'Copiar código Pix'}
@@ -278,7 +288,7 @@ export function StoreBillingPanel({ variant = 'embedded', showPlanLink = true }:
 
           <div className="store-billing-panel__invoices">
             <div className="store-billing-panel__invoices-head">
-              <h4>Faturas</h4>
+              <h4>Faturas e pagamentos</h4>
               <span className="store-billing-panel__muted">
                 {invoices.length ? `${invoices.length} registro(s)` : 'Nenhuma fatura ainda'}
               </span>

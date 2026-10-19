@@ -80,10 +80,10 @@ export function PlanPage() {
       <StoreBillingPanel variant="page" showPlanLink={false} />
 
       <article className="admin-card">
-        <h2>Plano da loja</h2>
+        <h2>Módulos liberados na loja</h2>
         <p>
-          Bronze (1 módulo), Silver (até 2) e Golden (tudo). O painel da loja entra em qualquer
-          plano — só administradores alteram o contrato.
+          Bronze (1 módulo), Silver (até 2) e Golden (tudo). O faturamento e o Pix ficam no bloco acima —
+          só administradores alteram o contrato de módulos.
         </p>
         <div className="plan-picker">
           {PLANS.map((item) => (

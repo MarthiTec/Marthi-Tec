@@ -50,6 +50,8 @@ const WORDS: Record<string, string> = {
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
   '/painel/financeiro': 'financeiro contas pagar receber caixa fluxo',
   '/painel/lojas': 'empresa lojas filiais licenca plano cnpj',
+  '/painel/plano': 'plano faturamento assinatura pix fatura cobranca mensalidade',
+  '/painel/faturamento': 'plano faturamento assinatura pix fatura cobranca mensalidade',
   '/painel/usuarios': 'usuarios equipe permissoes acesso',
   '/painel/operacoes': 'operacoes ramo comunicacao whatsapp email ajustes',
   '/painel/notas': 'nota fiscal nfe nfce notas emitidas',
@@ -65,6 +67,14 @@ export const TOP_SHORTCUTS: Array<{ id: string; path: string; label: string; hin
   { id: 'usuarios', path: '/painel/usuarios', label: 'Usuários', hint: 'Equipe e permissões', icon: 'people', adminOnly: true },
   { id: 'operacoes', path: '/painel/operacoes', label: 'Operações', hint: 'Ramo, comunicação e ajustes', icon: 'ops', adminOnly: true },
   { id: 'lojas', path: '/painel/lojas', label: 'Lojas & Licenças', hint: 'Filiais e plano', icon: 'store', adminOnly: true },
+  {
+    id: 'faturamento',
+    path: '/painel/plano',
+    label: 'Planos & Faturamento',
+    hint: 'Assinatura, faturas e Pix',
+    icon: 'plan',
+    adminOnly: true,
+  },
   { id: 'ajuda', path: '/painel/ajuda', label: 'Central de ajuda', hint: 'Dúvidas e suporte', icon: 'help' },
 ];
 
