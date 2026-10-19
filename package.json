@@ -23,7 +23,8 @@
     "lint": "npm run lint --workspaces --if-present",
     "test:audit": "npm run build:api && node --test scripts/module-persistence.test.mjs scripts/security-regression.test.mjs scripts/sales-persistence.test.mjs scripts/email-rendering.test.mjs scripts/client-payment-activation.test.mjs scripts/client-payment-ui.test.mjs scripts/commercial-orders.test.mjs",
     "test:mobile-stock": "npm run build:api && node --test scripts/mobile-stock-phase3.test.mjs",
-    "test:mobile-os": "npm run build:api && node --test scripts/mobile-os-phase4.test.mjs"
+    "test:mobile-os": "npm run build:api && node --test scripts/mobile-os-phase4.test.mjs",
+    "test:mobile-sales": "node --test scripts/mobile-sales-phase5.test.mjs"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.2",
