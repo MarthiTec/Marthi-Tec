@@ -59,6 +59,7 @@ import { catalogOrdersRouter } from './routes/catalogOrders.js';
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
 import { auditLogsRouter } from './routes/auditLogs.js';
+import { mobileDownloadRouter } from './routes/mobileDownload.js';
 
 const app = express();
 
@@ -93,6 +94,8 @@ app.use(express.json({ limit: '5mb' }));
 // Rotas da API da Marthi Plataforma
 app.use(healthRouter);
 app.use(authRouter);
+/** Antes do registry (que 503 sem DB): links de install do app são só env. */
+app.use(mobileDownloadRouter);
 app.use(partnersRouter);
 app.use(attributesRouter);
 app.use(pickupRouter);

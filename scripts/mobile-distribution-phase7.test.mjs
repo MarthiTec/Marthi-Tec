@@ -27,6 +27,22 @@ test('distribution docs exist', () => {
   assert.match(dist, /eas-cli build -p android --profile preview/);
   assert.match(dist, /Ad Hoc/);
   assert.match(dist, /Play Store|App Store/i);
+  assert.match(dist, /MOBILE_ANDROID_APK_URL/);
+  assert.match(dist, /MOBILE_IOS_INSTALL_URL/);
+  assert.match(dist, /Operações → Download do App/);
+});
+
+test('painel Operações tem UI de download do app', () => {
+  const ops = fs.readFileSync('apps/web/src/pages/admin/OperationsPage.tsx', 'utf8');
+  assert.match(ops, /MobileAppDownloadSection/);
+  assert.match(ops, /Download do App/);
+  assert.ok(fs.existsSync('apps/web/src/components/MobileAppDownloadSection.tsx'));
+  const section = fs.readFileSync('apps/web/src/components/MobileAppDownloadSection.tsx', 'utf8');
+  assert.match(section, /APK ainda não publicado/);
+  assert.match(section, /\/mobile\/download/);
+  assert.ok(fs.existsSync('apps/api/src/routes/mobileDownload.ts'));
+  const route = fs.readFileSync('apps/api/src/routes/mobileDownload.ts', 'utf8');
+  assert.match(route, /MOBILE_ANDROID_APK_URL|androidApkUrl/);
 });
 
 test('mobile package is excluded from Discloud Site upload', () => {

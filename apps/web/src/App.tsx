@@ -13,6 +13,7 @@ import { AreaGuard } from './components/AreaGuard';
 import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { DevMobileAppDownloadPage } from './pages/admin/DevMobileAppDownloadPage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -164,6 +165,9 @@ export function App() {
         <Route path="/fale-conosco" element={<Navigate to="/contato" replace />} />
         <Route path="/parceiro" element={<PartnerSignupPage />} />
         <Route path="/login" element={<LoginPage />} />
+        {import.meta.env.DEV ? (
+          <Route path="/dev/operacoes-app-download" element={<DevMobileAppDownloadPage />} />
+        ) : null}
         <Route path="/criar-senha" element={<SetupPasswordPage />} />
         <Route path="/definir-senha" element={<Navigate to="/criar-senha" replace />} />
         <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
@@ -279,6 +283,7 @@ export function App() {
           <Route path="operacoes/usuarios" element={<OperationsPage />} />
           <Route path="operacoes/comunicacao" element={<OperationsPage />} />
           <Route path="operacoes/whatsapp" element={<OperationsPage />} />
+          <Route path="operacoes/app" element={<OperationsPage />} />
           <Route path="pdv" element={<PosPage />} />
           <Route path="pdv/venda" element={<Navigate to="/caixa" replace />} />
           <Route path="venda-externa" element={<ExternalSalePage />} />

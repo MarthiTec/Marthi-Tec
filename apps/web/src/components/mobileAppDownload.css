@@ -1,0 +1,207 @@
+.mobile-app-dl {
+  display: grid;
+  gap: 18px;
+  padding: 22px 24px;
+}
+
+.mobile-app-dl__head {
+  display: grid;
+  gap: 4px;
+}
+
+.mobile-app-dl__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.mobile-app-dl__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, #0f766e) 16%, transparent);
+  color: var(--accent, #0f766e);
+  flex-shrink: 0;
+}
+
+.mobile-app-dl__head h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  color: var(--ink, #0f172a);
+}
+
+.mobile-app-dl__head p {
+  margin: 0;
+  color: var(--mute, #64748b);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+
+.mobile-app-dl__status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-2, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  color: var(--mute, #64748b);
+  font-size: 0.88rem;
+}
+
+.mobile-app-dl__status--warn {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.mobile-app-dl__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mobile-app-dl__platform {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line, #e2e8f0);
+  background: var(--card-2, #f8fafc);
+}
+
+.mobile-app-dl__platform h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  color: var(--ink, #0f172a);
+}
+
+.mobile-app-dl__lead {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--mute, #64748b);
+  line-height: 1.4;
+}
+
+.mobile-app-dl__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  font-weight: 650;
+}
+
+.mobile-app-dl__empty {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--line, #cbd5e1);
+  background: var(--surface, #ffffff);
+}
+
+.mobile-app-dl__empty strong {
+  color: var(--ink, #0f172a);
+  font-size: 0.92rem;
+}
+
+.mobile-app-dl__empty p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--mute, #64748b);
+  line-height: 1.45;
+}
+
+.mobile-app-dl__empty code,
+.mobile-app-dl__foot code {
+  font-size: 0.82em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent, #0f766e) 12%, transparent);
+  color: var(--ink, #0f172a);
+}
+
+.mobile-app-dl__empty .btn {
+  width: fit-content;
+}
+
+.mobile-app-dl__foot {
+  margin: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--line, #e2e8f0);
+}
+
+.mobile-app-dl__foot p {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--mute, #64748b);
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .mobile-app-dl {
+    padding: 16px;
+  }
+
+  .mobile-app-dl__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-app-dl__title-row {
+    gap: 10px;
+  }
+}
+
+.is-theme-dark .mobile-app-dl__head h2,
+.admin--dark .mobile-app-dl__head h2,
+.is-theme-dark .mobile-app-dl__platform h3,
+.admin--dark .mobile-app-dl__platform h3,
+.is-theme-dark .mobile-app-dl__empty strong,
+.admin--dark .mobile-app-dl__empty strong {
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .mobile-app-dl__head p,
+.admin--dark .mobile-app-dl__head p,
+.is-theme-dark .mobile-app-dl__lead,
+.admin--dark .mobile-app-dl__lead,
+.is-theme-dark .mobile-app-dl__empty p,
+.admin--dark .mobile-app-dl__empty p,
+.is-theme-dark .mobile-app-dl__foot p,
+.admin--dark .mobile-app-dl__foot p {
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .mobile-app-dl__platform,
+.admin--dark .mobile-app-dl__platform {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .mobile-app-dl__empty,
+.admin--dark .mobile-app-dl__empty {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.is-theme-dark .mobile-app-dl__status,
+.admin--dark .mobile-app-dl__status {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--mute, #94a3b8);
+}
+
+.is-theme-dark .mobile-app-dl__status--warn,
+.admin--dark .mobile-app-dl__status--warn {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.35);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.is-theme-dark .mobile-app-dl__foot,
+.admin--dark .mobile-app-dl__foot {
+  border-color: rgba(255, 255, 255, 0.08);
+}

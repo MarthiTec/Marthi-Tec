@@ -60,6 +60,16 @@ const envSchema = z.object({
       ? 'https://marthi-totem.discloud.dev'
       : 'http://localhost:5173')
   ),
+  /** URL HTTPS do APK Android (EAS / CDN). Vazio = painel mostra empty state honesto. */
+  MOBILE_ANDROID_APK_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : typeof value === 'string' ? value.trim() : value),
+    z.string().url().optional(),
+  ),
+  /** URL HTTPS de instalação iOS (TestFlight / Ad Hoc / link EAS). */
+  MOBILE_IOS_INSTALL_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : typeof value === 'string' ? value.trim() : value),
+    z.string().url().optional(),
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);

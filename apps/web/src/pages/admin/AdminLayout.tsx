@@ -37,6 +37,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/operacoes/usuarios': { kicker: 'Operações', title: 'Usuários da loja' },
   '/painel/operacoes/comunicacao': { kicker: 'Operações', title: 'Comunicação, WhatsApp & E-mail' },
   '/painel/operacoes/whatsapp': { kicker: 'Operações', title: 'Comunicação, WhatsApp & E-mail' },
+  '/painel/operacoes/app': { kicker: 'Operações', title: 'Download do App' },
   '/painel/pdv': { kicker: 'Vendas', title: 'Fila do totem' },
   '/painel/venda-externa': { kicker: 'Vendas', title: 'Venda externa' },
   '/painel/catalogo': { kicker: 'Vendas', title: 'Catálogo digital' },

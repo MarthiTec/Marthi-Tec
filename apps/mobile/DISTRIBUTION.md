@@ -58,6 +58,28 @@ npx eas-cli build -p ios --profile preview
 - Não colocar `DATABASE_URL`, `JWT_SECRET`, senhas SMTP ou tokens Evolution no binário / `app.json` commitado.
 - Não usar mocks de loja/cliente no app; só MarthiDB via API.
 
+## Download no painel (Operações)
+
+No sistema web: **Operações → Download do App** (`/painel/operacoes?tab=app`).
+
+Os botões leem URLs da API (`GET /api/v1/mobile/download`), alimentadas por variáveis de ambiente — sem APK fictício no código.
+
+### Variáveis no Site Discloud (`marthi-totem`)
+
+No dashboard Discloud → aplicação **Site** → **Variáveis** (não no Bot):
+
+| Variável | Exemplo | Efeito |
+|----------|---------|--------|
+| `MOBILE_ANDROID_APK_URL` | `https://expo.dev/artifacts/eas/….apk` | Botão **Baixar APK Android** |
+| `MOBILE_IOS_INSTALL_URL` | `https://testflight.apple.com/join/…` ou link EAS | Botão **Instalar no iPhone / iPad** |
+
+1. Gere o APK com EAS (`preview`) e copie o link HTTPS estável (ou hospede o arquivo num CDN próprio).
+2. Cole em `MOBILE_ANDROID_APK_URL` (URL completa `https://…`).
+3. **Reinicie** o Site na Discloud (não precisa rebuild do front).
+4. Abra Operações → Download do App e confira o botão ativo.
+
+Local: mesmas chaves no `.env` da raiz / `apps/api`. Deixe vazio até publicar — o painel mostra empty state honesto com link para este guia.
+
 ## Verificação de build config (local)
 
 ```bash

@@ -12,6 +12,7 @@ import { StoreSegmentSettings } from '../../components/StoreSegmentSettings';
 import { StockModeSettings } from '../../components/StockModeSettings';
 import { OrderReminderSettings } from '../../components/OrderReminderSettings';
 import { CommunicationSettingsSection } from '../../components/CommunicationSettingsSection';
+import { MobileAppDownloadSection } from '../../components/MobileAppDownloadSection';
 import {
   deleteOperationShortcut,
   listOperationShortcuts,
@@ -44,7 +45,7 @@ const EMPTY_DRAFT: Draft = {
   icon: 'ops',
 };
 
-type OpsTab = 'ramo' | 'loja' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'meta' | 'usuarios';
+type OpsTab = 'ramo' | 'loja' | 'atalhos' | 'comunicacao' | 'whatsapp' | 'meta' | 'usuarios' | 'app';
 
 /** Ramo da loja, atalhos configuráveis, Comunicação (WhatsApp & E-mail) e equipe da operação. */
 export function OperationsPage() {
@@ -59,10 +60,21 @@ export function OperationsPage() {
   const tabParam = searchParams.get('tab') as OpsTab | null;
 
   const [tab, setTab] = useState<OpsTab>(() => {
-    if (tabParam === 'ramo' || tabParam === 'loja' || tabParam === 'atalhos' || tabParam === 'comunicacao' || tabParam === 'meta' || tabParam === 'usuarios') return tabParam;
+    if (
+      tabParam === 'ramo' ||
+      tabParam === 'loja' ||
+      tabParam === 'atalhos' ||
+      tabParam === 'comunicacao' ||
+      tabParam === 'meta' ||
+      tabParam === 'usuarios' ||
+      tabParam === 'app'
+    ) {
+      return tabParam;
+    }
     if (tabParam === 'whatsapp') return 'comunicacao';
     if (location.pathname.endsWith('/usuarios')) return 'usuarios';
     if (location.pathname.endsWith('/comunicacao') || location.pathname.endsWith('/whatsapp')) return 'comunicacao';
+    if (location.pathname.endsWith('/app')) return 'app';
     return 'ramo';
   });
 
@@ -89,7 +101,26 @@ export function OperationsPage() {
       const el = document.getElementById('usuarios-loja');
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    if (location.pathname.endsWith('/app')) {
+      setTab('app');
+    }
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (
+      tabParam === 'ramo' ||
+      tabParam === 'loja' ||
+      tabParam === 'atalhos' ||
+      tabParam === 'comunicacao' ||
+      tabParam === 'meta' ||
+      tabParam === 'usuarios' ||
+      tabParam === 'app'
+    ) {
+      setTab(tabParam);
+    } else if (tabParam === 'whatsapp') {
+      setTab('comunicacao');
+    }
+  }, [tabParam]);
 
   function switchTab(nextTab: OpsTab) {
     setTab(nextTab);
@@ -278,6 +309,16 @@ export function OperationsPage() {
         >
           <AdminIcon name="people" />
           <span>Equipe &amp; Usuários da Loja</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn ${tab === 'app' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => switchTab('app')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 650 }}
+        >
+          <AdminIcon name="smartphone" />
+          <span>Download do App</span>
         </button>
       </div>
 
@@ -483,6 +524,9 @@ export function OperationsPage() {
           <TeamUsersSection variant="operations" id="usuarios-loja" />
         </>
       ) : null}
+
+      {/* Download do app lojista (APK / iOS) — URLs via env da API */}
+      {tab === 'app' ? <MobileAppDownloadSection /> : null}
     </section>
   );
 }
