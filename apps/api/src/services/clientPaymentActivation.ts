@@ -51,20 +51,25 @@ export async function confirmExistingClientPayment(input: {
       SELECT $1,$2,$3,'admin',true,now()
       WHERE NOT EXISTS (SELECT 1 FROM user_stores WHERE user_id=$2 AND store_id=$3)`, [randomUUID(), owner.id, store.id]);
     await ensureOwnerTeamMember(db,owner.id,store.id);
-    await db.query("UPDATE client_accounts SET status='active',updated_at=now() WHERE id=$1", [account.id]);
-    await db.query('UPDATE stores SET active=true,updated_at=now() WHERE id=$1', [store.id]);
-    await db.query("UPDATE store_licenses SET status='active',updated_at=now() WHERE id=$1", [license.id]);
+    await db.query("UPDATE client_accounts SET status='active' WHERE id=$1", [account.id]);
+    await db.query('UPDATE stores SET active=true WHERE id=$1', [store.id]);
+    await db.query("UPDATE store_licenses SET status='active' WHERE id=$1", [license.id]);
     const event = JSON.stringify([{ status, timestamp: new Date().toISOString(), detail: `Pagamento confirmado manualmente por ${input.actorId}` }]);
+    await db.query('SAVEPOINT sp_partner_signup');
     try {
       await db.query(`UPDATE partner_signups SET status=$1,payment_confirmed_at=now(),payment_method=$2,transaction_ref=$3,
-        audit_trail=COALESCE(audit_trail,'[]'::jsonb)||$4::jsonb,updated_at=now()
+        audit_trail=COALESCE(audit_trail,'[]'::jsonb)||$4::jsonb
         WHERE id=$5 OR (document=$6 AND $6<>'')`, [status,input.paymentMethod,input.transactionRef || null,event,account.id,account.document]);
+      await db.query('RELEASE SAVEPOINT sp_partner_signup');
     } catch {
+      await db.query('ROLLBACK TO SAVEPOINT sp_partner_signup');
+      await db.query('SAVEPOINT sp_partner_signup_fallback');
       try {
-        await db.query(`UPDATE partner_signups SET payment_confirmed_at=now(),payment_method=$1,transaction_ref=$2,updated_at=now()
+        await db.query(`UPDATE partner_signups SET payment_confirmed_at=now(),payment_method=$1,transaction_ref=$2
           WHERE id=$3 OR (document=$4 AND $4<>'')`, [input.paymentMethod,input.transactionRef || null,account.id,account.document]);
+        await db.query('RELEASE SAVEPOINT sp_partner_signup_fallback');
       } catch {
-        // safe fallback if partner_signups is missing or restricted
+        await db.query('ROLLBACK TO SAVEPOINT sp_partner_signup_fallback');
       }
     }
     await db.query(`INSERT INTO client_payment_confirmations(client_account_id,store_id,payment_method,transaction_ref,notes,confirmed_by,contracting_status)

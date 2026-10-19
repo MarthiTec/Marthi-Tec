@@ -172,7 +172,50 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
   try {
     await pool.query(`
       DO $$
+      DECLARE
+        r RECORD;
+        def TEXT;
       BEGIN
+        -- Converte colunas enum legadas nas tabelas de onboarding/licenciamento para TEXT
+        FOR r IN
+          SELECT c.table_name, c.column_name, c.column_default
+            FROM information_schema.columns c
+            JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+           WHERE c.table_schema = current_schema()
+             AND c.table_name IN (
+               'partner_signups', 'client_accounts', 'stores', 'store_licenses',
+               'users', 'user_stores', 'employees', 'auth_tokens'
+             )
+        LOOP
+          BEGIN
+            IF r.column_default IS NOT NULL THEN
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT', r.table_name, r.column_name);
+            END IF;
+            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE text USING %I::text', r.table_name, r.column_name, r.column_name);
+            IF r.column_default IS NOT NULL THEN
+              def := regexp_replace(r.column_default, '::"?[A-Za-z_]+"?$', '');
+              EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %s', r.table_name, r.column_name, def);
+            END IF;
+          EXCEPTION WHEN others THEN NULL; END;
+        END LOOP;
+
+        -- Garante DEFAULT now() em colunas created_at / updated_at legadas do Prisma
+        FOR r IN
+          SELECT table_name, column_name
+            FROM information_schema.columns
+           WHERE table_schema = current_schema()
+             AND table_name IN (
+               'partner_signups', 'client_accounts', 'stores', 'store_licenses',
+               'users', 'user_stores', 'employees', 'auth_tokens'
+             )
+             AND column_name IN ('created_at', 'updated_at')
+             AND column_default IS NULL
+        LOOP
+          BEGIN
+            EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT now()', r.table_name, r.column_name);
+          EXCEPTION WHEN others THEN NULL; END;
+        END LOOP;
+
         BEGIN
           ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'golden';
           ALTER TABLE partner_signups ADD COLUMN IF NOT EXISTS modules JSONB NOT NULL DEFAULT '[]'::jsonb;
@@ -277,6 +320,7 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
 
         BEGIN
           ALTER TABLE users ADD COLUMN IF NOT EXISTS store_id TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'password';
           ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
           ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0;
           ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_phone TEXT NOT NULL DEFAULT '';
@@ -302,6 +346,17 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
           ALTER TABLE employees ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
           ALTER TABLE employees ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
           ALTER TABLE employees ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'employees'
+              AND column_name = 'access_areas'
+              AND data_type <> 'jsonb'
+          ) THEN
+            ALTER TABLE employees ALTER COLUMN access_areas DROP DEFAULT;
+            ALTER TABLE employees ALTER COLUMN access_areas TYPE JSONB USING to_jsonb(access_areas);
+            ALTER TABLE employees ALTER COLUMN access_areas SET DEFAULT '[]'::jsonb;
+          END IF;
         EXCEPTION WHEN others THEN NULL; END;
 
         BEGIN
@@ -316,6 +371,17 @@ export async function ensurePartnerSignupsSchema(): Promise<void> {
             used_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
           );
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS token_hash TEXT;
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'activation';
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS client_id TEXT;
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS name TEXT;
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
+          ALTER TABLE auth_tokens ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        EXCEPTION WHEN others THEN NULL; END;
+
+        BEGIN
           CREATE TABLE IF NOT EXISTS client_payment_confirmations (
             client_account_id TEXT PRIMARY KEY REFERENCES client_accounts(id),
             store_id TEXT NOT NULL REFERENCES stores(id),
@@ -636,6 +702,11 @@ partnersRouter.post('/api/v1/partners/payment-confirm', requireSession, requireP
       },
     });
   } catch (error) {
+    if (error instanceof Error && !(error as { status?: number }).status) {
+      console.error('[partners] Erro em payment-confirm:', error);
+      (error as Error & { status?: number }).status = 422;
+      error.message = `Falha ao liberar acesso no MarthiDB: ${error.message}`;
+    }
     next(error);
   }
 });
@@ -967,23 +1038,16 @@ async function executePaymentActivation(
 
       // 1.4 Usuário Admin da Conta (Aguardando criação de senha segura)
       const normEmail = record.email.trim().toLowerCase();
-      let actualOwner = await db.query(
+      const actualOwner = await db.query(
         'SELECT id, client_account_id, password_hash, provider, active, global_role FROM users WHERE lower(email) = $1 FOR UPDATE',
         [normEmail],
       );
 
-      if (
-        actualOwner.rows[0] &&
-        actualOwner.rows[0].client_account_id !== actualAccountId &&
-        actualOwner.rows[0].global_role !== 'superadmin' &&
-        actualOwner.rows[0].client_account_id !== 'PRT-MUM5YWBG8DSR'
-      ) {
-        await db.query('DELETE FROM user_stores WHERE user_id = $1', [actualOwner.rows[0].id]);
-        await db.query('DELETE FROM users WHERE id = $1', [actualOwner.rows[0].id]);
-        actualOwner = { rows: [], rowCount: 0 } as any;
-      }
-
       if (!actualOwner.rows[0]) {
+        const existingUserById = await db.query('SELECT id FROM users WHERE id = $1 LIMIT 1', [userId]);
+        if (existingUserById.rows[0]) {
+          userId = `usr-${randomUUID()}`;
+        }
         await db.query(
           `INSERT INTO users (
             id, client_account_id, email, name, provider, password_hash, global_role, active, created_at
@@ -997,10 +1061,18 @@ async function executePaymentActivation(
             record.contactName || record.tradeName,
           ],
         );
-      } else if (actualOwner.rows[0].client_account_id === actualAccountId) {
-        userId = actualOwner.rows[0].id;
       } else {
-        throw Object.assign(new Error('E-mail vinculado a outra conta.'), { status: 409 });
+        userId = actualOwner.rows[0].id;
+        if (
+          actualOwner.rows[0].client_account_id !== actualAccountId &&
+          actualOwner.rows[0].global_role !== 'superadmin' &&
+          actualOwner.rows[0].client_account_id !== 'PRT-MUM5YWBG8DSR'
+        ) {
+          await db.query(
+            `UPDATE users SET client_account_id = $2, name = COALESCE(NULLIF($3, ''), name) WHERE id = $1`,
+            [userId, actualAccountId, record.contactName || record.tradeName],
+          );
+        }
       }
 
       // 1.5 Vínculo do Usuário com a Loja Matriz em user_stores
@@ -1012,21 +1084,24 @@ async function executePaymentActivation(
       );
       await ensureOwnerTeamMember(db, userId, storeId);
 
-      if (actorId) {
-        await db.query('SAVEPOINT sp_payment_conf');
-        try {
-          await db.query(
-            `INSERT INTO client_payment_confirmations (
-               client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status
-             ) VALUES ($1, $2, $3, $4, $5, $6, 'acesso_pendente')
-             ON CONFLICT (client_account_id) DO UPDATE
-             SET contracting_status = EXCLUDED.contracting_status, confirmed_at = now()`,
-            [actualAccountId, storeId, paymentMethod, record.transactionRef || null, notes || '', actorId],
-          );
-          await db.query('RELEASE SAVEPOINT sp_payment_conf');
-        } catch {
-          await db.query('ROLLBACK TO SAVEPOINT sp_payment_conf');
-        }
+      await db.query('SAVEPOINT sp_payment_conf');
+      try {
+        const actorRow = await db.query(
+          `SELECT id FROM users WHERE id = $1 OR id = $2 OR global_role = 'superadmin' ORDER BY (id = $1) DESC, (id = $2) DESC LIMIT 1`,
+          [actorId || '', userId],
+        );
+        const confirmedById = actorRow.rows[0]?.id || userId;
+        await db.query(
+          `INSERT INTO client_payment_confirmations (
+             client_account_id, store_id, payment_method, transaction_ref, notes, confirmed_by, contracting_status
+           ) VALUES ($1, $2, $3, $4, $5, $6, 'acesso_pendente')
+           ON CONFLICT (client_account_id) DO UPDATE
+           SET contracting_status = EXCLUDED.contracting_status, confirmed_at = now()`,
+          [actualAccountId, storeId, paymentMethod, record.transactionRef || null, notes || '', confirmedById],
+        );
+        await db.query('RELEASE SAVEPOINT sp_payment_conf');
+      } catch {
+        await db.query('ROLLBACK TO SAVEPOINT sp_payment_conf');
       }
 
       await db.query('COMMIT');

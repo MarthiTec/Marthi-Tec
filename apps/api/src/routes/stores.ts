@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireSession, requirePlatformAdmin, getPlanUserLimit } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 import { blockedMemoryMap } from '../db/requireDb.js';
+import { ensurePartnerSignupsSchema } from './partners.js';
 
 export const storesRouter = Router();
 
@@ -535,6 +536,7 @@ const EMPTY_ADMIN_ADDRESS: AdminAddress = { zipCode: '', street: '', number: '',
 
 storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, async (_req, res, next) => {
   try {
+    await ensurePartnerSignupsSchema();
     if (pool) {
       // 1. Busca contas de clientes existentes cruzadas com partner_signups para dados reais de pagamento/ativação
       const sql = `
@@ -552,7 +554,10 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
         FROM client_accounts c
         LEFT JOIN stores s ON s.client_account_id = c.id AND s.active=true
         LEFT JOIN store_licenses l ON l.client_account_id = c.id AND l.store_id=s.id
-        LEFT JOIN partner_signups ps ON (ps.id = c.id OR (ps.document = c.document AND ps.document != ''))
+        LEFT JOIN partner_signups ps ON (
+          ps.id = c.id
+          OR (regexp_replace(ps.document, '\\D', '', 'g') = regexp_replace(c.document, '\\D', '', 'g') AND regexp_replace(c.document, '\\D', '', 'g') != '')
+        )
         LEFT JOIN client_payment_confirmations pc ON pc.client_account_id=c.id
         LEFT JOIN users u ON u.client_account_id=c.id AND lower(u.email)=lower(c.email)
         ORDER BY c.created_at ASC, s.is_matrix DESC, s.created_at ASC, s.id ASC
@@ -624,7 +629,9 @@ storesRouter.get('/api/v1/admin/clients', requireSession, requirePlatformAdmin, 
           SELECT ps.*
           FROM partner_signups ps
           WHERE NOT EXISTS (
-            SELECT 1 FROM client_accounts c WHERE c.id = ps.id OR (c.document = ps.document AND ps.document != '')
+            SELECT 1 FROM client_accounts c
+            WHERE c.id = ps.id
+               OR (regexp_replace(c.document, '\\D', '', 'g') = regexp_replace(ps.document, '\\D', '', 'g') AND regexp_replace(ps.document, '\\D', '', 'g') != '')
           )
           ORDER BY ps.created_at DESC
         `;
