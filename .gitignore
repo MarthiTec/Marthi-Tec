@@ -1,6 +1,10 @@
 dist/
 apps/api/dist/
 apps/web/dist/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/android/
+apps/mobile/ios/
 node_modules/
 build/
 .env

@@ -12,6 +12,7 @@ discloud.backend.vars.env
 apps/*/node_modules/
 apps/api/package-lock.json
 apps/api/dist/
+apps/mobile/
 packages/
 docs/
 agent-transcripts/

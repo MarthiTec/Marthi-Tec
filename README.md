@@ -22,7 +22,7 @@ Cliente ativo, loja demo e futuros clientes existem como **registros no PostgreS
 | Web | React + Vite + TypeScript (`apps/web`) |
 | Banco | PostgreSQL **MarthiDB** (Discloud) — conexão só via `DATABASE_URL` |
 | Deploy | Discloud Site `marthi-totem` |
-| Mobile | React Native (fase futura) |
+| Mobile | Expo + React Native (`apps/mobile`) — lojista, distribuição interna |
 
 ## Infra Discloud
 
@@ -40,10 +40,13 @@ Defina `DATABASE_URL` (e demais secrets) no painel do Site ou em `.env` local. *
 apps/
   api/          → API REST (/api/v1)
   web/          → Painel + módulos (ERP, PDV, OS, Fiscal, CRM, totem, home)
+  mobile/       → App lojista (Expo) — fora do build Discloud Site
 packages/
   shared/       → Tipos compartilhados (bootstrap)
 docs/           → Arquitetura, ADRs, manuais, specs, auditorias
 ```
+
+App mobile (lojista): ver [`apps/mobile/README.md`](apps/mobile/README.md). Instalação separada (`npm install` dentro de `apps/mobile`) — não entra no workspace do Site Discloud.
 
 Mapa detalhado: [`docs/architecture.md`](docs/architecture.md). Índice: [`docs/README.md`](docs/README.md).
 
