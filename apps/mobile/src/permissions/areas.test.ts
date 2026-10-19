@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canSeeFinance, canSeeOs, canSeeSales, canSeeStock, hasArea } from './areas';
+import {
+  canManageStock,
+  canSeeCost,
+  canSeeFinance,
+  canSeeOs,
+  canSeeSalePrice,
+  canSeeSales,
+  canSeeStock,
+  hasArea,
+} from './areas';
 import type { AccessContext } from '../api/types';
 
 const base = (partial: Partial<AccessContext>): AccessContext => ({
@@ -32,5 +41,23 @@ test('áreas específicas respeitam lista', () => {
   assert.equal(canSeeOs(access), true);
   assert.equal(canSeeSales(access), true);
   assert.equal(canSeeStock(access), false);
+  assert.equal(canSeeFinance(access), false);
+});
+
+test('estoque: preço/custo e gestão', () => {
+  const stockOnly = base({ accessAreas: ['erp_stock'], role: 'operator', permissions: {} });
+  assert.equal(canSeeStock(stockOnly), true);
+  assert.equal(canSeeSalePrice(stockOnly), true);
+  assert.equal(canSeeCost(stockOnly), true);
+  assert.equal(canManageStock(stockOnly), true);
+
+  const seller = base({ accessAreas: ['erp_stock'], role: 'seller', permissions: {} });
+  assert.equal(canManageStock(seller), false);
+  assert.equal(canManageStock(base({ ...seller, permissions: { canEdit: true } })), true);
+});
+
+test('pdv vê preço de venda sem necessariamente custo financeiro', () => {
+  const access = base({ accessAreas: ['pdv'] });
+  assert.equal(canSeeSalePrice(access), true);
   assert.equal(canSeeFinance(access), false);
 });

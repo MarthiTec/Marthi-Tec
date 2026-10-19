@@ -435,6 +435,192 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
 });
 
 /**
+ * Detalhe de um item (mobile / consulta pontual).
+ */
+stockRouter.get('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
+  try {
+    const storeId = req.storeId!;
+    const id = req.params.id;
+    const result = await pool.query(
+      `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
+              kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
+              pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, scope, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name, avg_cost, pricing_policy,
+              (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+              (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
+         FROM stock_items WHERE id = $1 AND store_id = $2`,
+      [id, storeId],
+    );
+    if (!result.rows.length) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Item de estoque não encontrado.' } });
+      return;
+    }
+    res.json({
+      success: true,
+      data: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool, storeId, result.rows))[0])]))[0],
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Ajuste de saldo com motivo (kardex). Usado pelo app lojista; a API valida área como no restante do estoque.
+ */
+stockRouter.post('/api/v1/stock/:id/adjust', requireAuth, async (req, res, next) => {
+  const db = await pool.connect();
+  try {
+    if (!canManageArea(req)) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para ajustar estoque.' } });
+      return;
+    }
+    const body = z
+      .object({
+        qty: z.coerce.number().finite().nonnegative('Quantidade inválida.'),
+        reason: z.string().trim().min(3, 'Informe o motivo do ajuste (mín. 3 caracteres).').max(500),
+      })
+      .parse(req.body);
+    const storeId = req.storeId!;
+    const id = req.params.id;
+    await db.query('BEGIN');
+    const found = await db.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+    const stock = found.rows[0];
+    if (!stock) throw Object.assign(new Error('Item de estoque não encontrado.'), { status: 404 });
+    if (stock.unit !== 'KG' && !Number.isInteger(body.qty)) {
+      throw Object.assign(new Error('Produtos em unidade exigem quantidade inteira.'), { status: 400 });
+    }
+    if ((await unreservedQuantity(db, storeId, id, body.qty)) < 0) {
+      throw Object.assign(new Error('O saldo fica menor que a quantidade reservada em encomendas.'), { status: 409 });
+    }
+    const previous = Number(stock.qty) || 0;
+    const delta = body.qty - previous;
+    await db.query('UPDATE stock_items SET qty = $3, updated_at = now() WHERE id = $1 AND store_id = $2', [id, storeId, body.qty]);
+    if (delta !== 0) {
+      await db.query(
+        `INSERT INTO stock_movements (id, store_id, stock_id, type, qty, previous_qty, new_qty, unit_cost, ref_type, operator_name, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'adjustment', $9, $10)`,
+        [
+          `MOV-${randomUUID()}`,
+          storeId,
+          id,
+          delta > 0 ? 'in' : 'out',
+          Math.abs(delta),
+          previous,
+          body.qty,
+          Number(stock.cost) || 0,
+          req.user?.name || 'Operador',
+          body.reason,
+        ],
+      );
+    }
+    await db.query('COMMIT');
+    const fresh = await pool.query(
+      `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
+              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name
+         FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`,
+      [id, storeId],
+    );
+    res.json({
+      success: true,
+      data: {
+        product: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool, storeId, fresh.rows))[0])]))[0],
+        previousQty: previous,
+        newQty: body.qty,
+        delta,
+        reason: body.reason,
+      },
+    });
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    next(error);
+  } finally {
+    db.release();
+  }
+});
+
+/**
+ * Alteração autorizada de preço/custo com auditoria before/after (audit_logs).
+ */
+stockRouter.post('/api/v1/stock/:id/price-change', requireAuth, async (req, res, next) => {
+  const db = await pool.connect();
+  try {
+    if (!canManageArea(req)) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Sem permissão para alterar preços.' } });
+      return;
+    }
+    const body = z
+      .object({
+        price: z.coerce.number().finite().nonnegative().optional(),
+        cost: z.coerce.number().finite().nonnegative().optional(),
+        reason: z.string().trim().max(500).optional().default(''),
+      })
+      .refine((v) => v.price !== undefined || v.cost !== undefined, { message: 'Informe preço e/ou custo.' })
+      .parse(req.body);
+    const storeId = req.storeId!;
+    const id = req.params.id;
+    await db.query('BEGIN');
+    const found = await db.query('SELECT * FROM stock_items WHERE id = $1 AND store_id = $2 FOR UPDATE', [id, storeId]);
+    const stock = found.rows[0];
+    if (!stock) throw Object.assign(new Error('Item de estoque não encontrado.'), { status: 404 });
+    const before = { price: Number(stock.price) || 0, cost: Number(stock.cost) || 0 };
+    const after = {
+      price: body.price !== undefined ? body.price : before.price,
+      cost: body.cost !== undefined ? body.cost : before.cost,
+    };
+    if (before.price === after.price && before.cost === after.cost) {
+      throw Object.assign(new Error('Nenhuma alteração de preço/custo informada.'), { status: 400 });
+    }
+    await db.query('UPDATE stock_items SET price = $3, cost = $4, updated_at = now() WHERE id = $1 AND store_id = $2', [
+      id,
+      storeId,
+      after.price,
+      after.cost,
+    ]);
+    const auditId = `AUD-${randomUUID()}`;
+    await db.query(
+      `INSERT INTO audit_logs (id, store_id, user_id, action, entity, entity_id, details, ip)
+       VALUES ($1, $2, $3, $4, 'stock_item', $5, $6::jsonb, $7)`,
+      [
+        auditId,
+        storeId,
+        req.user?.id ?? null,
+        'stock.price_change',
+        id,
+        JSON.stringify({
+          before,
+          after,
+          reason: body.reason || null,
+          operatorName: req.user?.name || null,
+          operatorEmail: req.user?.email || null,
+        }),
+        req.ip || null,
+      ],
+    );
+    await db.query('COMMIT');
+    const fresh = await pool.query(
+      `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
+              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name
+         FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`,
+      [id, storeId],
+    );
+    res.json({
+      success: true,
+      data: {
+        product: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool, storeId, fresh.rows))[0])]))[0],
+        before,
+        after,
+        auditId,
+        reason: body.reason || null,
+      },
+    });
+  } catch (error) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    next(error);
+  } finally {
+    db.release();
+  }
+});
+
+/**
  * Criar item de estoque
  */
 stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
