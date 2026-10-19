@@ -360,6 +360,126 @@ workOrdersRouter.post('/api/v1/work-orders', async (req: Request, res: Response,
   }
 });
 
+/** Status oficiais da oficina (alinhados ao web). */
+const WORK_ORDER_STATUSES = [
+  'backlog',
+  'open',
+  'diagnosis',
+  'waiting',
+  'progress',
+  'reproved',
+  'ready',
+  'delivered',
+  'cancelled',
+] as const;
+
+type WorkOrderStatusCode = (typeof WORK_ORDER_STATUSES)[number];
+
+const STATUS_TRANSITIONS: Record<WorkOrderStatusCode, WorkOrderStatusCode[]> = {
+  backlog: ['open', 'diagnosis', 'waiting', 'progress', 'cancelled'],
+  open: ['diagnosis', 'waiting', 'progress', 'cancelled'],
+  diagnosis: ['waiting', 'progress', 'reproved', 'ready', 'cancelled'],
+  waiting: ['diagnosis', 'progress', 'cancelled'],
+  progress: ['waiting', 'ready', 'reproved', 'cancelled'],
+  reproved: ['diagnosis', 'progress', 'cancelled'],
+  ready: ['delivered', 'progress', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+function normalizeOsStatus(raw: string): WorkOrderStatusCode {
+  const value = String(raw || 'open').toLowerCase();
+  if ((WORK_ORDER_STATUSES as readonly string[]).includes(value)) return value as WorkOrderStatusCode;
+  if (value === 'opened') return 'open';
+  return 'open';
+}
+
+/**
+ * Transição de status autorizada com histórico (mobile / painel).
+ * Rejeita saltos inválidos; entregue/cancelada são terminais.
+ */
+workOrdersRouter.post('/api/v1/work-orders/:id/status', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!pool) return res.status(503).json({ success: false, error: { code: 'DATABASE_UNAVAILABLE', message: 'Banco indisponível.' } });
+    const body = z
+      .object({
+        status: z.enum(WORK_ORDER_STATUSES),
+        note: z.string().trim().max(500).optional().default(''),
+      })
+      .parse(req.body);
+    const storeId = req.storeId!;
+    const osId = req.params.id;
+    const currentRes = await pool.query('SELECT * FROM work_orders WHERE id = $1 AND store_id = $2', [osId, storeId]);
+    if (!currentRes.rows[0]) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+    }
+    const current = currentRes.rows[0];
+    const from = normalizeOsStatus(String(current.status));
+    const to = body.status;
+    if (from === to) {
+      return res.json({ success: true, data: rowToWorkOrder(current) });
+    }
+    const allowed = STATUS_TRANSITIONS[from] ?? [];
+    if (!allowed.includes(to)) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'INVALID_STATUS_TRANSITION',
+          message: `Não é permitido mudar de "${from}" para "${to}".`,
+        },
+      });
+    }
+
+    const history = Array.isArray(current.history)
+      ? current.history
+      : typeof current.history === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(current.history);
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+    history.push({
+      id: `H-${Date.now().toString(36)}`,
+      authorName: req.user?.name || 'Operador',
+      authorRole: req.user?.role || '',
+      field: 'status',
+      action: 'alterou',
+      fromValue: from,
+      toValue: to,
+      note: body.note || undefined,
+      createdAt: new Date().toISOString(),
+    });
+
+    const fields: string[] = ['status = $3', 'history = $4::jsonb', 'updated_at = now()'];
+    const values: any[] = [osId, storeId, to, JSON.stringify(history)];
+    let pIdx = 5;
+    if (to === 'progress' && !current.progress_started_at) {
+      fields.push(`progress_started_at = $${pIdx++}`);
+      values.push(new Date().toISOString());
+    }
+    if (to === 'delivered') {
+      fields.push(`delivered_at = COALESCE(delivered_at, $${pIdx++})`);
+      values.push(new Date().toISOString());
+    }
+    if (body.note) {
+      fields.push(`notes = CASE WHEN COALESCE(notes, '') = '' THEN $${pIdx} ELSE notes || E'\\n' || $${pIdx} END`);
+      values.push(body.note);
+      pIdx++;
+    }
+
+    const result = await pool.query(
+      `UPDATE work_orders SET ${fields.join(', ')} WHERE id = $1 AND store_id = $2 RETURNING *`,
+      values,
+    );
+    res.json({ success: true, data: rowToWorkOrder(result.rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // 4. Atualizar OS (PATCH)
 workOrdersRouter.patch('/api/v1/work-orders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
