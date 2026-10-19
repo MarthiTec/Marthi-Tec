@@ -91,7 +91,14 @@ npx eas-cli build -p ios --profile preview
 |------|---------------------|
 | 1 Fundação (auth, tema, client, nav, permissões) | Feito |
 | 2 Dashboard (indicadores reais + período + multi-loja) | Feito |
-| 3+ Estoque, OS, venda, atividades | Placeholders / próximas |
+| 3 Estoque (busca, detalhe, ajuste, preço, entrada, barcode) | Feito |
+| 4+ OS, venda, atividades | Placeholders / próximas |
+
+### Testar estoque (Phase 3)
+
+1. Conta com área de produtos/estoque no MarthiDB.
+2. Aba **Estoque** → busca, filtro baixo, ler código.
+3. Detalhe → ajuste com motivo, alteração de preço (auditoria), entrada simplificada, histórico.
 
 ## Testes
 

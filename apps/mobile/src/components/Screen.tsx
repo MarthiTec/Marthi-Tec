@@ -52,5 +52,5 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.2 },
   subtitle: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 2 },
   scroll: { padding: 16, paddingBottom: 32, gap: 12 },
-  body: { flex: 1, padding: 16 },
+  body: { flex: 1, padding: 16, minHeight: 0 },
 });
