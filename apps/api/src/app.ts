@@ -58,6 +58,7 @@ import { catalogOrdersRouter } from './routes/catalogOrders.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
+import { auditLogsRouter } from './routes/auditLogs.js';
 
 const app = express();
 
@@ -140,6 +141,7 @@ app.use(totemRouter);
 app.use(whatsappRouter);
 app.use(communicationRouter);
 app.use(workOrdersRouter);
+app.use(auditLogsRouter);
 
 // Proxy residual para qualquer rota externa legada
 app.use(proxyUnmatchedApi);
