@@ -10,6 +10,7 @@ export function detectMobileInstallChannel(url: string | null | undefined): Mobi
   if (
     u.includes('expo.dev') ||
     u.includes('expo.io') ||
+    u.includes('.exp.direct') ||
     u.startsWith('exp://') ||
     u.includes('/app-lojista') ||
     u.includes('exps://')

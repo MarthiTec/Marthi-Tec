@@ -9,12 +9,13 @@ Já embutido nos perfis `eas.json` e default de `src/api/config.ts`. Local: copi
 
 Se `EXPO_TOKEN` / login Expo / certificados Apple não estiverem disponíveis:
 
-1. Publique a página pública `https://marthi-totem.discloud.dev/app-lojista` (rota web).
-2. No Site Discloud, defina:
-   - `MOBILE_ANDROID_APK_URL=https://marthi-totem.discloud.dev/app-lojista?platform=android`
-   - `MOBILE_IOS_INSTALL_URL=https://marthi-totem.discloud.dev/app-lojista?platform=ios`
-3. Reinicie o Site. Em **Operações → Download do App** os botões aparecem como **Abrir no Expo Go** (não “Baixar APK”).
-4. **Não** invente URLs de `.apk`.
+1. Publique a página pública `https://marthi-totem.discloud.dev/app-lojista` (rota web) com CTA **Abrir no Expo Go**.
+2. Suba o bundler com tunnel público: `cd apps/mobile && EXPO_PUBLIC_API_URL=https://marthi-totem.discloud.dev npx expo start --tunnel`.
+3. No Site Discloud, PUT env com wrapper `{ "vars": { … } }` (merge completo) e reinicie:
+   - `EXPO_DEV_CLIENT_URL` / `VITE_EXPO_DEV_CLIENT_URL` = `https://expo.dev/go?url=exp%3A%2F%2F…` (ou `exp://…`)
+   - `MOBILE_ANDROID_APK_URL` / `MOBILE_IOS_INSTALL_URL` = mesma URL (ou `/app-lojista?platform=…` se o tunnel estiver fora do ar)
+4. Em **Operações → Download do App** os botões aparecem como **Abrir no Expo Go** (não “Baixar APK”).
+5. **Não** invente URLs de `.apk`. Tunnel morre quando a VM do agente dorme — próximo passo estável: **EAS Update** / `eas build --profile preview`.
 
 Quando o APK EAS existir, substitua as variáveis pelos links reais — os rótulos voltam a “Baixar APK Android” / TestFlight automaticamente.
 

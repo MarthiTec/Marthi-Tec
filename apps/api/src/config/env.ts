@@ -71,6 +71,14 @@ const envSchema = z.object({
     z.string().url().optional(),
   ),
   /**
+   * Deep link vivo do bundler Expo (tunnel `exp://` / `https://expo.dev/go?url=…` / EAS Update).
+   * Quando setado, Operações e `/app-lojista` preferem este link a APK/TestFlight ausentes.
+   */
+  EXPO_DEV_CLIENT_URL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : typeof value === 'string' ? value.trim() : value),
+    z.string().min(1).optional(),
+  ),
+  /**
    * Fallback da chave Pix de recebimento da Marthi quando `platform_payout_settings` estiver vazio.
    * Preferir gravar em /admin/recebimentos (MarthiDB). Default operacional: e-mail oficial.
    */
