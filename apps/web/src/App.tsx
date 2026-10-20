@@ -15,6 +15,7 @@ import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { DevMobileAppDownloadPage } from './pages/admin/DevMobileAppDownloadPage';
+import { MobileInstallPage } from './pages/MobileInstallPage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -158,6 +159,7 @@ export function App() {
         <Route path="/oferta/:storeId/:productId" element={<OfferPublicPage />} />
         <Route path="/exclusao-dados" element={<DataDeletionStatusPage />} />
         <Route path="/" element={<HomePage />} />
+        <Route path="/app-lojista" element={<MobileInstallPage />} />
         <Route path="/produtos" element={<ProductsPage />} />
         <Route path="/planos" element={<PlansPublicPage />} />
         <Route path="/precos" element={<Navigate to="/planos" replace />} />

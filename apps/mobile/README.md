@@ -15,7 +15,8 @@ Pacote **fora** do workspace Discloud Site (`apps/api` + `apps/web`). Instale em
 ## Configurar API
 
 ```bash
-export EXPO_PUBLIC_API_URL=https://marthi-totem.discloud.app
+# veja também apps/mobile/.env.example
+export EXPO_PUBLIC_API_URL=https://marthi-totem.discloud.dev
 # ou LAN: http://192.168.x.x:8080
 ```
 
