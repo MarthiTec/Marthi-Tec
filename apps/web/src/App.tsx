@@ -153,6 +153,7 @@ export function App() {
         <Route path="acompanhar-retirada/:token" element={<PickupTrackingPage />} />
         <Route path="/comprovante/:id" element={<ReceiptPublicPage />} />
         <Route path="/catalogo/:token" element={<CatalogPublicPage />} />
+        <Route path="/c/:slug" element={<CatalogPublicPage />} />
         <Route path="/oferta/:storeId/:productId" element={<OfferPublicPage />} />
         <Route path="/exclusao-dados" element={<DataDeletionStatusPage />} />
         <Route path="/" element={<HomePage />} />

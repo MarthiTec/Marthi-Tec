@@ -216,3 +216,71 @@ export const variantKey = (attributes: Array<{ id: string; value: string }>) =>
     .map((attr) => `${attr.id}=${String(attr.value).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '')}`)
     .sort()
     .join('|');
+
+/** Slugs reservados (rotas do site / painel) — não podem ser link curto de catálogo. */
+const RESERVED_SLUGS = new Set([
+  'api',
+  'c',
+  'catalogo',
+  'cardapio',
+  'contato',
+  'criar-senha',
+  'login',
+  'oferta',
+  'painel',
+  'parceiro',
+  'planos',
+  'precos',
+  'produtos',
+  'redefinir-senha',
+  'sobre',
+  'totem',
+  'www',
+]);
+
+/** Normaliza texto para slug público curto (/c/{slug}). */
+export function catalogPublicSlugify(input: string): string {
+  const base = String(input ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return base || 'catalogo';
+}
+
+export function isValidCatalogPublicSlug(slug: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length >= 2 && slug.length <= 48 && !RESERVED_SLUGS.has(slug);
+}
+
+type SlugDb = { query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }> };
+
+/** Garante slug único globalmente (sufixo -2, -3… se precisar). */
+export async function allocateCatalogPublicSlug(db: SlugDb, desired: string, excludeId?: string): Promise<string> {
+  let candidate = catalogPublicSlugify(desired);
+  if (!isValidCatalogPublicSlug(candidate)) candidate = 'catalogo';
+  for (let i = 0; i < 80; i += 1) {
+    const trySlug = i === 0 ? candidate : `${candidate.slice(0, Math.max(1, 48 - String(i + 1).length - 1))}-${i + 1}`;
+    if (!isValidCatalogPublicSlug(trySlug)) continue;
+    const taken = (
+      await db.query(
+        `SELECT 1 FROM sales_catalogs WHERE lower(public_slug) = lower($1) AND ($2::text IS NULL OR id <> $2) LIMIT 1`,
+        [trySlug, excludeId ?? null],
+      )
+    ).rows[0];
+    if (!taken) return trySlug;
+  }
+  return `c-${Date.now().toString(36)}`;
+}
+
+/** Resolve catálogo público por token longo ou slug curto. */
+export async function findSalesCatalogByPublicKey(db: SlugDb, key: string) {
+  const raw = String(key ?? '').trim().slice(0, 64);
+  if (!raw) return null;
+  const byToken = (await db.query('SELECT * FROM sales_catalogs WHERE token = $1 LIMIT 1', [raw])).rows[0];
+  if (byToken) return byToken;
+  const slug = catalogPublicSlugify(raw);
+  if (!slug) return null;
+  return (await db.query('SELECT * FROM sales_catalogs WHERE lower(public_slug) = lower($1) LIMIT 1', [slug])).rows[0] ?? null;
+}

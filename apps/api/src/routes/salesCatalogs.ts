@@ -3,7 +3,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
-import { buildCatalogItems } from '../services/salesCatalog.js';
+import {
+  allocateCatalogPublicSlug,
+  buildCatalogItems,
+  catalogPublicSlugify,
+  findSalesCatalogByPublicKey,
+  isValidCatalogPublicSlug,
+} from '../services/salesCatalog.js';
 import { isStoreManagement } from '../services/saleHistory.js';
 import { getStoreBrandProfile } from './storeProfile.js';
 
@@ -42,6 +48,13 @@ const catalogSchema = z.object({
   productIds: z.array(z.string().min(1).max(80)).max(500).default([]),
   /** Produtos em destaque (faixa no topo da página de venda). */
   featuredIds: z.array(z.string().min(1).max(80)).max(30).default([]),
+  /** Link curto público (/c/{slug}). Vazio = gerar a partir do nome da loja. */
+  publicSlug: z
+    .string()
+    .trim()
+    .max(48)
+    .default('')
+    .transform((value) => (value ? catalogPublicSlugify(value) : '')),
 });
 
 const view = (row: any) => ({
@@ -61,6 +74,7 @@ const view = (row: any) => ({
   productIds: Array.isArray(row.product_ids) ? row.product_ids : [],
   featuredIds: Array.isArray(row.featured_ids) ? row.featured_ids : [],
   token: row.token,
+  publicSlug: row.public_slug || '',
   createdBy: row.created_by,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -129,7 +143,24 @@ async function storeInfo(db: Db, storeId: string) {
 salesCatalogsRouter.get('/api/v1/sales-catalogs', async (req, res, next) => {
   try {
     const rows = (await pool.query('SELECT * FROM sales_catalogs WHERE store_id = $1 ORDER BY updated_at DESC', [req.storeId])).rows;
-    res.json({ success: true, data: rows.map(view) });
+    const store = await storeInfo(pool, req.storeId!);
+    const out = [];
+    for (const row of rows) {
+      if (row.public_slug) {
+        out.push(view(row));
+        continue;
+      }
+      const publicSlug = await allocateCatalogPublicSlug(pool, store.name || row.title || 'catalogo', row.id);
+      const updated = (
+        await pool.query('UPDATE sales_catalogs SET public_slug = $3, updated_at = now() WHERE id = $1 AND store_id = $2 RETURNING *', [
+          row.id,
+          req.storeId,
+          publicSlug,
+        ])
+      ).rows[0];
+      out.push(view(updated ?? { ...row, public_slug: publicSlug }));
+    }
+    res.json({ success: true, data: out });
   } catch (error) {
     next(error);
   }
@@ -149,10 +180,14 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs/preview', async (req, res, next
 salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
   try {
     const body = catalogSchema.parse(req.body ?? {});
+    const store = await storeInfo(pool, req.storeId!);
+    const desiredSlug = body.publicSlug || catalogPublicSlugify(store.name || body.title || 'catalogo');
+    if (body.publicSlug && !isValidCatalogPublicSlug(body.publicSlug)) throw httpError('Link curto inválido. Use letras, números e hífens (ex.: minha-loja).');
+    const publicSlug = await allocateCatalogPublicSlug(pool, desiredSlug);
     const row = (
       await pool.query(
-        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products, featured_ids, mode, show_repairs)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16::jsonb, $17, $18) RETURNING *`,
+        `INSERT INTO sales_catalogs (id, store_id, title, subtitle, show_cover, cover_style, cover_image, accent, show_prices, hide_sold_out, note, product_ids, token, created_by, include_order_products, featured_ids, mode, show_repairs, public_slug)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16::jsonb, $17, $18, $19) RETURNING *`,
         [
           `CAT-${randomUUID()}`,
           req.storeId,
@@ -172,6 +207,7 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
           JSON.stringify(body.featuredIds),
           body.mode,
           body.showRepairs,
+          publicSlug,
         ],
       )
     ).rows[0];
@@ -184,10 +220,23 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
 salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) => {
   try {
     const body = catalogSchema.parse(req.body ?? {});
+    const current = (await pool.query('SELECT * FROM sales_catalogs WHERE id = $1 AND store_id = $2', [req.params.id, req.storeId])).rows[0];
+    if (!current) throw httpError('Catálogo não encontrado nesta loja.', 404);
+
+    let publicSlug = current.public_slug || '';
+    if (body.publicSlug) {
+      if (!isValidCatalogPublicSlug(body.publicSlug)) throw httpError('Link curto inválido. Use letras, números e hífens (ex.: minha-loja).');
+      publicSlug = await allocateCatalogPublicSlug(pool, body.publicSlug, current.id);
+    } else if (!publicSlug) {
+      const store = await storeInfo(pool, req.storeId!);
+      publicSlug = await allocateCatalogPublicSlug(pool, store.name || body.title || 'catalogo', current.id);
+    }
+
     const row = (
       await pool.query(
         `UPDATE sales_catalogs SET title = $3, subtitle = $4, show_cover = $5, cover_style = $6, cover_image = $7, accent = $8, show_prices = $9,
-                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, featured_ids = $14::jsonb, mode = $15, show_repairs = $16, updated_at = now()
+                hide_sold_out = $10, note = $11, product_ids = $12::jsonb, include_order_products = $13, featured_ids = $14::jsonb, mode = $15, show_repairs = $16,
+                public_slug = $17, updated_at = now()
           WHERE id = $1 AND store_id = $2 RETURNING *`,
         [
           req.params.id,
@@ -206,6 +255,7 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
           JSON.stringify(body.featuredIds),
           body.mode,
           body.showRepairs,
+          publicSlug,
         ],
       )
     ).rows[0];
@@ -238,16 +288,26 @@ salesCatalogsRouter.delete('/api/v1/sales-catalogs/:id', async (req, res, next) 
   }
 });
 
-/** Página do cliente (sem login): só pelo token do link. */
+/** Página do cliente (sem login): token longo ou slug curto (/c/{slug}). */
 salesCatalogsRouter.get('/api/v1/public/sales-catalogs/:token', async (req, res, next) => {
   try {
-    const row = (await pool.query('SELECT * FROM sales_catalogs WHERE token = $1', [String(req.params.token).slice(0, 64)])).rows[0];
+    const row = await findSalesCatalogByPublicKey(pool, req.params.token);
     if (!row) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const catalog = view(row);
     const items = await catalogItems(pool, row.store_id, catalog.productIds, catalog.hideSoldOut, catalog.includeOrderProducts);
     const { token: _token, createdBy: _by, productIds: _ids, ...publicCatalog } = catalog;
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ success: true, data: { catalog: publicCatalog, sellers: await activeSellers(pool, row.store_id), store: await storeInfo(pool, row.store_id), items: catalog.showPrices ? items : items.map((item) => ({ ...item, price: 0, variants: item.variants.map((variant) => ({ ...variant, price: 0 })) })) } });
+    res.json({
+      success: true,
+      data: {
+        catalog: publicCatalog,
+        sellers: await activeSellers(pool, row.store_id),
+        store: await storeInfo(pool, row.store_id),
+        items: catalog.showPrices
+          ? items
+          : items.map((item) => ({ ...item, price: 0, variants: item.variants.map((variant) => ({ ...variant, price: 0 })) })),
+      },
+    });
   } catch (error) {
     next(error);
   }

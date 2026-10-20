@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
+import { findSalesCatalogByPublicKey } from '../services/salesCatalog.js';
 
 /**
  * Orçamento de manutenção pelo catálogo digital.
@@ -468,9 +469,9 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
 const publicItem = (item: any) => ({ serviceId: item.serviceId, name: item.name, optionName: item.optionName ?? '', price: item.price ?? null, estimatedMinutes: item.estimatedMinutes ?? null });
 
 async function catalogByToken(token: string) {
-  const row = (await pool.query('SELECT id, store_id, show_repairs FROM sales_catalogs WHERE token = $1', [String(token).slice(0, 64)])).rows[0];
+  const row = await findSalesCatalogByPublicKey(pool, token);
   if (!row || row.show_repairs === false) throw httpError('Manutenção indisponível neste link.', 404);
-  return row as { id: string; store_id: string };
+  return { id: String(row.id), store_id: String(row.store_id) };
 }
 
 // Limite por aparelho/IP: no máximo 6 envios a cada 10 minutos por catálogo (e 30 consultas de protocolo).

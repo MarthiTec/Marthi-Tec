@@ -31,7 +31,9 @@ const lineKey = (item: CatalogItem, variant: CatalogVariant | null) => `${item.i
  * Com ?imprimir=1 abre direto a impressão / PDF.
  */
 export function CatalogPublicPage() {
-  const { token = '' } = useParams();
+  const { token: tokenParam = '', slug = '' } = useParams();
+  /** Token longo (/catalogo/…) ou slug curto (/c/…). A API resolve os dois. */
+  const token = tokenParam || slug;
   const [params] = useSearchParams();
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState('');

@@ -179,6 +179,11 @@ export function CatalogHome({
           {[store.phone, store.instagram ? `@${store.instagram.replace(/^@/, '')}` : '', store.website].filter(Boolean).join(' · ')}
         </span>
         {look.note ? <p>{look.note}</p> : null}
+        <p className="chome__marthi">
+          <a href="/" target="_blank" rel="noopener noreferrer">
+            Desenvolvido por Marthi
+          </a>
+        </p>
       </footer>
     </div>
   );

@@ -3,6 +3,7 @@ import { useUserPreference } from '../../hooks/useUserPreference';
 import { AdminPicker } from '../../components/AdminPicker';
 import { AdminIcon } from '../../components/AdminIcons';
 import { CatalogDocument, type CatalogItem, type CatalogStore } from '../../components/CatalogDocument';
+import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
 import { conditionCode } from '../../data/productCondition';
 import { usePickupMethods } from '../../data/pickup';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -15,7 +16,7 @@ import {
   apiNewSalesCatalogLink,
   apiPreviewSalesCatalog,
   apiUpdateSalesCatalog,
-  catalogPublicUrl,
+  catalogShareUrl,
   type SalesCatalog,
   type SalesCatalogInput,
 } from '../../services/salesCatalogApi';
@@ -51,6 +52,7 @@ const blank = (): SalesCatalogInput => ({
   featuredIds: [],
   note: '',
   productIds: [],
+  publicSlug: '',
 });
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -67,7 +69,7 @@ const priceRange = (row: StockRow) => {
 const isUsed = (row: StockRow) =>
   (row.variations?.length ? row.variations.map((v) => conditionCode(v.condition) || 'new') : [conditionCode(row.condition) || 'new']).some((code) => code !== 'new');
 
-type Tab = 'products' | 'look' | 'preview';
+type Tab = 'products' | 'look' | 'share' | 'preview';
 type Availability = 'available' | 'stock' | 'order' | 'all';
 type Condition = 'all' | 'new' | 'used';
 /** Configuração da tela de cada usuário (fica no banco): catálogo aberto, aba e filtros. */
@@ -281,23 +283,39 @@ export function SalesCatalogPage() {
   /** Abre a página do cliente (salva antes, para o link mostrar exatamente o que está na tela). */
   async function openPublic(print = false) {
     const saved = await save();
-    if (saved) window.open(`${catalogPublicUrl(saved.token)}${print ? '?imprimir=1' : ''}`, '_blank', 'noopener');
+    if (saved) window.open(`${catalogShareUrl(saved)}${print ? '?imprimir=1' : ''}`, '_blank', 'noopener');
   }
   async function copyLink() {
     const saved = await save();
     if (!saved) return;
+    const url = catalogShareUrl(saved);
     try {
-      await navigator.clipboard.writeText(catalogPublicUrl(saved.token));
-      setNotice('Link copiado. Cole no WhatsApp ou no Instagram do cliente.');
+      await navigator.clipboard.writeText(url);
+      setNotice('Link copiado. Cole no WhatsApp, Instagram ou imprima o QR.');
     } catch {
-      setNotice(`Link: ${catalogPublicUrl(saved.token)}`);
+      setNotice(`Link: ${url}`);
     }
   }
   async function sendWhatsapp() {
     const saved = await save();
     if (!saved) return;
-    const text = `${saved.title}${saved.subtitle ? ` · ${saved.subtitle}` : ''}\nVeja nossos produtos: ${catalogPublicUrl(saved.token)}`;
+    const text = `${saved.title}${saved.subtitle ? ` · ${saved.subtitle}` : ''}\nVeja nossos produtos: ${catalogShareUrl(saved)}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  }
+  async function downloadQr() {
+    const saved = await save();
+    if (!saved) return;
+    const url = catalogShareUrl(saved);
+    try {
+      const dataUrl = await generateQrDataUrl(url, 600);
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `marthi-catalogo-qr-${saved.publicSlug || saved.id}.png`;
+      a.click();
+      setNotice('QR Code baixado em PNG (alta resolução).');
+    } catch {
+      setError('Não foi possível gerar o QR Code.');
+    }
   }
   async function newLink() {
     if (!current || !window.confirm('Gerar um novo link? O link antigo para de abrir.')) return;
@@ -402,6 +420,7 @@ export function SalesCatalogPage() {
           [
             ['products', `Produtos (${form.productIds.length})`],
             ['look', 'Uso, capa e aparência'],
+            ['share', 'Link e QR Code'],
             ['preview', 'Prévia'],
           ] as const
         ).map(([value, label]) => (
@@ -574,6 +593,95 @@ export function SalesCatalogPage() {
                 Observação no rodapé
                 <textarea className="admin-input" rows={2} maxLength={300} value={form.note} onChange={(e) => update({ note: e.target.value })} placeholder="Ex.: Preços à vista no PIX. Parcelamos em até 18x no cartão." />
               </label>
+            </div>
+          ) : null}
+
+          {tab === 'share' ? (
+            <div className="salescat__panel salescat__share">
+              <div>
+                <h2 className="salescat__share-title">Link curto e QR Code</h2>
+                <p className="salescat__muted">
+                  Use na mesa, no balcão ou em material impresso. O cliente aponta a câmera e abre o catálogo da loja — no mesmo padrão do Cardápio Digital.
+                </p>
+              </div>
+
+              <label className="admin-field">
+                Link curto (slug)
+                <div className="salescat__slug-row">
+                  <span className="salescat__slug-prefix">{typeof window !== 'undefined' ? `${window.location.origin}/c/` : '/c/'}</span>
+                  <input
+                    className="admin-input"
+                    maxLength={48}
+                    value={form.publicSlug ?? ''}
+                    onChange={(e) =>
+                      update({
+                        publicSlug: e.target.value
+                          .toLowerCase()
+                          .normalize('NFD')
+                          .replace(/[\u0300-\u036f]/g, '')
+                          .replace(/[^a-z0-9-]+/g, '-')
+                          .replace(/-+/g, '-')
+                          .replace(/^-|-$/g, '')
+                          .slice(0, 48),
+                      })
+                    }
+                    placeholder="minha-loja"
+                    aria-label="Slug do link curto"
+                    disabled={!currentId}
+                  />
+                </div>
+                <small className="salescat__muted">Letras, números e hífens. Salva com o catálogo. Ex.: /c/cellponto</small>
+              </label>
+
+              {currentId && (current?.publicSlug || form.publicSlug) ? (
+                <>
+                  <div className="salescat__share-card salescat__share-card--qr">
+                    <div className="salescat__qr">
+                      <QrCodeView value={catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })} size={140} colorDark="#16181d" />
+                    </div>
+                    <div className="salescat__share-copy">
+                      <strong>QR Code para mesa e fachada</strong>
+                      <p className="salescat__muted">
+                        Link público:{' '}
+                        <code className="salescat__code">{catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })}</code>
+                      </p>
+                      <div className="salescat__share-btns">
+                        <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void downloadQr()}>
+                          Baixar QR (PNG)
+                        </button>
+                        <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void copyLink()}>
+                          Copiar link
+                        </button>
+                        <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void openPublic()}>
+                          Abrir catálogo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="salescat__share-card">
+                    <strong>WhatsApp e redes</strong>
+                    <p className="salescat__muted">Envie o link curto aos clientes ou cole na bio do Instagram.</p>
+                    <div className="salescat__share-btns">
+                      <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void sendWhatsapp()}>
+                        <AdminIcon name="whatsapp" /> WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        disabled={busy}
+                        onClick={() => {
+                          void copyLink();
+                        }}
+                      >
+                        Copiar para a bio
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="salescat__muted">Salve o catálogo para gerar o link curto e o QR Code. Catálogos já salvos recebem o slug automaticamente.</p>
+              )}
             </div>
           ) : null}
         </div>

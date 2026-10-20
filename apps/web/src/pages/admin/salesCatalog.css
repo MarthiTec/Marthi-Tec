@@ -85,6 +85,35 @@
 .salescat__mode.is-on { border-color: var(--accent, #0f766e); background: color-mix(in srgb, var(--accent, #0f766e) 7%, transparent); }
 .salescat__autosave { margin: 0; color: var(--mute, #64748b); font-size: .78rem; font-weight: 600; }
 
+/* Link curto + QR (padrão cardápio digital). */
+.salescat__share { gap: 16px; }
+.salescat__share-title { margin: 0; font-size: 1.05rem; }
+.salescat__slug-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; overflow: hidden; background: var(--card-2, #f8fafc); }
+.salescat__slug-prefix { display: grid; place-items: center; padding: 0 10px; color: var(--mute, #64748b); font-size: .78rem; font-weight: 700; white-space: nowrap; border-right: 1px solid var(--line, #e2e8f0); }
+.salescat__slug-row .admin-input { flex: 1 1 140px; min-width: 0; border: 0; border-radius: 0; background: var(--card, #fff); }
+.salescat__share-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 14px; background: var(--card-2, #f8fafc); }
+.salescat__share-card--qr { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; }
+.salescat__qr { display: grid; place-items: center; padding: 10px; border-radius: 12px; background: #fff; border: 1px solid var(--line, #e2e8f0); }
+.salescat__share-copy { display: grid; gap: 8px; min-width: 0; }
+.salescat__share-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.salescat__code { display: inline; overflow-wrap: anywhere; font-size: .78rem; }
+.is-theme-dark .salescat__slug-row,
+.admin--dark .salescat__slug-row,
+.is-theme-dark .salescat__share-card,
+.admin--dark .salescat__share-card,
+.is-theme-dark .salescat__qr,
+.admin--dark .salescat__qr {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.is-theme-dark .salescat__slug-row .admin-input,
+.admin--dark .salescat__slug-row .admin-input { background: var(--card, #171e27); }
+@media (max-width: 640px) {
+  .salescat__share-card--qr { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .salescat__share-btns { justify-content: center; }
+  .salescat__share-btns .btn { flex: 1 1 100%; }
+}
+
 /* Miniaturas das capas (6 estilos). */
 .salescat__styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .salescat__style--hero span, .salescat__style--minimal span, .salescat__style--mosaic span, .salescat__style--dark span { width: 76px; height: 46px; border-radius: 8px; }
