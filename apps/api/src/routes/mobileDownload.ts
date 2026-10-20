@@ -26,9 +26,17 @@ function detectChannel(url: string | null | undefined): Channel {
   return 'generic';
 }
 
+/** Fallback Expo Go quando env ainda não injeta no container (git sync) ou está vazio. */
+function defaultInstallUrl(platform: 'android' | 'ios'): string | null {
+  const base = String(env.FRONTEND_URL || '').trim().replace(/\/$/, '');
+  if (!base.startsWith('https://')) return null;
+  return `${base}/app-lojista?platform=${platform}`;
+}
+
 mobileDownloadRouter.get('/api/v1/mobile/download', (_req, res) => {
-  const androidApkUrl = env.MOBILE_ANDROID_APK_URL ?? null;
-  const iosInstallUrl = env.MOBILE_IOS_INSTALL_URL ?? null;
+  // Prefer env (APK/TestFlight/EAS). Fallback: página pública Expo Go em /app-lojista.
+  const androidApkUrl = env.MOBILE_ANDROID_APK_URL ?? defaultInstallUrl('android');
+  const iosInstallUrl = env.MOBILE_IOS_INSTALL_URL ?? defaultInstallUrl('ios');
   res.json({
     success: true,
     data: {

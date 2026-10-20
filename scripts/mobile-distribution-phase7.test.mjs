@@ -45,7 +45,9 @@ test('painel Operações tem UI de download do app', () => {
   const route = fs.readFileSync('apps/api/src/routes/mobileDownload.ts', 'utf8');
   assert.match(route, /MOBILE_ANDROID_APK_URL|androidApkUrl/);
   assert.match(route, /androidChannel|expo-go/);
+  assert.match(route, /defaultInstallUrl|app-lojista/);
 });
+
 
 test('página pública /app-lojista e canal Expo Go documentados', () => {
   assert.ok(fs.existsSync('apps/web/src/pages/MobileInstallPage.tsx'));
