@@ -112,6 +112,33 @@
   line-height: 1.45;
 }
 
+.mobile-install__details {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.mobile-install__details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #5eead4;
+}
+
+.mobile-install__pre-link {
+  margin: 10px 0 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: #020617;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  color: #a7f3d0;
+  font-size: 0.78rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 520px) {
   .mobile-install {
     padding: 20px 12px 36px;

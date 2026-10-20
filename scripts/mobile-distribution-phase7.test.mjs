@@ -51,6 +51,9 @@ test('painel Operações tem UI de download do app', () => {
 
 test('página pública /app-lojista e canal Expo Go documentados', () => {
   assert.ok(fs.existsSync('apps/web/src/pages/MobileInstallPage.tsx'));
+  const page = fs.readFileSync('apps/web/src/pages/MobileInstallPage.tsx', 'utf8');
+  assert.match(page, /Abrir no Expo Go/);
+  assert.match(page, /VITE_EXPO_DEV_CLIENT_URL|EXPO_DEV_CLIENT_URL|expo\.dev\/go/);
   const app = fs.readFileSync('apps/web/src/App.tsx', 'utf8');
   assert.match(app, /path="\/app-lojista"/);
   const dist = fs.readFileSync(path.join(root, 'DISTRIBUTION.md'), 'utf8');
@@ -60,6 +63,8 @@ test('página pública /app-lojista e canal Expo Go documentados', () => {
   assert.equal(eas.build.preview.env.EXPO_PUBLIC_API_URL, 'https://marthi-totem.discloud.dev');
   const cfg = fs.readFileSync(path.join(root, 'src/api/config.ts'), 'utf8');
   assert.match(cfg, /marthi-totem\.discloud\.dev/);
+  const route = fs.readFileSync('apps/api/src/routes/mobileDownload.ts', 'utf8');
+  assert.match(route, /EXPO_DEV_CLIENT_URL/);
 });
 
 test('scanner IMEI compartilhado na entrada e venda externa', () => {
