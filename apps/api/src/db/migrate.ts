@@ -7,18 +7,41 @@ import type { Pool, PoolClient } from 'pg';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function listSqlMigrations(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+}
+
+/** Prefer the richest migrations tree so a stale dist/ cannot hide newer source SQL. */
 export function resolveMigrationsDir(): string {
   const candidates = [
-    path.join(__dirname, 'migrations'),
-    path.join(__dirname, '../../apps/api/src/db/migrations'),
-    path.join(process.cwd(), 'dist/db/migrations'),
     path.join(process.cwd(), 'apps/api/src/db/migrations'),
+    path.join(__dirname, '../../apps/api/src/db/migrations'),
+    path.join(__dirname, 'migrations'),
+    path.join(process.cwd(), 'dist/db/migrations'),
     path.join(process.cwd(), 'apps/api/dist/db/migrations'),
   ];
+
+  let bestDir = path.join(__dirname, 'migrations');
+  let bestFiles: string[] = [];
+
   for (const dir of candidates) {
-    if (fs.existsSync(dir)) return dir;
+    const files = listSqlMigrations(dir);
+    if (!files.length) continue;
+    const richer =
+      files.length > bestFiles.length ||
+      (files.length === bestFiles.length &&
+        (files[files.length - 1] ?? '') > (bestFiles[bestFiles.length - 1] ?? ''));
+    if (richer || bestFiles.length === 0) {
+      bestDir = dir;
+      bestFiles = files;
+    }
   }
-  return path.join(__dirname, 'migrations');
+
+  return bestDir;
 }
 
 export const MIGRATIONS_DIR = resolveMigrationsDir();
