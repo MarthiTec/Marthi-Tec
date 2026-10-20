@@ -54,7 +54,7 @@
       "eas": {
         "projectId": "replace-with-eas-project-id"
       },
-      "apiUrl": ""
+      "apiUrl": "https://marthi-totem.discloud.dev"
     }
   }
 }

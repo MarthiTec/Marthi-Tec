@@ -19,11 +19,13 @@ import {
   type StockMovement,
 } from '../../api/stockApi';
 import { useAuth } from '../../auth/AuthContext';
+import { BarcodeImeiScanner } from '../../components/BarcodeImeiScanner';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Screen } from '../../components/Screen';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { canManageStock, canSeeCost, canSeeSalePrice } from '../../permissions/areas';
 import { formatBrl, formatInt } from '../../utils/format';
+import { digitsOnly, normalizeScanPayload } from '../../utils/scanCode';
 
 type Panel = 'none' | 'adjust' | 'price' | 'entry';
 
@@ -48,6 +50,9 @@ export function StockDetailScreen() {
   const [entryQty, setEntryQty] = useState('1');
   const [entryCost, setEntryCost] = useState('');
   const [entryNotes, setEntryNotes] = useState('');
+  const [entryImeis, setEntryImeis] = useState<string[]>([]);
+  const [imeiDraft, setImeiDraft] = useState('');
+  const [scanImeiOpen, setScanImeiOpen] = useState(false);
 
   const showPrice = canSeeSalePrice(access);
   const showCost = canSeeCost(access);
@@ -142,6 +147,23 @@ export function StockDetailScreen() {
     }
   }
 
+  function addImei(raw: string) {
+    const n = normalizeScanPayload(raw);
+    const imei = digitsOnly(n.code || raw);
+    if (imei.length < 8) {
+      Alert.alert('IMEI inválido', 'Informe ou escaneie um IMEI/série válido.');
+      return;
+    }
+    if (entryImeis.includes(imei)) {
+      Alert.alert('IMEI já na lista', imei);
+      return;
+    }
+    setEntryImeis((prev) => [...prev, imei]);
+    setImeiDraft('');
+    const nextQty = Math.max(Number(entryQty) || 0, entryImeis.length + 1);
+    setEntryQty(String(nextQty));
+  }
+
   async function onEntry() {
     if (!token || !storeId || !item) return;
     const qty = Number(entryQty);
@@ -154,6 +176,10 @@ export function StockDetailScreen() {
       Alert.alert('Custo unitário inválido');
       return;
     }
+    if (entryImeis.length > qty) {
+      Alert.alert('IMEIs em excesso', 'Há mais IMEIs do que a quantidade da entrada.');
+      return;
+    }
     setBusy(true);
     try {
       const result = await createStockEntry({
@@ -163,14 +189,19 @@ export function StockDetailScreen() {
         qty,
         unitCost,
         notes: entryNotes.trim(),
+        imeis: entryImeis,
         payment: 'none',
       });
       setItem(result.product);
       setPanel('none');
       setEntryQty('1');
       setEntryNotes('');
+      setEntryImeis([]);
       await load();
-      Alert.alert('Entrada registrada', `+${qty} unidade(s)`);
+      Alert.alert(
+        'Entrada registrada',
+        `+${qty} unidade(s)${entryImeis.length ? ` · ${entryImeis.length} IMEI(s)` : ''}`,
+      );
     } catch (err) {
       Alert.alert('Erro', err instanceof Error ? err.message : 'Falha na entrada');
     } finally {
@@ -274,11 +305,68 @@ export function StockDetailScreen() {
           <Text style={[styles.section, { color: c.ink }]}>Entrada simplificada</Text>
           <Field label="Quantidade" value={entryQty} onChange={setEntryQty} keyboard="numeric" c={c} />
           <Field label="Custo unitário" value={entryCost} onChange={setEntryCost} keyboard="numeric" c={c} />
+          <Text style={{ color: c.mute, fontSize: 12, fontWeight: '700' }}>IMEI / série (opcional)</Text>
+          <Text style={{ color: c.mute, fontSize: 11 }}>
+            Escaneie a câmera ou digite. Enviado na mesma API de entradas do web.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <TextInput
+              value={imeiDraft}
+              onChangeText={setImeiDraft}
+              placeholder="IMEI"
+              placeholderTextColor={c.mute}
+              autoCapitalize="characters"
+              style={{
+                flex: 1,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: c.line,
+                backgroundColor: c.card,
+                color: c.ink,
+                borderRadius: 10,
+                minHeight: 44,
+                paddingHorizontal: 12,
+              }}
+              onSubmitEditing={() => addImei(imeiDraft)}
+            />
+            <PrimaryButton label="+" variant="ghost" onPress={() => addImei(imeiDraft)} />
+          </View>
+          <PrimaryButton label="Escanear IMEI" variant="ghost" onPress={() => setScanImeiOpen(true)} />
+          {entryImeis.map((imei) => (
+            <View
+              key={imei}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+            >
+              <Text style={{ color: c.ink, fontWeight: '700', flex: 1 }}>{imei}</Text>
+              <Pressable onPress={() => setEntryImeis((prev) => prev.filter((x) => x !== imei))}>
+                <Text style={{ color: c.danger, fontWeight: '700' }}>Rem</Text>
+              </Pressable>
+            </View>
+          ))}
           <Field label="Observação" value={entryNotes} onChange={setEntryNotes} c={c} />
           <PrimaryButton label="Registrar entrada" loading={busy} onPress={() => void onEntry()} />
-          <PrimaryButton label="Cancelar" variant="ghost" onPress={() => setPanel('none')} />
+          <PrimaryButton
+            label="Cancelar"
+            variant="ghost"
+            onPress={() => {
+              setPanel('none');
+              setEntryImeis([]);
+              setImeiDraft('');
+            }}
+          />
         </View>
       ) : null}
+
+      <BarcodeImeiScanner
+        visible={scanImeiOpen}
+        title="IMEI da entrada"
+        subtitle="Leia o IMEI / código de barras do aparelho"
+        manualPlaceholder="IMEI 15 dígitos"
+        onClose={() => setScanImeiOpen(false)}
+        onCaptured={(code) => {
+          setScanImeiOpen(false);
+          addImei(code);
+        }}
+      />
 
       <View style={[styles.card, { backgroundColor: c.card, borderColor: c.line }]}>
         <Text style={[styles.section, { color: c.ink }]}>Histórico de movimentos</Text>

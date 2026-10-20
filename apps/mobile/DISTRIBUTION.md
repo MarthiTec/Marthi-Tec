@@ -1,12 +1,28 @@
 # Distribuição interna — Marthi Lojista
 
-Sem Play Store / App Store nesta fase. Canal: APK Android + iOS Ad Hoc/dev.
+Sem Play Store / App Store nesta fase. Canal preferido: APK Android (EAS `preview`) + iOS Ad Hoc/TestFlight.
+
+**API de produção (build-time):** `EXPO_PUBLIC_API_URL=https://marthi-totem.discloud.dev`  
+Já embutido nos perfis `eas.json` e default de `src/api/config.ts`. Local: copie `.env.example` → `.env`.
+
+## Fallback honesto sem EAS (Expo Go)
+
+Se `EXPO_TOKEN` / login Expo / certificados Apple não estiverem disponíveis:
+
+1. Publique a página pública `https://marthi-totem.discloud.dev/app-lojista` (rota web).
+2. No Site Discloud, defina:
+   - `MOBILE_ANDROID_APK_URL=https://marthi-totem.discloud.dev/app-lojista?platform=android`
+   - `MOBILE_IOS_INSTALL_URL=https://marthi-totem.discloud.dev/app-lojista?platform=ios`
+3. Reinicie o Site. Em **Operações → Download do App** os botões aparecem como **Abrir no Expo Go** (não “Baixar APK”).
+4. **Não** invente URLs de `.apk`.
+
+Quando o APK EAS existir, substitua as variáveis pelos links reais — os rótulos voltam a “Baixar APK Android” / TestFlight automaticamente.
 
 ## Checklist pré-build
 
-1. Conta Expo (eas.dev / expo.dev) do time Marthi.
+1. Conta Expo (eas.dev / expo.dev) do time Marthi + `EXPO_TOKEN` ou `eas login`.
 2. `cd apps/mobile && npm install`
-3. Definir `EXPO_PUBLIC_API_URL` de **produção HTTPS** no perfil EAS (não embutir secrets JWT/DB no app).
+3. Confirmar `EXPO_PUBLIC_API_URL` nos perfis EAS (`eas.json` → já aponta para `marthi-totem.discloud.dev`).
 4. Preencher `extra.eas.projectId` em `app.json` via `npx eas-cli init` (placeholder atual: `replace-with-eas-project-id`).
 5. Conferir `eas.json` perfil `preview` → Android `buildType: apk`, `distribution: internal`.
 
@@ -70,8 +86,8 @@ No dashboard Discloud → aplicação **Site** → **Variáveis** (não no Bot):
 
 | Variável | Exemplo | Efeito |
 |----------|---------|--------|
-| `MOBILE_ANDROID_APK_URL` | `https://expo.dev/artifacts/eas/….apk` | Botão **Baixar APK Android** |
-| `MOBILE_IOS_INSTALL_URL` | `https://testflight.apple.com/join/…` ou link EAS | Botão **Instalar no iPhone / iPad** |
+| `MOBILE_ANDROID_APK_URL` | `https://expo.dev/artifacts/eas/….apk` **ou** `/app-lojista?platform=android` | **Baixar APK Android** ou **Abrir no Expo Go (Android)** |
+| `MOBILE_IOS_INSTALL_URL` | TestFlight / EAS **ou** `/app-lojista?platform=ios` | **Abrir TestFlight** / **Abrir no Expo Go (iPhone)** |
 
 1. Gere o APK com EAS (`preview`) e copie o link HTTPS estável (ou hospede o arquivo num CDN próprio).
 2. Cole em `MOBILE_ANDROID_APK_URL` (URL completa `https://…`).

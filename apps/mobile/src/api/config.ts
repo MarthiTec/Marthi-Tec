@@ -12,8 +12,9 @@ export function apiBaseUrl(): string {
   const fromExtra = (extra?.apiUrl || '').trim().replace(/\/$/, '');
   if (fromExtra) return fromExtra;
 
-  // Produção Site (mesma API do web). Em dev local use EXPO_PUBLIC_API_URL=http://HOST:8080
-  return 'https://marthi-totem.discloud.app';
+  // Produção Site ao vivo (baseDomain atual). Em dev local: EXPO_PUBLIC_API_URL=http://HOST:8080
+  // Nota: *.discloud.app do totem ainda não roteia; use .discloud.dev até migrar o domínio.
+  return 'https://marthi-totem.discloud.dev';
 }
 
 export function apiV1Url(): string {

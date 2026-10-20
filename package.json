@@ -27,7 +27,7 @@
     "test:mobile-os": "npm run build:api && node --test scripts/mobile-os-phase4.test.mjs",
     "test:mobile-sales": "node --test scripts/mobile-sales-phase5.test.mjs",
     "test:mobile-audit": "npm run build:api && node --test scripts/mobile-audit-phase6.test.mjs",
-    "test:mobile-distribution": "node --test scripts/mobile-distribution-phase7.test.mjs",
+    "test:mobile-distribution": "node --test scripts/mobile-distribution-phase7.test.mjs scripts/mobile-install-channel.test.mjs",
     "test:mobile": "npm run test:mobile-access && npm run test:mobile-stock && npm run test:mobile-os && npm run test:mobile-sales && npm run test:mobile-audit && npm run test:mobile-distribution"
   },
   "dependencies": {

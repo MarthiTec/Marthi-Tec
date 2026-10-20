@@ -40,9 +40,36 @@ test('painel Operações tem UI de download do app', () => {
   const section = fs.readFileSync('apps/web/src/components/MobileAppDownloadSection.tsx', 'utf8');
   assert.match(section, /APK ainda não publicado/);
   assert.match(section, /\/mobile\/download/);
+  assert.match(section, /Abrir no Expo Go|detectMobileInstallChannel/);
   assert.ok(fs.existsSync('apps/api/src/routes/mobileDownload.ts'));
   const route = fs.readFileSync('apps/api/src/routes/mobileDownload.ts', 'utf8');
   assert.match(route, /MOBILE_ANDROID_APK_URL|androidApkUrl/);
+  assert.match(route, /androidChannel|expo-go/);
+});
+
+test('página pública /app-lojista e canal Expo Go documentados', () => {
+  assert.ok(fs.existsSync('apps/web/src/pages/MobileInstallPage.tsx'));
+  const app = fs.readFileSync('apps/web/src/App.tsx', 'utf8');
+  assert.match(app, /path="\/app-lojista"/);
+  const dist = fs.readFileSync(path.join(root, 'DISTRIBUTION.md'), 'utf8');
+  assert.match(dist, /app-lojista/);
+  assert.match(dist, /EXPO_PUBLIC_API_URL=https:\/\/marthi-totem\.discloud\.dev/);
+  const eas = JSON.parse(fs.readFileSync(path.join(root, 'eas.json'), 'utf8'));
+  assert.equal(eas.build.preview.env.EXPO_PUBLIC_API_URL, 'https://marthi-totem.discloud.dev');
+  const cfg = fs.readFileSync(path.join(root, 'src/api/config.ts'), 'utf8');
+  assert.match(cfg, /marthi-totem\.discloud\.dev/);
+});
+
+test('scanner IMEI compartilhado na entrada e venda externa', () => {
+  assert.ok(fs.existsSync(path.join(root, 'src/components/BarcodeImeiScanner.tsx')));
+  assert.ok(fs.existsSync(path.join(root, 'src/utils/scanCode.ts')));
+  const entry = fs.readFileSync(path.join(root, 'src/screens/stock/StockDetailScreen.tsx'), 'utf8');
+  assert.match(entry, /BarcodeImeiScanner/);
+  assert.match(entry, /imeis:\s*entryImeis/);
+  const sales = fs.readFileSync(path.join(root, 'src/screens/sales/SalesNewScreen.tsx'), 'utf8');
+  assert.match(sales, /BarcodeImeiScanner/);
+  assert.match(sales, /lookupStock/);
+  assert.match(sales, /imei:\s*l\.imei/);
 });
 
 test('mobile package is excluded from Discloud Site upload', () => {
