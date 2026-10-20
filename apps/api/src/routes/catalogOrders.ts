@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
-import { variantKey } from '../services/salesCatalog.js';
+import { findSalesCatalogByPublicKey, variantKey } from '../services/salesCatalog.js';
 import { catalogItems, orderMethodOf } from './salesCatalogs.js';
 
 /**
@@ -106,7 +106,7 @@ const view = (row: any) => ({
 /** Cliente envia o pedido (ou só o cadastro) pelo link do catálogo. */
 catalogOrdersRouter.post('/api/v1/public/sales-catalogs/:token/orders', async (req, res, next) => {
   try {
-    const catalog = (await pool.query('SELECT * FROM sales_catalogs WHERE token = $1', [String(req.params.token).slice(0, 64)])).rows[0];
+    const catalog = await findSalesCatalogByPublicKey(pool, req.params.token);
     if (!catalog) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const body = orderSchema.parse(req.body ?? {});
     if (body.website) throw httpError('Não foi possível enviar.', 400);

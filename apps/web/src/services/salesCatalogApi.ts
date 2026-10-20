@@ -13,6 +13,8 @@ export type SalesCatalog = CatalogLook & {
   /** Faixa "Destaques" no topo da página de venda. */
   featuredIds: string[];
   token: string;
+  /** Link curto público: /c/{publicSlug}. */
+  publicSlug?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -103,5 +105,12 @@ export const apiAcceptCatalogOrder = (id: string) =>
   nestPost<{ order: CatalogOrder; createdCustomer: boolean; customer: { id: string; name: string; phone: string; document: string; email: string } }>(`/catalog-orders/${encodeURIComponent(id)}/accept`, {});
 export const apiCancelCatalogOrder = (id: string, reason: string) => nestPost<CatalogOrder>(`/catalog-orders/${encodeURIComponent(id)}/cancel`, { reason });
 
-/** Endereço que o cliente abre (mesmo domínio do painel). */
+/** Endereço longo (token). Preferir `catalogShortUrl` quando houver slug. */
 export const catalogPublicUrl = (token: string) => `${window.location.origin}/catalogo/${token}`;
+
+/** Link curto de vitrine / mesa: /c/{slug}. */
+export const catalogShortUrl = (slug: string) => `${window.location.origin}/c/${encodeURIComponent(slug)}`;
+
+/** Melhor URL para compartilhar: curto se existir slug; senão o token. */
+export const catalogShareUrl = (catalog: { token: string; publicSlug?: string }) =>
+  catalog.publicSlug ? catalogShortUrl(catalog.publicSlug) : catalogPublicUrl(catalog.token);

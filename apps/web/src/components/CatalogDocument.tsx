@@ -472,6 +472,11 @@ export function CatalogDocument({
           {store.instagram ? ` · @${store.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '')}` : ''}
         </p>
         <small>Preços e disponibilidade sujeitos a alteração · {monthYear()}</small>
+        <p className="catalog-foot__marthi">
+          <a href="/" target="_blank" rel="noopener noreferrer">
+            Desenvolvido por Marthi
+          </a>
+        </p>
       </footer>
     </div>
   );

@@ -4,12 +4,12 @@
 /* Topo: saudação + busca, num cartão com brilho na cor da loja. */
 .chome__hero { position: relative; display: grid; gap: 14px; overflow: hidden; padding: 22px 18px 18px; border-radius: 26px; background: #fff; box-shadow: 0 14px 40px rgba(22, 24, 29, 0.08); isolation: isolate; animation: chome-rise .5s cubic-bezier(.2, .8, .2, 1) both; }
 .chome__glow { position: absolute; inset: -40% -20% auto auto; z-index: -1; width: 70%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--cat-accent) 30%, transparent), transparent); animation: chome-float 9s ease-in-out infinite alternate; }
-.chome__brand { display: flex; align-items: center; gap: 10px; }
-.chome__brand img, .chome__mono { width: 44px; height: 44px; border-radius: 14px; object-fit: contain; background: #fff; box-shadow: 0 2px 10px rgba(22, 24, 29, 0.1); }
-.chome__mono { display: grid; place-items: center; background: var(--cat-accent); color: #fff; font-size: 1.2rem; font-weight: 900; }
-.chome__brand div { display: grid; }
+.chome__brand { display: flex; align-items: center; gap: 12px; }
+.chome__brand img, .chome__mono { width: 56px; height: 56px; border-radius: 16px; object-fit: contain; background: #fff; box-shadow: 0 4px 16px rgba(22, 24, 29, 0.12); }
+.chome__mono { display: grid; place-items: center; background: var(--cat-accent); color: #fff; font-size: 1.35rem; font-weight: 900; }
+.chome__brand div { display: grid; gap: 2px; }
 .chome__brand small { color: #6b7280; font-size: .78rem; font-weight: 600; }
-.chome__brand strong { font-size: 1.05rem; font-weight: 900; }
+.chome__brand strong { font-size: 1.2rem; font-weight: 900; letter-spacing: -.015em; }
 .chome__hero h1 { margin: 0; font-size: clamp(1.6rem, 6.4vw, 2.6rem); font-weight: 900; line-height: 1.05; letter-spacing: -.025em; }
 .chome__search { display: flex; align-items: center; gap: 8px; min-height: 54px; padding: 0 6px 0 16px; border: 1px solid #e6e7eb; border-radius: 999px; background: #f7f8fa; transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease; }
 .chome__search:focus-within { border-color: var(--cat-accent); background: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--cat-accent) 14%, transparent); }
@@ -73,6 +73,9 @@
 .chome__foot { display: grid; justify-items: center; gap: 4px; padding: 18px; color: #6b7280; font-size: .82rem; text-align: center; }
 .chome__foot strong { color: #16181d; }
 .chome__foot p { margin: 4px 0 0; max-width: 560px; }
+.chome__marthi { margin-top: 12px !important; }
+.chome__marthi a { color: #6b7280; font-size: .74rem; font-weight: 600; text-decoration: none; border-bottom: 1px solid rgba(107, 114, 128, 0.35); }
+.chome__marthi a:hover { color: #16181d; }
 
 /* Navegação fixa no topo: Início | Catálogo | Manutenção. */
 .cnav { position: sticky; top: 0; z-index: 30; display: flex; justify-content: center; padding: 8px 12px; background: color-mix(in srgb, #f3f4f6 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
