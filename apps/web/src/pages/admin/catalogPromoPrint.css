@@ -1,0 +1,330 @@
+/* Propaganda / flyer do Catálogo Digital (print + tela). */
+
+.catpromo {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 16px 40px;
+  background: var(--surface, #f1f5f9);
+  color: var(--ink, #0f172a);
+}
+
+.catpromo__controls {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  background: var(--card, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.catpromo__controls-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.catpromo__controls-head h1 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.catpromo__controls-head p {
+  margin: 4px 0 0;
+  color: var(--mute, #64748b);
+  font-size: 0.84rem;
+  max-width: 36ch;
+}
+
+.catpromo__fields {
+  display: grid;
+  gap: 10px;
+}
+
+.catpromo__field {
+  min-width: 0;
+}
+
+.catpromo__covers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.catpromo__cover {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  background: var(--card-2, #f8fafc);
+  color: var(--mute, #64748b);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.catpromo__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.catpromo__cover.is-on {
+  border-color: var(--accent, #0f766e);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #0f766e) 35%, transparent);
+}
+
+.catpromo__cover--upload {
+  border-style: dashed;
+}
+
+.catpromo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catpromo__actions .btn {
+  flex: 1 1 auto;
+  min-height: 42px;
+}
+
+.catpromo__error {
+  margin: 0;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.catpromo__notice {
+  margin: 0;
+  color: var(--accent, #0f766e);
+  font-weight: 600;
+}
+
+.catpromo__muted {
+  color: var(--mute, #64748b);
+  font-size: 0.82rem;
+}
+
+/* Flyer — arte com capa + QR sobreposto */
+.catpromo__flyer {
+  position: relative;
+  width: min(100%, 380px);
+  min-height: 640px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 14px;
+  padding: 22px 20px 18px;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+  isolation: isolate;
+}
+
+.catpromo__art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #16181d;
+}
+
+.catpromo__art img,
+.catpromo__art-empty {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.catpromo__art-empty {
+  background:
+    radial-gradient(60% 50% at 80% 20%, color-mix(in srgb, var(--cat-accent, #e4572e) 55%, transparent), transparent 70%),
+    linear-gradient(160deg, #1b1e24, #0f1115);
+}
+
+.catpromo__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(15, 17, 21, 0.55) 0%, rgba(15, 17, 21, 0.25) 38%, rgba(15, 17, 21, 0.72) 100%);
+}
+
+.catpromo__brand,
+.catpromo__copy,
+.catpromo__qr-wrap,
+.catpromo__foot {
+  position: relative;
+  z-index: 1;
+}
+
+.catpromo__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.catpromo__brand img,
+.catpromo__mono {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.catpromo__mono {
+  display: grid;
+  place-items: center;
+  background: var(--cat-accent, #e4572e);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.catpromo__brand strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.catpromo__brand small {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.catpromo__copy {
+  align-self: end;
+  text-align: center;
+}
+
+.catpromo__kicker {
+  margin: 0 0 6px;
+  color: color-mix(in srgb, var(--cat-accent, #e4572e) 70%, #fff);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.catpromo__copy h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 6vw, 1.85rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.catpromo__sub {
+  margin: 8px auto 0;
+  max-width: 28ch;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.catpromo__qr-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.catpromo__qr {
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+  border: 3px solid color-mix(in srgb, var(--cat-accent, #e4572e) 75%, #fff);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.catpromo__scan {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.catpromo__slug {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.catpromo__foot {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.is-theme-dark .catpromo,
+.admin--dark .catpromo {
+  background: var(--surface, #0f141a);
+  color: var(--ink, #e8eef4);
+}
+
+.is-theme-dark .catpromo__controls,
+.admin--dark .catpromo__controls {
+  background: var(--card, #171e27);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.is-theme-dark .catpromo__cover,
+.admin--dark .catpromo__cover {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 520px) {
+  .catpromo__actions .btn {
+    flex: 1 1 100%;
+  }
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print,
+  .admin-top,
+  .admin-side,
+  .erp-app__top,
+  .erp-app__side,
+  .catpromo__controls {
+    display: none !important;
+  }
+
+  .catpromo {
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  .catpromo__flyer {
+    box-shadow: none !important;
+    margin: 12mm auto !important;
+    page-break-inside: avoid !important;
+  }
+}

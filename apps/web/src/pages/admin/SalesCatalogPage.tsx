@@ -647,7 +647,7 @@ export function SalesCatalogPage() {
                       </p>
                       <div className="salescat__share-btns">
                         <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void downloadQr()}>
-                          Baixar QR (PNG)
+                          Baixar só QR (PNG)
                         </button>
                         <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void copyLink()}>
                           Copiar link
@@ -656,6 +656,27 @@ export function SalesCatalogPage() {
                           Abrir catálogo
                         </button>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="salescat__share-card">
+                    <strong>Propaganda com capa + QR</strong>
+                    <p className="salescat__muted">
+                      Escolha a foto de capa e imprima o flyer com o QR do link curto — como o display do Cardápio Digital.
+                    </p>
+                    <div className="salescat__share-btns">
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        disabled={busy}
+                        onClick={() => {
+                          void save().then((saved) => {
+                            if (saved) window.location.assign(`/painel/catalogo/imprimir?id=${encodeURIComponent(saved.id)}`);
+                          });
+                        }}
+                      >
+                        Abrir propaganda / imprimir
+                      </button>
                     </div>
                   </div>
 
