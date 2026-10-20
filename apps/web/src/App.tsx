@@ -15,6 +15,7 @@ import './styles/operatorThemeDark.css';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { DevMobileAppDownloadPage } from './pages/admin/DevMobileAppDownloadPage';
+import { DevMobileImeiScanPage } from './pages/admin/DevMobileImeiScanPage';
 import { MobileInstallPage } from './pages/MobileInstallPage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -169,8 +170,11 @@ export function App() {
         <Route path="/fale-conosco" element={<Navigate to="/contato" replace />} />
         <Route path="/parceiro" element={<PartnerSignupPage />} />
         <Route path="/login" element={<LoginPage />} />
-        {import.meta.env.DEV ? (
+        {import.meta.env.DEV ? (<>
+          
           <Route path="/dev/operacoes-app-download" element={<DevMobileAppDownloadPage />} />
+          <Route path="/dev/mobile-imei-scan" element={<DevMobileImeiScanPage />} />
+        </>
         ) : null}
         <Route path="/criar-senha" element={<SetupPasswordPage />} />
         <Route path="/definir-senha" element={<Navigate to="/criar-senha" replace />} />
