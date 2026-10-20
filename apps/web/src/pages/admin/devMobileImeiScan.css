@@ -1,0 +1,139 @@
+.dev-imei {
+  min-height: 100vh;
+  margin: 0;
+  padding: 28px 18px 40px;
+  box-sizing: border-box;
+  background: linear-gradient(165deg, #0f172a 0%, #134e4a 50%, #0f172a 100%);
+  color: #e2e8f0;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  max-width: 480px;
+  margin-inline: auto;
+}
+
+.dev-imei__eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5eead4;
+  font-weight: 700;
+}
+
+.dev-imei h1 {
+  margin: 0 0 10px;
+  font-size: 1.55rem;
+  color: #f8fafc;
+}
+
+.dev-imei__lead {
+  margin: 0 0 20px;
+  color: #cbd5e1;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.dev-imei__phone {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.75);
+  display: grid;
+  gap: 12px;
+}
+
+.dev-imei__phone header {
+  display: grid;
+  gap: 2px;
+}
+
+.dev-imei__phone header strong {
+  font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.dev-imei__phone header span {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.dev-imei__viewfinder {
+  position: relative;
+  height: 200px;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(45, 212, 191, 0.2), transparent 40%),
+    #020617;
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  display: grid;
+  place-items: end center;
+  padding-bottom: 14px;
+}
+
+.dev-imei__frame {
+  position: absolute;
+  inset: 28px 36px;
+  border: 2px solid rgba(94, 234, 212, 0.75);
+  border-radius: 12px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
+}
+
+.dev-imei__viewfinder p {
+  position: relative;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.dev-imei__phone label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.dev-imei__phone input {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #0b1220;
+  color: #f8fafc;
+  padding: 0 12px;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.dev-imei__cta {
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: #0d9488;
+  color: #fff;
+  font-weight: 700;
+  cursor: default;
+}
+
+.dev-imei__flows {
+  margin: 18px 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+
+.dev-imei__flows code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
