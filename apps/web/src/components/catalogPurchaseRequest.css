@@ -1,0 +1,125 @@
+.cpr {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #0b1220;
+  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  --cat-accent: #e4572e;
+}
+
+.cpr__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cpr__back {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.cpr__form,
+.cpr__done {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  align-content: start;
+}
+
+.cpr__lead {
+  margin: 0;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.cpr__product {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cpr__product span {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.cpr__form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.cpr__form input,
+.cpr__form textarea {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.55);
+  color: #f8fafc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.cpr__honey {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  height: 0;
+  width: 0;
+}
+
+.cpr__error {
+  margin: 0;
+  color: #fca5a5;
+}
+
+.cpr__btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--cat-accent, #e4572e);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+}
+
+.cpr__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cpr__btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cpr__protocol {
+  font-size: 1.6rem;
+  letter-spacing: 0.04em;
+  color: var(--cat-accent, #e4572e);
+}
+
+.cpr__done p {
+  margin: 0;
+  color: #cbd5e1;
+  line-height: 1.45;
+}

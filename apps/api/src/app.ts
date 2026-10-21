@@ -55,6 +55,7 @@ import { repairsRouter } from './routes/repairs.js';
 import { repairPartsRouter } from './routes/repairParts.js';
 import { repairPartOrdersRouter } from './routes/repairPartOrders.js';
 import { catalogOrdersRouter } from './routes/catalogOrders.js';
+import { purchaseRequestsRouter } from './routes/purchaseRequests.js';
 
 import { companyUsersRouter } from './routes/companyUsers.js';
 import { workOrdersRouter } from './routes/workOrders.js';
@@ -129,6 +130,7 @@ app.use(repairsRouter);
 app.use(repairPartsRouter);
 app.use(repairPartOrdersRouter);
 app.use(catalogOrdersRouter);
+app.use(purchaseRequestsRouter);
 app.use(posRouter);
 app.use(salesRouter);
 app.use(commercialRouter);

@@ -84,6 +84,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/catalogo', label: 'Catálogo digital', accent: '#e4572e' },
+      { to: '/painel/solicitacoes-compra', label: 'Solicitações de compras', accent: '#0284c7' },
       { to: '/erp/entrada-estoque', label: 'Entrada de estoque' },
       { to: '/painel/especificacoes', label: 'Especificações' },
       { to: '/painel/pessoas', label: 'Pessoas' },

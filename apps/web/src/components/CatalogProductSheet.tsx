@@ -18,6 +18,7 @@ export function CatalogProductSheet({
   store,
   onAdd,
   onClose,
+  onRequest,
   canBuy: sells = true,
 }: {
   item: CatalogItem;
@@ -27,6 +28,8 @@ export function CatalogProductSheet({
   canBuy?: boolean;
   onAdd: (item: CatalogItem, variant: CatalogVariant | null) => void;
   onClose: () => void;
+  /** Quando indisponível: abrir solicitação ao vendedor. */
+  onRequest?: (item: CatalogItem, variant: CatalogVariant | null) => void;
 }) {
   const variants = item.variants;
   const first = variants.find(open) ?? variants[0] ?? null;
@@ -205,13 +208,27 @@ export function CatalogProductSheet({
           <small>{variant?.label || item.condition || ''}</small>
         </div>
         {sells ? (
-          <button type="button" className="psheet__add" disabled={!canBuy} onClick={() => onAdd(item, variants.length ? variant : null)}>
-            {canBuy ? 'Adicionar à sacola' : 'Indisponível'}
-          </button>
+          canBuy ? (
+            <button type="button" className="psheet__add" onClick={() => onAdd(item, variants.length ? variant : null)}>
+              Adicionar à sacola
+            </button>
+          ) : onRequest ? (
+            <button type="button" className="psheet__add" onClick={() => onRequest(item, variants.length ? variant : null)}>
+              Solicitar ao vendedor
+            </button>
+          ) : (
+            <button type="button" className="psheet__add" disabled>
+              Indisponível
+            </button>
+          )
         ) : interest && canBuy ? (
           <a className="psheet__add psheet__add--wa" href={interest} target="_blank" rel="noreferrer">
             Tenho interesse
           </a>
+        ) : onRequest && !canBuy ? (
+          <button type="button" className="psheet__add" onClick={() => onRequest(item, variants.length ? variant : null)}>
+            Solicitar ao vendedor
+          </button>
         ) : (
           <button type="button" className="psheet__add" disabled>
             {canBuy ? 'Fale com a loja' : 'Indisponível'}

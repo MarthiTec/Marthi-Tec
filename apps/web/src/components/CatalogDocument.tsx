@@ -60,6 +60,8 @@ export type CatalogShop = {
   onUpgrade: () => void;
   onSignup: () => void;
   onPdf: () => void;
+  /** Produto/opção indisponível: pedir ao vendedor (solicitação de compra). */
+  onRequest?: (item: CatalogItem) => void;
 };
 
 export const catalogMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: value % 1 ? 2 : 0 });
@@ -430,9 +432,19 @@ export function CatalogDocument({
                         {single ? 'Adicionar à sacola' : 'Ver opções'}
                       </button>
                     ) : null}
+                    {shop?.onRequest && item.soldOut ? (
+                      <button type="button" className="catalog-buy" onClick={() => shop.onRequest?.(item)}>
+                        Solicitar ao vendedor
+                      </button>
+                    ) : null}
                     {(interactive || shop) && interest && !item.soldOut && !shop?.canBuy ? (
                       <a className="catalog-cta" href={interest} target="_blank" rel="noreferrer">
                         Tenho interesse
+                      </a>
+                    ) : null}
+                    {(interactive || shop) && item.soldOut && !shop?.onRequest && interest ? (
+                      <a className="catalog-cta" href={interest} target="_blank" rel="noreferrer">
+                        Consultar disponibilidade
                       </a>
                     ) : null}
                   </div>

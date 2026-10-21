@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { InlineSupplierCreate } from '../../components/InlineSupplierCreate';
@@ -15,6 +15,7 @@ import { CONDITION_LABEL, conditionCode, type ProductConditionCode } from '../..
 import { stockMatches } from '../../data/stockSearch';
 import { apiListBankAccounts, apiListStock, apiListSuppliers } from '../../services/erpApi';
 import { apiCreateStockEntry } from '../../services/productCatalogApi';
+import { apiUpdatePurchaseRequest } from '../../services/purchaseRequestsApi';
 import '../../components/supplierEntries.css';
 import './stockEntry.css';
 import { QuickAddButton } from '../../components/QuickModal';
@@ -89,12 +90,24 @@ function variationLabel(v: StockVariationRow) {
   return `${attrs || 'Sem atributos'} · ${condition} · ${v.qty} un`;
 }
 
+type PrefillState = {
+  productId?: string;
+  qty?: number;
+  notes?: string;
+  purchaseRequestId?: string;
+  attrs?: Record<string, string>;
+};
+
 /**
  * Entrada de estoque: escolhe o produto e lança a compra (Empresa) ou o aparelho de Upgrade com
  * fornecedor, data, quantidade, custo, IMEIs, condição e bateria. O mesmo produto recebe
  * entradas de vários fornecedores, com IMEIs, condições e baterias diferentes.
  */
 export function StockEntryPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const prefillDone = useRef(false);
+  const [purchaseRequestId, setPurchaseRequestId] = useState<string | null>(null);
   const [items, setItems] = useState<StockItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
@@ -163,20 +176,31 @@ export function StockEntryPage() {
   const chosenVariation = !creatingVariation && form.variationKey ? variations.find((v) => (v.id ?? '') === form.variationKey) : undefined;
   const effectiveCondition = chosenVariation ? conditionCode(chosenVariation.condition) || 'new' : form.condition;
 
-  function pick(item: StockItem) {
+  function pick(item: StockItem, prefill?: PrefillState) {
     setSelectedId(item.id);
     setQuery('');
     setNotice('');
     setError('');
     const productSupplier = suppliers.find((s) => s.id === item.supplierId);
+    const attrs = prefill?.attrs ?? {};
+    const matched =
+      item.variations?.find((v) => {
+        const entries = Object.entries(attrs);
+        if (!entries.length) return false;
+        return entries.every(([key, value]) => String((v.attrs ?? {})[key] ?? '').toLowerCase() === String(value).toLowerCase());
+      }) ?? null;
     setForm({
       ...emptyForm(),
-      variationKey: item.variations?.length ? item.variations[0].id ?? '' : '',
-      price: Number(item.price) || 0,
+      variationKey: matched?.id ?? (item.variations?.length ? item.variations[0].id ?? '' : ''),
+      newAttrs: matched ? {} : Object.keys(attrs).length ? { ...attrs } : {},
+      price: Number(matched?.price ?? item.price) || 0,
       unitCost: Number(item.avgCost ?? item.cost) || 0,
       supplierId: productSupplier?.id ?? '',
       origin: productSupplier?.origin ?? 'company',
+      qty: Math.max(1, Number(prefill?.qty) || 1),
+      notes: prefill?.notes?.trim() || '',
     });
+    if (prefill?.purchaseRequestId) setPurchaseRequestId(prefill.purchaseRequestId);
   }
 
   function clearForm() {
@@ -186,6 +210,32 @@ export function StockEntryPage() {
     setError('');
     setNewValueFor(null);
   }
+
+  useEffect(() => {
+    if (prefillDone.current || loading || !items.length) return;
+    const state = (location.state as PrefillState | null) ?? null;
+    const params = new URLSearchParams(location.search);
+    const productId = state?.productId || params.get('productId') || '';
+    if (!productId) return;
+    const item = items.find((row) => row.id === productId);
+    if (!item) {
+      setError('Produto da solicitação não encontrado nesta loja.');
+      prefillDone.current = true;
+      return;
+    }
+    pick(item, {
+      productId,
+      qty: (state?.qty ?? Number(params.get('qty') || 1)) || 1,
+      notes: state?.notes || params.get('notes') || '',
+      purchaseRequestId: state?.purchaseRequestId || params.get('purchaseRequestId') || undefined,
+      attrs: state?.attrs,
+    });
+    setNotice(`Produto pré-preenchido pela solicitação de compra. Confira quantidade, custo e IMEIs antes de lançar.`);
+    prefillDone.current = true;
+    window.history.replaceState({}, document.title);
+    // pick/suppliers stable enough after items load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, loading, location.state, location.search]);
 
   const update = (patch: Partial<Form>) => setForm((current) => ({ ...current, ...patch }));
 
@@ -232,9 +282,26 @@ export function StockEntryPage() {
       });
       setItems((current) => current.map((item) => (item.id === result.product.id ? result.product : item)));
       const finance = !result.payableId ? '' : form.payment === 'paid' ? ' Compra lançada como paga no financeiro.' : ' Compra lançada no contas a pagar.';
+      const entryLabel = `Entrada lançada: ${qty} un de ${product.name}${imeis.length ? ` (${imeis.length} IMEI${imeis.length > 1 ? 's' : ''})` : ''}.${finance}`;
+      const saleLine = { stockId: product.id, name: product.name, qty: 1, price: Number(product.price) || 0 };
+      const linkedRequestId = purchaseRequestId;
       // Salvou → fechou: volta à busca limpa pronta para a próxima entrada.
       clearForm();
-      setNotice(`Entrada lançada: ${qty} un de ${product.name}${imeis.length ? ` (${imeis.length} IMEI${imeis.length > 1 ? 's' : ''})` : ''}.${finance}`);
+      setNotice(entryLabel);
+      if (linkedRequestId) {
+        setPurchaseRequestId(linkedRequestId);
+        setPendingSaleLine(saleLine);
+        try {
+          await apiUpdatePurchaseRequest(linkedRequestId, {
+            status: 'fulfilled',
+            stockEntryId: result.entryId,
+            note: 'Entrada de estoque lançada a partir da solicitação',
+          });
+        } catch {
+          // Entrada já gravada; vínculo com a solicitação é complementar.
+        }
+        setNotice(`${entryLabel} Solicitação atualizada — pode abrir a venda no PDV.`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível lançar a entrada.');
     } finally {

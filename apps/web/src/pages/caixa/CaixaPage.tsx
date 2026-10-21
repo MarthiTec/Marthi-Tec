@@ -652,6 +652,7 @@ export function CaixaPage() {
   useEffect(() => {
     const navState = location.state as {
       osId?: string;
+      purchaseRequestId?: string;
       quote?: PosQuote;
       updatePrices?: boolean;
       customerName?: string;
@@ -671,24 +672,29 @@ export function CaixaPage() {
       return;
     }
 
-    if (navState?.osId && navState.lines?.length) {
-      setLinkedOsId(navState.osId);
-      const cartLines: CartLine[] = navState.lines.map((l, idx) => ({
-        key: `os-${navState.osId}-${idx}-${Date.now()}`,
-        stockId: l.stockId || '',
-        name: l.name,
-        sku: '',
-        qty: l.qty || 1,
-        basePrice: l.price || 0,
-        unitPrice: l.price || 0,
-        priceTableId: '',
-        unit: 'UN',
-        lineDiscount: 0,
-        lineDiscountMode: 'money',
-        lineSurcharge: 0,
-        lineSurchargeMode: 'money',
-        imei: '',
-      }));
+    if (navState?.lines?.length) {
+      if (navState.osId) setLinkedOsId(navState.osId);
+      const stockList = getAdminState().stock ?? [];
+      const cartLines: CartLine[] = navState.lines.map((l, idx) => {
+        const stock = l.stockId ? stockList.find((item) => item.id === l.stockId) : null;
+        const unitPrice = l.price > 0 ? l.price : Number(stock?.price) || 0;
+        return {
+          key: `${navState.osId || navState.purchaseRequestId || 'nav'}-${idx}-${Date.now()}`,
+          stockId: l.stockId || '',
+          name: l.name || stock?.name || 'Produto',
+          sku: stock?.sku || '',
+          qty: l.qty || 1,
+          basePrice: unitPrice,
+          unitPrice,
+          priceTableId: '',
+          unit: 'UN',
+          lineDiscount: 0,
+          lineDiscountMode: 'money' as const,
+          lineSurcharge: 0,
+          lineSurchargeMode: 'money' as const,
+          imei: '',
+        };
+      });
       setLines(cartLines);
       if (navState.customerName) {
         setCustomerName(navState.customerName);
@@ -701,7 +707,13 @@ export function CaixaPage() {
         setCustomerCpf(navState.customerDocument);
         setAskCpf(true);
       }
-      setMessage(`Ordem de Serviço #${navState.osId} carregada no PDV para recebimento.`);
+      if (navState.osId) {
+        setMessage(`Ordem de Serviço #${navState.osId} carregada no PDV para recebimento.`);
+      } else if (navState.purchaseRequestId) {
+        setMessage('Solicitação de compra carregada no PDV. Confira preço, estoque e IMEI antes de finalizar.');
+      } else {
+        setMessage('Itens carregados no PDV.');
+      }
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
