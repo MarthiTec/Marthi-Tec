@@ -7,7 +7,7 @@ import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { PanelAppsMenu } from '../../components/PanelAppsMenu';
 import { SidebarFinder } from '../../components/SidebarFinder';
 import type { Screen } from '../../data/screenDirectory';
-import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { PageBackProvider, ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
@@ -275,6 +275,7 @@ export function AdminLayout() {
   }
 
   return (
+    <PageBackProvider>
     <div
       className={`admin ${menuOpen ? 'is-menu-open' : ''} ${collapsed ? 'is-collapsed' : ''} ${
         isDark ? 'admin--dark is-theme-dark' : ''
@@ -427,9 +428,7 @@ export function AdminLayout() {
               <i />
             </span>
           </button>
-          {location.pathname !== '/painel' && location.pathname !== '/painel/' ? (
-            <ScreenBackButton home="/painel" label="Voltar" />
-          ) : null}
+          <ScreenBackButton home="/painel" label="Voltar" />
           <div className="admin__title">
             <p className="admin__kicker">{page.kicker}</p>
             <h1>{page.title}</h1>
@@ -468,5 +467,6 @@ export function AdminLayout() {
         logoutOnly
       />
     </div>
+    </PageBackProvider>
   );
 }

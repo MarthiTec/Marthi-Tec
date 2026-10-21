@@ -18,6 +18,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 import { getAdminState } from '../../data/adminStore';
 import { useBrands } from '../../data/brandStore';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -432,12 +433,12 @@ export function PromoCampaignsPage() {
 
   const headingActions = (
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
       {!formVisible ? (
         <HeadingNewButton onClick={startNew} label="Nova campanha comercial" />
       ) : readOnly ? (
         <>
           <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

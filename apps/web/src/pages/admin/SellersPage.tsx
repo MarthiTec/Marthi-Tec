@@ -12,6 +12,7 @@ import {
 } from '../../components/CrudKit';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { HeadingCancelButton, HeadingEditButton, HeadingNewButton, HeadingRecordNav, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 import { AddressFields, ContactListField, EMPTY_ADDRESS, PersonTypeField, type AddressValue, type DocumentType } from '../../components/PersonFields';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { useAuth } from '../../contexts/AuthContext';
@@ -194,12 +195,12 @@ export function SellersPage() {
   return (
     <section className="admin-page">
       <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
         {!formVisible ? (
           <HeadingNewButton onClick={startNew} label="Novo vendedor" />
         ) : readOnly ? (
           <>
             <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-            <HeadingCancelButton onClick={closeForm} label="Voltar" />
             <HeadingEditButton onClick={() => setMode('edit')} />
           </>
         ) : (

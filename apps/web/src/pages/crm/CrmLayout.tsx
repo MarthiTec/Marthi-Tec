@@ -5,7 +5,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
-import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { PageBackProvider, ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
 import { isMarthiStaffEmail } from '../../data/marthiStaff';
@@ -111,6 +111,7 @@ export function CrmLayout() {
   }
 
   return (
+    <PageBackProvider>
     <div className={`crm-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="crm-app__top">
         <ModuleMenuButton open={navOpen} onClick={() => setNavOpen((open) => !open)} />
@@ -208,5 +209,6 @@ export function CrmLayout() {
 
       <CrmSellerAlerts />
     </div>
+    </PageBackProvider>
   );
 }

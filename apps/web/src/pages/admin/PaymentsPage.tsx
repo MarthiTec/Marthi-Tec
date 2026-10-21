@@ -31,6 +31,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 
 import {
 
@@ -343,6 +344,7 @@ export function PaymentsPage() {
   const headingActions = (
 
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
 
       {!formVisible ? (
 
@@ -353,7 +355,6 @@ export function PaymentsPage() {
         <>
 
           <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
 
           <HeadingEditButton onClick={() => setMode('edit')} />
 

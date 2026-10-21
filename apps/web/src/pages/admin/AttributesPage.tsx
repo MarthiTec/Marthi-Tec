@@ -23,6 +23,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 import {
   ATTRIBUTES_EVENT,
   createAttribute,
@@ -374,12 +375,12 @@ export function AttributesPage() {
 
   const headingActions = (
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
       {!formVisible ? (
         <HeadingNewButton onClick={startNew} label="Novo atributo" />
       ) : readOnly ? (
         <>
           <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

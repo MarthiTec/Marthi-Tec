@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePageBackHandler } from './pageBack';
 import './recordNav.css';
 
 const HEADING_SLOT_ID = 'panel-page-actions';
@@ -126,7 +127,7 @@ type HeadingFormMode = 'list' | 'view' | 'edit';
 /**
  * Padrão global Entrada de estoque / venda externa: ações só no título sticky.
  * - list: Novo
- * - view: setas + Voltar discreto + Editar
+ * - view: setas + Editar (Voltar fica só no shell — ScreenBackButton)
  * - edit: Cancelar + Salvar (Ctrl+S visual)
  */
 export function HeadingFormActions<T extends { id: string }>({
@@ -156,6 +157,7 @@ export function HeadingFormActions<T extends { id: string }>({
   currentId?: string | null;
   onOpen?: (item: T) => void;
 }) {
+  usePageBackHandler(mode === 'list' ? null : onClose);
   return (
     <PageHeadingActions>
       {mode === 'list' ? (
@@ -165,7 +167,6 @@ export function HeadingFormActions<T extends { id: string }>({
           {items && onOpen ? (
             <HeadingRecordNav items={items} currentId={currentId} onOpen={onOpen} />
           ) : null}
-          <HeadingCancelButton onClick={onClose} label="Voltar" />
           {onEdit ? <HeadingEditButton onClick={onEdit} /> : null}
         </>
       ) : (

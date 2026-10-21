@@ -7,7 +7,7 @@ import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
-import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { PageBackProvider, ScreenBackButton } from '../../components/ScreenBackButton';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
 import { useAuth } from '../../contexts/AuthContext';
@@ -102,6 +102,7 @@ export function EcommerceLayout() {
   }
 
   return (
+    <PageBackProvider>
     <div className={`ecommerce-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="ecommerce-app__top">
         <OsEcosystemMenu />
@@ -221,5 +222,6 @@ export function EcommerceLayout() {
         afterExitTo="/painel"
       />
     </div>
+    </PageBackProvider>
   );
 }
