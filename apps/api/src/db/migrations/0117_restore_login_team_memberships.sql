@@ -1,5 +1,6 @@
 -- Re-mirror user_stores logins into employees (owners / Google OAuth / null users.store_id).
 -- Same intent as 0032; safe to re-run. Does not change credentials.
+-- Renumbered from 0116 → 0117 after #66 claimed 0116 for audit_logs_operacoes (collision fix).
 INSERT INTO employees(
   id, store_id, name, phone, email, document, role, is_system_user, user_email,
   access_areas, permissions, active, created_at

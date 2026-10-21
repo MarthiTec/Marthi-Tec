@@ -65,3 +65,10 @@ test('copy-api-migrations still picks up *.sql including 0116', () => {
   const mig = path.join(root, 'apps/api/src/db/migrations/0116_audit_logs_operacoes.sql');
   assert.ok(fs.existsSync(mig));
 });
+
+test('only one migration is numbered 0116 (audit owns it)', () => {
+  const dir = path.join(root, 'apps/api/src/db/migrations');
+  const ones = fs.readdirSync(dir).filter((f) => f.startsWith('0116_') && f.endsWith('.sql'));
+  assert.deepEqual(ones, ['0116_audit_logs_operacoes.sql']);
+  assert.ok(fs.existsSync(path.join(dir, '0117_restore_login_team_memberships.sql')));
+});
