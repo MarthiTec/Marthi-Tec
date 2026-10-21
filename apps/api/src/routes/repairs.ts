@@ -469,7 +469,9 @@ repairsRouter.post('/api/v1/repair-requests/:id/convert', async (req, res, next)
 const publicItem = (item: any) => ({ serviceId: item.serviceId, name: item.name, optionName: item.optionName ?? '', price: item.price ?? null, estimatedMinutes: item.estimatedMinutes ?? null });
 
 async function catalogByToken(token: string) {
-  const row = await findSalesCatalogByPublicKey(pool, token);
+  const key = String(token ?? '').trim();
+  if (!key) throw httpError('Manutenção indisponível neste link.', 404);
+  const row = await findSalesCatalogByPublicKey(pool, key);
   if (!row || row.show_repairs === false) throw httpError('Manutenção indisponível neste link.', 404);
   return { id: String(row.id), store_id: String(row.store_id) };
 }

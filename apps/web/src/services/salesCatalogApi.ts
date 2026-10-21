@@ -30,8 +30,13 @@ export const apiNewSalesCatalogLink = (id: string) => nestPost<SalesCatalog>(`/s
 export const apiPreviewSalesCatalog = (productIds: string[], hideSoldOut: boolean, includeOrderProducts: boolean) =>
   nestPost<CatalogPage>('/sales-catalogs/preview', { productIds, hideSoldOut, includeOrderProducts });
 export type CatalogSeller = { id: string; name: string };
-export const apiPublicSalesCatalog = (token: string) =>
-  nestGet<CatalogPage & { catalog: CatalogLook & { hideSoldOut: boolean }; sellers: CatalogSeller[] }>(`/public/sales-catalogs/${encodeURIComponent(token)}`);
+export const apiPublicSalesCatalog = (token: string) => {
+  const key = String(token ?? '').trim();
+  if (!key) return Promise.reject(new Error('Link inválido. Confira o endereço e tente de novo.'));
+  return nestGet<CatalogPage & { catalog: CatalogLook & { hideSoldOut: boolean }; sellers: CatalogSeller[] }>(
+    `/public/sales-catalogs/${encodeURIComponent(key)}`,
+  );
+};
 
 /** Pedido (ou só cadastro) que o cliente envia pelo catálogo. */
 export type CatalogCustomerInput = {
@@ -76,8 +81,11 @@ export type CatalogOrderInput = {
   notes: string;
   website: string;
 };
-export const apiSubmitCatalogOrder = (token: string, body: CatalogOrderInput) =>
-  nestPost<{ id: string; code: string; total: number }>(`/public/sales-catalogs/${encodeURIComponent(token)}/orders`, body);
+export const apiSubmitCatalogOrder = (token: string, body: CatalogOrderInput) => {
+  const key = String(token ?? '').trim();
+  if (!key) return Promise.reject(new Error('Link inválido. Confira o endereço e tente de novo.'));
+  return nestPost<{ id: string; code: string; total: number }>(`/public/sales-catalogs/${encodeURIComponent(key)}/orders`, body);
+};
 
 /** Fila da loja (venda externa). */
 export type CatalogOrderLine = { productId: string; name: string; variantLabel: string; condition: string; attributes: Array<{ id: string; name: string; value: string }>; qty: number; price: number; availability: 'in_stock' | 'order'; leadDays: number | null; pickupMethodId: string | null };
@@ -106,11 +114,16 @@ export const apiAcceptCatalogOrder = (id: string) =>
 export const apiCancelCatalogOrder = (id: string, reason: string) => nestPost<CatalogOrder>(`/catalog-orders/${encodeURIComponent(id)}/cancel`, { reason });
 
 /** Endereço longo (token). Preferir `catalogShortUrl` quando houver slug. */
-export const catalogPublicUrl = (token: string) => `${window.location.origin}/catalogo/${token}`;
+export const catalogPublicUrl = (token: string) => `${window.location.origin}/catalogo/${encodeURIComponent(token)}`;
 
 /** Link curto de vitrine / mesa: /c/{slug}. */
 export const catalogShortUrl = (slug: string) => `${window.location.origin}/c/${encodeURIComponent(slug)}`;
 
-/** Melhor URL para compartilhar: curto se existir slug; senão o token. */
-export const catalogShareUrl = (catalog: { token: string; publicSlug?: string }) =>
-  catalog.publicSlug ? catalogShortUrl(catalog.publicSlug) : catalogPublicUrl(catalog.token);
+/** Melhor URL para compartilhar: curto se existir slug; senão o token. Vazio se nenhum dos dois. */
+export const catalogShareUrl = (catalog: { token?: string; publicSlug?: string }) => {
+  const slug = String(catalog.publicSlug ?? '').trim();
+  if (slug) return catalogShortUrl(slug);
+  const token = String(catalog.token ?? '').trim();
+  if (token) return catalogPublicUrl(token);
+  return '';
+};

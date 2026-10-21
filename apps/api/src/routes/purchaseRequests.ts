@@ -341,7 +341,9 @@ const publicSchema = z.object({
 
 purchaseRequestsRouter.post('/api/v1/public/sales-catalogs/:token/purchase-requests', async (req, res, next) => {
   try {
-    const catalog = await findSalesCatalogByPublicKey(pool, req.params.token);
+    const key = String(req.params.token ?? '').trim();
+    if (!key) throw httpError('Catálogo não encontrado ou link desativado.', 404);
+    const catalog = await findSalesCatalogByPublicKey(pool, key);
     if (!catalog) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const body = publicSchema.parse(req.body ?? {});
     if (body.website) throw httpError('Não foi possível enviar.', 400);

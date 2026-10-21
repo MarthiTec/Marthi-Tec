@@ -86,5 +86,8 @@ export const apiDuplicatePurchaseRequest = (id: string) =>
 export const apiDeletePurchaseRequest = (id: string) =>
   nestDelete<PurchaseRequest | { ok: true }>(`/purchase-requests/${encodeURIComponent(id)}`);
 
-export const apiSubmitPurchaseRequest = (token: string, body: PurchaseRequestInput) =>
-  nestPost<{ id: string; protocol: string }>(`/public/sales-catalogs/${encodeURIComponent(token)}/purchase-requests`, body);
+export const apiSubmitPurchaseRequest = (token: string, body: PurchaseRequestInput) => {
+  const key = String(token ?? '').trim();
+  if (!key) return Promise.reject(new Error('Link inválido. Confira o endereço e tente de novo.'));
+  return nestPost<{ id: string; protocol: string }>(`/public/sales-catalogs/${encodeURIComponent(key)}/purchase-requests`, body);
+};
