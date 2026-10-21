@@ -2336,7 +2336,14 @@ export type ApiExternalSaleSummary = {
 };
 
 /** Vendas externas já feitas no período (padrão: últimos 30 dias). */
-export function apiListExternalSales(params: { from?: string; to?: string; search?: string; status?: 'all' | 'completed' | 'cancelled' }) {
+export function apiListExternalSales(params: {
+  from?: string;
+  to?: string;
+  search?: string;
+  /** Digits-only IMEI (AND with search). */
+  imei?: string;
+  status?: 'all' | 'completed' | 'cancelled';
+}) {
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value) qs.set(key, value);
   return nestGet<ApiExternalSaleSummary[]>(`/sales/external${qs.size ? `?${qs}` : ''}`);

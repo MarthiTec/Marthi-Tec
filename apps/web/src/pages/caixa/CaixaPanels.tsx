@@ -414,7 +414,7 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
                   <button type="button" className="btn btn--ghost" onClick={() => startEdit(sale)} disabled={!open}>
                     <AdminIcon name="edit" /> Editar
                   </button>
-                ) : (
+                ) : open ? (
                   <Link
                     to={`/painel/venda-externa?edit=${encodeURIComponent(sale.id)}`}
                     className="btn btn--ghost"
@@ -422,7 +422,7 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
                   >
                     <AdminIcon name="edit" /> Corrigir na Venda Externa
                   </Link>
-                )}
+                ) : null}
                 <button type="button" className="btn btn--ghost" onClick={() => onOpenExchange?.(sale.id)} disabled={!open || !pos || !onOpenExchange}>
                   <AdminIcon name="swap" /> Criar troca
                 </button>

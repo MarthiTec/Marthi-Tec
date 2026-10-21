@@ -36,6 +36,7 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
   const [search, setSearch] = useState('');
   const [imei, setImei] = useState('');
   const [query, setQuery] = useState('');
+  const [imeiQuery, setImeiQuery] = useState('');
   const [rows, setRows] = useState<ApiExternalSaleSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,10 +61,9 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const free = search.trim();
-      const imeiDigits = imei.replace(/\D/g, '');
-      // IMEI dedicado entra na mesma busca do servidor (telefone/CPF/IMEI por dígitos).
-      setQuery(imeiDigits.length >= 3 ? (free ? `${free} ${imeiDigits}` : imeiDigits) : free);
+      setQuery(search.trim());
+      const digits = imei.replace(/\D/g, '');
+      setImeiQuery(digits.length >= 3 ? digits : '');
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search, imei]);
@@ -73,13 +73,21 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
     setError('');
     try {
       const days = PERIODS.find((item) => item.id === period)?.days ?? 7;
-      setRows(await apiListExternalSales({ from: periodStart(days), to: new Date(Date.now() + 60000).toISOString(), search: query, status }));
+      setRows(
+        await apiListExternalSales({
+          from: periodStart(days),
+          to: new Date(Date.now() + 60000).toISOString(),
+          search: query,
+          imei: imeiQuery,
+          status,
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar as vendas.');
     } finally {
       setLoading(false);
     }
-  }, [period, query, status]);
+  }, [period, query, imeiQuery, status]);
 
   useEffect(() => {
     void load();

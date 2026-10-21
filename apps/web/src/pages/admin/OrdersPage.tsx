@@ -90,7 +90,7 @@ export function OrdersPage() {
             const open = sale.status === 'sold';
             return (
               <div className="caixa-panel__actions caixa-sale-actions">
-                {sale.type === 'external' ? (
+                {sale.type === 'external' && open ? (
                   <Link
                     to={`/painel/venda-externa?edit=${encodeURIComponent(sale.id)}`}
                     className="btn btn--ghost"
