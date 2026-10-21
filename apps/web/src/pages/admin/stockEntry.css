@@ -18,9 +18,10 @@
 .stock-entry__product strong { font-size: 1.1rem; }
 .stock-entry__grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .stock-entry__wide { grid-column: 1 / -1; }
-.stock-entry__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
-.stock-entry__actions-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-.stock-entry__notice { margin: 10px 0 0; color: #0e7490; font-weight: 600; }
+.stock-entry__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 14px; }
+.stock-entry__notice { margin: 10px 0 0; color: var(--accent, #0e7490); font-weight: 600; }
+.is-theme-dark .stock-entry__notice,
+.admin--dark .stock-entry__notice { color: var(--accent, #2dd4bf); }
 @media (max-width: 640px) {
   .stock-entry__product { flex-wrap: wrap; }
   .stock-entry__product > button { width: 100%; }

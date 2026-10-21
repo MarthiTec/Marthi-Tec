@@ -510,14 +510,6 @@ export function StockEntryPage() {
             <span>
               Total da entrada <strong>{money((Number(form.qty) || 0) * (Number(form.unitCost) || 0))}</strong>
             </span>
-            <div className="stock-entry__actions-btns">
-              <button type="button" className="btn btn--ghost" disabled={saving} onClick={clearForm}>
-                Cancelar
-              </button>
-              <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void submit()}>
-                {saving ? 'Salvando…' : 'Salvar'}
-              </button>
-            </div>
           </div>
         </article>
       ) : null}

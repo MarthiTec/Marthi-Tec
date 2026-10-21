@@ -51,21 +51,28 @@ export function HeadingSaveButton({
   );
 }
 
-/** Botão Cancelar / Fechar com ícone. */
+/** Botão Cancelar (edição) ou Voltar (consulta) no título. */
 export function HeadingCancelButton({
   onClick,
   disabled,
   label = 'Cancelar',
 }: HeadingBtnProps) {
+  const isBack = label === 'Voltar' || label === 'Fechar';
   return (
     <button
       type="button"
-      className="btn btn--ghost page-heading-btn"
+      className={`btn btn--ghost page-heading-btn${isBack ? ' page-heading-btn--back' : ''}`}
       onClick={onClick}
       disabled={disabled}
     >
-      <img src="/pdv/cancel.png" alt="" className="page-heading-btn__ico" />
-      {label}
+      {isBack ? (
+        <span className="page-heading-btn__arrow" aria-hidden="true">
+          ←
+        </span>
+      ) : (
+        <img src="/pdv/cancel.png" alt="" className="page-heading-btn__ico" />
+      )}
+      {isBack ? 'Voltar' : label}
     </button>
   );
 }

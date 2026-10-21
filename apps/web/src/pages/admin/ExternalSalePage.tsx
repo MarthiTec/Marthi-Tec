@@ -879,9 +879,6 @@ export function ExternalSalePage() {
               ))}
             </ul>
           ) : null}
-          <button type="button" className="btn btn--ghost" onClick={() => void cancelEdit()}>
-            Cancelar correção
-          </button>
         </section>
       ) : null}
       {loading ? <p className="xsale-loading">Carregando catálogo e clientes…</p> : null}
@@ -1441,9 +1438,6 @@ export function ExternalSalePage() {
                 <span>Margem <strong className="xsale-good">{marginPercent}%</strong></span>
               </div>
             ) : null}
-            <button type="submit" className="btn btn--primary xsale-submit" disabled={submitting || loading || !storeId || Boolean(savedSaleId)}>
-              {submitting ? 'Gravando venda…' : editing ? '✓ Salvar correção' : '✓ Concluir venda'}
-            </button>
           </section>
         </aside>
       </form>

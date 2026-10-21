@@ -428,7 +428,7 @@ export function AdminLayout() {
             </span>
           </button>
           {location.pathname !== '/painel' && location.pathname !== '/painel/' ? (
-            <ScreenBackButton home="/painel" label="Painel" iconOnly />
+            <ScreenBackButton home="/painel" label="Voltar" />
           ) : null}
           <div className="admin__title">
             <p className="admin__kicker">{page.kicker}</p>
