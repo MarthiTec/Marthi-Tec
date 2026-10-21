@@ -1385,7 +1385,7 @@ export function StockPage() {
       ) : readOnly ? (
         <>
           <HeadingRecordNav items={visible} currentId={selectedId} onOpen={(item) => openForm(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Fechar" />
+          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

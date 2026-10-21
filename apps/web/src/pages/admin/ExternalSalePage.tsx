@@ -4,9 +4,14 @@ import { SaleAttributeFields } from '../../components/SaleAttributeFields';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import './externalSale.css';
 import { getActiveStore, getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  HeadingCancelButton,
+  HeadingSaveButton,
+  PageHeadingActions,
+} from '../../components/PageHeadingActions';
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
@@ -88,6 +93,8 @@ export function ExternalSalePage() {
   const { user } = useAuth();
   const isPrivileged = user?.role === 'admin' || user?.role === 'superadmin';
   const canCorrectSales = isPrivileged || user?.role === 'manager';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editSaleId = searchParams.get('edit')?.trim() || '';
 
   const [storeId, setStoreId] = useState(getActiveStoreId);
   const storeRef = useRef(storeId);
@@ -180,6 +187,8 @@ export function ExternalSalePage() {
 
   // Correção de venda concluída: número, data, motivo e as correções anteriores.
   const [editing, setEditing] = useState<{ id: string; saleDate: string; reason: string; revisions: Array<{ id: string; reason: string; operator: string; at: string }> } | null>(null);
+  /** Evita reabrir a mesma venda do ?edit= a cada refresh de catálogo. */
+  const openedEditRef = useRef('');
 
   // Modais de Sucesso, Recolhimento e Pendências
   const requestId = useRef(crypto.randomUUID());
@@ -607,6 +616,11 @@ export function ExternalSalePage() {
         ? await apiUpdateExternalSale(editing.id, { ...payload, saleDate: editing.saleDate, reason: editing.reason.trim() }, storeId)
         : await apiCreateExternalSale({...payload, requestId: requestId.current}, storeId);
       setEditing(null);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
       if (!result?.id) throw new Error('A API não confirmou a gravação da venda.');
       if (storeRef.current === storeId) setSavedSaleId(result.id);
       // Never reconstruct the receipt from browser caches or fixed company data.
@@ -626,19 +640,29 @@ export function ExternalSalePage() {
   }
 
   /** Abre a venda concluída no formulário: os aparelhos dela voltam ao estoque da tela até salvar. */
-  async function startEdit(saleId: string) {
+  const startEdit = useCallback(async (saleId: string) => {
     setHistoryOpen(false);
     setError('');
     try {
       const sale = await apiGetSaleForEdit(saleId, storeId);
       handleResetForm();
-      setStockItems((current) => restoreSaleUnits(current, sale.id, sale.lines));
+      // Restaura as unidades da venda no estoque da tela e usa essa lista (não o state antigo) nos custos.
+      let restored: StockOption[] = [];
+      setStockItems((current) => {
+        restored = restoreSaleUnits(current, sale.id, sale.lines);
+        return restored;
+      });
       setSelectedCustomerId(sale.customerId ?? '');
       setCustomerName(sale.customerName || 'Consumidor Final');
       setCustomerPhone(sale.customerPhone);
       setCustomerDocument(sale.customerDocument);
       setSelectedSellerId(sale.sellerId ?? '');
-      setLines(sale.lines.map((line) => ({ ...line, unitCost: stockItems.find((item) => item.id === line.stockId)?.cost ?? 0, discount: 0, surcharge: 0 })));
+      setLines(sale.lines.map((line) => ({
+        ...line,
+        unitCost: restored.find((item) => item.id === line.stockId)?.cost ?? 0,
+        discount: 0,
+        surcharge: 0,
+      })));
       setDiscountMode('money');
       setSurchargeMode('money');
       setGeneralDiscount(sale.discount);
@@ -651,19 +675,66 @@ export function ExternalSalePage() {
       setWarrantyTerms(sale.warrantyTerms);
       setSaleNotes(sale.notes);
       setEditing({ id: sale.id, saleDate: sale.saleDate, reason: '', revisions: sale.revisions });
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set('edit', sale.id);
+        return next;
+      }, { replace: true });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
+      openedEditRef.current = '';
       setError(err instanceof Error ? err.message : 'Não foi possível abrir a venda para correção.');
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
     }
-  }
+  }, [storeId, setSearchParams]);
 
   /** Sai da correção sem gravar: o estoque da tela volta a ser o do banco. */
   async function cancelEdit() {
+    openedEditRef.current = '';
     setEditing(null);
     handleResetForm();
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('edit');
+      return next;
+    }, { replace: true });
     const refreshed = await apiListStock().catch(() => null);
     if (refreshed && storeRef.current === storeId) setStockItems(refreshed.filter((it: any) => it.active !== false).map(toStockOption));
   }
+
+  /** Cancelar do topo: sai da correção ou limpa a venda em andamento. */
+  function handleCancel() {
+    if (editing) {
+      void cancelEdit();
+      return;
+    }
+    handleResetForm();
+  }
+
+  // PDV / Consultar vendas: /painel/venda-externa?edit=<id> abre a venda certa (não um formulário em branco).
+  useEffect(() => {
+    if (!editSaleId) {
+      openedEditRef.current = '';
+      return;
+    }
+    if (loading) return;
+    if (!canCorrectSales) {
+      setError('Seu usuário não tem permissão para corrigir vendas externas.');
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
+      return;
+    }
+    if (editing?.id === editSaleId || openedEditRef.current === editSaleId) return;
+    openedEditRef.current = editSaleId;
+    void startEdit(editSaleId);
+  }, [editSaleId, loading, canCorrectSales, editing?.id, startEdit, setSearchParams]);
 
   /** Pedido do catálogo: cliente aprovado, produtos, troca, pagamento e vendedor já na venda. */
   function attendCatalogOrder(order: CatalogOrder, customer: { id: string; name: string; phone: string; document: string; email: string }) {
@@ -743,6 +814,21 @@ export function ExternalSalePage() {
 
   return (
     <div className="admin-page external-sale-page xsale">
+      <PageHeadingActions>
+        <HeadingCancelButton
+          onClick={handleCancel}
+          disabled={submitting || Boolean(savedSaleId)}
+          label={editing ? 'Cancelar correção' : 'Cancelar'}
+        />
+        <HeadingSaveButton
+          onClick={() => {
+            const form = document.getElementById('xsale-form') as HTMLFormElement | null;
+            form?.requestSubmit();
+          }}
+          disabled={submitting || loading || !storeId || Boolean(savedSaleId)}
+          label={submitting ? 'Salvando…' : editing ? 'Salvar correção' : 'Salvar'}
+        />
+      </PageHeadingActions>
       <header className="xsale-head">
         <div className="xsale-head__info">
           <h1>
@@ -804,7 +890,7 @@ export function ExternalSalePage() {
       <CatalogOrdersQueue storeId={storeId} onAttend={attendCatalogOrder} />
       {catalogOrder ? <p role="status" className="xsale-promo"><span className="xsale-promo__tag">Catálogo</span><span className="xsale-promo__text">Finalizando o pedido <strong>{catalogOrder.code}</strong> do catálogo: ao concluir, ele sai da fila.</span></p> : null}
       <TotemExternalQueue storeId={storeId} onSelect={ticket=>{const stock=stockItems.find(item=>item.id===ticket.stockId);setSelectedCustomerId('');setCustomerName(ticket.customerName);setCustomerPhone(ticket.customerPhone);setLines([{stockId:ticket.stockId||'',name:ticket.productName,qty:1,unitPrice:ticket.cashPrice??0,unitCost:stock?.cost??0,discount:0,surcharge:0,imei:stock?.imei||'',attributes:ticket.attributes,pickupMethodId:ticket.pickupMethodId,deliveryAddress:ticket.deliveryAddress,sourceTicketId:ticket.id}]);setSaleNotes(`Atendimento do Totem ${ticket.id}`);setPayments([{method:ticket.payment==='Parcelado'?CREDIT_METHOD:'PIX',installments:ticket.installment?Number(ticket.installment.replace(/\D/g,''))||1:1,amount:0}]);requestId.current=crypto.randomUUID();}}/>
-      <form onSubmit={handleSubmit} className="xsale-layout">
+      <form id="xsale-form" onSubmit={handleSubmit} className="xsale-layout">
         <div className="xsale-main">
           {/* 1. Cliente */}
           <section className="xsale-card">

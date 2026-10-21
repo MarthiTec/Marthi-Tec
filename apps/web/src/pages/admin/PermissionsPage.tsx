@@ -372,7 +372,7 @@ export function PermissionsPage() {
         ) : readOnly ? (
           <>
             <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-            <HeadingCancelButton onClick={closeForm} label="Fechar" />
+            <HeadingCancelButton onClick={closeForm} label="Voltar" />
             <HeadingEditButton onClick={() => setMode('edit')} />
           </>
         ) : (

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
 import { AdminIcon } from '../../components/AdminIcons';
@@ -409,9 +410,19 @@ function SalesPanel({ onClose, onDone, onError, onOpenExchange }: PanelProps) {
             const canEmitNfce = open && pos && fiscalOn && (!fiscal || fiscal.kind === 'receipt' || fiscal.status === 'cancelled' || fiscal.status === 'error');
             return (
               <div className="caixa-panel__actions caixa-sale-actions">
-                <button type="button" className="btn btn--ghost" onClick={() => startEdit(sale)} disabled={!open || !pos} title={pos ? undefined : 'Venda externa: corrija pela tela de Venda Externa'}>
-                  <AdminIcon name="edit" /> Editar
-                </button>
+                {pos ? (
+                  <button type="button" className="btn btn--ghost" onClick={() => startEdit(sale)} disabled={!open}>
+                    <AdminIcon name="edit" /> Editar
+                  </button>
+                ) : (
+                  <Link
+                    to={`/painel/venda-externa?edit=${encodeURIComponent(sale.id)}`}
+                    className="btn btn--ghost"
+                    title="Abre a venda externa correta para correção"
+                  >
+                    <AdminIcon name="edit" /> Corrigir na Venda Externa
+                  </Link>
+                )}
                 <button type="button" className="btn btn--ghost" onClick={() => onOpenExchange?.(sale.id)} disabled={!open || !pos || !onOpenExchange}>
                   <AdminIcon name="swap" /> Criar troca
                 </button>

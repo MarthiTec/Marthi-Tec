@@ -34,6 +34,7 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('7');
   const [status, setStatus] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [search, setSearch] = useState('');
+  const [imei, setImei] = useState('');
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<ApiExternalSaleSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +59,14 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setQuery(search.trim()), 300);
+    const timer = window.setTimeout(() => {
+      const free = search.trim();
+      const imeiDigits = imei.replace(/\D/g, '');
+      // IMEI dedicado entra na mesma busca do servidor (telefone/CPF/IMEI por dígitos).
+      setQuery(imeiDigits.length >= 3 ? (free ? `${free} ${imeiDigits}` : imeiDigits) : free);
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, imei]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,8 +154,16 @@ export function ExternalSalesHistory({ onClose, onEdit }: { onClose: () => void;
           <input
             type="search"
             value={search}
-            placeholder="Buscar cliente, telefone, CPF ou nº da venda"
+            placeholder="Buscar cliente, telefone, CPF, IMEI ou nº da venda"
             onChange={(event) => setSearch(event.target.value)}
+          />
+          <input
+            type="search"
+            inputMode="numeric"
+            value={imei}
+            placeholder="Consultar por IMEI"
+            aria-label="Consultar por IMEI"
+            onChange={(event) => setImei(event.target.value.replace(/[^\d]/g, '').slice(0, 17))}
           />
           <div className="sales-history__chips" role="group" aria-label="Período">
             {PERIODS.map((item) => (
