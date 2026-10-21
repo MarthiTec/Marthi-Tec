@@ -1122,6 +1122,12 @@
   color: var(--mute);
 }
 
+.admin-picker__control {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
 .admin-picker__trigger {
   min-height: 40px;
   width: 100%;
@@ -1144,6 +1150,41 @@
     background-color 160ms ease,
     border-color 160ms ease,
     box-shadow 160ms ease;
+}
+
+.admin-picker--clearable .admin-picker__trigger {
+  padding-right: 40px;
+}
+
+.admin-picker__clear {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: var(--ink, #0f172a);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+}
+
+.admin-picker__clear:hover {
+  background: #e2e8f0;
+}
+
+.admin-picker__create {
+  font-weight: 650 !important;
+  color: rgb(var(--accent-rgb, 15, 118, 110)) !important;
 }
 
 .admin-picker__value {
@@ -6676,6 +6717,22 @@ select.caixa-mov-input {
   background: #121820;
   border-color: rgba(148, 163, 184, 0.28);
   color: #e8eef4;
+}
+
+.admin.admin--dark .admin-picker__clear,
+.is-theme-dark .admin-picker__clear {
+  background: rgba(148, 163, 184, 0.22);
+  color: #e8eef4;
+}
+
+.admin.admin--dark .admin-picker__clear:hover,
+.is-theme-dark .admin-picker__clear:hover {
+  background: rgba(148, 163, 184, 0.34);
+}
+
+.admin.admin--dark .admin-picker__create,
+.is-theme-dark .admin-picker__create {
+  color: rgb(var(--accent-rgb, 45, 212, 191)) !important;
 }
 
 .admin.admin--dark .admin-picker__value {
