@@ -11,15 +11,16 @@ const appPath = path.join(root, 'apps/web/src/App.tsx');
 const dirPath = path.join(root, 'apps/web/src/data/screenDirectory.ts');
 const erpLayoutPath = path.join(root, 'apps/web/src/pages/erp/ErpLayout.tsx');
 
-test('Fase A+/B: ProductsStockPage hub with four tabs', () => {
+test('Fase A+/B: ProductsStockPage hub with stock + Especificações tabs', () => {
   const hub = fs.readFileSync(hubPath, 'utf8');
-  for (const id of ['produtos', 'movimentacoes', 'entradas', 'ajustes']) {
+  for (const id of ['produtos', 'movimentacoes', 'entradas', 'ajustes', 'especificacoes']) {
     assert.ok(hub.includes(`id: '${id}'`), `missing tab ${id}`);
   }
   assert.match(hub, /StockPage/);
   assert.match(hub, /StockMovementsPage/);
   assert.match(hub, /StockEntryPage/);
   assert.match(hub, /StockBalancePage/);
+  assert.match(hub, /SpecificationsPage/);
   assert.match(hub, /RedirectToProductsStock/);
 });
 
