@@ -6,6 +6,7 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool, dbConfigured } from '../db/pool.js';
 import { hashPassword, upsertClientUserInMemory } from '../services/authService.js';
 import { blockedMemoryMap } from '../db/requireDb.js';
+import { ensureStoreLoginTeamMembers } from '../services/ownerTeam.js';
 import { randomBytes } from 'node:crypto';
 
 export const registryRouter = Router();
@@ -119,41 +120,57 @@ registryRouter.get('/api/v1/employees', requireAuth, async (req, res, next) => {
     const activeOnly = req.query.active === 'true';
 
     if (pool) {
-      const sql = `
-        SELECT e.id, e.name, e.phone, e.email, e.document, e.role, e.is_system_user, e.user_email,
-               e.access_areas, e.home_area, e.permissions, e.active, e.seller_id, e.created_at, e.updated_at,
-               -- Funcionário com login: vale a situação do login (login desativado = inativo).
-               (SELECT u.active FROM users u WHERE lower(u.email) = lower(COALESCE(NULLIF(e.user_email, ''), e.email)) LIMIT 1) AS login_active
-        FROM employees e
-        WHERE (e.store_id = $1 OR e.store_id IN (SELECT id FROM stores WHERE client_account_id = $2))
-        ORDER BY e.name ASC
-      `;
-      const result = await pool.query(sql, [storeId, clientAccountId]);
-      const rows = result.rows
-        .map((r) => ({ ...r, active: Boolean(r.active) && !(r.is_system_user && r.login_active === false) }))
-        .filter((r) => !activeOnly || r.active);
+      // Self-heal: account owners / Google OAuth admins may have user_stores + users
+      // without an employees row (auth allows that). Mirror them into the team list.
+      const client = await pool.connect();
+      try {
+        await ensureStoreLoginTeamMembers(client, storeId);
+        // Also mirror memberships on sibling stores of the same account (list is account-wide).
+        const siblings = await client.query(
+          `SELECT id FROM stores WHERE client_account_id = $1 AND id <> $2 AND active = true`,
+          [clientAccountId, storeId],
+        );
+        for (const row of siblings.rows) {
+          await ensureStoreLoginTeamMembers(client, row.id);
+        }
 
+        const sql = `
+          SELECT e.id, e.name, e.phone, e.email, e.document, e.role, e.is_system_user, e.user_email,
+                 e.access_areas, e.home_area, e.permissions, e.active, e.seller_id, e.created_at, e.updated_at,
+                 -- Funcionário com login: vale a situação do login (login desativado = inativo).
+                 (SELECT u.active FROM users u WHERE lower(u.email) = lower(COALESCE(NULLIF(e.user_email, ''), e.email)) LIMIT 1) AS login_active
+          FROM employees e
+          WHERE (e.store_id = $1 OR e.store_id IN (SELECT id FROM stores WHERE client_account_id = $2))
+          ORDER BY e.name ASC
+        `;
+        const result = await client.query(sql, [storeId, clientAccountId]);
+        const rows = result.rows
+          .map((r) => ({ ...r, active: Boolean(r.active) && !(r.is_system_user && r.login_active === false) }))
+          .filter((r) => !activeOnly || r.active);
 
-      res.json({
-        success: true,
-        data: rows.map((r) => ({
-          id: r.id,
-          name: r.name,
-          phone: r.phone || '',
-          email: r.email || '',
-          document: r.document || '',
-          role: r.role,
-          isSystemUser: Boolean(r.is_system_user),
-          userEmail: r.user_email || '',
-          accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
-          homeArea: r.home_area || '',
-          permissions: r.permissions || {},
-          active: Boolean(r.active),
-          sellerId: r.seller_id || undefined,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at,
-        })),
-      });
+        res.json({
+          success: true,
+          data: rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            phone: r.phone || '',
+            email: r.email || '',
+            document: r.document || '',
+            role: r.role,
+            isSystemUser: Boolean(r.is_system_user),
+            userEmail: r.user_email || '',
+            accessAreas: Array.isArray(r.access_areas) ? r.access_areas : [],
+            homeArea: r.home_area || '',
+            permissions: r.permissions || {},
+            active: Boolean(r.active),
+            sellerId: r.seller_id || undefined,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+          })),
+        });
+      } finally {
+        client.release();
+      }
       return;
     }
 
