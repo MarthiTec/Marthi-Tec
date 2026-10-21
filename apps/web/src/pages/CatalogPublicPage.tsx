@@ -42,8 +42,8 @@ export function CatalogPublicPage() {
   const [checkout, setCheckout] = useState<CheckoutMode | null>(null);
   /** Produto aberto (página do produto). */
   const [openId, setOpenId] = useState<string | null>(null);
-  /** Solicitar ao vendedor (produto/opção indisponível). */
-  const [purchaseAsk, setPurchaseAsk] = useState<{ item: CatalogItem; variant: CatalogVariant | null } | null>(null);
+  /** Solicitar ao vendedor (esgotado ou produto fora do catálogo). */
+  const [purchaseAsk, setPurchaseAsk] = useState<{ item: CatalogItem | null; variant: CatalogVariant | null; query?: string } | null>(null);
   const [toast, setToast] = useState('');
   /** Comprar produtos | Solicitar manutenção (só aparece se a loja tem serviços no Catálogo de manutenções). */
   /** Início (escolha), Catálogo ou Manutenção. Links com ?manutencao=1 / ?catalogo=1 (ou PDF) abrem direto. */
@@ -239,6 +239,7 @@ export function CatalogPublicPage() {
           }}
           onOpenItem={(item) => setOpenId(item.id)}
           onSignup={() => setCheckout('signup')}
+          onRequestProduct={(query) => setPurchaseAsk({ item: null, variant: null, query })}
         />
       ) : tab === 'repair' && repairBrands.length ? (
         <div style={{ padding: 12 }}>
@@ -262,6 +263,7 @@ export function CatalogPublicPage() {
               onSignup: () => setCheckout('signup'),
               onPdf: () => window.print(),
               onRequest: (item) => setPurchaseAsk({ item, variant: null }),
+              onRequestMissing: (query) => setPurchaseAsk({ item: null, variant: null, query }),
             }}
           />
         </div>
@@ -290,6 +292,7 @@ export function CatalogPublicPage() {
           accent={data.catalog.accent}
           item={purchaseAsk.item}
           variant={purchaseAsk.variant}
+          initialQuery={purchaseAsk.query || ''}
           onClose={() => setPurchaseAsk(null)}
         />
       ) : null}

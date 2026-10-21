@@ -22,6 +22,14 @@ export type PurchaseRequest = {
   productId: string | null;
   productName: string;
   brand: string;
+  catalogTypeId: string | null;
+  catalogModelId: string | null;
+  deviceType: string;
+  deviceModel: string;
+  color: string;
+  capacity: string;
+  condition: 'new' | 'used';
+  conditionLabel: string;
   variantLabel: string;
   attributes: Array<{ id?: string; name?: string; value: string }>;
   qty: number;
@@ -38,11 +46,26 @@ export type PurchaseRequest = {
   updatedAt: string;
 };
 
+export type PurchaseBuilderOptions = {
+  brands: Array<{ slug: string; name: string }>;
+  types: Array<{ id: string; brandSlug: string; name: string }>;
+  models: Array<{ id: string; typeId: string; name: string }>;
+  colors: string[];
+  capacities: string[];
+};
+
 export type PurchaseRequestInput = {
   requestKey: string;
   productId: string | null;
   productName: string;
   brand: string;
+  catalogTypeId?: string | null;
+  catalogModelId?: string | null;
+  deviceType?: string;
+  deviceModel?: string;
+  color?: string;
+  capacity?: string;
+  condition?: 'new' | 'used';
   variantLabel: string;
   attributes: Array<{ id?: string; name?: string; value: string }>;
   qty: number;
@@ -90,4 +113,14 @@ export const apiSubmitPurchaseRequest = (token: string, body: PurchaseRequestInp
   const key = String(token ?? '').trim();
   if (!key) return Promise.reject(new Error('Link inválido. Confira o endereço e tente de novo.'));
   return nestPost<{ id: string; protocol: string }>(`/public/sales-catalogs/${encodeURIComponent(key)}/purchase-requests`, body);
+};
+
+export const apiPublicPurchaseBuilder = (token: string, params: { brand?: string; typeId?: string } = {}) => {
+  const key = String(token ?? '').trim();
+  if (!key) return Promise.reject(new Error('Link inválido. Confira o endereço e tente de novo.'));
+  const query = new URLSearchParams();
+  if (params.brand) query.set('brand', params.brand);
+  if (params.typeId) query.set('typeId', params.typeId);
+  const suffix = query.toString() ? `?${query}` : '';
+  return nestGet<PurchaseBuilderOptions>(`/public/sales-catalogs/${encodeURIComponent(key)}/purchase-builder${suffix}`);
 };
