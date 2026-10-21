@@ -130,24 +130,31 @@
   overflow: hidden;
   border-radius: 20px;
   color: #fff;
+  background-color: #16181d;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
   isolation: isolate;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .catpromo__art {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: #16181d;
+  background-color: #16181d;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-.catpromo__art img,
+.catpromo__art-photo,
 .catpromo__art-empty {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .catpromo__art-empty {
@@ -161,6 +168,8 @@
   inset: 0;
   background:
     linear-gradient(180deg, rgba(15, 17, 21, 0.55) 0%, rgba(15, 17, 21, 0.25) 38%, rgba(15, 17, 21, 0.72) 100%);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .catpromo__brand,
@@ -177,6 +186,7 @@
   gap: 12px;
 }
 
+.catpromo__logo,
 .catpromo__brand img,
 .catpromo__mono {
   width: 52px;
@@ -185,6 +195,8 @@
   object-fit: contain;
   background: #fff;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .catpromo__mono {
@@ -252,6 +264,14 @@
   background: #fff;
   border: 3px solid color-mix(in srgb, var(--cat-accent, #e4572e) 75%, #fff);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.catpromo__qr canvas {
+  display: block;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .catpromo__scan {
@@ -310,6 +330,8 @@
   .no-print,
   .admin-top,
   .admin-side,
+  .admin__side,
+  .admin__top,
   .erp-app__top,
   .erp-app__side,
   .catpromo__controls {
@@ -322,9 +344,94 @@
     min-height: auto !important;
   }
 
+  .catpromo__flyer,
+  .catpromo__art,
+  .catpromo__art-photo,
+  .catpromo__art-empty,
+  .catpromo__scrim,
+  .catpromo__logo,
+  .catpromo__brand img,
+  .catpromo__mono,
+  .catpromo__qr,
+  .catpromo__qr canvas,
+  .catpromo__slug {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   .catpromo__flyer {
     box-shadow: none !important;
     margin: 12mm auto !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background-color: #16181d !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    /* isolation + border-radius + overflow: hidden costumam sumir a capa no Chromium */
+    isolation: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    color: #fff !important;
+  }
+
+  .catpromo__art {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background-color: #16181d !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+  }
+
+  .catpromo__art-photo {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    object-fit: cover !important;
+  }
+
+  .catpromo__scrim {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 1 !important;
+    display: block !important;
+    background:
+      linear-gradient(180deg, rgba(15, 17, 21, 0.55) 0%, rgba(15, 17, 21, 0.25) 38%, rgba(15, 17, 21, 0.72) 100%) !important;
+  }
+
+  .catpromo__brand,
+  .catpromo__copy,
+  .catpromo__qr-wrap,
+  .catpromo__foot {
+    position: relative !important;
+    z-index: 2 !important;
+    color: #fff !important;
+  }
+
+  .catpromo__brand small,
+  .catpromo__sub,
+  .catpromo__scan,
+  .catpromo__foot {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  .catpromo__kicker {
+    color: color-mix(in srgb, var(--cat-accent, #e4572e) 70%, #fff) !important;
+  }
+
+  .catpromo__slug {
+    background: rgba(255, 255, 255, 0.14) !important;
+    color: #fff !important;
   }
 }

@@ -216,16 +216,55 @@ export function CatalogPromoPrintPage() {
         <article
           ref={flyerRef}
           className="catpromo__flyer"
-          style={{ ['--cat-accent' as string]: accent }}
+          style={{
+            ['--cat-accent' as string]: accent,
+            // background-image no article + <img>: Chromium omite backgrounds
+            // sem print-color-adjust e às vezes filhos absolute no print.
+            ...(cover
+              ? {
+                  backgroundImage: `url(${JSON.stringify(cover)})`,
+                  backgroundSize: 'cover' as const,
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat' as const,
+                }
+              : {}),
+          }}
           aria-label="Prévia da propaganda"
         >
-          <div className="catpromo__art" aria-hidden>
-            {cover ? <img src={cover} alt="" referrerPolicy="no-referrer" /> : <span className="catpromo__art-empty" />}
+          <div
+            className="catpromo__art"
+            aria-hidden
+            style={
+              cover
+                ? {
+                    backgroundImage: `url(${JSON.stringify(cover)})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                  }
+                : undefined
+            }
+          >
+            {cover ? (
+              <img
+                className="catpromo__art-photo"
+                src={cover}
+                alt=""
+                decoding="sync"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="catpromo__art-empty" />
+            )}
             <span className="catpromo__scrim" />
           </div>
 
           <header className="catpromo__brand">
-            {store?.logo ? <img src={store.logo} alt="" /> : <span className="catpromo__mono">{(store?.name || catalog.title).slice(0, 1)}</span>}
+            {store?.logo ? (
+              <img className="catpromo__logo" src={store.logo} alt="" decoding="sync" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="catpromo__mono">{(store?.name || catalog.title).slice(0, 1)}</span>
+            )}
             <div>
               <strong>{store?.name || 'Sua loja'}</strong>
               <small>{catalog.title}</small>
