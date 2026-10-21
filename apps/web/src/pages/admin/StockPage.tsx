@@ -1405,6 +1405,9 @@ export function StockPage() {
               <rect x="14" y="14" width="7" height="7" rx="1.5" />
             </svg>
           </button>
+          <HeadingEditButton onClick={() => setMode('edit')} />
+        </>
+      ) : (
         <>
           <HeadingCancelButton onClick={closeForm} />
           <HeadingSaveButton onClick={() => void submit()} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
