@@ -98,6 +98,8 @@ export function SalesCatalogPage() {
   const opened = useRef(false);
   /** Último estado gravado no banco (para salvar sozinho só quando mudar algo). */
   const lastSaved = useRef('');
+  /** Gerações do auto-save: ignora resposta atrasada depois de Salvar manual. */
+  const saveGen = useRef(0);
   const [autoState, setAutoState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [stock, setStock] = useState<StockRow[]>([]);
   const [groups, setGroups] = useState<ProductGroup[]>([]);
@@ -173,15 +175,23 @@ export function SalesCatalogPage() {
     const json = JSON.stringify(form);
     if (json === lastSaved.current) return;
     const id = currentId;
+    const payload = form;
+    const gen = saveGen.current;
     const timer = window.setTimeout(() => {
+      if (json === lastSaved.current || gen !== saveGen.current) return;
       setAutoState('saving');
-      apiUpdateSalesCatalog(id, form)
+      apiUpdateSalesCatalog(id, payload)
         .then((saved) => {
-          lastSaved.current = json;
+          if (gen !== saveGen.current) return;
+          const synced = { ...payload, publicSlug: saved.publicSlug || payload.publicSlug || '' };
+          lastSaved.current = JSON.stringify(synced);
+          setForm((current) => (JSON.stringify(current) === json ? synced : current));
           setCatalogs((list) => list.map((item) => (item.id === saved.id ? saved : item)));
+          setError('');
           setAutoState('saved');
         })
         .catch((err) => {
+          if (gen !== saveGen.current) return;
           setAutoState('idle');
           setError(err instanceof Error ? err.message : 'Não foi possível salvar o catálogo.');
         });
@@ -264,16 +274,22 @@ export function SalesCatalogPage() {
   async function save() {
     setBusy(true);
     setError('');
+    saveGen.current += 1;
+    const gen = saveGen.current;
     try {
       const saved = currentId ? await apiUpdateSalesCatalog(currentId, form) : await apiCreateSalesCatalog(form);
-      lastSaved.current = JSON.stringify(form);
+      if (gen !== saveGen.current) return saved;
+      const synced = { ...form, publicSlug: saved.publicSlug || form.publicSlug || '' };
+      lastSaved.current = JSON.stringify(synced);
+      setForm(synced);
       setCatalogs((list) => [saved, ...list.filter((item) => item.id !== saved.id)]);
       setCurrentId(saved.id);
       setScreen({ currentId: saved.id });
       setNotice('Catálogo salvo.');
+      setAutoState('saved');
       return saved;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível salvar o catálogo.');
+      if (gen === saveGen.current) setError(err instanceof Error ? err.message : 'Não foi possível salvar o catálogo.');
       return null;
     } finally {
       setBusy(false);
@@ -283,12 +299,22 @@ export function SalesCatalogPage() {
   /** Abre a página do cliente (salva antes, para o link mostrar exatamente o que está na tela). */
   async function openPublic(print = false) {
     const saved = await save();
-    if (saved) window.open(`${catalogShareUrl(saved)}${print ? '?imprimir=1' : ''}`, '_blank', 'noopener');
+    if (!saved) return;
+    const url = catalogShareUrl(saved);
+    if (!url) {
+      setError('Salve o catálogo com um link curto (ou gere um novo link) antes de pré-visualizar.');
+      return;
+    }
+    window.open(`${url}${print ? '?imprimir=1' : ''}`, '_blank', 'noopener');
   }
   async function copyLink() {
     const saved = await save();
     if (!saved) return;
     const url = catalogShareUrl(saved);
+    if (!url) {
+      setError('Salve o catálogo com um link curto antes de copiar.');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       setNotice('Link copiado. Cole no WhatsApp, Instagram ou imprima o QR.');
@@ -299,13 +325,22 @@ export function SalesCatalogPage() {
   async function sendWhatsapp() {
     const saved = await save();
     if (!saved) return;
-    const text = `${saved.title}${saved.subtitle ? ` · ${saved.subtitle}` : ''}\nVeja nossos produtos: ${catalogShareUrl(saved)}`;
+    const url = catalogShareUrl(saved);
+    if (!url) {
+      setError('Salve o catálogo com um link curto antes de enviar.');
+      return;
+    }
+    const text = `${saved.title}${saved.subtitle ? ` · ${saved.subtitle}` : ''}\nVeja nossos produtos: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
   }
   async function downloadQr() {
     const saved = await save();
     if (!saved) return;
     const url = catalogShareUrl(saved);
+    if (!url) {
+      setError('Salve o catálogo com um link curto antes de gerar o QR Code.');
+      return;
+    }
     try {
       const dataUrl = await generateQrDataUrl(url, 600);
       const a = document.createElement('a');
@@ -633,17 +668,23 @@ export function SalesCatalogPage() {
                 <small className="salescat__muted">Letras, números e hífens. Salva com o catálogo. Ex.: /c/cellponto</small>
               </label>
 
-              {currentId && (current?.publicSlug || form.publicSlug) ? (
+              {currentId && catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug }) ? (
                 <>
                   <div className="salescat__share-card salescat__share-card--qr">
                     <div className="salescat__qr">
-                      <QrCodeView value={catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })} size={140} colorDark="#16181d" />
+                      <QrCodeView
+                        value={catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })}
+                        size={140}
+                        colorDark="#16181d"
+                      />
                     </div>
                     <div className="salescat__share-copy">
                       <strong>QR Code para mesa e fachada</strong>
                       <p className="salescat__muted">
                         Link público:{' '}
-                        <code className="salescat__code">{catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })}</code>
+                        <code className="salescat__code">
+                          {catalogShareUrl({ token: current?.token || '', publicSlug: form.publicSlug || current?.publicSlug })}
+                        </code>
                       </p>
                       <div className="salescat__share-btns">
                         <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void downloadQr()}>

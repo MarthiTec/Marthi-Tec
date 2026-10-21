@@ -291,7 +291,9 @@ salesCatalogsRouter.delete('/api/v1/sales-catalogs/:id', async (req, res, next) 
 /** Página do cliente (sem login): token longo ou slug curto (/c/{slug}). */
 salesCatalogsRouter.get('/api/v1/public/sales-catalogs/:token', async (req, res, next) => {
   try {
-    const row = await findSalesCatalogByPublicKey(pool, req.params.token);
+    const key = String(req.params.token ?? '').trim();
+    if (!key) throw httpError('Catálogo não encontrado ou link desativado.', 404);
+    const row = await findSalesCatalogByPublicKey(pool, key);
     if (!row) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const catalog = view(row);
     const items = await catalogItems(pool, row.store_id, catalog.productIds, catalog.hideSoldOut, catalog.includeOrderProducts);

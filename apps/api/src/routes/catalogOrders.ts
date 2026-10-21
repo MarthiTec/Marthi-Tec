@@ -106,7 +106,9 @@ const view = (row: any) => ({
 /** Cliente envia o pedido (ou só o cadastro) pelo link do catálogo. */
 catalogOrdersRouter.post('/api/v1/public/sales-catalogs/:token/orders', async (req, res, next) => {
   try {
-    const catalog = await findSalesCatalogByPublicKey(pool, req.params.token);
+    const key = String(req.params.token ?? '').trim();
+    if (!key) throw httpError('Catálogo não encontrado ou link desativado.', 404);
+    const catalog = await findSalesCatalogByPublicKey(pool, key);
     if (!catalog) throw httpError('Catálogo não encontrado ou link desativado.', 404);
     const body = orderSchema.parse(req.body ?? {});
     if (body.website) throw httpError('Não foi possível enviar.', 400);

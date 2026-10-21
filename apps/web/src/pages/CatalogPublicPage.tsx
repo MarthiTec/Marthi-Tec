@@ -34,7 +34,7 @@ const lineKey = (item: CatalogItem, variant: CatalogVariant | null) => `${item.i
 export function CatalogPublicPage() {
   const { token: tokenParam = '', slug = '' } = useParams();
   /** Token longo (/catalogo/…) ou slug curto (/c/…). A API resolve os dois. */
-  const token = tokenParam || slug;
+  const token = String(tokenParam || slug || '').trim();
   const [params] = useSearchParams();
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState('');
@@ -58,6 +58,10 @@ export function CatalogPublicPage() {
   };
   const [repairBrands, setRepairBrands] = useState<Array<{ brand: string; models: string[] }>>([]);
   useEffect(() => {
+    if (!token) {
+      setRepairBrands([]);
+      return;
+    }
     let alive = true;
     apiPublicRepairBrands(token)
       .then((result) => alive && setRepairBrands(result.brands))
@@ -68,27 +72,30 @@ export function CatalogPublicPage() {
   }, [token]);
   const toastTimer = useRef<number | undefined>(undefined);
 
-  const load = useCallback(
-    () =>
-      apiPublicSalesCatalog(token)
-        .then((result) => {
-          setData(result);
-          setError('');
-          document.title = `${result.catalog.title} · ${result.store.name}`.trim();
-          // A sacola acompanha o estoque: preço novo, e o que esgotou sai.
-          setBag((lines) =>
-            lines.flatMap((line) => {
-              const item = result.items.find((entry) => entry.id === line.item.id);
-              if (!item || item.soldOut) return [];
-              if (!line.variant) return [{ ...line, item }];
-              const variant = item.variants.find((entry) => lineKey(item, entry) === line.key);
-              return variant && variant.availability !== 'sold_out' ? [{ ...line, item, variant }] : [];
-            }),
-          );
-        })
-        .catch((err) => setError(err instanceof Error ? err.message : 'Catálogo indisponível.')),
-    [token],
-  );
+  const load = useCallback(() => {
+    if (!token) {
+      setData(null);
+      setError('Link inválido. Confira o endereço e tente de novo.');
+      return Promise.resolve();
+    }
+    return apiPublicSalesCatalog(token)
+      .then((result) => {
+        setData(result);
+        setError('');
+        document.title = `${result.catalog.title} · ${result.store.name}`.trim();
+        // A sacola acompanha o estoque: preço novo, e o que esgotou sai.
+        setBag((lines) =>
+          lines.flatMap((line) => {
+            const item = result.items.find((entry) => entry.id === line.item.id);
+            if (!item || item.soldOut) return [];
+            if (!line.variant) return [{ ...line, item }];
+            const variant = item.variants.find((entry) => lineKey(item, entry) === line.key);
+            return variant && variant.availability !== 'sold_out' ? [{ ...line, item, variant }] : [];
+          }),
+        );
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Catálogo indisponível.'));
+  }, [token]);
 
   // Página aberta há tempo (cliente ou loja): quando o Marthi atualiza, recarrega sozinha para o visual
   // ficar igual ao configurado — só se não houver nada na sacola nem pedido/produto aberto.

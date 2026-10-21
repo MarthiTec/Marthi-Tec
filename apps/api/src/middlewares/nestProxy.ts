@@ -5,13 +5,31 @@ function nestOrigin() {
   return (process.env.NEST_API_URL || '').replace(/\/$/, '');
 }
 
+function apiPathname(req: Request) {
+  const raw = req.originalUrl || req.url || '';
+  return raw.split('?')[0] || '';
+}
+
 /**
  * Encaminha /api que este processo Express não implementa para o Nest.
  * Perfil, catálogo do totem, estoque e PDV moram no Marthi-Backend.
+ *
+ * Rotas `/api/v1/public/*` são first-party (catálogo, pedidos, OS, solicitações):
+ * se não casarem com um handler Express, respondemos 404 — nunca "Token ausente
+ * ou inválido." do requireAuth (isso confundia link curto /c/{slug} e o painel).
  */
 export async function proxyUnmatchedApi(req: Request, res: Response, next: NextFunction) {
   if (!req.originalUrl.startsWith('/api')) {
     next();
+    return;
+  }
+
+  const path = apiPathname(req);
+  if (path.startsWith('/api/v1/public/') || path === '/api/v1/public') {
+    res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Rota pública não encontrada.', details: {} },
+    });
     return;
   }
 
