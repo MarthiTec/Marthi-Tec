@@ -7642,8 +7642,14 @@ select.caixa-mov-input {
   estiver aberta: qualquer overflow ≠ visible vira containing block e o position:sticky
   da descrição deixa de acompanhar a rolagem de .admin__workspace / .erp-app__content.
   O recorte lateral fica no workspace (overflow-x) e nos containers de tabela.
+
+  #55 embute StockPage em HubPage (.admin-page.hub-page). Em ≤960px, .admin-page ganha
+  overflow-x:hidden — isso presa o sticky da descrição se o hub ficar no meio do caminho.
 */
 .admin-page.admin-page--stock-form {
+  overflow: visible !important;
+}
+.admin-page:has(.admin-page--stock-form) {
   overflow: visible !important;
 }
 .admin__workspace:has(.admin-page--stock-form) .admin__main {
