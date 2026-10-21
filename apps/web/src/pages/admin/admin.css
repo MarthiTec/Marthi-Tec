@@ -1480,9 +1480,46 @@
 
 .page-heading-btn__arrow {
   width: auto;
-  font-size: 1rem;
+  font-size: 1.2rem;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 400;
+}
+
+/* Voltar em modo consulta: squircle discreto (Catálogo Digital), não pill */
+.page-heading-btn--back {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--line, #e6e7eb) !important;
+  background: var(--card, #ffffff) !important;
+  color: var(--ink, #16181d) !important;
+  box-shadow: none !important;
+  flex: 0 0 40px !important;
+}
+
+.page-heading-btn--back:hover:not(:disabled) {
+  background: var(--card-2, #f8fafc) !important;
+  border-color: var(--mute, #94a3b8) !important;
+  color: var(--ink, #0f172a) !important;
+}
+
+.is-theme-dark .page-heading-btn--back,
+.admin--dark .page-heading-btn--back {
+  background: var(--card, #171e27) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--ink, #e8eef4) !important;
+}
+
+.is-theme-dark .page-heading-btn--back:hover:not(:disabled),
+.admin--dark .page-heading-btn--back:hover:not(:disabled) {
+  background: var(--card-2, #1c2430) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
 }
 
 /* Ícones pretos: brancos no botão primário; invertidos no tema escuro (ghost) */
@@ -1534,6 +1571,16 @@
     min-width: 0;
     min-height: 44px !important;
     height: 44px;
+  }
+
+  /* Voltar discreto não estica no mobile */
+  .page-heading-actions > .page-heading-btn--back,
+  .stock-heading-actions > .page-heading-btn--back {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
   }
 }
 
@@ -5407,12 +5454,14 @@ select.caixa-mov-input {
     min-width: 580px !important;
   }
 
-  /* Garantir que o botão "Voltar" no header do admin não seja espremido */
+  /* Voltar discreto: manter squircle 40×40 no header */
   .admin__top .screen-back {
     flex-shrink: 0;
-    min-height: 34px;
-    padding: 0 10px;
-    font-size: 0.78rem;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
   }
 
   /* Limitar o StoreSwitcher no header do admin em tablets/mobile */

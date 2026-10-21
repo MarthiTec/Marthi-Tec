@@ -8,8 +8,8 @@ function historyIndex(): number {
 }
 
 /**
- * Voltar ao recurso anterior (histórico do router). Se não houver histórico in-app,
- * cai no `home` do módulo (ex.: /erp, /painel).
+ * Voltar discreto (padrão Catálogo Digital): squircle + seta ←.
+ * Histórico do router quando existe; senão cai no `home` do módulo.
  */
 export function ScreenBackButton({
   home,
@@ -19,7 +19,7 @@ export function ScreenBackButton({
   home: string;
   label?: string;
   className?: string;
-  /** @deprecated Sempre mostra ← Voltar (padrão Entrada de estoque). */
+  /** @deprecated Sempre ícone discreto (seta); texto só em aria/title. */
   iconOnly?: boolean;
 }) {
   const navigate = useNavigate();
@@ -49,7 +49,6 @@ export function ScreenBackButton({
       <span className="screen-back__arrow" aria-hidden="true">
         ←
       </span>
-      <span className="screen-back__label">{label}</span>
     </button>
   );
 }

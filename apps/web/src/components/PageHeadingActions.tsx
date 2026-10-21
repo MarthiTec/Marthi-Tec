@@ -51,28 +51,38 @@ export function HeadingSaveButton({
   );
 }
 
-/** Botão Cancelar (edição) ou Voltar (consulta) no título. */
+/** Botão Cancelar (edição) ou Voltar discreto (consulta) no título. */
 export function HeadingCancelButton({
   onClick,
   disabled,
   label = 'Cancelar',
 }: HeadingBtnProps) {
   const isBack = label === 'Voltar' || label === 'Fechar';
-  return (
-    <button
-      type="button"
-      className={`btn btn--ghost page-heading-btn${isBack ? ' page-heading-btn--back' : ''}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {isBack ? (
+  if (isBack) {
+    return (
+      <button
+        type="button"
+        className="page-heading-btn page-heading-btn--back"
+        onClick={onClick}
+        disabled={disabled}
+        title="Voltar"
+        aria-label="Voltar"
+      >
         <span className="page-heading-btn__arrow" aria-hidden="true">
           ←
         </span>
-      ) : (
-        <img src="/pdv/cancel.png" alt="" className="page-heading-btn__ico" />
-      )}
-      {isBack ? 'Voltar' : label}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="btn btn--ghost page-heading-btn"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <img src="/pdv/cancel.png" alt="" className="page-heading-btn__ico" />
+      {label}
     </button>
   );
 }
