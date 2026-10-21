@@ -46,12 +46,18 @@ const WORDS: Record<string, string> = {
   '/painel/os/pecas': 'pecas peca estoque minimo tela bateria conector manutencao custo relatorio',
   '/erp': 'retaguarda erp',
   // Hub Produtos & Estoque (abas): sinônimos cobrem entrada / balanço / movimentos.
-  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo',
-  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario',
+  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo especificacoes marcas atributos kits lotes almoxarifado',
+  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario especificacoes marcas atributos kits lotes almoxarifado',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
+<<<<<<< HEAD
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda leads lead',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada',
   '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro relatorio cliente',
+=======
+  '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda',
+  '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada kits lotes almoxarifado',
+  '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro',
+>>>>>>> d561253 (feat(web): Especificações hub tab with Kits/Lotes/Almoxarifados)
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
   '/painel/financeiro': 'financeiro contas pagar receber caixa fluxo dre aging lucro a receber a pagar',
   '/erp/relatorios': 'relatorios indicadores dre vendas metas estoque imei pecas hub central',

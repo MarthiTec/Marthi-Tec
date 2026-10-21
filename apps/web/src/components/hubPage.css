@@ -56,6 +56,18 @@
   min-width: 0;
 }
 
+.hub-head__aside--embedded {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hub-page--embedded {
+  padding: 0;
+}
+
 .hub-tabs {
   display: flex;
   gap: 4px;

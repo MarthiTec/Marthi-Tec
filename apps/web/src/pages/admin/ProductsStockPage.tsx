@@ -3,18 +3,19 @@ import { HubPage, type HubTab } from '../../components/HubPage';
 import { useAuth } from '../../contexts/AuthContext';
 import { canAccessPath, userIsStoreAdmin } from '../../data/erpRegistry';
 import { hubFullAccess, type StockTab } from '../../data/hubPaths';
+import { SpecificationsPage } from './SpecificationsPage';
 import { StockEntryPage } from './StockEntryPage';
 import { StockPage } from './StockPage';
 import { StockBalancePage } from '../erp/StockBalancePage';
 import { StockMovementsPage } from '../erp/StockMovementsPage';
 
-const TABS: Array<HubTab<StockTab> & { legacy: string }> = [
+const TABS: Array<HubTab<StockTab> & { legacy: string | string[] }> = [
   {
     id: 'produtos',
     label: 'Produtos',
     icon: 'box',
     legacy: '/erp/produtos',
-    hint: 'Cadastro de produtos e estoque. Kits, lotes e almoxarifado ficam na Retaguarda completa.',
+    hint: 'Cadastro de produtos e estoque. Kits, lotes e almoxarifado ficam na aba Especificações.',
     render: () => <StockPage />,
   },
   {
@@ -41,6 +42,15 @@ const TABS: Array<HubTab<StockTab> & { legacy: string }> = [
     hint: 'Inventário físico (balanço). Ajuste pontual de quantidade fica em Movimentações → tipo Ajuste.',
     render: () => <StockBalancePage />,
   },
+  {
+    id: 'especificacoes',
+    label: 'Especificações',
+    icon: 'tag',
+    // Qualquer um destes paths libera a aba (admin da loja já vê tudo via hubFullAccess).
+    legacy: ['/erp/especificacoes', '/erp/kits', '/erp/lotes', '/erp/almoxarifado', '/painel/especificacoes'],
+    hint: 'Marcas, atributos, grupos e retirada — mais kits, lotes e almoxarifados. Cadastro do produto continua enxuto na aba Produtos.',
+    render: () => <SpecificationsPage embedded includeSupportResources />,
+  },
 ];
 
 /** Redireciona rotas legadas (entrada/balanço/movimentos) para a aba do hub, preservando state. */
@@ -50,14 +60,19 @@ export function RedirectToProductsStock({ aba }: { aba: StockTab }) {
   return <Navigate to={`${base}?aba=${aba}`} replace state={location.state} />;
 }
 
+function canAccessLegacy(legacy: string | string[], email: string | undefined, full: boolean) {
+  if (full) return true;
+  const paths = Array.isArray(legacy) ? legacy : [legacy];
+  return paths.some((path) => canAccessPath(path, email));
+}
+
 /**
  * Área de trabalho Produtos & Estoque: abas sobre as telas já existentes
- * (StockPage, movimentos, entrada, balanço) — sem mudar regras de negócio.
+ * (StockPage, movimentos, entrada, balanço, especificações) — sem mudar regras de negócio.
  */
 export function ProductsStockPage() {
   const { user } = useAuth();
   const full = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
-  // Produtos e as demais abas usam a mesma capability erp_stock; filtramos por path legado.
   const allowed = TABS.filter((tab) => {
     if (tab.id === 'produtos') {
       return (
@@ -66,7 +81,7 @@ export function ProductsStockPage() {
         canAccessPath('/painel/produtos', user?.email)
       );
     }
-    return full || canAccessPath(tab.legacy, user?.email);
+    return canAccessLegacy(tab.legacy, user?.email, full);
   });
   if (allowed.length === 0) {
     return <p className="empty">Sem permissão para Produtos & Estoque.</p>;
@@ -75,7 +90,7 @@ export function ProductsStockPage() {
     <HubPage
       icon="box"
       title="Produtos & Estoque"
-      subtitle="Cadastros, entradas, movimentos e inventário numa área só — sem voltar ao menu a cada passo."
+      subtitle="Cadastros, entradas, movimentos, inventário e especificações numa área só — sem voltar ao menu a cada passo."
       tabs={allowed}
       aside={
         <div className="hub-head__aside-links" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

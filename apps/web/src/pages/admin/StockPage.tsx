@@ -57,7 +57,7 @@ import {
 } from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes, updateAttribute } from '../../data/attributeStore';
 import { apiListSuppliers } from '../../services/erpApi';
-import { peoplePath as peopleHubPath, productsStockPath, specificationsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
+import { peoplePath as peopleHubPath, productsStockPath, productsStockSpecsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
 import {
   getFiscalClassification,
   listFiscalClassifications,
@@ -146,7 +146,8 @@ const REFRESH_EVENTS = [
 export function StockPage() {
   const location = useLocation();
   const totemSurface = isTotemCatalogPath(location.pathname);
-  const specsPath = (tab: SpecsTab) => specificationsPath(location.pathname, tab);
+  // Prefer hub Produtos & Estoque (?aba=especificacoes) para não sair do workspace; totem usa /painel/totem/especificacoes.
+  const specsPath = (tab: SpecsTab) => productsStockSpecsPath(location.pathname, tab);
   const peoplePath = (tab: PeopleTab) => peopleHubPath(location.pathname, tab);
   const catalogFull = hasCapability('catalog.full');
   const lite = !catalogFull && !totemSurface;

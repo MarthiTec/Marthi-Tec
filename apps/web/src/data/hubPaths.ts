@@ -1,12 +1,18 @@
 /**
  * Telas agrupadas em abas: Especificações (marcas, atributos, grupos e tipos de retirada), Pessoas
  * (clientes, fornecedores, vendedores, funcionários e permissões) e Produtos & Estoque
- * (produtos, movimentações, entradas e ajustes/balanço). O endereço segue o app em
- * que a pessoa está (painel, totem ou Retaguarda) para não tirar ninguém do contexto.
+ * (produtos, movimentações, entradas, ajustes/balanço e especificações + kits/lotes/almoxarifado).
+ * O endereço segue o app em que a pessoa está (painel, totem ou Retaguarda).
  */
 export type SpecsTab = 'marcas' | 'atributos' | 'grupos' | 'retirada';
+/** Sub-abas do bloco Especificações no hub de estoque (specs + recursos de apoio). */
+export type StockSpecsTab = SpecsTab | 'kits' | 'lotes' | 'almoxarifado';
 export type PeopleTab = 'clientes' | 'fornecedores' | 'vendedores' | 'funcionarios' | 'permissoes';
-export type StockTab = 'produtos' | 'movimentacoes' | 'entradas' | 'ajustes';
+/** Abas do hub Produtos & Estoque — `especificacoes` embute specs + kits/lotes/almoxarifado. */
+export type StockTab = 'produtos' | 'movimentacoes' | 'entradas' | 'ajustes' | 'especificacoes';
+
+/** Query da sub-aba de Especificações quando embutida no hub (`?aba=especificacoes&espec=marcas`). */
+export const STOCK_SPECS_PARAM = 'espec';
 
 function withTab(base: string, tab?: string) {
   return tab ? `${base}?aba=${tab}` : base;
@@ -19,6 +25,22 @@ export function specificationsPath(pathname: string, tab?: SpecsTab) {
       ? '/painel/totem/especificacoes'
       : '/painel/especificacoes';
   return withTab(base, tab);
+}
+
+/**
+ * Especificações no contexto do hub Produtos & Estoque (painel / Retaguarda).
+ * Totem continua no atalho dedicado (`/painel/totem/especificacoes`) — sem kits/lotes/almoxarifado.
+ */
+export function productsStockSpecsPath(pathname: string, tab?: StockSpecsTab) {
+  if (pathname.startsWith('/painel/totem')) {
+    // Totem: só as abas de catálogo (marcas/atributos/…); kits etc. ficam na Retaguarda/hub.
+    if (tab === 'kits' || tab === 'lotes' || tab === 'almoxarifado') {
+      return productsStockPath('/painel', 'especificacoes') + `&${STOCK_SPECS_PARAM}=${tab}`;
+    }
+    return specificationsPath(pathname, tab);
+  }
+  const hub = productsStockPath(pathname, 'especificacoes');
+  return tab ? `${hub}&${STOCK_SPECS_PARAM}=${tab}` : hub;
 }
 
 export function peoplePath(pathname: string, tab?: PeopleTab) {
