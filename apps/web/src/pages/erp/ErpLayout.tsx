@@ -3,6 +3,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react
 import { AreaGuard, useCanOpen } from '../../components/AreaGuard';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { BrandLogo } from '../../components/BrandLogo';
+import { ErpAppsMenu } from '../../components/ErpAppsMenu';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
@@ -188,6 +189,7 @@ export function ErpLayout() {
             <span>Painel</span>
           </Link>
         ) : null}
+        <ErpAppsMenu />
         <button type="button" className="erp-app__exit" onClick={() => setExitOpen(true)}>
           Sair
         </button>

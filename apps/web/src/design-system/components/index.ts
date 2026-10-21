@@ -55,3 +55,8 @@ export { HubPage, type HubTab } from '../../components/HubPage';
 /* Theme + confirms */
 export { PanelThemeToggle } from '../../components/PanelThemeToggle';
 export { ConfirmDialog, type ConfirmDialogProps } from '../../components/ConfirmDialog';
+
+/* Apps / bento grid launcher (Painel + Retaguarda) */
+export { AppsGridMenu, type AppsGridItem } from '../../components/AppsGridMenu';
+export { PanelAppsMenu } from '../../components/PanelAppsMenu';
+export { ErpAppsMenu } from '../../components/ErpAppsMenu';
