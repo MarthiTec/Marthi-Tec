@@ -84,8 +84,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
-      // Fase A+/B: uma entrada → workspace com abas (Produtos · Movimentações · Entradas · Ajustes).
-      { to: '/erp/produtos', label: 'Produtos & Estoque' },
+      // Fase A+/B: hub no Painel (AdminLayout). Dual path `/erp/produtos` permanece na Retaguarda.
+      { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/catalogo', label: 'Catálogo digital', accent: '#e4572e' },
       { to: '/painel/solicitacoes-compra', label: 'Solicitações de compras', accent: '#0284c7' },
       { to: '/painel/especificacoes', label: 'Especificações' },
@@ -233,20 +233,30 @@ export function navGroupForPath(pathname: string, search = '') {
   return null;
 }
 
+/** Hub Produtos & Estoque existe em `/painel/produtos` e `/erp/produtos` (dual path). */
+function stockHubPaths(path: string) {
+  if (path === '/painel/produtos' || path === '/erp/produtos') {
+    return ['/painel/produtos', '/erp/produtos'];
+  }
+  return [path];
+}
+
 export function childIsActive(child: AdminNavChild, pathname: string, search: string) {
   const [path, query] = child.to.split('?');
   const cleanSearch = search.replace(/^\?/, '');
+  const hubs = stockHubPaths(path);
+  const onPath = hubs.some((hub) => pathname === hub);
   if (query) {
-    return pathname === path && cleanSearch === query;
+    return onPath && cleanSearch === query;
   }
   // Hubs (Pessoas, Especificações, Produtos & Estoque) usam só `?aba=` — o item do menu
   // continua ativo na aba escolhida.
-  if (pathname === path && cleanSearch) {
+  if (onPath && cleanSearch) {
     const params = new URLSearchParams(cleanSearch);
     const keys = [...params.keys()];
     if (keys.length === 1 && keys[0] === 'aba') return true;
     return false;
   }
   if (child.end) return pathname === path && !cleanSearch;
-  return pathname === path || pathname.startsWith(`${path}/`);
+  return hubs.some((hub) => pathname === hub || pathname.startsWith(`${hub}/`));
 }

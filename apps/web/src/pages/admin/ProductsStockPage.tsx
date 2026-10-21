@@ -46,7 +46,8 @@ const TABS: Array<HubTab<StockTab> & { legacy: string }> = [
 /** Redireciona rotas legadas (entrada/balanço/movimentos) para a aba do hub, preservando state. */
 export function RedirectToProductsStock({ aba }: { aba: StockTab }) {
   const location = useLocation();
-  return <Navigate to={`/erp/produtos?aba=${aba}`} replace state={location.state} />;
+  const base = location.pathname.startsWith('/painel') ? '/painel/produtos' : '/erp/produtos';
+  return <Navigate to={`${base}?aba=${aba}`} replace state={location.state} />;
 }
 
 /**
@@ -58,7 +59,13 @@ export function ProductsStockPage() {
   const full = hubFullAccess(user?.role, userIsStoreAdmin(user?.email));
   // Produtos e as demais abas usam a mesma capability erp_stock; filtramos por path legado.
   const allowed = TABS.filter((tab) => {
-    if (tab.id === 'produtos') return full || canAccessPath('/erp/produtos', user?.email);
+    if (tab.id === 'produtos') {
+      return (
+        full ||
+        canAccessPath('/erp/produtos', user?.email) ||
+        canAccessPath('/painel/produtos', user?.email)
+      );
+    }
     return full || canAccessPath(tab.legacy, user?.email);
   });
   if (allowed.length === 0) {

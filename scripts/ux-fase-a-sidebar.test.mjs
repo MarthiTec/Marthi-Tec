@@ -25,9 +25,9 @@ test('Fase A: navGroupForPath covers PDV + Retaguarda children that were missing
 test('Fase A (superseded by A+/B hub): Retaguarda stock entry before vitrine', () => {
   const nav = fs.readFileSync(navPath, 'utf8');
   const erpBlock = nav.slice(nav.indexOf("id: 'erp'"), nav.indexOf("id: 'ads'"));
-  const produtos = erpBlock.indexOf("to: '/erp/produtos'");
+  const produtos = erpBlock.indexOf("to: '/painel/produtos'");
   const catalogo = erpBlock.indexOf("to: '/painel/catalogo'");
-  assert.ok(produtos > 0, 'Produtos & Estoque hub in Retaguarda');
+  assert.ok(produtos > 0, 'Produtos & Estoque hub in Retaguarda (painel-native)');
   assert.ok(catalogo > produtos, 'Estoque hub before Catálogo');
   assert.match(erpBlock, /label: 'Produtos & Estoque'/);
 });

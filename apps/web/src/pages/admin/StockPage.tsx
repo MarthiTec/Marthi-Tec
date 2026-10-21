@@ -1918,11 +1918,20 @@ export function StockPage() {
             </div>
           </div>
           <p className="empty stock-simple__hint">
-            Fornecedor, data de entrada, grupo, subgrupo e códigos ficam na aba <button type="button" className="link-btn" onClick={() => setFormTab('specs')}>Especificações</button>. Compras com IMEI entram pela{' '}
-            <Link to={productsStockPath('entradas')}>Entrada de estoque</Link>
-            {' · '}
-            <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>
-            {' '}ou pelo botão Fornecedores da grade.
+            Fornecedor, data de entrada, grupo, subgrupo e códigos ficam na aba <button type="button" className="link-btn" onClick={() => setFormTab('specs')}>Especificações</button>. Compras com IMEI{' '}
+            {totemSurface ? (
+              <>
+                entram pelo botão Fornecedores da grade ou por{' '}
+                <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>.
+              </>
+            ) : (
+              <>
+                entram pela <Link to={productsStockPath(location.pathname, 'entradas')}>Entrada de estoque</Link>
+                {' · '}
+                <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>
+                {' '}ou pelo botão Fornecedores da grade.
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -2400,7 +2409,8 @@ export function StockPage() {
               {totemSurface && catalogFull && !simple ? (
                 <>
                   {' '}
-                  Cadastro completo em <Link to="/erp/produtos">Retaguarda · produtos</Link>.
+                  Cadastro completo em <Link to={productsStockPath('/painel', 'produtos')}>Produtos & Estoque</Link>
+                  {' '}(mesmo cadastro, no Painel).
                 </>
               ) : null}
             </p>
@@ -3049,7 +3059,10 @@ export function StockPage() {
                 </label>
               </div>
               <div className="stock-config-links">
-                <Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link>
+                {/* API de aparelhos vive na Retaguarda; no Catálogo do totem não empurrar totem-only para /erp. */}
+                {!totemSurface && catalogFull ? (
+                  <Link to="/erp/api-aparelhos">Configurar consulta de aparelhos por API</Link>
+                ) : null}
                 <Link to={specsPath('retirada')}>Cadastrar tipos de retirada e acompanhar entregas</Link>
                 <Link to={specsPath('grupos')}>Cadastrar {groupLabels.group.toLowerCase()} e {groupLabels.subgroup.toLowerCase()}</Link>
               </div>

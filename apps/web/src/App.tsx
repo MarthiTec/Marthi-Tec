@@ -323,7 +323,7 @@ export function App() {
           <Route path="fiscal" element={<FiscalPanelPage />} />
           <Route path="erp" element={<ErpPanelPage />} />
           <Route path="clientes" element={<Navigate to="/painel/pessoas?aba=clientes" replace />} />
-          <Route path="produtos" element={<Navigate to="/erp/produtos" replace />} />
+          <Route path="produtos" element={<ProductsStockPage />} />
           <Route path="estoque" element={<RedirectToProductsStock aba="ajustes" />} />
           <Route path="balanco" element={<RedirectToProductsStock aba="ajustes" />} />
           <Route path="movimentos" element={<RedirectToProductsStock aba="movimentacoes" />} />

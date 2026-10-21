@@ -25,9 +25,18 @@ export function peoplePath(pathname: string, tab?: PeopleTab) {
   return withTab(pathname.startsWith('/erp') ? '/erp/pessoas' : '/painel/pessoas', tab);
 }
 
-/** Hub Produtos & Estoque (canônico em `/erp/produtos`). */
-export function productsStockPath(tab?: StockTab) {
-  return withTab('/erp/produtos', tab);
+/**
+ * Hub Produtos & Estoque — o endereço segue o contexto (totem / painel / Retaguarda).
+ * Totem-only fica em `/painel/totem/produtos` (sem abas de entrada/balanço do ERP).
+ * Painel e aliases usam `/painel/produtos` (AdminLayout). Retaguarda usa `/erp/produtos`.
+ */
+export function productsStockPath(pathname: string, tab?: StockTab) {
+  if (pathname.startsWith('/painel/totem')) {
+    // Catálogo do totem: só cadastro na vitrine — sem hub de entradas/movimentos.
+    return '/painel/totem/produtos';
+  }
+  const base = pathname.startsWith('/erp') ? '/erp/produtos' : '/painel/produtos';
+  return withTab(base, tab);
 }
 
 /** Dono, gerente e admin (pelo login ou pelo cadastro da loja) veem todas as abas, como no painel. */

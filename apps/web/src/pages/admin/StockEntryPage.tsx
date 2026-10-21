@@ -362,7 +362,7 @@ export function StockEntryPage() {
             ) : (
               <li className="empty">
                 Nenhum produto encontrado.{' '}
-                <Link to={productsStockPath('produtos')}>Cadastrar produto</Link>
+                <Link to={productsStockPath(location.pathname, 'produtos')}>Cadastrar produto</Link>
                 {' · '}
                 <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>
               </li>

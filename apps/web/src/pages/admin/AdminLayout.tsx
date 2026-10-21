@@ -68,7 +68,7 @@ const TITLES: Record<string, { kicker: string; title: string }> = {
   '/painel/fornecedores': { kicker: 'Pessoas', title: 'Fornecedores' },
   '/painel/funcionarios': { kicker: 'Pessoas', title: 'Funcionários' },
   '/painel/estoque': { kicker: 'Produtos', title: 'Produtos' },
-  '/painel/produtos': { kicker: 'Produtos', title: 'Cadastro de produtos' },
+  '/painel/produtos': { kicker: 'Produtos', title: 'Produtos & Estoque' },
   '/painel/ecommerce': { kicker: 'E-commerce', title: 'Visão da loja online' },
   '/painel/fiscal': { kicker: 'Emissor Fiscal', title: 'Visão fiscal' },
   '/painel/erp': { kicker: 'Retaguarda', title: 'Visão e ajustes da Retaguarda' },

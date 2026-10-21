@@ -32,7 +32,7 @@ test('Fase A+/B: productsStockPath helper exists', () => {
 test('Fase A+/B: Painel menu collapses stock family to hub', () => {
   const nav = fs.readFileSync(navPath, 'utf8');
   const erpBlock = nav.slice(nav.indexOf("id: 'erp'"), nav.indexOf("id: 'ads'"));
-  assert.match(erpBlock, /to: '\/erp\/produtos',\s*label: 'Produtos & Estoque'/);
+  assert.match(erpBlock, /to: '\/painel\/produtos',\s*label: 'Produtos & Estoque'/);
   assert.equal(erpBlock.includes("to: '/erp/entrada-estoque'"), false, 'entrada should not be a separate nav child');
   assert.equal(erpBlock.includes("to: '/erp/balanco'"), false, 'balanço should not be a separate nav child');
   assert.equal(erpBlock.includes("to: '/erp/movimentos'"), false, 'movimentos should not be a separate nav child');
