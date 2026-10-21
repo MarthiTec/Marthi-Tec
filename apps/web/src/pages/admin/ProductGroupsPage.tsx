@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
-import { AdminPicker } from '../../components/AdminPicker';
-import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
-import { HeadingFormActions } from '../../components/PageHeadingActions';
+import {
+  AdminPicker,
+  CrudNameButton,
+  CrudRowActions,
+  HeadingFormActions,
+  confirmDelete,
+} from '../../design-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { hubFullAccess } from '../../data/hubPaths';
