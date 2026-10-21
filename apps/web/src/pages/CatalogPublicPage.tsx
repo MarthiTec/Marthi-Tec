@@ -5,6 +5,7 @@ import { CatalogCheckout, type BagLine, type CheckoutMode } from '../components/
 import { CatalogProductSheet } from '../components/CatalogProductSheet';
 import { apiPublicSalesCatalog } from '../services/salesCatalogApi';
 import { CatalogRepairFlow } from '../components/CatalogRepairFlow';
+import { CatalogPurchaseRequest } from '../components/CatalogPurchaseRequest';
 import { CatalogHome, type HomeShopIntent } from '../components/CatalogHome';
 import { apiPublicRepairBrands } from '../services/repairsApi';
 
@@ -41,6 +42,8 @@ export function CatalogPublicPage() {
   const [checkout, setCheckout] = useState<CheckoutMode | null>(null);
   /** Produto aberto (página do produto). */
   const [openId, setOpenId] = useState<string | null>(null);
+  /** Solicitar ao vendedor (produto/opção indisponível). */
+  const [purchaseAsk, setPurchaseAsk] = useState<{ item: CatalogItem; variant: CatalogVariant | null } | null>(null);
   const [toast, setToast] = useState('');
   /** Comprar produtos | Solicitar manutenção (só aparece se a loja tem serviços no Catálogo de manutenções). */
   /** Início (escolha), Catálogo ou Manutenção. Links com ?manutencao=1 / ?catalogo=1 (ou PDF) abrem direto. */
@@ -244,7 +247,15 @@ export function CatalogPublicPage() {
             initialQuery={shopIntent.query}
             initialBrand={shopIntent.brand}
             initialFilter={shopIntent.filter}
-            shop={{ canBuy: sells, onAdd: add, onOpen: (item) => setOpenId(item.id), onUpgrade: () => setCheckout('upgrade'), onSignup: () => setCheckout('signup'), onPdf: () => window.print() }}
+            shop={{
+              canBuy: sells,
+              onAdd: add,
+              onOpen: (item) => setOpenId(item.id),
+              onUpgrade: () => setCheckout('upgrade'),
+              onSignup: () => setCheckout('signup'),
+              onPdf: () => window.print(),
+              onRequest: (item) => setPurchaseAsk({ item, variant: null }),
+            }}
           />
         </div>
       )}
@@ -258,7 +269,21 @@ export function CatalogPublicPage() {
             setOpenId(null);
           }}
           onClose={() => setOpenId(null)}
+          onRequest={(item, variant) => {
+            setOpenId(null);
+            setPurchaseAsk({ item, variant });
+          }}
           canBuy={sells}
+        />
+      ) : null}
+      {purchaseAsk ? (
+        <CatalogPurchaseRequest
+          token={token}
+          store={data.store}
+          accent={data.catalog.accent}
+          item={purchaseAsk.item}
+          variant={purchaseAsk.variant}
+          onClose={() => setPurchaseAsk(null)}
         />
       ) : null}
       {count && !checkout && !openId ? (

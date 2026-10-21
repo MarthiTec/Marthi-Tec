@@ -4,6 +4,7 @@ import { ReceiptPublicPage } from './pages/ReceiptPublicPage';
 import { CatalogPublicPage } from './pages/CatalogPublicPage';
 import { SalesCatalogPage } from './pages/admin/SalesCatalogPage';
 import { CatalogPromoPrintPage } from './pages/admin/CatalogPromoPrintPage';
+import { PurchaseRequestsPage } from './pages/admin/PurchaseRequestsPage';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { isAllowedWhileTotemLocked, lockedTotemUrl } from './data/totemKioskLock';
@@ -297,6 +298,7 @@ export function App() {
           <Route path="venda-externa" element={<ExternalSalePage />} />
           <Route path="catalogo" element={<SalesCatalogPage />} />
           <Route path="catalogo/imprimir" element={<CatalogPromoPrintPage />} />
+          <Route path="solicitacoes-compra" element={<PurchaseRequestsPage />} />
           <Route path="calculadora" element={<InstallmentCalculatorPage />} />
           <Route path="cotacao" element={<QuickQuotePage />} />
           <Route path="ads" element={<AdsOverviewPage />} />
