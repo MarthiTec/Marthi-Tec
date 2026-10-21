@@ -7574,6 +7574,7 @@ select.caixa-mov-input {
 /* Estoque simplificado: descrição em destaque que acompanha o formulário. */
 .stock-simple-description {
   position: sticky;
+  /* ERP: o título fica fora de .erp-app__content — cola no topo da área de rolagem. */
   top: 0;
   z-index: 6;
   display: flex;
@@ -7586,6 +7587,10 @@ select.caixa-mov-input {
   border: 1px solid rgba(14, 116, 144, 0.35);
   background: var(--card, #fff);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+/* Painel (/painel/…): o header sticky do shell ocupa --admin-top-h; a descrição cola abaixo. */
+.admin__workspace .stock-simple-description {
+  top: var(--admin-top-h, 64px);
 }
 .stock-simple-description > label:first-child { flex: 1 1 320px; display: flex; flex-direction: column; gap: 4px; }
 .stock-simple-description > label:first-child > span { font-size: 0.78rem; font-weight: 700; color: #0e7490; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -7607,10 +7612,43 @@ select.caixa-mov-input {
 .stock-simple__device { margin: 0 0 8px; }
 .stock-specs-fields { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 @media (max-width: 640px) {
+  .stock-simple-description {
+    /* Celular: barra mais baixa para não comer a viewport; ainda acompanha a rolagem. */
+    padding: 10px 12px;
+    gap: 6px 10px;
+    align-items: stretch;
+  }
   .stock-simple-description input:not([type='checkbox']) { font-size: 1.1rem; }
+  .stock-simple-description__brand { padding-bottom: 0; }
 }
-/* A descrição do estoque simplificado fica fixa no topo: o recorte lateral não pode virar área de rolagem. */
-.admin-page.admin-page--stock-form { overflow-x: clip !important; overflow-y: visible !important; }
+.is-theme-dark .stock-simple-description,
+.admin--dark .stock-simple-description {
+  background: var(--card, #171e27);
+  border-color: rgba(45, 212, 191, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.is-theme-dark .stock-simple-description > label:first-child > span,
+.admin--dark .stock-simple-description > label:first-child > span {
+  color: #67e8f9;
+}
+.is-theme-dark .stock-simple-description input:not([type='checkbox']),
+.admin--dark .stock-simple-description input:not([type='checkbox']) {
+  background: var(--card-2, #1c2430);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink, #e8eef4);
+}
+/*
+  Não use overflow clip/hidden no .admin-page (nem em .admin__main) enquanto a ficha
+  estiver aberta: qualquer overflow ≠ visible vira containing block e o position:sticky
+  da descrição deixa de acompanhar a rolagem de .admin__workspace / .erp-app__content.
+  O recorte lateral fica no workspace (overflow-x) e nos containers de tabela.
+*/
+.admin-page.admin-page--stock-form {
+  overflow: visible !important;
+}
+.admin__workspace:has(.admin-page--stock-form) .admin__main {
+  overflow: visible !important;
+}
 
 /* Ajuda do estoque simplificado: escolher cores e capacidades do modelo. */
 .stock-help-pick {
