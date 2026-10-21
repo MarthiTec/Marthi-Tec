@@ -290,7 +290,6 @@ export function StockEntryPage() {
       setNotice(entryLabel);
       if (linkedRequestId) {
         setPurchaseRequestId(linkedRequestId);
-        setPendingSaleLine(saleLine);
         try {
           await apiUpdatePurchaseRequest(linkedRequestId, {
             status: 'fulfilled',
@@ -300,7 +299,13 @@ export function StockEntryPage() {
         } catch {
           // Entrada já gravada; vínculo com a solicitação é complementar.
         }
-        setNotice(`${entryLabel} Solicitação atualizada — pode abrir a venda no PDV.`);
+        setNotice(`${entryLabel} Solicitação atualizada — abrindo PDV.`);
+        navigate('/caixa', {
+          state: {
+            purchaseRequestId: linkedRequestId,
+            lines: [saleLine],
+          },
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível lançar a entrada.');
