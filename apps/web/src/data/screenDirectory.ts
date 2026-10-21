@@ -49,15 +49,9 @@ const WORDS: Record<string, string> = {
   '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo especificacoes marcas atributos kits lotes almoxarifado',
   '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario especificacoes marcas atributos kits lotes almoxarifado',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
-<<<<<<< HEAD
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda leads lead',
-  '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada',
-  '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro relatorio cliente',
-=======
-  '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada kits lotes almoxarifado',
-  '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro',
->>>>>>> d561253 (feat(web): Especificações hub tab with Kits/Lotes/Almoxarifados)
+  '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro relatorio cliente',
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
   '/painel/financeiro': 'financeiro contas pagar receber caixa fluxo dre aging lucro a receber a pagar',
   '/erp/relatorios': 'relatorios indicadores dre vendas metas estoque imei pecas hub central',
