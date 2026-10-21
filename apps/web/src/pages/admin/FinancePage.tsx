@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { AgingPanel } from '../../components/finance/AgingPanel';
 import { BillsPanel } from '../../components/finance/BillsPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -62,6 +63,7 @@ const TABS = [
   { id: 'extrato', label: 'Extrato' },
   { id: 'pagar', label: 'A pagar' },
   { id: 'receber', label: 'A receber' },
+  { id: 'aging', label: 'Aging AR/AP' },
   { id: 'contas', label: 'Contas bancárias' },
   { id: 'tesouraria', label: 'Tesouraria' },
   { id: 'antecipados', label: 'Antecipados' },
@@ -216,6 +218,8 @@ export function FinancePage() {
             {' · '}
             <Link to="/painel/relatorio-vendas">Vendas &amp; Metas</Link>
             {' · '}
+            <Link to="?tab=aging">Aging AR/AP</Link>
+            {' · '}
             <Link to="?tab=dre">DRE</Link>
           </p>
         </div>
@@ -321,6 +325,15 @@ export function FinancePage() {
                 refresh(note);
                 audit('financeiro.receber', note);
               }}
+            />
+          ) : null}
+
+          {tab === 'aging' ? (
+            <AgingPanel
+              receivables={receivables}
+              payables={payables}
+              onGoReceber={() => setTab('receber')}
+              onGoPagar={() => setTab('pagar')}
             />
           ) : null}
 
@@ -560,6 +573,9 @@ function ResumoPanel({
           </button>
           <button type="button" className="btn btn--ghost" onClick={() => onGo('receber')}>
             Contas a receber
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={() => onGo('aging')}>
+            Aging AR/AP
           </button>
           <button type="button" className="btn btn--ghost" onClick={() => onGo('contas')}>
             Contas bancárias

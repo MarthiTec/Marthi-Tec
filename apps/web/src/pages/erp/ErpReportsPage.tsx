@@ -41,6 +41,12 @@ const REPORTS: Array<{ to: string; icon: AdminIconName; title: string; text: str
     text: 'Livro de receitas e despesas do período. Separado da receita de vendas faturadas.',
   },
   {
+    to: '/erp/financeiro?tab=aging',
+    icon: 'chart',
+    title: 'Aging a receber / a pagar',
+    text: 'Saldo em aberto por vencimento (due_date real). Capital de giro — não é receita de vendas.',
+  },
+  {
     to: '/erp/relatorio-estoque',
     icon: 'box',
     title: 'Relatório de estoque',
@@ -233,6 +239,9 @@ export function ErpReportsPage() {
         </Link>
         <Link to="/erp/financeiro?tab=dre" className="btn btn--ghost">
           DRE completo
+        </Link>
+        <Link to="/erp/financeiro?tab=aging" className="btn btn--ghost">
+          Aging AR/AP
         </Link>
         <Link to="/painel/os/pecas?aba=relatorio" className="btn btn--ghost">
           Peças OS
