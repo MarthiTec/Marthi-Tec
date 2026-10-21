@@ -127,7 +127,7 @@ export function BrandsPage() {
         )}
         <div className="admin-toolbar">
           {!readOnly && <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar marca'}</button>}
-          <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Fechar' : 'Cancelar'}</button>
+          <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Voltar' : 'Cancelar'}</button>
         </div>
       </form>}
       <div className="admin-card admin-table-container">

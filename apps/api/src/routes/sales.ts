@@ -441,7 +441,19 @@ salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) =>
           AND s.created_at >= $2 AND s.created_at < $3
           AND ($4 = 'all' OR s.status = $4)
           AND ($5 = '' OR s.id ILIKE $5 OR s.customer_name ILIKE $5 OR s.seller_name ILIKE $5
-               OR ($6 <> '' AND regexp_replace(COALESCE(s.customer_phone, '') || COALESCE(s.customer_document, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'))
+               OR ($6 <> '' AND (
+                 regexp_replace(COALESCE(s.customer_phone, '') || COALESCE(s.customer_document, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
+                 OR EXISTS (
+                   SELECT 1 FROM sales_order_lines l
+                    WHERE l.sale_id = s.id
+                      AND regexp_replace(COALESCE(l.imei, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
+                 )
+                 OR EXISTS (
+                   SELECT 1 FROM sale_trade_ins t
+                    WHERE t.sale_id = s.id
+                      AND regexp_replace(COALESCE(t.imei, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
+                 )
+               )))
         ORDER BY s.created_at DESC
         LIMIT 300`,
       [req.storeId, from.toISOString(), to.toISOString(), q.status, term, digits],

@@ -337,7 +337,7 @@ export function TeamUsersSection({ variant, id }: Props) {
         />
       ) : readOnly ? (
         <>
-          <HeadingCancelButton onClick={closeForm} label="Fechar" />
+          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

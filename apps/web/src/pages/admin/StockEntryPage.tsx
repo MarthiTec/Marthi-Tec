@@ -4,8 +4,10 @@ import { AdminPicker } from '../../components/AdminPicker';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { InlineSupplierCreate } from '../../components/InlineSupplierCreate';
 import { filledImeis, ImeiListField } from '../../components/ImeiListField';
+import { HeadingCancelButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import { SUPPLIER_ORIGIN_OPTIONS, type SupplierOrigin } from '../../components/SupplierEntriesModal';
 import type { StockItem, StockVariationRow } from '../../data/adminStore';
+import { STOCK_EVENT } from '../../data/adminStore';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import { findBrand, useBrands } from '../../data/brandStore';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
@@ -116,12 +118,15 @@ export function StockEntryPage() {
 
   useEffect(() => {
     let alive = true;
-    const load = () => {
-      setLoading(true);
+    const load = (opts?: { quiet?: boolean }) => {
+      if (!opts?.quiet) setLoading(true);
       Promise.all([apiListStock(), apiListSuppliers(true).catch(() => []), hydrateAttributesFromApi().catch(() => undefined)])
         .then(([stock, sup]) => {
           if (!alive) return;
-          setItems((Array.isArray(stock) ? stock : []).filter((item) => item.active !== false));
+          const next = (Array.isArray(stock) ? stock : []).filter((item) => item.active !== false);
+          setItems(next);
+          // Produto excluído / inativado: fecha o formulário e volta à busca limpa.
+          setSelectedId((current) => (current && !next.some((item) => item.id === current) ? '' : current));
           setSuppliers(sup.map((row) => ({ id: row.id, name: row.tradeName || row.name, origin: row.origin === 'upgrade' ? 'upgrade' : 'company' })));
           setAttributes(getAttributes().filter((attr) => attr.active && attr.useOnStock));
         })
@@ -129,10 +134,14 @@ export function StockEntryPage() {
         .finally(() => alive && setLoading(false));
     };
     load();
-    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+    const onStoreChanged = () => load();
+    const onStockChanged = () => load({ quiet: true });
+    window.addEventListener(STORE_CONTEXT_CHANGED_EVENT, onStoreChanged);
+    window.addEventListener(STOCK_EVENT, onStockChanged);
     return () => {
       alive = false;
-      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, load);
+      window.removeEventListener(STORE_CONTEXT_CHANGED_EVENT, onStoreChanged);
+      window.removeEventListener(STOCK_EVENT, onStockChanged);
     };
   }, []);
 
@@ -168,6 +177,14 @@ export function StockEntryPage() {
       supplierId: productSupplier?.id ?? '',
       origin: productSupplier?.origin ?? 'company',
     });
+  }
+
+  function clearForm() {
+    setSelectedId('');
+    setQuery('');
+    setForm(emptyForm());
+    setError('');
+    setNewValueFor(null);
   }
 
   const update = (patch: Partial<Form>) => setForm((current) => ({ ...current, ...patch }));
@@ -215,16 +232,9 @@ export function StockEntryPage() {
       });
       setItems((current) => current.map((item) => (item.id === result.product.id ? result.product : item)));
       const finance = !result.payableId ? '' : form.payment === 'paid' ? ' Compra lançada como paga no financeiro.' : ' Compra lançada no contas a pagar.';
+      // Salvou → fechou: volta à busca limpa pronta para a próxima entrada.
+      clearForm();
       setNotice(`Entrada lançada: ${qty} un de ${product.name}${imeis.length ? ` (${imeis.length} IMEI${imeis.length > 1 ? 's' : ''})` : ''}.${finance}`);
-      setForm((current) => ({
-        ...current,
-        variationKey: result.variationId ?? current.variationKey,
-        newAttrs: {},
-        qty: 1,
-        imeiList: [],
-  secondList: [],
-        notes: '',
-      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível lançar a entrada.');
     } finally {
@@ -239,9 +249,17 @@ export function StockEntryPage() {
 
   return (
     <section className="admin-page stock-entry">
+      {product ? (
+        <PageHeadingActions>
+          <HeadingCancelButton onClick={clearForm} disabled={saving} />
+          <HeadingSaveButton onClick={() => void submit()} disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} />
+        </PageHeadingActions>
+      ) : null}
+
       <article className="admin-card">
         <h2 className="stock-entry__title">Entrada de estoque</h2>
         <p className="empty">Busque o produto pela descrição, marca, tipo, modelo, IMEI ou fornecedor e lance a entrada.</p>
+        {notice ? <p className="stock-entry__notice" role="status">{notice}</p> : null}
         <div className="admin-form stock-entry__search">
           <label>
             Produto
@@ -287,7 +305,7 @@ export function StockEntryPage() {
                 {[brandName(product.brand), product.catalogTypeName, product.catalogModelName].filter(Boolean).join(' · ')} · estoque atual {product.qty} un · venda {salePriceText(product)}
               </small>
             </div>
-            <button type="button" className="btn btn--ghost" onClick={() => setSelectedId('')}>
+            <button type="button" className="btn btn--ghost" onClick={clearForm}>
               Trocar produto
             </button>
           </header>
@@ -416,14 +434,18 @@ export function StockEntryPage() {
           </div>
 
           {error ? <p role="alert" className="qty-low">{error}</p> : null}
-          {notice ? <p className="stock-entry__notice">{notice}</p> : null}
           <div className="stock-entry__actions">
             <span>
               Total da entrada <strong>{money((Number(form.qty) || 0) * (Number(form.unitCost) || 0))}</strong>
             </span>
-            <button type="button" className="btn btn--primary" disabled={saving} onClick={submit}>
-              {saving ? 'Lançando…' : 'Lançar entrada'}
-            </button>
+            <div className="stock-entry__actions-btns">
+              <button type="button" className="btn btn--ghost" disabled={saving} onClick={clearForm}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void submit()}>
+                {saving ? 'Salvando…' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </article>
       ) : null}

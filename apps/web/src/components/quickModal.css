@@ -169,6 +169,10 @@
 .sales-history {width:min(980px,100%);height:min(86dvh,900px);}
 .sales-history__filters {display:grid;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line,rgba(16,20,24,.1));}
 .sales-history__filters input {width:100%;box-sizing:border-box;min-height:42px;padding:8px 12px;border:1px solid var(--line,#d8dde3);border-radius:10px;background:var(--card-2,#f8fafc);color:inherit;font:inherit;}
+@media (min-width:641px){
+  .sales-history__filters{grid-template-columns:minmax(0,1.4fr) minmax(140px,.7fr);align-items:start}
+  .sales-history__filters .sales-history__chips{grid-column:1/-1}
+}
 .sales-history__chips {display:flex;flex-wrap:wrap;gap:6px;}
 .sales-history__chips button {min-height:32px;padding:0 12px;border:1px solid var(--line,#d8dde3);border-radius:999px;background:transparent;color:inherit;font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;}
 .sales-history__chips button.is-active {background:var(--accent,#0f766e);border-color:var(--accent,#0f766e);color:#fff;}

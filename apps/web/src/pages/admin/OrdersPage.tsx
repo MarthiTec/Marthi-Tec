@@ -91,7 +91,10 @@ export function OrdersPage() {
             return (
               <div className="caixa-panel__actions caixa-sale-actions">
                 {sale.type === 'external' ? (
-                  <Link to="/painel/venda-externa" className="btn btn--ghost">
+                  <Link
+                    to={`/painel/venda-externa?edit=${encodeURIComponent(sale.id)}`}
+                    className="btn btn--ghost"
+                  >
                     <AdminIcon name="edit" /> Corrigir na Venda Externa
                   </Link>
                 ) : null}

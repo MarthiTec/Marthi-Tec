@@ -212,7 +212,7 @@ export function ProductGroupsPage() {
           </div>
           <div className="admin-toolbar">
             {!readOnly ? <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button> : null}
-            <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Fechar' : 'Cancelar'}</button>
+            <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Voltar' : 'Cancelar'}</button>
           </div>
         </form>
       ) : null}
