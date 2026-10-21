@@ -184,7 +184,7 @@ export function PurchaseRequestsPage() {
       setError('Vincule ou informe um produto do cadastro antes de abrir a entrada de estoque.');
       return;
     }
-    navigate('/erp/entrada-estoque', {
+    navigate('/erp/produtos?aba=entradas', {
       state: {
         productId: row.productId,
         qty: row.qty,

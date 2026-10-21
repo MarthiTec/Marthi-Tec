@@ -84,10 +84,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     children: [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
-      { to: '/painel/produtos', label: 'Produtos & Estoque' },
-      { to: '/erp/entrada-estoque', label: 'Entrada de estoque' },
-      { to: '/erp/balanco', label: 'Balanço' },
-      { to: '/erp/movimentos', label: 'Movimentos' },
+      // Fase A+/B: uma entrada → workspace com abas (Produtos · Movimentações · Entradas · Ajustes).
+      { to: '/erp/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/catalogo', label: 'Catálogo digital', accent: '#e4572e' },
       { to: '/painel/solicitacoes-compra', label: 'Solicitações de compras', accent: '#0284c7' },
       { to: '/painel/especificacoes', label: 'Especificações' },
@@ -240,7 +238,14 @@ export function childIsActive(child: AdminNavChild, pathname: string, search: st
   if (query) {
     return pathname === path && cleanSearch === query;
   }
-  if (pathname === path && cleanSearch) return false;
+  // Hubs (Pessoas, Especificações, Produtos & Estoque) usam só `?aba=` — o item do menu
+  // continua ativo na aba escolhida.
+  if (pathname === path && cleanSearch) {
+    const params = new URLSearchParams(cleanSearch);
+    const keys = [...params.keys()];
+    if (keys.length === 1 && keys[0] === 'aba') return true;
+    return false;
+  }
   if (child.end) return pathname === path && !cleanSearch;
   return pathname === path || pathname.startsWith(`${path}/`);
 }

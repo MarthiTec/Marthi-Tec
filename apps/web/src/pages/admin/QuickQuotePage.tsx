@@ -303,7 +303,12 @@ export function QuickQuotePage() {
             {error ? <p className="qty-low" role="alert">{error}</p> : null}
             {created ? (
               <p className="quick-quote__done" role="status">
-                {created} <Link to="/painel/orcamentos">Ver orçamentos</Link>
+                {created}{' '}
+                <Link to="/painel/orcamentos">Ver orçamentos</Link>
+                {' · '}
+                <Link to="/painel/venda-externa">Venda externa</Link>
+                {' · '}
+                <Link to="/caixa">Abrir caixa</Link>
               </p>
             ) : null}
             <button type="button" className="btn btn--primary" disabled={!ready || saving} onClick={() => void formalize()}>

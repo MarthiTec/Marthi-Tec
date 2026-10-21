@@ -18,13 +18,13 @@ import { isNestAuthed } from '../../services/nestClient';
 
 const CARDS = [
   {
-    to: '/erp/balanco',
+    to: '/erp/produtos?aba=ajustes',
     tag: 'Estoque',
     title: 'Balanço e alertas',
     text: 'Saldo, mín/máx, custo médio, markup, margem e última compra.',
   },
   {
-    to: '/erp/movimentos',
+    to: '/erp/produtos?aba=movimentacoes',
     tag: 'Estoque',
     title: 'Movimentação',
     text: 'Compras, vendas, OS, inventário e histórico de saldos.',

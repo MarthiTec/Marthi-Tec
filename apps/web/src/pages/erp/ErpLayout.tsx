@@ -66,10 +66,14 @@ const NAV_FOOD: NavItem[] = [
 ];
 
 const NAV_PRODUCTS: NavItem[] = [
-  { to: '/erp/produtos', label: 'Produtos & Estoque', icon: 'box', end: true },
-  { to: '/erp/entrada-estoque', label: 'Entrada de estoque', icon: 'inbox' },
-  { to: '/erp/balanco', label: 'Balanço', icon: 'clipboard' },
-  { to: '/erp/movimentos', label: 'Movimentos', icon: 'swap' },
+  // Hub Produtos & Estoque (abas); deep links /entrada-estoque|/balanco|/movimentos redirecionam.
+  {
+    to: '/erp/produtos',
+    label: 'Produtos & Estoque',
+    icon: 'box',
+    end: true,
+    also: ['/erp/entrada-estoque', '/erp/balanco', '/erp/movimentos'],
+  },
   { to: '/erp/especificacoes', label: 'Especificações', icon: 'tag' },
   { to: '/erp/api-aparelhos', label: 'API de aparelhos', icon: 'barcode' },
   { to: '/erp/notas', label: 'Notas de estoque', icon: 'fiscal' },

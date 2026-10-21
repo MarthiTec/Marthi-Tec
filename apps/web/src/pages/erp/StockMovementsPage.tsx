@@ -127,7 +127,7 @@ export function StockMovementsPage() {
       <p className="empty" style={{ marginTop: 0 }}>
         Entradas, saídas, compras (atualizam custo médio e última compra), vendas e inventário.
         Consulte o{' '}
-        <Link to="/erp/balanco">balanço</Link> para mínimos, máximos, markup e margem.
+        <Link to="/erp/produtos?aba=ajustes">balanço</Link> para mínimos, máximos, markup e margem.
       </p>
 
       <article className="admin-card">
@@ -209,7 +209,7 @@ export function StockMovementsPage() {
           <button type="button" className="btn btn--primary" onClick={submit}>
             Confirmar movimento
           </button>
-          <Link to="/erp/balanco" className="btn btn--ghost">
+          <Link to="/erp/produtos?aba=ajustes" className="btn btn--ghost">
             Ver balanço
           </Link>
         </div>

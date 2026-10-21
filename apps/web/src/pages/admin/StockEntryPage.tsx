@@ -10,6 +10,7 @@ import type { StockItem, StockVariationRow } from '../../data/adminStore';
 import { STOCK_EVENT } from '../../data/adminStore';
 import { getAttributes, hydrateAttributesFromApi, type ProductAttribute } from '../../data/attributeStore';
 import { findBrand, useBrands } from '../../data/brandStore';
+import { productsStockPath } from '../../data/hubPaths';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { CONDITION_LABEL, conditionCode, type ProductConditionCode } from '../../data/productCondition';
 import { stockMatches } from '../../data/stockSearch';
@@ -360,7 +361,10 @@ export function StockEntryPage() {
               ))
             ) : (
               <li className="empty">
-                Nenhum produto encontrado. <Link to="/erp/produtos">Cadastrar produto</Link>
+                Nenhum produto encontrado.{' '}
+                <Link to={productsStockPath('produtos')}>Cadastrar produto</Link>
+                {' · '}
+                <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>
               </li>
             )}
           </ul>

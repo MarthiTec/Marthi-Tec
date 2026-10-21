@@ -57,7 +57,7 @@ import {
 } from '../../data/adminStore';
 import { ATTRIBUTES_EVENT, getAttributes, stockAttributes, replaceAttributes, updateAttribute } from '../../data/attributeStore';
 import { apiListSuppliers } from '../../services/erpApi';
-import { peoplePath as peopleHubPath, specificationsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
+import { peoplePath as peopleHubPath, productsStockPath, specificationsPath, type PeopleTab, type SpecsTab } from '../../data/hubPaths';
 import {
   getFiscalClassification,
   listFiscalClassifications,
@@ -1919,7 +1919,10 @@ export function StockPage() {
           </div>
           <p className="empty stock-simple__hint">
             Fornecedor, data de entrada, grupo, subgrupo e códigos ficam na aba <button type="button" className="link-btn" onClick={() => setFormTab('specs')}>Especificações</button>. Compras com IMEI entram pela{' '}
-            <Link to="/erp/entrada-estoque">Entrada de estoque</Link> ou pelo botão Fornecedores da grade.
+            <Link to={productsStockPath('entradas')}>Entrada de estoque</Link>
+            {' · '}
+            <Link to="/painel/solicitacoes-compra">Solicitações de compras</Link>
+            {' '}ou pelo botão Fornecedores da grade.
           </p>
         </div>
       </div>

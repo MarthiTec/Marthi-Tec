@@ -22,16 +22,14 @@ test('Fase A: navGroupForPath covers PDV + Retaguarda children that were missing
   }
 });
 
-test('Fase A: Retaguarda lists Balanço and Movimentos before vitrine', () => {
+test('Fase A (superseded by A+/B hub): Retaguarda stock entry before vitrine', () => {
   const nav = fs.readFileSync(navPath, 'utf8');
   const erpBlock = nav.slice(nav.indexOf("id: 'erp'"), nav.indexOf("id: 'ads'"));
-  const balanco = erpBlock.indexOf("to: '/erp/balanco'");
-  const movimentos = erpBlock.indexOf("to: '/erp/movimentos'");
+  const produtos = erpBlock.indexOf("to: '/erp/produtos'");
   const catalogo = erpBlock.indexOf("to: '/painel/catalogo'");
-  assert.ok(balanco > 0 && movimentos > balanco, 'Balanço then Movimentos');
-  assert.ok(catalogo > movimentos, 'Estoque family before Catálogo');
-  assert.match(erpBlock, /label: 'Balanço'/);
-  assert.match(erpBlock, /label: 'Movimentos'/);
+  assert.ok(produtos > 0, 'Produtos & Estoque hub in Retaguarda');
+  assert.ok(catalogo > produtos, 'Estoque hub before Catálogo');
+  assert.match(erpBlock, /label: 'Produtos & Estoque'/);
 });
 
 test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', () => {
@@ -60,7 +58,8 @@ test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', (
 
 test('Fase A: Finder synonyms cover inventário / ajuste / sem caixa', () => {
   const dir = fs.readFileSync(dirPath, 'utf8');
-  assert.match(dir, /\/erp\/balanco': '[^']*inventario/);
-  assert.match(dir, /\/erp\/movimentos': '[^']*ajuste de estoque/);
+  // Após hub A+/B, inventário/ajuste ficam nos sinônimos de /erp/produtos.
+  assert.match(dir, /\/erp\/produtos': '[^']*inventario/);
+  assert.match(dir, /\/erp\/produtos': '[^']*ajuste de estoque/);
   assert.match(dir, /\/painel\/venda-externa': '[^']*sem caixa/);
 });

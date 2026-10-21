@@ -42,12 +42,10 @@ const WORDS: Record<string, string> = {
   '/painel/os/manutencoes': 'servicos manutencao tela bateria preco conserto catalogo',
   '/painel/os/pecas': 'pecas peca estoque minimo tela bateria conector manutencao custo',
   '/erp': 'retaguarda erp',
-  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei',
+  // Hub Produtos & Estoque (abas): sinônimos cobrem entrada / balanço / movimentos.
+  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda',
-  '/erp/entrada-estoque': 'entrada compra nota fornecedor estoque',
-  '/erp/balanco': 'balanco inventario contagem fisica estoque minimo maximo markup margem',
-  '/erp/movimentos': 'movimentos movimentacao ajuste de estoque saida compra venda historico saldo inventario',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada',
   '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro',
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
@@ -106,9 +104,15 @@ export function plain(text: string) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-/** Endereços que abrem a mesma tela do menu (o painel redireciona para o app da Retaguarda). */
+/** Endereços que abrem a mesma tela do menu (rotas legadas → hub Produtos & Estoque). */
 const ALIASES: Record<string, string> = {
-  '/erp/produtos': '/painel/produtos',
+  '/painel/produtos': '/erp/produtos',
+  '/erp/entrada-estoque': '/erp/produtos',
+  '/erp/balanco': '/erp/produtos',
+  '/erp/movimentos': '/erp/produtos',
+  '/painel/estoque': '/erp/produtos',
+  '/painel/balanco': '/erp/produtos',
+  '/painel/movimentos': '/erp/produtos',
 };
 
 /** Tela aberta agora (o caminho mais específico do menu que combina com o endereço). */
