@@ -175,7 +175,7 @@ export function AgingPanel({
           </p>
           <p className="empty" style={{ margin: '6px 0 0', fontSize: '0.8rem' }}>
             Referência: {asOf.toLocaleDateString('pt-BR')} ·{' '}
-            <Link to="/erp/relatorios">Central de Relatórios</Link>
+            <Link to="/painel/relatorios">Central de Relatórios</Link>
           </p>
         </div>
         <div style={{ minWidth: 160 }}>

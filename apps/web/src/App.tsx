@@ -308,6 +308,9 @@ export function App() {
           <Route path="ads/contas" element={<AdsAccountsPage />} />
           <Route path="metas" element={<GoalsManagementPage />} />
           <Route path="relatorio-vendas" element={<SalesGoalsReportPage />} />
+          <Route path="relatorios" element={<ErpReportsPage />} />
+          <Route path="relatorio-estoque" element={<StockReportPage />} />
+          <Route path="relatorio-imei" element={<ImeiReportPage />} />
           <Route path="totem" element={<TotemInsightsPage />} />
           <Route path="totem/produtos" element={<StockPage />} />
           <Route path="totem/especificacoes" element={<SpecificationsPage />} />
@@ -334,10 +337,10 @@ export function App() {
           <Route path="almoxarifado" element={<Navigate to="/erp/almoxarifado" replace />} />
           <Route path="tabelas" element={<Navigate to="/erp/tabelas" replace />} />
           <Route path="campanhas" element={<Navigate to="/erp/campanhas" replace />} />
-          <Route path="orcamentos" element={<Navigate to="/erp/orcamentos" replace />} />
+          <Route path="orcamentos" element={<QuotesManagementPage />} />
           <Route path="pagamentos" element={<PaymentsPage />} />
           <Route path="taxas-cartao" element={<CardRatesPage />} />
-          <Route path="financeiro" element={<Navigate to="/erp/financeiro" replace />} />
+          <Route path="financeiro" element={<FinancePage />} />
           <Route path="vendedores" element={<Navigate to="/painel/pessoas?aba=vendedores" replace />} />
           <Route path="fornecedores" element={<Navigate to="/painel/pessoas?aba=fornecedores" replace />} />
           <Route path="funcionarios" element={<Navigate to="/painel/pessoas?aba=funcionarios" replace />} />

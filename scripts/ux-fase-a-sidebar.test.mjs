@@ -35,6 +35,7 @@ test('Fase A (superseded by A+/B hub): Retaguarda stock entry before vitrine', (
 test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', () => {
   const nav = fs.readFileSync(navPath, 'utf8');
   const pdv = nav.slice(nav.indexOf("id: 'presales'"), nav.indexOf("id: 'os'"));
+  // Relatório Vendas & Metas saiu do PDV → grupo top-level Relatórios.
   const order = [
     '/caixa',
     '/painel/venda-externa',
@@ -46,7 +47,6 @@ test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', (
     '/painel/taxas-cartao',
     '/painel/calculadora',
     '/painel/metas',
-    '/painel/relatorio-vendas',
   ];
   let last = -1;
   for (const to of order) {
@@ -54,6 +54,7 @@ test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', (
     assert.ok(idx > last, `expected ${to} after previous`);
     last = idx;
   }
+  assert.ok(!pdv.includes("to: '/painel/relatorio-vendas'"), 'Vendas & Metas leaves PDV for Relatórios menu');
 });
 
 test('Fase A: Finder synonyms cover inventário / ajuste / sem caixa', () => {

@@ -58,7 +58,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/taxas-cartao', label: 'Taxas & Maquininhas' },
       { to: '/painel/calculadora', label: 'Calculadora' },
       { to: '/painel/metas', label: 'Metas & Comissões', accent: '#6366f1' },
-      { to: '/painel/relatorio-vendas', label: 'Relatório Vendas & Metas', accent: '#d97706' },
     ],
   },
   {
@@ -92,10 +91,27 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
-      { to: '/erp/relatorios', label: 'Relatórios', accent: '#d97706' },
       { to: '/painel/plano', label: 'Planos & Faturamento' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },
+    ],
+  },
+  {
+    id: 'relatorios',
+    label: 'Relatórios',
+    icon: 'chart',
+    module: 'erp',
+    children: [
+      { to: '/painel/relatorios', label: 'Central de Relatórios', end: true, accent: '#d97706' },
+      { to: '/painel/relatorio-vendas', label: 'Vendas & Metas', accent: '#d97706' },
+      { to: '/painel/metas', label: 'Metas & Comissões', accent: '#6366f1' },
+      { to: '/painel/financeiro?tab=dre', label: 'Financeiro / DRE' },
+      { to: '/painel/financeiro?tab=aging', label: 'Aging a receber / a pagar' },
+      { to: '/painel/relatorio-estoque', label: 'Estoque (com fotos)' },
+      { to: '/painel/relatorio-imei', label: 'Estoque por IMEI' },
+      { to: '/painel/os/pecas?aba=relatorio', label: 'Peças de manutenção (OS)' },
+      { to: '/painel/solicitacoes-compra', label: 'Leads do catálogo digital' },
+      { to: '/painel/pessoas?aba=clientes', label: 'Clientes' },
     ],
   },
   {
@@ -161,6 +177,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 ];
 
 export function navGroupForPath(pathname: string, search = '') {
+  const cleanSearch = search.replace(/^\?/, '');
+  const params = new URLSearchParams(cleanSearch);
+  const aba = params.get('aba');
+  const tab = params.get('tab');
+
   if (
     pathname.startsWith('/painel/operacoes') ||
     pathname.startsWith('/painel/usuarios') ||
@@ -170,11 +191,27 @@ export function navGroupForPath(pathname: string, search = '') {
     return 'operacoes';
   }
   if (pathname.startsWith('/painel/totem')) return 'totem';
+
+  // Relatórios (antes de PDV/OS/Retaguarda — paths compartilhados).
+  if (
+    pathname.startsWith('/painel/relatorios') ||
+    pathname.startsWith('/painel/relatorio-vendas') ||
+    pathname.startsWith('/painel/relatorio-estoque') ||
+    pathname.startsWith('/painel/relatorio-imei') ||
+    pathname.startsWith('/erp/relatorios') ||
+    pathname.startsWith('/erp/relatorio-estoque') ||
+    pathname.startsWith('/erp/relatorio-imei') ||
+    ((pathname.startsWith('/painel/financeiro') || pathname.startsWith('/erp/financeiro')) &&
+      (tab === 'dre' || tab === 'aging')) ||
+    ((pathname.startsWith('/painel/os/pecas') || pathname.startsWith('/os/pecas')) && aba === 'relatorio')
+  ) {
+    return 'relatorios';
+  }
+
   if (
     pathname.startsWith('/painel/pdv') ||
     pathname.startsWith('/painel/venda-externa') ||
     pathname.startsWith('/painel/metas') ||
-    pathname.startsWith('/painel/relatorio-vendas') ||
     pathname.startsWith('/painel/pedidos') ||
     pathname.startsWith('/painel/pagamentos') ||
     pathname.startsWith('/painel/cotacao') ||

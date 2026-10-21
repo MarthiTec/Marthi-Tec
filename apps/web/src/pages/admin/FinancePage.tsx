@@ -214,7 +214,7 @@ export function FinancePage() {
             o retorno do banco. Recebido e livro ≠ receita de vendas.
           </p>
           <p className="empty" style={{ marginTop: 8 }}>
-            <Link to="/erp/relatorios">Central de Relatórios</Link>
+            <Link to="/painel/relatorios">Central de Relatórios</Link>
             {' · '}
             <Link to="/painel/relatorio-vendas">Vendas &amp; Metas</Link>
             {' · '}
