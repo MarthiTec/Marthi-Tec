@@ -46,16 +46,17 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'PDV',
     icon: 'cart',
     module: 'erp',
+    // Ordem Fase A: Operar → Negociar → Configurar → Desempenho (sem paths novos).
     children: [
       { to: '/caixa', label: 'Abrir caixa', openApp: true, accent: '#1d4ed8' },
       { to: '/painel/venda-externa', label: 'Venda Externa / Sem Caixa', accent: '#059669' },
       { to: '/painel/pdv', label: 'Fila do totem', end: true },
-      { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
       { to: '/painel/pedidos', label: 'Consultar vendas' },
-      { to: '/painel/pagamentos', label: 'Formas de pagamento' },
       { to: '/painel/cotacao', label: 'Cotação rápida', accent: '#0f766e' },
-      { to: '/painel/calculadora', label: 'Calculadora' },
+      { to: '/painel/orcamentos', label: 'Orçamentos', accent: '#0284c7' },
+      { to: '/painel/pagamentos', label: 'Formas de pagamento' },
       { to: '/painel/taxas-cartao', label: 'Taxas & Maquininhas' },
+      { to: '/painel/calculadora', label: 'Calculadora' },
       { to: '/painel/metas', label: 'Metas & Comissões', accent: '#6366f1' },
       { to: '/painel/relatorio-vendas', label: 'Relatório Vendas & Metas', accent: '#d97706' },
     ],
@@ -79,13 +80,16 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'Retaguarda',
     icon: 'ops',
     module: 'erp',
+    // Ordem Fase A: Abrir → Estoque (celular) → Vitrine → Cadastros → Conta.
     children: [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
+      { to: '/erp/entrada-estoque', label: 'Entrada de estoque' },
+      { to: '/erp/balanco', label: 'Balanço' },
+      { to: '/erp/movimentos', label: 'Movimentos' },
       { to: '/painel/catalogo', label: 'Catálogo digital', accent: '#e4572e' },
       { to: '/painel/solicitacoes-compra', label: 'Solicitações de compras', accent: '#0284c7' },
-      { to: '/erp/entrada-estoque', label: 'Entrada de estoque' },
       { to: '/painel/especificacoes', label: 'Especificações' },
       { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
@@ -173,7 +177,11 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/metas') ||
     pathname.startsWith('/painel/relatorio-vendas') ||
     pathname.startsWith('/painel/pedidos') ||
-    pathname.startsWith('/painel/pagamentos')
+    pathname.startsWith('/painel/pagamentos') ||
+    pathname.startsWith('/painel/cotacao') ||
+    pathname.startsWith('/painel/orcamentos') ||
+    pathname.startsWith('/painel/calculadora') ||
+    pathname.startsWith('/painel/taxas-cartao')
   ) {
     return 'presales';
   }
@@ -189,6 +197,10 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/fornecedores') ||
     pathname.startsWith('/painel/produtos') ||
     pathname.startsWith('/painel/estoque') ||
+    pathname.startsWith('/painel/balanco') ||
+    pathname.startsWith('/painel/movimentos') ||
+    pathname.startsWith('/painel/catalogo') ||
+    pathname.startsWith('/painel/solicitacoes-compra') ||
     pathname.startsWith('/painel/marcas') ||
     pathname.startsWith('/painel/atributos') ||
     pathname.startsWith('/painel/especificacoes') ||
@@ -200,6 +212,7 @@ export function navGroupForPath(pathname: string, search = '') {
     pathname.startsWith('/painel/financeiro') ||
     pathname.startsWith('/painel/plano') ||
     pathname.startsWith('/painel/faturamento') ||
+    pathname.startsWith('/painel/lojas') ||
     pathname.startsWith('/painel/auditoria')
   ) {
     return 'erp';
