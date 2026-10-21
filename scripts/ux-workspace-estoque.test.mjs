@@ -53,11 +53,23 @@ test('Fase A+/B: childIsActive keeps hub active on ?aba=', () => {
   assert.match(fn, /keys\[0\] === 'aba'/);
 });
 
-test('Fase A+/B: Finder synonyms live on hub path', () => {
+test('Fase A+/B: Finder synonyms + named deep-links for hub abas', () => {
   const dir = fs.readFileSync(dirPath, 'utf8');
-  assert.match(dir, /\/erp\/produtos': '[^']*inventario/);
-  assert.match(dir, /\/erp\/produtos': '[^']*ajuste de estoque/);
-  assert.match(dir, /\/erp\/produtos': '[^']*entrada/);
+  // Nomes visíveis na busca (STOCK_HUB_TABS) + path painel-native com ?aba=.
+  assert.match(dir, /STOCK_HUB_TABS/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=entradas',\s*label: 'Entradas'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=movimentacoes',\s*label: 'Movimentações'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=ajustes',\s*label: 'Ajustes'/);
+  assert.match(dir, /\/painel\/produtos\?aba=entradas': '[^']*entrada/);
+  assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*inventario/);
+  assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*ajuste de estoque/);
+  assert.match(dir, /\/painel\/produtos\?aba=movimentacoes': '[^']*movimentacao/);
+  // Cadastro base não engole mais "entrada" (aponta à aba Entradas).
+  assert.equal(
+    /\/painel\/produtos': '[^']*\bentrada\b/.test(dir),
+    false,
+    'entrada must not remain on base /painel/produtos synonyms',
+  );
 });
 
 test('Fase A+/B: ERP nav keeps one stock hub entry + advanced features', () => {

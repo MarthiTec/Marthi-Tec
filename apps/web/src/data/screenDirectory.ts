@@ -45,9 +45,13 @@ const WORDS: Record<string, string> = {
   '/painel/os/manutencoes': 'servicos manutencao tela bateria preco conserto catalogo',
   '/painel/os/pecas': 'pecas peca estoque minimo tela bateria conector manutencao custo relatorio',
   '/erp': 'retaguarda erp',
-  // Hub Produtos & Estoque (abas): sinônimos cobrem entrada / balanço / movimentos.
-  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo especificacoes marcas atributos kits lotes almoxarifado',
-  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario especificacoes marcas atributos kits lotes almoxarifado',
+  // Hub Produtos & Estoque: cadastro no path base; abas com nome próprio + ?aba= (ver STOCK_HUB_TABS).
+  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei especificacoes marcas atributos kits lotes almoxarifado',
+  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei especificacoes marcas atributos kits lotes almoxarifado',
+  // Abas do hub — busca "entrada" / "balanço" / "movimentos" mostra o nome e abre a aba certa.
+  '/painel/produtos?aba=entradas': 'entrada entradas estoque compra nota fornecedor imei lancamento entrada de estoque',
+  '/painel/produtos?aba=movimentacoes': 'movimentos movimentacao saida venda historico saldo',
+  '/painel/produtos?aba=ajustes': 'balanco inventario contagem fisica minimo maximo markup margem ajuste de estoque',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda leads lead',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada kits lotes almoxarifado',
@@ -70,6 +74,16 @@ const WORDS: Record<string, string> = {
   '/painel/ajuda': 'ajuda suporte duvida tutorial',
   '/painel': 'inicio painel visao geral',
 };
+
+/**
+ * Abas do hub Produtos & Estoque na busca do menu (nome visível + deep-link ?aba=).
+ * Preferir `/painel/produtos` (totem/painel) — não forçar `/erp` para clientes só-totem.
+ */
+export const STOCK_HUB_TABS: Array<{ path: string; label: string; icon: AdminIconName }> = [
+  { path: '/painel/produtos?aba=entradas', label: 'Entradas', icon: 'inbox' },
+  { path: '/painel/produtos?aba=movimentacoes', label: 'Movimentações', icon: 'swap' },
+  { path: '/painel/produtos?aba=ajustes', label: 'Ajustes', icon: 'clipboard' },
+];
 
 /** Atalhos do menu de grade do topo (também entram na busca). */
 export const TOP_SHORTCUTS: Array<{ id: string; path: string; label: string; hint: string; icon: AdminIconName; adminOnly?: boolean }> = [
@@ -146,6 +160,16 @@ function build(): Screen[] {
     for (const child of group.children ?? []) {
       add({ path: child.to, label: child.label, group: group.label, groupId: group.id, icon: group.icon, module: group.module, end: child.end, openApp: child.openApp });
     }
+  }
+  for (const tab of STOCK_HUB_TABS) {
+    add({
+      path: tab.path,
+      label: tab.label,
+      group: 'Produtos & Estoque',
+      groupId: 'erp',
+      icon: tab.icon,
+      module: 'erp',
+    });
   }
   for (const item of TOP_SHORTCUTS) add({ path: item.path, label: item.label, group: 'Atalhos', groupId: item.id, icon: item.icon, module: null, end: item.path === '/painel', adminOnly: item.adminOnly });
   return list;
