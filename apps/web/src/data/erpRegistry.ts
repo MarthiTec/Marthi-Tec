@@ -698,8 +698,10 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
     pathname.startsWith('/erp/balanco') ||
     pathname.startsWith('/erp/movimentos') ||
     pathname.startsWith('/erp/relatorio-estoque') ||
+    pathname.startsWith('/painel/relatorio-estoque') ||
     pathname.startsWith('/erp/entrada-estoque') ||
     pathname.startsWith('/erp/relatorio-imei') ||
+    pathname.startsWith('/painel/relatorio-imei') ||
     pathname.startsWith('/erp/api-aparelhos') ||
     pathname.startsWith('/erp/comercial') ||
     pathname.startsWith('/painel/solicitacoes-compra') ||
@@ -757,6 +759,7 @@ export function pathToAccessArea(pathname: string): AccessArea | null {
   if (
     pathname.startsWith('/erp/auditoria') ||
     pathname.startsWith('/erp/relatorios') ||
+    pathname.startsWith('/painel/relatorios') ||
     pathname.startsWith('/painel/auditoria') ||
     pathname.startsWith('/painel/erp')
   ) {

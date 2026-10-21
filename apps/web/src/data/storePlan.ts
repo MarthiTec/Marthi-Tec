@@ -164,6 +164,11 @@ export function moduleForPath(pathname: string): PartnerModuleId | null {
     pathname.startsWith('/painel/almoxarifado') ||
     pathname.startsWith('/painel/tabelas') ||
     pathname.startsWith('/painel/financeiro') ||
+    pathname.startsWith('/painel/relatorios') ||
+    pathname.startsWith('/painel/relatorio-vendas') ||
+    pathname.startsWith('/painel/relatorio-estoque') ||
+    pathname.startsWith('/painel/relatorio-imei') ||
+    pathname.startsWith('/painel/metas') ||
     pathname.startsWith('/painel/vendedores') ||
     pathname.startsWith('/painel/fornecedores') ||
     pathname.startsWith('/painel/funcionarios') ||

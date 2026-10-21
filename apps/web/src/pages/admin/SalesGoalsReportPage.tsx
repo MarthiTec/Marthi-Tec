@@ -275,7 +275,7 @@ export function SalesGoalsReportPage() {
             Receita de vendas concluídas (não confundir com recebido no caixa/AR). Lucro só com permissão.
           </p>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem' }}>
-            <Link to="/erp/relatorios" style={{ color: 'var(--accent)' }}>
+            <Link to="/painel/relatorios" style={{ color: 'var(--accent)' }}>
               ← Central de Relatórios
             </Link>
             {' · '}
@@ -711,7 +711,7 @@ export function SalesGoalsReportPage() {
               <Link to="/painel/venda-externa" className="admin-btn admin-btn--secondary">
                 Venda externa
               </Link>
-              <Link to="/erp/relatorios" className="admin-btn admin-btn--secondary">
+              <Link to="/painel/relatorios" className="admin-btn admin-btn--secondary">
                 Central de Relatórios
               </Link>
             </div>

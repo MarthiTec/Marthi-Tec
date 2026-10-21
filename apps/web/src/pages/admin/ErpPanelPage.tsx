@@ -302,7 +302,7 @@ export function ErpPanelPage() {
         <Link to="/erp/boletos" className="btn btn--ghost">
           Boletos
         </Link>
-        <Link to="/erp/relatorios" className="btn btn--ghost">
+        <Link to="/painel/relatorios" className="btn btn--ghost">
           Relatórios
         </Link>
       </div>
