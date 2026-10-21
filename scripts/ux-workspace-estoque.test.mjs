@@ -47,10 +47,11 @@ test('Fase A+/B: App redirects legacy stock routes into hub abas', () => {
   assert.match(app, /RedirectToProductsStock aba="ajustes"/);
 });
 
-test('Fase A+/B: childIsActive keeps hub active on ?aba=', () => {
+test('Fase A+/B: childIsActive keeps hub active on ?aba= (+ espec=)', () => {
   const nav = fs.readFileSync(navPath, 'utf8');
   const fn = nav.slice(nav.indexOf('export function childIsActive'));
-  assert.match(fn, /keys\[0\] === 'aba'/);
+  assert.match(fn, /key === 'aba' \|\| key === 'espec'/);
+  assert.match(fn, /params\.has\('aba'\)/);
 });
 
 test('Fase A+/B: Finder synonyms + named deep-links for hub abas', () => {
@@ -60,23 +61,39 @@ test('Fase A+/B: Finder synonyms + named deep-links for hub abas', () => {
   assert.match(dir, /path: '\/painel\/produtos\?aba=entradas',\s*label: 'Entradas'/);
   assert.match(dir, /path: '\/painel\/produtos\?aba=movimentacoes',\s*label: 'Movimentações'/);
   assert.match(dir, /path: '\/painel\/produtos\?aba=ajustes',\s*label: 'Ajustes'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=especificacoes',\s*label: 'Especificações'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=especificacoes&espec=kits',\s*label: 'Kits'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=especificacoes&espec=lotes',\s*label: 'Lotes \/ Rastro'/);
+  assert.match(dir, /path: '\/painel\/produtos\?aba=especificacoes&espec=almoxarifado',\s*label: 'Almoxarifado'/);
   assert.match(dir, /\/painel\/produtos\?aba=entradas': '[^']*entrada/);
   assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*inventario/);
   assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*ajuste de estoque/);
   assert.match(dir, /\/painel\/produtos\?aba=movimentacoes': '[^']*movimentacao/);
-  // Cadastro base não engole mais "entrada" (aponta à aba Entradas).
+  assert.match(dir, /\/painel\/produtos\?aba=especificacoes&espec=kits': '[^']*kits/);
+  // Cadastro base não engole mais "entrada" / "kits" (apontam às abas nomeadas).
   assert.equal(
     /\/painel\/produtos': '[^']*\bentrada\b/.test(dir),
     false,
     'entrada must not remain on base /painel/produtos synonyms',
   );
+  assert.equal(
+    /\/painel\/produtos': '[^']*\bkits\b/.test(dir),
+    false,
+    'kits must not remain on base /painel/produtos synonyms',
+  );
 });
 
-test('Fase A+/B: ERP nav keeps one stock hub entry + advanced features', () => {
+test('Fase A+/B: ERP nav keeps one stock hub + non-relocated product items', () => {
   const erp = fs.readFileSync(erpLayoutPath, 'utf8');
   const block = erp.slice(erp.indexOf('const NAV_PRODUCTS'), erp.indexOf('const NAV_PEOPLE'));
   assert.match(block, /to: '\/erp\/produtos'/);
-  assert.match(block, /to: '\/erp\/kits'/);
+  assert.match(block, /to: '\/erp\/api-aparelhos'/);
+  assert.match(block, /to: '\/erp\/notas'/);
+  assert.match(block, /to: '\/erp\/tabelas'/);
+  assert.equal(block.includes("to: '/erp/kits'"), false);
+  assert.equal(block.includes("to: '/erp/lotes'"), false);
+  assert.equal(block.includes("to: '/erp/almoxarifado'"), false);
+  assert.equal(block.includes("to: '/erp/especificacoes'"), false);
   assert.equal(block.includes("to: '/erp/entrada-estoque'"), false);
   assert.equal(block.includes("to: '/erp/balanco'"), false);
   assert.equal(block.includes("to: '/erp/movimentos'"), false);

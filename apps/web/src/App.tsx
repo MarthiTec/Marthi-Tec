@@ -61,7 +61,11 @@ import { AdminHomePage } from './pages/admin/AdminHomePage';
 import { OperationsPage } from './pages/admin/OperationsPage';
 import { SpecificationsPage } from './pages/admin/SpecificationsPage';
 import { PeoplePage } from './pages/admin/PeoplePage';
-import { ProductsStockPage, RedirectToProductsStock } from './pages/admin/ProductsStockPage';
+import {
+  ProductsStockPage,
+  RedirectToProductsStock,
+  RedirectToProductsStockSpecs,
+} from './pages/admin/ProductsStockPage';
 import { EcommercePanelPage } from './pages/admin/EcommercePanelPage';
 import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
 import { ErpPanelPage } from './pages/admin/ErpPanelPage';
@@ -90,9 +94,6 @@ import { FiscalClassPage } from './pages/admin/FiscalClassPage';
 import { CfopPage } from './pages/admin/CfopPage';
 import { FiscalIssuerPage } from './pages/admin/FiscalIssuerPage';
 import { FiscalCstPage } from './pages/admin/FiscalCstPage';
-import { KitsPage } from './pages/admin/KitsPage';
-import { LotsPage } from './pages/admin/LotsPage';
-import { WarehousePage } from './pages/admin/WarehousePage';
 import { HelpPage } from './pages/admin/HelpPage';
 import { OperatorAccountPage } from './pages/shared/OperatorAccountPage';
 import { MarthiLayout } from './pages/marthi/MarthiLayout';
@@ -256,13 +257,13 @@ export function App() {
           <Route path="relatorio-imei" element={<ImeiReportPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
-          <Route path="especificacoes" element={<SpecificationsPage />} />
-          <Route path="tipos-retirada" element={<Navigate to="/erp/especificacoes?aba=retirada" replace />} />
-          <Route path="atributos" element={<Navigate to="/erp/especificacoes?aba=atributos" replace />} />
-          <Route path="marcas" element={<Navigate to="/erp/especificacoes?aba=marcas" replace />} />
-          <Route path="kits" element={<KitsPage />} />
-          <Route path="lotes" element={<LotsPage />} />
-          <Route path="almoxarifado" element={<WarehousePage />} />
+          <Route path="especificacoes" element={<RedirectToProductsStockSpecs />} />
+          <Route path="tipos-retirada" element={<RedirectToProductsStockSpecs espec="retirada" />} />
+          <Route path="atributos" element={<RedirectToProductsStockSpecs espec="atributos" />} />
+          <Route path="marcas" element={<RedirectToProductsStockSpecs espec="marcas" />} />
+          <Route path="kits" element={<RedirectToProductsStockSpecs espec="kits" />} />
+          <Route path="lotes" element={<RedirectToProductsStockSpecs espec="lotes" />} />
+          <Route path="almoxarifado" element={<RedirectToProductsStockSpecs espec="almoxarifado" />} />
           <Route path="tabelas" element={<PriceTablesPage />} />
           <Route path="campanhas" element={<PromoCampaignsPage />} />
           <Route path="orcamentos" element={<QuotesManagementPage />} />
@@ -330,11 +331,11 @@ export function App() {
           <Route path="estoque" element={<RedirectToProductsStock aba="ajustes" />} />
           <Route path="balanco" element={<RedirectToProductsStock aba="ajustes" />} />
           <Route path="movimentos" element={<RedirectToProductsStock aba="movimentacoes" />} />
-          <Route path="atributos" element={<Navigate to="/painel/especificacoes?aba=atributos" replace />} />
-          <Route path="marcas" element={<Navigate to="/painel/especificacoes?aba=marcas" replace />} />
-          <Route path="kits" element={<Navigate to="/erp/kits" replace />} />
-          <Route path="lotes" element={<Navigate to="/erp/lotes" replace />} />
-          <Route path="almoxarifado" element={<Navigate to="/erp/almoxarifado" replace />} />
+          <Route path="atributos" element={<RedirectToProductsStockSpecs espec="atributos" />} />
+          <Route path="marcas" element={<RedirectToProductsStockSpecs espec="marcas" />} />
+          <Route path="kits" element={<RedirectToProductsStockSpecs espec="kits" />} />
+          <Route path="lotes" element={<RedirectToProductsStockSpecs espec="lotes" />} />
+          <Route path="almoxarifado" element={<RedirectToProductsStockSpecs espec="almoxarifado" />} />
           <Route path="tabelas" element={<Navigate to="/erp/tabelas" replace />} />
           <Route path="campanhas" element={<Navigate to="/erp/campanhas" replace />} />
           <Route path="orcamentos" element={<QuotesManagementPage />} />

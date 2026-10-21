@@ -45,16 +45,21 @@ const WORDS: Record<string, string> = {
   '/painel/os/manutencoes': 'servicos manutencao tela bateria preco conserto catalogo',
   '/painel/os/pecas': 'pecas peca estoque minimo tela bateria conector manutencao custo relatorio',
   '/erp': 'retaguarda erp',
-  // Hub Produtos & Estoque: cadastro no path base; abas com nome próprio + ?aba= (ver STOCK_HUB_TABS).
-  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei especificacoes marcas atributos kits lotes almoxarifado',
-  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei especificacoes marcas atributos kits lotes almoxarifado',
-  // Abas do hub — busca "entrada" / "balanço" / "movimentos" mostra o nome e abre a aba certa.
+  // Hub Produtos & Estoque: cadastro no path base; abas / sub-abas com nome próprio (ver STOCK_HUB_TABS).
+  '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei',
+  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei',
+  // Abas do hub — busca "entrada" / "kits" / "especificações" mostra o nome e abre a aba certa.
   '/painel/produtos?aba=entradas': 'entrada entradas estoque compra nota fornecedor imei lancamento entrada de estoque',
   '/painel/produtos?aba=movimentacoes': 'movimentos movimentacao saida venda historico saldo',
   '/painel/produtos?aba=ajustes': 'balanco inventario contagem fisica minimo maximo markup margem ajuste de estoque',
+  '/painel/produtos?aba=especificacoes': 'especificacoes marcas atributos cores capacidades grupos retirada',
+  '/painel/produtos?aba=especificacoes&espec=kits': 'kits kit composicao composicoes',
+  '/painel/produtos?aba=especificacoes&espec=lotes': 'lotes lote rastro validade',
+  '/painel/produtos?aba=especificacoes&espec=almoxarifado': 'almoxarifado almoxarifados deposito deposito estoque transferencia',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda leads lead',
-  '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada kits lotes almoxarifado',
+  // Totem-only: atalho dedicado (sem kits/lotes/almox). Painel/ERP usam o hub acima.
+  '/painel/totem/especificacoes': 'especificacoes marcas atributos cores capacidades grupos retirada totem',
   '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro relatorio cliente',
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
   '/painel/financeiro': 'financeiro contas pagar receber caixa fluxo dre aging lucro a receber a pagar',
@@ -76,13 +81,18 @@ const WORDS: Record<string, string> = {
 };
 
 /**
- * Abas do hub Produtos & Estoque na busca do menu (nome visível + deep-link ?aba=).
- * Preferir `/painel/produtos` (totem/painel) — não forçar `/erp` para clientes só-totem.
+ * Abas / sub-abas do hub Produtos & Estoque na busca do menu (nome visível + deep-link).
+ * Preferir `/painel/produtos` — não forçar `/erp` (clientes só-totem / painel).
+ * Kits / Lotes / Almoxarifado / Especificações: hub, não itens de menu Retaguarda.
  */
 export const STOCK_HUB_TABS: Array<{ path: string; label: string; icon: AdminIconName }> = [
   { path: '/painel/produtos?aba=entradas', label: 'Entradas', icon: 'inbox' },
   { path: '/painel/produtos?aba=movimentacoes', label: 'Movimentações', icon: 'swap' },
   { path: '/painel/produtos?aba=ajustes', label: 'Ajustes', icon: 'clipboard' },
+  { path: '/painel/produtos?aba=especificacoes', label: 'Especificações', icon: 'tag' },
+  { path: '/painel/produtos?aba=especificacoes&espec=kits', label: 'Kits', icon: 'layers' },
+  { path: '/painel/produtos?aba=especificacoes&espec=lotes', label: 'Lotes / Rastro', icon: 'barcode' },
+  { path: '/painel/produtos?aba=especificacoes&espec=almoxarifado', label: 'Almoxarifado', icon: 'warehouse' },
 ];
 
 /** Atalhos do menu de grade do topo (também entram na busca). */

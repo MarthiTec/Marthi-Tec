@@ -67,20 +67,24 @@ const NAV_FOOD: NavItem[] = [
 ];
 
 const NAV_PRODUCTS: NavItem[] = [
-  // Hub Produtos & Estoque (abas); deep links /entrada-estoque|/balanco|/movimentos redirecionam.
+  // Hub Produtos & Estoque (abas); Kits/Lotes/Almox/Especificações ficam na aba Especificações.
   {
     to: '/erp/produtos',
     label: 'Produtos & Estoque',
     icon: 'box',
     end: true,
-    also: ['/erp/entrada-estoque', '/erp/balanco', '/erp/movimentos'],
+    also: [
+      '/erp/entrada-estoque',
+      '/erp/balanco',
+      '/erp/movimentos',
+      '/erp/especificacoes',
+      '/erp/kits',
+      '/erp/lotes',
+      '/erp/almoxarifado',
+    ],
   },
-  { to: '/erp/especificacoes', label: 'Especificações', icon: 'tag' },
   { to: '/erp/api-aparelhos', label: 'API de aparelhos', icon: 'barcode' },
   { to: '/erp/notas', label: 'Notas de estoque', icon: 'fiscal' },
-  { to: '/erp/kits', label: 'Kits', icon: 'layers' },
-  { to: '/erp/lotes', label: 'Lotes / Rastro', icon: 'barcode' },
-  { to: '/erp/almoxarifado', label: 'Almoxarifado', icon: 'warehouse' },
   { to: '/erp/tabelas', label: 'Tabelas de preço', icon: 'list' },
   { to: '/erp/campanhas', label: 'Campanhas', icon: 'percent' },
   { to: '/erp/orcamentos', label: 'Orçamentos', icon: 'clipboard' },
