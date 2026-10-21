@@ -44,6 +44,7 @@ const WORDS: Record<string, string> = {
   '/erp': 'retaguarda erp',
   // Hub Produtos & Estoque (abas): sinônimos cobrem entrada / balanço / movimentos.
   '/erp/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario contagem fisica minimo maximo markup margem movimentos movimentacao ajuste de estoque saida venda historico saldo',
+  '/painel/produtos': 'produtos estoque cadastro produto aparelho celular imei entrada compra nota fornecedor balanco inventario',
   '/painel/catalogo': 'catalogo digital vitrine link pdf cliente pagina de venda sacola loja online',
   '/painel/solicitacoes-compra': 'solicitacao compra pedido cliente catalogo esgotado encomenda vendedor entrada venda',
   '/painel/especificacoes': 'marcas atributos cores capacidades grupos retirada',
@@ -107,6 +108,7 @@ export function plain(text: string) {
 
 /** Endereços que abrem a mesma tela do menu (rotas legadas → hub Produtos & Estoque). */
 const ALIASES: Record<string, string> = {
+  // Dual path: rota real em /painel/produtos (AdminLayout); highlight do menu aponta ao item Retaguarda.
   '/painel/produtos': '/erp/produtos',
   '/erp/entrada-estoque': '/erp/produtos',
   '/erp/balanco': '/erp/produtos',
