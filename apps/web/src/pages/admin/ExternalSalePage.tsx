@@ -350,6 +350,8 @@ export function ExternalSalePage() {
     // Sem IMEI no cadastro, o IMEI é digitado na tela: mantém o que já foi digitado.
     if (!imeis.length) return current ?? '';
     if (current && imeis.includes(current)) return current;
+    // Correção: não apaga IMEI colado/trocado só porque ainda não está na lista da variação.
+    if (editing && current?.trim()) return current.trim();
     return imeis.length === 1 ? imeis[0] : '';
   }
 
@@ -559,7 +561,14 @@ export function ExternalSalePage() {
         return;
       }
       const imeis = availableImeis(prod, variation);
-      if (imeis.length && !imeis.includes(String(line.imei ?? '').trim())) {
+      const typedImei = String(line.imei ?? '').trim();
+      if (editing) {
+        // Correção: permite limpar/colar IMEI trocado entre linhas; o servidor valida se o IMEI é do produto.
+        if (imeis.length && !typedImei) {
+          setError(`Item ${index + 1}: informe o IMEI do aparelho vendido.`);
+          return;
+        }
+      } else if (imeis.length && !imeis.includes(typedImei)) {
         setError(`Item ${index + 1}: escolha o IMEI do aparelho vendido.`);
         return;
       }
@@ -694,9 +703,9 @@ export function ExternalSalePage() {
     }
   }, [storeId, setSearchParams]);
 
-  /** Sai da correção sem gravar: o estoque da tela volta a ser o do banco. */
+  /** Sai da correção sem gravar: limpa o formulário, tira `?edit=` e o estoque da tela volta ao banco. */
   async function cancelEdit() {
-    openedEditRef.current = '';
+    // Não zerar openedEditRef antes de remover ?edit= — o effect reabria a mesma venda.
     setEditing(null);
     handleResetForm();
     setSearchParams((current) => {
@@ -747,7 +756,7 @@ export function ExternalSalePage() {
       const ok = await confirm({
         title: editing ? 'Cancelar correção da venda' : 'Cancelar venda externa',
         message: editing
-          ? 'Descartar as alterações desta correção? Nada será gravado e o formulário será limpo.'
+          ? 'Descartar as alterações desta correção? Nada será gravado, o formulário será limpo e a correção será encerrada.'
           : 'Há dados preenchidos nesta venda. Descartar e limpar o formulário?',
         confirmLabel: editing ? 'Descartar correção' : 'Limpar formulário',
         danger: true,
@@ -1054,32 +1063,75 @@ export function ExternalSalePage() {
                     const imeis = prod && (variation || !prod.variations?.length) ? availableImeis(prod, variation) : [];
                     if (!imeis.length) {
                       // Sem IMEI no cadastro: o vendedor digita o do aparelho (fica gravado na baixa da venda).
+                      // Em correção, também digita/cola mesmo aguardando variação — para trocar IMEIs invertidos.
                       const waitingVariation = Boolean(prod?.variations?.length && !variation);
+                      const freeEdit = Boolean(editing) || !waitingVariation;
                       return (
                         <div className="external-sale-wide-field">
-                          <label className="admin-label">IMEI do aparelho{waitingVariation ? '' : ' · sem IMEI no cadastro'}</label>
+                          <label className="admin-label">
+                            IMEI do aparelho
+                            {waitingVariation && !editing ? '' : waitingVariation ? ' · correção' : ' · sem IMEI no cadastro'}
+                          </label>
                           <input
                             type="text"
                             className="admin-input"
                             inputMode="numeric"
                             maxLength={20}
-                            disabled={waitingVariation}
-                            placeholder={waitingVariation ? 'Escolha cor e capacidade' : 'Digite o IMEI (opcional)'}
-                            value={waitingVariation ? '' : line.imei || ''}
+                            disabled={!freeEdit}
+                            placeholder={
+                              waitingVariation && !editing
+                                ? 'Escolha cor e capacidade'
+                                : editing
+                                  ? 'Digite ou cole o IMEI'
+                                  : 'Digite o IMEI (opcional)'
+                            }
+                            value={waitingVariation && !editing ? '' : line.imei || ''}
                             onChange={(e) => handleLineFieldChange(idx, 'imei', e.target.value.replace(/[^0-9A-Za-z]/g, ''))}
                           />
                         </div>
                       );
                     }
+                    // Correção: estoque da variação + demais IMEIs do produto + linhas irmãs (para trocar).
+                    const productImeis = editing && prod
+                      ? [
+                          ...new Set([
+                            ...imeis,
+                            ...(prod.variations ?? []).flatMap((v) => availableImeis(prod, v)),
+                            ...availableImeis(prod, undefined),
+                          ]),
+                        ]
+                      : imeis;
+                    const siblingImeis = editing
+                      ? lines
+                          .filter((other, otherIdx) => otherIdx !== idx && other.stockId === line.stockId && other.imei?.trim())
+                          .map((other) => other.imei!.trim())
+                      : [];
+                    const optionValues = [
+                      ...productImeis,
+                      ...(line.imei?.trim() && !productImeis.includes(line.imei.trim()) ? [line.imei.trim()] : []),
+                      ...siblingImeis.filter((imei) => !productImeis.includes(imei) && imei !== line.imei?.trim()),
+                    ];
+                    const uniqueImeis = [...new Set(optionValues)];
+                    const imeiOptions = [
+                      ...(editing ? [{ value: '', label: '— Limpar IMEI —' }] : []),
+                      ...uniqueImeis.map((imei) => ({ value: imei, label: imei })),
+                    ];
                     return (
                       <div className="external-sale-wide-field">
                         <AdminPicker
-                          label={`IMEI do aparelho · ${imeis.length} em estoque`}
+                          label={
+                            editing
+                              ? `IMEI do aparelho · ${imeis.length} em estoque (pode limpar ou colar)`
+                              : `IMEI do aparelho · ${imeis.length} em estoque`
+                          }
                           value={line.imei || ''}
                           searchable
+                          clearable={Boolean(editing)}
+                          creatable={Boolean(editing)}
+                          searchPlaceholder={editing ? 'Buscar, digitar ou colar IMEI…' : 'Buscar opção...'}
                           placeholder="Escolha o IMEI"
-                          options={imeis.map((imei) => ({ value: imei, label: imei }))}
-                          onChange={(imei) => handleLineFieldChange(idx, 'imei', imei)}
+                          options={imeiOptions}
+                          onChange={(imei) => handleLineFieldChange(idx, 'imei', imei.replace(/[^0-9A-Za-z]/g, ''))}
                         />
                       </div>
                     );
