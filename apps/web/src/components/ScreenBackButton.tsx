@@ -1,17 +1,25 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AdminIcon } from './AdminIcons';
 import './moduleChrome.css';
 
+/** Índice da pilha do React Router (quando disponível). */
+function historyIndex(): number {
+  const state = window.history.state as { idx?: number } | null;
+  return typeof state?.idx === 'number' ? state.idx : -1;
+}
+
+/**
+ * Voltar discreto (padrão Catálogo Digital): squircle + seta ←.
+ * Histórico do router quando existe; senão cai no `home` do módulo.
+ */
 export function ScreenBackButton({
   home,
   label = 'Voltar',
   className = '',
-  iconOnly = false,
 }: {
   home: string;
   label?: string;
   className?: string;
-  /** Só a casinha (início do painel), sem texto. */
+  /** @deprecated Sempre ícone discreto (seta); texto só em aria/title. */
   iconOnly?: boolean;
 }) {
   const navigate = useNavigate();
@@ -22,25 +30,25 @@ export function ScreenBackButton({
   if (atHome) return null;
 
   function goBack() {
+    const idx = historyIndex();
+    if (idx > 0) {
+      navigate(-1);
+      return;
+    }
     navigate(home);
   }
 
   return (
     <button
       type="button"
-      className={`screen-back${iconOnly ? ' screen-back--home' : ''} ${className}`.trim()}
+      className={`screen-back ${className}`.trim()}
       onClick={goBack}
-      title={`Voltar para ${label}`}
-      aria-label={`Voltar para ${label}`}
+      title={label}
+      aria-label={label}
     >
-      {iconOnly ? (
-        <AdminIcon name="home" />
-      ) : (
-        <>
-          <span className="screen-back__arrow" aria-hidden="true">←</span>
-          <span className="screen-back__label">{label}</span>
-        </>
-      )}
+      <span className="screen-back__arrow" aria-hidden="true">
+        ←
+      </span>
     </button>
   );
 }

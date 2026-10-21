@@ -1423,9 +1423,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  align-self: center;
   flex: 0 0 auto;
   min-width: 0;
   margin-left: auto;
+  padding-bottom: 0;
 }
 
 .erp-app__heading-actions:empty,
@@ -1445,19 +1447,79 @@
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
+  /* Uma linha: Cancelar e Salvar compartilham o mesmo centro vertical. */
+  align-content: center;
 }
 
 .page-heading-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 8px !important;
+  box-sizing: border-box;
+  min-height: 40px !important;
+  height: 40px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle;
 }
 
-.page-heading-btn__ico {
+.page-heading-btn__ico,
+.page-heading-btn__arrow {
   width: 16px;
   height: 16px;
   object-fit: contain;
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   pointer-events: none;
+  align-self: center;
+}
+
+.page-heading-btn__arrow {
+  width: auto;
+  font-size: 1.2rem;
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* Voltar em modo consulta: squircle discreto (Catálogo Digital), não pill */
+.page-heading-btn--back {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--line, #e6e7eb) !important;
+  background: var(--card, #ffffff) !important;
+  color: var(--ink, #16181d) !important;
+  box-shadow: none !important;
+  flex: 0 0 40px !important;
+}
+
+.page-heading-btn--back:hover:not(:disabled) {
+  background: var(--card-2, #f8fafc) !important;
+  border-color: var(--mute, #94a3b8) !important;
+  color: var(--ink, #0f172a) !important;
+}
+
+.is-theme-dark .page-heading-btn--back,
+.admin--dark .page-heading-btn--back {
+  background: var(--card, #171e27) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--ink, #e8eef4) !important;
+}
+
+.is-theme-dark .page-heading-btn--back:hover:not(:disabled),
+.admin--dark .page-heading-btn--back:hover:not(:disabled) {
+  background: var(--card-2, #1c2430) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
 }
 
 /* Ícones pretos: brancos no botão primário; invertidos no tema escuro (ghost) */
@@ -1473,14 +1535,53 @@
 
 .page-heading-btn__kbd,
 .stock-heading-actions__kbd {
-  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin: 0 0 0 2px;
   padding: 2px 6px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(0, 0, 0, 0.18);
   font-size: 0.68rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1;
+  height: 18px;
+  box-sizing: border-box;
+}
+
+.is-theme-dark .page-heading-btn__kbd,
+.admin--dark .page-heading-btn__kbd,
+.is-theme-dark .stock-heading-actions__kbd,
+.admin--dark .stock-heading-actions__kbd {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8eef4;
+}
+
+@media (max-width: 768px) {
+  .page-heading-actions,
+  .stock-heading-actions {
+    width: 100%;
+  }
+
+  .page-heading-actions > .btn,
+  .stock-heading-actions > .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 44px !important;
+    height: 44px;
+  }
+
+  /* Voltar discreto não estica no mobile */
+  .page-heading-actions > .page-heading-btn--back,
+  .stock-heading-actions > .page-heading-btn--back {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+  }
 }
 
 .stock-form-stack {
@@ -5246,10 +5347,16 @@ select.caixa-mov-input {
   }
 
   #panel-page-actions .btn,
-  .admin__heading-actions .btn {
-    padding: 5px 10px !important;
-    font-size: 0.75rem !important;
-    min-height: 34px !important;
+  .admin__heading-actions .btn,
+  #panel-page-actions .page-heading-btn,
+  .admin__heading-actions .page-heading-btn {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    font-size: 0.78rem !important;
+    min-height: 40px !important;
+    height: 40px !important;
   }
 
   .admin__workspace {
@@ -5347,12 +5454,14 @@ select.caixa-mov-input {
     min-width: 580px !important;
   }
 
-  /* Garantir que o botão "Voltar" no header do admin não seja espremido */
+  /* Voltar discreto: manter squircle 40×40 no header */
   .admin__top .screen-back {
     flex-shrink: 0;
-    min-height: 34px;
-    padding: 0 10px;
-    font-size: 0.78rem;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
   }
 
   /* Limitar o StoreSwitcher no header do admin em tablets/mobile */
