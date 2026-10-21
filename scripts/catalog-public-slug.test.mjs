@@ -84,6 +84,10 @@ test('unmatched /api/v1/public/* must not surface auth Token ausente', async () 
   assert.match(src, /api\/v1\/public/);
   assert.match(src, /Rota pública não encontrada/);
   assert.doesNotMatch(src.split('if (path.startsWith')[1]?.slice(0, 400) ?? '', /Token ausente ou inválido/);
+  // HTML do edge (Service Unavailable) não pode ser reencaminhado ao painel.
+  assert.match(src, /looksLikeJson/);
+  assert.match(src, /application\/json/);
+  assert.match(src, /Backend Marthi temporariamente indisponível/);
 
   // Espelho da guarda em nestProxy: paths públicos sem handler → 404, nunca requireAuth.
   const guard = (originalUrl) => {
