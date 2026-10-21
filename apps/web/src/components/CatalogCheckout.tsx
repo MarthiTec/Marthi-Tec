@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { availabilityText, catalogMoney as money, UPGRADE_CHECKLIST, whatsappLink, type CatalogItem, type CatalogStore, type CatalogVariant } from './CatalogDocument';
 import { apiSubmitCatalogOrder, type CatalogCustomerInput, type CatalogSeller, type CatalogTradeInInput } from '../services/salesCatalogApi';
+import { AdminPicker } from '../design-system';
 import { ChoiceField } from './ChoiceField';
 import './catalogCheckout.css';
 
@@ -292,16 +293,15 @@ export function CatalogCheckout({
               ))}
             </div>
             {payment === 'Cartão de Crédito' ? (
-              <label>
-                Parcelas
-                <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))}>
-                  {Array.from({ length: 18 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n === 1 ? 'À vista' : `${n}x`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <AdminPicker
+                label="Parcelas"
+                value={String(installments)}
+                options={Array.from({ length: 18 }, (_, i) => i + 1).map((n) => ({
+                  value: String(n),
+                  label: n === 1 ? 'À vista' : `${n}x`,
+                }))}
+                onChange={(value) => setInstallments(Number(value) || 1)}
+              />
             ) : null}
             <small className="checkout__muted">O pagamento é feito com a loja, na confirmação do pedido.{payment === 'Cartão de Crédito' && installments > 1 ? ' Juros do cartão conforme a maquininha.' : ''}</small>
             <h3>Retirada</h3>
