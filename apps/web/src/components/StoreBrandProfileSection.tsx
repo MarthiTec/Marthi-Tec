@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TotemSettingsImage } from '../pages/admin/TotemSettingsControls';
+import { HeadingSaveButton, PageHeadingActions } from './PageHeadingActions';
 import { fileToStoreLogo } from '../data/totemSettings';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../data/multiStoreStore';
 import { apiGetStoreBrandProfile, apiSaveStoreBrandProfile, type ApiStoreBrandProfile } from '../services/erpApi';
@@ -78,7 +79,26 @@ export function StoreBrandProfileSection() {
       : `https://instagram.com/${form.instagram.trim().replace(/^@/, '')}`
     : '';
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
+    <>
+      <PageHeadingActions>
+        <HeadingSaveButton
+          onClick={() => void save()}
+          disabled={saving}
+          label={saving ? 'Salvando…' : 'Salvar'}
+        />
+      </PageHeadingActions>
     <article className="admin-card">
       <h2>Dados da loja</h2>
       <p className="empty">
@@ -133,11 +153,7 @@ export function StoreBrandProfileSection() {
         </label>
       </div>
       {message ? <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'ops-page__flash' : 'qty-low'}>{message.text}</p> : null}
-      <div className="settings-form-actions" style={{ marginTop: 12 }}>
-        <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void save()}>
-          {saving ? 'Salvando…' : 'Salvar dados da loja'}
-        </button>
-      </div>
     </article>
+    </>
   );
 }

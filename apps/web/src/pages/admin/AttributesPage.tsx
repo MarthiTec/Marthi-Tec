@@ -735,44 +735,6 @@ export function AttributesPage() {
             ) : null}
           </div>
 
-          {!readOnly ? (
-            <div className="admin-form-actions" style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => void submit()}
-                disabled={saving || (mode === 'new' && safeItems.length >= MAX_ATTRIBUTES)}
-              >
-                {saving ? 'Salvando…' : mode === 'edit' ? 'Salvar alterações' : 'Cadastrar atributo'}
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={closeForm}
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <div className="admin-form-actions" style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setMode('edit')}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={closeForm}
-              >
-                Fechar
-              </button>
-            </div>
-          )}
-
           {atLimit ? (
             <p className="empty" style={{ marginTop: 12 }}>
               Limite de {MAX_ATTRIBUTES} atributos. Edite ou exclua um existente para cadastrar outro.

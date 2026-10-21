@@ -121,6 +121,69 @@ export function HeadingEditButton({ onClick, disabled, label = 'Editar' }: Headi
   );
 }
 
+type HeadingFormMode = 'list' | 'view' | 'edit';
+
+/**
+ * Padrão global Entrada de estoque / venda externa: ações só no título sticky.
+ * - list: Novo
+ * - view: setas + Voltar discreto + Editar
+ * - edit: Cancelar + Salvar (Ctrl+S visual)
+ */
+export function HeadingFormActions<T extends { id: string }>({
+  mode,
+  onNew,
+  onClose,
+  onEdit,
+  onSave,
+  saving,
+  disabledSave,
+  newLabel = 'Novo',
+  saveLabel,
+  items,
+  currentId,
+  onOpen,
+}: {
+  mode: HeadingFormMode;
+  onNew?: () => void;
+  onClose: () => void;
+  onEdit?: () => void;
+  onSave?: () => void;
+  saving?: boolean;
+  disabledSave?: boolean;
+  newLabel?: string;
+  saveLabel?: string;
+  items?: readonly T[];
+  currentId?: string | null;
+  onOpen?: (item: T) => void;
+}) {
+  return (
+    <PageHeadingActions>
+      {mode === 'list' ? (
+        onNew ? <HeadingNewButton onClick={onNew} label={newLabel} /> : null
+      ) : mode === 'view' ? (
+        <>
+          {items && onOpen ? (
+            <HeadingRecordNav items={items} currentId={currentId} onOpen={onOpen} />
+          ) : null}
+          <HeadingCancelButton onClick={onClose} label="Voltar" />
+          {onEdit ? <HeadingEditButton onClick={onEdit} /> : null}
+        </>
+      ) : (
+        <>
+          <HeadingCancelButton onClick={onClose} disabled={saving} />
+          {onSave ? (
+            <HeadingSaveButton
+              onClick={onSave}
+              disabled={saving || disabledSave}
+              label={saveLabel ?? (saving ? 'Salvando…' : 'Salvar')}
+            />
+          ) : null}
+        </>
+      )}
+    </PageHeadingActions>
+  );
+}
+
 /**
  * Navegar entre os cadastros da lista sem fechar a ficha: primeiro, anterior, próximo e último,
  * na ordem (e com os filtros) da lista que está na tela. Só aparece consultando um item.

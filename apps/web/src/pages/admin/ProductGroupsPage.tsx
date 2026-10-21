@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
+import { HeadingFormActions } from '../../components/PageHeadingActions';
 import { useAuth } from '../../contexts/AuthContext';
 import { userIsStoreAdmin } from '../../data/erpRegistry';
 import { hubFullAccess } from '../../data/hubPaths';
@@ -116,6 +117,19 @@ export function ProductGroupsPage() {
   const matches = (item: ProductGroup) => !q || item.name.toLowerCase().includes(q);
   const visibleParents = parents.filter((item) => matches(item) || childrenOf(item.id).some(matches));
   const labelsChanged = labelForm.group.trim() !== labels.group || labelForm.subgroup.trim() !== labels.subgroup;
+  const formMode = !form ? 'list' : readOnly ? 'view' : 'edit';
+
+  useEffect(() => {
+    if (!form || readOnly) return;
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const row = (item: ProductGroup, child: boolean) => (
     <tr key={item.id} className={child ? 'product-groups__child' : undefined}>
@@ -141,17 +155,30 @@ export function ProductGroupsPage() {
 
   return (
     <section className="admin-page product-groups">
-      <div className="admin-card">
-        <div className="admin-toolbar">
-          <input aria-label={`Buscar ${labels.group.toLowerCase()}`} placeholder={`Buscar ${labels.group.toLowerCase()} ou ${labels.subgroup.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
-          {canEdit ? <button type="button" className="btn btn--primary" onClick={() => open()}>Novo {labels.group.toLowerCase()}</button> : null}
+      <HeadingFormActions
+        mode={formMode}
+        onNew={canEdit ? () => open() : undefined}
+        onClose={() => setForm(null)}
+        onEdit={canEdit ? () => setReadOnly(false) : undefined}
+        onSave={() => void save()}
+        saving={saving}
+        newLabel={`Novo ${labels.group.toLowerCase()}`}
+        items={groups}
+        currentId={form?.id}
+        onOpen={(item) => open(item, true)}
+      />
+      {!form ? (
+        <div className="admin-card">
+          <div className="admin-toolbar">
+            <input aria-label={`Buscar ${labels.group.toLowerCase()}`} placeholder={`Buscar ${labels.group.toLowerCase()} ou ${labels.subgroup.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          <p className="empty">
+            Organize os produtos em dois níveis. Ex.: <strong>Bebidas</strong> › Cerveja, Refrigerante, Sucos · <strong>Eletrônicos</strong> › Celular, Fone.
+          </p>
         </div>
-        <p className="empty">
-          Organize os produtos em dois níveis. Ex.: <strong>Bebidas</strong> › Cerveja, Refrigerante, Sucos · <strong>Eletrônicos</strong> › Celular, Fone.
-        </p>
-      </div>
+      ) : null}
 
-      {canEdit ? (
+      {!form && canEdit ? (
         <div className="admin-card">
           <h3>Como chamar cada nível</h3>
           <p className="empty">Tem loja que chama de Família, Categoria ou Departamento. O nome escolhido aparece aqui e no cadastro do produto.</p>
@@ -210,27 +237,25 @@ export function ProductGroupsPage() {
               onChange={(value) => setForm({ ...form, active: value === 'active' })}
             />
           </div>
-          <div className="admin-toolbar">
-            {!readOnly ? <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button> : null}
-            <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Voltar' : 'Cancelar'}</button>
-          </div>
         </form>
       ) : null}
 
-      <div className="admin-card admin-table-container">
-        <table className="admin-table">
-          <thead><tr><th>Nome</th><th>Nível</th><th>Situação</th><th>Produtos</th><th>Ações</th></tr></thead>
-          <tbody>
-            {visibleParents.flatMap((parent) => [
-              row(parent, false),
-              ...childrenOf(parent.id).filter((child) => matches(parent) || matches(child)).map((child) => row(child, true)),
-            ])}
-            {!visibleParents.length ? (
-              <tr><td colSpan={5} className="empty">{loading ? 'Carregando…' : `Nenhum ${labels.group.toLowerCase()} cadastrado.`}</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      {!form ? (
+        <div className="admin-card admin-table-container">
+          <table className="admin-table">
+            <thead><tr><th>Nome</th><th>Nível</th><th>Situação</th><th>Produtos</th><th>Ações</th></tr></thead>
+            <tbody>
+              {visibleParents.flatMap((parent) => [
+                row(parent, false),
+                ...childrenOf(parent.id).filter((child) => matches(parent) || matches(child)).map((child) => row(child, true)),
+              ])}
+              {!visibleParents.length ? (
+                <tr><td colSpan={5} className="empty">{loading ? 'Carregando…' : `Nenhum ${labels.group.toLowerCase()} cadastrado.`}</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }

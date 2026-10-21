@@ -1,6 +1,7 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import {
   applyRootPathCascade,
   clearCertificate,
@@ -95,8 +96,22 @@ export function FiscalIssuerPage() {
 
   const ready = issuerIsReady(form);
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
     <section className="admin-page fiscal-config">
+      <PageHeadingActions>
+        <HeadingSaveButton onClick={() => void save()} disabled={busy} label="Salvar" />
+      </PageHeadingActions>
       <article className="admin-card">
         <h2>Configuração fiscal</h2>
         <p className="fiscal-config__lead">
@@ -421,9 +436,6 @@ export function FiscalIssuerPage() {
       </article>
 
       <div className="admin-toolbar">
-        <button type="button" className="btn btn--primary" disabled={busy} onClick={save}>
-          Salvar
-        </button>
         {inPanel ? (
           <>
             <Link to="/painel/notas" className="btn btn--ghost">

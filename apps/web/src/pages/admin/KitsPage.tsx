@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
+import { HeadingCancelButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import { getAdminState } from '../../data/adminStore';
 import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { listKits, upsertKit, type ProductKitItem } from '../../data/fiscalCatalog';
@@ -42,6 +43,14 @@ export function KitsPage() {
     });
   }
 
+  function clearForm() {
+    setName('');
+    setSku('');
+    setParentStockId('');
+    setItems([]);
+    setError('');
+  }
+
   async function submit() {
     const result = await upsertKit({
       name,
@@ -55,14 +64,28 @@ export function KitsPage() {
       return;
     }
     setKits(listKits());
-    setName('');
-    setSku('');
-    setItems([]);
-    setError('');
+    clearForm();
   }
+
+  const dirty = Boolean(name.trim() || sku.trim() || parentStockId || items.length);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void submit();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   return (
     <section className="admin-page">
+      <PageHeadingActions>
+        {dirty ? <HeadingCancelButton onClick={clearForm} /> : null}
+        <HeadingSaveButton onClick={() => void submit()} label="Salvar kit" />
+      </PageHeadingActions>
       <article className="admin-card">
         <h2>Novo kit</h2>
         <p>
@@ -103,9 +126,6 @@ export function KitsPage() {
         <div className="admin-toolbar" style={{ marginTop: 12 }}>
           <button type="button" className="btn btn--ghost" onClick={addLine}>
             Adicionar item
-          </button>
-          <button type="button" className="btn btn--primary" onClick={() => void submit()}>
-            Salvar kit
           </button>
         </div>
         {items.length > 0 ? (

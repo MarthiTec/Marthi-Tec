@@ -5,6 +5,7 @@ import {commercialRequest} from '../../services/commercialApi';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
+import { HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import {
   type CardBrand,
   type CardBrandInstallment,
@@ -247,6 +248,13 @@ export function CardRatesPage() {
   return (
     <div className="admin-page card-rates-page" style={{ paddingBottom: 60 }}>
       {dialog}
+      <PageHeadingActions>
+        <HeadingSaveButton
+          onClick={() => void handleSave()}
+          disabled={!loaded || saving}
+          label={saving ? 'Salvando…' : 'Salvar'}
+        />
+      </PageHeadingActions>
 
       <div className="admin-page__head" style={{ marginBottom: 18 }}>
         <div>
@@ -278,14 +286,6 @@ export function CardRatesPage() {
           ) : null}
           <button
             type="button"
-            className="btn btn--primary btn--sm"
-            disabled={!loaded || saving}
-            onClick={() => void handleSave()}
-          >
-            {saving ? 'Salvando…' : 'Salvar Taxas'}
-          </button>
-          <button
-            type="button"
             className="btn btn--outline btn--sm"
             onClick={handleCreateMachine}
             title="Adicionar mais uma maquininha POS para a loja"
@@ -305,14 +305,6 @@ export function CardRatesPage() {
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
             <span>Usar taxas de cartão nesta loja</span>
           </label>
-          <button
-            className="btn btn--primary btn--sm"
-            type="button"
-            disabled={!loaded || saving}
-            onClick={() => void handleSave()}
-          >
-            {saving ? 'Salvando…' : 'Salvar alterações'}
-          </button>
         </div>
         <p className="empty" style={{ margin: '8px 0 0', fontSize: '0.84rem' }}>
           Recurso opcional do ramo. Oficinas iniciam com o recurso ativo. As taxas são definidas por cada loja.
@@ -891,31 +883,11 @@ export function CardRatesPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
-          {saveSuccess ? (
-            <span
-              style={{
-                background: 'rgba(45, 212, 191, 0.15)',
-                color: 'var(--accent, #2dd4bf)',
-                padding: '6px 14px',
-                borderRadius: 8,
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                border: '1px solid rgba(45, 212, 191, 0.3)',
-              }}
-            >
-              ✓ Configuração salva com sucesso
-            </span>
-          ) : null}
-          <button
-            className="btn btn--primary"
-            type="button"
-            disabled={!loaded || saving}
-            onClick={() => void handleSave()}
-          >
-            {saving ? 'Salvando…' : 'Salvar Alterações'}
-          </button>
-        </div>
+        {saveSuccess ? (
+          <p role="status" style={{ marginTop: 18, color: 'var(--accent, #2dd4bf)', fontWeight: 600 }}>
+            ✓ Configuração salva com sucesso
+          </p>
+        ) : null}
       </article>
       </fieldset>
     </div>
