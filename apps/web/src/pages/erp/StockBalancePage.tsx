@@ -243,7 +243,7 @@ export function StockBalancePage() {
         <>
           <p className="empty" style={{ marginTop: 0 }}>
             Posição e valorização do estoque: saldo, mínimos/máximos, custo médio, markup, margem e última compra.
-            Movimentações em <Link to="/erp/movimentos">Movimentos</Link> · cadastro em{' '}
+            Movimentações em <Link to="/erp/produtos?aba=movimentacoes">Movimentos</Link> · cadastro em{' '}
             <Link to="/erp/produtos">Produtos</Link> · tipos de preço em{' '}
             <Link to="/erp/tabelas">Tabelas</Link>.
           </p>
@@ -334,7 +334,7 @@ export function StockBalancePage() {
                 >
                   Atualizar
                 </button>
-                <Link to="/erp/movimentos" className="btn btn--primary">
+                <Link to="/erp/produtos?aba=movimentacoes" className="btn btn--primary">
                   Novo movimento
                 </Link>
               </div>

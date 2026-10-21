@@ -189,10 +189,17 @@ export function QuotesManagementPage() {
           </button>
           <button
             type="button"
+            className="btn btn--ghost"
+            onClick={() => navigate('/painel/venda-externa')}
+          >
+            Venda externa
+          </button>
+          <button
+            type="button"
             className="btn btn--primary"
             onClick={() => navigate('/caixa')}
           >
-            🛒 Abrir PDV / Novo Orçamento
+            Abrir caixa / Novo orçamento
           </button>
         </div>
       </header>
@@ -394,14 +401,24 @@ export function QuotesManagementPage() {
                     <td className="text-right">
                       <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                         {quote.status !== 'converted' ? (
-                          <button
-                            type="button"
-                            className="btn btn--primary quotes-action-btn"
-                            onClick={() => handleConvertToSale(quote, false)}
-                            title="Converter proposta diretamente em venda no PDV"
-                          >
-                            🛒 Vender
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn--primary quotes-action-btn"
+                              onClick={() => handleConvertToSale(quote, false)}
+                              title="Converter proposta diretamente em venda no PDV"
+                            >
+                              Vender
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost quotes-action-btn"
+                              onClick={() => navigate('/painel/venda-externa')}
+                              title="Abrir venda externa / sem caixa"
+                            >
+                              Sem caixa
+                            </button>
+                          </>
                         ) : null}
                         <button
                           type="button"

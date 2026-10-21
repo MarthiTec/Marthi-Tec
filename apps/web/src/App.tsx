@@ -46,8 +46,6 @@ import { ErpLayout } from './pages/erp/ErpLayout';
 import { ErpHomePage } from './pages/erp/ErpHomePage';
 import { ErpBoletosPage } from './pages/erp/ErpBoletosPage';
 import { ErpReportsPage } from './pages/erp/ErpReportsPage';
-import { StockBalancePage } from './pages/erp/StockBalancePage';
-import { StockMovementsPage } from './pages/erp/StockMovementsPage';
 import { PromoCampaignsPage } from './pages/erp/PromoCampaignsPage';
 import { QuotesManagementPage } from './pages/admin/QuotesManagementPage';
 import { CrmLayout } from './pages/crm/CrmLayout';
@@ -63,6 +61,7 @@ import { AdminHomePage } from './pages/admin/AdminHomePage';
 import { OperationsPage } from './pages/admin/OperationsPage';
 import { SpecificationsPage } from './pages/admin/SpecificationsPage';
 import { PeoplePage } from './pages/admin/PeoplePage';
+import { ProductsStockPage, RedirectToProductsStock } from './pages/admin/ProductsStockPage';
 import { EcommercePanelPage } from './pages/admin/EcommercePanelPage';
 import { FiscalPanelPage } from './pages/admin/FiscalPanelPage';
 import { ErpPanelPage } from './pages/admin/ErpPanelPage';
@@ -112,7 +111,6 @@ import { ExternalSalePage } from './pages/admin/ExternalSalePage';
 import { InstallmentCalculatorPage } from './pages/admin/InstallmentCalculatorPage';
 import { QuickQuotePage } from './pages/admin/QuickQuotePage';
 import { StockReportPage } from './pages/admin/StockReportPage';
-import { StockEntryPage } from './pages/admin/StockEntryPage';
 import { ImeiReportPage } from './pages/admin/ImeiReportPage';
 import { AdsOverviewPage } from './pages/ads/AdsOverviewPage';
 import { AdsCreatePage } from './pages/ads/AdsCreatePage';
@@ -250,11 +248,11 @@ export function App() {
           <Route index element={<ErpHomePage />} />
           <Route path="perfil" element={<OperatorAccountPage />} />
           <Route path="conta" element={<OperatorAccountPage />} />
-          <Route path="produtos" element={<StockPage />} />
-          <Route path="balanco" element={<StockBalancePage />} />
-          <Route path="movimentos" element={<StockMovementsPage />} />
+          <Route path="produtos" element={<ProductsStockPage />} />
+          <Route path="balanco" element={<RedirectToProductsStock aba="ajustes" />} />
+          <Route path="movimentos" element={<RedirectToProductsStock aba="movimentacoes" />} />
           <Route path="relatorio-estoque" element={<StockReportPage />} />
-          <Route path="entrada-estoque" element={<StockEntryPage />} />
+          <Route path="entrada-estoque" element={<RedirectToProductsStock aba="entradas" />} />
           <Route path="relatorio-imei" element={<ImeiReportPage />} />
           <Route path="notas" element={<InvoicesPage />} />
           <Route path="api-aparelhos" element={<DeviceCatalogSettingsPage />} />
@@ -326,9 +324,9 @@ export function App() {
           <Route path="erp" element={<ErpPanelPage />} />
           <Route path="clientes" element={<Navigate to="/painel/pessoas?aba=clientes" replace />} />
           <Route path="produtos" element={<Navigate to="/erp/produtos" replace />} />
-          <Route path="estoque" element={<Navigate to="/erp/balanco" replace />} />
-          <Route path="balanco" element={<Navigate to="/erp/balanco" replace />} />
-          <Route path="movimentos" element={<Navigate to="/erp/movimentos" replace />} />
+          <Route path="estoque" element={<RedirectToProductsStock aba="ajustes" />} />
+          <Route path="balanco" element={<RedirectToProductsStock aba="ajustes" />} />
+          <Route path="movimentos" element={<RedirectToProductsStock aba="movimentacoes" />} />
           <Route path="atributos" element={<Navigate to="/painel/especificacoes?aba=atributos" replace />} />
           <Route path="marcas" element={<Navigate to="/painel/especificacoes?aba=marcas" replace />} />
           <Route path="kits" element={<Navigate to="/erp/kits" replace />} />
