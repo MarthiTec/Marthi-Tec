@@ -1,0 +1,25 @@
+/**
+ * Design-system token contract (documentation + optional import).
+ *
+ * Canonical live values remain in:
+ *   - apps/web/src/styles/global.css (:root)
+ *   - apps/web/src/pages/admin/admin.css (.admin / .admin.admin--dark)
+ *   - module CSS (caixa, erp, …) for --accent overrides
+ *
+ * Importing this file does NOT redefine a parallel theme. It only documents
+ * the semantic names consumers should use. Prefer `var(--surface)` etc. in CSS.
+ *
+ * Theme dark: always support `.is-theme-dark` and `.admin--dark`.
+ */
+
+:root {
+  /* Semantic surfaces / text — values inherited from global.css / module shells */
+  /* --surface, --card, --card-2, --ink, --mute, --line, --accent, --accent-rgb */
+
+  /* Typography */
+  /* --font-sans, --font-display */
+
+  /* Admin chrome (set on .admin) */
+  /* --sidebar, --sidebar-w, --sidebar-collapsed-w, --admin-top-h */
+  /* --red, --teal, --teal-soft */
+}

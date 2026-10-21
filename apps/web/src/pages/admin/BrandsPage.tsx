@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react';
 import { STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiStoreStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
-import { AdminPicker } from '../../components/AdminPicker';
-import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
-import { HeadingFormActions } from '../../components/PageHeadingActions';
+import {
+  AdminPicker,
+  CrudNameButton,
+  CrudRowActions,
+  HeadingFormActions,
+  confirmDelete,
+} from '../../design-system';
 import { autoBrandLogo, autoFillBrandLogos, createBrand, deleteBrand, updateBrand, useBrands, type Brand } from '../../data/brandStore';
 import { fileToStoreLogo } from '../../data/totemSettings';
 import { TotemSettingsImage } from './TotemSettingsControls';
