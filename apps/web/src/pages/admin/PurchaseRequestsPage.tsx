@@ -18,9 +18,27 @@ const OPEN = 'open,in_progress';
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const statusOf = (value: PurchaseStatus) => PURCHASE_STATUS.find((s) => s.value === value) ?? PURCHASE_STATUS[0];
 const productLine = (row: PurchaseRequest) => {
-  const parts = [row.productName || row.desiredOptions || 'Produto sob consulta', row.variantLabel].filter(Boolean);
+  const device = [row.deviceType, row.deviceModel].filter(Boolean).join(' ');
+  const opts = [row.capacity, row.color].filter(Boolean).join(' · ');
+  const condition = row.conditionLabel || (row.condition === 'used' ? 'usado' : 'novo');
+  const parts = [
+    row.productName || device || row.desiredOptions || 'Produto sob consulta',
+    opts || row.variantLabel,
+    condition ? `condição ${condition}` : '',
+  ].filter(Boolean);
   return parts.join(' · ');
 };
+const deviceMeta = (row: PurchaseRequest) =>
+  [
+    row.brand ? `Marca: ${row.brand}` : '',
+    row.deviceType ? `Tipo: ${row.deviceType}` : '',
+    row.deviceModel ? `Modelo: ${row.deviceModel}` : '',
+    row.color ? `Cor: ${row.color}` : '',
+    row.capacity ? `Capacidade: ${row.capacity}` : '',
+    `Condição: ${row.conditionLabel || (row.condition === 'used' ? 'usado' : 'novo')}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 const whatsapp = (phone: string, text: string) => {
   const digits = phone.replace(/\D/g, '');
   return digits.length >= 10 ? `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}?text=${encodeURIComponent(text)}` : '';
@@ -325,6 +343,7 @@ export function PurchaseRequestsPage() {
                   <strong>{current.customerName}</strong> · {current.customerPhone}
                 </div>
                 <div>{productLine(current)}</div>
+                {deviceMeta(current) ? <div>{deviceMeta(current)}</div> : null}
                 {current.desiredOptions ? <div>Opções pedidas: {current.desiredOptions}</div> : null}
                 {current.notes ? <div>Obs.: {current.notes}</div> : null}
                 {current.handledBy ? <div>Atendente: {current.handledBy}</div> : null}

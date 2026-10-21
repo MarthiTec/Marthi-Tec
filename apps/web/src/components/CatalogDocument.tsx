@@ -62,6 +62,8 @@ export type CatalogShop = {
   onPdf: () => void;
   /** Produto/opção indisponível: pedir ao vendedor (solicitação de compra). */
   onRequest?: (item: CatalogItem) => void;
+  /** Produto que não está no catálogo (busca vazia / pedido livre). */
+  onRequestMissing?: (query?: string) => void;
 };
 
 export const catalogMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: value % 1 ? 2 : 0 });
@@ -454,7 +456,14 @@ export function CatalogDocument({
           })}
         </ul>
       ) : (
-        <p className="catalog-empty">{items.length ? 'Nenhum produto com esse filtro.' : 'Nenhum produto disponível neste catálogo.'}</p>
+        <div className="catalog-empty">
+          <p>{items.length ? 'Nenhum produto com esse filtro.' : 'Nenhum produto disponível neste catálogo.'}</p>
+          {shop?.onRequestMissing ? (
+            <button type="button" className="catalog-buy" onClick={() => shop.onRequestMissing?.(query.trim() || undefined)}>
+              Solicitar ao vendedor
+            </button>
+          ) : null}
+        </div>
       )}
 
       {/* Última página: o que adiantar do aparelho para dar na troca (Upgrade). */}

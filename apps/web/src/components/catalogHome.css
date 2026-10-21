@@ -26,6 +26,8 @@
 .chome__action--shop { background: linear-gradient(135deg, var(--cat-accent), color-mix(in srgb, var(--cat-accent) 70%, #16181d)); color: #fff; }
 .chome__action--shop::after { content: ''; position: absolute; right: -30px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
 .chome__action--repair { background: linear-gradient(135deg, #16181d, #2b2f36); color: #fff; }
+.chome__action--request { background: linear-gradient(135deg, #0f766e, #134e4a); color: #fff; }
+.chome__action--request .chome__icon svg { stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
 .chome__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: rgba(255, 255, 255, 0.18); }
 .chome__icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chome__action-text { position: relative; z-index: 1; display: grid; gap: 2px; min-width: 0; }

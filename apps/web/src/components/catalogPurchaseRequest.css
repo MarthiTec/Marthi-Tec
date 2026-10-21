@@ -123,3 +123,73 @@
   color: #cbd5e1;
   line-height: 1.45;
 }
+
+.cpr__muted {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.cpr__desc {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(228, 87, 46, 0.12);
+  border: 1px solid rgba(228, 87, 46, 0.28);
+}
+
+.cpr__desc span {
+  font-size: 0.75rem;
+  color: #fb923c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cpr__desc strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+.cpr .choice-field {
+  margin: 0;
+}
+
+.cpr__condition {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.cpr__condition legend {
+  padding: 0;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.cpr__condition-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cpr__condition-row button {
+  flex: 1;
+  min-width: 7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cpr__condition-row button.is-on {
+  border-color: var(--cat-accent, #e4572e);
+  background: color-mix(in srgb, var(--cat-accent, #e4572e) 22%, transparent);
+  color: #fff;
+}

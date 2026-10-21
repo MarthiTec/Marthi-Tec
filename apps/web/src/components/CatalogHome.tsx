@@ -25,6 +25,7 @@ export function CatalogHome({
   onTrack,
   onOpenItem,
   onSignup,
+  onRequestProduct,
 }: {
   look: CatalogLook;
   store: CatalogStore;
@@ -36,6 +37,8 @@ export function CatalogHome({
   onTrack: () => void;
   onOpenItem: (item: CatalogItem) => void;
   onSignup: () => void;
+  /** Produto que não está listado no catálogo. */
+  onRequestProduct?: (query?: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const style = { '--cat-accent': look.accent || '#e4572e' } as CSSProperties;
@@ -115,6 +118,22 @@ export function CatalogHome({
             <span className="chome__action-text">
               <strong>Solicitar manutenção</strong>
               <small>Orçamento pelo celular, sem fila</small>
+            </span>
+            <span className="chome__go" aria-hidden>
+              →
+            </span>
+          </button>
+        ) : null}
+        {onRequestProduct ? (
+          <button type="button" className="chome__action chome__action--request" onClick={() => onRequestProduct(query.trim() || undefined)}>
+            <span className="chome__icon" aria-hidden>
+              <svg viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            <span className="chome__action-text">
+              <strong>Solicitar ao vendedor</strong>
+              <small>Produto que não está no catálogo</small>
             </span>
             <span className="chome__go" aria-hidden>
               →
