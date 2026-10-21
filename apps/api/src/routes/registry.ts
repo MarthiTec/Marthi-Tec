@@ -8,6 +8,7 @@ import { hashPassword, upsertClientUserInMemory } from '../services/authService.
 import { blockedMemoryMap } from '../db/requireDb.js';
 import { ensureStoreLoginTeamMembers } from '../services/ownerTeam.js';
 import { randomBytes } from 'node:crypto';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 export const registryRouter = Router();
 registryRouter.use((req,res,next)=>{
@@ -647,6 +648,20 @@ registryRouter.post('/api/v1/customers', requireAuth, async (req, res, next) => 
       if(!inserted.rows[0]) throw Object.assign(new Error('Já existe um cliente com este telefone nesta loja.'),{status:409});
       await savePersonDetails(pool, 'customers', id, storeId, personDetailsSchema.parse(req.body));
       const saved = (await pool.query('SELECT * FROM customers WHERE id = $1 AND store_id = $2', [id, storeId])).rows[0];
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'cliente.criar',
+        entity: 'customer',
+        entityId: id,
+        actionType: 'inclusao',
+        module: 'clientes',
+        menuLabel: 'Clientes',
+        summary: body.name.trim(),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.status(201).json({success:true,data:{...rowToClient(saved),...personDetailsFromRow(saved)}});
       return;
     }
@@ -710,6 +725,20 @@ registryRouter.patch('/api/v1/customers/:id', requireAuth, async (req, res, next
       );
       await savePersonDetails(pool, 'customers', id, storeId, personDetailsSchema.parse(req.body));
       const updated = await pool.query(`SELECT * FROM customers WHERE id = $1 AND store_id=$2`, [id,storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'cliente.atualizar',
+        entity: 'customer',
+        entityId: id,
+        actionType: 'alteracao',
+        module: 'clientes',
+        menuLabel: 'Clientes',
+        summary: String(body.name || updated.rows[0]?.name || id),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.json({ success: true, data: {...rowToClient(updated.rows[0]),...personDetailsFromRow(updated.rows[0] ?? {})} });
       return;
     }
@@ -732,7 +761,22 @@ registryRouter.delete('/api/v1/customers/:id', requireAuth, async (req, res, nex
     const storeId = req.storeId!;
     const id = req.params.id;
     if (pool) {
+      const prev = await pool.query(`SELECT name FROM customers WHERE id = $1 AND store_id = $2`, [id, storeId]);
       await pool.query(`DELETE FROM customers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'cliente.excluir',
+        entity: 'customer',
+        entityId: id,
+        actionType: 'exclusao',
+        module: 'clientes',
+        menuLabel: 'Clientes',
+        summary: String(prev.rows[0]?.name || id),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.json({ success: true, data: { ok: true } });
       return;
     }
@@ -786,6 +830,20 @@ registryRouter.post('/api/v1/suppliers', requireAuth, async (req, res, next) => 
       );
       await savePersonDetails(pool, 'suppliers', id, storeId, personDetailsSchema.parse(req.body));
       const resQuery = await pool.query(`SELECT * FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'fornecedor.criar',
+        entity: 'supplier',
+        entityId: id,
+        actionType: 'inclusao',
+        module: 'pessoas',
+        menuLabel: 'Fornecedores',
+        summary: body.name.trim(),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.status(201).json({ success: true, data: { ...rowToClient(resQuery.rows[0]), ...personDetailsFromRow(resQuery.rows[0] ?? {}) } });
       return;
     }
@@ -815,6 +873,20 @@ registryRouter.patch('/api/v1/suppliers/:id', requireAuth, async (req, res, next
       );
       await savePersonDetails(pool, 'suppliers', id, storeId, personDetailsSchema.parse(req.body));
       const updated = await pool.query(`SELECT * FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'fornecedor.atualizar',
+        entity: 'supplier',
+        entityId: id,
+        actionType: 'alteracao',
+        module: 'pessoas',
+        menuLabel: 'Fornecedores',
+        summary: String(body.name || updated.rows[0]?.name || id),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.json({ success: true, data: { ...rowToClient(updated.rows[0]), ...personDetailsFromRow(updated.rows[0] ?? {}) } });
       return;
     }
@@ -837,7 +909,22 @@ registryRouter.delete('/api/v1/suppliers/:id', requireAuth, async (req, res, nex
     const storeId = req.storeId!;
     const id = req.params.id;
     if (pool) {
+      const prev = await pool.query(`SELECT name FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
       await pool.query(`DELETE FROM suppliers WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'fornecedor.excluir',
+        entity: 'supplier',
+        entityId: id,
+        actionType: 'exclusao',
+        module: 'pessoas',
+        menuLabel: 'Fornecedores',
+        summary: String(prev.rows[0]?.name || id),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.json({ success: true, data: { ok: true } });
       return;
     }
