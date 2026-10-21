@@ -424,12 +424,15 @@ salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) =>
       from: z.string().datetime({ offset: true }).optional(),
       to: z.string().datetime({ offset: true }).optional(),
       search: z.string().trim().max(80).default(''),
+      /** Digits-only IMEI filter (AND with search when both are set). */
+      imei: z.string().trim().max(20).default(''),
       status: z.enum(['all', 'completed', 'cancelled']).default('all'),
     }).parse(req.query);
     const to = q.to ? new Date(q.to) : new Date();
     const from = q.from ? new Date(q.from) : new Date(to.getTime() - 30 * 86400000);
     const term = q.search ? `%${q.search.replace(/[%_\\]/g, (c) => '\\' + c)}%` : '';
     const digits = q.search.replace(/\D/g, '');
+    const imeiDigits = q.imei.replace(/\D/g, '');
     const result = await pool.query(
       `SELECT s.id, s.created_at, s.customer_name, s.customer_phone, s.customer_document, s.seller_name,
               COALESCE(NULLIF(s.final_amount, 0), s.total_amount, s.total, 0) AS amount, s.status, s.cancel_reason,
@@ -441,22 +444,29 @@ salesRouter.get('/api/v1/sales/external', requireAuth, async (req, res, next) =>
           AND s.created_at >= $2 AND s.created_at < $3
           AND ($4 = 'all' OR s.status = $4)
           AND ($5 = '' OR s.id ILIKE $5 OR s.customer_name ILIKE $5 OR s.seller_name ILIKE $5
-               OR ($6 <> '' AND (
-                 regexp_replace(COALESCE(s.customer_phone, '') || COALESCE(s.customer_document, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
-                 OR EXISTS (
+               OR ($6 <> '' AND regexp_replace(COALESCE(s.customer_phone, '') || COALESCE(s.customer_document, ''), '\\D', '', 'g') LIKE '%' || $6 || '%')
+               OR ($6 <> '' AND EXISTS (
                    SELECT 1 FROM sales_order_lines l
                     WHERE l.sale_id = s.id
                       AND regexp_replace(COALESCE(l.imei, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
-                 )
-                 OR EXISTS (
+                 ))
+               OR ($6 <> '' AND EXISTS (
                    SELECT 1 FROM sale_trade_ins t
                     WHERE t.sale_id = s.id
                       AND regexp_replace(COALESCE(t.imei, ''), '\\D', '', 'g') LIKE '%' || $6 || '%'
-                 )
-               )))
+                 )))
+          AND ($7 = '' OR EXISTS (
+                SELECT 1 FROM sales_order_lines l
+                 WHERE l.sale_id = s.id
+                   AND regexp_replace(COALESCE(l.imei, ''), '\\D', '', 'g') LIKE '%' || $7 || '%'
+              ) OR EXISTS (
+                SELECT 1 FROM sale_trade_ins t
+                 WHERE t.sale_id = s.id
+                   AND regexp_replace(COALESCE(t.imei, ''), '\\D', '', 'g') LIKE '%' || $7 || '%'
+              ))
         ORDER BY s.created_at DESC
         LIMIT 300`,
-      [req.storeId, from.toISOString(), to.toISOString(), q.status, term, digits],
+      [req.storeId, from.toISOString(), to.toISOString(), q.status, term, digits, imeiDigits],
     );
     res.json({
       success: true,
