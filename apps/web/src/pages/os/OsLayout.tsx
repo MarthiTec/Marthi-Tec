@@ -6,7 +6,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
-import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { PageBackProvider, ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { useAuth } from '../../contexts/AuthContext';
@@ -253,6 +253,7 @@ export function OsLayout() {
   }
 
   return (
+    <PageBackProvider>
     <div
       className={`os-app ${opsMenuOpen ? 'is-ops-open' : ''} ${isProfile ? 'is-profile-dock' : ''} ${
         isDark ? 'is-theme-dark' : ''
@@ -409,5 +410,6 @@ export function OsLayout() {
         afterExitTo="/painel"
       />
     </div>
+    </PageBackProvider>
   );
 }

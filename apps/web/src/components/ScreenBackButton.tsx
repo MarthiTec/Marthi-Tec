@@ -1,5 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { usePageBackHandlerState } from './pageBack';
 import './moduleChrome.css';
+
+export { PageBackProvider, RegisterPageBack, usePageBackHandler } from './pageBack';
 
 /** Índice da pilha do React Router (quando disponível). */
 function historyIndex(): number {
@@ -9,7 +12,8 @@ function historyIndex(): number {
 
 /**
  * Voltar discreto (padrão Catálogo Digital): squircle + seta ←.
- * Histórico do router quando existe; senão cai no `home` do módulo.
+ * Se a página registrou um handler (ficha aberta), fecha a ficha;
+ * senão usa histórico do router / `home` do módulo.
  */
 export function ScreenBackButton({
   home,
@@ -24,12 +28,17 @@ export function ScreenBackButton({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const handler = usePageBackHandlerState();
   const atHome =
     (location.pathname === home || location.pathname === `${home}/`) && !location.search;
 
-  if (atHome) return null;
+  if (atHome && !handler) return null;
 
   function goBack() {
+    if (handler) {
+      handler();
+      return;
+    }
     const idx = historyIndex();
     if (idx > 0) {
       navigate(-1);

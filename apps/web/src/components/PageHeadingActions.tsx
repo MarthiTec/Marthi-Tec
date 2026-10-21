@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePageBackHandler } from './pageBack';
 import './recordNav.css';
 
 const HEADING_SLOT_ID = 'panel-page-actions';
@@ -118,6 +119,69 @@ export function HeadingEditButton({ onClick, disabled, label = 'Editar' }: Headi
       <img src="/pdv/edit.png" alt="" className="page-heading-btn__ico page-heading-btn__ico--on-primary" />
       {label}
     </button>
+  );
+}
+
+type HeadingFormMode = 'list' | 'view' | 'edit';
+
+/**
+ * Padrão global Entrada de estoque / venda externa: ações só no título sticky.
+ * - list: Novo
+ * - view: setas + Editar (Voltar fica só no shell — ScreenBackButton)
+ * - edit: Cancelar + Salvar (Ctrl+S visual)
+ */
+export function HeadingFormActions<T extends { id: string }>({
+  mode,
+  onNew,
+  onClose,
+  onEdit,
+  onSave,
+  saving,
+  disabledSave,
+  newLabel = 'Novo',
+  saveLabel,
+  items,
+  currentId,
+  onOpen,
+}: {
+  mode: HeadingFormMode;
+  onNew?: () => void;
+  onClose: () => void;
+  onEdit?: () => void;
+  onSave?: () => void;
+  saving?: boolean;
+  disabledSave?: boolean;
+  newLabel?: string;
+  saveLabel?: string;
+  items?: readonly T[];
+  currentId?: string | null;
+  onOpen?: (item: T) => void;
+}) {
+  usePageBackHandler(mode === 'list' ? null : onClose);
+  return (
+    <PageHeadingActions>
+      {mode === 'list' ? (
+        onNew ? <HeadingNewButton onClick={onNew} label={newLabel} /> : null
+      ) : mode === 'view' ? (
+        <>
+          {items && onOpen ? (
+            <HeadingRecordNav items={items} currentId={currentId} onOpen={onOpen} />
+          ) : null}
+          {onEdit ? <HeadingEditButton onClick={onEdit} /> : null}
+        </>
+      ) : (
+        <>
+          <HeadingCancelButton onClick={onClose} disabled={saving} />
+          {onSave ? (
+            <HeadingSaveButton
+              onClick={onSave}
+              disabled={saving || disabledSave}
+              label={saveLabel ?? (saving ? 'Salvando…' : 'Salvar')}
+            />
+          ) : null}
+        </>
+      )}
+    </PageHeadingActions>
   );
 }
 

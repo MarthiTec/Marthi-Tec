@@ -7,7 +7,7 @@ import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExitOrLogoutDialog } from '../../components/ExitOrLogoutDialog';
 import { ModuleMenuButton } from '../../components/ModuleMenuButton';
 import { ModuleSideFoot } from '../../components/ModuleSideFoot';
-import { ScreenBackButton } from '../../components/ScreenBackButton';
+import { PageBackProvider, ScreenBackButton } from '../../components/ScreenBackButton';
 import { StoreSwitcher } from '../../components/StoreSwitcher';
 import { UserChip } from '../../components/UserChip';
 import { OsEcosystemMenu } from '../os/OsEcosystemMenu';
@@ -168,6 +168,7 @@ export function ErpLayout() {
   }
 
   return (
+    <PageBackProvider>
     <div className={`erp-app ${navOpen ? 'is-nav-open' : 'is-nav-closed'} ${isDark ? 'is-theme-dark' : ''}`}>
       <header className="erp-app__top">
         <OsEcosystemMenu />
@@ -294,5 +295,6 @@ export function ErpLayout() {
         afterExitTo="/painel"
       />
     </div>
+    </PageBackProvider>
   );
 }

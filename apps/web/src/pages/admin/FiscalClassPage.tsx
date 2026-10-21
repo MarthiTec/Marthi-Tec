@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
+import {
+  HeadingCancelButton,
+  HeadingSaveButton,
+  InlineHeadingActions,
+  PageHeadingActions,
+} from '../../components/PageHeadingActions';
 import {
   listCfops,
   listFiscalClassifications,
@@ -69,8 +75,38 @@ export function FiscalClassPage() {
     });
   }
 
+  function clearForm() {
+    setEditingId(undefined);
+    setForm({ ...EMPTY, defaultCfopId: cfops[0]?.id ?? '' });
+    setError('');
+  }
+
+  const inline = useContext(InlineHeadingActions);
+
+  // Só na tela própria — no drawer do produto o StockPage já trata Ctrl+S.
+  useEffect(() => {
+    if (inline) return;
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void submit();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
     <section className="admin-page">
+      <PageHeadingActions>
+        {editingId ? (
+          <HeadingCancelButton onClick={clearForm} />
+        ) : null}
+        <HeadingSaveButton
+          onClick={() => void submit()}
+          label={editingId ? 'Salvar' : 'Cadastrar'}
+        />
+      </PageHeadingActions>
       <article className="admin-card">
         <h2>{editingId ? 'Editar classificação fiscal' : 'Nova classificação fiscal'}</h2>
         <p>
@@ -187,23 +223,6 @@ export function FiscalClassPage() {
             Observações
             <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </label>
-        </div>
-        <div className="admin-toolbar" style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
-            {editingId ? 'Salvar' : 'Cadastrar'}
-          </button>
-          {editingId ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={() => {
-                setEditingId(undefined);
-                setForm({ ...EMPTY, defaultCfopId: cfops[0]?.id ?? '' });
-              }}
-            >
-              Cancelar
-            </button>
-          ) : null}
         </div>
       </article>
 

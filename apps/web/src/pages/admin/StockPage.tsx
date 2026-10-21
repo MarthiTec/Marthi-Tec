@@ -43,6 +43,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 import {
   getAdminState,
   removeStockItem,
@@ -1380,12 +1381,12 @@ export function StockPage() {
 
   const headingActions = (
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
       {!formVisible ? (
         <HeadingNewButton onClick={startNewProduct} label="Novo Produto" />
       ) : readOnly ? (
         <>
           <HeadingRecordNav items={visible} currentId={selectedId} onOpen={(item) => openForm(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

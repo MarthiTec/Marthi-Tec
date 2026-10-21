@@ -23,6 +23,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 import {
   ATTRIBUTES_EVENT,
   createAttribute,
@@ -374,12 +375,12 @@ export function AttributesPage() {
 
   const headingActions = (
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
       {!formVisible ? (
         <HeadingNewButton onClick={startNew} label="Novo atributo" />
       ) : readOnly ? (
         <>
           <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (
@@ -734,44 +735,6 @@ export function AttributesPage() {
               </label>
             ) : null}
           </div>
-
-          {!readOnly ? (
-            <div className="admin-form-actions" style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => void submit()}
-                disabled={saving || (mode === 'new' && safeItems.length >= MAX_ATTRIBUTES)}
-              >
-                {saving ? 'Salvando…' : mode === 'edit' ? 'Salvar alterações' : 'Cadastrar atributo'}
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={closeForm}
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <div className="admin-form-actions" style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setMode('edit')}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={closeForm}
-              >
-                Fechar
-              </button>
-            </div>
-          )}
 
           {atLimit ? (
             <p className="empty" style={{ marginTop: 12 }}>

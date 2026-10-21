@@ -17,6 +17,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from './PageHeadingActions';
+import { RegisterPageBack } from './pageBack';
 import { useAuth } from '../contexts/AuthContext';
 import { logAction } from '../data/auditLog';
 import { ERP_BOOTSTRAP_EVENT } from '../data/erpBootstrap';
@@ -330,6 +331,7 @@ export function TeamUsersSection({ variant, id }: Props) {
 
   const headingActions = (
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
       {!formVisible ? (
         <HeadingNewButton
           onClick={startNew}
@@ -337,7 +339,6 @@ export function TeamUsersSection({ variant, id }: Props) {
         />
       ) : readOnly ? (
         <>
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
           <HeadingEditButton onClick={() => setMode('edit')} />
         </>
       ) : (

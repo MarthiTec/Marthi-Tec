@@ -1,6 +1,7 @@
 import {TotemSettingToggle,TotemSettingsImage,TotemSettingsBanners,TotemSettingsGroup} from './TotemSettingsControls';
 import { AdminIcon } from '../../components/AdminIcons';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import {assistantText} from '../../data/totemAssistant';
 import './totemSettings.css';
 import { useState, useEffect } from 'react';
@@ -291,7 +292,14 @@ export function TotemSettingsPage() {
 
   return (
     <section className="admin-page totem-settings-page">
-      <div className="totem-settings-savebar" role="region" aria-label="Salvar configurações do totem">
+      <PageHeadingActions>
+        <HeadingSaveButton
+          onClick={() => void save()}
+          disabled={saving}
+          label={saving ? 'Salvando…' : 'Salvar'}
+        />
+      </PageHeadingActions>
+      <div className="totem-settings-savebar" role="region" aria-label="Status das configurações do totem">
         <div className="totem-settings-savebar__title">
           <h1>Configurações do totem</h1>
           <p role="status" className={`totem-settings-savebar__status${error ? ' is-error' : dirty ? ' is-dirty' : saved ? ' is-saved' : ''}`}>
@@ -304,9 +312,6 @@ export function TotemSettingsPage() {
             <span>{allGroupsOpen ? 'Inibir tudo' : 'Exibir tudo'}</span>
           </button>
           <Link to="/painel/totem/previa" className="btn btn--ghost btn--sm">Visualizar totem</Link>
-          <button type="button" className="btn btn--primary btn--sm" disabled={saving} onClick={() => void save()}>
-            {saving ? 'Salvando…' : 'Salvar configurações'}
-          </button>
         </div>
       </div>
       <p className="totem-settings-intro">Escolha a aparência, personalize a conversa e indique quem receberá os pedidos. Preços, ofertas e dados fiscais ficam no cadastro de produtos.</p>

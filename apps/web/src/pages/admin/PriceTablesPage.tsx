@@ -33,6 +33,7 @@ import {
   HeadingSaveButton,
   PageHeadingActions,
 } from '../../components/PageHeadingActions';
+import { RegisterPageBack } from '../../components/pageBack';
 
 import { getAdminState, removePriceTable, savePriceTables, type PriceTable } from '../../data/adminStore';
 
@@ -291,6 +292,7 @@ export function PriceTablesPage() {
   const headingActions = (
 
     <PageHeadingActions>
+      <RegisterPageBack active={formVisible} onBack={closeForm} />
 
       {!formVisible ? (
 
@@ -301,7 +303,6 @@ export function PriceTablesPage() {
         <>
 
           <HeadingRecordNav items={filtered} currentId={selectedId} onOpen={(item) => loadItem(item, 'view')} />
-          <HeadingCancelButton onClick={closeForm} label="Voltar" />
 
           <HeadingEditButton onClick={() => setMode('edit')} />
 

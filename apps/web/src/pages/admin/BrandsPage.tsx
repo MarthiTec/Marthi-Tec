@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudNameButton, CrudRowActions, confirmDelete } from '../../components/CrudKit';
+import { HeadingFormActions } from '../../components/PageHeadingActions';
 import { autoBrandLogo, autoFillBrandLogos, createBrand, deleteBrand, updateBrand, useBrands, type Brand } from '../../data/brandStore';
 import { fileToStoreLogo } from '../../data/totemSettings';
 import { TotemSettingsImage } from './TotemSettingsControls';
@@ -85,9 +86,35 @@ export function BrandsPage() {
     try { await deleteBrand(brand.id); }
     catch (err) { setMessage(err instanceof Error ? err.message : 'Não foi possível excluir a marca.'); }
   }
+  useEffect(() => {
+    if (!form || readOnly) return;
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
   const withoutIcon = brands.filter((brand) => !brand.logo).length;
+  const filtered = brands.filter((b) => b.name.toLowerCase().includes(query.toLowerCase()));
+  const formMode = !form ? 'list' : readOnly ? 'view' : 'edit';
   return (
     <section className="admin-page brands-page">
+      <HeadingFormActions
+        mode={formMode}
+        onNew={canEdit ? () => open() : undefined}
+        onClose={() => setForm(null)}
+        onEdit={canEdit ? () => setReadOnly(false) : undefined}
+        onSave={() => void save()}
+        saving={saving}
+        newLabel="Nova marca"
+        saveLabel={saving ? 'Salvando…' : 'Salvar'}
+        items={filtered}
+        currentId={form?.id}
+        onOpen={(brand) => open(brand, true)}
+      />
       <div className="admin-card"><div className="admin-toolbar">
         <input aria-label="Buscar marcas" placeholder="Buscar marca" value={query} onChange={e => setQuery(e.target.value)} />
         {canEdit && withoutIcon > 0 ? (
@@ -95,7 +122,6 @@ export function BrandsPage() {
             {bulkBusy ? 'Buscando ícones…' : `Buscar ícones automaticamente (${withoutIcon})`}
           </button>
         ) : null}
-        {canEdit && <button className="btn btn--primary" onClick={() => open()}>Nova marca</button>}
       </div>
       <p className="empty">Marcas disponíveis para os produtos desta loja. O ícone aparece na vitrine do totem (barra lateral e abas do topo).</p></div>
       {(message || error) && <p role="alert">{message || error} {error && <button className="btn btn--ghost" onClick={() => void reload()}>Tentar novamente</button>}</p>}
@@ -125,24 +151,22 @@ export function BrandsPage() {
             ) : null}
           </div>
         )}
-        <div className="admin-toolbar">
-          {!readOnly && <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar marca'}</button>}
-          <button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setForm(null)}>{readOnly ? 'Voltar' : 'Cancelar'}</button>
-        </div>
       </form>}
-      <div className="admin-card admin-table-container">
-        <table className="admin-table">
-          <thead><tr><th>Marca</th><th>Situação</th><th>Produtos</th><th>Ações</th></tr></thead>
-          <tbody>
-            {brands.filter(b => b.name.toLowerCase().includes(query.toLowerCase())).map(brand => <tr key={brand.id}>
-              <td><span className="brands-page__name"><BrandIcon brand={brand} /><CrudNameButton onClick={() => open(brand, true)}>{brand.name}</CrudNameButton></span></td>
-              <td>{brand.active ? 'Ativa' : 'Inativa'}</td><td>{brand.productCount}</td>
-              <td><CrudRowActions onView={() => open(brand, true)} canEdit={canEdit} canDelete={canEdit} onEdit={() => open(brand)} onDuplicate={canEdit ? () => open(brand, false, true) : undefined} onDelete={() => void remove(brand)} /></td>
-            </tr>)}
-            {!brands.length && <tr><td colSpan={4} className="empty">{loading ? 'Carregando marcas…' : 'Nenhuma marca cadastrada.'}</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      {!form ? (
+        <div className="admin-card admin-table-container">
+          <table className="admin-table">
+            <thead><tr><th>Marca</th><th>Situação</th><th>Produtos</th><th>Ações</th></tr></thead>
+            <tbody>
+              {filtered.map(brand => <tr key={brand.id}>
+                <td><span className="brands-page__name"><BrandIcon brand={brand} /><CrudNameButton onClick={() => open(brand, true)}>{brand.name}</CrudNameButton></span></td>
+                <td>{brand.active ? 'Ativa' : 'Inativa'}</td><td>{brand.productCount}</td>
+                <td><CrudRowActions onView={() => open(brand, true)} canEdit={canEdit} canDelete={canEdit} onEdit={() => open(brand)} onDuplicate={canEdit ? () => open(brand, false, true) : undefined} onDelete={() => void remove(brand)} /></td>
+              </tr>)}
+              {!brands.length && <tr><td colSpan={4} className="empty">{loading ? 'Carregando marcas…' : 'Nenhuma marca cadastrada.'}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }

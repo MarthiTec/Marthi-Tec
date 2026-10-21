@@ -5,6 +5,7 @@ import { TeamUsersSection } from '../../components/TeamUsersSection';
 import { AdminIcon, type AdminIconName } from '../../components/AdminIcons';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
+import { HeadingCancelButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
 import { PresenceStatusControl } from '../../components/PresenceStatusControl';
 import { StoreBrandProfileSection } from '../../components/StoreBrandProfileSection';
 import { TeamPresenceBoard } from '../../components/TeamPresenceBoard';
@@ -151,8 +152,8 @@ export function OperationsPage() {
     setEditing(false);
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit(event?: FormEvent) {
+    event?.preventDefault();
     if (!draft) return;
     const label = draft.label.trim();
     const href = draft.href.trim();
@@ -340,6 +341,13 @@ export function OperationsPage() {
       {tab === 'loja' ? <StoreBrandProfileSection /> : null}
 
       {/* ABA 2: Atalhos Operacionais */}
+      {tab === 'atalhos' && draft ? (
+        <PageHeadingActions>
+          <HeadingCancelButton onClick={cancelEdit} />
+          <HeadingSaveButton onClick={() => void submit()} />
+        </PageHeadingActions>
+      ) : null}
+
       {tab === 'atalhos' ? (
         <>
           {draft ? (
@@ -348,14 +356,6 @@ export function OperationsPage() {
                 <div>
                   <h2>{draft.id ? 'Editar operação' : 'Nova operação'}</h2>
                   <p>Verde = ativo · vermelho = inativo. A cor do botão é a sua escolha.</p>
-                </div>
-                <div className="ops-form__actions">
-                  <button type="button" className="btn btn--ghost" onClick={cancelEdit}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn--primary">
-                    Salvar
-                  </button>
                 </div>
               </header>
 
