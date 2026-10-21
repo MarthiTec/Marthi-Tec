@@ -47,12 +47,25 @@ test('StockPage product helpers prefer productsStockSpecsPath (stay in workspace
   assert.equal(stock.includes('specificationsPath(location.pathname'), false);
 });
 
-test('Standalone menu entries for Especificações remain (additive)', () => {
+test('Retaguarda/Painel menus drop relocated specs; Totem keeps Especificações', () => {
   assert.match(nav, /to: '\/painel\/totem\/especificacoes',\s*label: 'Especificações'/);
-  assert.match(nav, /to: '\/painel\/especificacoes',\s*label: 'Especificações'/);
+  const erpNav = nav.slice(nav.indexOf("id: 'erp'"), nav.indexOf("id: 'ads'"));
+  assert.equal(erpNav.includes("to: '/painel/especificacoes'"), false, 'duplicate Especificações out of Painel Retaguarda');
   const block = erp.slice(erp.indexOf('const NAV_PRODUCTS'), erp.indexOf('const NAV_PEOPLE'));
-  assert.match(block, /to: '\/erp\/especificacoes'/);
-  assert.match(block, /to: '\/erp\/kits'/);
-  assert.match(block, /to: '\/erp\/lotes'/);
-  assert.match(block, /to: '\/erp\/almoxarifado'/);
+  assert.match(block, /to: '\/erp\/produtos'/);
+  assert.equal(block.includes("to: '/erp/especificacoes'"), false);
+  assert.equal(block.includes("to: '/erp/kits'"), false);
+  assert.equal(block.includes("to: '/erp/lotes'"), false);
+  assert.equal(block.includes("to: '/erp/almoxarifado'"), false);
+  assert.match(block, /to: '\/erp\/api-aparelhos'/);
+  assert.match(block, /to: '\/erp\/notas'/);
+});
+
+test('Legacy kits/lotes/almox/especificacoes redirect into hub Especificações', () => {
+  const hub = fs.readFileSync(path.join(root, 'apps/web/src/pages/admin/ProductsStockPage.tsx'), 'utf8');
+  const app = fs.readFileSync(path.join(root, 'apps/web/src/App.tsx'), 'utf8');
+  assert.match(hub, /export function RedirectToProductsStockSpecs/);
+  assert.match(app, /RedirectToProductsStockSpecs espec="kits"/);
+  assert.match(app, /RedirectToProductsStockSpecs espec="lotes"/);
+  assert.match(app, /RedirectToProductsStockSpecs espec="almoxarifado"/);
 });

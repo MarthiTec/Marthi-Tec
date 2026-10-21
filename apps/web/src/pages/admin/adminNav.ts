@@ -84,10 +84,10 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/erp', label: 'Abrir Retaguarda', openApp: true, accent: '#0e7490' },
       { to: '/painel/erp', label: 'Visão e ajustes', end: true },
       // Fase A+/B: hub no Painel (AdminLayout). Dual path `/erp/produtos` permanece na Retaguarda.
+      // Especificações / Kits / Lotes / Almoxarifado: só na aba Especificações do hub (não no menu).
       { to: '/painel/produtos', label: 'Produtos & Estoque' },
       { to: '/painel/catalogo', label: 'Catálogo digital', accent: '#e4572e' },
       { to: '/painel/solicitacoes-compra', label: 'Solicitações de compras', accent: '#0284c7' },
-      { to: '/painel/especificacoes', label: 'Especificações' },
       { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
@@ -286,12 +286,11 @@ export function childIsActive(child: AdminNavChild, pathname: string, search: st
   if (query) {
     return onPath && cleanSearch === query;
   }
-  // Hubs (Pessoas, Especificações, Produtos & Estoque) usam só `?aba=` — o item do menu
-  // continua ativo na aba escolhida.
+  // Hubs (Pessoas, Produtos & Estoque) usam `?aba=` (+ opcional `espec=` sob Especificações).
   if (onPath && cleanSearch) {
     const params = new URLSearchParams(cleanSearch);
     const keys = [...params.keys()];
-    if (keys.length === 1 && keys[0] === 'aba') return true;
+    if (keys.every((key) => key === 'aba' || key === 'espec') && params.has('aba')) return true;
     return false;
   }
   if (child.end) return pathname === path && !cleanSearch;

@@ -2,7 +2,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import { HubPage, type HubTab } from '../../components/HubPage';
 import { useAuth } from '../../contexts/AuthContext';
 import { canAccessPath, userIsStoreAdmin } from '../../data/erpRegistry';
-import { hubFullAccess, type StockTab } from '../../data/hubPaths';
+import { hubFullAccess, STOCK_SPECS_PARAM, type StockSpecsTab, type StockTab } from '../../data/hubPaths';
 import { SpecificationsPage } from './SpecificationsPage';
 import { StockEntryPage } from './StockEntryPage';
 import { StockPage } from './StockPage';
@@ -58,6 +58,33 @@ export function RedirectToProductsStock({ aba }: { aba: StockTab }) {
   const location = useLocation();
   const base = location.pathname.startsWith('/painel') ? '/painel/produtos' : '/erp/produtos';
   return <Navigate to={`${base}?aba=${aba}`} replace state={location.state} />;
+}
+
+const STOCK_SPECS_TABS = new Set<StockSpecsTab>([
+  'marcas',
+  'atributos',
+  'grupos',
+  'retirada',
+  'kits',
+  'lotes',
+  'almoxarifado',
+]);
+
+/** Kits / Lotes / Almox / marcas… → hub Produtos & Estoque → aba Especificações (+ `espec=`). */
+export function RedirectToProductsStockSpecs({ espec }: { espec?: StockSpecsTab } = {}) {
+  const location = useLocation();
+  const base = location.pathname.startsWith('/painel') ? '/painel/produtos' : '/erp/produtos';
+  // Rotas legadas `/especificacoes?aba=marcas` → hub `?aba=especificacoes&espec=marcas`.
+  const legacyAba = new URLSearchParams(location.search).get('aba');
+  const tab =
+    espec ??
+    (legacyAba && STOCK_SPECS_TABS.has(legacyAba as StockSpecsTab)
+      ? (legacyAba as StockSpecsTab)
+      : undefined);
+  const to = tab
+    ? `${base}?aba=especificacoes&${STOCK_SPECS_PARAM}=${tab}`
+    : `${base}?aba=especificacoes`;
+  return <Navigate to={to} replace state={location.state} />;
 }
 
 function canAccessLegacy(legacy: string | string[], email: string | undefined, full: boolean) {
