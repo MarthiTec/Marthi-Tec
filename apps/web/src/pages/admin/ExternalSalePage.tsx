@@ -15,6 +15,7 @@ import {
 import { useBrands, findBrand, normalizeBrand } from '../../data/brandStore';
 import { useDeviceReference } from '../../data/deviceCatalog';
 import { AdminPicker } from '../../components/AdminPicker';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { CREDIT_METHOD, moneyAdjust, quotePayments, type MoneyMode, type PaymentRow } from '../../data/splitPayment';
 import '../caixa/caixaPayments.css';
 import { CurrencyInput } from '../../components/CurrencyInput';
@@ -91,6 +92,7 @@ const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'c
 
 export function ExternalSalePage() {
   const { user } = useAuth();
+  const { confirm, dialog } = useConfirmDialog();
   const isPrivileged = user?.role === 'admin' || user?.role === 'superadmin';
   const canCorrectSales = isPrivileged || user?.role === 'manager';
   const [searchParams, setSearchParams] = useSearchParams();
@@ -706,8 +708,52 @@ export function ExternalSalePage() {
     if (refreshed && storeRef.current === storeId) setStockItems(refreshed.filter((it: any) => it.active !== false).map(toStockOption));
   }
 
-  /** Cancelar do topo: sai da correção ou limpa a venda em andamento. */
-  function handleCancel() {
+  function isFormDirty() {
+    if (editing) return true;
+    if (savedSaleId) return false;
+    const hasProduct = lines.some(
+      (line) =>
+        Boolean(line.stockId) ||
+        Boolean(line.name?.trim()) ||
+        Number(line.unitPrice) > 0 ||
+        Number(line.qty) !== 1 ||
+        Boolean(line.imei?.trim()),
+    );
+    const customerTouched =
+      selectedCustomerId !== '' ||
+      customerName.trim() !== 'Consumidor Final' ||
+      Boolean(customerPhone.trim()) ||
+      Boolean(customerDocument.trim());
+    const paymentsTouched =
+      payments.length !== 1 ||
+      payments[0]?.method !== CREDIT_METHOD ||
+      Number(payments[0]?.installments) !== 1;
+    return (
+      hasProduct ||
+      customerTouched ||
+      hasTradeIn ||
+      paymentsTouched ||
+      Boolean(selectedSellerId) ||
+      generalDiscount > 0 ||
+      generalSurcharge > 0 ||
+      Boolean(saleNotes.trim()) ||
+      Boolean(catalogOrder)
+    );
+  }
+
+  /** Cancelar do topo: confirma se houver alterações; sai da correção ou limpa a venda. */
+  async function handleCancel() {
+    if (isFormDirty()) {
+      const ok = await confirm({
+        title: editing ? 'Cancelar correção da venda' : 'Cancelar venda externa',
+        message: editing
+          ? 'Descartar as alterações desta correção? Nada será gravado e o formulário será limpo.'
+          : 'Há dados preenchidos nesta venda. Descartar e limpar o formulário?',
+        confirmLabel: editing ? 'Descartar correção' : 'Limpar formulário',
+        danger: true,
+      });
+      if (!ok) return;
+    }
     if (editing) {
       void cancelEdit();
       return;
@@ -814,9 +860,10 @@ export function ExternalSalePage() {
 
   return (
     <div className="admin-page external-sale-page xsale">
+      {dialog}
       <PageHeadingActions>
         <HeadingCancelButton
-          onClick={handleCancel}
+          onClick={() => void handleCancel()}
           disabled={submitting || Boolean(savedSaleId)}
           label={editing ? 'Cancelar correção' : 'Cancelar'}
         />

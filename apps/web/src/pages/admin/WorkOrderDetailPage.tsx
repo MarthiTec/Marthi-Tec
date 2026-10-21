@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { SignaturePad } from '../../components/SignaturePad';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { OperatorAccountPage } from '../shared/OperatorAccountPage';
 import {
   findStockMatches,
@@ -84,6 +85,7 @@ export function WorkOrderDetailPage() {
 
 function WorkOrderDetailBody({ id }: { id: string }) {
   const osBase = useOsBase();
+  const { confirm, dialog } = useConfirmDialog();
   const current = getWorkOrder(id);
   const [form, setForm] = useState(current);
   const [saved, setSaved] = useState(false);
@@ -128,6 +130,7 @@ function WorkOrderDetailBody({ id }: { id: string }) {
   if (!current || !form) {
     return (
       <section className="admin-page">
+        {dialog}
         <article className="admin-card">
           <h2>OS não encontrada</h2>
           <p>Essa ordem não está no histórico local.</p>
@@ -277,6 +280,16 @@ function WorkOrderDetailBody({ id }: { id: string }) {
 
   async function removeLine(lineId: string) {
     if (!form) return;
+    const line = form.lines.find((item) => item.id === lineId);
+    const ok = await confirm({
+      title: 'Estornar peça da OS',
+      message: line
+        ? `Estornar ${line.name} (qtd ${line.qty}) · custo ${money(line.unitCost * line.qty)} · cobrança ${money(line.unitPrice * line.qty)}? A peça volta ao estoque e o lançamento financeiro é revertido.`
+        : 'Estornar esta peça da OS? A peça volta ao estoque e o lançamento financeiro é revertido.',
+      confirmLabel: 'Estornar',
+      danger: true,
+    });
+    if (!ok) return;
     const result = await removeWorkOrderLine(form.id, lineId);
     if (!result.ok) {
       fail(result.error);
@@ -321,6 +334,7 @@ function WorkOrderDetailBody({ id }: { id: string }) {
 
   return (
     <section className="admin-page">
+      {dialog}
       <article className="admin-card">
         <div className="os-detail__top">
           <div>

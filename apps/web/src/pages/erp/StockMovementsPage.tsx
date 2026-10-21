@@ -4,6 +4,7 @@ import { AdminPicker } from '../../components/AdminPicker';
 import { matchesQuery } from '../../components/CrudKit';
 import { getAdminState, STOCK_EVENT } from '../../data/adminStore';
 import { money } from '../../data/financeBook';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import {
   applyStockMovement,
   listStockMovements,
@@ -25,6 +26,7 @@ const MOVE_OPTIONS: { value: StockMoveType; label: string; direction: 1 | -1 }[]
 ];
 
 export function StockMovementsPage() {
+  const { confirm, dialog } = useConfirmDialog();
   const [stock, setStock] = useState(() => getAdminState().stock);
   const [movements, setMovements] = useState(() => listStockMovements(300));
   const [stockId, setStockId] = useState(stock[0]?.id ?? '');
@@ -65,7 +67,7 @@ export function StockMovementsPage() {
     });
   }, [movements, typeFilter, query]);
 
-  function submit() {
+  async function submit() {
     setError('');
     setMessage('');
     if (!stockId) {
@@ -77,6 +79,17 @@ export function StockMovementsPage() {
       setError('Quantidade inválida.');
       return;
     }
+
+    const productLabel = selected ? `${selected.name} · ${selected.sku}` : 'produto';
+    const ok = await confirm({
+      title: isInventory ? 'Confirmar ajuste de inventário' : 'Confirmar movimento de estoque',
+      message: isInventory
+        ? `Definir o saldo de ${productLabel} para ${qtyNum}? O estoque muda imediatamente.`
+        : `${STOCK_MOVE_LABEL[moveType]} de ${qtyNum} un. em ${productLabel} (saldo atual ${selected?.qty ?? '—'})? A quantidade é aplicada na hora.`,
+      confirmLabel: 'Confirmar',
+      danger: moveMeta.direction < 0 || isInventory,
+    });
+    if (!ok) return;
 
     if (isInventory) {
       const result = setStockQtyAbsolute(stockId, qtyNum, note || 'Ajuste de inventário');
@@ -124,6 +137,7 @@ export function StockMovementsPage() {
 
   return (
     <section className="admin-page">
+      {dialog}
       <p className="empty" style={{ marginTop: 0 }}>
         Entradas, saídas, compras (atualizam custo médio e última compra), vendas e inventário.
         Consulte o{' '}
@@ -206,7 +220,7 @@ export function StockMovementsPage() {
         ) : null}
         {message ? <p className="empty">{message}</p> : null}
         <div className="admin-toolbar" style={{ marginTop: 8 }}>
-          <button type="button" className="btn btn--primary" onClick={submit}>
+          <button type="button" className="btn btn--primary" onClick={() => void submit()}>
             Confirmar movimento
           </button>
           <Link to="/erp/produtos?aba=ajustes" className="btn btn--ghost">

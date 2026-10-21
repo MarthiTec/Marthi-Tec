@@ -3239,6 +3239,7 @@ function SaveQuotePanel(props: PanelProps) {
 }
 
 function TotemQueuePanel({ onClose, onDone, onImportTotemTicket }: PanelProps) {
+  const { confirm, dialog } = useConfirmDialog();
   const [tickets, setTickets] = useState<QueueTicket[]>(() => listOpenCashierTickets());
 
   useEffect(() => {
@@ -3255,13 +3256,21 @@ function TotemQueuePanel({ onClose, onDone, onImportTotemTicket }: PanelProps) {
     }
   }
 
-  function handleCancel(id: string) {
-    updateQueueTicket(id, 'cancelled');
+  async function handleCancel(ticket: QueueTicket) {
+    const ok = await confirm({
+      title: 'Descartar pedido do totem',
+      message: `Descartar a senha ${ticket.ticketSenha || ticket.id} · ${ticket.productName} · ${ticket.customerName}? O pedido sai da fila do caixa.`,
+      confirmLabel: 'Descartar',
+      danger: true,
+    });
+    if (!ok) return;
+    updateQueueTicket(ticket.id, 'cancelled');
     onDone('Pedido do totem cancelado.');
   }
 
   return (
     <div className="caixa-totem-panel">
+      {dialog}
       <div className="pdv__modal-head">
         <div>
           <h3>🛎️ Fila de Atendimento do Totem</h3>
@@ -3331,7 +3340,7 @@ function TotemQueuePanel({ onClose, onDone, onImportTotemTicket }: PanelProps) {
                 <button
                   type="button"
                   className="btn btn--ghost caixa-totem-btn-cancel"
-                  onClick={() => handleCancel(t.id)}
+                  onClick={() => void handleCancel(t)}
                   title="Cancelar este pedido"
                 >
                   Descartar
