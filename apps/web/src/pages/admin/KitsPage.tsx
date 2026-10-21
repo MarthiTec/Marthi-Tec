@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
-import { HeadingCancelButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
+import {
+  HeadingCancelButton,
+  HeadingSaveButton,
+  InlineHeadingActions,
+  PageHeadingActions,
+} from '../../components/PageHeadingActions';
 import { getAdminState } from '../../data/adminStore';
 import { ERP_BOOTSTRAP_EVENT } from '../../data/erpBootstrap';
 import { listKits, upsertKit, type ProductKitItem } from '../../data/fiscalCatalog';
@@ -68,8 +73,11 @@ export function KitsPage() {
   }
 
   const dirty = Boolean(name.trim() || sku.trim() || parentStockId || items.length);
+  const inline = useContext(InlineHeadingActions);
 
+  // Só na tela própria — no drawer do produto o StockPage já trata Ctrl+S.
   useEffect(() => {
+    if (inline) return;
     function onKey(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();

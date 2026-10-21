@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AdminPicker } from '../../components/AdminPicker';
 import { CrudIconButton } from '../../components/CrudKit';
-import { HeadingCancelButton, HeadingSaveButton, PageHeadingActions } from '../../components/PageHeadingActions';
+import {
+  HeadingCancelButton,
+  HeadingSaveButton,
+  InlineHeadingActions,
+  PageHeadingActions,
+} from '../../components/PageHeadingActions';
 import {
   listCfops,
   listFiscalClassifications,
@@ -76,7 +81,11 @@ export function FiscalClassPage() {
     setError('');
   }
 
+  const inline = useContext(InlineHeadingActions);
+
+  // Só na tela própria — no drawer do produto o StockPage já trata Ctrl+S.
   useEffect(() => {
+    if (inline) return;
     function onKey(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();

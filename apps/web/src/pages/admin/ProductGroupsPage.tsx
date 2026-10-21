@@ -163,7 +163,10 @@ export function ProductGroupsPage() {
         onSave={() => void save()}
         saving={saving}
         newLabel={`Novo ${labels.group.toLowerCase()}`}
-        items={groups}
+        items={visibleParents.flatMap((parent) => [
+          parent,
+          ...childrenOf(parent.id).filter((child) => matches(parent) || matches(child)),
+        ])}
         currentId={form?.id}
         onOpen={(item) => open(item, true)}
       />

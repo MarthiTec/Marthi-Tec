@@ -48,14 +48,17 @@ export function StoreBrandProfileSection() {
     };
   }, []);
 
-  if (!form || !profile) {
-    return <article className="admin-card">{message ? <p role="alert" className="qty-low">{message.text}</p> : <p className="empty">Carregando dados da loja…</p>}</article>;
-  }
-
-  const set = (patch: Partial<Form>) => {
-    setForm({ ...form, ...patch });
-    setMessage(null);
-  };
+  useEffect(() => {
+    if (!form || !profile) return;
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   async function save() {
     if (!form) return;
@@ -73,22 +76,20 @@ export function StoreBrandProfileSection() {
     }
   }
 
+  if (!form || !profile) {
+    return <article className="admin-card">{message ? <p role="alert" className="qty-low">{message.text}</p> : <p className="empty">Carregando dados da loja…</p>}</article>;
+  }
+
+  const set = (patch: Partial<Form>) => {
+    setForm({ ...form, ...patch });
+    setMessage(null);
+  };
+
   const instagramPreview = form.instagram.trim()
     ? /^https?:\/\//i.test(form.instagram.trim())
       ? form.instagram.trim()
       : `https://instagram.com/${form.instagram.trim().replace(/^@/, '')}`
     : '';
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault();
-        void save();
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   return (
     <>
@@ -99,61 +100,61 @@ export function StoreBrandProfileSection() {
           label={saving ? 'Salvando…' : 'Salvar'}
         />
       </PageHeadingActions>
-    <article className="admin-card">
-      <h2>Dados da loja</h2>
-      <p className="empty">
-        Aparecem no comprovante de venda (impresso e em PDF), nas mensagens de WhatsApp e no totem. O QR Code do
-        comprovante leva para o Instagram da loja (sem Instagram, para o site).
-      </p>
-      <div className="admin-form" style={{ marginTop: 12 }}>
-        <div className="span-2">
-          <TotemSettingsImage
-            label="Logo da loja"
-            hint={
-              profile.logoFromTotem
-                ? 'Esta é a logo que já estava no totem. Troque aqui para usar outra no comprovante e no totem.'
-                : 'Usada no comprovante, no PDF e no totem (se o totem não tiver uma própria). PNG com fundo transparente fica melhor.'
-            }
-            value={form.logo}
-            convert={fileToStoreLogo}
-            onChange={(logo) => set({ logo })}
-          />
+      <article className="admin-card">
+        <h2>Dados da loja</h2>
+        <p className="empty">
+          Aparecem no comprovante de venda (impresso e em PDF), nas mensagens de WhatsApp e no totem. O QR Code do
+          comprovante leva para o Instagram da loja (sem Instagram, para o site).
+        </p>
+        <div className="admin-form" style={{ marginTop: 12 }}>
+          <div className="span-2">
+            <TotemSettingsImage
+              label="Logo da loja"
+              hint={
+                profile.logoFromTotem
+                  ? 'Esta é a logo que já estava no totem. Troque aqui para usar outra no comprovante e no totem.'
+                  : 'Usada no comprovante, no PDF e no totem (se o totem não tiver uma própria). PNG com fundo transparente fica melhor.'
+              }
+              value={form.logo}
+              convert={fileToStoreLogo}
+              onChange={(logo) => set({ logo })}
+            />
+          </div>
+          <label>
+            Telefone de contato
+            <input value={form.phone} inputMode="tel" placeholder="(24) 99999-0000" onChange={(e) => set({ phone: e.target.value })} />
+          </label>
+          <label>
+            E-mail
+            <input value={form.email} type="email" placeholder="contato@sualoja.com.br" onChange={(e) => set({ email: e.target.value })} />
+          </label>
+          <label>
+            Instagram
+            <input value={form.instagram} placeholder="@sualoja" onChange={(e) => set({ instagram: e.target.value })} />
+            {instagramPreview ? <small className="empty">QR Code abre: {instagramPreview}</small> : null}
+          </label>
+          <label>
+            Facebook
+            <input value={form.facebook} placeholder="facebook.com/sualoja" onChange={(e) => set({ facebook: e.target.value })} />
+          </label>
+          <label className="span-2">
+            Site
+            <input value={form.website} placeholder="www.sualoja.com.br" onChange={(e) => set({ website: e.target.value })} />
+          </label>
+          <label className="span-2">
+            Assinatura das mensagens
+            <textarea
+              rows={3}
+              maxLength={600}
+              value={form.signature}
+              placeholder={`${profile.name}\nSeu celular em boas mãos 📱`}
+              onChange={(e) => set({ signature: e.target.value })}
+            />
+            <small className="empty">Vai no fim das mensagens de WhatsApp para o cliente. Em branco, o sistema usa o nome da loja com telefone, Instagram e site.</small>
+          </label>
         </div>
-        <label>
-          Telefone de contato
-          <input value={form.phone} inputMode="tel" placeholder="(24) 99999-0000" onChange={(e) => set({ phone: e.target.value })} />
-        </label>
-        <label>
-          E-mail
-          <input value={form.email} type="email" placeholder="contato@sualoja.com.br" onChange={(e) => set({ email: e.target.value })} />
-        </label>
-        <label>
-          Instagram
-          <input value={form.instagram} placeholder="@sualoja" onChange={(e) => set({ instagram: e.target.value })} />
-          {instagramPreview ? <small className="empty">QR Code abre: {instagramPreview}</small> : null}
-        </label>
-        <label>
-          Facebook
-          <input value={form.facebook} placeholder="facebook.com/sualoja" onChange={(e) => set({ facebook: e.target.value })} />
-        </label>
-        <label className="span-2">
-          Site
-          <input value={form.website} placeholder="www.sualoja.com.br" onChange={(e) => set({ website: e.target.value })} />
-        </label>
-        <label className="span-2">
-          Assinatura das mensagens
-          <textarea
-            rows={3}
-            maxLength={600}
-            value={form.signature}
-            placeholder={`${profile.name}\nSeu celular em boas mãos 📱`}
-            onChange={(e) => set({ signature: e.target.value })}
-          />
-          <small className="empty">Vai no fim das mensagens de WhatsApp para o cliente. Em branco, o sistema usa o nome da loja com telefone, Instagram e site.</small>
-        </label>
-      </div>
-      {message ? <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'ops-page__flash' : 'qty-low'}>{message.text}</p> : null}
-    </article>
+        {message ? <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'ops-page__flash' : 'qty-low'}>{message.text}</p> : null}
+      </article>
     </>
   );
 }
