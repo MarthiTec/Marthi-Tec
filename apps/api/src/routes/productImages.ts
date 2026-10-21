@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { matchReference } from '../services/deviceReference.js';
+import { fetchImageAsDataUrl } from '../services/imageProxy.js';
 import { loadReferences } from './deviceReference.js';
 
 /**
  * Sugestões de foto da web para o produto sem foto (o vendedor escolhe e ela entra como "foto hospedada").
  * iPhone: a foto oficial do modelo na página da Apple. Demais: busca no Wikimedia Commons (imagens livres).
  * Nada é baixado nem gravado aqui: só a lista de endereços HTTPS para a tela.
+ *
+ * O endpoint `/inline` baixa a imagem no servidor (data URL) para o flyer PNG/impressão —
+ * contorna CORS de hosts como Apple/Commons no canvas do browser.
  */
 export const productImagesRouter = Router();
 
@@ -113,6 +117,17 @@ productImagesRouter.get('/api/v1/product-images/suggestions', requireAuth, async
     const unique = items.filter((item, index) => items.findIndex((other) => other.url === item.url) === index).slice(0, 9);
     cache.set(key, { at: Date.now(), items: unique });
     res.json({ success: true, data: unique });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Inline HTTPS → data URL (flyer do Catálogo Digital: print + PNG sem CORS). */
+productImagesRouter.get('/api/v1/product-images/inline', requireAuth, async (req, res, next) => {
+  try {
+    const url = String(req.query.url ?? '').trim();
+    const dataUrl = await fetchImageAsDataUrl(url);
+    res.json({ success: true, data: { dataUrl } });
   } catch (error) {
     next(error);
   }

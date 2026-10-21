@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import html2canvas from 'html2canvas';
 import { AdminPicker } from '../../components/AdminPicker';
 import { QrCodeView, generateQrDataUrl } from '../../components/QrCodeView';
 import {
@@ -10,6 +9,13 @@ import {
   type SalesCatalog,
 } from '../../services/salesCatalogApi';
 import type { CatalogItem, CatalogStore } from '../../components/CatalogDocument';
+import {
+  captureFlyerPngBlob,
+  downloadFlyerPngBlob,
+  flyerCssBackground,
+  inlineFlyerImage,
+  waitForFlyerImages,
+} from '../../utils/catalogFlyerExport';
 import './catalogPromoPrint.css';
 
 type CoverChoice = { id: string; label: string; image: string };
@@ -27,6 +33,8 @@ export function CatalogPromoPrintPage() {
   const [store, setStore] = useState<CatalogStore | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [cover, setCover] = useState('');
+  /** Origem escolhida na grade (antes do inline HTTPS→data) — mantém o highlight. */
+  const [coverOrigin, setCoverOrigin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -54,6 +62,7 @@ export function CatalogPromoPrintPage() {
         setItems(data.items);
         const fallback = preferredCover || data.items.find((item) => item.image)?.image || '';
         setCover(fallback);
+        setCoverOrigin(fallback);
       })
       .catch(() => undefined);
     return () => {
@@ -78,25 +87,75 @@ export function CatalogPromoPrintPage() {
 
   const shareUrl = catalog ? catalogShareUrl(catalog) : '';
   const accent = catalog?.accent || '#e4572e';
+  const cssCover = flyerCssBackground(cover);
+
+  function selectCover(image: string) {
+    setCover(image);
+    setCoverOrigin(image);
+  }
 
   function onUpload(file: File | null) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') setCover(reader.result);
+      if (typeof reader.result === 'string') {
+        setCover(reader.result);
+        setCoverOrigin(reader.result);
+      }
     };
     reader.readAsDataURL(file);
+  }
+
+  /** Inline capa + logo HTTPS → data URL (canvas/print sem CORS e sem data: no CSS). */
+  async function prepareFlyerImages() {
+    const flyer = flyerRef.current;
+    if (!flyer) return;
+
+    const nextCover = cover ? await inlineFlyerImage(cover) : '';
+    if (nextCover && nextCover !== cover) {
+      setCover(nextCover);
+      // Aplica no DOM já — não espera o re-render do React antes do html2canvas/print.
+      flyer.querySelectorAll<HTMLImageElement>('.catpromo__art-photo').forEach((img) => {
+        img.removeAttribute('crossorigin');
+        img.src = nextCover;
+      });
+      flyer.style.backgroundImage = '';
+      flyer.querySelectorAll<HTMLElement>('.catpromo__art').forEach((el) => {
+        el.style.backgroundImage = '';
+      });
+    }
+
+    const logo = store?.logo;
+    if (logo && !logo.startsWith('data:')) {
+      const nextLogo = await inlineFlyerImage(logo);
+      if (nextLogo && nextLogo !== logo) {
+        setStore((current) => (current ? { ...current, logo: nextLogo } : current));
+        flyer.querySelectorAll<HTMLImageElement>('.catpromo__logo').forEach((img) => {
+          img.removeAttribute('crossorigin');
+          img.src = nextLogo;
+        });
+      }
+    }
+
+    await waitForFlyerImages(flyer);
   }
 
   async function downloadQrOnly() {
     if (!shareUrl || !catalog) return;
     setBusy(true);
+    setError('');
     try {
       const dataUrl = await generateQrDataUrl(shareUrl, 600);
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
       const a = document.createElement('a');
-      a.href = dataUrl;
+      const url = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `marthi-catalogo-qr-${catalog.publicSlug || catalog.id}.png`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
       setNotice('QR Code baixado (só o código).');
     } catch {
       setError('Não foi possível baixar o QR Code.');
@@ -108,21 +167,30 @@ export function CatalogPromoPrintPage() {
   async function downloadFlyerPng() {
     if (!flyerRef.current || !catalog) return;
     setBusy(true);
+    setError('');
+    setNotice('');
     try {
-      const canvas = await html2canvas(flyerRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#0f1115',
-        logging: false,
-      });
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png');
-      a.download = `marthi-catalogo-propaganda-${catalog.publicSlug || catalog.id}.png`;
-      a.click();
+      await prepareFlyerImages();
+      if (!flyerRef.current) throw new Error('Prévia indisponível.');
+      const blob = await captureFlyerPngBlob(flyerRef.current);
+      downloadFlyerPngBlob(blob, catalog.publicSlug || catalog.id);
       setNotice('Propaganda baixada em PNG.');
-    } catch {
-      setError('Não foi possível gerar a propaganda. Tente imprimir.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível gerar a propaganda. Tente imprimir.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function printFlyer() {
+    if (!flyerRef.current || !catalog) return;
+    setBusy(true);
+    setError('');
+    try {
+      await prepareFlyerImages();
+      window.print();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível preparar a impressão.');
     } finally {
       setBusy(false);
     }
@@ -164,6 +232,7 @@ export function CatalogPromoPrintPage() {
               onChange={(value) => {
                 setCatalogId(value);
                 setCover('');
+                setCoverOrigin('');
               }}
             />
           </div>
@@ -177,8 +246,8 @@ export function CatalogPromoPrintPage() {
                 key={row.id}
                 type="button"
                 title={row.label}
-                className={`catpromo__cover${cover === row.image ? ' is-on' : ''}`}
-                onClick={() => setCover(row.image)}
+                className={`catpromo__cover${coverOrigin === row.image || cover === row.image ? ' is-on' : ''}`}
+                onClick={() => selectCover(row.image)}
               >
                 <img src={row.image} alt={row.label} referrerPolicy="no-referrer" />
               </button>
@@ -200,7 +269,7 @@ export function CatalogPromoPrintPage() {
         </div>
 
         <div className="catpromo__actions">
-          <button type="button" className="btn btn--primary" disabled={!catalog || busy} onClick={() => window.print()}>
+          <button type="button" className="btn btn--primary" disabled={!catalog || busy} onClick={() => void printFlyer()}>
             Imprimir propaganda
           </button>
           <button type="button" className="btn btn--ghost" disabled={!catalog || busy || !cover} onClick={() => void downloadFlyerPng()}>
@@ -218,11 +287,10 @@ export function CatalogPromoPrintPage() {
           className="catpromo__flyer"
           style={{
             ['--cat-accent' as string]: accent,
-            // background-image no article + <img>: Chromium omite backgrounds
-            // sem print-color-adjust e às vezes filhos absolute no print.
-            ...(cover
+            // background-image só para HTTPS curto — data: enorme no CSS quebra o print do Chrome.
+            ...(cssCover
               ? {
-                  backgroundImage: `url(${JSON.stringify(cover)})`,
+                  backgroundImage: cssCover,
                   backgroundSize: 'cover' as const,
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat' as const,
@@ -235,9 +303,9 @@ export function CatalogPromoPrintPage() {
             className="catpromo__art"
             aria-hidden
             style={
-              cover
+              cssCover
                 ? {
-                    backgroundImage: `url(${JSON.stringify(cover)})`,
+                    backgroundImage: cssCover,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',

@@ -118,7 +118,9 @@
   font-size: 0.82rem;
 }
 
-/* Flyer — arte com capa + QR sobreposto */
+/* Flyer — arte com capa + QR sobreposto.
+   A capa vive no <img.catpromo__art-photo>; background-image só para HTTPS curto
+   (nunca data: enorme — quebra o print preview do Chrome). */
 .catpromo__flyer {
   position: relative;
   width: min(100%, 380px);
