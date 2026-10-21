@@ -59,17 +59,17 @@ const REPORTS: Array<{ to: string; icon: AdminIconName; title: string; text: str
     text: 'Consumo de peças da oficina, estoque baixo e encomendas — CSV e impressão.',
   },
   {
-    to: '/erp/movimentos',
+    to: '/erp/produtos?aba=movimentacoes',
     icon: 'swap',
     title: 'Movimentação de estoque',
-    text: 'Operação: entradas, vendas, ajustes e baixas com saldo.',
+    text: 'Operação (workspace Produtos & Estoque): entradas, vendas, ajustes e baixas.',
     kind: 'ops',
   },
   {
-    to: '/erp/balanco',
+    to: '/erp/produtos?aba=ajustes',
     icon: 'clipboard',
     title: 'Balanço e alertas',
-    text: 'Operação: saldo, mínimo/máximo, custo médio, markup e margem.',
+    text: 'Operação (workspace Produtos & Estoque): saldo, mínimo/máximo, markup e margem.',
     kind: 'ops',
   },
 ];
@@ -167,7 +167,7 @@ export function ErpReportsPage() {
         <article className="admin-card">
           <div className="admin-toolbar">
             <h2 style={{ margin: 0 }}>Estoque baixo</h2>
-            <Link to="/erp/balanco" className="btn btn--ghost">
+            <Link to="/erp/produtos?aba=ajustes" className="btn btn--ghost">
               Balanço
             </Link>
           </div>
@@ -188,7 +188,7 @@ export function ErpReportsPage() {
         <article className="admin-card">
           <div className="admin-toolbar">
             <h2 style={{ margin: 0 }}>Últimos movimentos</h2>
-            <Link to="/erp/movimentos" className="btn btn--ghost">
+            <Link to="/erp/produtos?aba=movimentacoes" className="btn btn--ghost">
               Movimentos
             </Link>
           </div>
