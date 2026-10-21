@@ -25,6 +25,7 @@ import type {
 import {
   nestRequest,
   nestDelete,
+  nestDownload,
   nestGet,
   nestPatch,
   nestPost,
@@ -2406,6 +2407,16 @@ export function apiGetSalesGoalsReport(params: Record<string, string | undefined
   }
   const query = qs.toString();
   return nestGet<any>(`/reports/sales-goals${query ? `?${query}` : ''}`);
+}
+
+/** Export XLSX com Bearer + mesmos filtros da tela (não usar window.open). */
+export function apiExportSalesGoalsReport(params: Record<string, string | undefined>) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) qs.set(k, v);
+  }
+  const query = qs.toString();
+  return nestDownload(`/reports/sales-goals/export${query ? `?${query}` : ''}`);
 }
 
 export function apiListPickups() {

@@ -76,7 +76,7 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
       `SELECT created_at FROM (
          SELECT created_at, SUM(COALESCE(${metric}, 0)) OVER (ORDER BY created_at, id) AS acc
            FROM sales_orders
-          WHERE store_id = $1 AND status != 'cancelled' AND created_at::date >= $2::date ${sellerFilter}
+          WHERE store_id = $1 AND status = 'completed' AND created_at::date >= $2::date ${sellerFilter}
        ) t WHERE acc >= $3 ORDER BY created_at LIMIT 1`,
       reachParams,
     );
@@ -93,7 +93,7 @@ export async function computeGoalMetrics(goal: any, storeId: string) {
       COALESCE(SUM(gross_profit), 0)::numeric as total_profit
     FROM sales_orders
     WHERE store_id = $1
-      AND status != 'cancelled'
+      AND status = 'completed'
       AND created_at::date >= $2::date
       ${openEnded ? 'AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)' : 'AND created_at::date <= $3::date'}
       ${sellerFilter}

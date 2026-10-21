@@ -50,6 +50,7 @@ const WORDS: Record<string, string> = {
   '/painel/pessoas': 'clientes fornecedores vendedores funcionarios cadastro',
   '/erp/api-aparelhos': 'consulta aparelho modelo ficha',
   '/painel/financeiro': 'financeiro contas pagar receber caixa fluxo',
+  '/erp/relatorios': 'relatorios indicadores dre vendas metas estoque imei pecas hub central',
   '/painel/lojas': 'empresa lojas filiais licenca plano cnpj',
   '/painel/plano': 'plano faturamento assinatura pix fatura cobranca mensalidade',
   '/painel/faturamento': 'plano faturamento assinatura pix fatura cobranca mensalidade',

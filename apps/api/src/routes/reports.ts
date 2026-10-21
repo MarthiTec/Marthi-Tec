@@ -51,7 +51,8 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
       return;
     }
 
-    const conditions: string[] = ['s.store_id = $1', "s.status != 'cancelled'"];
+    // Alinhado ao dashboard: só vendas concluídas (não basta excluir canceladas).
+    const conditions: string[] = ['s.store_id = $1', "s.status = 'completed'"];
     const values: any[] = [storeId];
     let pIdx = 2;
 
@@ -78,6 +79,12 @@ reportsRouter.get('/api/v1/reports/sales-goals', requireAuth, async (req, res, n
     if (paymentMethod && typeof paymentMethod === 'string' && paymentMethod !== 'all') {
       conditions.push(`s.payment_name ILIKE $${pIdx++}`);
       values.push(`%${paymentMethod}%`);
+    }
+    if (productId && typeof productId === 'string' && productId !== 'all') {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM sales_order_lines pl WHERE (pl.sale_id = s.id OR pl.order_id = s.id) AND pl.stock_id = $${pIdx++})`,
+      );
+      values.push(productId);
     }
 
     const sql = `
@@ -256,38 +263,58 @@ reportsRouter.get('/api/v1/reports/sales-goals/export', requireAuth, async (req,
       return;
     }
 
-    const { startDate, endDate, sellerId } = req.query;
-    const conditions: string[] = ['store_id = $1', "status != 'cancelled'"];
+    const { startDate, endDate, sellerId, paymentMethod, saleType, customerId, productId } = req.query;
+    // Mesmos filtros e status da tela GET /sales-goals (Bearer obrigatório via requireAuth).
+    const conditions: string[] = ['s.store_id = $1', "s.status = 'completed'"];
     const values: any[] = [storeId];
     let pIdx = 2;
 
     if (startDate && typeof startDate === 'string') {
-      conditions.push(`created_at::date >= $${pIdx++}::date`);
+      conditions.push(`s.created_at::date >= $${pIdx++}::date`);
       values.push(startDate);
     }
     if (endDate && typeof endDate === 'string') {
-      conditions.push(`created_at::date <= $${pIdx++}::date`);
+      conditions.push(`s.created_at::date <= $${pIdx++}::date`);
       values.push(endDate);
     }
     if (sellerId && typeof sellerId === 'string' && sellerId !== 'all') {
-      conditions.push(`seller_id = $${pIdx++}`);
+      conditions.push(`s.seller_id = $${pIdx++}`);
       values.push(sellerId);
+    }
+    if (customerId && typeof customerId === 'string' && customerId !== 'all') {
+      conditions.push(`s.customer_id = $${pIdx++}`);
+      values.push(customerId);
+    }
+    if (saleType && typeof saleType === 'string' && saleType !== 'all') {
+      conditions.push(`s.sale_type = $${pIdx++}`);
+      values.push(saleType);
+    }
+    if (paymentMethod && typeof paymentMethod === 'string' && paymentMethod !== 'all') {
+      conditions.push(`s.payment_name ILIKE $${pIdx++}`);
+      values.push(`%${paymentMethod}%`);
+    }
+    if (productId && typeof productId === 'string' && productId !== 'all') {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM sales_order_lines pl WHERE (pl.sale_id = s.id OR pl.order_id = s.id) AND pl.stock_id = $${pIdx++})`,
+      );
+      values.push(productId);
     }
 
     const query = `
       SELECT
-        created_at::date as data,
-        id as venda_numero,
-        customer_name as cliente,
-        seller_name as vendedor,
-        payment_name as forma_pagamento,
-        total_amount as valor_venda,
-        cost_total as custo,
-        gross_profit as lucro,
-        margin_percent as margem_percent
-      FROM sales_orders
+        s.created_at::date as data,
+        s.id as venda_numero,
+        s.customer_name as cliente,
+        s.seller_name as vendedor,
+        s.payment_name as forma_pagamento,
+        s.sale_type as tipo_venda,
+        s.total_amount as valor_venda,
+        s.cost_total as custo,
+        s.gross_profit as lucro,
+        s.margin_percent as margem_percent
+      FROM sales_orders s
       WHERE ${conditions.join(' AND ')}
-      ORDER BY created_at DESC
+      ORDER BY s.created_at DESC
     `;
 
     const result = await pool.query(query, values);
@@ -300,12 +327,13 @@ reportsRouter.get('/api/v1/reports/sales-goals/export', requireAuth, async (req,
         'Cliente': r.cliente,
         'Vendedor': r.vendedor,
         'Forma de Pagamento': r.forma_pagamento,
-        'Valor da Venda (R$)': Number(r.valor_venda),
+        'Tipo': r.tipo_venda === 'external' ? 'Venda Externa' : 'PDV Balcão',
+        'Receita da venda (R$)': Number(r.valor_venda),
       };
 
       if (canViewProfit) {
         base['Custo (R$)'] = Number(r.custo);
-        base['Lucro Bruto (R$)'] = Number(r.lucro);
+        base['Lucro bruto (R$)'] = Number(r.lucro);
         base['Margem (%)'] = Number(r.margem_percent);
       }
 
