@@ -1,9 +1,10 @@
+/* Solicitar ao vendedor — tema claro, alinhado ao catálogo / ChoiceField / manutenção. */
 .cpr {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: #0b1220;
-  color: #f8fafc;
+  background: #f3f4f6;
+  color: #16181d;
   display: flex;
   flex-direction: column;
   --cat-accent: #e4572e;
@@ -14,13 +15,20 @@
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #fff;
+  border-bottom: 1px solid #e6e7eb;
+  box-shadow: 0 1px 0 rgba(22, 24, 29, 0.04);
+}
+
+.cpr__head strong {
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 .cpr__back {
   border: 0;
   background: transparent;
-  color: inherit;
+  color: #16181d;
   font-size: 1.25rem;
   cursor: pointer;
   padding: 4px 8px;
@@ -41,21 +49,22 @@
 
 .cpr__lead {
   margin: 0;
-  color: #cbd5e1;
+  color: #6b7280;
   line-height: 1.45;
 }
 
 .cpr__product {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e6e7eb;
+  box-shadow: 0 3px 14px rgba(22, 24, 29, 0.05);
 }
 
 .cpr__product span {
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 0.9rem;
 }
 
@@ -63,17 +72,27 @@
   display: grid;
   gap: 6px;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  font-weight: 700;
+  color: #4b5563;
 }
 
 .cpr__form input,
 .cpr__form textarea {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 23, 42, 0.55);
-  color: #f8fafc;
-  border-radius: 10px;
+  border: 1px solid #d8dbe0;
+  background: #fff;
+  color: #16181d;
+  border-radius: 14px;
   padding: 10px 12px;
   font: inherit;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.cpr__form input:focus,
+.cpr__form textarea:focus {
+  outline: 2px solid var(--cat-accent, #e4572e);
+  outline-offset: 0;
+  border-color: transparent;
 }
 
 .cpr__honey {
@@ -86,15 +105,17 @@
 
 .cpr__error {
   margin: 0;
-  color: #fca5a5;
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .cpr__btn {
   border: 0;
-  border-radius: 12px;
+  border-radius: 999px;
   padding: 12px 16px;
+  min-height: 50px;
   font: inherit;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   background: var(--cat-accent, #e4572e);
   color: #fff;
@@ -108,8 +129,9 @@
 }
 
 .cpr__btn--ghost {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #fff;
+  color: #16181d;
+  border: 1px solid #d8dbe0;
 }
 
 .cpr__protocol {
@@ -120,39 +142,75 @@
 
 .cpr__done p {
   margin: 0;
-  color: #cbd5e1;
+  color: #6b7280;
   line-height: 1.45;
 }
 
 .cpr__muted {
   margin: 0;
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 0.9rem;
 }
 
 .cpr__desc {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(228, 87, 46, 0.12);
-  border: 1px solid rgba(228, 87, 46, 0.28);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cat-accent, #e4572e) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--cat-accent, #e4572e) 28%, #e6e7eb);
 }
 
 .cpr__desc span {
   font-size: 0.75rem;
-  color: #fb923c;
+  color: var(--cat-accent, #e4572e);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: 800;
 }
 
 .cpr__desc strong {
   font-size: 1.05rem;
   letter-spacing: 0.02em;
+  color: #16181d;
 }
 
 .cpr .choice-field {
   margin: 0;
+}
+
+/* Garante contraste do ChoiceField dentro do overlay (herança de cor). */
+.cpr .choice-chips button {
+  background: #fff;
+  color: #16181d;
+  border-color: #d8dbe0;
+}
+
+.cpr .choice-chips button.is-on {
+  background: var(--cat-accent, #e4572e);
+  border-color: var(--cat-accent, #e4572e);
+  color: #fff;
+}
+
+.cpr .choice-combo__btn {
+  background: #fff;
+  color: #16181d;
+  border-color: #d8dbe0;
+}
+
+.cpr .choice-combo__panel {
+  background: #fff;
+  color: #16181d;
+}
+
+.cpr .choice-combo__panel input {
+  background: #fff;
+  color: #16181d;
+  border-color: #d8dbe0;
+}
+
+.cpr .choice-combo__panel li[role='option'] {
+  color: #16181d;
 }
 
 .cpr__condition {
@@ -166,7 +224,8 @@
 .cpr__condition legend {
   padding: 0;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  font-weight: 700;
+  color: #4b5563;
 }
 
 .cpr__condition-row {
@@ -178,18 +237,19 @@
 .cpr__condition-row button {
   flex: 1;
   min-width: 7rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(15, 23, 42, 0.55);
-  color: #e2e8f0;
-  border-radius: 10px;
+  min-height: 42px;
+  border: 1px solid #d8dbe0;
+  background: #fff;
+  color: #16181d;
+  border-radius: 999px;
   padding: 10px 14px;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .cpr__condition-row button.is-on {
   border-color: var(--cat-accent, #e4572e);
-  background: color-mix(in srgb, var(--cat-accent, #e4572e) 22%, transparent);
+  background: var(--cat-accent, #e4572e);
   color: #fff;
 }
