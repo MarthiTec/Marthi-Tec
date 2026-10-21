@@ -118,7 +118,9 @@
 .repairs__picker { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line, #e2e8f0); border-radius: 16px; background: var(--card, #fff); }
 .repairs__manual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; align-items: end; }
 .repairs__manual label { display: grid; gap: 4px; min-width: 0; color: var(--mute, #64748b); font-size: .74rem; font-weight: 700; }
-.repairs__manual input, .repairs__devices input, .repairs__row--add input, .repairs__time input, .repairs__time select { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--line, #d8dde3); border-radius: 10px; background: #fff; color: var(--ink, #16181d); font: inherit; font-size: .86rem; box-sizing: border-box; }
+.repairs__manual input, .repairs__devices input, .repairs__row--add input, .repairs__time input { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--line, #d8dde3); border-radius: 10px; background: #fff; color: var(--ink, #16181d); font: inherit; font-size: .86rem; box-sizing: border-box; }
+.repairs__time .admin-picker { min-width: 72px; }
+.repairs__time .admin-picker__trigger { min-height: 40px; }
 .repairs__workspace { display: grid; gap: 14px; align-items: start; }
 .repairs__workspace.has-device, .repairs__workspace:has(.repairs__device-empty) { grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); }
 .repairs__devices { position: sticky; top: 12px; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 16px; background: var(--card, #fff); max-height: calc(100vh - 160px); overflow-y: auto; }
@@ -197,7 +199,7 @@
   .repairs__add-name { grid-template-columns: minmax(0, 1fr); }
   .repairs__option { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; }
 }
-.admin.admin--dark .repairs__manual input, .admin.admin--dark .repairs__devices input, .admin.admin--dark .repairs__add input, .admin.admin--dark .repairs__add select, .admin.admin--dark .repairs__time input, .admin.admin--dark .repairs__time select { background: #121820; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
+.admin.admin--dark .repairs__manual input, .admin.admin--dark .repairs__devices input, .admin.admin--dark .repairs__add input, .admin.admin--dark .repairs__time input { background: #121820; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
 .admin.admin--dark .repairs__icon { background: transparent; border-color: rgba(148, 163, 184, 0.28); color: #e8eef4; }
 .repairs__neg { color: #dc2626; }
 .repairs__diagnosis { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 12%, transparent); color: inherit; font-size: .84rem; line-height: 1.4; }

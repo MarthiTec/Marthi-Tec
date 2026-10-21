@@ -8,6 +8,8 @@ import {
   apiCreateLot,
   apiCreateWarehouse,
   apiCreateWarehouseMove,
+  apiDeleteKit,
+  apiDeleteWarehouse,
   apiListCfops,
   apiListFecps,
   apiListFiscalClassifications,
@@ -802,6 +804,27 @@ export async function upsertWarehouse(
   return { ok: true, data: created };
 }
 
+export async function deleteWarehouse(id: string): Promise<CatalogResult<true>> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeleteWarehouse(id);
+      const state = load();
+      state.warehouses = state.warehouses.filter((item) => item.id !== id);
+      save(state);
+      return { ok: true, data: true };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao excluir almoxarifado.') };
+    }
+  }
+  const state = load();
+  if (!state.warehouses.some((item) => item.id === id)) {
+    return { ok: false, error: 'Almoxarifado não encontrado.' };
+  }
+  state.warehouses = state.warehouses.filter((item) => item.id !== id);
+  save(state);
+  return { ok: true, data: true };
+}
+
 export async function createLot(input: {
   stockId: string;
   stockName: string;
@@ -928,6 +951,27 @@ export async function upsertKit(input: {
   state.kits = [created, ...state.kits];
   save(state);
   return { ok: true, data: created };
+}
+
+export async function deleteKit(id: string): Promise<CatalogResult<true>> {
+  if (isNestAuthed()) {
+    try {
+      await apiDeleteKit(id);
+      const state = load();
+      state.kits = state.kits.filter((item) => item.id !== id);
+      save(state);
+      return { ok: true, data: true };
+    } catch (error) {
+      return { ok: false, error: nestError(error, 'Falha ao excluir kit.') };
+    }
+  }
+  const state = load();
+  if (!state.kits.some((item) => item.id === id)) {
+    return { ok: false, error: 'Kit não encontrado.' };
+  }
+  state.kits = state.kits.filter((item) => item.id !== id);
+  save(state);
+  return { ok: true, data: true };
 }
 
 export async function createWarehouseMove(input: {

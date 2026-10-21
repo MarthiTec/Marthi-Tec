@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AdminIcon } from '../../components/AdminIcons';
-import { AdminPicker } from '../../components/AdminPicker';
+import { AdminPicker, CrudRowActions, confirmDelete } from '../../design-system';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { QuickModal } from '../../components/QuickModal';
 import { UppercaseToggle, useUppercase } from '../../components/UppercaseToggle';
@@ -207,7 +206,7 @@ export function RepairServicesPage() {
     }
   }
   async function remove(service: RepairService) {
-    if (!window.confirm(`Excluir "${service.name}" do ${service.brand} ${service.model}?`)) return;
+    if (!confirmDelete(`${service.name} (${service.brand} ${service.model})`)) return;
     try {
       await apiDeleteRepairService(service.id);
       setServices((list) => list.filter((item) => item.id !== service.id));
@@ -313,19 +312,13 @@ export function RepairServicesPage() {
                     <span data-label="Ativo">
                       <input type="checkbox" checked={service.active} aria-label={`${service.name} ativo`} onChange={() => void patchService(service, { active: !service.active })} />
                     </span>
-                    <span className="repairs__row-actions">
-                      <button type="button" className="repairs__icon" title="Editar" aria-label={`Editar ${service.name}`} onClick={() => open(service)}>
-                        <AdminIcon name="edit" />
-                      </button>
-                      <button type="button" className="repairs__icon" title="Copiar para outro aparelho" aria-label={`Copiar ${service.name} para outro aparelho`} onClick={() => open(service, true)}>
-                        <svg className="admin-ico" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="9" y="9" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                          <path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                        </svg>
-                      </button>
-                      <button type="button" className="repairs__icon repairs__icon--danger" title="Excluir" aria-label={`Excluir ${service.name}`} onClick={() => void remove(service)}>
-                        <AdminIcon name="trash" />
-                      </button>
+                    <span className="repairs__row-actions" onClick={(e) => e.stopPropagation()}>
+                      <CrudRowActions
+                        onView={() => open(service)}
+                        onEdit={() => open(service)}
+                        onDuplicate={() => open(service, true)}
+                        onDelete={() => void remove(service)}
+                      />
                     </span>
                   </div>
                 );
@@ -355,11 +348,18 @@ export function RepairServicesPage() {
                 Prazo
                 <span className="repairs__time">
                   <input value={quick.time} inputMode="decimal" placeholder="0" aria-label="Prazo" onChange={(e) => setQuick((value) => ({ ...value, time: e.target.value }))} />
-                  <select value={quick.unit} aria-label="Unidade do prazo" onChange={(e) => setQuick((value) => ({ ...value, unit: e.target.value as Unit }))}>
-                    <option value="min">min</option>
-                    <option value="h">h</option>
-                    <option value="d">dias</option>
-                  </select>
+                  <AdminPicker
+                    compact
+                    label="Unidade do prazo"
+                    value={quick.unit}
+                    searchable={false}
+                    options={[
+                      { value: 'min', label: 'min' },
+                      { value: 'h', label: 'h' },
+                      { value: 'd', label: 'dias' },
+                    ]}
+                    onChange={(unit) => setQuick((value) => ({ ...value, unit: unit as Unit }))}
+                  />
                 </span>
               </label>
               <div className="repairs__add-go">
@@ -439,11 +439,18 @@ export function RepairServicesPage() {
               Prazo estimado
               <span className="repairs__time">
                 <input value={time.value} inputMode="decimal" placeholder="0" onChange={(e) => set({ estimatedMinutes: inputToMinutes(e.target.value, time.unit) })} />
-                <select value={time.unit} onChange={(e) => set({ estimatedMinutes: inputToMinutes(time.value, e.target.value as Unit) })}>
-                  <option value="min">min</option>
-                  <option value="h">horas</option>
-                  <option value="d">dias</option>
-                </select>
+                <AdminPicker
+                  compact
+                  label="Unidade do prazo"
+                  value={time.unit}
+                  searchable={false}
+                  options={[
+                    { value: 'min', label: 'min' },
+                    { value: 'h', label: 'horas' },
+                    { value: 'd', label: 'dias' },
+                  ]}
+                  onChange={(unit) => set({ estimatedMinutes: inputToMinutes(time.value, unit as Unit) })}
+                />
               </span>
             </label>
             <label className="quick-modal__check repairs__active">
