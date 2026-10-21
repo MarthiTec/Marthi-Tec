@@ -28,7 +28,22 @@ export function useBrands() {
   const reload = useCallback(async () => {
     const current = ++version.current;
     setLoading(true); setError('');
-    try { const rows = await fetchBrands(); if (current === version.current) setBrands(rows); }
+    try {
+      // Um retry curto cobre o blip de HTML 404 do edge durante restart/deploy do Site.
+      let rows: Brand[] | null = null;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          rows = await fetchBrands();
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
+        }
+      }
+      if (rows) { if (current === version.current) setBrands(rows); }
+      else throw lastErr;
+    }
     catch (err) { if (current === version.current) { setBrands([]); setError(err instanceof Error ? err.message : 'Não foi possível carregar as marcas.'); } }
     finally { if (current === version.current) setLoading(false); }
   }, []);
