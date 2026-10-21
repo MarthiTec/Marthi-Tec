@@ -1,8 +1,47 @@
 import type { NextFunction, Request, Response } from 'express';
-import {requireAuth} from './authMiddleware.js';
+import { SignJWT } from 'jose';
+import { requireAuth } from './authMiddleware.js';
 
 function nestOrigin() {
   return (process.env.NEST_API_URL || '').replace(/\/$/, '');
+}
+
+/**
+ * Nest Site on Discloud currently keeps runtime JWT_SECRET stuck at the Nest
+ * scaffold default (panel updates do not apply to that key). Totem signs with a
+ * different secret. When proxying, re-sign a Nest-facing Bearer with the Nest
+ * secret so Nest can verify HMAC; prefer NEST_JWT_SECRET when Discloud applies it.
+ */
+function nestJwtSecret(): Uint8Array {
+  const raw = (
+    process.env.NEST_JWT_SECRET ||
+    process.env.NEST_JWT_ACCESS_SECRET ||
+    // Known Nest runtime default until Discloud applies JWT_SECRET updates.
+    'marthi-dev-secret-change-me'
+  ).trim();
+  return new TextEncoder().encode(raw);
+}
+
+async function nestFacingAuthorization(req: Request): Promise<string | undefined> {
+  const user = req.user;
+  if (!user?.id || !user.email) {
+    return req.header('authorization') || undefined;
+  }
+
+  const token = await new SignJWT({
+    email: user.email,
+    name: user.name || user.email,
+    picture: user.picture ?? null,
+    provider: user.provider === 'google' ? 'google' : 'password',
+    storeId: req.storeId || '',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime('2h')
+    .sign(nestJwtSecret());
+
+  return `Bearer ${token}`;
 }
 
 function apiPathname(req: Request) {
@@ -44,14 +83,17 @@ export async function proxyUnmatchedApi(req: Request, res: Response, next: NextF
 
   if (!nestOrigin()) return next();
   if (!req.user) {
-    return requireAuth(req,res, (error?:unknown) => { if(error) return next(error); void proxyUnmatchedApi(req,res,next); });
+    return requireAuth(req, res, (error?: unknown) => {
+      if (error) return next(error);
+      void proxyUnmatchedApi(req, res, next);
+    });
   }
   const target = `${nestOrigin()}${req.originalUrl}`;
   try {
     const headers = new Headers();
-    const authorization = req.header('authorization');
+    const authorization = await nestFacingAuthorization(req);
     if (authorization) headers.set('authorization', authorization);
-    if(req.storeId) headers.set('x-store-id',req.storeId);
+    if (req.storeId) headers.set('x-store-id', req.storeId);
     // Preferimos JSON: páginas HTML de indisponibilidade do edge quebravam o painel.
     headers.set('accept', 'application/json');
 
@@ -64,11 +106,18 @@ export async function proxyUnmatchedApi(req: Request, res: Response, next: NextF
       }
     }
 
-    const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(15000) });
+    const upstream = await fetch(target, {
+      method: req.method,
+      headers,
+      body,
+      redirect: 'error',
+      signal: AbortSignal.timeout(15000),
+    });
     const text = await upstream.text();
     const type = upstream.headers.get('content-type');
     if (!looksLikeJson(text, type)) {
-      const unavailable = upstream.status === 404 || upstream.status >= 500 || /service unavailable/i.test(text);
+      const unavailable =
+        upstream.status === 404 || upstream.status >= 500 || /service unavailable/i.test(text);
       res.status(unavailable ? 502 : upstream.status || 502).json({
         success: false,
         error: {
