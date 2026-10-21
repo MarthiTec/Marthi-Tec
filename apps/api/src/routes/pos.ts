@@ -12,6 +12,7 @@ import { unreservedQuantity } from '../services/commercialReservations.js';
 import { reduceStockQtyInMemory } from './stock.js';
 import { lineUnitCost } from '../services/saleCost.js';
 import { applyRealSaleCost } from '../services/saleHistory.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 export const posRouter = Router();
 
@@ -164,6 +165,21 @@ posRouter.post('/api/v1/pos/sessions/open', requireAuth, async (req, res, next) 
           [movId, id, storeId, body.openingFloat, body.note || 'Abertura de caixa', body.operatorName, openedAt],
         );
 
+        await writeAuditLogSafe(client, {
+          storeId,
+          userId: req.user?.id,
+          action: 'pdv.caixa.abrir',
+          entity: 'cash_session',
+          entityId: id,
+          actionType: 'conclusao',
+          module: 'pdv',
+          menuLabel: 'PDV / Caixa',
+          summary: `Abertura de caixa · fundo ${body.openingFloat}`,
+          details: { openingFloat: body.openingFloat, terminalId: body.terminalId || null },
+          ip: req.ip,
+          actorName: req.user?.name || body.operatorName,
+          actorEmail: req.user?.email,
+        });
         await client.query('COMMIT');
 
         res.status(201).json({
@@ -353,6 +369,21 @@ posRouter.post('/api/v1/pos/sessions/:id/close', requireAuth, async (req, res, n
           [movId, sessionId, storeId, body.countedCash, body.note || 'Fechamento de caixa', body.operatorName],
         );
 
+        await writeAuditLogSafe(client, {
+          storeId,
+          userId: req.user?.id,
+          action: 'pdv.caixa.fechar',
+          entity: 'cash_session',
+          entityId: sessionId,
+          actionType: 'conclusao',
+          module: 'pdv',
+          menuLabel: 'PDV / Caixa',
+          summary: `Fechamento de caixa · diferença ${diff}`,
+          details: { countedCash: body.countedCash, expectedCash: expCash, difference: diff },
+          ip: req.ip,
+          actorName: req.user?.name || body.operatorName,
+          actorEmail: req.user?.email,
+        });
         await client.query('COMMIT');
         res.json({ success: true, data: { ok: true, difference: diff } });
         return;
@@ -570,6 +601,21 @@ posRouter.post('/api/v1/pos/sales', requireAuth, async (req, res, next) => {
           );
         }
 
+        await writeAuditLogSafe(client, {
+          storeId,
+          userId: req.user?.id,
+          action: 'pdv.venda.concluir',
+          entity: 'sales_order',
+          entityId: orderId,
+          actionType: 'conclusao',
+          module: 'pdv',
+          menuLabel: 'PDV / Caixa',
+          summary: `Venda PDV ${orderId} · ${body.paymentName}`,
+          details: { total, linesCount: body.lines.length, paymentName: body.paymentName },
+          ip: req.ip,
+          actorName: req.user?.name,
+          actorEmail: req.user?.email,
+        });
         await client.query('COMMIT');
 
         res.status(201).json({

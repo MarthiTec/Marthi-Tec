@@ -6,6 +6,21 @@ import { useAuth } from '../../auth/AuthContext';
 import { Screen } from '../../components/Screen';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
+const ACTION_TYPE_LABEL: Record<string, string> = {
+  inclusao: 'Inclusão',
+  alteracao: 'Alteração',
+  exclusao: 'Exclusão',
+  conclusao: 'Conclusão',
+};
+
+function titleFor(item: AuditLogEntry) {
+  const type = item.actionTypeLabel || (item.actionType ? ACTION_TYPE_LABEL[item.actionType] : '');
+  const module = item.moduleLabel || item.module || '';
+  if (type && module) return `${type} · ${module}`;
+  if (type) return type;
+  return item.action;
+}
+
 export function ActivitiesScreen() {
   const c = useThemeColors();
   const router = useRouter();
@@ -44,7 +59,7 @@ export function ActivitiesScreen() {
         <TextInput
           value={action}
           onChangeText={setAction}
-          placeholder="Filtrar ação (ex.: price_change)"
+          placeholder="Filtrar ação (ex.: produto.criar)"
           placeholderTextColor={c.mute}
           style={{
             borderWidth: StyleSheet.hairlineWidth,
@@ -89,16 +104,19 @@ export function ActivitiesScreen() {
           ListEmptyComponent={!loading ? <Text style={{ color: c.mute, textAlign: 'center' }}>Sem atividades nesta loja.</Text> : null}
           renderItem={({ item }) => (
             <View style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: c.line, backgroundColor: c.card, borderRadius: 12, padding: 12 }}>
-              <Text style={{ color: c.ink, fontWeight: '800' }}>{item.action}</Text>
+              <Text style={{ color: c.ink, fontWeight: '800' }}>{titleFor(item)}</Text>
               <Text style={{ color: c.mute, fontSize: 12, marginTop: 2 }}>
-                {item.entity}
+                {item.menuLabel || item.action}
                 {item.entityId ? ` · ${item.entityId}` : ''}
               </Text>
+              {item.summary ? (
+                <Text style={{ color: c.ink, fontSize: 13, marginTop: 6 }} numberOfLines={3}>
+                  {item.summary}
+                </Text>
+              ) : null}
               <Text style={{ color: c.mute, fontSize: 11, marginTop: 4 }}>
                 {item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : ''}
-              </Text>
-              <Text style={{ color: c.mute, fontSize: 11, marginTop: 6 }} numberOfLines={4}>
-                {JSON.stringify(item.details)}
+                {item.actorName ? ` · ${item.actorName}` : ''}
               </Text>
             </View>
           )}

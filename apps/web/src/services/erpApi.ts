@@ -2103,6 +2103,66 @@ export function apiCreateAudit(body: {
   return nestPost<ApiAuditEntry>('/audit', body);
 }
 
+/** Trilha operacional MarthiDB (Express `audit_logs`) — fonte da tela Auditoria. */
+export type ApiAuditActionType = 'inclusao' | 'alteracao' | 'exclusao' | 'conclusao';
+
+export type ApiStoreAuditEntry = {
+  id: string;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  userId?: string | null;
+  module?: string | null;
+  moduleLabel?: string | null;
+  menuLabel?: string | null;
+  actionType?: ApiAuditActionType | string | null;
+  actionTypeLabel?: string | null;
+  summary?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  details?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ApiStoreAuditMeta = {
+  modules: Array<{ value: string; label: string }>;
+  actionTypes: Array<{ value: string; label: string }>;
+};
+
+export function apiListStoreAudit(query?: {
+  action?: string;
+  entity?: string;
+  module?: string;
+  menu?: string;
+  actionType?: ApiAuditActionType | string;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.action) params.set('action', query.action);
+  if (query?.entity) params.set('entity', query.entity);
+  if (query?.module) params.set('module', query.module);
+  if (query?.menu) params.set('menu', query.menu);
+  if (query?.actionType) params.set('actionType', query.actionType);
+  if (query?.limit) params.set('limit', String(query.limit));
+  const qs = params.toString();
+  return nestGet<ApiStoreAuditEntry[]>(`/audit-logs${qs ? `?${qs}` : ''}`);
+}
+
+export function apiCreateStoreAudit(body: {
+  action: string;
+  entity?: string;
+  entityId?: string;
+  actionType?: ApiAuditActionType;
+  module?: string;
+  menuLabel?: string;
+  summary?: string;
+  path?: string;
+  kind?: ApiAuditKind;
+  details?: Record<string, unknown>;
+}) {
+  return nestPost<ApiStoreAuditEntry>('/audit-logs', body);
+}
+
 /** Público — sem Bearer (loja seed no Nest). */
 export function apiTrackTotemClick(body: { productId: string; productName: string }) {
   return nestPost<{ id: string; productId: string; productName: string; createdAt: string }>(

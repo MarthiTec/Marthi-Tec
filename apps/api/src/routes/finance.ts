@@ -5,6 +5,7 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { pool } from '../db/pool.js';
 import { blockedMemoryMap } from '../db/requireDb.js';
 import { assertBillAmountEditable, assertBillDeletable, assertBillRevertible } from '../services/billRules.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 export const financeRouter = Router();
 
@@ -165,6 +166,20 @@ financeRouter.post('/api/v1/finance/accounts', requireAuth, async (req, res, nex
       );
       const resQuery = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
       const r = resQuery.rows[0];
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'financeiro.conta.criar',
+        entity: 'bank_account',
+        entityId: id,
+        actionType: 'inclusao',
+        module: 'financeiro',
+        menuLabel: 'Financeiro · Contas',
+        summary: body.name.trim(),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.status(201).json({
         success: true,
         data: {
@@ -212,6 +227,20 @@ financeRouter.patch('/api/v1/finance/accounts/:id', requireAuth, async (req, res
         [body.name, body.bank, body.agency, body.number, body.type, body.active, id, storeId],
       );
       const updated = await pool.query(`SELECT * FROM bank_accounts WHERE id = $1 AND store_id = $2`, [id, storeId]);
+      await writeAuditLogSafe(pool, {
+        storeId,
+        userId: req.user?.id,
+        action: 'financeiro.conta.atualizar',
+        entity: 'bank_account',
+        entityId: id,
+        actionType: 'alteracao',
+        module: 'financeiro',
+        menuLabel: 'Financeiro · Contas',
+        summary: String(body.name || updated.rows[0]?.name || id),
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       res.json({ success: true, data: rowToClient(updated.rows[0]) });
       return;
     }
@@ -234,6 +263,20 @@ financeRouter.delete('/api/v1/finance/accounts/:id', requireAuth, async (req, re
   try {
     const row = (await pool.query('UPDATE bank_accounts SET active = false, updated_at = now() WHERE id = $1 AND store_id = $2 RETURNING *', [req.params.id, req.storeId])).rows[0];
     if (!row) throw Object.assign(new Error('Conta bancária não encontrada nesta loja.'), { status: 404 });
+    await writeAuditLogSafe(pool, {
+      storeId: req.storeId!,
+      userId: req.user?.id,
+      action: 'financeiro.conta.inativar',
+      entity: 'bank_account',
+      entityId: req.params.id,
+      actionType: 'exclusao',
+      module: 'financeiro',
+      menuLabel: 'Financeiro · Contas',
+      summary: String(row.name || req.params.id),
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     res.json({ success: true, data: rowToClient(row) });
   } catch (error) {
     next(error);
@@ -484,6 +527,21 @@ financeRouter.post(['/api/v1/finance/payables/:id/pay', '/api/v1/finance/payable
           );
         }
 
+        await writeAuditLogSafe(client, {
+          storeId,
+          userId: req.user?.id,
+          action: 'financeiro.pagar.baixar',
+          entity: 'payable',
+          entityId: id,
+          actionType: 'conclusao',
+          module: 'financeiro',
+          menuLabel: 'Financeiro · Contas a pagar',
+          summary: String(curr.description || id),
+          details: { netAmount, status: nextStatus },
+          ip: req.ip,
+          actorName: req.user?.name,
+          actorEmail: req.user?.email,
+        });
         await client.query('COMMIT');
 
         const updated = await pool.query(`SELECT * FROM payables WHERE id = $1 AND store_id = $2`, [id, storeId]);
@@ -834,6 +892,21 @@ financeRouter.post(['/api/v1/finance/receivables/:id/receive', '/api/v1/finance/
           );
         }
 
+        await writeAuditLogSafe(client, {
+          storeId,
+          userId: req.user?.id,
+          action: 'financeiro.receber.baixar',
+          entity: 'receivable',
+          entityId: id,
+          actionType: 'conclusao',
+          module: 'financeiro',
+          menuLabel: 'Financeiro · Contas a receber',
+          summary: String(curr.description || id),
+          details: { netAmount, status: nextStatus },
+          ip: req.ip,
+          actorName: req.user?.name,
+          actorEmail: req.user?.email,
+        });
         await client.query('COMMIT');
 
         const updated = await pool.query(`SELECT * FROM receivables WHERE id = $1 AND store_id = $2`, [id, storeId]);

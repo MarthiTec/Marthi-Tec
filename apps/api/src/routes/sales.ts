@@ -23,6 +23,7 @@ function warrantyLabel(type: string | null | undefined, months: unknown) {
 }
 import { resolveStoreEvolutionCreds, sendEvolutionDocument, sendEvolutionText, normalizeBrazilPhone } from '../services/evolutionWhatsApp.js';
 import { sendMail, escapeHtml } from '../services/emailService.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 export const salesRouter = Router();
 
@@ -80,6 +81,21 @@ salesRouter.post('/api/v1/sales/external', requireAuth, async (req, res, next) =
       }
       const result = await recordExternalSale(client, { storeId, userName: req.user?.name || '', userRole: req.user?.role }, body, { orderId, today, saleAt });
       if (body.requestId) await client.query('UPDATE sales_orders SET request_key = $1 WHERE id = $2 AND store_id = $3', [body.requestId, orderId, storeId]);
+      await writeAuditLogSafe(client, {
+        storeId,
+        userId: req.user?.id,
+        action: 'venda.externa.criar',
+        entity: 'sales_order',
+        entityId: orderId,
+        actionType: 'conclusao',
+        module: 'vendas',
+        menuLabel: 'Venda externa',
+        summary: `Venda externa ${orderId}`,
+        details: { saleDate: body.saleDate || today },
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       await client.query('COMMIT');
 
       res.status(201).json({ success: true, data: result });
@@ -658,6 +674,21 @@ salesRouter.put('/api/v1/sales/:id', requireAuth, async (req, res, next) => {
       'INSERT INTO sale_revisions (id, store_id, sale_id, reason, operator_name, before, after) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)',
       [`REV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, storeId, sale.id, reason, operator, JSON.stringify(before), JSON.stringify(await saleSnapshot(client, storeId, sale.id))],
     );
+    await writeAuditLogSafe(client, {
+      storeId,
+      userId: req.user?.id,
+      action: 'venda.externa.alterar',
+      entity: 'sales_order',
+      entityId: sale.id,
+      actionType: 'alteracao',
+      module: 'vendas',
+      menuLabel: 'Venda externa',
+      summary: `Correção da venda ${sale.id}`,
+      details: { reason },
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     await client.query('COMMIT');
     res.json({ success: true, data: result });
   } catch (error) {
@@ -796,6 +827,21 @@ salesRouter.post('/api/v1/sales/:id/cancel', requireAuth, async (req, res, next)
           if (cashBack) await client.query('UPDATE cash_sessions SET expected_cash = expected_cash - $2::numeric WHERE id = $1', [open.id, cashBack]);
         }
       }
+      await writeAuditLogSafe(client, {
+        storeId,
+        userId: req.user?.id,
+        action: 'venda.cancelar',
+        entity: 'sales_order',
+        entityId: saleId,
+        actionType: 'exclusao',
+        module: sale.sale_type === 'external' ? 'vendas' : 'pdv',
+        menuLabel: sale.sale_type === 'external' ? 'Venda externa' : 'PDV / Caixa',
+        summary: `Cancelamento ${saleId}`,
+        details: { reason: body.reason },
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
       await client.query('COMMIT');
       res.json({ success: true, data: { ok: true, saleId, status: 'cancelled' } });
     } catch (err: any) {

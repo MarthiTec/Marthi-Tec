@@ -4,8 +4,32 @@ import { pool } from '../db/pool.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { consumeStockPart, returnStockPart, stockPartSchema } from './repairParts.js';
 import { createPartOrders, markWaiting, partOrderSchema } from './repairPartOrders.js';
+import { writeAuditLogSafe, type AuditActionType } from '../services/auditLogWriter.js';
 
 export const workOrdersRouter = Router();
+
+async function auditQuote(
+  req: Request,
+  osId: string,
+  action: string,
+  actionType: AuditActionType,
+  summary: string,
+) {
+  await writeAuditLogSafe(pool, {
+    storeId: req.storeId!,
+    userId: req.user?.id,
+    action,
+    entity: 'work_order_quote',
+    entityId: osId,
+    actionType,
+    module: 'cotacoes',
+    menuLabel: 'Cotações / Orçamentos (OS)',
+    summary,
+    ip: req.ip,
+    actorName: req.user?.name,
+    actorEmail: req.user?.email,
+  });
+}
 workOrdersRouter.use('/api/v1/work-orders', requireAuth);
 
 /* ── Helpers ───────────────────────────────────────────── */
@@ -931,6 +955,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/draft', async (req: Request
     );
 
     if (!updated.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+    await auditQuote(req, osId, 'os.orcamento.rascunho', 'alteracao', `Orçamento rascunho · OS ${osId}`);
     res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
   } catch (error) {
     next(error);
@@ -949,6 +974,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/send', async (req: Request,
     );
 
     if (!updated.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+    await auditQuote(req, osId, 'os.orcamento.enviar', 'conclusao', `Orçamento enviado · OS ${osId}`);
     res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
   } catch (error) {
     next(error);
@@ -969,6 +995,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/approve', async (req: Reque
     );
 
     if (!updated.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+    await auditQuote(req, osId, 'os.orcamento.aprovar', 'conclusao', `Orçamento aprovado · OS ${osId}`);
     res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
   } catch (error) {
     next(error);
@@ -987,6 +1014,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/reject', async (req: Reques
     );
 
     if (!updated.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
+    await auditQuote(req, osId, 'os.orcamento.rejeitar', 'conclusao', `Orçamento rejeitado · OS ${osId}`);
     res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });
   } catch (error) {
     next(error);
@@ -1003,6 +1031,7 @@ workOrdersRouter.post('/api/v1/work-orders/:id/quote/reopen', async (req: Reques
       `UPDATE work_orders SET quote_status = 'draft', quote_decided_at = null, updated_at = now() WHERE id = $1 AND store_id = $2 RETURNING *`,
       [osId, storeId]
     );
+    if (updated.rows[0]) await auditQuote(req, osId, 'os.orcamento.reabrir', 'alteracao', `Orçamento reaberto · OS ${osId}`);
 
     if (!updated.rows[0]) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'OS não encontrada.' } });
     res.json({ success: true, data: rowToWorkOrder(updated.rows[0]) });

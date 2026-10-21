@@ -12,6 +12,7 @@ import { stockDetails } from '../services/stockDetails.js';
 import { postEntryPayable } from '../services/entryFinance.js';
 import { imeiHistory, imeiReport, revertWriteOff, writeOffImei } from '../services/soldUnits.js';
 import { formatStockRow } from './stock.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 /**
  * Entrada de estoque: escolhe o produto e lança a compra (ou o aparelho de upgrade) com
@@ -145,6 +146,21 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
       imeis: entry.imeis,
       entryDate: entry.entryDate || null,
       operator: req.user?.name || 'Operador',
+    });
+    await writeAuditLogSafe(db, {
+      storeId,
+      userId: req.user?.id,
+      action: 'estoque.entrada',
+      entity: 'stock_supplier_entry',
+      entityId: entryId,
+      actionType: 'inclusao',
+      module: 'entrada',
+      menuLabel: 'Entrada de estoque',
+      summary: `${product.name}: +${qty}${supplierName ? ` · ${supplierName}` : ''}`,
+      details: { stockItemId: product.id, qty, unitCost, payableId: payableId || null },
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
     });
     await db.query('COMMIT');
 

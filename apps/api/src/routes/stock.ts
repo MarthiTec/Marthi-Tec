@@ -13,6 +13,7 @@ import { unreservedQuantity } from '../services/commercialReservations.js';
 import { pool } from '../db/pool.js';
 import { blockedMemoryMap, dbUnavailableError } from '../db/requireDb.js';
 import { ensureProductAttributeValues } from '../services/attributeValues.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 export const stockRouter = Router();
 
@@ -512,6 +513,23 @@ stockRouter.post('/api/v1/stock/:id/adjust', requireAuth, async (req, res, next)
         ],
       );
     }
+    if (delta !== 0) {
+      await writeAuditLogSafe(db, {
+        storeId,
+        userId: req.user?.id,
+        action: 'estoque.ajuste',
+        entity: 'stock_item',
+        entityId: id,
+        actionType: 'alteracao',
+        module: 'movimentos',
+        menuLabel: 'Movimentos / ajuste de estoque',
+        summary: `${stock.name || id}: ${previous} → ${body.qty}`,
+        details: { previousQty: previous, newQty: body.qty, delta, reason: body.reason },
+        ip: req.ip,
+        actorName: req.user?.name,
+        actorEmail: req.user?.email,
+      });
+    }
     await db.query('COMMIT');
     const fresh = await pool.query(
       `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
@@ -575,26 +593,25 @@ stockRouter.post('/api/v1/stock/:id/price-change', requireAuth, async (req, res,
       after.price,
       after.cost,
     ]);
-    const auditId = `AUD-${randomUUID()}`;
-    await db.query(
-      `INSERT INTO audit_logs (id, store_id, user_id, action, entity, entity_id, details, ip)
-       VALUES ($1, $2, $3, $4, 'stock_item', $5, $6::jsonb, $7)`,
-      [
-        auditId,
-        storeId,
-        req.user?.id ?? null,
-        'stock.price_change',
-        id,
-        JSON.stringify({
-          before,
-          after,
-          reason: body.reason || null,
-          operatorName: req.user?.name || null,
-          operatorEmail: req.user?.email || null,
-        }),
-        req.ip || null,
-      ],
-    );
+    const auditId = await writeAuditLogSafe(db, {
+      storeId,
+      userId: req.user?.id,
+      action: 'stock.price_change',
+      entity: 'stock_item',
+      entityId: id,
+      actionType: 'alteracao',
+      module: 'produtos_estoque',
+      menuLabel: 'Produtos & Estoque',
+      summary: `${stock.name || id}: preço/custo alterado`,
+      details: {
+        before,
+        after,
+        reason: body.reason || null,
+      },
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     await db.query('COMMIT');
     const fresh = await pool.query(
       `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
@@ -746,6 +763,21 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
           const createdRes = await client.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`, [id, storeId]);
           const [created] = await attachSupplierEntries(client, storeId, [formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0])]);
+          await writeAuditLogSafe(client, {
+            storeId,
+            userId: req.user?.id,
+            action: 'produto.criar',
+            entity: 'stock_item',
+            entityId: id,
+            actionType: 'inclusao',
+            module: 'produtos_estoque',
+            menuLabel: 'Produtos & Estoque',
+            summary: body.name.trim(),
+            details: { sku: body.sku, qty: body.qty },
+            ip: req.ip,
+            actorName: req.user?.name,
+            actorEmail: req.user?.email,
+          });
           await client.query('COMMIT');
           res.status(201).json({ success: true, data: created });
           return;
@@ -943,6 +975,23 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
             await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
           }
 
+          await writeAuditLogSafe(client, {
+            storeId,
+            userId: req.user?.id,
+            action: 'produto.atualizar',
+            entity: 'stock_item',
+            entityId: id,
+            actionType: 'alteracao',
+            module: 'produtos_estoque',
+            menuLabel: 'Produtos & Estoque',
+            summary: String(body.name ?? curr.name ?? id),
+            details: {
+              fields: Object.keys(body).filter((k) => (body as Record<string, unknown>)[k] !== undefined).slice(0, 30),
+            },
+            ip: req.ip,
+            actorName: req.user?.name,
+            actorEmail: req.user?.email,
+          });
           await client.query('COMMIT');
 
           const updatedRes = await pool.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1`, [id]);
@@ -983,8 +1032,9 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
       try {
         const linked=await pool.query("SELECT id FROM commercial_orders WHERE store_id=$1 AND (stock_id=$2 OR used_stock_id=$2) LIMIT 1",[storeId,id]);
         if(linked.rows[0])throw Object.assign(new Error('Produto vinculado ao histórico de encomenda. Utilize inativação após liberar reservas.'),{status:409});
-        const exists = await pool.query('SELECT 1 FROM stock_items WHERE id = $1 AND store_id = $2', [id, storeId]);
+        const exists = await pool.query('SELECT id, name FROM stock_items WHERE id = $1 AND store_id = $2', [id, storeId]);
         if (!exists.rows.length) throw Object.assign(new Error('Produto não encontrado nesta loja.'), { status: 404 });
+        const productName = String(exists.rows[0].name || id);
         // Produto com histórico de verdade (venda, nota, troca) não some do banco: notas, vendas e
         // relatórios dependem dele. Ele é inativado e sai do PDV, do totem e das vendas.
         // As movimentações do próprio cadastro (saldo inicial, entradas de fornecedor, ajustes) não
@@ -997,8 +1047,25 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
            LIMIT 1`,
           [storeId, id],
         );
+        const auditDelete = async (mode: 'exclusao' | 'alteracao', summary: string) => {
+          await writeAuditLogSafe(pool, {
+            storeId,
+            userId: req.user?.id,
+            action: mode === 'exclusao' ? 'produto.excluir' : 'produto.inativar',
+            entity: 'stock_item',
+            entityId: id,
+            actionType: mode,
+            module: 'produtos_estoque',
+            menuLabel: 'Produtos & Estoque',
+            summary,
+            ip: req.ip,
+            actorName: req.user?.name,
+            actorEmail: req.user?.email,
+          });
+        };
         const deactivate = async () => {
           await pool.query('UPDATE stock_items SET active = false, show_on_totem = false, updated_at = now() WHERE id = $1 AND store_id = $2', [id, storeId]);
+          await auditDelete('alteracao', `${productName} (inativado)`);
           res.json({ success: true, data: { ok: true, deactivated: true, message: 'O produto tem vendas, notas ou trocas, então foi inativado (some do PDV, do totem e das vendas) e o histórico foi mantido.' } });
         };
         if (history.rows.length) return void (await deactivate());
@@ -1009,6 +1076,20 @@ stockRouter.delete('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next
           await cancelEntryPayables(db, storeId, (await db.query('SELECT id FROM stock_supplier_entries WHERE store_id = $1 AND stock_item_id = $2', [storeId, id])).rows.map((row) => row.id));
           await db.query('DELETE FROM stock_movements WHERE store_id = $1 AND stock_id = $2', [storeId, id]);
           await db.query('DELETE FROM stock_items WHERE id = $1 AND store_id = $2', [id, storeId]);
+          await writeAuditLogSafe(db, {
+            storeId,
+            userId: req.user?.id,
+            action: 'produto.excluir',
+            entity: 'stock_item',
+            entityId: id,
+            actionType: 'exclusao',
+            module: 'produtos_estoque',
+            menuLabel: 'Produtos & Estoque',
+            summary: productName,
+            ip: req.ip,
+            actorName: req.user?.name,
+            actorEmail: req.user?.email,
+          });
           await db.query('COMMIT');
         } catch (deleteError) {
           await db.query('ROLLBACK');

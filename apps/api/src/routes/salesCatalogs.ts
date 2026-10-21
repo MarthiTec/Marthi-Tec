@@ -12,6 +12,7 @@ import {
 } from '../services/salesCatalog.js';
 import { isStoreManagement } from '../services/saleHistory.js';
 import { getStoreBrandProfile } from './storeProfile.js';
+import { writeAuditLogSafe } from '../services/auditLogWriter.js';
 
 /**
  * Catálogo de produtos para o cliente (painel do lojista). A loja marca os produtos, escolhe a capa e
@@ -211,6 +212,21 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs', async (req, res, next) => {
         ],
       )
     ).rows[0];
+    await writeAuditLogSafe(pool, {
+      storeId: req.storeId!,
+      userId: req.user?.id,
+      action: 'catalogo.criar',
+      entity: 'sales_catalog',
+      entityId: row.id,
+      actionType: 'inclusao',
+      module: 'catalogo_digital',
+      menuLabel: 'Catálogo digital',
+      summary: body.title || row.id,
+      details: { publicSlug: row.public_slug || null },
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     res.status(201).json({ success: true, data: view(row) });
   } catch (error) {
     next(error);
@@ -260,6 +276,21 @@ salesCatalogsRouter.patch('/api/v1/sales-catalogs/:id', async (req, res, next) =
       )
     ).rows[0];
     if (!row) throw httpError('Catálogo não encontrado nesta loja.', 404);
+    await writeAuditLogSafe(pool, {
+      storeId: req.storeId!,
+      userId: req.user?.id,
+      action: 'catalogo.atualizar',
+      entity: 'sales_catalog',
+      entityId: row.id,
+      actionType: 'alteracao',
+      module: 'catalogo_digital',
+      menuLabel: 'Catálogo digital',
+      summary: body.title || row.id,
+      details: { publicSlug: row.public_slug || null },
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     res.json({ success: true, data: view(row) });
   } catch (error) {
     next(error);
@@ -271,6 +302,20 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs/:id/new-link', async (req, res,
   try {
     const row = (await pool.query('UPDATE sales_catalogs SET token = $3, updated_at = now() WHERE id = $1 AND store_id = $2 RETURNING *', [req.params.id, req.storeId, newToken()])).rows[0];
     if (!row) throw httpError('Catálogo não encontrado nesta loja.', 404);
+    await writeAuditLogSafe(pool, {
+      storeId: req.storeId!,
+      userId: req.user?.id,
+      action: 'catalogo.novo_link',
+      entity: 'sales_catalog',
+      entityId: row.id,
+      actionType: 'alteracao',
+      module: 'catalogo_digital',
+      menuLabel: 'Catálogo digital',
+      summary: `Novo link · ${row.title || row.id}`,
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     res.json({ success: true, data: view(row) });
   } catch (error) {
     next(error);
@@ -280,8 +325,26 @@ salesCatalogsRouter.post('/api/v1/sales-catalogs/:id/new-link', async (req, res,
 salesCatalogsRouter.delete('/api/v1/sales-catalogs/:id', async (req, res, next) => {
   try {
     if (!isStoreManagement(req.user?.role)) throw httpError('Só a gestão exclui catálogos.', 403);
+    const prev = await pool.query('SELECT id, title FROM sales_catalogs WHERE id = $1 AND store_id = $2', [
+      req.params.id,
+      req.storeId,
+    ]);
     const result = await pool.query('DELETE FROM sales_catalogs WHERE id = $1 AND store_id = $2', [req.params.id, req.storeId]);
     if (!result.rowCount) throw httpError('Catálogo não encontrado nesta loja.', 404);
+    await writeAuditLogSafe(pool, {
+      storeId: req.storeId!,
+      userId: req.user?.id,
+      action: 'catalogo.excluir',
+      entity: 'sales_catalog',
+      entityId: req.params.id,
+      actionType: 'exclusao',
+      module: 'catalogo_digital',
+      menuLabel: 'Catálogo digital',
+      summary: String(prev.rows[0]?.title || req.params.id),
+      ip: req.ip,
+      actorName: req.user?.name,
+      actorEmail: req.user?.email,
+    });
     res.json({ success: true, data: { ok: true } });
   } catch (error) {
     next(error);
