@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AdminPicker } from '../../components/AdminPicker';
 import { BillsPanel } from '../../components/finance/BillsPanel';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import {
   addFinance,
   FINANCE_SOURCE_LABEL,
@@ -985,6 +986,7 @@ function AntecipadosPanel({
   onError: (value: string) => void;
   onSaved: (note: string) => void;
 }) {
+  const { confirm, dialog } = useConfirmDialog();
   const [kind, setKind] = useState<AdvanceKind>('customer');
   const [partyName, setPartyName] = useState('');
   const [amount, setAmount] = useState('');
@@ -1011,6 +1013,7 @@ function AntecipadosPanel({
 
   return (
     <>
+      {dialog}
       <article className="admin-card">
         <h2>Pagamento / recebimento antecipado</h2>
         <div className="admin-form">
@@ -1079,6 +1082,13 @@ function AntecipadosPanel({
                           onClick={() => {
                             void (async () => {
                               const open = item.amount - item.usedAmount;
+                              const ok = await confirm({
+                                title: 'Aplicar antecipação',
+                                message: `Aplicar ${money(open)} de ${item.partyName} (${ADVANCE_KIND_LABEL[item.kind]}) no financeiro? O saldo em aberto desta antecipação será consumido.`,
+                                confirmLabel: 'Aplicar',
+                                danger: true,
+                              });
+                              if (!ok) return;
                               const result = await applyAdvance(item.id, open);
                               if (!result.ok) onError(result.error);
                               else onSaved(`Aplicada ${item.id}`);
@@ -1092,6 +1102,14 @@ function AntecipadosPanel({
                           className="btn btn--ghost crud-actions__danger"
                           onClick={() => {
                             void (async () => {
+                              const open = item.amount - item.usedAmount;
+                              const ok = await confirm({
+                                title: 'Estornar antecipação',
+                                message: `Estornar a antecipação de ${item.partyName} (${ADVANCE_KIND_LABEL[item.kind]}) · valor ${money(item.amount)}${item.usedAmount > 0 ? ` · já usado ${money(item.usedAmount)}` : ''} · em aberto ${money(open)}? O lançamento volta no financeiro.`,
+                                confirmLabel: 'Estornar',
+                                danger: true,
+                              });
+                              if (!ok) return;
                               const result = await refundAdvance(item.id);
                               if (!result.ok) onError(result.error);
                               else onSaved(`Estornada ${item.id}`);
