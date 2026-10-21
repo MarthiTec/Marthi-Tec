@@ -88,6 +88,51 @@ export const TOP_SHORTCUTS: Array<{ id: string; path: string; label: string; hin
   { id: 'ajuda', path: '/painel/ajuda', label: 'Central de ajuda', hint: 'Dúvidas e suporte', icon: 'help' },
 ];
 
+/**
+ * Atalhos do menu de grade do topo da Retaguarda.
+ * Preferir `/painel/...` quando houver dual (Relatórios, Taxas); ERP-only quando não houver alias.
+ */
+export const ERP_TOP_SHORTCUTS: Array<{
+  id: string;
+  path: string;
+  label: string;
+  hint: string;
+  icon: AdminIconName;
+  also?: string[];
+}> = [
+  {
+    id: 'api-aparelhos',
+    path: '/erp/api-aparelhos',
+    label: 'API de aparelhos',
+    hint: 'Consulta por modelo e ficha',
+    icon: 'barcode',
+  },
+  {
+    id: 'taxas',
+    path: '/painel/taxas-cartao',
+    label: 'Taxas & Maquininhas',
+    hint: 'Cartão e juros da loja',
+    icon: 'card',
+    also: ['/erp/taxas-cartao'],
+  },
+  {
+    id: 'relatorios',
+    path: '/painel/relatorios',
+    label: 'Relatórios',
+    hint: 'Central de relatórios',
+    icon: 'chart',
+    also: ['/erp/relatorios', '/erp/relatorio-estoque', '/erp/relatorio-imei', '/painel/relatorio-estoque', '/painel/relatorio-imei'],
+  },
+  {
+    id: 'auditoria',
+    path: '/erp/auditoria',
+    label: 'Auditoria',
+    hint: 'Inclusões, alterações e exclusões',
+    icon: 'shield',
+    also: ['/painel/auditoria'],
+  },
+];
+
 function build(): Screen[] {
   const list: Screen[] = [];
   const seen = new Set<string>();

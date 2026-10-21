@@ -88,6 +88,59 @@
   background: rgba(220, 38, 38, 0.1);
   color: #dc2626;
 }
+
+/* Tema escuro (Painel `.admin--dark` e shells com `.is-theme-dark`). */
+.is-theme-dark .panel-apps__btn,
+.admin--dark .panel-apps__btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--ink, #e8eef4);
+}
+.is-theme-dark .panel-apps__btn:hover,
+.is-theme-dark .panel-apps__btn.is-active,
+.admin--dark .panel-apps__btn:hover,
+.admin--dark .panel-apps__btn.is-active {
+  border-color: var(--teal, #2dd4bf);
+  background: color-mix(in srgb, var(--teal, #2dd4bf) 16%, transparent);
+}
+.is-theme-dark .panel-apps__popover,
+.admin--dark .panel-apps__popover {
+  background: var(--card, #1c2430);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+.is-theme-dark .panel-apps__item,
+.admin--dark .panel-apps__item {
+  color: var(--ink, #e8eef4);
+}
+.is-theme-dark .panel-apps__item:hover,
+.is-theme-dark .panel-apps__item.is-current,
+.admin--dark .panel-apps__item:hover,
+.admin--dark .panel-apps__item.is-current {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.is-theme-dark .panel-apps__item small,
+.admin--dark .panel-apps__item small {
+  color: var(--mute, #94a3b8);
+}
+
+/* Topo escuro da Retaguarda: trigger alinhado aos botões do chrome. */
+.erp-app__top .panel-apps__btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #f1f5f9;
+}
+.erp-app__top .panel-apps__btn:hover,
+.erp-app__top .panel-apps__btn.is-active {
+  background: rgba(45, 212, 191, 0.2);
+  border-color: rgba(45, 212, 191, 0.5);
+  color: #2dd4bf;
+}
+
 /* Celular: o menu ocupa a largura da tela em vez de sair pela esquerda. */
 @media (max-width: 600px) {
   .panel-apps__popover {
@@ -96,5 +149,8 @@
     left: 12px;
     right: 12px;
     width: auto;
+  }
+  .erp-app__top .panel-apps__popover {
+    top: 56px;
   }
 }
