@@ -148,12 +148,21 @@ export function nestDelete<T>(path: string) {
   return nestRequest<T>(path, { method: 'DELETE' });
 }
 
-/** Baixa um arquivo da API (ex.: comprovante em PDF) com a sessão atual. */
+/** Baixa um arquivo da API (ex.: comprovante em PDF / Excel) com a sessão atual. */
 export async function nestDownload(path: string, storeId?: string): Promise<Blob> {
   const headers = new Headers();
   const token = getAuthToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (storeId) headers.set('x-store-id', storeId);
+  if (!headers.has('x-store-id')) {
+    try {
+      const key = tenantScopedKey('marthi.multi_store.active_store_id.v1');
+      const activeStoreId = localStorage.getItem(key);
+      if (activeStoreId) headers.set('x-store-id', activeStoreId);
+    } catch {
+      // ignore
+    }
+  }
   const response = await fetch(`${apiBase()}${path}`, { headers });
   if (!response.ok) {
     const body = await response.json().catch(() => null);

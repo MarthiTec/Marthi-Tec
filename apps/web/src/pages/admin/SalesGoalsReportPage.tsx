@@ -1,25 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import './goalsPages.css';
 import { getActiveStore } from '../../data/multiStoreStore';
 import { AdminPicker } from '../../components/AdminPicker';
-import { apiGetSalesGoalsReport, apiListCustomers, apiListGoals, apiListSellers, type GoalRow } from '../../services/erpApi';
+import {
+  apiExportSalesGoalsReport,
+  apiGetSalesGoalsReport,
+  apiListCustomers,
+  apiListGoals,
+  apiListSellers,
+  type GoalRow,
+} from '../../services/erpApi';
 import { jsPDF } from 'jspdf';
 import { ReportShareActions } from '../../components/ReportShareActions';
+import { downloadBlob } from '../../utils/commercialPdf';
+
+function monthBounds() {
+  const d = new Date();
+  return {
+    start: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10),
+    end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10),
+  };
+}
 
 export function SalesGoalsReportPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const defaults = useMemo(() => monthBounds(), []);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loadError, setLoadError] = useState('');
+  const [exportError, setExportError] = useState('');
 
-  // Filtros
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-  });
+  // Deep-link: ?startDate=&endDate= (hub / atalhos)
+  const [startDate, setStartDate] = useState(() => searchParams.get('startDate') || defaults.start);
+  const [endDate, setEndDate] = useState(() => searchParams.get('endDate') || defaults.end);
   // Filtro pelo id do vendedor cadastrado (antes ia o nome e o filtro nunca encontrava vendas).
   const [sellerName, setSellerName] = useState('all');
   const [sellerOptions, setSellerOptions] = useState<Array<{ id: string; name: string }>>([]);
@@ -31,6 +46,28 @@ export function SalesGoalsReportPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [goals, setGoals] = useState<GoalRow[]>([]);
 
+  const reportFilters = useMemo(
+    () => ({
+      startDate,
+      endDate,
+      sellerId: sellerName !== 'all' ? sellerName : undefined,
+      paymentMethod: paymentMethod !== 'all' ? paymentMethod : undefined,
+      saleType: saleType !== 'all' ? saleType : undefined,
+      customerId: customerId !== 'all' ? customerId : undefined,
+      goalId: goalId !== 'all' ? goalId : undefined,
+    }),
+    [startDate, endDate, sellerName, paymentMethod, saleType, customerId, goalId],
+  );
+
+  const filtersActive =
+    sellerName !== 'all' ||
+    paymentMethod !== 'all' ||
+    saleType !== 'all' ||
+    customerId !== 'all' ||
+    goalId !== 'all' ||
+    startDate !== defaults.start ||
+    endDate !== defaults.end;
+
   useEffect(() => {
     apiListCustomers().then((c) => setCustomers(Array.isArray(c) ? c : [])).catch(() => {});
     apiListGoals().then((g) => setGoals(Array.isArray(g) ? g : [])).catch(() => {});
@@ -39,19 +76,21 @@ export function SalesGoalsReportPage() {
       .catch(() => setSellerOptions([]));
   }, []);
 
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (startDate) next.set('startDate', startDate);
+    else next.delete('startDate');
+    if (endDate) next.set('endDate', endDate);
+    else next.delete('endDate');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync dates into URL
+  }, [startDate, endDate]);
+
   async function fetchReport() {
     setLoading(true);
     setLoadError('');
     try {
-      const res = await apiGetSalesGoalsReport({
-        startDate,
-        endDate,
-        sellerId: sellerName !== 'all' ? sellerName : undefined,
-        paymentMethod: paymentMethod !== 'all' ? paymentMethod : undefined,
-        saleType: saleType !== 'all' ? saleType : undefined,
-        customerId: customerId !== 'all' ? customerId : undefined,
-        goalId: goalId !== 'all' ? goalId : undefined,
-      });
+      const res = await apiGetSalesGoalsReport(reportFilters);
       // O cliente da API já devolve o conteúdo de "data" (antes lia res.data e o relatório ficava sempre vazio).
       setData(res && typeof res === 'object' && 'summary' in res ? res : (res as any)?.data ?? null);
     } catch (err) {
@@ -65,15 +104,29 @@ export function SalesGoalsReportPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [startDate, endDate, sellerName, paymentMethod, saleType, customerId, goalId]);
+  }, [reportFilters]);
 
-  function handleExportExcel() {
-    const params = new URLSearchParams({
-      startDate,
-      endDate,
-    });
-    if (sellerName !== 'all') params.set('sellerId', sellerName);
-    window.open(`/api/v1/reports/sales-goals/export?${params.toString()}`, '_blank');
+  function clearFilters() {
+    setStartDate(defaults.start);
+    setEndDate(defaults.end);
+    setSellerName('all');
+    setPaymentMethod('all');
+    setSaleType('all');
+    setCustomerId('all');
+    setGoalId('all');
+  }
+
+  async function handleExportExcel() {
+    setExporting(true);
+    setExportError('');
+    try {
+      const blob = await apiExportSalesGoalsReport(reportFilters);
+      downloadBlob(blob, `Relatorio_Vendas_Metas_${startDate}_${endDate}.xlsx`);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Não foi possível exportar o Excel.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function handleExportPdf() {
@@ -101,11 +154,11 @@ export function SalesGoalsReportPage() {
     doc.setFontSize(9);
 
     const summaryLine1 = [
-      `Total Vendido: R$ ${s.totalSales?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      `Receita de vendas: R$ ${s.totalSales?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       canViewProfit ? `Total de Custo: R$ ${s.totalCost?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
       canViewProfit ? `Lucro Bruto: R$ ${s.grossProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
       canViewProfit ? `Margem Média: ${s.marginPercent}%` : null,
-      `Vendas: ${s.salesCount}`,
+      `Vendas concluídas: ${s.salesCount}`,
       `Ticket Médio: R$ ${s.averageTicket?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
     ].filter((name): name is string => Boolean(name)).join('   |   ');
     doc.text(summaryLine1, 14, y);
@@ -188,11 +241,13 @@ export function SalesGoalsReportPage() {
     : '';
   const shareLines = [
     `Período: ${day(startDate)}${endDate ? ` até ${day(endDate)}` : ' até hoje'}`,
-    s ? `Vendas: ${s.salesCount} · Total vendido: ${brl(s.totalSales)}` : '',
+    s ? `Vendas concluídas: ${s.salesCount} · Receita de vendas: ${brl(s.totalSales)}` : '',
     goal ? `Meta "${goal.name}" (${goal.sellerName}): ${goalValue(goal.realized)} de ${goalValue(goal.targetValue)} (${goal.percent}%) · ${goalPeriod}` : '',
     goal && !goal.isReached ? `Faltam ${goalValue(goal.remaining)}` : goal ? 'Meta batida ✅' : '',
     ...((data?.rows ?? []) as any[]).slice(0, 40).map((row) => `• ${new Date(row.date).toLocaleDateString('pt-BR')} · ${row.customerName} · ${row.sellerName} · ${brl(row.netAmount)}`),
   ].filter(Boolean);
+
+  const emptyRows = !loading && !loadError && (!data?.rows || data.rows.length === 0);
 
   return (
     <div className="admin-page goals-page" style={{ padding: '16px 20px', maxWidth: '1280px', margin: '0 auto' }}>
@@ -208,8 +263,7 @@ export function SalesGoalsReportPage() {
         }}
       >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.4rem' }}>📊</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--ink)' }}>
               Relatório de Vendas & Metas
             </h1>
@@ -218,30 +272,47 @@ export function SalesGoalsReportPage() {
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--mute)' }}>
-            Acompanhe vendas, metas e comissões da loja no período selecionado.
+            Receita de vendas concluídas (não confundir com recebido no caixa/AR). Lucro só com permissão.
+          </p>
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem' }}>
+            <Link to="/erp/relatorios" style={{ color: 'var(--accent)' }}>
+              ← Central de Relatórios
+            </Link>
+            {' · '}
+            <Link to={`/erp/financeiro?tab=dre`} style={{ color: 'var(--accent)' }}>
+              DRE
+            </Link>
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <ReportShareActions title="Relatório de Vendas & Metas" lines={shareLines} disabled={!data} onPrint={handleExportPdf} />
+          <ReportShareActions title="Relatório de Vendas & Metas" lines={shareLines} disabled={!data || emptyRows} onPrint={handleExportPdf} />
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={handleExportExcel}
+            onClick={() => void handleExportExcel()}
+            disabled={exporting || emptyRows}
           >
-            <span>📥</span> Exportar Excel (XLSX)
+            {exporting ? 'Exportando…' : 'Exportar Excel (XLSX)'}
           </button>
           <button
             type="button"
             className="admin-btn admin-btn--primary"
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             onClick={handleExportPdf}
+            disabled={emptyRows}
           >
-            <span>📄</span> Gerar PDF Executivo
+            Gerar PDF Executivo
           </button>
         </div>
       </div>
+
+      {exportError ? (
+        <p role="alert" className="qty-low" style={{ marginBottom: 12 }}>
+          {exportError}
+        </p>
+      ) : null}
 
       {/* BARRA DE FILTROS COMPLETOS */}
       <div
@@ -397,11 +468,12 @@ export function SalesGoalsReportPage() {
               }}
             >
               <span style={{ fontSize: '0.74rem', color: 'var(--mute)', textTransform: 'uppercase' }}>
-                Total Vendido
+                Receita de vendas
               </span>
               <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent, #2dd4bf)', marginTop: '2px' }}>
                 R$ {(s.totalSales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
+              <small style={{ color: 'var(--mute)' }}>Faturado no período · não é recebido</small>
             </div>
 
             {canViewProfit && (
@@ -556,7 +628,7 @@ export function SalesGoalsReportPage() {
             }}
           >
             <div>
-              <span style={{ color: 'var(--mute)' }}>Vendas:</span>{' '}
+              <span style={{ color: 'var(--mute)' }}>Receita de vendas:</span>{' '}
               <strong>R$ {s.totalSales?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
             </div>
             {canViewProfit && (
@@ -566,7 +638,7 @@ export function SalesGoalsReportPage() {
                   <strong>R$ {s.totalCost?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--mute)' }}>Lucro:</span>{' '}
+                  <span style={{ color: 'var(--mute)' }}>Lucro bruto:</span>{' '}
                   <strong style={{ color: 'var(--goals-success)' }}>
                     R$ {s.grossProfit?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </strong>
@@ -578,7 +650,7 @@ export function SalesGoalsReportPage() {
               </>
             )}
             <div>
-              <span style={{ color: 'var(--mute)' }}>Quantidade de Vendas:</span>{' '}
+              <span style={{ color: 'var(--mute)' }}>Qtd. vendas concluídas:</span>{' '}
               <strong>{s.salesCount}</strong>
             </div>
             <div>
@@ -610,9 +682,39 @@ export function SalesGoalsReportPage() {
 
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mute)' }}>Carregando dados...</div>
-        ) : !data?.rows || data.rows.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--mute)' }}>
-            Nenhuma venda localizada para os filtros selecionados.
+        ) : emptyRows ? (
+          <div
+            role="status"
+            style={{
+              padding: '28px 20px',
+              textAlign: 'center',
+              color: 'var(--mute)',
+              background: 'var(--card-2, #1c2430)',
+              borderRadius: 8,
+            }}
+          >
+            <p style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: 600, color: 'var(--ink)' }}>
+              Nenhuma venda no período
+            </p>
+            <p style={{ margin: '0 0 16px', fontSize: '0.88rem' }}>
+              Só entram vendas concluídas. Ajuste o período ou limpe os filtros — não inventamos números.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {filtersActive ? (
+                <button type="button" className="admin-btn admin-btn--secondary" onClick={clearFilters}>
+                  Limpar filtros
+                </button>
+              ) : null}
+              <Link to="/caixa" className="admin-btn admin-btn--primary">
+                Ir ao Caixa
+              </Link>
+              <Link to="/painel/venda-externa" className="admin-btn admin-btn--secondary">
+                Venda externa
+              </Link>
+              <Link to="/erp/relatorios" className="admin-btn admin-btn--secondary">
+                Central de Relatórios
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="admin-table-container">

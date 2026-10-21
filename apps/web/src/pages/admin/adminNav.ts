@@ -92,6 +92,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/painel/pessoas', label: 'Pessoas' },
       { to: '/erp/api-aparelhos', label: 'Consulta de aparelhos' },
       { to: '/painel/financeiro', label: 'Financeiro & Pagamentos' },
+      { to: '/erp/relatorios', label: 'Relatórios', accent: '#d97706' },
       { to: '/painel/plano', label: 'Planos & Faturamento' },
       { to: '/painel/lojas', label: 'Dados da Empresa & Lojas' },
       { to: '/painel/usuarios', label: 'Usuários & Permissões' },

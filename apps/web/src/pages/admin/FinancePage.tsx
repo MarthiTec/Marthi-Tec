@@ -208,7 +208,14 @@ export function FinancePage() {
           <h2 className="fin-hub-intro__title">Financeiro</h2>
           <p>
             Operação diária, boletos, conciliação e arquivos CNAB em um só lugar — do lançamento até
-            o retorno do banco.
+            o retorno do banco. Recebido e livro ≠ receita de vendas.
+          </p>
+          <p className="empty" style={{ marginTop: 8 }}>
+            <Link to="/erp/relatorios">Central de Relatórios</Link>
+            {' · '}
+            <Link to="/painel/relatorio-vendas">Vendas &amp; Metas</Link>
+            {' · '}
+            <Link to="?tab=dre">DRE</Link>
           </p>
         </div>
         <div className="fin-hub-intro__stats">
