@@ -59,8 +59,9 @@ test('Fase A: PDV order is Operar → Negociar → Configurar → Desempenho', (
 
 test('Fase A: Finder synonyms cover inventário / ajuste / sem caixa', () => {
   const dir = fs.readFileSync(dirPath, 'utf8');
-  // Após hub A+/B, inventário/ajuste ficam nos sinônimos de /erp/produtos.
-  assert.match(dir, /\/erp\/produtos': '[^']*inventario/);
-  assert.match(dir, /\/erp\/produtos': '[^']*ajuste de estoque/);
+  // Abas do hub: inventário/ajuste → ?aba=ajustes; entrada → ?aba=entradas.
+  assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*inventario/);
+  assert.match(dir, /\/painel\/produtos\?aba=ajustes': '[^']*ajuste de estoque/);
+  assert.match(dir, /\/painel\/produtos\?aba=entradas': '[^']*entrada/);
   assert.match(dir, /\/painel\/venda-externa': '[^']*sem caixa/);
 });
