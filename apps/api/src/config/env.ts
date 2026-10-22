@@ -85,6 +85,11 @@ const envSchema = z.object({
   PLATFORM_PIX_KEY: z.string().optional(),
   PLATFORM_PIX_KEY_TYPE: z.enum(['email', 'cpf_cnpj', 'telefone', 'aleatoria']).optional(),
   PLATFORM_PIX_RECEIVER_NAME: z.string().optional(),
+  /**
+   * Chave RapidAPI (DeviceSpecs) da plataforma — fallback quando a loja não cadastrou a própria
+   * em /erp/api-aparelhos. Nunca commitar; colar só nas Variáveis do Site Discloud (marthi-totem / backend).
+   */
+  DEVICE_CATALOG_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

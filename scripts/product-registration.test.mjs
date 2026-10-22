@@ -188,10 +188,38 @@ test('device key is encrypted and full provider specifications are saved only fo
  globalThis.fetch=async(url,options)=>{if(String(url).startsWith('https://deviceultraparser.p.rapidapi.com/')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-provider-key');return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
  try{
  const response=await request('/device-reference?name=Samsung%20Galaxy%20S24');assert.equal(response.status,200,JSON.stringify(response.json));assert.deepEqual(response.json.data.capacities,['128GB','256GB']);
+ // Catálogo Tipo+Modelo (GALAXY S + 24) normaliza para o mesmo Galaxy S24 (cache hit).
+ const fromCatalog=await request('/device-reference?name=GALAXY%20S%2024&brand=samsung');
+ assert.equal(fromCatalog.status,200,JSON.stringify(fromCatalog.json));
  assert.equal((await request('/device-reference?name=Samsung%20Galaxy%20S24')).status,200);assert.equal(calls,1);
  const models=(await query('SELECT * FROM device_catalog_models')).rows;assert.equal(models.length,1);assert.equal(models[0].store_id,'store-a');assert.deepEqual(models[0].raw_data,raw);
  }finally{globalThis.fetch=realFetch;}
  assert.equal((await query("SELECT count(*)::int n FROM device_catalog_models WHERE store_id='store-b'")).rows[0].n,0);
+});
+
+test('platform DEVICE_CATALOG_API_KEY serves multi-brand help when the store has no own key',async()=>{
+ // Remove a chave da loja A para forçar o fallback da plataforma.
+ await query("DELETE FROM device_catalog_models WHERE store_id='store-a'");
+ await query("DELETE FROM device_catalog_settings WHERE store_id='store-a'");
+ const catalogEnv=await import('../dist/config/env.js');
+ const envObj=catalogEnv.env;
+ const had=Object.getOwnPropertyDescriptor(envObj,'DEVICE_CATALOG_API_KEY');
+ Object.defineProperty(envObj,'DEVICE_CATALOG_API_KEY',{value:'test-only-platform-key',configurable:true,enumerable:true,writable:true});
+ const raw={manufacturer:'Xiaomi',model:'Redmi Note 13 Pro',colors:['Black'],normalizedSpecs:{memoryOptions:{availableStorageGb:[256]}}};
+ const realFetch=globalThis.fetch;let calls=0;
+ globalThis.fetch=async(url,options)=>{if(String(url).includes('deviceultraparser.p.rapidapi.com')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-platform-key');assert.match(String(url),/Xiaomi\/Redmi%20Note%2013%20Pro/);return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
+ try{
+  const response=await request('/device-reference?name=REDMI%20NOTE%2013%20PRO&brand=xiaomi');
+  assert.equal(response.status,200,JSON.stringify(response.json));
+  assert.deepEqual(response.json.data.capacities,['256GB']);
+  assert.equal(calls,1);
+  const meta=await request('/device-reference/settings');
+  assert.equal(meta.json.data.platformKeyConfigured,true);
+ }finally{
+  globalThis.fetch=realFetch;
+  if(had)Object.defineProperty(envObj,'DEVICE_CATALOG_API_KEY',had);
+  else Object.defineProperty(envObj,'DEVICE_CATALOG_API_KEY',{value:undefined,configurable:true,enumerable:true,writable:true});
+ }
 });
 
 after(async()=>{server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));await db.close();});
@@ -635,6 +663,34 @@ test('lookup finds the product by an IMEI typed in the supplier entries or in a 
   const byVariation = await request('/stock/lookup?code=359000000000777');
   assert.equal(byVariation.json.data?.id, created.id);
   assert.equal((await request('/stock/lookup?code=000000000000000')).json.data, null);
+});
+
+test('platform catalog seeds Android models so marca→tipo→modelo fills Descrição like Apple', async () => {
+  const samsungTypes = (await request('/catalog/types?brand=samsung')).json.data;
+  const galaxyS = samsungTypes.find((t) => t.name === 'GALAXY S');
+  assert.ok(galaxyS, JSON.stringify(samsungTypes.map((t) => t.name)));
+  const galaxySModels = (await request('/catalog/models?typeId=' + galaxyS.id)).json.data.map((m) => m.name);
+  for (const name of ['24', '24 ULTRA', '25 ULTRA']) assert.ok(galaxySModels.includes(name), name);
+
+  const xiaomiTypes = (await request('/catalog/types?brand=xiaomi')).json.data;
+  const redmiNote = xiaomiTypes.find((t) => t.name === 'REDMI NOTE');
+  const noteModels = (await request('/catalog/models?typeId=' + redmiNote.id)).json.data.map((m) => m.name);
+  assert.ok(noteModels.includes('13 PRO'), noteModels.join(','));
+
+  const motoTypes = (await request('/catalog/types?brand=motorola')).json.data;
+  const motoG = motoTypes.find((t) => t.name === 'MOTO G');
+  const motoModels = (await request('/catalog/models?typeId=' + motoG.id)).json.data.map((m) => m.name);
+  assert.ok(motoModels.includes('84'), motoModels.join(','));
+
+  const realmeTypes = (await request('/catalog/types?brand=realme')).json.data;
+  const realmeC = realmeTypes.find((t) => t.name === 'REALME C');
+  const realmeModels = (await request('/catalog/models?typeId=' + realmeC.id)).json.data.map((m) => m.name);
+  assert.ok(realmeModels.includes('55'), realmeModels.join(','));
+
+  assert.equal(catalog.toProviderModelQuery('Samsung', 'GALAXY S 24 ULTRA'), 'Galaxy S24 Ultra');
+  assert.equal(catalog.toProviderModelQuery('Xiaomi', 'REDMI NOTE 13 PRO'), 'Redmi Note 13 Pro');
+  assert.equal(catalog.toProviderModelQuery('Motorola', 'MOTO G 84'), 'Moto G84');
+  assert.equal(catalog.toProviderModelQuery('Realme', 'REALME C 55'), 'Realme C55');
 });
 
 test('simple stock: brand/type/model catalog, who registered, supplier origin, stock mode and entry screen', async () => {

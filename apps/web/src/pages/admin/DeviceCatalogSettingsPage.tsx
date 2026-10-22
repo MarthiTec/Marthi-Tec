@@ -6,6 +6,8 @@ import { getActiveStoreId, STORE_CONTEXT_CHANGED_EVENT } from '../../data/multiS
 
 type Config = {
   settings: { provider_id: string; enabled: boolean; cache_days: number; configured: boolean } | null;
+  /** Chave RapidAPI da plataforma no servidor (DEVICE_CATALOG_API_KEY) — sem revelar o valor. */
+  platformKeyConfigured?: boolean;
   providers: { id: string; name: string; docs_url: string }[];
   brands: { name: string }[];
 };
@@ -104,6 +106,9 @@ export function DeviceCatalogSettingsPage() {
       <p>
         Especificações, cores e capacidades são consultadas no fornecedor e registradas no banco desta loja.
         Custos e preços de venda são definidos no cadastro do produto.
+        {config?.platformKeyConfigured
+          ? ' A plataforma já tem chave RapidAPI no servidor: lojas sem chave própria usam essa chave automaticamente (iPhone continua gratuito via Apple).'
+          : ' Sem chave da plataforma no servidor: cadastre a chave RapidAPI desta loja abaixo, ou peça à Marthi para definir DEVICE_CATALOG_API_KEY no Site Discloud.'}{' '}
       </p>
       {error ? <p role="alert">{error}</p> : null}
       {message ? <p role="status">{message}</p> : null}
@@ -126,7 +131,9 @@ export function DeviceCatalogSettingsPage() {
               placeholder={
                 config?.settings?.configured
                   ? 'Chave cadastrada; deixe em branco para manter'
-                  : 'Informe a chave do fornecedor'
+                  : config?.platformKeyConfigured
+                    ? 'Opcional — plataforma já tem chave; deixe em branco para usá-la'
+                    : 'Informe a chave do fornecedor'
               }
               onChange={(e) => setKey(e.target.value)}
             />
