@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {loadCatalogDevice,encryptCatalogKey} from '../services/deviceCatalogApi.js';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
+import { env } from '../config/env.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { APPLE_REFERENCE_URL, matchReference, normalizeDeviceText, parseAppleModels, type DeviceReference } from '../services/deviceReference.js';
 import { appleSpecsUrl, catalogSpecLines, parseAppleSpecs, type SpecLine } from '../services/appleSpecs.js';
@@ -91,14 +92,20 @@ deviceReferenceRouter.get('/api/v1/device-reference/specs', requireAuth, async (
   } catch (error) { next(error); }
 });
 
-deviceReferenceRouter.get('/api/v1/device-reference/settings',requireAuth,async(req,res,next)=>{try{const s=(await pool.query('SELECT provider_id,enabled,cache_days,(api_key_encrypted<>$2) AS configured FROM device_catalog_settings WHERE store_id=$1',[req.storeId,''])).rows[0];res.json({success:true,data:{settings:s??null,providers:(await pool.query('SELECT id,name,docs_url FROM device_catalog_providers WHERE active=true')).rows,brands:(await pool.query('SELECT name FROM device_catalog_brands ORDER BY name')).rows}});}catch(e){next(e);}});
+deviceReferenceRouter.get('/api/v1/device-reference/settings',requireAuth,async(req,res,next)=>{try{
+ const platformKeyConfigured=Boolean((env.DEVICE_CATALOG_API_KEY||'').trim());
+ const s=(await pool.query('SELECT provider_id,enabled,cache_days,(api_key_encrypted<>$2) AS configured FROM device_catalog_settings WHERE store_id=$1',[req.storeId,''])).rows[0];
+ res.json({success:true,data:{settings:s??null,platformKeyConfigured,providers:(await pool.query('SELECT id,name,docs_url FROM device_catalog_providers WHERE active=true')).rows,brands:(await pool.query('SELECT name FROM device_catalog_brands ORDER BY name')).rows}});
+}catch(e){next(e);}});
 deviceReferenceRouter.put('/api/v1/device-reference/settings',requireAuth,async(req,res,next)=>{try{
  if(!['admin','manager','superadmin'].includes(req.user!.role||''))throw Object.assign(new Error('Sem permissão para configurar a API.'),{status:403});
  const b=z.object({providerId:z.string(),enabled:z.boolean(),cacheDays:z.number().int().min(1).max(365),apiKey:z.string().trim().max(1000).optional()}).parse(req.body);
  if(!(await pool.query('SELECT id FROM device_catalog_providers WHERE id=$1 AND active=true',[b.providerId])).rows.length)throw Object.assign(new Error('Fornecedor inválido.'),{status:400});
  const saved=(await pool.query('SELECT api_key_encrypted,provider_id FROM device_catalog_settings WHERE store_id=$1',[req.storeId])).rows[0];
  const key=b.apiKey?encryptCatalogKey(b.apiKey):saved?.provider_id===b.providerId?saved.api_key_encrypted:'';
- if(b.enabled&&!key)throw Object.assign(new Error('Informe a chave para ativar a consulta.'),{status:400});
- await pool.query('INSERT INTO device_catalog_settings(store_id,provider_id,enabled,cache_days,api_key_encrypted) VALUES($1,$2,$3,$4,$5) ON CONFLICT(store_id) DO UPDATE SET provider_id=EXCLUDED.provider_id,enabled=EXCLUDED.enabled,cache_days=EXCLUDED.cache_days,api_key_encrypted=EXCLUDED.api_key_encrypted,updated_at=now()',[req.storeId,b.providerId,b.enabled,b.cacheDays,key]);
- res.json({success:true,data:{configured:Boolean(key)}});
+ const platformKeyConfigured=Boolean((env.DEVICE_CATALOG_API_KEY||'').trim());
+ // Loja pode ativar só com a chave da plataforma (DEVICE_CATALOG_API_KEY no servidor).
+ if(b.enabled&&!key&&!platformKeyConfigured)throw Object.assign(new Error('Informe a chave para ativar a consulta.'),{status:400});
+ await pool.query('INSERT INTO device_catalog_settings(store_id,provider_id,enabled,cache_days,api_key_encrypted) VALUES($1,$2,$3,$4,$5) ON CONFLICT(store_id) DO UPDATE SET provider_id=EXCLUDED.provider_id,enabled=EXCLUDED.enabled,cache_days=EXCLUDED.cache_days,api_key_encrypted=EXCLUDED.api_key_encrypted,updated_at=now()',[req.storeId,b.providerId,b.enabled,b.cacheDays,key||'']);
+ res.json({success:true,data:{configured:Boolean(key),platformKeyConfigured}});
  }catch(e){next(e);}});

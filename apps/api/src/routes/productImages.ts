@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware.js';
+import { loadCatalogDevice } from '../services/deviceCatalogApi.js';
 import { matchReference } from '../services/deviceReference.js';
 import { fetchImageAsDataUrl } from '../services/imageProxy.js';
 import { loadReferences } from './deviceReference.js';
@@ -107,6 +108,23 @@ productImagesRouter.get('/api/v1/product-images/suggestions', requireAuth, async
       const reference = matchReference(term, await loadReferences().catch(() => []));
       if (reference?.image) {
         items.push({ url: reference.image, thumbUrl: reference.image, title: `${reference.model} (foto oficial)`, source: 'Apple', license: 'Foto oficial do fabricante', pageUrl: reference.sourceUrl });
+      }
+    } else if (req.storeId) {
+      // Se a DeviceSpecs trouxer HTTPS de imagem (campo opcional), usa antes do Commons.
+      try {
+        const device = await loadCatalogDevice(req.storeId, name, brand);
+        if (device?.image) {
+          items.push({
+            url: device.image,
+            thumbUrl: device.image,
+            title: `${device.brand} ${device.model}`,
+            source: 'API de aparelhos',
+            license: 'Imagem do fornecedor de especificações',
+            pageUrl: device.sourceUrl,
+          });
+        }
+      } catch {
+        // Sem chave / loja desativada / modelo não encontrado: segue só com Commons.
       }
     }
     try {
