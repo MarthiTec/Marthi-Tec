@@ -185,7 +185,7 @@ test('device key is encrypted and full provider specifications are saved only fo
  assert.ok(!JSON.stringify((await request('/device-reference/settings')).json).includes('test-only-provider-key'));
  const raw={manufacturer:'Samsung',model:'Galaxy S24',colors:['Amber Yellow','Onyx Black'],normalizedSpecs:{memoryOptions:{availableStorageGb:[128,256]}},display:'Supplier specification'};
  const realFetch=globalThis.fetch;let calls=0;
- globalThis.fetch=async(url,options)=>{if(String(url).startsWith('https://deviceultraparser.p.rapidapi.com/')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-provider-key');return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
+ globalThis.fetch=async(url,options)=>{if(String(url).startsWith('https://gsmarenaparser.p.rapidapi.com/')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-provider-key');return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
  try{
  const response=await request('/device-reference?name=Samsung%20Galaxy%20S24');assert.equal(response.status,200,JSON.stringify(response.json));assert.deepEqual(response.json.data.capacities,['128GB','256GB']);
  // Catálogo Tipo+Modelo (GALAXY S + 24) normaliza para o mesmo Galaxy S24 (cache hit).
@@ -207,7 +207,7 @@ test('platform DEVICE_CATALOG_API_KEY serves multi-brand help when the store has
  Object.defineProperty(envObj,'DEVICE_CATALOG_API_KEY',{value:'test-only-platform-key',configurable:true,enumerable:true,writable:true});
  const raw={manufacturer:'Xiaomi',model:'Redmi Note 13 Pro',colors:['Black'],normalizedSpecs:{memoryOptions:{availableStorageGb:[256]}}};
  const realFetch=globalThis.fetch;let calls=0;
- globalThis.fetch=async(url,options)=>{if(String(url).includes('deviceultraparser.p.rapidapi.com')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-platform-key');assert.match(String(url),/Xiaomi\/Redmi%20Note%2013%20Pro/);return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
+ globalThis.fetch=async(url,options)=>{if(String(url).includes('gsmarenaparser.p.rapidapi.com')){calls++;assert.equal(options.headers['x-rapidapi-key'],'test-only-platform-key');assert.match(String(url),/Xiaomi\/Redmi%20Note%2013%20Pro/);return new Response(JSON.stringify(raw),{status:200,headers:{'content-type':'application/json'}});}return realFetch(url,options);};
  try{
   const response=await request('/device-reference?name=REDMI%20NOTE%2013%20PRO&brand=xiaomi');
   assert.equal(response.status,200,JSON.stringify(response.json));

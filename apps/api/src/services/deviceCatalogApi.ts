@@ -250,7 +250,8 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
       requestKey,
       (async () => {
         const base = new URL(baseUrl);
-        if (base.protocol !== 'https:' || base.hostname !== 'deviceultraparser.p.rapidapi.com') {
+        // Hosts oficiais do fornecedor na RapidAPI (GSMArenaParser é a listagem atual).
+        if (base.protocol !== 'https:' || !['gsmarenaparser.p.rapidapi.com', 'deviceultraparser.p.rapidapi.com'].includes(base.hostname)) {
           throw new Error('Endereço do fornecedor inválido.');
         }
         const sourceUrl = base.href.replace(/\/$/, '') + '/clean/getspecs/' + encodeURIComponent(brand.name) + '/' + encodeURIComponent(model);

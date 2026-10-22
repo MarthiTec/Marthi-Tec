@@ -1,6 +1,6 @@
 # Consulta de aparelhos e cadastro de produtos
 
-Acesse Retaguarda → API de aparelhos (`/erp/api-aparelhos`). O fornecedor DeviceSpecs / RapidAPI é registrado pela migração 0040. Crie a chave seguindo a documentação em https://ds.gtgroup.dev/docs, cadastre-a nessa tela e ative a consulta para a loja selecionada. Não é necessário informar a chave no chat ou incluí-la no código.
+Acesse Retaguarda → API de aparelhos (`/erp/api-aparelhos`). O fornecedor DeviceSpecs / RapidAPI é registrado pela migração 0040. Assine a API "GSMArenaParser" na RapidAPI (https://rapidapi.com/controller2042000/api/gsmarenaparser — plano Basic grátis com 15 consultas/dia; documentação em https://ds.gtgroup.dev/docs), cadastre-a nessa tela e ative a consulta para a loja selecionada. Não é necessário informar a chave no chat ou incluí-la no código.
 
 **Chave da plataforma (opcional):** defina `DEVICE_CATALOG_API_KEY` nas Variáveis de Ambiente do Site Discloud (`marthi-totem` e/ou `marthi-backend`). Lojas sem chave própria usam essa chave automaticamente para ajuda/ficha de marcas ≠ iPhone. iPhone continua gratuito via `support.apple.com`. A chave nunca é exposta ao navegador.
 
