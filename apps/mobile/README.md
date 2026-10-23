@@ -1,6 +1,8 @@
 # Marthi Lojista (mobile)
 
-App **Expo + React Native + TypeScript** para o lojista. Consome as mesmas APIs de `apps/api` (sem backend paralelo). Foco: lojas de celular (venda + OS).
+App **Expo + React Native + TypeScript** para o lojista. Consome as mesmas APIs Express de `apps/api` via HTTPS (sem backend paralelo e **sem** imports do `apps/web`). Foco: lojas de celular (venda + OS).
+
+**Layout:** pacote separado dentro de `MarthiTec/Marthi-Tec` (`apps/mobile`) — fora do npm workspace do Site Discloud e fora do ZIP de deploy (`.discloudignore`). A conexão com o front/API é só HTTP (`EXPO_PUBLIC_API_URL` → `/api/v1`). Não use Nest `marthi-backend` como base URL do app (rotas lojista diferem).
 
 Distribuição: **testes internos** (APK Android; iOS Ad Hoc / development). Sem lojas públicas. Detalhes: [`DISTRIBUTION.md`](./DISTRIBUTION.md).
 
@@ -10,7 +12,7 @@ Distribuição: **testes internos** (APK Android; iOS Ad Hoc / development). Sem
 - Conta Marthi válida no MarthiDB (mesmo login do web)
 - API HTTPS (produção) ou HTTP na LAN (dev)
 
-Pacote **fora** do workspace Discloud Site (`apps/api` + `apps/web`). Instale em `apps/mobile`.
+Instale dependências **neste diretório** (`cd apps/mobile && npm install`), não via workspaces da raiz.
 
 ## Configurar API
 
@@ -18,6 +20,7 @@ Pacote **fora** do workspace Discloud Site (`apps/api` + `apps/web`). Instale em
 # veja também apps/mobile/.env.example
 export EXPO_PUBLIC_API_URL=https://marthi-totem.discloud.dev
 # ou LAN: http://192.168.x.x:8080
+# Atenção: marthi-totem.discloud.app ainda não roteia (404) — use .discloud.dev
 ```
 
 ## Rodar
