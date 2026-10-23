@@ -215,6 +215,14 @@ test('platform DEVICE_CATALOG_API_KEY serves multi-brand help when the store has
   assert.equal(calls,1);
   const meta=await request('/device-reference/settings');
   assert.equal(meta.json.data.platformKeyConfigured,true);
+  // Plano Basic da RapidAPI bloqueia a rota: a mensagem chega à tela (424, não a página 5xx do proxy).
+  const okFetch=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>String(url).includes('gsmarenaparser.p.rapidapi.com')?new Response(JSON.stringify({message:'This endpoint is disabled for your subscription'}),{status:401,headers:{'content-type':'application/json'}}):okFetch(url,options);
+  try{
+   const blockedPlan=await request('/device-reference?name=REDMI%20NOTE%2011&brand=xiaomi');
+   assert.equal(blockedPlan.status,424,JSON.stringify(blockedPlan.json));
+   assert.match(JSON.stringify(blockedPlan.json),/plano da RapidAPI não libera/);
+  }finally{globalThis.fetch=okFetch;}
   // Trava do plano gratuito: passou do limite do dia, não chama a RapidAPI (nem cobra).
   const hadLimit=Object.getOwnPropertyDescriptor(envObj,'DEVICE_CATALOG_DAILY_LIMIT');
   Object.defineProperty(envObj,'DEVICE_CATALOG_DAILY_LIMIT',{value:1,configurable:true,enumerable:true,writable:true});

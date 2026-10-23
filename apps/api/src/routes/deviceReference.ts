@@ -52,9 +52,9 @@ async function appleSpecs(url: string, base: { model: string; capacities: string
       const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
       const final = new URL(response.url || url);
       if (final.protocol !== 'https:' || final.hostname !== 'support.apple.com') throw new Error('Endereço de especificações inválido.');
-      if (!response.ok) throw Object.assign(new Error('Não foi possível consultar a ficha técnica da Apple agora.'), { status: 502 });
+      if (!response.ok) throw Object.assign(new Error('Não foi possível consultar a ficha técnica da Apple agora.'), { status: 424 });
       const lines = parseAppleSpecs(await response.text(), base);
-      if (lines.length < 5) throw Object.assign(new Error('A página da Apple não trouxe a ficha técnica deste modelo.'), { status: 502 });
+      if (lines.length < 5) throw Object.assign(new Error('A página da Apple não trouxe a ficha técnica deste modelo.'), { status: 424 });
       await pool.query(`INSERT INTO device_reference_sources (source_url, data) VALUES ($1, $2::jsonb)
         ON CONFLICT (source_url) DO UPDATE SET data = EXCLUDED.data, refreshed_at = now()`, [key, JSON.stringify(lines)]);
       return lines;

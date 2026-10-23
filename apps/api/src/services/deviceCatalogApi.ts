@@ -222,7 +222,7 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
       await pool.query(`SELECT id, base_url FROM device_catalog_providers WHERE id = 'devicespecs' AND active = true`)
     ).rows[0];
     if (!provider) {
-      throw Object.assign(new Error('Fornecedor DeviceSpecs indisponível.'), { status: 502 });
+      throw Object.assign(new Error('Fornecedor DeviceSpecs indisponível.'), { status: 424 });
     }
     apiKey = platformKey;
     baseUrl = provider.base_url;
@@ -286,15 +286,21 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
         });
         if (response.status === 404) return null;
         if (!response.ok) {
+          // O plano grátis (Basic) da RapidAPI bloqueia as rotas desta API: a resposta diz isso no corpo.
+          const detail = await response.text().catch(() => '');
+          const planBlocked = /disabled for your subscription|not subscribed/i.test(detail);
+          // 424 (falha do fornecedor), não 5xx: o proxy do Discloud troca 5xx pela página genérica de erro.
           throw Object.assign(
             new Error(
-              response.status === 401 || response.status === 403
-                ? 'A chave da API de aparelhos não foi aceita.'
-                : response.status === 429
-                  ? 'Limite de consultas da API atingido. Tente novamente mais tarde.'
-                  : 'Não foi possível consultar a API de aparelhos.',
+              planBlocked
+                ? 'O plano da RapidAPI não libera esta consulta (o Basic grátis bloqueia a ficha técnica). Assine um plano pago da API GSMArenaParser.'
+                : response.status === 401 || response.status === 403
+                  ? 'A chave da API de aparelhos não foi aceita.'
+                  : response.status === 429
+                    ? 'Limite de consultas da API atingido. Tente novamente mais tarde.'
+                    : 'Não foi possível consultar a API de aparelhos.',
             ),
-            { status: 502 },
+            { status: 424 },
           );
         }
         const raw = await response.json();
