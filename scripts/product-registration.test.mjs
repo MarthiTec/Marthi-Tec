@@ -215,6 +215,20 @@ test('platform DEVICE_CATALOG_API_KEY serves multi-brand help when the store has
   assert.equal(calls,1);
   const meta=await request('/device-reference/settings');
   assert.equal(meta.json.data.platformKeyConfigured,true);
+  // Trava do plano gratuito: passou do limite do dia, não chama a RapidAPI (nem cobra).
+  const hadLimit=Object.getOwnPropertyDescriptor(envObj,'DEVICE_CATALOG_DAILY_LIMIT');
+  Object.defineProperty(envObj,'DEVICE_CATALOG_DAILY_LIMIT',{value:1,configurable:true,enumerable:true,writable:true});
+  try{
+   const blocked=await request('/device-reference?name=REDMI%20NOTE%2012%20PRO&brand=xiaomi');
+   assert.notEqual(blocked.status,200);
+   assert.match(JSON.stringify(blocked.json),/Limite de 1 consultas por dia/);
+   assert.equal(calls,1,'não chamou a API depois do limite');
+   const again=await request('/device-reference?name=REDMI%20NOTE%2013%20PRO&brand=xiaomi');
+   assert.equal(again.status,200,'o que já foi consultado continua vindo do banco');
+   assert.equal(calls,1);
+  }finally{
+   if(hadLimit)Object.defineProperty(envObj,'DEVICE_CATALOG_DAILY_LIMIT',hadLimit);
+  }
  }finally{
   globalThis.fetch=realFetch;
   if(had)Object.defineProperty(envObj,'DEVICE_CATALOG_API_KEY',had);

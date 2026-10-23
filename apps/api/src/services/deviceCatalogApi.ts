@@ -249,6 +249,26 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
     pending.set(
       requestKey,
       (async () => {
+        // Trava do plano gratuito: no máximo N consultas por dia por chave (o que já foi consultado
+        // continua vindo do banco). Conta antes de chamar, de forma atômica.
+        const limit = Number(env.DEVICE_CATALOG_DAILY_LIMIT ?? 15);
+        if (limit > 0) {
+          const scope = settings?.api_key_encrypted ? 'store:' + storeId : 'platform';
+          const counted = (
+            await pool.query(
+              `INSERT INTO device_catalog_usage(scope, day, count) VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 1)
+               ON CONFLICT (scope, day) DO UPDATE SET count = device_catalog_usage.count + 1 WHERE device_catalog_usage.count < $2
+               RETURNING count`,
+              [scope, limit],
+            )
+          ).rows[0];
+          if (!counted) {
+            throw Object.assign(
+              new Error(`Limite de ${limit} consultas por dia da API de aparelhos atingido. Volta amanhã; aparelhos já consultados continuam disponíveis.`),
+              { status: 429 },
+            );
+          }
+        }
         const base = new URL(baseUrl);
         // Hosts oficiais do fornecedor na RapidAPI (GSMArenaParser é a listagem atual).
         if (base.protocol !== 'https:' || !['gsmarenaparser.p.rapidapi.com', 'deviceultraparser.p.rapidapi.com'].includes(base.hostname)) {

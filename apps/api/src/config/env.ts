@@ -90,6 +90,11 @@ const envSchema = z.object({
    * em /erp/api-aparelhos. Nunca commitar; colar só nas Variáveis do Site Discloud (marthi-totem / backend).
    */
   DEVICE_CATALOG_API_KEY: z.string().optional(),
+  /**
+   * Máximo de consultas por dia à API de aparelhos (por chave: plataforma ou loja). O plano gratuito
+   * da RapidAPI tem 15/dia e cobra cada consulta a mais; 0 = sem trava (plano pago).
+   */
+  DEVICE_CATALOG_DAILY_LIMIT: z.coerce.number().int().min(0).default(15),
 });
 
 const parsed = envSchema.safeParse(process.env);
