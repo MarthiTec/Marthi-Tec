@@ -62,6 +62,8 @@ export function RedirectToProductsStock({ aba }: { aba: StockTab }) {
 
 const STOCK_SPECS_TABS = new Set<StockSpecsTab>([
   'marcas',
+  'tipos',
+  'modelos',
   'atributos',
   'grupos',
   'retirada',

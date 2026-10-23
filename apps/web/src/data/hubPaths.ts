@@ -4,7 +4,7 @@
  * (produtos, movimentações, entradas, ajustes/balanço e especificações + kits/lotes/almoxarifado).
  * O endereço segue o app em que a pessoa está (painel, totem ou Retaguarda).
  */
-export type SpecsTab = 'marcas' | 'atributos' | 'grupos' | 'retirada';
+export type SpecsTab = 'marcas' | 'tipos' | 'modelos' | 'atributos' | 'grupos' | 'retirada';
 /** Sub-abas do bloco Especificações no hub de estoque (specs + recursos de apoio). */
 export type StockSpecsTab = SpecsTab | 'kits' | 'lotes' | 'almoxarifado';
 export type PeopleTab = 'clientes' | 'fornecedores' | 'vendedores' | 'funcionarios' | 'permissoes';

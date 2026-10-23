@@ -349,8 +349,8 @@ stockRouter.get('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, scope, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name,
-                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
-                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
+                 (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = ct.id WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = cm.id WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
           WHERE ${conditions.join(' AND ')}
           ORDER BY name ASC
@@ -400,8 +400,8 @@ stockRouter.get('/api/v1/stock/lookup', requireOrDemoAuth, async (req, res, next
           SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                  kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                  pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name,
-                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
-                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
+                 (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = ct.id WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = cm.id WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
           FROM stock_items
           WHERE store_id = $1 AND (
             barcode = $2 OR sku = $2 OR imei = $2
@@ -446,8 +446,8 @@ stockRouter.get('/api/v1/stock/:id', requireAuth, async (req, res, next) => {
       `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
               kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
               pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, scope, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name, avg_cost, pricing_policy,
-              (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
-              (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
+              (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = ct.id WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+              (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = cm.id WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
          FROM stock_items WHERE id = $1 AND store_id = $2`,
       [id, storeId],
     );
@@ -532,8 +532,8 @@ stockRouter.post('/api/v1/stock/:id/adjust', requireAuth, async (req, res, next)
     }
     await db.query('COMMIT');
     const fresh = await pool.query(
-      `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
-              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name
+      `SELECT s.*, (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
+              (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS catalog_model_name
          FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`,
       [id, storeId],
     );
@@ -614,8 +614,8 @@ stockRouter.post('/api/v1/stock/:id/price-change', requireAuth, async (req, res,
     });
     await db.query('COMMIT');
     const fresh = await pool.query(
-      `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
-              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name
+      `SELECT s.*, (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
+              (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS catalog_model_name
          FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`,
       [id, storeId],
     );
@@ -761,7 +761,7 @@ stockRouter.post('/api/v1/stock', requireOrDemoAuth, async (req, res, next) => {
 
           // Cor/capacidade sugeridas pelo catálogo que ainda não existiam no atributo são criadas nele.
           await ensureProductAttributeValues(client, storeId, { attrs: body.attrs, variations: body.variations });
-          const createdRes = await client.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`, [id, storeId]);
+          const createdRes = await client.query(`SELECT s.*, (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`, [id, storeId]);
           const [created] = await attachSupplierEntries(client, storeId, [formatStockRow((await stockDetails(client, storeId, createdRes.rows))[0])]);
           await writeAuditLogSafe(client, {
             storeId,
@@ -994,7 +994,7 @@ stockRouter.patch('/api/v1/stock/:id', requireOrDemoAuth, async (req, res, next)
           });
           await client.query('COMMIT');
 
-          const updatedRes = await pool.query(`SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1`, [id]);
+          const updatedRes = await pool.query(`SELECT s.*, (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS catalog_type_name, (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS catalog_model_name FROM stock_items s WHERE s.id = $1`, [id]);
           res.json({ success: true, data: (await attachSupplierEntries(pool, storeId, [formatStockRow((await stockDetails(pool,storeId,updatedRes.rows))[0])]))[0] });
           return;
         } catch (err) {
@@ -1126,8 +1126,8 @@ stockRouter.get('/api/v1/products', requireOrDemoAuth, async (req, res, next) =>
           `SELECT id, name, sku, barcode, imei, unit, qty, min_qty, cost, price,
                   kind, condition, category, brand, supplier_id, track_lot, is_kit, active,
                   pickup_prices, attrs, color, capacity, card_rate, show_on_totem, images, variations, created_at, updated_at, sku_with_supplier, group_id, subgroup_id, entry_date, dun14, purchase_unit, purchase_factor, battery_level, show_condition_on_totem, interest_free_installments, video_url, specs, catalog_type_id, catalog_model_id, created_by_name,
-                 (SELECT name FROM catalog_types ct WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
-                 (SELECT name FROM catalog_models cm WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
+                 (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = ct.id WHERE ct.id = stock_items.catalog_type_id) AS catalog_type_name,
+                 (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = stock_items.store_id AND ov.ref_id = cm.id WHERE cm.id = stock_items.catalog_model_id) AS catalog_model_name
            FROM stock_items
            WHERE store_id = $1 AND active = true
            ORDER BY name ASC`,

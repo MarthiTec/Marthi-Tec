@@ -165,8 +165,8 @@ stockEntriesRouter.post('/api/v1/stock/:id/entries', requireAuth, async (req, re
     await db.query('COMMIT');
 
     const fresh = await pool.query(
-      `SELECT s.*, (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
-              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS catalog_model_name
+      `SELECT s.*, (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS catalog_type_name,
+              (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS catalog_model_name
          FROM stock_items s WHERE s.id = $1`,
       [product.id],
     );

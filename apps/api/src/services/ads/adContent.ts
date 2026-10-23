@@ -17,8 +17,8 @@ export async function publicOffer(db: Db, storeId: string, productId: string, va
   const product = (
     await db.query(
       `SELECT s.id, s.name, s.brand, s.price, s.qty, s.condition, s.battery_level, s.images, s.variations, s.attrs, s.pickup_prices, s.active,
-              (SELECT name FROM catalog_types ct WHERE ct.id = s.catalog_type_id) AS type_name,
-              (SELECT name FROM catalog_models cm WHERE cm.id = s.catalog_model_id) AS model_name,
+              (SELECT COALESCE(ov.name, ct.name) FROM catalog_types ct LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = ct.id WHERE ct.id = s.catalog_type_id) AS type_name,
+              (SELECT COALESCE(ov.name, cm.name) FROM catalog_models cm LEFT JOIN catalog_store_overrides ov ON ov.store_id = s.store_id AND ov.ref_id = cm.id WHERE cm.id = s.catalog_model_id) AS model_name,
               (SELECT b.name FROM store_brands b WHERE b.store_id = s.store_id AND (b.slug = s.brand OR lower(b.name) = lower(s.brand)) LIMIT 1) AS brand_name
          FROM stock_items s WHERE s.id = $1 AND s.store_id = $2`,
       [productId, storeId],

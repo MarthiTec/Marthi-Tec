@@ -39,3 +39,9 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--teal, #0f766e) 10%, transparent);
 }
+
+/* Tipos e modelos (Especificações): origem do registro e aviso da base da plataforma. */
+.catalog-name { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.catalog-origin { padding: 1px 8px; border-radius: 999px; background: var(--card-2, #f1f5f9); color: var(--mute, #64748b); font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.catalog-note { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 12%, transparent); font-size: .84rem; }
+.brands-page tr.is-inactive td { opacity: .6; }

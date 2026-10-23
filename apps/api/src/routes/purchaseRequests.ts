@@ -429,9 +429,10 @@ purchaseRequestsRouter.get('/api/v1/public/sales-catalogs/:token/purchase-builde
     const types = brand
       ? (
           await pool.query(
-            `SELECT id, brand_slug, name FROM catalog_types
-              WHERE active = true AND (store_id IS NULL OR store_id = $1) AND brand_slug = $2
-              ORDER BY sort, name`,
+            `SELECT t.id, t.brand_slug, COALESCE(o.name, t.name) AS name FROM catalog_types t
+               LEFT JOIN catalog_store_overrides o ON o.store_id = $1 AND o.ref_id = t.id
+              WHERE t.active = true AND COALESCE(o.hidden, false) = false AND (t.store_id IS NULL OR t.store_id = $1) AND t.brand_slug = $2
+              ORDER BY t.sort, 3`,
             [storeId, brand],
           )
         ).rows.map((row: any) => ({ id: row.id, brandSlug: row.brand_slug, name: row.name }))
@@ -440,11 +441,12 @@ purchaseRequestsRouter.get('/api/v1/public/sales-catalogs/:token/purchase-builde
     const models = typeId
       ? (
           await pool.query(
-            `SELECT m.id, m.type_id, m.name FROM catalog_models m
+            `SELECT m.id, m.type_id, COALESCE(o.name, m.name) AS name FROM catalog_models m
                JOIN catalog_types t ON t.id = m.type_id
-              WHERE m.active = true AND (m.store_id IS NULL OR m.store_id = $1)
+               LEFT JOIN catalog_store_overrides o ON o.store_id = $1 AND o.ref_id = m.id
+              WHERE m.active = true AND COALESCE(o.hidden, false) = false AND (m.store_id IS NULL OR m.store_id = $1)
                 AND (t.store_id IS NULL OR t.store_id = $1) AND m.type_id = $2
-              ORDER BY m.sort, m.name`,
+              ORDER BY m.sort, 3`,
             [storeId, typeId],
           )
         ).rows.map((row: any) => ({ id: row.id, typeId: row.type_id, name: row.name }))

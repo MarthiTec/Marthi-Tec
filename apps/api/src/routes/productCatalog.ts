@@ -176,15 +176,44 @@ productCatalogRouter.get('/api/v1/stock/:id/movements', requireAuth, async (req,
 
 const catalogTypeSchema = z.object({ brandSlug: z.string().trim().min(1).max(80), name: z.string().trim().min(1, 'Informe o tipo.').max(60) });
 const catalogModelSchema = z.object({ typeId: z.string().min(1), name: z.string().trim().min(1, 'Informe o modelo.').max(60) });
-const toCatalogType = (row: any) => ({ id: row.id, brandSlug: row.brand_slug, name: row.name, sort: Number(row.sort) || 0, own: Boolean(row.store_id) });
-const toCatalogModel = (row: any) => ({ id: row.id, typeId: row.type_id, name: row.name, sort: Number(row.sort) || 0, own: Boolean(row.store_id) });
+// A loja pode renomear/ocultar só para ela um tipo ou modelo da plataforma (catalog_store_overrides).
+const toCatalogType = (row: any) => ({
+  id: row.id,
+  brandSlug: row.brand_slug,
+  name: row.override_name || row.name,
+  originalName: row.name,
+  sort: Number(row.sort) || 0,
+  own: Boolean(row.store_id),
+  active: row.store_id ? row.active !== false : !row.override_hidden,
+  modelCount: Number(row.model_count ?? 0),
+  productCount: Number(row.product_count ?? 0),
+});
+const toCatalogModel = (row: any) => ({
+  id: row.id,
+  typeId: row.type_id,
+  name: row.override_name || row.name,
+  originalName: row.name,
+  sort: Number(row.sort) || 0,
+  own: Boolean(row.store_id),
+  active: row.store_id ? row.active !== false : !row.override_hidden,
+  productCount: Number(row.product_count ?? 0),
+});
+const truthy = (value: unknown) => ['1', 'true', 'sim'].includes(String(value ?? '').toLowerCase());
 
 productCatalogRouter.get('/api/v1/catalog/types', requireAuth, async (req, res, next) => {
   try {
     const brand = String(req.query.brand ?? '').trim().toLowerCase();
+    // ?all=1: tela de Especificações (inclui inativos/ocultos e as contagens).
+    const all = truthy(req.query.all);
     const result = await pool.query(
-      `SELECT * FROM catalog_types WHERE active = true AND (store_id IS NULL OR store_id = $1) ${brand ? 'AND brand_slug = $2' : ''}
-        ORDER BY brand_slug, sort, name`,
+      `SELECT t.*, o.name AS override_name, o.hidden AS override_hidden
+              ${all ? `, (SELECT count(*) FROM catalog_models m WHERE m.type_id = t.id AND (m.store_id IS NULL OR m.store_id = $1)) AS model_count,
+                       (SELECT count(*) FROM stock_items s WHERE s.store_id = $1 AND s.catalog_type_id = t.id) AS product_count` : ''}
+         FROM catalog_types t
+         LEFT JOIN catalog_store_overrides o ON o.store_id = $1 AND o.ref_id = t.id
+        WHERE (t.store_id IS NULL OR t.store_id = $1) ${brand ? 'AND t.brand_slug = $2' : ''}
+          ${all ? '' : 'AND t.active = true AND COALESCE(o.hidden, false) = false'}
+        ORDER BY t.brand_slug, t.sort, COALESCE(o.name, t.name)`,
       brand ? [req.storeId, brand] : [req.storeId],
     );
     res.json({ success: true, data: result.rows.map(toCatalogType) });
@@ -213,10 +242,15 @@ productCatalogRouter.post('/api/v1/catalog/types', requireAuth, async (req, res,
 productCatalogRouter.get('/api/v1/catalog/models', requireAuth, async (req, res, next) => {
   try {
     const typeId = String(req.query.typeId ?? '').trim();
+    const all = truthy(req.query.all);
     const result = await pool.query(
-      `SELECT m.* FROM catalog_models m JOIN catalog_types t ON t.id = m.type_id
-        WHERE m.active = true AND (m.store_id IS NULL OR m.store_id = $1) AND (t.store_id IS NULL OR t.store_id = $1) ${typeId ? 'AND m.type_id = $2' : ''}
-        ORDER BY m.type_id, m.sort, m.name`,
+      `SELECT m.*, o.name AS override_name, o.hidden AS override_hidden
+              ${all ? ', (SELECT count(*) FROM stock_items s WHERE s.store_id = $1 AND s.catalog_model_id = m.id) AS product_count' : ''}
+         FROM catalog_models m JOIN catalog_types t ON t.id = m.type_id
+         LEFT JOIN catalog_store_overrides o ON o.store_id = $1 AND o.ref_id = m.id
+        WHERE (m.store_id IS NULL OR m.store_id = $1) AND (t.store_id IS NULL OR t.store_id = $1) ${typeId ? 'AND m.type_id = $2' : ''}
+          ${all ? '' : 'AND m.active = true AND COALESCE(o.hidden, false) = false'}
+        ORDER BY m.type_id, m.sort, COALESCE(o.name, m.name)`,
       typeId ? [req.storeId, typeId] : [req.storeId],
     );
     res.json({ success: true, data: result.rows.map(toCatalogModel) });
@@ -243,6 +277,62 @@ productCatalogRouter.post('/api/v1/catalog/models', requireAuth, async (req, res
     next(error);
   }
 });
+
+const catalogPatchSchema = z.object({
+  name: z.string().trim().min(1, 'Informe o nome.').max(60).optional(),
+  active: z.boolean().optional(),
+  brandSlug: z.string().trim().min(1).max(80).optional(),
+  typeId: z.string().min(1).optional(),
+});
+
+/**
+ * Alterar tipo/modelo: o da loja muda direto; o da plataforma muda só para esta loja (nome e ativo
+ * ficam numa sobreposição), para nunca alterar o catálogo das outras lojas.
+ */
+for (const kind of ['type', 'model'] as const) {
+  const table = kind === 'type' ? 'catalog_types' : 'catalog_models';
+  productCatalogRouter.patch(`/api/v1/catalog/${kind === 'type' ? 'types' : 'models'}/:id`, requireAuth, async (req, res, next) => {
+    try {
+      if (!canManageArea(req)) return forbidden(res);
+      const body = catalogPatchSchema.parse(req.body ?? {});
+      const row = (await pool.query(`SELECT * FROM ${table} WHERE id = $1 AND (store_id IS NULL OR store_id = $2)`, [req.params.id, req.storeId])).rows[0];
+      if (!row) return notFound(res);
+      const name = body.name?.toUpperCase();
+      if (row.store_id) {
+        if (kind === 'model' && body.typeId) {
+          const type = (await pool.query('SELECT id FROM catalog_types WHERE id = $1 AND (store_id IS NULL OR store_id = $2)', [body.typeId, req.storeId])).rows[0];
+          if (!type) return notFound(res);
+        }
+        await pool.query(
+          `UPDATE ${table} SET name = COALESCE($3, name), active = COALESCE($4, active)
+                  ${kind === 'type' ? ', brand_slug = COALESCE($5, brand_slug)' : ', type_id = COALESCE($5, type_id)'}
+            WHERE id = $1 AND store_id = $2`,
+          [row.id, req.storeId, name ?? null, body.active ?? null, kind === 'type' ? body.brandSlug?.toLowerCase() ?? null : body.typeId ?? null],
+        );
+      } else {
+        // Da plataforma: o nome igual ao original não é sobreposição; ocultar = inativo só nesta loja.
+        const overrideName = name && name !== String(row.name).toUpperCase() ? name : name === undefined ? undefined : null;
+        await pool.query(
+          `INSERT INTO catalog_store_overrides (store_id, ref_id, kind, name, hidden) VALUES ($1, $2, $3, $4, COALESCE($5, false))
+           ON CONFLICT (store_id, ref_id) DO UPDATE SET name = CASE WHEN $6 THEN EXCLUDED.name ELSE catalog_store_overrides.name END,
+                  hidden = COALESCE($5, catalog_store_overrides.hidden), updated_at = now()`,
+          [req.storeId, row.id, kind, overrideName ?? null, body.active === undefined ? null : !body.active, overrideName !== undefined],
+        );
+      }
+      const fresh = (
+        await pool.query(
+          `SELECT x.*, o.name AS override_name, o.hidden AS override_hidden FROM ${table} x
+             LEFT JOIN catalog_store_overrides o ON o.store_id = $2 AND o.ref_id = x.id WHERE x.id = $1`,
+          [row.id, req.storeId],
+        )
+      ).rows[0];
+      res.json({ success: true, data: kind === 'type' ? toCatalogType(fresh) : toCatalogModel(fresh) });
+    } catch (error) {
+      if (isDuplicate(error)) return duplicate(res, kind === 'type' ? 'um tipo' : 'um modelo');
+      next(error);
+    }
+  });
+}
 
 /** Só tipos/modelos que a própria loja cadastrou podem ser excluídos (os da plataforma ficam). */
 for (const [path, table] of [['/api/v1/catalog/types/:id', 'catalog_types'], ['/api/v1/catalog/models/:id', 'catalog_models']] as const) {

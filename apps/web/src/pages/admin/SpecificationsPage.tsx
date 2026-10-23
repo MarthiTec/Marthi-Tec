@@ -11,6 +11,7 @@ import {
 } from '../../data/hubPaths';
 import { AttributesPage } from './AttributesPage';
 import { BrandsPage } from './BrandsPage';
+import { CatalogModelsPage, CatalogTypesPage } from './CatalogTypesModelsPages';
 import { KitsPage } from './KitsPage';
 import { LotsPage } from './LotsPage';
 import { PickupMethodsPage } from './PickupMethodsPage';
@@ -19,6 +20,8 @@ import { WarehousePage } from './WarehousePage';
 
 const CORE_TABS: Array<HubTab<SpecsTab>> = [
   { id: 'marcas', label: 'Marcas', icon: 'tag', hint: 'Marcas dos produtos, com o ícone que aparece na vitrine do totem.', render: () => <BrandsPage /> },
+  { id: 'tipos', label: 'Tipos', icon: 'list', hint: 'Linhas de cada marca (ex.: Samsung › Galaxy A). Marca → Tipo → Modelo monta a descrição do produto.', render: () => <CatalogTypesPage /> },
+  { id: 'modelos', label: 'Modelos', icon: 'smartphone', hint: 'Modelos de cada tipo (ex.: Galaxy A › A15). Aparecem no cadastro simplificado do produto.', render: () => <CatalogModelsPage /> },
   { id: 'atributos', label: 'Atributos', icon: 'sliders', hint: 'Cor, capacidade, tamanho… Os valores viram as variações do produto.', render: () => <AttributesPage /> },
   { id: 'grupos', label: 'Grupos', icon: 'apps', hint: 'Grupos e subgrupos (ex.: Bebidas › Cerveja). Você escolhe como chamar cada nível.', render: () => <ProductGroupsPage /> },
   { id: 'retirada', label: 'Tipos de retirada', icon: 'truck', hint: 'Em mãos, encomenda, entrega: como o cliente recebe o produto e o prazo de cada forma.', render: () => <PickupMethodsPage /> },
@@ -50,6 +53,8 @@ export function SpecificationsPage({
   const legacy: Record<StockSpecsTab, string> = totem
     ? {
         marcas: '/painel/totem/marcas',
+        tipos: '/painel/totem/marcas',
+        modelos: '/painel/totem/marcas',
         atributos: '/painel/totem/atributos',
         grupos: '/painel/totem/marcas',
         retirada: '/painel/totem',
@@ -59,6 +64,8 @@ export function SpecificationsPage({
       }
     : {
         marcas: '/erp/marcas',
+        tipos: '/erp/marcas',
+        modelos: '/erp/marcas',
         atributos: '/erp/atributos',
         grupos: '/erp/marcas',
         retirada: '/erp/tipos-retirada',
@@ -91,7 +98,7 @@ export function SpecificationsPage({
       subtitle={
         includeSupportResources && !totem
           ? 'Marcas, atributos, grupos, retirada — e kits, lotes e almoxarifados usados no produto.'
-          : 'Tudo o que descreve os produtos num lugar só: marcas, atributos, grupos e tipos de retirada.'
+          : 'Tudo o que descreve os produtos num lugar só: marcas, tipos, modelos, atributos, grupos e tipos de retirada.'
       }
       tabs={allowed}
       aside={aside}

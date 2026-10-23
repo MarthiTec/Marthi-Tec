@@ -30,12 +30,30 @@ export const apiListProductMovements = (stockId: string, limit = 20) =>
   nestGet<ProductMovement[]>(`/stock/${encodeURIComponent(stockId)}/movements?limit=${limit}`);
 
 /* Catálogo Marca → Tipo → Modelo (a descrição do produto sai daqui). */
-export type CatalogType = { id: string; brandSlug: string; name: string; sort: number; own: boolean };
-export type CatalogModel = { id: string; typeId: string; name: string; sort: number; own: boolean };
+export type CatalogType = {
+  id: string;
+  brandSlug: string;
+  name: string;
+  sort: number;
+  /** false = da base da plataforma (a alteração vale só para esta loja). */
+  own: boolean;
+  originalName?: string;
+  active?: boolean;
+  modelCount?: number;
+  productCount?: number;
+};
+export type CatalogModel = { id: string; typeId: string; name: string; sort: number; own: boolean; originalName?: string; active?: boolean; productCount?: number };
 export const apiListCatalogTypes = (brandSlug?: string) => nestGet<CatalogType[]>(`/catalog/types${brandSlug ? `?brand=${encodeURIComponent(brandSlug)}` : ''}`);
 export const apiCreateCatalogType = (body: { brandSlug: string; name: string }) => nestPost<CatalogType>('/catalog/types', body);
 export const apiListCatalogModels = (typeId?: string) => nestGet<CatalogModel[]>(`/catalog/models${typeId ? `?typeId=${encodeURIComponent(typeId)}` : ''}`);
 export const apiCreateCatalogModel = (body: { typeId: string; name: string }) => nestPost<CatalogModel>('/catalog/models', body);
+/** Telas de Especificações: inclui inativos e as contagens de modelos/produtos. */
+export const apiListCatalogTypesAll = () => nestGet<CatalogType[]>('/catalog/types?all=1');
+export const apiListCatalogModelsAll = () => nestGet<CatalogModel[]>('/catalog/models?all=1');
+export const apiUpdateCatalogType = (id: string, body: { name?: string; active?: boolean; brandSlug?: string }) => nestPatch<CatalogType>(`/catalog/types/${encodeURIComponent(id)}`, body);
+export const apiUpdateCatalogModel = (id: string, body: { name?: string; active?: boolean; typeId?: string }) => nestPatch<CatalogModel>(`/catalog/models/${encodeURIComponent(id)}`, body);
+export const apiDeleteCatalogType = (id: string) => nestDelete<{ ok: true }>(`/catalog/types/${encodeURIComponent(id)}`);
+export const apiDeleteCatalogModel = (id: string) => nestDelete<{ ok: true }>(`/catalog/models/${encodeURIComponent(id)}`);
 
 /* Modo do estoque da loja. */
 export type StockMode = 'simple' | 'standard';
