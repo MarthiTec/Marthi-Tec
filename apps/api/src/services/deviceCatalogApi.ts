@@ -121,8 +121,25 @@ export function toProviderModelQuery(brandName: string, rawModel: string): strin
   return rawModel.trim().replace(/\s+/g, ' ');
 }
 
+/** O fornecedor manda textos com entidades HTML (ex.: "A76 &amp; A55"): devolve o texto limpo em todo o objeto. */
+const ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
+export function decodeEntities<T>(value: T): T {
+  if (typeof value === 'string') {
+    return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code: string) => {
+      if (code[0] === '#') {
+        const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : Number(code.slice(1));
+        return Number.isFinite(n) && n > 0 ? String.fromCodePoint(n) : match;
+      }
+      return ENTITIES[code.toLowerCase()] ?? match;
+    }) as T;
+  }
+  if (Array.isArray(value)) return value.map((entry) => decodeEntities(entry)) as T;
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, decodeEntities(entry)])) as T;
+  return value;
+}
+
 export function parseDeviceSpecs(raw: any, sourceUrl: string): DeviceReference & { specifications: any; fetchedAt: string } {
-  const data = raw?.data ?? raw;
+  const data = decodeEntities(raw?.data ?? raw);
   if (Array.isArray(data) && data.length !== 1) throw new Error('O fornecedor retornou mais de um modelo. Informe o nome completo.');
   const item = Array.isArray(data) ? data[0] : data;
   if (!item || typeof item !== 'object') throw new Error('Resposta de especificações inválida.');
@@ -242,7 +259,7 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
       [storeId, providerId, queryKey],
     )
   ).rows[0];
-  if (saved && Date.now() - new Date(saved.refreshed_at).getTime() < cacheDays * 86400000) return saved.data;
+  if (saved && Date.now() - new Date(saved.refreshed_at).getTime() < cacheDays * 86400000) return decodeEntities(saved.data);
 
   const requestKey = storeId + ':' + providerId + ':' + queryKey;
   if (!pending.has(requestKey)) {
@@ -324,7 +341,7 @@ export async function loadCatalogDevice(storeId: string, name: string, brandQuer
   try {
     return await pending.get(requestKey);
   } catch (error) {
-    if (saved) return { ...saved.data, stale: true };
+    if (saved) return { ...decodeEntities(saved.data), stale: true };
     throw error;
   }
 }

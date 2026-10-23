@@ -943,3 +943,11 @@ test('external sale refuses an IMEI that does not belong to the product', async 
   const right = await request('/sales/external', 'POST', { paymentMethod: 'Pix', customerName: 'Cliente', lines: [{ stockId: item.id, name: item.name, qty: 1, unitPrice: 2000, imei: '357700000000001' }] });
   assert.equal(right.status, 201, JSON.stringify(right.json));
 });
+
+test('ficha técnica do fornecedor sem entidades HTML (ex.: "A76 &amp; A55" vira "A76 & A55")', async () => {
+  const { decodeEntities, parseDeviceSpecs } = await import('../dist/services/deviceCatalogApi.js');
+  assert.equal(decodeEntities('2x2.2 GHz Cortex-A76 &amp; 6x2.0 GHz Cortex-A55'), '2x2.2 GHz Cortex-A76 & 6x2.0 GHz Cortex-A55');
+  assert.equal(decodeEntities('Tela 6,5&quot; &#8211; 90Hz &#x2B;'), 'Tela 6,5" – 90Hz +');
+  const parsed = parseDeviceSpecs({ manufacturer: 'Samsung', model: 'Galaxy A15', colors: ['Brave Black'], cpu_raw: 'A76 &amp; A55' }, 'https://exemplo');
+  assert.equal(parsed.specifications.cpu_raw, 'A76 & A55');
+});
